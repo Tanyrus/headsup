@@ -7,10 +7,13 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 OUT="$ROOT/build"
 PLUGINS_DIR="${AGGROGLOW_PLUGINS_DIR:-$HOME/Games/PhoenixXI/plugins}"
-PURE_SOURCES=(con.cpp mobdb.cpp classifier.cpp settings.cpp tracker.cpp outline_math.cpp)
-PLUGIN_SOURCES=("${PURE_SOURCES[@]}" outline.cpp menu.cpp plugin.cpp)
+PURE_SOURCES=(con.cpp mobdata.cpp classifier.cpp settings.cpp tracker.cpp outline_math.cpp labels.cpp examine.cpp nameplate.cpp icons.cpp)
+PLUGIN_SOURCES=("${PURE_SOURCES[@]}" outline.cpp labels_render.cpp menu.cpp plugin.cpp)
 
-generate() { python3 "$ROOT/tools/gen_mobdb.py"; }
+generate() {
+    python3 "$ROOT/tools/gen_mobdata.py"
+    python3 "$ROOT/tools/gen_icons.py"
+}
 
 unit_tests() {
     mkdir -p "$OUT"

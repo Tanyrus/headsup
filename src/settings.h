@@ -17,9 +17,16 @@ namespace aggroglow
         float thickness    = 4.0f;  // render-target pixels, 1-16
         int smoothness     = 8;     // shifted copies per mesh, 4-16
         float maxDistance  = 40.0f; // yalms, 5-60
-        bool modernConTable = false;
-        bool show[kCategoryCount]   = {true, true, true}; // indexed by Category
-        Color color[kCategoryCount] = {{{1.00f, 0.15f, 0.15f, 1.0f}}, {{0.20f, 1.00f, 0.30f, 1.0f}}, {{0.70f, 0.70f, 0.70f, 1.0f}}};
+        bool showLabels    = true;  // level and con above outlined mobs' nameplates
+        bool autoExamine   = false; // /check the targeted mob once per respawn when it would give exp
+        bool show[kCategoryCount]   = {true, true, true, true, true}; // indexed by Category
+        Color color[kCategoryCount] = {
+            {{1.00f, 0.15f, 0.15f, 1.0f}}, // will attack: red
+            {{0.20f, 1.00f, 0.30f, 1.0f}}, // won't attack: green
+            {{0.70f, 0.70f, 0.70f, 1.0f}}, // unknown: gray
+            {{1.00f, 0.60f, 0.10f, 1.0f}}, // NM will attack: gold-orange
+            {{1.00f, 0.84f, 0.00f, 1.0f}}, // NM won't attack: gold
+        };
     };
 
     // Key/value persistence: Ashita's configuration manager in the plugin, an in-memory map in tests.

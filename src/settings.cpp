@@ -9,7 +9,7 @@ namespace aggroglow
 {
     namespace
     {
-        const char* const kCategoryKeys[kCategoryCount] = {"willAttack", "wontAttack", "unknown"};
+        const char* const kCategoryKeys[kCategoryCount] = {"willAttack", "wontAttack", "unknown", "nmWillAttack", "nmWontAttack"};
         // Colors are opaque: outline copies take alpha from the texture, where it shapes hair and cloth cut-outs.
         const char* const kChannelKeys[3]               = {"R", "G", "B"};
 
@@ -42,7 +42,8 @@ namespace aggroglow
         const float copies = ClampFloat(store.GetFloat("smoothness", static_cast<float>(s.smoothness)), 4.0f, 16.0f, static_cast<float>(s.smoothness));
         s.smoothness     = static_cast<int>(std::lround(copies));
         s.maxDistance    = store.GetFloat("maxDistance", s.maxDistance);
-        s.modernConTable = store.GetBool("modernConTable", s.modernConTable);
+        s.showLabels     = store.GetBool("showLabels", s.showLabels);
+        s.autoExamine    = store.GetBool("autoExamine", s.autoExamine);
         for (int c = 0; c < kCategoryCount; ++c)
         {
             const std::string base = kCategoryKeys[c];
@@ -65,7 +66,8 @@ namespace aggroglow
         setFloat("thickness", s.thickness);
         setFloat("smoothness", static_cast<float>(s.smoothness));
         setFloat("maxDistance", s.maxDistance);
-        setBool("modernConTable", s.modernConTable);
+        setBool("showLabels", s.showLabels);
+        setBool("autoExamine", s.autoExamine);
         for (int c = 0; c < kCategoryCount; ++c)
         {
             const std::string base = kCategoryKeys[c];

@@ -1,59 +1,68 @@
 #include "con.h"
 #include "test.h"
 
+#include <string>
+
 using namespace aggroglow;
 
-// Expected values are read from the Phoenix tables in src/con_tables.inc.
+// Expected values are read from the era table in src/con_tables.inc.
 
-TEST(era_even_match_at_75)
+TEST(even_match_at_75)
 {
-    CHECK_EQ(BaseExp(ConTable::Era, 75, 75), 100u);
-    CHECK(!IsTooWeak(ConTable::Era, 75, 75));
+    CHECK_EQ(BaseExp(75, 75), 100u);
+    CHECK(Difficulty(75, 75) == Con::EvenMatch);
+    CHECK(!IsTooWeak(75, 75));
 }
 
-TEST(era_too_weak_boundary_at_75)
+TEST(too_weak_boundary_at_75)
 {
-    CHECK_EQ(BaseExp(ConTable::Era, 75, 56), 15u);
-    CHECK(!IsTooWeak(ConTable::Era, 75, 56));
-    CHECK_EQ(BaseExp(ConTable::Era, 75, 55), 0u);
-    CHECK(IsTooWeak(ConTable::Era, 75, 55));
+    CHECK_EQ(BaseExp(75, 56), 15u);
+    CHECK(!IsTooWeak(75, 56));
+    CHECK_EQ(BaseExp(75, 55), 0u);
+    CHECK(IsTooWeak(75, 55));
 }
 
-TEST(era_low_level_bracket)
+TEST(low_level_bracket)
 {
-    CHECK_EQ(BaseExp(ConTable::Era, 10, 3), 20u);
-    CHECK_EQ(BaseExp(ConTable::Era, 10, 2), 15u);
-    CHECK(IsTooWeak(ConTable::Era, 10, 1));
+    CHECK_EQ(BaseExp(10, 3), 20u);
+    CHECK_EQ(BaseExp(10, 2), 15u);
+    CHECK(IsTooWeak(10, 1));
 }
 
 TEST(level_difference_is_clamped_to_the_table)
 {
-    CHECK_EQ(BaseExp(ConTable::Era, 1, 99), 600u);
-    CHECK_EQ(BaseExp(ConTable::Modern, 1, 99), 800u);
+    CHECK_EQ(BaseExp(1, 99), 600u);
 }
 
 TEST(unknown_player_level_gives_no_exp)
 {
-    CHECK_EQ(BaseExp(ConTable::Era, 0, 10), 0u);
+    CHECK_EQ(BaseExp(0, 10), 0u);
+    CHECK(Difficulty(0, 10) == Con::TooWeak);
 }
 
 TEST(player_levels_above_99_use_99)
 {
-    CHECK_EQ(BaseExp(ConTable::Era, 120, 99), BaseExp(ConTable::Era, 99, 99));
+    CHECK_EQ(BaseExp(120, 99), BaseExp(99, 99));
 }
 
-TEST(modern_even_match_and_easy_prey_threshold)
+TEST(difficulty_follows_the_era_curve)
 {
-    CHECK_EQ(BaseExp(ConTable::Modern, 75, 75), 200u);
-    CHECK_EQ(BaseExp(ConTable::Modern, 10, 2), 60u);
-    CHECK(!IsTooWeak(ConTable::Modern, 10, 2));
-    CHECK(IsTooWeak(ConTable::Modern, 10, 1));
+    // Player 75: -20 0 exp, -19 15, -8 47, -7 50, -1 93, +1 130, +3 200, and player 20: +6 450.
+    CHECK(Difficulty(75, 55) == Con::TooWeak);
+    CHECK(Difficulty(75, 56) == Con::EasyPrey);
+    CHECK(Difficulty(75, 67) == Con::EasyPrey);
+    CHECK(Difficulty(75, 68) == Con::DecentChallenge);
+    CHECK(Difficulty(75, 74) == Con::DecentChallenge);
+    CHECK(Difficulty(75, 76) == Con::Tough);
+    CHECK(Difficulty(75, 77) == Con::Tough);
+    CHECK(Difficulty(75, 78) == Con::VeryTough);
+    CHECK(Difficulty(20, 26) == Con::IncrediblyTough);
 }
 
-TEST(modern_incredibly_easy_prey_needs_mob_level_56)
+TEST(abbreviations)
 {
-    CHECK_EQ(BaseExp(ConTable::Modern, 78, 56), 55u);
-    CHECK(!IsTooWeak(ConTable::Modern, 78, 56));
-    CHECK_EQ(BaseExp(ConTable::Modern, 76, 33), 14u);
-    CHECK(IsTooWeak(ConTable::Modern, 76, 33));
+    const char* const expected[kConCount] = {"TW", "IEP", "EP", "DC", "EM", "T", "VT", "IT"};
+    for (int i = 0; i < kConCount; ++i)
+        CHECK(std::string(Abbrev(static_cast<Con>(i))) == expected[i]);
+    CHECK(std::string(Abbrev(static_cast<Con>(8))) == "??");
 }

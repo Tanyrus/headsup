@@ -55,8 +55,9 @@ TEST(offsets_are_the_requested_pixels_from_the_centre)
 TEST(owner_is_the_first_tracked_pointer_of_any_kind)
 {
     Tracker t;
-    t.Update({ActorInput{0x1000, 1052, false, true, 0.0f, "Carrott"}, ActorInput{0x2000, 0, true, true, 10.0f, "Beach Monk"}},
-        103, PlayerState{20, false, ConTable::Era}, Settings{});
+    t.Update({ActorInput{0x1000, 1052, 0, false, true, 0.0f, "Carrott", nullptr},
+                 ActorInput{0x2000, 0, 0, true, true, 10.0f, "Beach Monk", nullptr}},
+        PlayerState{20, false}, Settings{});
 
     const uint32_t playerDraw[] = {0x5, 0x1234, 0x1000, 0x2000}; // stale mob pointer above the live player
     const ActorInfo* owner      = FindOwner(std::begin(playerDraw), std::end(playerDraw), t);

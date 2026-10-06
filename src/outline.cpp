@@ -48,6 +48,96 @@ namespace aggroglow
         m_MeshesLast       = m_Meshes;
         m_Meshes           = 0;
         m_ClearedThisFrame = false;
+        if (!m_TextFinished) FinishText();
+        m_TextFinished = false;
+        ReadBackBufferSize();
+    }
+
+    bool OutlineRenderer::TextPending() const
+    {
+        return !m_TextFinished && !m_Glyphs.empty();
+    }
+
+    void OutlineRenderer::FinishText()
+    {
+        m_TextFinished = true;
+        m_PlatesLast.clear();
+        m_RawPlatesLast.clear();
+        std::unordered_map<uint16_t, uint32_t> runs;
+        for (const auto& [index, glyphs] : m_Glyphs)
+        {
+            ScreenBox raw;
+            for (const ScreenBox& g : glyphs)
+                raw.Add(g);
+            m_RawPlatesLast[index] = raw;
+            const ScreenBox plate  = NameplateFromGlyphs(glyphs);
+            if (!plate.valid) continue;
+            m_PlatesLast[index] = plate;
+            runs[index]         = PlateFramesInRow(index) + 1;
+        }
+        m_PlateRuns.swap(runs);
+        m_Glyphs.clear();
+        m_TextStatsLast = m_TextStats;
+        m_TextStats     = TextDrawStats{};
+        m_PlateDrawsLast.swap(m_PlateDraws);
+        m_PlateDraws.clear();
+        m_MeshDrawsLast.swap(m_MeshDraws);
+        m_MeshDraws.clear();
+    }
+
+    void OutlineRenderer::ReadBackBufferSize()
+    {
+        if (m_Device == nullptr) return;
+        IDirect3DSurface8* back = nullptr;
+        if (FAILED(m_Device->GetBackBuffer(0, D3DBACKBUFFER_TYPE_MONO, &back)) || back == nullptr) return;
+        D3DSURFACE_DESC desc{};
+        if (SUCCEEDED(back->GetDesc(&desc)))
+        {
+            m_BackBufferWidth  = static_cast<float>(desc.Width);
+            m_BackBufferHeight = static_cast<float>(desc.Height);
+        }
+        back->Release();
+    }
+
+    const ScreenBox* OutlineRenderer::NameplateBox(uint16_t index) const
+    {
+        const auto it = m_PlatesLast.find(index);
+        return it == m_PlatesLast.end() ? nullptr : &it->second;
+    }
+
+    void OutlineRenderer::OnDrawUP(D3DPRIMITIVETYPE type, UINT primCount, const void* vertices, UINT stride,
+        const Tracker& tracker, bool collect)
+    {
+        if (!collect || m_Device == nullptr || tracker.OutlinedCount() == 0 || m_BackBufferWidth <= 0.0f) return;
+        DWORD vs = 0;
+        if (FAILED(m_Device->GetVertexShader(&vs)) || IsDeclarationHandle(vs) || (vs & D3DFVF_POSITION_MASK) != D3DFVF_XYZRHW)
+            return;
+        ScreenBox box;
+        if (!WorldTextBox(vertices, stride, VertexCount(type, primCount), box)) return; // cheap: rejects HUD text
+        ++m_TextStats.inScene;
+        const ActorInfo* owner = FindOwnerOnStack(tracker);
+        if (owner == nullptr)
+        {
+            ++m_TextStats.noOwner;
+            return;
+        }
+        if (!owner->outline)
+        {
+            ++m_TextStats.otherOwner;
+            return;
+        }
+        ++m_TextStats.owned;
+        ++m_PlateDraws[owner->index];
+
+        // Pretransformed coordinates are render-target pixels; labels are placed in back-buffer pixels.
+        IDirect3DSurface8* target = nullptr;
+        if (FAILED(m_Device->GetRenderTarget(&target)) || target == nullptr) return;
+        D3DSURFACE_DESC desc{};
+        const bool described = SUCCEEDED(target->GetDesc(&desc));
+        target->Release();
+        if (!described || desc.Width == 0 || desc.Height == 0) return;
+        m_Glyphs[owner->index].push_back(box.Scaled(m_BackBufferWidth / static_cast<float>(desc.Width),
+            m_BackBufferHeight / static_cast<float>(desc.Height)));
     }
 
     bool OutlineRenderer::TakeStencilWarning()
@@ -101,6 +191,7 @@ namespace aggroglow
         if (!IsCharacterModelDraw()) return false;
         const ActorInfo* owner = FindOwnerOnStack(tracker);
         if (owner == nullptr || !owner->outline) return false;
+        ++m_MeshDraws[owner->index];
         m_StencilAvailable = BoundSurfaceHasStencil();
         if (!m_StencilAvailable)
         {
