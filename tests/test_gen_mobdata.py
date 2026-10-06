@@ -47,7 +47,7 @@ class Parse(unittest.TestCase):
 class Output(unittest.TestCase):
     def test_c_strings_escape_quotes_backslashes_and_non_ascii(self):
         self.assertEqual(gen.c_string("Do'Bho"), '"Do\'Bho"')
-        self.assertEqual(gen.c_string('a"b\\c?'), '"a\\042b\\134c\\077"')
+        self.assertEqual(gen.c_string('a"b\\c?'), '"a\\042b\\134c?"')
         self.assertEqual(gen.c_string('é'), '"\\303\\251"')
 
     def test_record_line(self):

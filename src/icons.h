@@ -6,7 +6,7 @@
 
 namespace aggroglow
 {
-    // The MobDB icons XIUI shows (third_party/mobdb-icons), in tools/gen_icons.py's order.
+    // The MobDB icons XIUI shows (third_party/mobdb-icons).
     enum class Icon : uint8_t
     {
         AggroNQ,
@@ -39,6 +39,8 @@ namespace aggroglow
     {
         const unsigned char* data;
         uint32_t size;
+        uint32_t width;
+        uint32_t height;
     };
 
     // The embedded PNG for an icon.

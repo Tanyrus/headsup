@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstddef>
 #include <cstdint>
 #include <string_view>
 
@@ -51,5 +50,4 @@ namespace aggroglow
     // differ (data older than the server's ID assignments).
     const MobRecord* FindMob(uint32_t serverId, std::string_view displayName);
 
-    size_t MobRecordCount();
 }

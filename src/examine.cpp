@@ -10,7 +10,19 @@ namespace aggroglow
         constexpr uint16_t kImpossibleToGauge = 0xF9;
         constexpr uint16_t kFirstCheckMessage = 0xAA; // 0xAA-0xB2: the con, then the defense/evasion remark
         constexpr uint16_t kLastCheckMessage  = 0xB2;
-        constexpr uint32_t kCheckTypeBase     = 0x40; // the reply's 0x10 field: 0x40 + Con
+        constexpr uint32_t kCheckTypeBase     = 0x40; // the reply's check type field: 0x40 + Con
+
+        // Byte offsets, counting Ashita's 4-byte packet header.
+        constexpr size_t kRequestServerId    = 0x04;
+        constexpr size_t kRequestTargetIndex = 0x08;
+        constexpr size_t kRequestKind        = 0x0C;
+        constexpr uint8_t kKindCheck         = 0;
+        constexpr size_t kReplyServerId      = 0x08;
+        constexpr size_t kReplyLevel         = 0x0C;
+        constexpr size_t kReplyCheckType     = 0x10;
+        constexpr size_t kReplyTargetIndex   = 0x16;
+        constexpr size_t kReplyMessage       = 0x18;
+        constexpr size_t kReplyMinSize       = kReplyMessage + sizeof(uint16_t);
 
         template <typename T>
         T Read(const uint8_t* data, size_t offset)
@@ -30,21 +42,21 @@ namespace aggroglow
     std::array<uint8_t, 16> BuildCheckRequest(uint32_t serverId, uint16_t targetIndex)
     {
         std::array<uint8_t, 16> packet{};
-        Write<uint32_t>(packet.data(), 0x04, serverId);
-        Write<uint32_t>(packet.data(), 0x08, targetIndex);
-        packet[0x0C] = 0; // kind 0: Check
+        Write<uint32_t>(packet.data(), kRequestServerId, serverId);
+        Write<uint32_t>(packet.data(), kRequestTargetIndex, targetIndex);
+        packet[kRequestKind] = kKindCheck;
         return packet;
     }
 
     std::optional<CheckReply> ParseCheckReply(const uint8_t* data, uint32_t size)
     {
-        if (data == nullptr || size < 0x1A) return std::nullopt;
-        const auto message = Read<uint16_t>(data, 0x18);
-        CheckReply reply{Read<uint32_t>(data, 0x08), Read<uint16_t>(data, 0x16), false, {}};
+        if (data == nullptr || size < kReplyMinSize) return std::nullopt;
+        const auto message = Read<uint16_t>(data, kReplyMessage);
+        CheckReply reply{Read<uint32_t>(data, kReplyServerId), Read<uint16_t>(data, kReplyTargetIndex), false, {}};
         if (message == kImpossibleToGauge) return reply;
         if (message < kFirstCheckMessage || message > kLastCheckMessage) return std::nullopt;
-        const auto level = Read<int32_t>(data, 0x0C);
-        const auto type  = Read<uint32_t>(data, 0x10);
+        const auto level = Read<int32_t>(data, kReplyLevel);
+        const auto type  = Read<uint32_t>(data, kReplyCheckType);
         if (level <= 0 || type < kCheckTypeBase || type >= kCheckTypeBase + kConCount) return std::nullopt;
         reply.gauged = true;
         reply.result = CheckResult{level, static_cast<Con>(type - kCheckTypeBase)};

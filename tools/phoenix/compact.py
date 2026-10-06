@@ -49,6 +49,7 @@ def display_name(name: str) -> str:
 
 
 AGGRO_FIELDS = ('aggro', 'alwaysAggro', 'noAggro', 'neutral')
+DETECTION_FIELDS = ('link', 'detects', 'trueDetection')
 
 
 def attacks(mob) -> bool:
@@ -57,8 +58,9 @@ def attacks(mob) -> bool:
 
 
 def merge(snapshots):
-    """One record per mob ID. Identity, respawn, type, link and detection come from the first snapshot that has the
-    mob, the level range spans every snapshot, and the aggro fields come from the first snapshot in which it attacks."""
+    """One record per mob ID. Identity, respawn and type come from the first snapshot that has the mob, link and
+    detection from the first that exported them, the level range spans every snapshot, and the aggro fields come from
+    the first snapshot in which the mob attacks."""
     merged = {}
     for snapshot in snapshots:
         for mob in snapshot:
@@ -68,6 +70,9 @@ def merge(snapshots):
                 continue
             first['minLevel'] = min(first['minLevel'], mob['minLevel'])
             first['maxLevel'] = max(first['maxLevel'], mob['maxLevel'])
+            if 'detects' not in first and 'detects' in mob:
+                for field in DETECTION_FIELDS:
+                    first[field] = mob[field]
             if not attacks(first) and attacks(mob):
                 for field in AGGRO_FIELDS:
                     first[field] = mob[field]
@@ -80,8 +85,6 @@ def rows(mobs):
 
 
 def compact(dump_paths, out_dir, commit):
-    if isinstance(dump_paths, (str, pathlib.Path)):
-        dump_paths = [dump_paths]
     mobs = merge(json.loads(pathlib.Path(path).read_text(encoding='utf-8')) for path in dump_paths)
     out_dir = pathlib.Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

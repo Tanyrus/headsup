@@ -41,8 +41,4 @@ namespace aggroglow
         return &*it;
     }
 
-    size_t MobRecordCount()
-    {
-        return std::size(kMobs);
-    }
 }

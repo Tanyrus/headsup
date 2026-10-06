@@ -35,7 +35,7 @@ class Compact(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         dump = pathlib.Path(self.tmp.name) / 'dump.json'
         dump.write_text(json.dumps(DUMP))
-        self.count, self.zones = compact.compact(dump, self.tmp.name, 'abc123')
+        self.count, self.zones = compact.compact([dump], self.tmp.name, 'abc123')
         self.lines = (pathlib.Path(self.tmp.name) / 'phoenix_mobs.tsv').read_text().splitlines()
 
     def tearDown(self):
@@ -105,6 +105,11 @@ class MergeSnapshots(unittest.TestCase):
                                     [mob(link=False, detects=0x101, trueDetection=True)])
         self.assertEqual((rows[0][5], rows[0][7]), ('64', '2'))
 
+    def test_detection_comes_from_a_snapshot_that_has_it(self):
+        old = {k: v for k, v in mob().items() if k not in ('link', 'detects', 'trueDetection')}
+        rows, _ = self.compact_rows([old], [mob(link=True, detects=0x002, trueDetection=True)])
+        self.assertEqual((rows[0][5], rows[0][7]), (str(64 | 128), '2'))
+
     def test_mobs_from_any_snapshot_are_kept_and_counted(self):
         rows, meta = self.compact_rows([mob()], [mob(), mob(id=16797855)])
         self.assertEqual([r[0] for r in rows], ['16797854', '16797855'])
@@ -113,10 +118,10 @@ class MergeSnapshots(unittest.TestCase):
 
 class Validate(unittest.TestCase):
     RECORDS = {
-        17199105: (103, 'Stag Crab', 15, 17, 3, 0),
-        17272838: (121, 'Guardian Treant', 32, 32, 60, 0),
-        17199322: (103, 'Snipper', 19, 20, 0, 300),
-        17199648: (103, 'Goblin Bounty Hunter', 17, 20, 1, 300),
+        17199105: (103, 'Stag Crab', 15, 17, 3, 0, 2),
+        17272838: (121, 'Guardian Treant', 32, 32, 60, 0, 2),
+        17199322: (103, 'Snipper', 19, 20, 0, 300, 2),
+        17199648: (103, 'Goblin Bounty Hunter', 17, 20, 65, 300, 1),
     }
 
     def test_known_spawns_pass(self):
@@ -124,9 +129,14 @@ class Validate(unittest.TestCase):
 
     def test_wrong_level_and_aggro_fail(self):
         records = dict(self.RECORDS)
-        records[17199322] = (103, 'Snipper', 19, 21, 1, 300)
+        records[17199322] = (103, 'Snipper', 19, 21, 1, 300, 2)
         problems = validate.check(records, min_mobs=4, min_zones=2)
         self.assertEqual(len(problems), 2)
+
+    def test_missing_link_or_detection_fails(self):
+        records = dict(self.RECORDS)
+        records[17199648] = (103, 'Goblin Bounty Hunter', 17, 20, 1, 300, 0)
+        self.assertEqual(len(validate.check(records, min_mobs=4, min_zones=2)), 2)
 
     def test_too_few_mobs_or_zones_fail(self):
         self.assertEqual(len(validate.check(self.RECORDS, min_mobs=5, min_zones=3)), 2)

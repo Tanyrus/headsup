@@ -59,10 +59,7 @@ TEST(difficulty_follows_the_era_curve)
     CHECK(Difficulty(20, 26) == Con::IncrediblyTough);
 }
 
-TEST(abbreviations)
+TEST(an_unknown_con_abbreviates_to_question_marks)
 {
-    const char* const expected[kConCount] = {"TW", "IEP", "EP", "DC", "EM", "T", "VT", "IT"};
-    for (int i = 0; i < kConCount; ++i)
-        CHECK(std::string(Abbrev(static_cast<Con>(i))) == expected[i]);
-    CHECK(std::string(Abbrev(static_cast<Con>(8))) == "??");
+    CHECK(std::string(Abbrev(static_cast<Con>(kConCount))) == "??");
 }

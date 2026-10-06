@@ -199,7 +199,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 16785590	2	Forest Tiger	22	25	1	300	257
 16785591	2	Forest Tiger	22	25	1	300	257
 16785592	2	Forest Tiger	22	25	1	300	257
-16785593	2	Tempest Tigon	42	43	17	6260	257
+16785593	2	Tempest Tigon	42	43	17	8684	257
 16785594	2	Ghoul blm	21	27	1	300	6
 16785595	2	Ghoul war	21	27	1	300	6
 16785596	2	Thunder Elemental	29	31	1	300	32
@@ -953,7 +953,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 16797966	5	Molech	79	82	193	300	1
 16797967	5	Molech	79	82	193	300	1
 16797968	5	Magnotaur	83	83	209	0	1
-16797969	5	Jormungand	95	95	145	264600	3
+16797969	5	Jormungand	95	95	145	374400	3
 16797970	5	Agloolik	77	80	1	300	33
 16797971	5	Agloolik	77	80	1	300	33
 16797972	5	Agloolik	77	80	1	300	33
@@ -1201,7 +1201,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 16805959	7	Gallinipper AC	37	39	64	300	2
 16805960	7	Gallinipper AC	37	39	64	300	2
 16805961	7	Attohwa Coeurl	37	39	1	300	257
-16805962	7	Sekhmet	52	53	81	5755	259
+16805962	7	Sekhmet	52	53	81	5801	259
 16805963	7	Tracer Antlion	38	40	64	300	2
 16805964	7	Attohwa Coeurl	37	39	1	300	257
 16805965	7	Attohwa Coeurl	37	39	1	300	257
@@ -1454,7 +1454,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 16806212	7	Cutlass Scorpion AC	67	69	1	300	258
 16806213	7	Cutlass Scorpion AC	67	69	1	300	258
 16806214	7	Cutlass Scorpion AC	67	69	1	300	258
-16806215	7	Xolotl	80	81	81	77539	6
+16806215	7	Xolotl	80	81	81	82824	6
 16806216	7	Xolotls Hound Warrior	72	72	1	0	6
 16806217	7	Xolotls Sacrifice	72	72	1	0	6
 16806218	7	Sand Lizard	66	68	64	300	2
@@ -1466,7 +1466,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 16806224	7	Tomb Mage	72	73	1	300	6
 16806225	7	Arch Corse	75	80	1	300	6
 16806226	7	Tracker Antlion	70	72	64	300	2
-16806227	7	Tiamat	95	95	145	325800	1
+16806227	7	Tiamat	95	95	145	318600	1
 16806228	7	Arch Corse	75	80	1	300	6
 16806229	7	Arch Corse	75	80	1	300	6
 16806230	7	Arch Corse	75	80	1	300	6
@@ -3170,7 +3170,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 16843040	16	Thinker	38	40	129	840	2
 16843041	16	Thinker	38	40	129	840	2
 16843042	16	Thinker	38	40	129	840	2
-16843043	16	Cerebrator	38	38	145	16718	2
+16843043	16	Cerebrator	38	38	145	18966	2
 16846849	17	Wreaker	37	38	161	0	2
 16846850	17	Wreaker	37	38	161	0	2
 16846851	17	Wreaker	37	38	161	0	2
@@ -3497,7 +3497,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 16851264	18	Seether Prom	37	38	129	720	2
 16851265	18	Wanderer	34	36	129	720	2
 16851266	18	Wanderer	34	36	129	720	2
-16851267	18	Satiator	38	38	145	4493	2
+16851267	18	Satiator	38	38	145	4256	2
 16855041	19	Progenerator	37	38	161	0	2
 16855042	19	Offspring	27	28	225	0	2
 16855043	19	Offspring	27	28	225	0	2
@@ -3849,7 +3849,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 16859469	20	Craver	38	40	129	840	2
 16859470	20	Craver	38	40	129	840	2
 16859471	20	Craver	38	40	129	840	2
-16859472	20	Coveter	38	38	145	8950	2
+16859472	20	Coveter	38	38	145	19075	2
 16863233	21	Delver	37	38	161	0	2
 16863234	21	Delver	37	38	161	0	2
 16863235	21	Delver	37	38	161	0	2
@@ -4393,7 +4393,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 16875635	24	Abraxas	85	86	1	300	1
 16875636	24	Abraxas	85	86	1	300	1
 16875637	24	Abraxas	85	86	1	300	1
-16875638	24	Flockbock	83	83	80	4425	257
+16875638	24	Flockbock	83	83	80	3940	257
 16875639	24	Abraxas	85	86	1	300	1
 16875640	24	Abraxas	85	86	1	300	1
 16875641	24	Abraxas	85	86	1	300	1
@@ -5016,7 +5016,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 16887950	27	Fomor Ninja	44	46	1	840	6
 16887951	27	Hell Bat	44	46	64	840	2
 16887952	27	Hell Bat	44	46	64	840	2
-16887953	27	Eba	48	50	17	40896	6
+16887953	27	Eba	48	50	17	39280	6
 16887954	27	Diremite	44	46	0	840	2
 16887955	27	Makara	45	47	0	840	2
 16887956	27	Makara	45	47	0	840	2
@@ -10463,7 +10463,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 16986352	51	Lesser Colibri	64	65	0	300	1
 16986353	51	Air Elemental	75	75	1	300	32
 16986354	51	Air Elemental	75	75	1	300	32
-16986355	51	Hydra	80	80	145	190800	2
+16986355	51	Hydra	80	80	145	194400	2
 16986356	51	Soldier Pephredo	64	66	65	300	257
 16986357	51	Worker Pephredo	63	64	64	300	257
 16986358	51	Worker Pephredo	63	64	64	300	257
@@ -10759,7 +10759,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 16990249	52	Aht Urhgan Attercop	64	65	64	300	2
 16990250	52	Aht Urhgan Attercop	64	65	64	300	2
 16990251	52	Fomor Thief	63	64	1	300	70
-16990252	52	Harvestman	72	73	80	78649	2
+16990252	52	Harvestman	72	73	80	81256	2
 16990253	52	Lesser Colibri	63	65	0	300	1
 16990254	52	Lesser Colibri	63	65	0	300	1
 16990255	52	Lesser Colibri	63	65	0	300	1
@@ -10831,7 +10831,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 16990321	52	Troll Shieldbearer	72	73	65	300	1
 16990322	52	Troll Sabreur	72	73	65	300	1
 16990323	52	Troll Surveillant	72	73	65	300	1
-16990324	52	Trolls Automaton	70	71	64	0	1
+16990324	52	Trolls Automaton	70	71	72	0	1
 16990325	52	Date Eruca	72	73	1	300	258
 16990326	52	Date Eruca	72	73	1	300	258
 16990327	52	Date Eruca	72	73	1	300	258
@@ -11446,7 +11446,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 16998739	54	Merrow Wavedancer	81	83	65	960	1
 16998740	54	Ice Elemental	80	80	1	960	32
 16998741	54	Dark Elemental	80	80	1	960	32
-16998742	54	Lamie No9	80	85	209	215038	1
+16998742	54	Lamie No9	80	85	209	215810	1
 16998743	54	Lamias Avatar	72	76	64	0	33
 16998744	54	Dweomershell	88	89	1	960	2
 16998745	54	Dweomershell	89	90	1	960	2
@@ -11964,7 +11964,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17027329	61	Hilltroll Monk	81	83	65	300	1
 17027330	61	Fire Elemental	74	76	1	300	32
 17027331	61	Hilltroll Puppetmaster	81	83	65	300	1
-17027332	61	Trolls Automaton	77	79	72	0	1
+17027332	61	Trolls Automaton	77	79	64	0	1
 17027333	61	Phasma	73	76	1	300	6
 17027334	61	Hilltroll Red Mage	81	83	65	300	1
 17027335	61	Hilltroll Dark Knight	81	83	65	300	1
@@ -12090,7 +12090,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17027455	61	Dahak	81	83	1	1800	2
 17027456	61	Dahak	81	83	1	1800	2
 17027457	61	Dahak	81	83	1	1800	2
-17027458	61	Cerberus	85	85	145	93600	2
+17027458	61	Cerberus	85	85	145	122400	2
 17027459	61	Dark Rider	95	95	16	0	33
 17027460	61	Dark Bugler	76	76	193	0	3
 17027461	61	Dark Bugler	76	76	193	0	3
@@ -12154,7 +12154,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17031183	62	Purgatory Bat	70	72	65	960	2
 17031184	62	Troll Stoneworker	73	75	65	960	1
 17031185	62	Troll Engraver	73	75	65	960	1
-17031186	62	Trolls Automaton	69	78	64	0	1
+17031186	62	Trolls Automaton	69	78	72	0	1
 17031187	62	Troll Cameist	73	75	65	960	1
 17031188	62	Troll Stoneworker	73	75	65	960	1
 17031189	62	Troll Ironworker	73	75	65	960	1
@@ -12213,7 +12213,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17031242	62	Moblin Millionaire	74	75	65	960	1
 17031243	62	Troll Gemologist	73	75	65	960	1
 17031244	62	Troll Engraver	71	73	65	960	1
-17031245	62	Trolls Automaton	69	78	64	0	1
+17031245	62	Trolls Automaton	69	78	72	0	1
 17031246	62	Troll Ironworker	71	73	65	960	1
 17031247	62	Troll Lapidarist	71	73	65	960	1
 17031248	62	Magmatic Eruca	73	75	65	960	258
@@ -12265,13 +12265,13 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17031294	62	Troll Ironworker	73	75	65	960	1
 17031295	62	Troll Cameist	71	73	65	960	1
 17031296	62	Troll Engraver	71	73	65	960	1
-17031297	62	Trolls Automaton	69	78	72	0	1
+17031297	62	Trolls Automaton	69	78	64	0	1
 17031298	62	Troll Gemologist	71	73	65	960	1
 17031299	62	Troll Lapidarist	71	73	65	960	1
 17031300	62	Magmatic Eruca	71	73	65	960	258
 17031301	62	Magmatic Eruca	71	73	65	960	258
 17031302	62	Troll Engraver	71	73	65	960	1
-17031303	62	Trolls Automaton	69	78	64	0	1
+17031303	62	Trolls Automaton	69	78	72	0	1
 17031304	62	Wamouracampa	72	76	64	960	2
 17031305	62	Wamouracampa	72	76	64	960	2
 17031306	62	Wamouracampa	72	76	64	960	2
@@ -12312,7 +12312,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17031341	62	Wamouracampa	72	76	64	960	2
 17031342	62	Wamoura	80	82	193	960	34
 17031343	62	Troll Engraver	73	75	65	960	1
-17031344	62	Trolls Automaton	69	78	72	0	1
+17031344	62	Trolls Automaton	69	78	64	0	1
 17031345	62	Troll Ironworker	73	75	65	960	1
 17031346	62	Troll Cameist	73	75	65	960	1
 17031347	62	Troll Gemologist	73	75	65	960	1
@@ -12371,7 +12371,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17031400	62	Fire Elemental	74	75	1	960	32
 17031401	62	Big Bomb	83	83	17	0	33
 17031402	62	Troll Machinist	78	82	193	960	1
-17031403	62	Trolls Automaton	69	78	64	0	1
+17031403	62	Trolls Automaton	69	78	72	0	1
 17031404	62	Troll Scrimer	78	82	193	960	1
 17031405	62	Troll Grenadier	78	82	193	960	1
 17031406	62	Troll Targeteer	78	82	193	960	1
@@ -12394,7 +12394,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17031423	62	Ebony Pudding	77	79	65	960	65
 17031424	62	Troll Combatant	78	82	193	960	1
 17031425	62	Troll Machinist	78	82	193	960	1
-17031426	62	Trolls Automaton	69	78	64	0	1
+17031426	62	Trolls Automaton	69	78	72	0	1
 17031427	62	Troll Scrimer	78	82	193	960	1
 17031428	62	Ebony Pudding	77	79	65	960	65
 17031429	62	Troll Grenadier	78	82	193	960	1
@@ -12447,7 +12447,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17031476	62	Moblin Millionaire	76	77	65	960	1
 17031477	62	Troll Artilleryman	78	82	193	960	1
 17031478	62	Troll Machinist	78	82	193	960	1
-17031479	62	Trolls Automaton	69	78	64	0	1
+17031479	62	Trolls Automaton	69	78	72	0	1
 17031480	62	Moblin Billionaire	76	77	65	960	1
 17031481	62	Farlarder the Shrewd	80	80	209	960	1
 17031482	62	Dorgerwor the Astute	81	81	209	259200	1
@@ -12472,7 +12472,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17031501	62	Troll Artilleryman	78	82	193	960	1
 17031502	62	Troll Combatant	78	82	193	960	1
 17031503	62	Troll Machinist	78	82	193	960	1
-17031504	62	Trolls Automaton	69	78	72	0	1
+17031504	62	Trolls Automaton	69	78	64	0	1
 17031505	62	Friars Lantern	77	79	1	960	33
 17031506	62	Friars Lantern	77	79	1	960	33
 17031507	62	Ebony Pudding	77	79	65	960	65
@@ -12482,7 +12482,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17031511	62	Troll Artilleryman	78	82	193	960	1
 17031512	62	Ebony Pudding	77	79	65	960	65
 17031513	62	Troll Machinist	78	82	193	960	1
-17031514	62	Trolls Automaton	69	78	64	0	1
+17031514	62	Trolls Automaton	69	78	72	0	1
 17031515	62	Ebony Pudding	77	79	65	960	65
 17031516	62	Ebony Pudding	77	79	65	960	65
 17031517	62	Friars Lantern	77	79	1	960	33
@@ -12494,7 +12494,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17031523	62	Friars Lantern	77	79	1	960	33
 17031524	62	Antares H	77	79	1	960	258
 17031525	62	Troll Machinist	78	82	193	960	1
-17031526	62	Trolls Automaton	69	78	72	0	1
+17031526	62	Trolls Automaton	69	78	64	0	1
 17031527	62	Friars Lantern	77	79	1	960	33
 17031528	62	Antares H	77	79	1	960	258
 17031529	62	Troll Scrimer	78	82	193	960	1
@@ -12509,7 +12509,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17031538	62	Troll Combatant	78	82	193	960	1
 17031539	62	Friars Lantern	77	79	1	960	33
 17031540	62	Troll Machinist	78	82	193	960	1
-17031541	62	Trolls Automaton	69	78	72	0	1
+17031541	62	Trolls Automaton	69	78	64	0	1
 17031542	62	Antares H	77	79	1	960	258
 17031543	62	Friars Lantern	77	79	1	960	33
 17031544	62	Troll Scrimer	78	82	193	960	1
@@ -12519,7 +12519,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17031548	62	Troll Artilleryman	78	82	193	960	1
 17031549	62	Troll Combatant	78	82	193	960	1
 17031550	62	Troll Machinist	78	82	193	960	1
-17031551	62	Trolls Automaton	69	78	64	0	1
+17031551	62	Trolls Automaton	69	78	72	0	1
 17031552	62	Troll Scrimer	78	82	193	960	1
 17031553	62	Troll Targeteer	78	82	193	960	1
 17031554	62	Troll Cuirasser	81	83	1	960	1
@@ -14374,7 +14374,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17100837	79	Caedarva Leech	63	65	64	300	2
 17100838	79	Treant Sapling AS CM	61	63	64	300	2
 17100839	79	Marsh Murre	64	66	64	300	2
-17100840	79	Orderly Imp	63	65	193	300	3
+17100840	79	Orderly Imp	63	65	193	300	2
 17100841	79	Marsh Murre	64	66	64	300	2
 17100842	79	Puktrap	64	66	0	300	2
 17100843	79	Puktrap	64	66	0	300	2
@@ -14429,7 +14429,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17100892	79	Wild Karakul	68	70	0	300	1
 17100893	79	Chigoe	64	66	1	300	3
 17100894	79	Chigoe	65	66	1	300	3
-17100895	79	Orderly Imp	66	68	193	300	3
+17100895	79	Orderly Imp	66	68	193	300	2
 17100896	79	Mature Treant	70	72	1	300	2
 17100897	79	Treant Sapling AS CM	61	63	64	300	2
 17100898	79	Treant Sapling AS CM	61	63	64	300	2
@@ -14449,7 +14449,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17100912	79	Treant Sapling AS CM	61	63	64	300	2
 17100913	79	Mature Treant	70	72	1	300	2
 17100914	79	Treant Sapling AS CM	61	63	64	300	2
-17100915	79	Orderly Imp	66	68	193	300	3
+17100915	79	Orderly Imp	66	68	193	300	2
 17100916	79	Mature Treant	70	72	1	300	2
 17100917	79	Treant Sapling AS CM	61	63	64	300	2
 17100918	79	Treant Sapling AS CM	61	63	64	300	2
@@ -14461,11 +14461,11 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17100924	79	Reserve Draugar	73	74	1	960	6
 17100925	79	Reserve Draugar	73	74	1	960	6
 17100926	79	Marsh Murre	66	68	64	300	2
-17100927	79	Heraldic Imp CM	79	81	129	300	3
+17100927	79	Heraldic Imp CM	79	81	129	300	2
 17100928	79	Spongilla Fly	78	79	64	300	2
 17100929	79	Spongilla Fly	78	79	64	300	2
-17100930	79	Heraldic Imp CM	79	81	129	300	3
-17100931	79	Heraldic Imp CM	79	81	129	300	3
+17100930	79	Heraldic Imp CM	79	81	129	300	2
+17100931	79	Heraldic Imp CM	79	81	129	300	2
 17100932	79	Spongilla Fly	78	79	64	300	2
 17100933	79	Jnun CM	76	77	0	300	6
 17100934	79	Jnun CM	76	77	0	300	6
@@ -14473,19 +14473,19 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17100936	79	Jnun CM	76	77	0	300	6
 17100937	79	Jnun CM	76	77	0	300	6
 17100938	79	Spongilla Fly	78	79	64	300	2
-17100939	79	Heraldic Imp CM	79	81	129	300	3
+17100939	79	Heraldic Imp CM	79	81	129	300	2
 17100940	79	Spongilla Fly	78	79	64	300	2
 17100941	79	Spongilla Fly	78	79	64	300	2
-17100942	79	Heraldic Imp CM	79	81	129	300	3
+17100942	79	Heraldic Imp CM	79	81	129	300	2
 17100943	79	Spongilla Fly	78	79	64	300	2
-17100944	79	Heraldic Imp CM	79	81	129	300	3
-17100945	79	Heraldic Imp CM	79	81	129	300	3
-17100946	79	Heraldic Imp CM	79	81	129	300	3
+17100944	79	Heraldic Imp CM	79	81	129	300	2
+17100945	79	Heraldic Imp CM	79	81	129	300	2
+17100946	79	Heraldic Imp CM	79	81	129	300	2
 17100947	79	Spongilla Fly	78	79	64	300	2
 17100948	79	Spongilla Fly	78	79	64	300	2
-17100949	79	Heraldic Imp CM	79	81	129	300	3
-17100950	79	Heraldic Imp CM	79	81	129	300	3
-17100951	79	Heraldic Imp CM	79	81	129	300	3
+17100949	79	Heraldic Imp CM	79	81	129	300	2
+17100950	79	Heraldic Imp CM	79	81	129	300	2
+17100951	79	Heraldic Imp CM	79	81	129	300	2
 17100952	79	Spongilla Fly	78	79	64	300	2
 17100953	79	Caedarva Leech	63	65	64	300	2
 17100954	79	Caedarva Leech	63	65	64	300	2
@@ -14494,11 +14494,11 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17100957	79	Chigoe	64	66	1	300	3
 17100958	79	Chigoe	64	66	1	300	3
 17100959	79	Spongilla Fly	78	79	64	300	2
-17100960	79	Heraldic Imp CM	79	81	129	300	3
-17100961	79	Heraldic Imp CM	79	81	129	300	3
+17100960	79	Heraldic Imp CM	79	81	129	300	2
+17100961	79	Heraldic Imp CM	79	81	129	300	2
 17100962	79	Thunder Elemental	70	71	1	300	32
 17100963	79	Marsh Murre	64	66	64	300	2
-17100964	79	Heraldic Imp CM	79	81	129	300	3
+17100964	79	Heraldic Imp CM	79	81	129	300	2
 17100965	79	Mosshorn	80	81	1	300	257
 17100966	79	Wild Karakul	68	70	0	300	1
 17100967	79	Mosshorn	80	81	1	300	257
@@ -14526,7 +14526,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17100989	79	Marsh Murre	65	67	64	300	2
 17100990	79	Qiqirn Rock Hound	67	69	64	960	257
 17100991	79	Guard Skeleton blm	67	69	65	300	6
-17100992	79	Orderly Imp	66	68	193	300	3
+17100992	79	Orderly Imp	66	68	193	300	2
 17100993	79	Marsh Murre	65	67	64	300	2
 17100994	79	Qiqirn Rock Hound	67	69	64	960	257
 17100995	79	Guard Skeleton war	67	69	65	300	6
@@ -14542,16 +14542,16 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17101007	79	Qiqirn Mireguide	67	69	64	960	257
 17101009	79	Guard Skeleton blm	67	69	65	300	6
 17101010	79	Marsh Murre	65	67	64	300	2
-17101011	79	Orderly Imp	66	68	193	300	3
+17101011	79	Orderly Imp	66	68	193	300	2
 17101012	79	Qiqirn Mireguide	67	69	64	960	257
 17101014	79	Guard Skeleton blm	67	69	65	300	6
 17101015	79	Marsh Murre	65	67	64	300	2
 17101016	79	Chigoe	64	66	1	300	3
 17101017	79	Chigoe	64	66	1	300	3
-17101018	79	Orderly Imp	66	68	193	300	3
+17101018	79	Orderly Imp	66	68	193	300	2
 17101019	79	Marsh Murre	65	67	64	300	2
 17101020	79	Marsh Murre	65	67	64	300	2
-17101021	79	Heraldic Imp CM	79	81	129	300	3
+17101021	79	Heraldic Imp CM	79	81	129	300	2
 17101022	79	Lamia Idolater	79	81	1	300	7
 17101023	79	Lamia Idolater	79	81	1	300	7
 17101024	79	Lamia Idolater	79	81	1	300	7
@@ -14563,7 +14563,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17101030	79	Lamia Idolater	79	81	1	300	7
 17101031	79	Lamia Idolater	79	81	1	300	7
 17101032	79	Treant Sapling AS CM	61	63	64	300	2
-17101033	79	Heraldic Imp CM	79	81	129	300	3
+17101033	79	Heraldic Imp CM	79	81	129	300	2
 17101034	79	Elder Treant	80	82	65	300	2
 17101035	79	Elder Treant	80	82	65	300	2
 17101036	79	Ephramadian Shade	75	77	1	960	6
@@ -14595,7 +14595,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17101062	79	Draugar Servant	78	80	1	960	6
 17101063	79	Lamia Idolater	79	81	1	300	7
 17101064	79	Lamia Idolater	79	81	1	300	7
-17101065	79	Heraldic Imp CM	79	81	129	300	3
+17101065	79	Heraldic Imp CM	79	81	129	300	2
 17101066	79	Jnun CM	75	77	0	300	6
 17101067	79	Jnun CM	75	77	0	300	6
 17101068	79	Jnun CM	75	77	0	300	6
@@ -14625,13 +14625,13 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17101092	79	Lamia Idolater	79	81	1	300	7
 17101093	79	Lamia Idolater	79	81	1	300	7
 17101094	79	Lamia Idolater	79	81	1	300	7
-17101095	79	Heraldic Imp CM	79	81	129	300	3
+17101095	79	Heraldic Imp CM	79	81	129	300	2
 17101096	79	Lamia Necromancer	82	83	65	300	1
 17101097	79	Lamia Idolater	79	81	1	300	7
 17101098	79	Lamia Idolater	79	81	1	300	7
-17101099	79	Aynu-Kaysey	82	83	17	13794	7
+17101099	79	Aynu-Kaysey	82	83	17	9059	7
 17101100	79	Treant Sapling AS CM	61	63	64	300	2
-17101101	79	Heraldic Imp CM	79	81	129	300	3
+17101101	79	Heraldic Imp CM	79	81	129	300	2
 17101102	79	Elder Treant	80	82	65	300	2
 17101103	79	Elder Treant	80	82	65	300	2
 17101104	79	Treant Sapling AS CM	61	63	64	300	2
@@ -14678,53 +14678,53 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17101146	79	Jazaraat	67	70	145	0	6
 17101148	79	Lamia No27	79	81	209	0	1
 17101149	79	Moshdahn	79	81	209	0	7
-17101150	79	Heraldic Imp CM	80	82	129	300	3
-17101151	79	Heraldic Imp CM	80	82	129	300	3
-17101152	79	Heraldic Imp CM	80	82	129	300	3
+17101150	79	Heraldic Imp CM	80	82	129	300	2
+17101151	79	Heraldic Imp CM	80	82	129	300	2
+17101152	79	Heraldic Imp CM	80	82	129	300	2
 17101153	79	Soulflayer	82	83	129	300	354
 17101154	79	Soulflayer	82	83	129	300	354
-17101155	79	Heraldic Imp CM	80	82	129	300	3
-17101156	79	Heraldic Imp CM	80	82	129	300	3
+17101155	79	Heraldic Imp CM	80	82	129	300	2
+17101156	79	Heraldic Imp CM	80	82	129	300	2
 17101157	79	Soulflayer	82	83	129	300	354
-17101159	79	Heraldic Imp CM	80	82	129	300	3
-17101160	79	Heraldic Imp CM	80	82	129	300	3
-17101161	79	Heraldic Imp CM	80	82	129	300	3
+17101159	79	Heraldic Imp CM	80	82	129	300	2
+17101160	79	Heraldic Imp CM	80	82	129	300	2
+17101161	79	Heraldic Imp CM	80	82	129	300	2
 17101162	79	Soulflayer	82	83	129	300	354
-17101163	79	Heraldic Imp CM	80	82	129	300	3
-17101164	79	Heraldic Imp CM	80	82	129	300	3
+17101163	79	Heraldic Imp CM	80	82	129	300	2
+17101164	79	Heraldic Imp CM	80	82	129	300	2
 17101165	79	Soulflayer	82	83	129	300	354
-17101166	79	Heraldic Imp CM	80	82	129	300	3
+17101166	79	Heraldic Imp CM	80	82	129	300	2
 17101167	79	Soulflayer	82	83	129	300	354
 17101168	79	Soulflayer	82	83	129	300	354
-17101169	79	Heraldic Imp CM	80	82	129	300	3
-17101170	79	Heraldic Imp CM	80	82	129	300	3
-17101171	79	Heraldic Imp CM	80	82	129	300	3
-17101172	79	Heraldic Imp CM	80	82	129	300	3
+17101169	79	Heraldic Imp CM	80	82	129	300	2
+17101170	79	Heraldic Imp CM	80	82	129	300	2
+17101171	79	Heraldic Imp CM	80	82	129	300	2
+17101172	79	Heraldic Imp CM	80	82	129	300	2
 17101173	79	Soulflayer	82	83	129	300	354
 17101174	79	Soulflayer	82	83	129	300	354
-17101175	79	Heraldic Imp CM	80	82	129	300	3
-17101176	79	Heraldic Imp CM	80	82	129	300	3
-17101177	79	Heraldic Imp CM	80	82	129	300	3
+17101175	79	Heraldic Imp CM	80	82	129	300	2
+17101176	79	Heraldic Imp CM	80	82	129	300	2
+17101177	79	Heraldic Imp CM	80	82	129	300	2
 17101178	79	Soulflayer	82	83	129	300	354
 17101179	79	Soulflayer	82	83	129	300	354
-17101180	79	Heraldic Imp CM	80	82	129	300	3
-17101181	79	Heraldic Imp CM	80	82	129	300	3
-17101182	79	Heraldic Imp CM	80	82	129	300	3
-17101183	79	Heraldic Imp CM	80	82	129	300	3
+17101180	79	Heraldic Imp CM	80	82	129	300	2
+17101181	79	Heraldic Imp CM	80	82	129	300	2
+17101182	79	Heraldic Imp CM	80	82	129	300	2
+17101183	79	Heraldic Imp CM	80	82	129	300	2
 17101184	79	Soulflayer	82	83	129	300	354
 17101185	79	Soulflayer	82	83	129	300	354
 17101186	79	Soulflayer	82	83	129	300	354
 17101187	79	Soulflayer	82	83	129	300	354
-17101188	79	Heraldic Imp CM	80	82	129	300	3
-17101189	79	Heraldic Imp CM	80	82	129	300	3
+17101188	79	Heraldic Imp CM	80	82	129	300	2
+17101189	79	Heraldic Imp CM	80	82	129	300	2
 17101190	79	Soulflayer	82	83	129	300	354
-17101191	79	Heraldic Imp CM	80	82	129	300	3
-17101192	79	Heraldic Imp CM	80	82	129	300	3
-17101193	79	Heraldic Imp CM	80	82	129	300	3
+17101191	79	Heraldic Imp CM	80	82	129	300	2
+17101192	79	Heraldic Imp CM	80	82	129	300	2
+17101193	79	Heraldic Imp CM	80	82	129	300	2
 17101194	79	Heraldic Imp CM	80	82	129	300	3
-17101195	79	Heraldic Imp CM	80	82	129	300	3
-17101196	79	Heraldic Imp CM	80	82	129	300	3
-17101197	79	Khimaira	85	85	145	54000	3
+17101195	79	Heraldic Imp CM	80	82	129	300	2
+17101196	79	Heraldic Imp CM	80	82	129	300	2
+17101197	79	Khimaira	85	85	145	61200	3
 17101198	79	Verdelet	85	86	209	0	3
 17101199	79	Tyger	88	90	145	0	3
 17101200	79	Mahjlaef the Paintorn	83	85	209	0	354
@@ -14764,46 +14764,46 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17101242	79	Magh Bihu	139	139	17	0	2
 17101243	79	Dazbog	139	139	17	0	1
 17101244	79	Mnejing	139	139	0	0	1
-17101245	79	Locus Imp	134	136	129	60	3
-17101246	79	Locus Imp	134	136	129	60	3
-17101247	79	Locus Imp	134	136	129	60	3
-17101248	79	Locus Imp	134	136	129	60	3
-17101249	79	Locus Imp	134	136	129	60	3
-17101250	79	Locus Imp	134	136	129	60	3
-17101251	79	Locus Imp	134	136	129	60	3
-17101252	79	Locus Imp	134	136	129	60	3
-17101253	79	Locus Imp	134	136	129	60	3
-17101254	79	Locus Imp	134	136	129	60	3
-17101255	79	Locus Imp	134	136	129	60	3
-17101256	79	Locus Imp	134	136	129	60	3
-17101257	79	Locus Imp	134	136	129	60	3
-17101258	79	Locus Imp	134	136	129	60	3
-17101259	79	Locus Imp	134	136	129	60	3
-17101260	79	Locus Imp	134	136	129	60	3
-17101261	79	Locus Imp	134	136	129	60	3
-17101262	79	Locus Imp	134	136	129	60	3
-17101263	79	Locus Imp	134	136	129	60	3
-17101264	79	Locus Imp	134	136	129	60	3
-17101265	79	Locus Imp	134	136	129	60	3
-17101266	79	Locus Imp	134	136	129	60	3
-17101267	79	Locus Imp	134	136	129	60	3
-17101268	79	Locus Imp	134	136	129	60	3
-17101269	79	Locus Imp	134	136	129	60	3
-17101270	79	Locus Imp	134	136	129	60	3
-17101271	79	Locus Imp	134	136	129	60	3
-17101272	79	Locus Imp	134	136	129	60	3
-17101273	79	Locus Imp	134	136	129	60	3
-17101274	79	Locus Imp	134	136	129	60	3
-17101275	79	Locus Imp	134	136	129	60	3
-17101276	79	Locus Imp	134	136	129	60	3
-17101277	79	Locus Imp	134	136	129	60	3
-17101278	79	Locus Imp	134	136	129	60	3
-17101279	79	Locus Imp	134	136	129	60	3
-17101280	79	Locus Imp	134	136	129	60	3
-17101281	79	Locus Imp	134	136	129	60	3
-17101282	79	Locus Imp	134	136	129	60	3
-17101283	79	Locus Imp	134	136	129	60	3
-17101284	79	Locus Imp	134	136	129	60	3
+17101245	79	Locus Imp	134	136	129	60	2
+17101246	79	Locus Imp	134	136	129	60	2
+17101247	79	Locus Imp	134	136	129	60	2
+17101248	79	Locus Imp	134	136	129	60	2
+17101249	79	Locus Imp	134	136	129	60	2
+17101250	79	Locus Imp	134	136	129	60	2
+17101251	79	Locus Imp	134	136	129	60	2
+17101252	79	Locus Imp	134	136	129	60	2
+17101253	79	Locus Imp	134	136	129	60	2
+17101254	79	Locus Imp	134	136	129	60	2
+17101255	79	Locus Imp	134	136	129	60	2
+17101256	79	Locus Imp	134	136	129	60	2
+17101257	79	Locus Imp	134	136	129	60	2
+17101258	79	Locus Imp	134	136	129	60	2
+17101259	79	Locus Imp	134	136	129	60	2
+17101260	79	Locus Imp	134	136	129	60	2
+17101261	79	Locus Imp	134	136	129	60	2
+17101262	79	Locus Imp	134	136	129	60	2
+17101263	79	Locus Imp	134	136	129	60	2
+17101264	79	Locus Imp	134	136	129	60	2
+17101265	79	Locus Imp	134	136	129	60	2
+17101266	79	Locus Imp	134	136	129	60	2
+17101267	79	Locus Imp	134	136	129	60	2
+17101268	79	Locus Imp	134	136	129	60	2
+17101269	79	Locus Imp	134	136	129	60	2
+17101270	79	Locus Imp	134	136	129	60	2
+17101271	79	Locus Imp	134	136	129	60	2
+17101272	79	Locus Imp	134	136	129	60	2
+17101273	79	Locus Imp	134	136	129	60	2
+17101274	79	Locus Imp	134	136	129	60	2
+17101275	79	Locus Imp	134	136	129	60	2
+17101276	79	Locus Imp	134	136	129	60	2
+17101277	79	Locus Imp	134	136	129	60	2
+17101278	79	Locus Imp	134	136	129	60	2
+17101279	79	Locus Imp	134	136	129	60	2
+17101280	79	Locus Imp	134	136	129	60	2
+17101281	79	Locus Imp	134	136	129	60	2
+17101282	79	Locus Imp	134	136	129	60	2
+17101283	79	Locus Imp	134	136	129	60	2
+17101284	79	Locus Imp	134	136	129	60	2
 17108993	81	Snipper	13	17	1	0	2
 17108994	81	Mud Pugil	15	20	1	0	2
 17108995	81	Pug Pugil	15	20	1	0	2
@@ -14958,7 +14958,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17109144	81	Wild Sheep	16	18	64	300	257
 17109145	81	Giant Spider	50	52	64	300	2
 17109146	81	Giant Spider	50	52	64	300	2
-17109147	81	Melusine	73	73	16	7440	1
+17109147	81	Melusine	73	73	16	7320	1
 17109148	81	Giant Spider	50	52	64	300	2
 17109149	81	Giant Spider	50	52	64	300	2
 17109150	81	Giant Spider	50	52	64	300	2
@@ -15046,7 +15046,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17109232	81	Colibri past	45	47	0	300	1
 17109233	81	Colibri past	45	47	0	300	1
 17109234	81	Colibri past	45	47	0	300	1
-17109235	81	Myradrosh	53	53	16	6289	1
+17109235	81	Myradrosh	53	53	16	6176	1
 17109236	81	Colibri past	45	47	0	300	1
 17109237	81	Colibri past	45	47	0	300	1
 17109238	81	Colibri past	45	47	0	300	1
@@ -15198,10 +15198,10 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17109384	81	Yacumama	82	82	16	3600	2
 17109385	81	Capricornus	82	82	16	3600	2
 17109386	81	Quagmire Pugil	80	80	16	300	2
-17109387	81	Quagmire Pugil	80	80	16	300	2
+17109387	81	Quagmire Pugil	80	80	24	300	2
 17109388	81	Quagmire Pugil	80	80	16	300	2
 17109389	81	Quagmire Pugil	80	80	16	300	2
-17109390	81	Sunderclaw	80	80	24	300	2
+17109390	81	Sunderclaw	80	80	16	300	2
 17109391	81	Sunderclaw	80	80	16	300	2
 17109392	81	Sunderclaw	80	80	16	300	2
 17109393	81	Sunderclaw	80	80	16	300	2
@@ -15734,9 +15734,9 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17113490	82	Krabkatoa	85	85	16	7200	2
 17113491	82	Yacumama	82	82	16	3600	2
 17113492	82	Capricornus	82	82	16	3600	2
-17113493	82	Quagmire Pugil	80	80	24	300	2
+17113493	82	Quagmire Pugil	80	80	16	300	2
 17113494	82	Quagmire Pugil	80	80	16	300	2
-17113495	82	Quagmire Pugil	80	80	16	300	2
+17113495	82	Quagmire Pugil	80	80	24	300	2
 17113496	82	Quagmire Pugil	80	80	16	300	2
 17113497	82	Sunderclaw	80	80	16	300	2
 17113498	82	Sunderclaw	80	80	16	300	2
@@ -17519,7 +17519,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17137856	88	Fledermaus past	45	47	64	300	2
 17137857	88	Rock Eater past	32	35	64	300	2
 17137858	88	Rock Eater past	32	35	64	300	2
-17137859	88	Olgoi-Khorkhoi	53	54	80	5927	2
+17137859	88	Olgoi-Khorkhoi	53	54	80	6804	2
 17137860	88	Veteran Quadav past	59	63	65	300	258
 17137861	88	Greater Quadav past	59	64	65	300	258
 17137862	88	Onyx Quadav past	59	63	65	300	258
@@ -17702,7 +17702,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17138040	88	Goblin Mine	51	51	129	0	2
 17138041	88	Sandworm	85	85	17	86400	2
 17138042	88	Goblin Picaroon	71	73	17	300	1
-17138069	88	Yilbegan	90	92	24	86400	2
+17138069	88	Yilbegan	90	92	16	86400	2
 17138070	88	Blobdingnag	85	85	16	7200	258
 17138071	88	Septic Boil	85	85	80	0	258
 17138072	88	Septic Boil	85	85	80	0	258
@@ -18540,7 +18540,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17146149	90	Quadav Guard	75	75	65	0	258
 17146150	90	Quadav Guard	75	75	65	0	258
 17146169	90	Yilbegan	90	92	16	86400	2
-17146170	90	Blobdingnag	85	85	16	7200	258
+17146170	90	Blobdingnag	85	85	24	7200	258
 17146171	90	Septic Boil	85	85	80	0	258
 17146172	90	Septic Boil	85	85	80	0	258
 17146173	90	Septic Boil	85	85	80	0	258
@@ -18676,7 +18676,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17149983	91	Lycopodium	28	32	3	300	2
 17149984	91	Death Wasp past	38	42	64	300	257
 17149985	91	Death Wasp past	38	42	64	300	257
-17149986	91	Lamina	57	58	16	5758	2
+17149986	91	Lamina	57	58	16	7140	2
 17149987	91	Death Wasp past	38	42	64	300	257
 17149988	91	Death Wasp past	38	42	64	300	257
 17149989	91	Death Wasp past	38	42	64	300	257
@@ -20003,13 +20003,13 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17166763	95	Romaa Mihgo	0	0	0	0	1
 17166767	95	Yilbegan	90	92	16	86400	2
 17166768	95	Orcus	85	85	145	7200	2
-17166769	95	Farruca Fly	82	82	24	3600	2
-17166770	95	Jyeshtha	82	82	16	3600	258
+17166769	95	Farruca Fly	82	82	16	3600	2
+17166770	95	Jyeshtha	82	82	24	3600	258
 17166771	95	Rummager Beetle	80	80	16	300	257
 17166772	95	Rummager Beetle	80	80	16	300	257
 17166773	95	Rummager Beetle	80	80	16	300	257
 17166774	95	Rummager Beetle	80	80	16	300	257
-17166775	95	Raker Bee	80	80	24	300	257
+17166775	95	Raker Bee	80	80	16	300	257
 17166776	95	Raker Bee	80	80	16	300	257
 17166777	95	Raker Bee	80	80	16	300	257
 17166778	95	Raker Bee	80	80	16	300	257
@@ -20242,7 +20242,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17170497	96	Rafflesia	59	62	1	960	2
 17170498	96	Rafflesia	59	62	1	960	2
 17170499	96	Kirtimukha	65	65	17	0	2
-17170500	96	Death Jacket FKNS	33	37	72	720	257
+17170500	96	Death Jacket FKNS	33	37	64	720	257
 17170501	96	Air Elemental	60	60	1	960	32
 17170502	96	Death Jacket FKNS	33	37	64	720	257
 17170503	96	Death Jacket FKNS	33	37	64	720	257
@@ -20950,10 +20950,10 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17174909	97	Jyeshtha	82	82	16	3600	258
 17174910	97	Rummager Beetle	80	80	16	300	257
 17174911	97	Rummager Beetle	80	80	24	300	257
-17174912	97	Rummager Beetle	80	80	24	300	257
+17174912	97	Rummager Beetle	80	80	16	300	257
 17174913	97	Rummager Beetle	80	80	16	300	257
 17174914	97	Raker Bee	80	80	16	300	257
-17174915	97	Raker Bee	80	80	16	300	257
+17174915	97	Raker Bee	80	80	24	300	257
 17174916	97	Raker Bee	80	80	16	300	257
 17174917	97	Raker Bee	80	80	16	300	257
 17174918	97	Kayeel-Payeel	70	70	0	0	1
@@ -21207,7 +21207,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17178686	98	Tabar Beak past	52	54	1	300	1
 17178687	98	Tabar Beak past	52	54	1	300	1
 17178688	98	Tabar Beak past	52	54	1	300	1
-17178689	98	Coquecigrue	68	68	17	7744	1
+17178689	98	Coquecigrue	68	68	17	7438	1
 17178690	98	Tabar Beak past	52	54	1	300	1
 17178691	98	Tabar Beak past	52	54	1	300	1
 17178692	98	Diving Beetle past	44	47	64	300	257
@@ -21662,7 +21662,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17182787	99	Antlion Fly	63	64	64	960	2
 17182788	99	Earth Elemental	80	80	1	960	32
 17182789	99	Fire Elemental	80	80	1	960	32
-17182790	99	Duu Masa the Onecut	80	80	209	7690	1
+17182790	99	Duu Masa the Onecut	80	80	209	9107	1
 17182791	99	Yagudo Sentinel past	76	79	65	960	1
 17182792	99	Yagudo High Priest past	76	79	65	960	1
 17182793	99	Yagudo Sentinel past	76	79	65	960	1
@@ -21903,18 +21903,18 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17183028	99	Yagudo Abbot indoor S	81	83	65	960	1
 17183029	99	Yagudo Hierogrammat	81	83	65	960	1
 17183030	99	Yagudo Hierogrammat	81	83	65	960	1
-17183031	99	Dee Zelko the Esoteric	83	83	209	2341	1
-17183032	99	Marquis Forneus	80	85	209	6704	257
-17183033	99	Loo Kutto the Pensive	83	83	209	9287	1
-17183034	99	Fleshgnasher	80	85	145	6513	1
-17183035	99	Vee Ladu the Titterer	83	83	209	4036	1
-17183036	99	Maa Illmu the Bestower	83	83	209	5603	1
-17183037	99	Asterion	80	85	209	1930	1
-17183038	99	Suu Xicu the Cantabile	83	83	209	4264	1
-17183039	99	Vee Ladu the Titterer	83	83	209	6805	1
-17183040	99	Vee Ladu the Titterer	83	83	209	1838	1
-17183041	99	Vee Ladu the Titterer	83	83	209	6956	1
-17183042	99	Vee Ladu the Titterer	83	83	209	8686	1
+17183031	99	Dee Zelko the Esoteric	83	83	209	1796	1
+17183032	99	Marquis Forneus	80	85	209	4029	257
+17183033	99	Loo Kutto the Pensive	83	83	209	9255	1
+17183034	99	Fleshgnasher	80	85	145	8604	1
+17183035	99	Vee Ladu the Titterer	83	83	209	5042	1
+17183036	99	Maa Illmu the Bestower	83	83	209	8566	1
+17183037	99	Asterion	80	85	209	9442	1
+17183038	99	Suu Xicu the Cantabile	83	83	209	2216	1
+17183039	99	Vee Ladu the Titterer	83	83	209	3014	1
+17183040	99	Vee Ladu the Titterer	83	83	209	8507	1
+17183041	99	Vee Ladu the Titterer	83	83	209	5029	1
+17183042	99	Vee Ladu the Titterer	83	83	209	6928	1
 17183043	99	Duu Nazo the Spryfooted	83	83	81	0	1
 17183044	99	Duu Nazo the Spryfooted	83	83	81	0	1
 17183045	99	Duu Nazo the Spryfooted	83	83	81	0	1
@@ -22577,7 +22577,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17191041	101	Mouse Bat	4	5	0	180	2
 17191042	101	Mouse Bat	4	5	0	180	2
 17191043	101	Tainted Hound	6	7	1	300	6
-17191044	101	Rambukk	12	13	16	2519	257
+17191044	101	Rambukk	12	13	16	1365	257
 17191045	101	Pugil	2	3	0	180	2
 17191046	101	Pugil	2	3	0	180	2
 17191047	101	Pugil	2	3	0	180	2
@@ -23337,7 +23337,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17195475	102	Nihniknoovi	14	14	81	0	1
 17195476	102	Pixie	51	54	0	0	1
 17195482	102	Yilbegan	90	92	16	86400	2
-17195483	102	Dawon	85	85	24	7200	257
+17195483	102	Dawon	85	85	16	7200	257
 17195484	102	Tammuz	82	82	16	3600	257
 17195485	102	Chesma	82	82	16	3600	257
 17195486	102	Void Hare	80	80	16	300	257
@@ -23410,7 +23410,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17199158	103	Star Bat	19	20	0	300	2
 17199159	103	Ghoul war	18	19	1	300	6
 17199160	103	Ghoul war	18	19	1	300	6
-17199161	103	Metal Shears	22	23	16	4132	2
+17199161	103	Metal Shears	22	23	16	4195	2
 17199162	103	Sand Hare	16	17	64	300	257
 17199163	103	Sand Hare	16	17	64	300	257
 17199164	103	Sand Hare	16	17	64	300	257
@@ -23600,7 +23600,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17199348	103	Beach Pugil	23	24	0	300	2
 17199349	103	Beach Pugil	23	24	0	300	2
 17199350	103	Bogy	28	30	1	300	6
-17199351	103	Hippomaritimus	37	38	16	5191	2
+17199351	103	Hippomaritimus	37	38	16	5257	2
 17199352	103	Sand Bats	12	13	1	300	2
 17199353	103	Sand Bats	12	13	1	300	2
 17199354	103	Sand Hare	17	18	64	300	257
@@ -23875,16 +23875,16 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17203203	104	Thread Leech	19	22	1	0	2
 17203204	104	Ferocious Pugil	24	25	1	0	2
 17203205	104	Huge Leech	27	29	1	0	2
-17203206	104	Knight Crab	35	35	67	2700	2
-17203207	104	Knight Crab	35	35	67	2700	2
-17203208	104	Knight Crab	35	35	67	2700	2
-17203209	104	Knight Crab	35	35	67	2700	2
-17203210	104	Knight Crab	35	35	67	2700	2
-17203211	104	Knight Crab	35	35	67	2700	2
-17203212	104	Knight Crab	35	35	67	2700	2
-17203213	104	Knight Crab	35	35	67	2700	2
-17203214	104	Knight Crab	35	35	67	2700	2
-17203215	104	Knight Crab	35	35	67	2700	2
+17203206	104	Knight Crab	35	35	67	9900	2
+17203207	104	Knight Crab	35	35	67	9900	2
+17203208	104	Knight Crab	35	35	67	9900	2
+17203209	104	Knight Crab	35	35	67	9900	2
+17203210	104	Knight Crab	35	35	67	9900	2
+17203211	104	Knight Crab	35	35	67	9900	2
+17203212	104	Knight Crab	35	35	67	9900	2
+17203213	104	Knight Crab	35	35	67	9900	2
+17203214	104	Knight Crab	35	35	67	9900	2
+17203215	104	Knight Crab	35	35	67	9900	2
 17203216	104	King Arthro	55	55	19	0	2
 17203217	104	Stag Beetle	22	23	64	300	257
 17203218	104	Stag Beetle	22	23	64	300	257
@@ -24083,7 +24083,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17203411	104	Orcish Fighter	21	22	65	300	257
 17203412	104	Orcish Cursemaker	21	22	65	300	257
 17203413	104	Orcish Serjeant	21	22	65	300	257
-17203414	104	Meteormauler Zhagtegg	37	40	81	75861	257
+17203414	104	Meteormauler Zhagtegg	37	40	81	75668	257
 17203415	104	Orcish Cursemaker	25	25	65	0	257
 17203416	104	Orcish Serjeant	24	25	65	0	257
 17203417	104	Snipper	19	20	0	300	2
@@ -24116,7 +24116,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17203444	104	Zombie blm	21	22	1	300	6
 17203445	104	Will-o-the-Wisp	24	25	1	300	33
 17203446	104	Scavenging Hound	22	23	1	300	6
-17203447	104	Fraelissa	34	35	17	3801	2
+17203447	104	Fraelissa	34	35	17	4285	2
 17203448	104	Fradubio	59	60	147	0	2
 17203449	104	Duessa	54	54	193	0	2
 17203450	104	Duessa	54	54	193	0	2
@@ -24216,7 +24216,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17203544	104	Brutal Sheep	20	21	64	300	257
 17203545	104	Walking Tree	27	28	1	300	2
 17203546	104	Scavenging Hound	22	23	1	300	6
-17203547	104	Sappy Sycamore	41	42	80	4191	2
+17203547	104	Sappy Sycamore	41	42	80	3678	2
 17203548	104	Jugner Funguar	24	25	64	300	2
 17203549	104	Jugner Funguar	24	25	64	300	2
 17203550	104	Forest Leech	21	22	64	300	2
@@ -24724,7 +24724,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17207654	105	Wight war	26	32	1	300	6
 17207655	105	Wight blm	26	32	1	300	6
 17207656	105	Ice Elemental	38	40	1	300	32
-17207657	105	Ahtu	51	52	17	12049	2
+17207657	105	Ahtu	51	52	17	11768	2
 17207658	105	May Fly	25	26	64	300	2
 17207659	105	May Fly	25	26	64	300	2
 17207660	105	May Fly	25	26	64	300	2
@@ -25076,7 +25076,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17211663	106	Young Quadav	3	4	65	300	258
 17211664	106	Amethyst Quadav	3	4	65	300	258
 17211665	106	Amber Quadav	3	4	65	300	258
-17211666	106	Bedrock Barry	11	12	16	3659	2
+17211666	106	Bedrock Barry	11	12	16	4154	2
 17211667	106	Ornery Sheep	5	6	64	300	257
 17211668	106	Ornery Sheep	5	6	64	300	257
 17211669	106	Goblin Thug	4	5	65	300	1
@@ -25277,7 +25277,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17211870	106	Septic Boil	85	85	80	0	258
 17211871	106	Septic Boil	85	85	80	0	258
 17211872	106	Shoggoth	82	82	16	3600	2
-17211873	106	Lamprey Lord	82	82	16	3600	2
+17211873	106	Lamprey Lord	82	82	24	3600	2
 17211874	106	Ground Guzzler	80	80	24	300	2
 17211875	106	Ground Guzzler	80	80	24	300	2
 17211876	106	Ground Guzzler	80	80	24	300	2
@@ -25587,7 +25587,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17215775	107	Amethyst Quadav	6	7	65	300	258
 17215776	107	Amber Quadav	6	7	65	300	258
 17215777	107	Enchanted Bones war	6	7	1	300	6
-17215778	107	Tococo	4	5	80	3892	1
+17215778	107	Tococo	4	5	80	3884	1
 17215779	107	Ornery Sheep	5	6	64	300	257
 17215780	107	Ornery Sheep	5	6	64	300	257
 17215781	107	Goblin Thug	6	7	65	300	1
@@ -25797,7 +25797,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17219616	108	Strolling Sapling	8	9	0	300	2
 17219617	108	Strolling Sapling	8	9	0	300	2
 17219618	108	Strolling Sapling	8	9	0	300	2
-17219619	108	Ghillie Dhu	16	18	80	3752	2
+17219619	108	Ghillie Dhu	16	18	80	3830	2
 17219620	108	Rock Eater	10	11	64	300	2
 17219621	108	Rock Eater	10	11	64	300	2
 17219622	108	Rock Eater	10	11	64	300	2
@@ -25965,7 +25965,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17219784	108	Strolling Sapling	8	9	0	300	2
 17219785	108	Strolling Sapling	8	9	0	300	2
 17219786	108	Wolf Zombie	12	13	1	300	6
-17219787	108	Highlander Lizard	27	28	80	1250	2
+17219787	108	Highlander Lizard	27	28	80	1388	2
 17219788	108	Huge Wasp	9	10	0	300	257
 17219789	108	Huge Wasp	9	10	0	300	257
 17219790	108	Mad Sheep	12	13	64	300	257
@@ -26619,7 +26619,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17224101	109	Copper Quadav	22	23	65	300	258
 17224102	109	Brass Quadav	22	23	65	300	258
 17224103	109	Onyx Quadav	17	18	65	300	258
-17224104	109	BoWho Warmonger	36	37	81	76337	258
+17224104	109	BoWho Warmonger	36	37	81	76226	258
 17224105	109	Brass Quadav	22	23	65	300	258
 17224106	109	Onyx Quadav	17	18	65	300	258
 17224107	109	Old Quadav	22	23	65	300	258
@@ -27169,7 +27169,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17228239	110	Clipper	24	25	0	300	2
 17228240	110	Clipper	24	25	0	300	2
 17228241	110	Goblin Digger	28	29	65	300	1
-17228242	110	Simurgh	58	58	19	4552	1
+17228242	110	Simurgh	58	58	19	5049	1
 17228249	110	Chuglix Berrypaws	1	1	81	0	1
 17228250	110	Yilbegan	90	92	16	86400	2
 17228251	110	Verthandi	85	85	24	7200	1
@@ -27411,7 +27411,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17232091	111	Rime Gigas	40	43	65	300	1
 17232092	111	Gigass Tiger	33	35	0	0	257
 17232093	111	Sleet Gigas	40	43	65	300	1
-17232094	111	Humbaba	62	62	81	3790	1
+17232094	111	Humbaba	62	62	81	3712	1
 17232095	111	Cold Gigas	40	43	65	300	1
 17232096	111	Snow Gigas	40	43	65	300	1
 17232097	111	Rime Gigas	40	43	65	300	1
@@ -27434,7 +27434,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17232114	111	Living Statue	37	39	1	300	32
 17232115	111	Living Statue	37	39	1	300	32
 17232116	111	Living Statue	37	39	1	300	32
-17232117	111	Calcabrina	52	55	17	5408	288
+17232117	111	Calcabrina	52	55	17	5742	288
 17232118	111	Goblin Poacher	40	43	65	300	1
 17232119	111	Goblin Trader	40	43	65	300	1
 17232120	111	Goblins Tiger	28	35	0	0	257
@@ -27666,7 +27666,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17236143	112	Demon Knight	48	50	65	300	257
 17236144	112	Evil Eye	47	48	1	300	3
 17236145	112	Evil Eye	47	48	1	300	3
-17236146	112	Duke Focalor	51	52	81	5672	257
+17236146	112	Duke Focalor	51	52	81	6970	257
 17236147	112	Demon Pawn	50	52	65	300	257
 17236148	112	Demon Pawn	50	52	65	300	257
 17236149	112	Evil Eye	47	48	1	300	3
@@ -27933,7 +27933,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17240229	113	Robber Crab	64	67	1	300	2
 17240230	113	Robber Crab	64	67	1	300	2
 17240231	113	Robber Crab	64	67	1	300	2
-17240232	113	Tegmine	71	72	17	7263	2
+17240232	113	Tegmine	71	72	17	7365	2
 17240233	113	Beach Bunny	62	65	64	300	257
 17240234	113	Beach Bunny	62	65	64	300	257
 17240235	113	Robber Crab	64	67	1	300	2
@@ -28016,7 +28016,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17240312	113	Doom Soldier	66	70	1	300	6
 17240313	113	Doom Mage	67	71	1	300	6
 17240314	113	Fire Elemental	67	69	1	300	32
-17240315	113	Zmey Gorynych	78	78	17	4879	258
+17240315	113	Zmey Gorynych	78	78	17	5012	258
 17240316	113	Goblin Mercenary	65	68	65	300	1
 17240317	113	Velociraptor	66	69	1	300	258
 17240318	113	Sand Cockatrice	71	74	1	300	1
@@ -28114,7 +28114,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17240410	113	Sand Cockatrice	71	74	1	300	1
 17240411	113	Sand Cockatrice	71	74	1	300	1
 17240412	113	Sand Cockatrice	71	74	1	300	1
-17240413	113	Kreutzet	79	80	81	32437	1
+17240413	113	Kreutzet	79	80	81	39434	1
 17240414	113	Axesarion the Wanderer	68	68	81	0	6
 17240415	113	Hobgoblin Warrior	70	73	81	0	1
 17240416	113	Hobgoblin White Mage	70	73	81	0	1
@@ -28352,7 +28352,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17244369	114	Antican Speculator	44	49	65	300	258
 17244370	114	Antican Speculator	44	49	65	300	258
 17244371	114	Antican Sagittarius	44	49	65	300	258
-17244372	114	Centurio XII-I	56	57	81	72354	258
+17244372	114	Centurio XII-I	56	57	81	73226	258
 17244373	114	Antican Decurio	44	49	65	0	258
 17244374	114	Antican Speculator	44	49	65	0	258
 17244375	114	Sand Beetle	36	40	64	300	257
@@ -28451,7 +28451,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17244468	114	Lost Soul blm	44	48	1	300	6
 17244469	114	Lesser Manticore	47	49	1	300	257
 17244470	114	Lesser Manticore	47	49	1	300	257
-17244471	114	Nandi	48	49	80	3726	257
+17244471	114	Nandi	48	49	80	4140	257
 17244472	114	Goblin Reaper	45	49	65	300	1
 17244473	114	Goblin Reaper	45	49	65	300	1
 17244474	114	Desert Dhalmel	39	44	64	300	257
@@ -28519,7 +28519,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17244536	114	Contantican Black Mage	50	53	81	0	258
 17244537	114	Contantican Paladin	50	53	81	0	258
 17244538	114	Contantican Ranger	50	53	81	0	258
-17244539	114	Cactrot Rapido	80	81	80	189853	2
+17244539	114	Cactrot Rapido	80	81	80	247091	2
 17244540	114	Hastatus XIII-LXXV	50	55	65	0	258
 17244541	114	Hastatus XIII-XCVI	50	55	65	0	258
 17244542	114	Sagittarius XIII-XXVI	50	55	65	0	258
@@ -28885,8 +28885,8 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17248613	115	Yilbegan	90	92	16	86400	2
 17248614	115	Orcus	85	85	145	7200	2
 17248615	115	Farruca Fly	82	82	24	3600	2
-17248616	115	Jyeshtha	82	82	16	3600	258
-17248617	115	Rummager Beetle	80	80	16	300	257
+17248616	115	Jyeshtha	82	82	24	3600	258
+17248617	115	Rummager Beetle	80	80	24	300	257
 17248618	115	Rummager Beetle	80	80	16	300	257
 17248619	115	Rummager Beetle	80	80	16	300	257
 17248620	115	Rummager Beetle	80	80	16	300	257
@@ -29273,7 +29273,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17252722	116	River Crab	5	6	0	180	2
 17252723	116	Pug Pugil	7	8	0	180	2
 17252724	116	Pug Pugil	7	8	0	180	2
-17252725	116	Duke Decapod	7	8	16	3619	2
+17252725	116	Duke Decapod	7	8	16	4153	2
 17252726	116	River Crab	5	6	0	180	2
 17252727	116	Pug Pugil	7	8	0	180	2
 17252728	116	River Crab	5	6	0	180	2
@@ -30018,7 +30018,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17260729	118	Poison Leech	21	22	64	300	2
 17260730	118	Poison Leech	21	22	64	300	2
 17260731	118	Poison Leech	21	22	64	300	2
-17260732	118	Wake Warder Wanda	22	23	16	4051	2
+17260732	118	Wake Warder Wanda	22	23	16	4010	2
 17260733	118	Snipper	19	20	0	300	2
 17260734	118	Shoal Pugil	24	25	0	300	2
 17260735	118	Shoal Pugil	24	25	0	300	2
@@ -30533,7 +30533,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17264825	119	Goblin Butcher	16	17	65	300	1
 17264826	119	Zombie war	16	23	1	300	6
 17264827	119	Zombie blm	16	23	1	300	6
-17264828	119	Waraxe Beak	55	56	19	79425	1
+17264828	119	Waraxe Beak	55	56	19	84325	1
 17264829	119	Goblin Ambusher	16	17	65	300	1
 17264830	119	Goblin Tinkerer	16	17	65	300	1
 17264831	119	Goblin Gambler	21	22	65	300	1
@@ -30651,7 +30651,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17264943	119	Yagudo Piper	17	18	65	300	1
 17264944	119	Yagudo Priest	22	23	65	300	1
 17264945	119	Yagudo Persecutor	17	18	65	300	1
-17264946	119	Coo Keja the Unseen	35	37	81	82581	1
+17264946	119	Coo Keja the Unseen	35	37	81	76092	1
 17264947	119	Yagudo Votary	24	25	65	300	1
 17264948	119	Yagudo Theologist	24	25	65	300	1
 17264949	119	Wandering Sapling	15	16	64	300	2
@@ -30821,12 +30821,12 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17265119	119	Orcus	85	85	145	7200	2
 17265120	119	Farruca Fly	82	82	24	3600	2
 17265121	119	Jyeshtha	82	82	16	3600	258
-17265122	119	Rummager Beetle	80	80	16	300	257
+17265122	119	Rummager Beetle	80	80	24	300	257
 17265123	119	Rummager Beetle	80	80	16	300	257
 17265124	119	Rummager Beetle	80	80	16	300	257
 17265125	119	Rummager Beetle	80	80	16	300	257
 17265126	119	Raker Bee	80	80	16	300	257
-17265127	119	Raker Bee	80	80	24	300	257
+17265127	119	Raker Bee	80	80	16	300	257
 17265128	119	Raker Bee	80	80	16	300	257
 17265129	119	Raker Bee	80	80	16	300	257
 17265130	119	Lord Asag	94	95	17	0	7
@@ -31204,7 +31204,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17269103	120	Evil Spirit	35	36	1	300	6
 17269104	120	Evil Spirit	35	36	1	300	6
 17269105	120	Goblin Digger	29	30	65	300	1
-17269106	120	Roc	55	55	19	6269	1
+17269106	120	Roc	55	55	19	6111	1
 17269107	120	Climbpix Highrise	55	55	17	0	1
 17269113	120	Balam-Agab	30	36	17	0	257
 17269114	120	Dribblix Greasemaw	30	36	81	0	1
@@ -31469,7 +31469,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17273067	121	Lesser Gaylas	39	42	65	300	2
 17273068	121	Goblin Trader	42	46	65	300	1
 17273069	121	Goblins Leech SoZT	35	37	64	0	2
-17273070	121	Goobbue Parasite	42	45	64	300	2
+17273070	121	Goobbue Parasite	42	45	72	300	2
 17273071	121	Goobbue Parasite	42	45	64	300	2
 17273072	121	Goobbue Parasite	42	45	64	300	2
 17273073	121	Goobbue Parasite	42	45	64	300	2
@@ -32221,7 +32221,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17281278	123	Creek Sahagin	34	38	65	300	2
 17281279	123	Creek Sahagin	34	38	65	300	2
 17281280	123	Stream Sahagin	34	38	65	300	2
-17281281	123	Meww the Turtlerider	47	49	81	10461	2
+17281281	123	Meww the Turtlerider	47	49	81	9357	2
 17281282	123	Creek Sahagin	34	38	65	0	2
 17281283	123	Stream Sahagin	34	38	65	0	2
 17281284	123	Young Opo-opo	34	36	64	300	257
@@ -32236,7 +32236,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17281293	123	Young Opo-opo	34	36	64	300	257
 17281294	123	Creek Sahagin	34	38	65	300	2
 17281295	123	River Sahagin	34	38	65	300	2
-17281296	123	Pyuu the Spatemaker	73	74	209	6757	2
+17281296	123	Pyuu the Spatemaker	73	74	209	6153	2
 17281297	123	Young Opo-opo	34	36	64	300	257
 17281298	123	Young Opo-opo	34	36	64	300	257
 17281299	123	Creek Sahagin	34	38	65	300	2
@@ -32542,7 +32542,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17285217	124	Goblin Trader	45	49	65	300	1
 17285218	124	Goblins Bee jungle	38	40	64	0	257
 17285219	124	Master Coeurl	47	50	1	300	257
-17285220	124	Woodland Sage	60	61	19	83535	2
+17285220	124	Woodland Sage	60	61	19	84084	2
 17285221	124	Big Jaw	43	47	1	300	2
 17285222	124	Big Jaw	43	47	1	300	2
 17285223	124	Water Elemental	53	55	1	300	32
@@ -32570,7 +32570,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17285245	124	Yhoator Wasp	37	40	64	300	257
 17285246	124	Yhoator Wasp	37	40	64	300	257
 17285247	124	Goblin Reaper	41	45	65	300	1
-17285248	124	Powderer Penny	49	49	80	5795	257
+17285248	124	Powderer Penny	49	49	80	6823	257
 17285249	124	Young Opo-opo	40	44	64	300	257
 17285250	124	Yhoator Wasp	37	40	64	300	257
 17285251	124	Yhoator Wasp	37	40	64	300	257
@@ -32781,7 +32781,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17285457	124	Tonberry Creeper	45	49	65	300	1
 17285458	124	Tonberry Hexer	45	49	65	300	1
 17285459	124	Tonberry Creeper	45	49	65	300	1
-17285460	124	Bisque-heeled Sunberry	57	59	83	6945	1
+17285460	124	Bisque-heeled Sunberry	57	59	83	4022	1
 17285461	124	Tonberry Hexer	45	49	65	300	1
 17285462	124	Tonberry Creeper	45	49	65	300	1
 17285463	124	Tonberry Creeper	45	49	65	300	1
@@ -32847,7 +32847,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17285523	124	Tonberry Creeper	45	49	65	300	1
 17285524	124	Tonberry Hexer	45	49	65	300	1
 17285525	124	Fire Elemental	53	55	1	300	32
-17285526	124	Bright-handed Kunberry	55	57	81	75605	1
+17285526	124	Bright-handed Kunberry	55	57	81	76085	1
 17285527	124	Tonberry Hexer	45	49	65	0	1
 17285528	124	Tonberry Harasser	45	49	65	0	1
 17285529	124	Tonberrys Elemental	38	40	65	0	32
@@ -36515,7 +36515,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17338582	137	Caracal	80	82	1	300	257
 17338583	137	Caracal	80	82	1	300	257
 17338584	137	Ice Elemental	80	80	1	300	32
-17338585	137	Zirnitra	85	85	209	15698	1
+17338585	137	Zirnitra	85	85	209	14504	1
 17338586	137	Greater Amphiptere	83	85	209	3600	1
 17338587	137	Greater Amphiptere	83	85	209	3600	1
 17338588	137	Greater Amphiptere	83	85	209	3600	1
@@ -40159,9 +40159,9 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17383439	148	Platinum Quadav	69	72	65	960	258
 17383440	148	Adaman Quadav	72	74	209	1200	258
 17383441	148	Ruby Quadav	72	74	209	1200	258
-17383442	148	Diamond Quadav	75	75	209	84600	258
+17383442	148	Diamond Quadav	75	75	209	77400	258
 17383443	148	ZaDha Adamantking	85	85	209	0	258
-17383444	148	Diamond Quadav	75	75	209	79200	258
+17383444	148	Diamond Quadav	75	75	209	86400	258
 17383446	148	HuRhe Marrowgorger	72	75	65	0	258
 17387521	149	Ferocious Pugil	22	24	1	0	2
 17387522	149	Ferocious Pugil	22	24	1	0	2
@@ -41226,7 +41226,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17396131	151	Yagudo Assassin	70	72	65	960	1
 17396132	151	Yagudo Templar	72	74	209	1440	1
 17396133	151	Yagudo High Priest	72	74	209	1440	1
-17396134	151	Yagudo Avatar	75	75	209	5527	1
+17396134	151	Yagudo Avatar	75	75	209	4748	1
 17396135	151	Yagudos Elemental	25	29	64	0	32
 17396136	151	Yagudos Avatar	60	60	32	0	33
 17396137	151	Tzee Xicu the Manifest	85	85	209	0	1
@@ -43342,7 +43342,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17436711	161	Ice Elemental	48	49	1	840	32
 17436712	161	Evil Eye	46	48	65	840	3
 17436713	161	Evil Eye	46	48	65	840	3
-17436714	161	Likho	67	68	81	3791	3
+17436714	161	Likho	67	68	81	4185	3
 17436715	161	Evil Eye	46	48	65	840	3
 17436716	161	Evil Eye	46	48	65	840	3
 17436717	161	Demon Pawn	50	52	65	960	257
@@ -43504,7 +43504,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17436873	161	Doom Demon	64	66	65	960	257
 17436874	161	Abyssal Demon	64	66	65	960	257
 17436875	161	Demons Elemental	49	54	64	0	32
-17436876	161	Marquis Naberius	63	64	81	8850	257
+17436876	161	Marquis Naberius	63	64	81	7613	257
 17436877	161	Blood Demon	64	66	65	960	257
 17436878	161	Doom Demon	64	66	65	960	257
 17436879	161	Abyssal Demon	64	66	65	960	257
@@ -43541,21 +43541,21 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17436910	161	Judicator Demon CZB	71	73	65	960	257
 17436911	161	Stygian Demon CZB	71	73	65	960	257
 17436912	161	Demons Elemental	60	64	64	0	32
-17436913	161	Marquis Allocen	76	76	81	6959	257
+17436913	161	Marquis Allocen	76	76	81	3003	257
 17436914	161	Gore Demon CZB	71	73	65	960	257
 17436915	161	Judicator Demon CZB	71	73	65	960	257
 17436916	161	Stygian Demon CZB	71	73	65	960	257
 17436917	161	Demons Elemental	60	64	64	0	32
-17436918	161	Marquis Amon	76	76	81	1101	257
+17436918	161	Marquis Amon	76	76	81	2766	257
 17436919	161	Gore Demon CZB	71	73	65	960	257
 17436920	161	Dread Demon CZB	71	73	65	960	257
 17436921	161	Stygian Demon CZB	71	73	65	960	257
 17436922	161	Demons Elemental	60	64	64	0	32
-17436923	161	Duke Haborym	76	76	81	9597	257
+17436923	161	Duke Haborym	76	76	81	998	257
 17436924	161	Gore Demon CZB	71	73	65	960	257
 17436925	161	Dread Demon CZB	71	73	65	960	257
 17436926	161	Judicator Demon CZB	71	73	65	960	257
-17436927	161	Grand Duke Batym	76	76	81	9937	257
+17436927	161	Grand Duke Batym	76	76	81	9094	257
 17436928	161	Demons Elemental	60	64	64	0	32
 17436929	161	Demons Avatar	52	54	0	0	33
 17436930	161	Ahriman	63	65	65	960	3
@@ -44381,12 +44381,12 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17461335	167	Garm BO	64	66	1	960	6
 17461336	167	Haunt	60	63	1	960	6
 17461337	167	Haunt	60	63	1	960	6
-17461338	167	Drexerion the Condemned	72	73	81	6484	6
+17461338	167	Drexerion the Condemned	72	73	81	9771	6
 17461339	167	Garm BO	64	66	1	960	6
 17461340	167	Garm BO	64	66	1	960	6
 17461341	167	Haunt	60	63	1	960	6
 17461342	167	Haunt	60	63	1	960	6
-17461343	167	Phanduron the Condemned	72	73	81	9930	6
+17461343	167	Phanduron the Condemned	72	73	81	10563	6
 17461344	167	Dark Aspic	52	54	1	960	258
 17461345	167	Dark Aspic	52	54	1	960	258
 17461346	167	Werebat	55	59	1	960	2
@@ -45606,9 +45606,9 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17485995	173	Water Elemental	32	34	1	720	32
 17485996	173	Seeker Bats	22	26	64	600	2
 17485997	173	Seeker Bats	22	26	64	600	2
-17485998	173	Jammer Leech	60	60	81	841	2
-17485999	173	Jammer Leech	60	60	81	1783	2
-17486000	173	Jammer Leech	60	60	81	1665	2
+17485998	173	Jammer Leech	60	60	81	914	2
+17485999	173	Jammer Leech	60	60	81	1494	2
+17486000	173	Jammer Leech	60	60	81	1147	2
 17486001	173	Greater Pugil	30	33	1	720	2
 17486002	173	Clipper	29	32	0	720	2
 17486003	173	Greater Pugil	30	33	1	720	2
@@ -46134,7 +46134,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17490231	174	Cancer	65	65	16	0	2
 17490232	174	Robber Crab	60	63	1	0	2
 17490233	174	Phantom Worm	70	72	81	0	2
-17490234	174	Guivre	84	84	19	7414	1
+17490234	174	Guivre	84	84	19	9592	1
 17490235	174	Kettenkaefer	80	80	17	0	257
 17490236	174	Tangaroa	96	97	17	0	2
 17490237	174	Koura	92	93	17	0	2
@@ -50936,7 +50936,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17555718	190	Plague Bats	15	17	65	480	2
 17555719	190	Plague Bats	15	17	65	480	2
 17555720	190	Plague Bats	15	17	65	480	2
-17555721	190	Barbastelle	15	17	81	5336	2
+17555721	190	Barbastelle	15	17	81	3438	2
 17555722	190	Plague Bats	15	17	65	480	2
 17555723	190	Plague Bats	15	17	65	480	2
 17555724	190	Rock Eater	14	16	1	480	2
@@ -50978,7 +50978,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17555760	190	Hati	77	78	1	960	6
 17555761	190	Spartoi Warrior	78	80	1	960	6
 17555762	190	Spartoi Sorcerer	80	81	1	960	6
-17555763	190	Vrtra	95	95	209	369000	3
+17555763	190	Vrtra	95	95	209	399600	3
 17555764	190	Pey	76	76	81	0	6
 17555765	190	Pey	76	76	81	0	6
 17555766	190	Iruci	76	76	81	0	6
@@ -52071,7 +52071,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17568124	193	Stroper	31	34	1	720	2
 17568125	193	Stroper	31	34	1	720	2
 17568126	193	Stroper	31	34	1	720	2
-17568127	193	Morbolger	42	44	19	6596	2
+17568127	193	Morbolger	42	44	19	6134	2
 17568128	193	Napalm	31	33	1	720	33
 17568129	193	Napalm	31	33	1	720	33
 17568130	193	Air Elemental	33	36	1	720	32
@@ -52540,7 +52540,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17576005	195	Lost Soul war EN	45	46	1	840	6
 17576006	195	Lost Soul war EN	45	46	1	840	6
 17576007	195	Lost Soul blm EN	45	46	1	840	6
-17576008	195	Anemone	45	46	1	81720	2
+17576008	195	Anemone	45	46	1	70132	2
 17576009	195	Gazer	41	43	1	840	2
 17576010	195	Gazer	41	43	1	840	2
 17576011	195	Gazer	41	43	1	840	2
@@ -52599,7 +52599,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17576064	195	Gazer	41	43	1	840	2
 17576065	195	Gazer	41	43	1	840	2
 17576066	195	Gazer	41	43	1	840	2
-17576067	195	Anemone	45	46	1	79808	2
+17576067	195	Anemone	45	46	1	79688	2
 17576068	195	Puroboros EN GC	42	44	1	840	33
 17576069	195	Lost Soul blm EN	42	46	1	840	6
 17576070	195	Lost Soul blm EN	42	46	1	840	6
@@ -53302,7 +53302,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17584309	197	Blazer Beetle	52	54	65	960	257
 17584310	197	Blazer Beetle	52	54	65	960	257
 17584311	197	Blazer Beetle	52	54	65	960	257
-17584312	197	Dynast Beetle	56	56	81	6989	257
+17584312	197	Dynast Beetle	56	56	81	6844	257
 17584313	197	Fire Elemental	52	54	1	960	32
 17584314	197	Water Elemental	52	54	1	960	32
 17584315	197	Helm Beetle	59	62	65	960	257
@@ -53868,7 +53868,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17588671	198	Labyrinth Scorpion	30	33	1	720	258
 17588672	198	Labyrinth Scorpion	30	33	1	720	258
 17588673	198	Protozoan	29	31	1	720	258
-17588674	198	Argus	36	37	17	3970	2
+17588674	198	Argus	36	37	17	0	2
 17588675	198	Ancient Bat LDT MoS	26	29	65	600	2
 17588676	198	Ancient Bat LDT MoS	26	29	65	600	2
 17588677	198	Poison Leech	24	28	64	600	2
@@ -53879,7 +53879,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17588682	198	Poison Leech	24	28	64	600	2
 17588683	198	Poison Leech	24	28	64	600	2
 17588684	198	Poison Leech	24	28	64	600	2
-17588685	198	Leech King	35	36	81	0	2
+17588685	198	Leech King	35	36	81	915	2
 17588686	198	Poison Leech	24	28	64	600	2
 17588687	198	Poison Leech	24	28	64	600	2
 17588688	198	Poison Leech	24	28	64	600	2
@@ -53992,8 +53992,8 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17596503	200	Fallen Soldier war	47	49	1	840	6
 17596504	200	Fallen Soldier blm	47	49	1	840	6
 17596505	200	Bhuta	47	48	1	840	6
-17596506	200	Old Two-Wings	52	52	83	82327	2
-17596507	200	Skewer Sam	54	54	19	81923	1
+17596506	200	Old Two-Wings	52	52	83	83284	2
+17596507	200	Skewer Sam	54	54	19	76918	1
 17596508	200	Funnel Bats GC	51	53	65	960	2
 17596509	200	Funnel Bats GC	51	53	65	960	2
 17596510	200	Fetid Flesh	54	56	1	960	6
@@ -54206,7 +54206,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17596717	200	Wraith	60	62	1	960	6
 17596718	200	Wraith	60	62	1	960	6
 17596719	200	Wraith	60	62	1	960	6
-17596720	200	Serket	70	70	16	78503	258
+17596720	200	Serket	70	70	16	81756	258
 17596721	200	Wraith	60	62	1	960	6
 17596722	200	Magic Jug	62	64	1	960	32
 17596723	200	Magic Jug	62	64	1	960	32
@@ -54649,7 +54649,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17613126	204	Underworld Bats	50	52	65	960	2
 17613127	204	Underworld Bats	50	52	65	960	2
 17613128	204	Dabotzs Ghost	53	53	17	0	6
-17613129	204	Capricious Cassie	70	70	17	6751	2
+17613129	204	Capricious Cassie	70	70	17	6321	2
 17613134	204	Orientalis Shadow	128	128	81	0	6
 17613135	204	Borealis Shadow	128	128	81	0	6
 17613136	204	Australis Shadow	128	128	81	0	6
@@ -54912,7 +54912,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17617144	205	Volcanic Bomb	74	78	1	960	33
 17617145	205	Ash Lizard	73	76	64	960	2
 17617146	205	Ash Lizard	73	76	64	960	2
-17617147	205	Ash Dragon	82	82	17	332143	2
+17617147	205	Ash Dragon	82	82	17	386364	2
 17617148	205	Volcanic Bomb	74	78	1	960	33
 17617149	205	Volcanic Bomb	74	78	1	960	33
 17617150	205	Volcanic Bomb	74	78	1	960	33
@@ -55782,7 +55782,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17645575	212	Labyrinth Lizard	46	49	64	840	2
 17645576	212	Labyrinth Leech	45	48	64	840	2
 17645577	212	Labyrinth Leech	45	48	64	840	2
-17645578	212	Bune	83	83	81	8069	1
+17645578	212	Bune	83	83	81	8401	1
 17645579	212	Goblin Poacher	46	49	65	840	1
 17645580	212	Labyrinth Lizard	46	49	64	840	2
 17645581	212	Labyrinth Lizard	46	49	64	840	2
@@ -56063,7 +56063,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17649690	213	Goblin Hunter	51	54	65	960	1
 17649691	213	Cockatrice	50	53	1	960	1
 17649692	213	Cockatrice	50	53	1	960	1
-17649693	213	Mysticmaker Profblix	50	52	81	9000	1
+17649693	213	Mysticmaker Profblix	50	52	81	8100	1
 17649694	213	Goblin Enchanter	51	54	65	960	1
 17649695	213	Goblin Hunter	51	54	65	960	1
 17649696	213	Cockatrice	50	53	1	960	1
@@ -65332,7 +65332,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17961066	289	Ilaern whm	115	119	64	180	3
 17961067	289	Ilaern whm	115	119	64	180	3
 17961068	289	Ilaern bst	115	119	64	180	3
-17961069	289	Eschan Ilaerns Euvhi	116	116	72	0	2
+17961069	289	Eschan Ilaerns Euvhi	116	116	64	0	2
 17961070	289	Ilaern whm	115	119	64	180	3
 17961071	289	Ilaern whm	115	119	64	180	3
 17961072	289	Ilaern whm	115	119	64	180	3
@@ -65342,7 +65342,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17961076	289	Eschan Euvhi	115	119	64	180	2
 17961077	289	Eschan Euvhi	115	119	64	180	2
 17961078	289	Ilaern bst	115	119	64	180	3
-17961079	289	Eschan Ilaerns Euvhi	116	116	64	0	2
+17961079	289	Eschan Ilaerns Euvhi	116	116	72	0	2
 17961080	289	Eschan Euvhi	115	119	64	180	2
 17961081	289	Eschan Euvhi	115	119	64	180	2
 17961082	289	Ilaern bst	115	119	64	180	3
@@ -65366,7 +65366,7 @@ id	zone	name	minLevel	maxLevel	flags	respawn	detects
 17961100	289	Eschan Euvhi	115	119	64	180	2
 17961101	289	Eschan Euvhi	115	119	64	180	2
 17961102	289	Ilaern bst	115	119	64	180	3
-17961103	289	Eschan Ilaerns Euvhi	116	116	72	0	2
+17961103	289	Eschan Ilaerns Euvhi	116	116	64	0	2
 17961104	289	Eschan Euvhi	115	119	64	180	2
 17961105	289	Eschan Euvhi	115	119	64	180	2
 17961106	289	Eschan Clionid	115	119	0	180	4

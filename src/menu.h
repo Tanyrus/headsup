@@ -12,7 +12,7 @@ namespace aggroglow
     {
         uint32_t outlinedMobs;
         uint32_t meshes;
-        uint32_t labels;
+        uint32_t nameplates;
         double frameMs;
         bool stencilAvailable;
     };

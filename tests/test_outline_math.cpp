@@ -28,7 +28,7 @@ TEST(identity_detection)
 
 TEST(shifted_projection_moves_points_by_the_same_ndc_offset_at_any_depth)
 {
-    // FFXI's right-handed projection from the spike dump (_34 = -1).
+    // FFXI's right-handed projection (_34 = -1).
     const Mat4 p{{0.8961f, 0, 0, 0, 0, 1.5104f, 0, 0, 0, 0, -1, -1, 0, 0, -0.1f, 0}};
     const Mat4 s = ShiftProjection(p, 0.01f, -0.02f);
     for (float z : {-2.0f, -15.0f, -80.0f})

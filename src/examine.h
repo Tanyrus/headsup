@@ -10,6 +10,8 @@
 
 namespace aggroglow
 {
+    constexpr uint16_t kCheckRequestPacket = 0x0DD; // client to server: Check
+    constexpr uint16_t kCheckReplyPacket   = 0x029; // server to client: Message Basic
     constexpr float kExamineMaxDistance = 45.0f;  // yalms; the server logs a warning past 50
     constexpr double kExamineInterval   = 1.0;    // seconds between automatic checks
     constexpr double kDefaultCooldown   = 600.0;  // seconds, when the data has no respawn time

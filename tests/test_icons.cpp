@@ -74,5 +74,7 @@ TEST(every_icon_has_an_embedded_png)
         const IconPng& png = IconImage(static_cast<Icon>(i));
         CHECK(png.size > 8);
         CHECK(std::memcmp(png.data, "\x89PNG\r\n\x1a\n", 8) == 0);
+        CHECK_EQ(png.width, 32u); // every MobDB icon is 32x32
+        CHECK_EQ(png.height, 32u);
     }
 }

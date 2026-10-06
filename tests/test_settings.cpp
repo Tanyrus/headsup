@@ -29,52 +29,84 @@ namespace
 
     constexpr int kNmWillAttack = static_cast<int>(Category::NmWillAttack);
     constexpr int kNmWontAttack = static_cast<int>(Category::NmWontAttack);
+
+    // Every field, so a loader or saver that drops one is caught.
+    void CheckSameColor(const Color& a, const Color& b)
+    {
+        for (int i = 0; i < 3; ++i)
+            CHECK_EQ(a.v[i], b.v[i]);
+    }
+
+    void CheckSame(const Settings& a, const Settings& b)
+    {
+        CHECK(a.enabled == b.enabled);
+        CHECK_EQ(a.thickness, b.thickness);
+        CHECK_EQ(a.smoothness, b.smoothness);
+        CHECK_EQ(a.maxDistance, b.maxDistance);
+        CHECK(a.showLabels == b.showLabels);
+        CHECK(a.autoExamine == b.autoExamine);
+        CHECK(a.replaceNameplates == b.replaceNameplates);
+        CHECK(a.showIcons == b.showIcons);
+        CHECK(a.scaleWithDistance == b.scaleWithDistance);
+        CHECK_EQ(a.fontIndex, b.fontIndex);
+        CHECK(a.fontBold == b.fontBold);
+        CHECK_EQ(a.nameSize, b.nameSize);
+        CHECK_EQ(a.labelSize, b.labelSize);
+        CHECK_EQ(a.iconSize, b.iconSize);
+        CHECK(a.ownNameColor == b.ownNameColor);
+        CheckSameColor(a.nameColor, b.nameColor);
+        for (int k = 0; k < kLabelShadeCount; ++k)
+            CheckSameColor(a.labelColor[k], b.labelColor[k]);
+        CheckSameColor(a.textOutline, b.textOutline);
+        CheckSameColor(a.iconTint, b.iconTint);
+        for (int c = 0; c < kCategoryCount; ++c)
+        {
+            CHECK(a.show[c] == b.show[c]);
+            CheckSameColor(a.color[c], b.color[c]);
+        }
+    }
 }
 
 TEST(empty_store_gives_defaults)
 {
     MapStore store;
-    const Settings s = LoadSettings(store);
-    CHECK(s.enabled);
-    CHECK_EQ(s.thickness, 4.0f);
-    CHECK_EQ(s.smoothness, 8);
-    CHECK_EQ(s.maxDistance, 40.0f);
-    CHECK(s.showLabels);
-    CHECK(!s.autoExamine);
-    CHECK(s.show[0] && s.show[1] && s.show[2] && s.show[kNmWillAttack] && s.show[kNmWontAttack]);
-    CHECK_EQ(s.color[0].v[0], 1.0f);
-    CHECK_EQ(s.color[kNmWillAttack].v[1], 0.60f); // gold-orange
-    CHECK_EQ(s.color[kNmWontAttack].v[1], 0.84f); // gold
+    CheckSame(LoadSettings(store), Settings{});
 }
 
 TEST(settings_round_trip)
 {
     MapStore store;
     Settings s;
-    s.enabled        = false;
-    s.thickness      = 6.5f;
-    s.smoothness     = 12;
-    s.maxDistance    = 25.0f;
-    s.showLabels     = false;
-    s.autoExamine    = true;
-    s.show[1]        = false;
-    s.show[kNmWontAttack]        = false;
-    s.color[2].v[0]              = 0.25f;
-    s.color[kNmWillAttack].v[2]  = 0.5f;
+    s.enabled           = false;
+    s.thickness         = 6.5f;
+    s.smoothness        = 12;
+    s.maxDistance       = 25.0f;
+    s.showLabels        = false;
+    s.autoExamine       = true;
+    s.replaceNameplates = true;
+    s.showIcons         = false;
+    s.scaleWithDistance = true;
+    s.fontIndex         = 3;
+    s.fontBold          = false;
+    s.nameSize          = 20;
+    s.labelSize         = 9;
+    s.iconSize          = 24;
+    s.ownNameColor      = true;
+    s.nameColor         = Color{{0.5f, 0.25f, 0.125f}};
+    for (int k = 0; k < kLabelShadeCount; ++k)
+        s.labelColor[k] = Color{{0.0625f * static_cast<float>(k), 0.5f, 0.25f}};
+    s.textOutline = Color{{0.25f, 0.25f, 0.5f}};
+    s.iconTint    = Color{{0.75f, 0.5f, 1.0f}};
+    for (int c = 0; c < kCategoryCount; ++c)
+    {
+        s.show[c]  = c % 2 == 0;
+        s.color[c] = Color{{0.25f, 0.5f, 0.75f}};
+    }
     SaveSettings(s, store);
-    const Settings r = LoadSettings(store);
-    CHECK(!r.enabled);
-    CHECK_EQ(r.thickness, 6.5f);
-    CHECK_EQ(r.smoothness, 12);
-    CHECK_EQ(r.maxDistance, 25.0f);
-    CHECK(!r.showLabels);
-    CHECK(r.autoExamine);
-    CHECK(!r.show[1]);
-    CHECK(!r.show[kNmWontAttack]);
-    CHECK_EQ(r.color[2].v[0], 0.25f);
-    CHECK_EQ(r.color[kNmWillAttack].v[2], 0.5f);
+    CheckSame(LoadSettings(store), s);
     CHECK(store.values.count("nmWillAttackB") == 1);
     CHECK(store.values.count("nmWontAttackShow") == 1);
+    CHECK(store.values.count("labelVeryToughR") == 1);
 }
 
 TEST(out_of_range_values_are_clamped)
@@ -83,12 +115,49 @@ TEST(out_of_range_values_are_clamped)
     store.values["thickness"]   = "99";
     store.values["smoothness"]  = "2";
     store.values["maxDistance"] = "-5";
-    store.values["willAttackA"] = "3";
+    store.values["fontIndex"]   = "9";
+    store.values["nameSize"]    = "100";
+    store.values["labelSize"]   = "2";
     const Settings s = LoadSettings(store);
-    CHECK_EQ(s.thickness, 16.0f);
-    CHECK_EQ(s.smoothness, 4);
-    CHECK_EQ(s.maxDistance, 5.0f);
-    CHECK_EQ(s.color[0].v[3], 1.0f);
+    CHECK_EQ(s.thickness, kMaxThickness);
+    CHECK_EQ(s.smoothness, kMinSmoothness);
+    CHECK_EQ(s.maxDistance, kMinOutlineDistance);
+    CHECK_EQ(s.fontIndex, kFontCount - 1);
+    CHECK_EQ(s.nameSize, kMaxTextSize);
+    CHECK_EQ(s.labelSize, kMinTextSize);
+    CHECK(std::string(FontFamily(-1)) == FontFamily(0));
+    CHECK(std::string(FontFamily(kFontCount)) == FontFamily(0));
+}
+
+TEST(clamp_bounds_every_field)
+{
+    // The menu relies on Clamp, not on the loader's own bounds.
+    Settings s;
+    s.thickness   = 0.0f;
+    s.smoothness  = 99;
+    s.maxDistance = 1000.0f;
+    s.fontIndex   = -3;
+    s.nameSize    = 100;
+    s.labelSize   = 0;
+    s.iconSize    = 49;
+    s.color[0]    = Color{{2.0f, -1.0f, 0.5f}};
+    s.nameColor   = s.color[0];
+    s.labelColor[kLabelShadeCount - 1] = s.color[0];
+    s.textOutline = s.color[0];
+    s.iconTint    = s.color[0];
+    const Settings c = Clamp(s);
+    for (const Color& clamped : {c.nameColor, c.labelColor[kLabelShadeCount - 1], c.textOutline, c.iconTint})
+        CheckSameColor(clamped, Color{{1.0f, 0.0f, 0.5f}});
+    CHECK_EQ(c.thickness, kMinThickness);
+    CHECK_EQ(c.smoothness, kMaxSmoothness);
+    CHECK_EQ(c.maxDistance, kMaxOutlineDistance);
+    CHECK_EQ(c.fontIndex, 0);
+    CHECK_EQ(c.nameSize, kMaxTextSize);
+    CHECK_EQ(c.labelSize, kMinTextSize);
+    CHECK_EQ(c.iconSize, kMaxTextSize);
+    CHECK_EQ(c.color[0].v[0], 1.0f);
+    CHECK_EQ(c.color[0].v[1], 0.0f);
+    CHECK_EQ(c.color[0].v[2], 0.5f);
 }
 
 TEST(non_finite_values_fall_back_to_defaults)
@@ -97,27 +166,15 @@ TEST(non_finite_values_fall_back_to_defaults)
     store.values["thickness"]   = "nan";
     store.values["smoothness"]  = "nan";
     store.values["maxDistance"] = "inf";
+    store.values["iconSize"]    = "nan";
     store.values["unknownG"]    = "nan";
-    const Settings s = LoadSettings(store);
-    CHECK_EQ(s.thickness, 4.0f);
-    CHECK_EQ(s.smoothness, 8);
-    CHECK_EQ(s.maxDistance, 40.0f);
-    CHECK_EQ(s.color[2].v[1], 0.70f);
+    CheckSame(LoadSettings(store), Settings{});
 }
 
 TEST(argb_packing)
 {
-    CHECK_EQ(ToArgb(Color{{1.0f, 0.0f, 0.0f, 1.0f}}), 0xFFFF0000u);
-    CHECK_EQ(ToArgb(Color{{0.2f, 1.0f, 0.3f, 0.5f}}), (128u << 24) | (51u << 16) | (255u << 8) | 77u);
-}
-
-TEST(colors_are_always_opaque)
-{
-    // Outline copies take alpha from the texture (it shapes cut-outs), so a color's alpha has no effect; keep it 1.
-    MapStore store;
-    store.values["wontAttackA"] = "0.2";
-    const Settings s = LoadSettings(store);
-    CHECK_EQ(s.color[1].v[3], 1.0f);
+    CHECK_EQ(ToArgb(Color{{1.0f, 0.0f, 0.0f}}), 0xFFFF0000u);
+    CHECK_EQ(ToArgb(Color{{0.2f, 1.0f, 0.3f}}), 0xFF33FF4Du);
 }
 
 TEST(v1_settings_files_still_load)
@@ -130,4 +187,17 @@ TEST(v1_settings_files_still_load)
     CHECK_EQ(s.color[0].v[0], 0.5f);
     CHECK(s.show[kNmWillAttack] && s.show[kNmWontAttack]);
     CHECK_EQ(s.color[kNmWontAttack].v[0], 1.0f);
+}
+
+TEST(nameplates_need_the_master_switch_and_a_part)
+{
+    Settings s;
+    CHECK(NameplatesOn(s)); // labels and icons are on by default
+    s.showLabels = false;
+    s.showIcons  = false;
+    CHECK(!NameplatesOn(s));
+    s.replaceNameplates = true;
+    CHECK(NameplatesOn(s));
+    s.enabled = false;
+    CHECK(!NameplatesOn(s));
 }

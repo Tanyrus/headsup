@@ -31,14 +31,16 @@ namespace
     const PlayerState kLevel20{20, false};
 }
 
-TEST(players_are_tracked_but_never_outlined)
+TEST(players_are_tracked_without_outline_or_nameplate)
 {
     Tracker t;
     t.Update({Player(0x1000)}, kLevel20, Settings{});
     const ActorInfo* info = t.Find(0x1000);
     CHECK(info != nullptr);
-    CHECK(!info->outline);
+    CHECK(!info->outline && !info->isMob);
+    CHECK(info->name[0] == '\0');
     CHECK_EQ(t.OutlinedCount(), 0u);
+    CHECK(t.Mobs().empty());
 }
 
 TEST(each_category_gets_its_colour)
@@ -119,16 +121,6 @@ TEST(unknown_pointers_are_not_found)
     CHECK(t.Find(0x9000) == nullptr);
 }
 
-TEST(outlined_mobs_get_a_label_from_the_data)
-{
-    Tracker t;
-    t.Update({BountyHunter(0x2000)}, kLevel20, Settings{});
-    const ActorInfo* info = t.Find(0x2000);
-    CHECK(std::string(info->label.text) == "Lv 17-20 EP-EM");
-    CHECK_EQ(info->label.argb, ConArgb(Con::EvenMatch));
-    CHECK_EQ(info->index, 0x220);
-}
-
 TEST(an_examined_spawn_uses_its_level_for_label_and_category)
 {
     // Level 10 is Too Weak at 20, so the aggressive Goblin Bounty Hunter won't attack.
@@ -142,13 +134,44 @@ TEST(an_examined_spawn_uses_its_level_for_label_and_category)
     CHECK_EQ(t.Find(0x2000)->argb, ToArgb(s.color[1]));
 }
 
-TEST(outlined_actors_lists_only_outlined_mobs)
+TEST(outlined_count_includes_only_outlined_mobs)
 {
     Tracker t;
     Settings s;
     s.show[1] = false;
     t.Update({Player(0x1000), BountyHunter(0x2000), Mob(0x3000, kSnipper, "Snipper"), BountyHunter(0x4000, 50.0f)}, kLevel20, s);
-    CHECK_EQ(t.OutlinedActors().size(), 1u);
-    CHECK_EQ(t.OutlinedActors()[0], 0x2000u);
-    CHECK(t.Find(0x3000)->label.text[0] == '\0');
+    CHECK_EQ(t.OutlinedCount(), 1u);
+    CHECK(t.Find(0x2000)->outline);
 }
+
+TEST(every_mob_gets_nameplate_data_at_any_distance)
+{
+    // Outlines stop at the max distance and hidden categories; nameplates do not.
+    Tracker t;
+    Settings s;
+    s.show[1] = false;
+    t.Update({Player(0x1000), BountyHunter(0x2000, 100.0f), Mob(0x3000, kSnipper, "Snipper")}, kLevel20, s);
+    const ActorInfo* far = t.Find(0x2000);
+    CHECK(far->isMob && far->alive && !far->outline);
+    CHECK_EQ(far->index, 0x220);
+    CHECK(std::string(far->name) == "Goblin Bounty Hunter");
+    CHECK(std::string(far->label.text) == "Lv 17-20 EP-EM");
+    CHECK(far->icons.count >= 1);
+    CHECK(far->icons.icons[0] == Icon::AggroNQ);
+    const ActorInfo* hidden = t.Find(0x3000);
+    CHECK(!hidden->outline);
+    CHECK(std::string(hidden->label.text) == "Lv 19-20 DC-EM");
+    CHECK(hidden->icons.icons[0] == Icon::PassiveNQ);
+    CHECK(t.Mobs() == (std::vector<ActorPtr>{0x2000, 0x3000}));
+}
+
+TEST(dead_mobs_keep_only_their_name)
+{
+    Tracker t;
+    t.Update({BountyHunter(0x2000, 10.0f, false)}, kLevel20, Settings{});
+    const ActorInfo* dead = t.Find(0x2000);
+    CHECK(std::string(dead->name) == "Goblin Bounty Hunter");
+    CHECK(dead->label.text[0] == '\0');
+    CHECK_EQ(dead->icons.count, 0);
+}
+

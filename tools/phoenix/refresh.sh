@@ -8,6 +8,8 @@
 #   AGGROGLOW_PHOENIX_DB_PORT  MariaDB port, default 3307
 #   AGGROGLOW_PHOENIX_DUMPS    server runs to snapshot, default 5, about a minute each (a mob counts as aggressive
 #                              if any run saw it attack)
+#   AGGROGLOW_PHOENIX_SNAPSHOTS  where every run's dumps are kept, one folder per Phoenix commit, default
+#                              ~/.cache/aggroglow-snapshots; each refresh merges all of that commit's dumps
 #   JOBS                    parallel build jobs, default nproc
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -22,11 +24,14 @@ VENV="$WORK/venv"
 DB="$WORK/db"
 SOCKET="${XDG_RUNTIME_DIR:-$WORK}/aggroglow-phoenix.sock" # under 108 characters, unlike a path inside $WORK
 STAGE="$WORK/out"
+SNAPSHOTS="${AGGROGLOW_PHOENIX_SNAPSHOTS:-$HOME/.cache/aggroglow-snapshots}/$COMMIT"
 
 log() { printf '[refresh] %s\n' "$*"; }
 fail() { printf '[refresh] FAILED: %s\n' "$*" >&2; exit 1; }
 
-case "$WORK" in /tmp | /tmp/*) fail "/tmp is a small RAM disk here; set AGGROGLOW_PHOENIX_DIR to a folder on disk" ;; esac
+for dir in "$WORK" "$SNAPSHOTS"; do
+    case "$dir" in /tmp | /tmp/*) fail "/tmp is a small RAM disk here; keep $dir on disk" ;; esac
+done
 for tool in git cmake ninja g++ python3 mariadbd mariadb-install-db mariadb mariadb-admin timeout; do
     command -v "$tool" > /dev/null || fail "missing tool: $tool"
 done
@@ -115,11 +120,12 @@ log "loading the database (dbtool update full)"
 
 # 6. Run the map server until the dump module writes every loaded mob and exits, several times: some mobs change
 #    aggression while the server runs (elementals, the Ghrah forms), and compact.py counts a mob as aggressive if any
-#    run saw it attack.
-rm -f "$WORK"/aggroglow_mobs*.json
+#    run saw it attack. Every dump is kept, so later refreshes of the same commit merge it too.
+mkdir -p "$SNAPSHOTS"
+stamp="$(date +%Y%m%d-%H%M%S)"
 dumps=()
 for run in $(seq "$DUMPS"); do
-    dump="$WORK/aggroglow_mobs_$run.json"
+    dump="$SNAPSHOTS/$stamp-$run.json"
     log "running xi_map until dump $run of $DUMPS is written"
     (cd "$SERVER" && AGGROGLOW_DUMP_PATH="$dump" timeout 1200 ./xi_map --ip 127.0.0.1 --port 54230 < /dev/null \
         > "$WORK/map.log" 2>&1) || fail "xi_map; see $WORK/map.log"
@@ -129,7 +135,12 @@ done
 
 # 7. Compact and validate into a staging folder; only then replace data/.
 rm -rf "$STAGE"
-python3 "$ROOT/tools/phoenix/compact.py" "${dumps[@]}" "$STAGE" "$COMMIT"
+# This run's dumps go first: they carry every field the current dump module writes.
+earlier=()
+for snapshot in "$SNAPSHOTS"/*.json; do
+    case "$snapshot" in "$SNAPSHOTS/$stamp"-*) ;; *) earlier+=("$snapshot") ;; esac
+done
+python3 "$ROOT/tools/phoenix/compact.py" "${dumps[@]}" "${earlier[@]}" "$STAGE" "$COMMIT"
 python3 "$ROOT/tools/phoenix/validate.py" "$STAGE/phoenix_mobs.tsv" || fail "validation; data/ left unchanged"
 mkdir -p "$ROOT/data"
 cp "$STAGE/phoenix_mobs.tsv" "$STAGE/phoenix_mobs.meta" "$ROOT/data/"

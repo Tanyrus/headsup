@@ -17,7 +17,15 @@ namespace aggroglow
         void Add(float x, float y);
         void Add(const ScreenBox& other);
         ScreenBox Scaled(float scaleX, float scaleY) const;
+        float Width() const { return maxX - minX; }
+        float Height() const { return maxY - minY; }
+        float CenterX() const { return (minX + maxX) * 0.5f; }
+        float CenterY() const { return (minY + maxY) * 0.5f; }
     };
+
+    constexpr uint32_t kWhite = 0xFFFFFFFF;
+    // XYZRHW vertices start with x, y, z and rhw; the diffuse color, when present, follows.
+    constexpr uint32_t kPretransformedPositionBytes = 4 * sizeof(float);
 
     // Vertices a draw of primitiveCount primitives reads, by D3DPRIMITIVETYPE (1 point list ... 6 triangle fan);
     // 0 for other types.
@@ -44,9 +52,63 @@ namespace aggroglow
     constexpr uint32_t kStableFrames = 2;
 
     // Whether the camera can see the mob well enough to label it: the game drew its body this frame, its nameplate has
-    // been drawn for kStableFrames frames in a row, and the nameplate lies fully inside the screen.
+    // been drawn for kStableFrames frames in a row, and some of the nameplate is on screen.
     bool LabelVisible(const ScreenBox* plate, uint32_t meshDraws, uint32_t plateFramesInRow, float screenWidth, float screenHeight);
 
-    // Top-left corner of a width x height label centered above a box, gap pixels above its top.
-    void PlaceAbove(const ScreenBox& box, float width, float height, float gap, float& x, float& y);
+    // One nameplate glyph draw and the color the game shows it in (white when the draw has none).
+    struct GlyphDraw
+    {
+        ScreenBox box;
+        uint32_t argb;
+    };
+
+    // The color the game shows for a letter: its vertex color times the texture stage's modulate scale (1, 2 or 4),
+    // made opaque like our name's outline.
+    uint32_t ShownColor(uint32_t diffuse, uint32_t modulateScale);
+
+    // The game's color for a name: the most common color among the letters inside its nameplate box; white if none.
+    uint32_t NameColor(const std::vector<GlyphDraw>& glyphs, const ScreenBox& plate);
+
+    // Who drew a glyph, by the stack scan.
+    enum class GlyphOwner : uint8_t
+    {
+        None,
+        Mob,
+        Other, // a player or NPC
+    };
+
+    // Replace mode: whether to hide a glyph of a mob's name. Only names AggroGlow replaced in the previous frame count
+    // (replacedPlates), and only glyphs as tall as that name's letters. Hidden inside such a name (padded by two letter
+    // heights), or when the game credits it to a mob whose replaced name is within six letter heights (a stale stack
+    // pointer). ownerPlate is the owner's previous name: for a mob, only if it was replaced. A player's or NPC's glyph
+    // inside its own name is never hidden.
+    bool HideGlyph(const ScreenBox& glyph, GlyphOwner owner, const ScreenBox* ownerPlate,
+        const std::vector<ScreenBox>& replacedPlates);
+
+    // Measured sizes of a nameplate's lines (0 for a line that is not shown).
+    struct LineSizes
+    {
+        float nameWidth, nameHeight;
+        float labelWidth, labelHeight;
+        int iconCount;
+        float iconSize;
+    };
+
+    // Top-left corners of each line, centered on the nameplate. With a name: the name is centered on the game's name,
+    // the label 1 px above it and the icon row 2 px above that. Without: the label and icons stack 2 px above the game's
+    // name. Icons are iconStep apart.
+    struct NameplateLayout
+    {
+        float nameX, nameY;
+        float labelX, labelY;
+        float iconsX, iconsY, iconStep;
+    };
+    NameplateLayout LayoutNameplate(const ScreenBox& plate, const LineSizes& sizes, bool showName);
+
+    // A text or icon size scaled like the game's names: base x (letterHeight / (screenHeight / 180)), clamped to
+    // 0.5x-2.5x, rounded to whole pixels.
+    int ScaledSize(int base, float letterHeight, float screenHeight);
+    // Keeps the current size until the target differs by 2 px or more, so fonts do not re-render every frame.
+    int SteppedSize(int current, int target);
+
 }

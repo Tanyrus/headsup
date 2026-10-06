@@ -15,7 +15,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 SDK = ROOT / 'third_party' / 'ashita-sdk'
 CALLED_INTERFACES = ['IAshitaCore', 'IMemoryManager', 'IEntity', 'IParty', 'IPlayer', 'IChatManager',
                      'IConfigurationManager', 'IGuiManager', 'IFontManager', 'IFontObject', 'IPrimitiveObject',
-                     'IPacketManager', 'ITarget']
+                     'IPacketManager', 'ITarget', 'IPrimitiveManager']
 INTERFACE = re.compile(r'^(?:struct|interface)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{(.*?)^\};', re.M | re.S)
 DECL = re.compile(r'virtual\s+[^;]*?\b([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)\s*(?:const)?\s*=\s*0\s*;')
 CALL = re.compile(r'->\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(')

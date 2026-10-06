@@ -6,10 +6,12 @@ The PNG files are compiled into the plugin as byte arrays; Ashita decodes them w
 import pathlib
 import sys
 
-# Same order as aggroglow::Icon in src/icons.h.
+# src/icons.cpp builds its table from these arrays in aggroglow::Icon order.
 ICONS = ['AggroNQ', 'AggroHQ', 'PassiveNQ', 'PassiveHQ', 'Link', 'Sight', 'TrueSight', 'Sound', 'Scent', 'Magic', 'JA',
          'Blood']
 PNG_SIGNATURE = b'\x89PNG\r\n\x1a\n'
+# src/icons.cpp reads the width and height from the IHDR chunk that must follow the signature.
+IHDR_TYPE = slice(12, 16)
 MAX_BYTES = 64 * 1024
 
 
@@ -32,12 +34,9 @@ def generate(icon_dir: pathlib.Path) -> str:
         if not path.is_file():
             raise IconError(f'missing icon {path}')
         data = path.read_bytes()
-        if not data.startswith(PNG_SIGNATURE) or len(data) > MAX_BYTES:
+        if not data.startswith(PNG_SIGNATURE) or data[IHDR_TYPE] != b'IHDR' or len(data) > MAX_BYTES:
             raise IconError(f'{path} is not a PNG of at most {MAX_BYTES} bytes')
         parts.append(c_array(name, data))
-    parts.append('const IconPng kIconPngs[] = {')
-    parts += [f'    {{kPng{name}, sizeof(kPng{name})}},' for name in ICONS]
-    parts.append('};')
     return '\n'.join(parts) + '\n'
 
 

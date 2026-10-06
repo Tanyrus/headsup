@@ -1,6 +1,7 @@
 #pragma once
 
 #include "classifier.h"
+#include "icons.h"
 #include "labels.h"
 #include "settings.h"
 
@@ -30,23 +31,28 @@ namespace aggroglow
         uint8_t stencilRef = 0;     // 1-255 when outlined
         uint32_t argb      = 0;     // outline colour (D3DCOLOR)
         uint16_t index     = 0;     // entity target index
-        Label label{};              // level and con text, set when outlined
+        bool isMob         = false; // spawn flag 0x10
+        bool alive         = false;
+        char name[32]      = {};    // a mob's name, for the replacement nameplate
+        Label label{};              // level and con text: every living mob
+        IconSet icons{};            // the MobDB icon row: every living mob with data
     };
 
-    // Per-frame table of every entity's actor pointer and the outline decision for each mob. Players and NPCs are
-    // included: a draw's owner is the first actor pointer of any kind on the stack.
+    // Per-frame table of every entity's actor pointer, each mob's nameplate data and its outline decision. Players and
+    // NPCs are included: a draw's owner is the first actor pointer of any kind on the stack.
     class Tracker
     {
     public:
         void Update(const std::vector<ActorInput>& actors, const PlayerState& player, const Settings& settings);
         const ActorInfo* Find(ActorPtr actor) const;
-        uint32_t OutlinedCount() const { return static_cast<uint32_t>(m_Outlined.size()); }
-        // Actor pointers of the mobs outlined this frame, in entity order.
-        const std::vector<ActorPtr>& OutlinedActors() const { return m_Outlined; }
+        uint32_t OutlinedCount() const { return m_Outlined; }
+        // Actor pointers of every mob, outlined or not, in entity order.
+        const std::vector<ActorPtr>& Mobs() const { return m_Mobs; }
 
     private:
         std::unordered_map<ActorPtr, ActorInfo> m_Actors;
-        std::vector<ActorPtr> m_Outlined;
+        std::vector<ActorPtr> m_Mobs;
+        uint32_t m_Outlined = 0;
         ActorPtr m_Min = 0;
         ActorPtr m_Max = 0;
     };

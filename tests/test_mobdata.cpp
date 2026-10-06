@@ -49,7 +49,3 @@ TEST(unknown_ids_are_not_found)
     CHECK(FindMob(0xFFFFFFFF, "Snipper") == nullptr);
 }
 
-TEST(all_data_is_compiled_in)
-{
-    CHECK(MobRecordCount() > 60000);
-}

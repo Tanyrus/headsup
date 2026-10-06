@@ -10,10 +10,13 @@ namespace aggroglow
 {
     namespace
     {
-        // D3D8 vertex declaration handles have bit 0 set (FVF codes never do); Wine also offsets them high.
+        constexpr DWORD kWineDeclarationHandles = 0xF0000000; // Wine numbers declaration handles from here
+        constexpr uintptr_t kStackScanBytes     = 0x1000;     // the game's draw call chain fits well inside this
+
+        // D3D8 vertex declaration handles have bit 0 set (FVF codes never do).
         bool IsDeclarationHandle(DWORD vs)
         {
-            return (vs & 1) != 0 || vs >= 0xF0000000;
+            return (vs & 1) != 0 || vs >= kWineDeclarationHandles;
         }
 
         Mat4 ToMat4(const D3DMATRIX& d)
@@ -48,6 +51,7 @@ namespace aggroglow
         m_MeshesLast       = m_Meshes;
         m_Meshes           = 0;
         m_ClearedThisFrame = false;
+        m_TargetSurface    = 0; // a render target recreated at the same address may have a new size
         if (!m_TextFinished) FinishText();
         m_TextFinished = false;
         ReadBackBufferSize();
@@ -62,25 +66,31 @@ namespace aggroglow
     {
         m_TextFinished = true;
         m_PlatesLast.clear();
-        m_RawPlatesLast.clear();
+        m_NameColorsLast.clear();
         std::unordered_map<uint16_t, uint32_t> runs;
+        std::vector<ScreenBox> boxes;
         for (const auto& [index, glyphs] : m_Glyphs)
         {
-            ScreenBox raw;
-            for (const ScreenBox& g : glyphs)
-                raw.Add(g);
-            m_RawPlatesLast[index] = raw;
-            const ScreenBox plate  = NameplateFromGlyphs(glyphs);
+            boxes.clear();
+            for (const GlyphDraw& g : glyphs)
+                boxes.push_back(g.box);
+            const ScreenBox plate = NameplateFromGlyphs(boxes);
             if (!plate.valid) continue;
-            m_PlatesLast[index] = plate;
-            runs[index]         = PlateFramesInRow(index) + 1;
+            m_PlatesLast[index]     = plate;
+            m_NameColorsLast[index] = NameColor(glyphs, plate);
+            runs[index] = PlateFramesInRow(index) + 1;
         }
         m_PlateRuns.swap(runs);
         m_Glyphs.clear();
+        m_OtherPlatesLast.clear();
+        for (auto& [index, glyphs] : m_OtherGlyphs)
+        {
+            const ScreenBox plate = NameplateFromGlyphs(std::move(glyphs));
+            if (plate.valid) m_OtherPlatesLast[index] = plate;
+        }
+        m_OtherGlyphs.clear();
         m_TextStatsLast = m_TextStats;
         m_TextStats     = TextDrawStats{};
-        m_PlateDrawsLast.swap(m_PlateDraws);
-        m_PlateDraws.clear();
         m_MeshDrawsLast.swap(m_MeshDraws);
         m_MeshDraws.clear();
     }
@@ -99,45 +109,88 @@ namespace aggroglow
         back->Release();
     }
 
+    void OutlineRenderer::SetReplacedNames(const std::vector<uint16_t>& indices)
+    {
+        m_Replaced.clear();
+        m_ReplacedPlates.clear();
+        for (const uint16_t index : indices)
+        {
+            if (const ScreenBox* plate = NameplateBox(index))
+            {
+                m_Replaced.insert(index);
+                m_ReplacedPlates.push_back(*plate);
+            }
+        }
+    }
+
     const ScreenBox* OutlineRenderer::NameplateBox(uint16_t index) const
     {
         const auto it = m_PlatesLast.find(index);
         return it == m_PlatesLast.end() ? nullptr : &it->second;
     }
 
-    void OutlineRenderer::OnDrawUP(D3DPRIMITIVETYPE type, UINT primCount, const void* vertices, UINT stride,
-        const Tracker& tracker, bool collect)
+    bool OutlineRenderer::OnDrawUP(D3DPRIMITIVETYPE type, UINT primCount, const void* vertices, UINT stride,
+        const Tracker& tracker, bool collect, bool hide)
     {
-        if (!collect || m_Device == nullptr || tracker.OutlinedCount() == 0 || m_BackBufferWidth <= 0.0f) return;
+        if (!collect || m_Device == nullptr || tracker.Mobs().empty() || m_BackBufferWidth <= 0.0f) return false;
         DWORD vs = 0;
         if (FAILED(m_Device->GetVertexShader(&vs)) || IsDeclarationHandle(vs) || (vs & D3DFVF_POSITION_MASK) != D3DFVF_XYZRHW)
-            return;
+            return false;
         ScreenBox box;
-        if (!WorldTextBox(vertices, stride, VertexCount(type, primCount), box)) return; // cheap: rejects HUD text
+        const uint32_t count = VertexCount(type, primCount);
+        if (!WorldTextBox(vertices, stride, count, box)) return false; // cheap: rejects HUD text
         ++m_TextStats.inScene;
-        const ActorInfo* owner = FindOwnerOnStack(tracker);
-        if (owner == nullptr)
+
+        // Pretransformed coordinates are render-target pixels; nameplates are placed in back-buffer pixels.
+        IDirect3DSurface8* target = nullptr;
+        if (FAILED(m_Device->GetRenderTarget(&target)) || target == nullptr) return false;
+        if (reinterpret_cast<uintptr_t>(target) != m_TargetSurface)
         {
-            ++m_TextStats.noOwner;
-            return;
+            D3DSURFACE_DESC desc{};
+            if (FAILED(target->GetDesc(&desc)) || desc.Width == 0 || desc.Height == 0)
+            {
+                target->Release();
+                return false;
+            }
+            m_TargetSurface = reinterpret_cast<uintptr_t>(target);
+            m_TargetScaleX  = m_BackBufferWidth / static_cast<float>(desc.Width);
+            m_TargetScaleY  = m_BackBufferHeight / static_cast<float>(desc.Height);
         }
-        if (!owner->outline)
+        target->Release();
+        const ScreenBox glyph = box.Scaled(m_TargetScaleX, m_TargetScaleY);
+
+        const ActorInfo* owner     = FindOwnerOnStack(tracker);
+        GlyphOwner kind            = GlyphOwner::None;
+        const ScreenBox* ownerName = nullptr;
+        if (owner == nullptr)
+            ++m_TextStats.noOwner;
+        else if (!owner->isMob)
         {
             ++m_TextStats.otherOwner;
-            return;
+            kind = GlyphOwner::Other;
+            m_OtherGlyphs[owner->index].push_back(glyph);
+            const auto it = m_OtherPlatesLast.find(owner->index);
+            if (it != m_OtherPlatesLast.end()) ownerName = &it->second;
         }
-        ++m_TextStats.owned;
-        ++m_PlateDraws[owner->index];
-
-        // Pretransformed coordinates are render-target pixels; labels are placed in back-buffer pixels.
-        IDirect3DSurface8* target = nullptr;
-        if (FAILED(m_Device->GetRenderTarget(&target)) || target == nullptr) return;
-        D3DSURFACE_DESC desc{};
-        const bool described = SUCCEEDED(target->GetDesc(&desc));
-        target->Release();
-        if (!described || desc.Width == 0 || desc.Height == 0) return;
-        m_Glyphs[owner->index].push_back(box.Scaled(m_BackBufferWidth / static_cast<float>(desc.Width),
-            m_BackBufferHeight / static_cast<float>(desc.Height)));
+        else
+        {
+            kind = GlyphOwner::Mob;
+            if (m_Replaced.count(owner->index) != 0) ownerName = NameplateBox(owner->index);
+            ++m_TextStats.owned;
+            uint32_t argb = kWhite;
+            if ((vs & D3DFVF_DIFFUSE) != 0 && stride >= kPretransformedPositionBytes + sizeof(argb))
+            {
+                std::memcpy(&argb, static_cast<const uint8_t*>(vertices) + kPretransformedPositionBytes, sizeof(argb));
+                // FFXI keeps the PS2's color math, where 0x80 is full intensity and the draw doubles it.
+                DWORD op = D3DTOP_MODULATE;
+                m_Device->GetTextureStageState(0, D3DTSS_COLOROP, &op);
+                argb = ShownColor(argb, op == D3DTOP_MODULATE4X ? 4 : op == D3DTOP_MODULATE2X ? 2 : 1);
+            }
+            m_Glyphs[owner->index].push_back(GlyphDraw{glyph, argb});
+        }
+        if (!hide || !HideGlyph(glyph, kind, ownerName, m_ReplacedPlates)) return false;
+        ++m_TextStats.hidden;
+        return true;
     }
 
     bool OutlineRenderer::TakeStencilWarning()
@@ -180,18 +233,22 @@ namespace aggroglow
     {
         const auto sp       = reinterpret_cast<uintptr_t>(__builtin_frame_address(0));
         const auto* tib     = reinterpret_cast<const NT_TIB*>(NtCurrentTeb());
-        const uintptr_t end = std::min<uintptr_t>(reinterpret_cast<uintptr_t>(tib->StackBase), sp + 0x1000);
+        const uintptr_t end = std::min<uintptr_t>(reinterpret_cast<uintptr_t>(tib->StackBase), sp + kStackScanBytes);
         return FindOwner(reinterpret_cast<const uint32_t*>(sp & ~uintptr_t{3}), reinterpret_cast<const uint32_t*>(end & ~uintptr_t{3}), tracker);
     }
 
     bool OutlineRenderer::OnDrawIndexed(D3DPRIMITIVETYPE type, UINT minIndex, UINT numVertices, UINT startIndex,
         UINT primCount, const Tracker& tracker, const Settings& settings)
     {
-        if (m_InDraw || m_Device == nullptr || !settings.enabled || tracker.OutlinedCount() == 0) return false;
+        if (m_InDraw || m_Device == nullptr) return false;
+        const bool outlines = settings.enabled && tracker.OutlinedCount() > 0;
+        const bool bodies   = NameplatesOn(settings) && !tracker.Mobs().empty(); // nameplates need to know who was drawn
+        if (!outlines && !bodies) return false;
         if (!IsCharacterModelDraw()) return false;
         const ActorInfo* owner = FindOwnerOnStack(tracker);
-        if (owner == nullptr || !owner->outline) return false;
-        ++m_MeshDraws[owner->index];
+        if (owner == nullptr) return false;
+        if (owner->isMob) ++m_MeshDraws[owner->index];
+        if (!outlines || !owner->outline) return false;
         m_StencilAvailable = BoundSurfaceHasStencil();
         if (!m_StencilAvailable)
         {
@@ -219,7 +276,7 @@ namespace aggroglow
         m_InDraw  = true;
         auto draw = [&] { m_Device->DrawIndexedPrimitive(type, minIndex, numVertices, startIndex, primCount); };
 
-        // 1. The mesh as the game drew it, also marking its visible pixels with this mob's stencil value.
+        // The mesh as the game drew it, also marking its visible pixels with this mob's stencil value.
         m_Device->SetRenderState(D3DRS_STENCILENABLE, TRUE);
         m_Device->SetRenderState(D3DRS_STENCILFUNC, D3DCMP_ALWAYS);
         m_Device->SetRenderState(D3DRS_STENCILREF, owner->stencilRef);
@@ -230,7 +287,7 @@ namespace aggroglow
         m_Device->SetRenderState(D3DRS_STENCILZFAIL, D3DSTENCILOP_KEEP);
         draw();
 
-        // 2. Solid-colour copies shifted around the silhouette wherever the stencil is not this mob.
+        // Solid-colour copies shifted around the silhouette, drawn only where the stencil is not this mob.
         m_Device->SetRenderState(D3DRS_STENCILFUNC, D3DCMP_NOTEQUAL);
         m_Device->SetRenderState(D3DRS_STENCILPASS, D3DSTENCILOP_KEEP);
         m_Device->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
@@ -254,7 +311,6 @@ namespace aggroglow
         }
         m_InDraw = false;
 
-        // 3. Restore everything this touched.
         m_Device->SetTransform(D3DTS_PROJECTION, &projection);
         for (size_t i = 0; i < std::size(kSavedStates); ++i)
             m_Device->SetRenderState(kSavedStates[i], states[i]);

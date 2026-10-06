@@ -6,26 +6,25 @@ namespace aggroglow
 {
     namespace
     {
-        constexpr uint32_t kGray = 0xFF999999; // 0.60, 0.60, 0.60
-        // TW gray, IEP and EP green, DC blue, EM white, T yellow, VT and IT red.
-        constexpr uint32_t kConArgb[kConCount] = {kGray, 0xFF66FF66, 0xFF66FF66, 0xFF73B3FF, 0xFFFFFFFF, 0xFFFFFF59,
-            0xFFFF5959, 0xFFFF5959};
+        constexpr LabelShade kConShades[kConCount] = {LabelShade::TooWeak, LabelShade::EasyPrey, LabelShade::EasyPrey,
+            LabelShade::DecentChallenge, LabelShade::EvenMatch, LabelShade::Tough, LabelShade::VeryTough,
+            LabelShade::VeryTough};
     }
 
-    uint32_t ConArgb(Con con)
+    LabelShade ShadeFor(Con con)
     {
         const auto i = static_cast<unsigned>(con);
-        return i < kConCount ? kConArgb[i] : kGray;
+        return i < kConCount ? kConShades[i] : LabelShade::Unknown;
     }
 
     Label MakeLabel(const MobRecord* mob, const CheckResult* examined, int playerLevel)
     {
         Label label{};
-        label.argb = kGray;
+        label.shade = LabelShade::Unknown;
         if (examined != nullptr && examined->level > 0)
         {
             std::snprintf(label.text, sizeof(label.text), "Lv %d %s", examined->level, Abbrev(examined->con));
-            label.argb = ConArgb(examined->con);
+            label.shade = ShadeFor(examined->con);
             return label;
         }
         if (mob == nullptr || mob->maxLevel == 0)
@@ -51,7 +50,7 @@ namespace aggroglow
             std::snprintf(label.text, sizeof(label.text), "Lv %s %s", levels, Abbrev(hardest));
         else
             std::snprintf(label.text, sizeof(label.text), "Lv %s %s-%s", levels, Abbrev(easiest), Abbrev(hardest));
-        label.argb = ConArgb(hardest);
+        label.shade = ShadeFor(hardest);
         return label;
     }
 }

@@ -1,12 +1,43 @@
 #include "icons.h"
 
+#include <iterator>
+
 namespace aggroglow
 {
     namespace
     {
 #include "generated/icons.inc"
 
-        static_assert(sizeof(kIconPngs) / sizeof(kIconPngs[0]) == kIconCount, "tools/gen_icons.py and Icon disagree");
+        // The width and height are the first fields of the IHDR chunk, after the signature and the chunk's length and type.
+        constexpr size_t kPngWidthOffset  = 16;
+        constexpr size_t kPngHeightOffset = 20;
+
+        uint32_t BigEndian32(const unsigned char* bytes)
+        {
+            return uint32_t{bytes[0]} << 24 | uint32_t{bytes[1]} << 16 | uint32_t{bytes[2]} << 8 | uint32_t{bytes[3]};
+        }
+
+        template <size_t N>
+        IconPng Png(const unsigned char (&data)[N])
+        {
+            return IconPng{data, N, BigEndian32(data + kPngWidthOffset), BigEndian32(data + kPngHeightOffset)};
+        }
+
+        const IconPng kIconPngs[] = {
+            Png(kPngAggroNQ),
+            Png(kPngAggroHQ),
+            Png(kPngPassiveNQ),
+            Png(kPngPassiveHQ),
+            Png(kPngLink),
+            Png(kPngSight),
+            Png(kPngTrueSight),
+            Png(kPngSound),
+            Png(kPngScent),
+            Png(kPngMagic),
+            Png(kPngJA),
+            Png(kPngBlood),
+        };
+        static_assert(std::size(kIconPngs) == kIconCount, "one PNG per Icon, in Icon order");
     }
 
     IconSet IconsFor(const MobRecord* mob)

@@ -45,7 +45,7 @@ def c_string(text: str) -> str:
     out = []
     for byte in text.encode('utf-8'):
         char = chr(byte)
-        out.append(char if 0x20 <= byte < 0x7F and char not in '"\\?' else f'\\{byte:03o}')
+        out.append(char if 0x20 <= byte < 0x7F and char not in '"\\' else f'\\{byte:03o}')
     return '"' + ''.join(out) + '"'
 
 
