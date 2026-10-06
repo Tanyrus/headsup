@@ -1,0 +1,3 @@
+build/
+src/generated/
+__pycache__/
