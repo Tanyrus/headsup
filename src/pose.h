@@ -1,6 +1,6 @@
 #pragma once
 
-#include "nameplate.h"
+#include "screen_box.h"
 
 #include <cstdint>
 
@@ -17,6 +17,10 @@ namespace headsup
     };
     Pose PoseFromStatus(uint32_t status);
 
+    // Phoenix's CBattleEntity::isSitting(), which lets Too Weak aggressive mobs aggro, with the animations its map
+    // server counts.
+    bool IsSittingStatus(uint32_t status);
+
     // A point in the game's world in Direct3D's axes: x, height (up is negative) and the entity's y.
     struct WorldPoint
     {
@@ -24,13 +28,13 @@ namespace headsup
     };
     WorldPoint FromEntityPosition(float x, float y, float z);
 
-    // The scene camera: world points to back-buffer pixels.
+    // The scene camera: world points to back-buffer rows (the screen's height in pixels).
     struct Camera
     {
         float viewProjection[4][4];
-        float width, height;
+        float height;
     };
-    Camera MakeCamera(const float view[16], const float projection[16], float width, float height);
+    Camera MakeCamera(const float view[16], const float projection[16], float height);
 
     // The back-buffer row of the point height above the feet, and the height whose point is on a row; false when it
     // cannot be projected (behind the camera, or the vertical seen end on).

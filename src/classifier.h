@@ -15,7 +15,8 @@ namespace headsup
         NmWillAttack = 3, // notorious monsters
         NmWontAttack = 4,
     };
-    constexpr int kCategoryCount = 5;
+    constexpr int kCategoryCount = static_cast<int>(Category::NmWontAttack) + 1;
+    constexpr int CategoryIndex(Category category) { return static_cast<int>(category); }
 
     struct PlayerState
     {
@@ -23,10 +24,7 @@ namespace headsup
         bool sitting = false; // resting, /sit or a chair: Phoenix lets Too Weak aggressive mobs aggro then
     };
 
-    // Phoenix's CBattleEntity::isSitting(): healing (33), sit (47) and sitchair 0-10 (63-73).
-    bool IsSittingStatus(uint32_t status);
-
-    // Phoenix's CZoneEntities::tapMobAggro with its mob data. examinedLevel is the level a /check reported
-    // for this spawn, or 0 when it has not been examined.
-    Category Classify(const MobRecord* mob, int examinedLevel, const PlayerState& player);
+    // Phoenix's CZoneEntities::tapMobAggro with its mob data. checkedLevel is the level a /check reported for this
+    // spawn, which includes its level mod, or 0 without one.
+    Category Classify(const MobRecord* mob, int checkedLevel, const PlayerState& player);
 }

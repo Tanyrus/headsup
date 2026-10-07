@@ -33,9 +33,6 @@ namespace
         void Set(const char* key, const char* value) override { values[key] = value; }
     };
 
-    constexpr int kNmWillAttack = static_cast<int>(Category::NmWillAttack);
-    constexpr int kNmWontAttack = static_cast<int>(Category::NmWontAttack);
-
     // Every field, so a loader or saver that drops one is caught.
     void CheckSameColor(const Color& a, const Color& b)
     {
@@ -50,7 +47,7 @@ namespace
         CHECK_EQ(a.smoothness, b.smoothness);
         CHECK_EQ(a.maxDistance, b.maxDistance);
         CHECK(a.showLabels == b.showLabels);
-        CHECK(a.replaceNameplates == b.replaceNameplates);
+        CHECK(a.replaceMobNames == b.replaceMobNames);
         CHECK(a.showIcons == b.showIcons);
         CHECK(a.scaleWithDistance == b.scaleWithDistance);
         CHECK(a.fontName == b.fontName);
@@ -58,6 +55,7 @@ namespace
         CHECK_EQ(a.nameSize, b.nameSize);
         CHECK_EQ(a.labelSize, b.labelSize);
         CHECK_EQ(a.iconSize, b.iconSize);
+        CHECK_EQ(a.playerIconSize, b.playerIconSize);
         CHECK(a.ownNameColor == b.ownNameColor);
         CHECK(a.replacePlayerNames == b.replacePlayerNames);
         CHECK(a.replaceNpcNames == b.replaceNpcNames);
@@ -80,7 +78,30 @@ namespace
             CHECK(a.show[c] == b.show[c]);
             CheckSameColor(a.color[c], b.color[c]);
         }
+        for (int i = 0; i < kPlayerIconCount; ++i)
+            CHECK(a.playerIconSide[i] == b.playerIconSide[i]);
     }
+}
+
+TEST(every_player_icon_shows_left_of_the_name_by_default)
+{
+    const Settings s;
+    for (int i = 0; i < kPlayerIconCount; ++i)
+        CHECK(s.playerIconSide[i] == IconSide::Left);
+}
+
+TEST(a_player_icons_side_is_saved_by_name)
+{
+    MapStore store;
+    Settings s;
+    s.playerIconSide[PlayerIconIndex(PlayerIcon::LevelSync)] = IconSide::Right;
+    s.playerIconSide[PlayerIconIndex(PlayerIcon::Away)]      = IconSide::Hidden;
+    SaveSettings(s, store);
+    CHECK(store.values["iconLevelSync"] == "right");
+    CHECK(store.values["iconAway"] == "hide");
+    CHECK(store.values["iconGm"] == "left");
+    store.values["iconGm"] = "middle"; // not a side: the default
+    CHECK(LoadSettings(store).playerIconSide[PlayerIconIndex(PlayerIcon::Gm)] == IconSide::Left);
 }
 
 TEST(empty_store_gives_defaults)
@@ -98,7 +119,7 @@ TEST(settings_round_trip)
     s.smoothness        = 12;
     s.maxDistance       = 25.0f;
     s.showLabels        = false;
-    s.replaceNameplates = false;
+    s.replaceMobNames = false;
     s.showIcons         = false;
     s.scaleWithDistance = false;
     s.fontName          = "Georgia";
@@ -106,6 +127,7 @@ TEST(settings_round_trip)
     s.nameSize          = 20;
     s.labelSize         = 9;
     s.iconSize          = 24;
+    s.playerIconSize    = 120;
     s.ownNameColor      = true;
     s.replacePlayerNames = false;
     s.replaceNpcNames   = false;
@@ -126,13 +148,17 @@ TEST(settings_round_trip)
     for (int c = 0; c < kCategoryCount; ++c)
     {
         s.show[c]  = c % 2 == 0;
-        s.color[c] = Color{{0.25f, 0.5f, 0.75f}};
+        s.color[c] = Color{{0.125f * static_cast<float>(c), 0.5f, 0.75f}}; // each its own, so a swapped key shows
     }
+    for (int i = 0; i < kPlayerIconCount; ++i)
+        s.playerIconSide[i] = static_cast<IconSide>((i + 1) % kIconSideCount); // a swapped key shows
     SaveSettings(s, store);
     CheckSame(LoadSettings(store), s);
     CHECK(store.values.count("nmWillAttackB") == 1);
     CHECK(store.values.count("nmWontAttackShow") == 1);
     CHECK(store.values.count("labelVeryToughR") == 1);
+    CHECK(store.values.count("iconLevelSync") == 1);
+    CHECK(store.values.count("iconSeekingParty") == 1);
 }
 
 TEST(out_of_range_values_are_clamped)
@@ -151,6 +177,19 @@ TEST(out_of_range_values_are_clamped)
     CHECK_EQ(s.labelSize, kMinTextSize);
 }
 
+TEST(a_whole_number_too_large_for_an_int_is_clamped_like_any_other)
+{
+    // A hand-edited file: the value saturates and Clamp takes it to the nearest limit, not past the other end.
+    MapStore store;
+    store.values["nameSize"]   = "1e10";
+    store.values["labelSize"]  = "-1e10";
+    store.values["cursorSize"] = "3e9";
+    const Settings s = LoadSettings(store);
+    CHECK_EQ(s.nameSize, kMaxTextSize);
+    CHECK_EQ(s.labelSize, kMinTextSize);
+    CHECK_EQ(s.cursorSize, kMaxTextSize);
+}
+
 TEST(a_font_name_windows_cannot_use_falls_back_to_the_default)
 {
     MapStore store;
@@ -160,17 +199,6 @@ TEST(a_font_name_windows_cannot_use_falls_back_to_the_default)
     CHECK(LoadSettings(store).fontName == kDefaultFont);
     store.values["fontName"] = std::string(kMaxFontName, 'x');
     CHECK(LoadSettings(store).fontName == std::string(kMaxFontName, 'x'));
-}
-
-TEST(a_font_saved_by_its_place_in_the_old_list_keeps_its_name)
-{
-    MapStore store;
-    store.values["fontIndex"] = "4";
-    CHECK(LoadSettings(store).fontName == "Courier New");
-    store.values["fontIndex"] = "9";
-    CHECK(LoadSettings(store).fontName == kDefaultFont);
-    store.values["fontName"] = "Georgia"; // a name, once saved, wins
-    CHECK(LoadSettings(store).fontName == "Georgia");
 }
 
 TEST(the_font_list_is_the_installed_families_sorted_once_each)
@@ -186,7 +214,7 @@ TEST(the_font_list_is_the_installed_families_sorted_once_each)
 
 TEST(clamp_bounds_every_field)
 {
-    // The menu relies on Clamp, not on the loader's own bounds.
+    // The menu relies on Clamp, not on the loader.
     Settings s;
     s.thickness   = 0.0f;
     s.smoothness  = 99;
@@ -195,22 +223,26 @@ TEST(clamp_bounds_every_field)
     s.nameSize    = 100;
     s.labelSize   = 0;
     s.iconSize    = 49;
+    s.playerIconSize = 10;
     s.cursorSize  = 2;
     s.nameRaise   = 99;
-    s.color[0]    = Color{{2.0f, -1.0f, 0.5f}};
-    s.nameColor   = s.color[0];
-    s.labelColor[kLabelShadeCount - 1] = s.color[0];
-    s.textOutline = s.color[0];
-    s.iconTint    = s.color[0];
-    s.cursorColor = s.color[0];
-    s.subCursorColor = s.color[0];
-    s.lockedCursorColor = s.color[0];
+    const Color wild{{2.0f, -1.0f, 0.5f}};
+    s.nameColor = s.textOutline = s.iconTint = s.cursorColor = s.subCursorColor = s.lockedCursorColor = wild;
+    for (Color& c : s.labelColor)
+        c = wild;
+    for (Color& c : s.color)
+        c = wild;
     const Settings c = Clamp(s);
-    for (const Color& clamped : {c.nameColor, c.labelColor[kLabelShadeCount - 1], c.textOutline, c.iconTint, c.cursorColor,
-             c.subCursorColor, c.lockedCursorColor})
-        CheckSameColor(clamped, Color{{1.0f, 0.0f, 0.5f}});
+    const Color clamped{{1.0f, 0.0f, 0.5f}};
+    for (const Color& each : {c.nameColor, c.textOutline, c.iconTint, c.cursorColor, c.subCursorColor, c.lockedCursorColor})
+        CheckSameColor(each, clamped);
+    for (const Color& each : c.labelColor)
+        CheckSameColor(each, clamped);
+    for (const Color& each : c.color)
+        CheckSameColor(each, clamped);
     CHECK_EQ(c.thickness, kMinThickness);
     CHECK_EQ(c.smoothness, kMaxSmoothness);
+    CHECK_EQ(c.playerIconSize, kMinPlayerIconSize);
     CHECK_EQ(c.maxDistance, kMaxOutlineDistance);
     CHECK(c.fontName == kDefaultFont);
     CHECK_EQ(c.nameSize, kMaxTextSize);
@@ -218,9 +250,6 @@ TEST(clamp_bounds_every_field)
     CHECK_EQ(c.iconSize, kMaxTextSize);
     CHECK_EQ(c.cursorSize, kMinTextSize);
     CHECK_EQ(c.nameRaise, kMaxNameRaise);
-    CHECK_EQ(c.color[0].v[0], 1.0f);
-    CHECK_EQ(c.color[0].v[1], 0.0f);
-    CHECK_EQ(c.color[0].v[2], 0.5f);
 }
 
 TEST(non_finite_values_fall_back_to_defaults)
@@ -240,24 +269,12 @@ TEST(argb_packing)
     CHECK_EQ(ToArgb(Color{{0.2f, 1.0f, 0.3f}}), 0xFF33FF4Du);
 }
 
-TEST(v1_settings_files_still_load)
-{
-    // A v1 file has no NM keys and may still carry the removed modernConTable key.
-    MapStore store;
-    store.values["willAttackR"]    = "0.5000";
-    store.values["modernConTable"] = "true";
-    const Settings s = LoadSettings(store);
-    CHECK_EQ(s.color[0].v[0], 0.5f);
-    CHECK(s.show[kNmWillAttack] && s.show[kNmWontAttack]);
-    CHECK_EQ(s.color[kNmWontAttack].v[0], 1.0f);
-}
-
 TEST(any_replaced_kind_of_name_counts)
 {
     Settings s;
-    s.replaceNameplates = s.replacePlayerNames = s.replaceNpcNames = false;
+    s.replaceMobNames = s.replacePlayerNames = s.replaceNpcNames = false;
     CHECK(!ReplacesNames(s));
-    for (bool Settings::*kind : {&Settings::replaceNameplates, &Settings::replacePlayerNames, &Settings::replaceNpcNames})
+    for (bool Settings::*kind : {&Settings::replaceMobNames, &Settings::replacePlayerNames, &Settings::replaceNpcNames})
     {
         Settings one = s;
         one.*kind    = true;
@@ -272,9 +289,9 @@ TEST(nameplates_need_the_master_switch_and_a_part)
     CHECK(NameplatesOn(Settings{}));
     Settings none;
     none.showLabels = none.showIcons = false;
-    none.replaceNameplates = none.replacePlayerNames = none.replaceNpcNames = none.replaceCursor = false;
+    none.replaceMobNames = none.replacePlayerNames = none.replaceNpcNames = none.replaceCursor = false;
     CHECK(!NameplatesOn(none));
-    for (bool Settings::*part : {&Settings::showLabels, &Settings::showIcons, &Settings::replaceNameplates,
+    for (bool Settings::*part : {&Settings::showLabels, &Settings::showIcons, &Settings::replaceMobNames,
              &Settings::replacePlayerNames, &Settings::replaceNpcNames, &Settings::replaceCursor})
     {
         Settings s  = none;

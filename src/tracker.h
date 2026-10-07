@@ -8,6 +8,7 @@
 #include "settings.h"
 
 #include <cstdint>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -15,13 +16,17 @@ namespace headsup
 {
     using ActorPtr = uint32_t; // FFXI is a 32-bit process
 
-    // From the entity's spawn flags: 0x10 a mob, 0x01 a player (you included), anything else an NPC.
     enum class EntityKind : uint8_t
     {
         Mob,
-        Player,
+        Player, // you included
         Npc,
     };
+    // From IEntity::GetSpawnFlags: the mob bit wins over the player bit, and neither means an NPC.
+    EntityKind KindFromSpawnFlags(uint32_t flags);
+
+    constexpr int kMaxStencilRef    = 255;  // outlined mobs take stencil references 1 to this, then wrap
+    constexpr uint32_t kMaxEntities = 4096; // more than the client's entity map holds
 
     struct ActorInput
     {
@@ -32,8 +37,8 @@ namespace headsup
         bool alive;       // HP above 0 (defeated mobs keep their model until they despawn)
         float distance;   // yalms from the player
         const char* name; // only read during Update
-        const CheckResult* examined; // this spawn's latest /check, or nullptr; only read during Update
-        const PlayerStatus* status;  // a player's last known status, or nullptr; only read during Update
+        const CheckResult* checked; // this spawn's latest /check, or nullptr; only read during Update
+        std::optional<PlayerStatus> status; // a player's
         Pose pose;                   // a player's; others stand
         WorldPoint feet;
     };
@@ -41,7 +46,7 @@ namespace headsup
     struct ActorInfo
     {
         bool outline       = false; // a mob that gets an outline this frame
-        uint8_t stencilRef = 0;     // 1-255 when outlined
+        uint8_t stencilRef = 0;     // 1 to kMaxStencilRef when outlined
         uint32_t argb      = 0;     // outline colour (D3DCOLOR)
         uint16_t index     = 0;     // entity target index
         EntityKind kind    = EntityKind::Npc;
@@ -49,17 +54,17 @@ namespace headsup
         char name[32]      = {};    // for the replacement nameplate
         Label label{};              // level and con text: every living mob
         IconSet icons{};            // the MobDB icon row: every living mob with data
-        IconSet nameIcons{};        // a player's icons, beside the name
+        PlayerIconRows nameIcons{}; // a player's icons, either side of the name
         uint32_t linkshellArgb = 0; // a player's linkshell color, for its icon
         Pose pose              = Pose::Standing;
         WorldPoint feet{};
     };
 
-    // Per-frame table of every entity's actor pointer and name, and each mob's level, icons and outline decision. A
-    // draw's owner is the first actor pointer of any kind on the stack.
     // Whether HeadsUp draws this entity's name in place of the game's: its kind's is replaced and it has one.
     bool ReplacesName(const Settings& settings, const ActorInfo& info);
 
+    // Per-frame table of every entity's actor pointer and name, and each mob's level, icons and outline decision. A
+    // draw's owner is the first actor pointer of any kind on the stack.
     class Tracker
     {
     public:

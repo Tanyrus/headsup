@@ -1,31 +1,34 @@
 #include "con.h"
 
+#include "generated/phoenix_rules.h"
+
 #include <algorithm>
+#include <iterator>
 
 namespace headsup
 {
     namespace
     {
-#include "con_tables.inc"
+        constexpr int kHighestCountedLevel = 99; // Phoenix's GetBaseExp counts no player level above this
+        constexpr int kLevelsPerColumn     = 5;
+        constexpr int kLastRow             = static_cast<int>(std::size(kBaseExp)) - 1;
     }
 
     uint32_t BaseExp(int playerLevel, int mobLevel)
     {
-        playerLevel = std::min(playerLevel, 99);
+        playerLevel = std::min(playerLevel, kHighestCountedLevel);
         if (playerLevel <= 0) return 0;
-        const int row = std::clamp(mobLevel - playerLevel + 44, 0, 59);
-        return kEraTable[row][(playerLevel - 1) / 5];
+        const int row = std::clamp(mobLevel - playerLevel - kFirstDifference, 0, kLastRow);
+        return kBaseExp[row][(playerLevel - 1) / kLevelsPerColumn];
     }
 
     Con Difficulty(int playerLevel, int mobLevel)
     {
         const uint32_t exp = BaseExp(playerLevel, mobLevel);
-        if (exp >= 400) return Con::IncrediblyTough;
-        if (exp >= 200) return Con::VeryTough;
-        if (exp >= 120) return Con::Tough;
-        if (exp >= 100) return Con::EvenMatch;
-        if (exp >= 50) return Con::DecentChallenge;
-        if (exp >= 15) return Con::EasyPrey;
+        if (exp == 0) return Con::TooWeak;
+        for (const DifficultyStep& step : kDifficulty)
+            if (exp >= step.minExp) return step.con;
+        if (exp >= kIncrediblyEasyPreyMinExp && mobLevel >= kIncrediblyEasyPreyMinLevel) return Con::IncrediblyEasyPrey;
         return Con::TooWeak;
     }
 

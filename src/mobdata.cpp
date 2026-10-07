@@ -19,6 +19,11 @@ namespace headsup
         }
     }
 
+    bool IsAggressive(const MobRecord& mob)
+    {
+        return (mob.flags & (kMobAggressive | kMobAlwaysAggro)) != 0 && (mob.flags & (kMobNoAggro | kMobFollows)) == 0;
+    }
+
     bool SameMobName(std::string_view a, std::string_view b)
     {
         size_t i = 0, j = 0;

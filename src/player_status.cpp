@@ -1,6 +1,9 @@
 #include "player_status.h"
 
-#include <cstring>
+#include "bytes.h"
+#include "settings.h"
+
+#include <algorithm>
 
 namespace headsup
 {
@@ -37,40 +40,44 @@ namespace headsup
         constexpr int kOwnNewBit        = 3;    // in the fourth word
         constexpr int kOwnMentorBit     = 4;
 
+        // 0x067.
+        constexpr size_t kSyncKind         = 0x04;
+        constexpr uint8_t kSyncCharacter   = 0x02;
+        constexpr size_t kSyncIndex        = 0x06;
+        constexpr size_t kSyncFlags        = 0x10;
+        constexpr size_t kSyncSize         = kSyncFlags + 1;
+        constexpr int kSyncLevelSyncBit    = 2;
+
         constexpr uint32_t kGmLevelMask = 0x7;
+
+        constexpr int kLevelSyncEffect   = 269; // the Level Sync status effect, and its icon
+        constexpr int kIconHighBits      = 2;   // per slot in a party member's icon mask, each worth 256
+        constexpr uint64_t kIconHighMask = 0x3;
+        constexpr int kIconLowBits       = 8;
+
+        // Each PlayerIcon's image.
+        constexpr Icon kPlayerIconImages[kPlayerIconCount] = {Icon::Gm, Icon::Mentor, Icon::NewAdventurer, Icon::LevelSync,
+            Icon::Away, Icon::Linkshell, Icon::Bazaar, Icon::Invite};
 
         // Render flags in the entity's memory.
         constexpr int kRenderSeekBit      = 20; // Flags1
         constexpr int kRenderLinkshellBit = 27;
         constexpr int kRenderBazaarBit    = 9;  // Flags2
 
-        uint32_t Word(const uint8_t* data, size_t offset)
-        {
-            uint32_t value;
-            std::memcpy(&value, data + offset, sizeof(value));
-            return value;
-        }
-
         bool Bit(uint32_t word, int bit)
         {
             return (word >> bit & 1u) != 0;
-        }
-
-        uint32_t Opaque(uint8_t r, uint8_t g, uint8_t b)
-        {
-            return 0xFF000000u | uint32_t{r} << 16 | uint32_t{g} << 8 | b;
         }
     }
 
     std::optional<PlayerUpdate> ParseOtherPlayer(const uint8_t* data, uint32_t size)
     {
         if (data == nullptr || size < kOtherSize) return std::nullopt;
-        uint16_t index;
-        std::memcpy(&index, data + kOtherIndex, sizeof(index));
         const uint8_t send = data[kOtherSend];
-        PlayerUpdate update{index, (send & kSendDespawn) != 0, std::nullopt};
+        PlayerUpdate update{ReadAt<uint16_t>(data, kOtherIndex), (send & kSendDespawn) != 0, std::nullopt};
         if ((send & kSendGeneral) == 0) return update;
-        const uint32_t flags1 = Word(data, kOtherFlags1), flags2 = Word(data, kOtherFlags2), flags3 = Word(data, kOtherFlags3);
+        const auto flags1 = ReadAt<uint32_t>(data, kOtherFlags1), flags2 = ReadAt<uint32_t>(data, kOtherFlags2),
+                   flags3 = ReadAt<uint32_t>(data, kOtherFlags3);
         PlayerStatus s;
         s.seekingParty  = Bit(flags1, kOtherSeekBit);
         s.away          = Bit(flags1, kOtherAwayBit);
@@ -87,7 +94,8 @@ namespace headsup
     std::optional<PlayerStatus> ParseOwnStatus(const uint8_t* data, uint32_t size)
     {
         if (data == nullptr || size < kOwnSize) return std::nullopt;
-        const uint32_t flags0 = Word(data, kOwnFlags0), flags1 = Word(data, kOwnFlags1), flags3 = Word(data, kOwnFlags3);
+        const auto flags0 = ReadAt<uint32_t>(data, kOwnFlags0), flags1 = ReadAt<uint32_t>(data, kOwnFlags1),
+                   flags3 = ReadAt<uint32_t>(data, kOwnFlags3);
         PlayerStatus s;
         s.seekingParty  = Bit(flags0, kOwnSeekBit);
         s.away          = Bit(flags0, kOwnAwayBit);
@@ -98,6 +106,28 @@ namespace headsup
         s.mentor        = Bit(flags3, kOwnMentorBit);
         s.linkshellArgb = Opaque(data[kOwnRed], data[kOwnRed + 1], data[kOwnRed + 2]);
         return s;
+    }
+
+    std::optional<LevelSyncUpdate> ParseCharSync(const uint8_t* data, uint32_t size)
+    {
+        if (data == nullptr || size < kSyncSize || data[kSyncKind] != kSyncCharacter) return std::nullopt;
+        return LevelSyncUpdate{ReadAt<uint16_t>(data, kSyncIndex), Bit(data[kSyncFlags], kSyncLevelSyncBit)};
+    }
+
+    bool LevelSyncInBuffs(const int16_t* buffs)
+    {
+        return buffs != nullptr && std::find(buffs, buffs + kStatusIconSlots, kLevelSyncEffect) != buffs + kStatusIconSlots;
+    }
+
+    bool LevelSyncInPartyIcons(const uint8_t* icons, uint64_t bitMask)
+    {
+        if (icons == nullptr) return false;
+        for (int slot = 0; slot < kStatusIconSlots; ++slot)
+        {
+            const auto high = static_cast<int>(bitMask >> (slot * kIconHighBits) & kIconHighMask);
+            if ((high << kIconLowBits | icons[slot]) == kLevelSyncEffect) return true;
+        }
+        return false;
     }
 
     PlayerStatus StatusFromRender(uint32_t flags1, uint32_t flags2, uint32_t linkshellBgr)
@@ -122,19 +152,18 @@ namespace headsup
         return s;
     }
 
-    IconSet PlayerIcons(const PlayerStatus& status)
+    PlayerIconRows PlayerIcons(const PlayerStatus& status, const Settings& settings)
     {
-        IconSet set;
-        auto add = [&](bool shown, Icon icon) {
-            if (shown) set.icons[set.count++] = icon;
-        };
-        add(status.gm, Icon::Gm);
-        add(status.mentor, Icon::Mentor);
-        add(status.newAdventurer, Icon::NewAdventurer);
-        add(status.away, Icon::Away);
-        add(status.linkshell, Icon::Linkshell);
-        add(status.bazaar, Icon::Bazaar);
-        add(status.seekingParty, Icon::Invite);
-        return set;
+        const bool has[kPlayerIconCount] = {status.gm, status.mentor, status.newAdventurer, status.levelSync, status.away,
+            status.linkshell, status.bazaar, status.seekingParty};
+        PlayerIconRows rows;
+        for (int i = 0; i < kPlayerIconCount; ++i)
+        {
+            const IconSide side = settings.playerIconSide[i];
+            if (!has[i] || side == IconSide::Hidden) continue;
+            IconSet& row           = side == IconSide::Right ? rows.right : rows.left;
+            row.icons[row.count++] = kPlayerIconImages[i];
+        }
+        return rows;
     }
 }

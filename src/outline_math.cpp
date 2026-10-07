@@ -1,13 +1,15 @@
 #include "outline_math.h"
 
 #include <cmath>
+#include <numbers>
 
 namespace headsup
 {
-    bool IsIdentity(const Mat4& m, float epsilon)
+    bool IsIdentity(const Mat4& m)
     {
+        constexpr float kTolerance = 1e-4f; // a skinned character's world matrix is identity to float precision
         for (int i = 0; i < 16; ++i)
-            if (std::fabs(m.m[i] - (i % 5 == 0 ? 1.0f : 0.0f)) > epsilon) return false;
+            if (std::fabs(m.m[i] - (i % 5 == 0 ? 1.0f : 0.0f)) > kTolerance) return false;
         return true;
     }
 
@@ -25,9 +27,9 @@ namespace headsup
 
     void OutlineOffset(int tap, int taps, float px, float width, float height, float& dxNdc, float& dyNdc)
     {
-        const float angle = 6.28318531f * static_cast<float>(tap) / static_cast<float>(taps);
-        dxNdc = 2.0f * px * std::cos(angle) / (width > 0.0f ? width : 1.0f);
-        dyNdc = 2.0f * px * std::sin(angle) / (height > 0.0f ? height : 1.0f);
+        const float angle = 2.0f * std::numbers::pi_v<float> * static_cast<float>(tap) / static_cast<float>(taps);
+        dxNdc = 2.0f * px * std::cos(angle) / width;
+        dyNdc = 2.0f * px * std::sin(angle) / height;
     }
 
     const ActorInfo* FindOwner(const uint32_t* begin, const uint32_t* end, const Tracker& tracker)
@@ -39,6 +41,6 @@ namespace headsup
 
     bool HasStencilBits(uint32_t depthFormat)
     {
-        return depthFormat == 73 || depthFormat == 75 || depthFormat == 79;
+        return depthFormat == kFormatD15S1 || depthFormat == kFormatD24S8 || depthFormat == kFormatD24X4S4;
     }
 }

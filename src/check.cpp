@@ -1,12 +1,11 @@
-#include "examine.h"
+#include "check.h"
 
-#include <cstring>
+#include "bytes.h"
 
 namespace headsup
 {
     namespace
     {
-        constexpr uint16_t kImpossibleToGauge = 0xF9;
         constexpr uint16_t kFirstCheckMessage = 0xAA; // 0xAA-0xB2: the con, then the defense/evasion remark
         constexpr uint16_t kLastCheckMessage  = 0xB2;
         constexpr uint32_t kCheckTypeBase     = 0x40; // the reply's check type field: 0x40 + Con
@@ -18,29 +17,18 @@ namespace headsup
         constexpr size_t kReplyTargetIndex   = 0x16;
         constexpr size_t kReplyMessage       = 0x18;
         constexpr size_t kReplyMinSize       = kReplyMessage + sizeof(uint16_t);
-
-        template <typename T>
-        T Read(const uint8_t* data, size_t offset)
-        {
-            T value;
-            std::memcpy(&value, data + offset, sizeof(value));
-            return value;
-        }
     }
 
     std::optional<CheckReply> ParseCheckReply(const uint8_t* data, uint32_t size)
     {
         if (data == nullptr || size < kReplyMinSize) return std::nullopt;
-        const auto message = Read<uint16_t>(data, kReplyMessage);
-        CheckReply reply{Read<uint32_t>(data, kReplyServerId), Read<uint16_t>(data, kReplyTargetIndex), false, {}};
-        if (message == kImpossibleToGauge) return reply;
+        const auto message = ReadAt<uint16_t>(data, kReplyMessage);
         if (message < kFirstCheckMessage || message > kLastCheckMessage) return std::nullopt;
-        const auto level = Read<int32_t>(data, kReplyLevel);
-        const auto type  = Read<uint32_t>(data, kReplyCheckType);
+        const auto level = ReadAt<int32_t>(data, kReplyLevel);
+        const auto type  = ReadAt<uint32_t>(data, kReplyCheckType);
         if (level <= 0 || type < kCheckTypeBase || type >= kCheckTypeBase + kConCount) return std::nullopt;
-        reply.gauged = true;
-        reply.result = CheckResult{level, static_cast<Con>(type - kCheckTypeBase)};
-        return reply;
+        return CheckReply{ReadAt<uint32_t>(data, kReplyServerId), ReadAt<uint16_t>(data, kReplyTargetIndex),
+            CheckResult{level, static_cast<Con>(type - kCheckTypeBase)}};
     }
 
     double CheckLifetime(const MobRecord* mob)
@@ -50,7 +38,8 @@ namespace headsup
 
     void CheckResults::Received(const CheckReply& reply, double lifetime, double now)
     {
-        if (reply.gauged) m_Results[reply.serverId] = Stored{reply.result, now + lifetime};
+        std::erase_if(m_Results, [&](const auto& entry) { return entry.second.expires <= now; });
+        m_Results[reply.serverId] = Stored{reply.result, now + lifetime};
     }
 
     const CheckResult* CheckResults::Result(uint32_t serverId, double now) const

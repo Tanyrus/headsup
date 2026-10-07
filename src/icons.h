@@ -1,40 +1,20 @@
 #pragma once
 
+#include "generated/icon_ids.h"
 #include "mobdata.h"
 
 #include <cstdint>
 
 namespace headsup
 {
-    // The MobDB icons XIUI shows (third_party/mobdb-icons), then XIUI's player icons (third_party/xiui-icons).
-    enum class Icon : uint8_t
-    {
-        AggroNQ,
-        AggroHQ,
-        PassiveNQ,
-        PassiveHQ,
-        Link,
-        Sight,
-        TrueSight,
-        Sound,
-        Scent,
-        Magic,
-        Ability, // JA.png: job abilities and weapon skills
-        Blood,   // low HP
-        Invite,  // seeking a party
-        Bazaar,
-        Linkshell,
-        Away,
-        Mentor,
-        NewAdventurer,
-        Gm,
-    };
-    constexpr int kIconCount = 19;
 
-    // A mob's icons, left to right.
+    // The longest row: a mob's aggro, link, sight or true sight, sound, scent, magic, ability and blood.
+    constexpr int kMaxIcons = 8;
+
+    // A row of icons, left to right: a mob's MobDB icons or a player's status icons.
     struct IconSet
     {
-        Icon icons[9];
+        Icon icons[kMaxIcons];
         int count = 0;
     };
 

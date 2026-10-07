@@ -1,11 +1,8 @@
-import importlib.util
-import pathlib
 import unittest
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
-_spec = importlib.util.spec_from_file_location('abi_check', ROOT / 'tools' / 'abi_check.py')
-abi = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(abi)
+from tooling import load
+
+abi = load('tools/abi_check.py')
 
 SAMPLE = """
 struct IThing
@@ -65,6 +62,32 @@ struct IGui
     def test_only_a_struct_returned_by_value_is_rejected(self):
         # MSVC returns it through a hidden pointer from a member function; MinGW expects it in registers.
         self.assertEqual(abi.struct_returns(self.TEXT), {'IGui': {'GetSize'}})
+
+
+class UnlistedInterfaces(unittest.TestCase):
+    TEXT = """
+struct ICore
+{
+    virtual IFonts* GetFonts(void) = 0;
+    virtual IChat* GetChat(void) = 0;
+};
+struct IFonts
+{
+    virtual void Draw(void) = 0;
+};
+struct IChat
+{
+    virtual void Write(void) = 0;
+};
+"""
+
+    def test_an_interface_named_or_reached_must_be_listed(self):
+        self.assertEqual(abi.unlisted_interfaces('IChat* chat;', self.TEXT, set(), ['ICore']), ['IChat'])
+        self.assertEqual(abi.unlisted_interfaces('', self.TEXT, {'GetFonts'}, ['ICore']), ['IFonts'])
+        self.assertEqual(abi.unlisted_interfaces('IChat* chat;', self.TEXT, {'GetChat'}, ['ICore', 'IChat']), [])
+
+    def test_a_pointer_to_something_that_is_not_an_interface_is_ignored(self):
+        self.assertEqual(abi.unlisted_interfaces('IDirect3DDevice8* device;', self.TEXT, set(), ['ICore']), [])
 
 
 if __name__ == '__main__':

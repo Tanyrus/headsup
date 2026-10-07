@@ -12,13 +12,13 @@ namespace headsup
     constexpr uint16_t kCheckReplyPacket = 0x029; // server to client: Message Basic
     constexpr double kDefaultCheckLifetime = 600.0; // seconds, when the data has no respawn time
 
-    // An incoming 0x029 (Message Basic) packet that answers a /check.
+    // An incoming 0x029 (Message Basic) packet that answers a /check with a level and con. Anything else, "impossible
+    // to gauge" (notorious monsters, battlefields) included, is nullopt.
     struct CheckReply
     {
-        uint32_t serverId;    // the checked mob
+        uint32_t serverId; // the checked mob
         uint16_t targetIndex;
-        bool gauged;          // false for "impossible to gauge" (notorious monsters, battlefields)
-        CheckResult result;   // set when gauged
+        CheckResult result;
     };
     std::optional<CheckReply> ParseCheckReply(const uint8_t* data, uint32_t size);
 
@@ -30,6 +30,7 @@ namespace headsup
     class CheckResults
     {
     public:
+        // Keeps the reply until now + lifetime, and drops every result that has expired.
         void Received(const CheckReply& reply, double lifetime, double now);
         // The latest result for this spawn while it is valid, else nullptr.
         const CheckResult* Result(uint32_t serverId, double now) const;

@@ -1,7 +1,6 @@
 #include "icons.h"
 #include "test.h"
 
-#include <cstring>
 #include <vector>
 
 using namespace headsup;
@@ -10,7 +9,7 @@ namespace
 {
     MobRecord Mob(uint8_t flags, uint16_t detects)
     {
-        return MobRecord{17199648, 103, "Goblin Bounty Hunter", 17, 20, flags, 300, detects};
+        return MobRecord{17199648, "Goblin Bounty Hunter", 17, 20, flags, 300, detects, 0};
     }
 
     std::vector<Icon> List(const IconSet& set)
@@ -34,13 +33,11 @@ TEST(aggressive_and_passive_mobs)
     CHECK(List(IconsFor(&passive)) == std::vector<Icon>{Icon::PassiveNQ});
 }
 
-TEST(no_aggro_or_neutral_mobs_are_passive)
+TEST(no_aggro_mobs_are_passive)
 {
     // The aggro icon is the mob's nature: it never aggros at all.
     const MobRecord noAggro = Mob(kMobAggressive | kMobNoAggro, 0);
     CHECK(List(IconsFor(&noAggro)) == std::vector<Icon>{Icon::PassiveNQ});
-    const MobRecord neutral = Mob(kMobAggressive | kMobNeutral, 0);
-    CHECK(List(IconsFor(&neutral)) == std::vector<Icon>{Icon::PassiveNQ});
 }
 
 TEST(notorious_monsters_get_hq_icons)
@@ -67,17 +64,23 @@ TEST(true_detection_replaces_sight)
     CHECK(List(IconsFor(&sound)) == (std::vector<Icon>{Icon::PassiveNQ, Icon::TrueSight, Icon::Sound}));
 }
 
-TEST(every_icon_has_its_pixels)
+TEST(every_icon_fills_a_square_so_all_show_the_same_size)
 {
+    // gen_icons.py cuts each image to its visible pixels: XIUI's player icons carry margins of 3 to 8 px of their 64.
     for (int i = 0; i < kIconCount; ++i)
     {
         const IconBitmap& icon = IconImage(static_cast<Icon>(i));
-        const uint32_t side    = i < static_cast<int>(Icon::Invite) ? 32u : 64u; // MobDB's, then XIUI's player icons
-        CHECK_EQ(icon.width, side);
-        CHECK_EQ(icon.height, side);
-        bool drawn = false;
-        for (uint32_t p = 0; p < icon.width * icon.height; ++p)
-            drawn |= icon.bgra[p * 4 + 3] != 0;
-        CHECK(drawn);
+        CHECK_EQ(icon.width, icon.height);
+        CHECK(icon.width > 0 && icon.width <= 64);
+        bool left = false, right = false, top = false, bottom = false;
+        for (uint32_t y = 0; y < icon.height; ++y)
+        {
+            for (uint32_t x = 0; x < icon.width; ++x)
+            {
+                if (icon.bgra[(y * icon.width + x) * 4 + 3] == 0) continue;
+                left |= x == 0, right |= x == icon.width - 1, top |= y == 0, bottom |= y == icon.height - 1;
+            }
+        }
+        CHECK((left && right) || (top && bottom));
     }
 }

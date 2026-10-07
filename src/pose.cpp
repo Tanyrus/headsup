@@ -1,6 +1,11 @@
 #include "pose.h"
 
+#include "generated/phoenix_rules.h"
+#include "nameplate.h"
+
+#include <algorithm>
 #include <cmath>
+#include <iterator>
 
 namespace headsup
 {
@@ -45,16 +50,20 @@ namespace headsup
         return Pose::Standing;
     }
 
+    bool IsSittingStatus(uint32_t status)
+    {
+        return std::find(std::begin(kSittingAnimations), std::end(kSittingAnimations), status) != std::end(kSittingAnimations);
+    }
+
     WorldPoint FromEntityPosition(float x, float y, float z) { return WorldPoint{x, z, y}; }
 
-    Camera MakeCamera(const float view[16], const float projection[16], float width, float height)
+    Camera MakeCamera(const float view[16], const float projection[16], float height)
     {
         Camera camera{};
         for (int row = 0; row < 4; ++row)
             for (int col = 0; col < 4; ++col)
                 for (int k = 0; k < 4; ++k)
                     camera.viewProjection[row][col] += view[row * 4 + k] * projection[k * 4 + col];
-        camera.width  = width;
         camera.height = height;
         return camera;
     }

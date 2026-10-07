@@ -16,7 +16,7 @@ namespace headsup
         VeryTough,
         IncrediblyTough,
     };
-    constexpr int kConCount = 8;
+    constexpr int kConCount = static_cast<int>(Con::IncrediblyTough) + 1;
 
     // What a /check reported for one spawn.
     struct CheckResult
@@ -25,10 +25,10 @@ namespace headsup
         Con con   = Con::TooWeak;
     };
 
-    // Phoenix's charutils::GetBaseExp with the era table it loads (modules/era toau_experience_points.lua).
+    // Phoenix's charutils::GetBaseExp with the table its map server loads. mobLevel includes the mob's level mod.
     uint32_t BaseExp(int playerLevel, int mobLevel);
 
-    // Phoenix's charutils::CheckMob with the era difficulty curve, which never returns Incredibly Easy Prey.
+    // Phoenix's charutils::CheckMob with the difficulty curve its map server loads.
     Con Difficulty(int playerLevel, int mobLevel);
 
     bool IsTooWeak(int playerLevel, int mobLevel);

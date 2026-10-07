@@ -5,7 +5,7 @@ GCC lays out virtual functions in declaration order. MSVC does too, except that 
 up next to its first declaration. A method that is not overloaded keeps its slot in both layouts unless an overload
 group around it is split, so this emulates both layouts and compares slots for every interface method the sources
 call. Overloaded and variadic methods are rejected outright, and IPluginBase (whose vtable the plugin builds) must
-have neither. clang's MSVC vftable dump confirmed this model for IGuiManager.
+have neither.
 
 A method that returns a struct by value is rejected too: MSVC member functions return it through a hidden pointer,
 while MinGW expects a small one such as ImVec2 back in registers, so Ashita writes the result to a stray address.
@@ -16,13 +16,16 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SDK = ROOT / 'third_party' / 'ashita-sdk'
+SOURCE_FOLDERS = ('src', 'dev')  # dev/, a developer's tools, is built in when present
 CALLED_INTERFACES = ['IAshitaCore', 'IMemoryManager', 'IEntity', 'IParty', 'IPlayer', 'IChatManager',
                      'IConfigurationManager', 'IGuiManager', 'ITarget']
+NOT_CALLED = {'ILogManager'}  # handed to the plugin, never called
 INTERFACE = re.compile(r'^(?:struct|interface)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{(.*?)^\};', re.M | re.S)
 DECL = re.compile(r'virtual\s+[^;]*?\b([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)\s*(?:const)?\s*=\s*0\s*;')
 CALL = re.compile(r'->\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(')
 STRUCT = re.compile(r'^\s*struct\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?::[^{;]*)?\{', re.M)
 RETURNING = re.compile(r'virtual\s+([^;(]*?)\b([A-Za-z_][A-Za-z0-9_]*)\s*\([^;]*\)\s*(?:const)?\s*=\s*0\s*;')
+INTERFACE_POINTER = re.compile(r'\b(I[A-Z][A-Za-z0-9_]*)\s*\*')
 
 
 def interfaces(text):
@@ -49,6 +52,26 @@ def struct_returns(text):
         if names:
             found[m.group(1)] = names
     return found
+
+
+def returned_interfaces(text):
+    """Interface name -> {method: the interface whose pointer it returns}."""
+    found = {}
+    for m in INTERFACE.finditer(text):
+        for d in RETURNING.finditer(m.group(2)):
+            target = re.fullmatch(r'\s*(I[A-Z][A-Za-z0-9_]*)\s*\*\s*', d.group(1))
+            if target:
+                found.setdefault(m.group(1), {})[d.group(2)] = target.group(1)
+    return found
+
+
+def unlisted_interfaces(sources, text, calls, listed):
+    """SDK interfaces the sources name as a pointer, or reach through a call on a listed one, that are not listed."""
+    used = set(INTERFACE_POINTER.findall(sources))
+    for iface, methods in returned_interfaces(text).items():
+        if iface in listed:
+            used |= {target for method, target in methods.items() if method in calls}
+    return sorted((used & set(interfaces(text))) - set(listed) - NOT_CALLED)
 
 
 def msvc_order(decls):
@@ -86,9 +109,11 @@ def main() -> int:
         problems.append('IPluginBase not found in the SDK')
     else:
         problems += [f'IPluginBase::{n} ({why})' for n, why in unstable_methods(found['IPluginBase']).items()]
-    calls = set()
-    for source in (ROOT / 'src').glob('*.cpp'):
-        calls |= set(CALL.findall(source.read_text(errors='replace')))
+    sources = '\n'.join(path.read_text(errors='replace') for folder in SOURCE_FOLDERS for pattern in ('*.cpp', '*.h')
+                        for path in (ROOT / folder).glob(pattern))
+    calls = set(CALL.findall(sources))
+    problems += [f'the plugin uses {name}, which is not in CALLED_INTERFACES and so is not checked'
+                 for name in unlisted_interfaces(sources, text, calls, CALLED_INTERFACES)]
     checked = 0
     returns = struct_returns(text)
     for iface in CALLED_INTERFACES:

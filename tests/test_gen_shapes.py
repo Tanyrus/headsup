@@ -1,12 +1,10 @@
-import importlib.util
 import pathlib
 import tempfile
 import unittest
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
-_spec = importlib.util.spec_from_file_location('gen_shapes', ROOT / 'tools' / 'gen_shapes.py')
-gen = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(gen)
+from tooling import load
+
+gen = load('tools/gen_shapes.py')
 
 
 class Flatten(unittest.TestCase):

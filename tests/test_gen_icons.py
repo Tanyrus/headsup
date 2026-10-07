@@ -1,14 +1,13 @@
-import importlib.util
 import pathlib
+import re
 import struct
 import tempfile
 import unittest
 import zlib
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
-_spec = importlib.util.spec_from_file_location('gen_icons', ROOT / 'tools' / 'gen_icons.py')
-gen = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(gen)
+from tooling import load
+
+gen = load('tools/gen_icons.py')
 
 SIGNATURE = b'\x89PNG\r\n\x1a\n'
 # The seven Adam7 passes: first column, first row, column step, row step.
@@ -102,11 +101,54 @@ class Decode(unittest.TestCase):
             gen.decode_bgra(png(2, 2, pixels(2, 2))[:-30])  # image data cut short
 
 
+class Size(unittest.TestCase):
+    def test_icons_are_at_most_64_pixels_a_side(self):
+        gen.decode_bgra(png(64, 1, pixels(64, 1)))
+        with self.assertRaises(gen.IconError) as caught:
+            gen.decode_bgra(png(65, 1, pixels(65, 1)))
+        self.assertIn('at most 64x64', str(caught.exception))
+
+
+def image(width, height, visible):
+    """BGRA pixels, transparent but for each (x, y): (alpha) in visible, colored by its place."""
+    out = bytearray(width * height * 4)
+    for (x, y), alpha in visible.items():
+        out[(y * width + x) * 4:(y * width + x + 1) * 4] = bytes([x + 1, y + 1, 9, alpha])
+    return bytes(out)
+
+
+class Trim(unittest.TestCase):
+    """Icons fill the same size on screen: each is cut to its visible pixels and centered on a square."""
+
+    def test_the_transparent_margin_is_cut_away(self):
+        visible = {(1, 1): 255, (2, 1): 255, (1, 2): 255, (2, 2): 255}
+        self.assertEqual(gen.trim_square(4, 4, image(4, 4, visible)),
+                         (2, 2, bytes([2, 2, 9, 255, 3, 2, 9, 255, 2, 3, 9, 255, 3, 3, 9, 255])))
+
+    def test_a_wide_icon_is_centered_on_a_square_its_width(self):
+        side, _, pixels = gen.trim_square(5, 3, image(5, 3, {(1, 1): 255, (2, 1): 255, (3, 1): 255}))
+        self.assertEqual(side, 3)
+        self.assertEqual(pixels[3 * 4:6 * 4], bytes([2, 2, 9, 255, 3, 2, 9, 255, 4, 2, 9, 255]))  # the middle row
+        self.assertEqual(pixels[:3 * 4] + pixels[6 * 4:], bytes(6 * 4))
+
+    def test_a_tall_icon_is_centered_across_and_rounds_left(self):
+        side, _, pixels = gen.trim_square(3, 4, image(3, 4, {(1, 0): 255, (1, 1): 255}))  # 1 wide, 2 tall
+        self.assertEqual(side, 2)
+        self.assertEqual(pixels, bytes([2, 1, 9, 255, 0, 0, 0, 0, 2, 2, 9, 255, 0, 0, 0, 0]))
+
+    def test_a_soft_edge_counts_as_visible(self):
+        self.assertEqual(gen.trim_square(3, 1, image(3, 1, {(0, 0): 1, (2, 0): 255}))[0], 3)
+
+    def test_an_icon_with_nothing_visible_fails(self):
+        with self.assertRaises(gen.IconError):
+            gen.trim_square(2, 2, bytes(16))
+
+
 class GenIcons(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.dir = pathlib.Path(self.tmp.name)
-        for _, path in gen.ICONS:
+        for _, path, _ in gen.ICONS:
             (self.dir / path).parent.mkdir(exist_ok=True)
             (self.dir / path).write_bytes(png(2, 1, bytes([1, 2, 3, 4, 5, 6, 7, 8])))
 
@@ -115,9 +157,19 @@ class GenIcons(unittest.TestCase):
 
     def test_one_bitmap_per_icon(self):
         text = gen.generate(self.dir)
-        self.assertIn('const unsigned char kBgraAggroNQ[] = {\n    0x03, 0x02, 0x01, 0x04, 0x07, 0x06, 0x05, 0x08,\n};\n'
-                      'const IconBitmap kIconAggroNQ = {kBgraAggroNQ, 2, 1};', text)
-        self.assertEqual(text.count('const IconBitmap kIcon'), len(gen.ICONS))
+        # The 2x1 test icon, trimmed to a square: its row, then a transparent one.
+        self.assertIn('const unsigned char kBgraAggroNQ[] = {\n    0x03, 0x02, 0x01, 0x04, 0x07, 0x06, 0x05, 0x08, 0x00, 0x00, '
+                      '0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\n};\nconst IconBitmap kIconAggroNQ = {kBgraAggroNQ, 2, 2};', text)
+        self.assertEqual(len(re.findall(r'const IconBitmap kIcon\w+ = ', text)), len(gen.ICONS))
+
+    def test_the_enum_and_the_table_follow_one_order(self):
+        table = gen.generate(self.dir).split('const IconBitmap kIcons[] = {')[1].split('}')[0]
+        ids = gen.generate_ids()
+        names = [name for name, _, _ in gen.ICONS]
+        self.assertEqual([entry.strip() for entry in table.split(',')], [f'kIcon{name}' for name in names])
+        self.assertEqual([line.strip().split(',')[0] for line in ids.splitlines() if line.startswith('        ')], names)
+        self.assertIn('        Ability, // job abilities and weapon skills', ids)
+        self.assertIn(f'constexpr int kIconCount = {len(names)};', ids)
 
     def test_a_missing_or_unreadable_icon_fails(self):
         (self.dir / 'mobdb-icons' / 'Link.png').write_bytes(b'GIF89a')

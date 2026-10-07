@@ -9,7 +9,6 @@ TEST(lookup_by_server_id)
 {
     const MobRecord* m = FindMob(17199648, "Goblin Bounty Hunter");
     CHECK(m != nullptr);
-    CHECK_EQ(m->zone, 103);
     CHECK_EQ(m->minLevel, 17);
     CHECK_EQ(m->maxLevel, 20);
     CHECK_EQ(m->flags, kMobAggressive | kMobLink);
@@ -28,6 +27,19 @@ TEST(passive_and_notorious_flags)
     CHECK_EQ(monk->flags, kMobAggressive | kMobNotorious);
 }
 
+TEST(a_mob_aggros_unless_no_aggro_or_a_follower)
+{
+    struct Row
+    {
+        uint8_t flags;
+        bool aggressive;
+    };
+    for (const Row& row : {Row{kMobAggressive, true}, Row{kMobAlwaysAggro, true}, Row{0, false},
+             Row{kMobAggressive | kMobNoAggro, false}, Row{kMobAlwaysAggro | kMobNoAggro, false}, Row{kMobLink, false},
+             Row{kMobAggressive | kMobFollows, false}})
+        CHECK(IsAggressive(MobRecord{1, "Mob", 1, 1, row.flags, 0, 0, 0}) == row.aggressive);
+}
+
 TEST(a_different_name_at_the_id_is_not_a_match)
 {
     CHECK(FindMob(17199648, "Snipper") == nullptr);
@@ -41,6 +53,14 @@ TEST(names_match_without_punctuation_or_case)
     CHECK(SameMobName("goblin bounty hunter", "Goblin Bounty Hunter"));
     CHECK(!SameMobName("Goblin Bounty Hunter", "Goblin Bounty Hunters"));
     CHECK(!SameMobName("Bat", ""));
+}
+
+TEST(a_starter_mobs_level_mod)
+{
+    const MobRecord* rabbit = FindMob(17190918, "Wild Rabbit"); // East Ronfaure; its spawn script sets -2
+    CHECK(rabbit != nullptr);
+    CHECK_EQ(rabbit->expLevelMod, -2);
+    CHECK_EQ(FindMob(17199648, "Goblin Bounty Hunter")->expLevelMod, 0);
 }
 
 TEST(unknown_ids_are_not_found)

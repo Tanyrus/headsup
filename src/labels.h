@@ -18,7 +18,7 @@ namespace headsup
         Tough,
         VeryTough, // and Incredibly Tough
     };
-    constexpr int kLabelShadeCount = 7;
+    constexpr int kLabelShadeCount = static_cast<int>(LabelShade::VeryTough) + 1;
 
     struct Label
     {
@@ -28,7 +28,7 @@ namespace headsup
 
     LabelShade ShadeFor(Con con);
 
-    // Before an examine: the level range and con range from the data ("Lv 20-23 EP-DC"), colored by the higher
-    // con. After one: the exact level and the server's con ("Lv 22 DC"). "Lv ? ??" when the level is unknown.
-    Label MakeLabel(const MobRecord* mob, const CheckResult* examined, int playerLevel);
+    // Before a /check: the level range and con range from the data ("Lv 20-23 EP-DC"), colored by the higher con.
+    // After one: the exact level and the server's con ("Lv 22 DC"). "Lv ? ??" when the level is unknown.
+    Label MakeLabel(const MobRecord* mob, const CheckResult* checked, int playerLevel);
 }

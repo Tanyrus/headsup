@@ -49,7 +49,7 @@ namespace headsup
             info.bmiHeader.biWidth       = width;
             info.bmiHeader.biHeight      = -height; // rows top to bottom
             info.bmiHeader.biPlanes      = 1;
-            info.bmiHeader.biBitCount    = 32;
+            info.bmiHeader.biBitCount    = kBytesPerPixel * 8;
             info.bmiHeader.biCompression = BI_RGB;
             void* bits                   = nullptr;
             const HBITMAP bitmap         = CreateDIBSection(dc, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
@@ -57,7 +57,7 @@ namespace headsup
             {
                 const HGDIOBJ oldBitmap = SelectObject(dc, bitmap);
                 const size_t pixels     = static_cast<size_t>(width) * static_cast<size_t>(height);
-                std::memset(bits, 0, pixels * 4);
+                std::memset(bits, 0, pixels * kBytesPerPixel);
                 SetBkMode(dc, TRANSPARENT);
                 SetTextColor(dc, RGB(255, 255, 255));
                 TextOutA(dc, margin, margin, text, length);
@@ -67,7 +67,10 @@ namespace headsup
                 out.height       = height;
                 out.alpha.resize(pixels);
                 for (size_t i = 0; i < pixels; ++i)
-                    out.alpha[i] = std::max({bgrx[i * 4], bgrx[i * 4 + 1], bgrx[i * 4 + 2]});
+                {
+                    const uint8_t* bgr = bgrx + i * kBytesPerPixel;
+                    out.alpha[i]       = std::max({bgr[0], bgr[1], bgr[2]});
+                }
                 SelectObject(dc, oldBitmap);
                 drawn = true;
             }

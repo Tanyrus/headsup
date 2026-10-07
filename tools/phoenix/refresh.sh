@@ -1,20 +1,25 @@
 #!/usr/bin/env bash
-# Regenerate data/phoenix_mobs.tsv from Phoenix's own map server (spec: docs/specs/2026-10-06-headsup-v2-design.md,
-# section 1). Builds Phoenix at tools/phoenix/PHOENIX_COMMIT with every module plus tools/phoenix/headsup_dump,
-# loads its database into a private MariaDB, runs xi_map until the dump module writes every loaded mob, then
-# compacts and validates the dump. data/ is only written when validation passes.
+# Regenerate data/phoenix_mobs.tsv and data/phoenix_rules.json from Phoenix's own map server; data/ is only written when
+# validation passes. It clones Phoenix at PHOENIX_COMMIT with its patches and mesh submodules (not the staff-only
+# phoenix_ac), builds the map server with the headsup_dump module, loads Phoenix's database into a private MariaDB, runs
+# the server until the module has dumped every loaded mob and the /check and aggro rules HEADSUP_PHOENIX_DUMPS times,
+# then merges every dump kept for this commit and validates it.
+# A mob counts as aggressive if any run saw it attack: some change aggression while the server runs.
 #
-#   HEADSUP_PHOENIX_DIR   work folder, default ~/.cache/headsup-phoenix (about 6 GB; never under /tmp)
-#   HEADSUP_PHOENIX_DB_PORT  MariaDB port, default 3307
-#   HEADSUP_PHOENIX_DUMPS    server runs to snapshot, default 5, about a minute each (a mob counts as aggressive
-#                              if any run saw it attack)
-#   HEADSUP_PHOENIX_SNAPSHOTS  where every run's dumps are kept, one folder per Phoenix commit, default
-#                              ~/.cache/headsup-snapshots; each refresh merges all of that commit's dumps
-#   JOBS                    parallel build jobs, default nproc
+#   HEADSUP_PHOENIX_DIR        work folder, default ~/.cache/headsup-phoenix (about 6 GB; never under /tmp)
+#   HEADSUP_PHOENIX_DB_PORT    MariaDB port, default 3307
+#   HEADSUP_PHOENIX_MAP_PORT   map server port, default 54230
+#   HEADSUP_PHOENIX_DUMPS      server runs to snapshot, default 5, about three minutes each
+#   HEADSUP_PHOENIX_SNAPSHOTS  where every run's dumps are kept, one folder per Phoenix commit, settings and dump
+#                              module, default ~/.cache/headsup-snapshots; each refresh merges all of that folder's dumps
+#   HEADSUP_PHOENIX_JOBS       parallel build jobs, default nproc
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 WORK="${HEADSUP_PHOENIX_DIR:-$HOME/.cache/headsup-phoenix}"
 PORT="${HEADSUP_PHOENIX_DB_PORT:-3307}"
+MAP_PORT="${HEADSUP_PHOENIX_MAP_PORT:-54230}"
+MAP_TIMEOUT=1200 # seconds for one server run to write its dump
+VANADIEL_DAY=3456 # real seconds in a Vana'diel day: 24 hours of 144 s
 DUMPS="${HEADSUP_PHOENIX_DUMPS:-5}"
 COMMIT="$(tr -d '[:space:]' < "$ROOT/tools/phoenix/PHOENIX_COMMIT")"
 PHOENIX_URL=https://github.com/phoenixffxi/Phoenix.git
@@ -22,9 +27,17 @@ SERVER="$WORK/server"
 BUILD="$WORK/build"
 VENV="$WORK/venv"
 DB="$WORK/db"
-SOCKET="${XDG_RUNTIME_DIR:-$WORK}/headsup-phoenix.sock" # under 108 characters, unlike a path inside $WORK
+# A Unix socket's path must stay under 108 characters, which a long HEADSUP_PHOENIX_DIR could pass.
+SOCKET="${XDG_RUNTIME_DIR:-$WORK}/headsup-phoenix.sock"
 STAGE="$WORK/out"
-SNAPSHOTS="${HEADSUP_PHOENIX_SNAPSHOTS:-$HOME/.cache/headsup-snapshots}/$COMMIT"
+# Live Phoenix restricts content to Treasures of Aht Urhgan and before. That picks the era experience table and /check
+# curve, and which mobs load, so the server runs with the same settings. Dumps made with other settings, or by another
+# version of the dump module, are kept apart.
+LIVE_SETTINGS=(XI_MAIN_RESTRICT_CONTENT=1 XI_MAIN_ENABLE_WOTG=0 XI_MAIN_ENABLE_ACP=0 XI_MAIN_ENABLE_AMK=0
+    XI_MAIN_ENABLE_ASA=0 XI_MAIN_ENABLE_ABYSSEA=0 XI_MAIN_ENABLE_VOIDWATCH=0 XI_MAIN_ENABLE_SOA=0 XI_MAIN_ENABLE_ROV=0
+    XI_MAIN_ENABLE_TVR=0)
+DUMP_ID="$(printf '%s\n' "${LIVE_SETTINGS[@]}" | cat - "$ROOT/tools/phoenix/headsup_dump/headsup_dump.cpp" | sha256sum | cut -c1-8)"
+SNAPSHOTS="${HEADSUP_PHOENIX_SNAPSHOTS:-$HOME/.cache/headsup-snapshots}/$COMMIT-$DUMP_ID"
 
 log() { printf '[refresh] %s\n' "$*"; }
 fail() { printf '[refresh] FAILED: %s\n' "$*" >&2; exit 1; }
@@ -32,14 +45,13 @@ fail() { printf '[refresh] FAILED: %s\n' "$*" >&2; exit 1; }
 for dir in "$WORK" "$SNAPSHOTS"; do
     case "$dir" in /tmp | /tmp/*) fail "/tmp is a small RAM disk here; keep $dir on disk" ;; esac
 done
-for tool in git cmake ninja g++ python3 mariadbd mariadb-install-db mariadb mariadb-admin timeout; do
+for tool in git cmake ninja g++ python3 mariadbd mariadb-install-db mariadb mariadb-admin timeout faketime; do
     command -v "$tool" > /dev/null || fail "missing tool: $tool"
 done
 mkdir -p "$WORK/tmp"
 export TMPDIR="$WORK/tmp"
 
-# 1. Phoenix source at the pinned commit, with the submodules the server needs. phoenix_ac is staff only: it is
-#    never fetched, and its modules are taken out of the module list.
+# phoenix_ac is staff only: it is never fetched, and its modules are taken out of the module list.
 if [ ! -d "$SERVER/.git" ]; then
     git init -q "$SERVER"
     git -C "$SERVER" remote add origin "$PHOENIX_URL"
@@ -53,8 +65,8 @@ log "updating submodules (ximeshes, navmeshes)"
 git -C "$SERVER" submodule update -q --init --checkout --depth 1 ximeshes navmeshes
 sed -i '/^phoenix_ac\//d' "$SERVER/modules/init.txt"
 
-# 2. Live runs with the temporary patches: two enabled fishing modules need them, and one of them changes the
-#    YAML merge. Skip a patch that is already applied.
+# Live runs with the temporary patches: two enabled fishing modules need them, and one of them changes the YAML
+# merge.
 for patch in "$SERVER"/modules/temp_patch/*.patch; do
     [ -e "$patch" ] || continue
     if git -C "$SERVER" apply --reverse --check "$patch" 2> /dev/null; then continue; fi
@@ -62,14 +74,13 @@ for patch in "$SERVER"/modules/temp_patch/*.patch; do
     git -C "$SERVER" apply "$patch"
 done
 
-# 3. The dump module, loaded after every other module. Copy only on change so the build stays incremental.
+# The dump module loads after every other module. Copy it only on change so the build stays incremental.
 mkdir -p "$SERVER/modules/headsup_dump"
 cmp -s "$ROOT/tools/phoenix/headsup_dump/headsup_dump.cpp" "$SERVER/modules/headsup_dump/headsup_dump.cpp" ||
     cp "$ROOT/tools/phoenix/headsup_dump/headsup_dump.cpp" "$SERVER/modules/headsup_dump/headsup_dump.cpp"
 grep -qx 'headsup_dump/' "$SERVER/modules/init.txt" ||
     printf '\n# headsup: dump every loaded mob (tools/phoenix/refresh.sh)\nheadsup_dump/\n' >> "$SERVER/modules/init.txt"
 
-# 4. Build xi_map.
 if [ ! -x "$VENV/bin/python" ]; then
     log "creating the Python venv"
     python3 -m venv "$VENV"
@@ -80,10 +91,10 @@ cmake -G Ninja -S "$SERVER" -B "$BUILD" -DCMAKE_BUILD_TYPE=Release -DTRACY_ENABL
     -DWARNINGS_AS_ERRORS=FALSE -DENABLE_CLANG_TIDY=OFF -DPython_EXECUTABLE="$VENV/bin/python" \
     > "$WORK/configure.log" 2>&1 || fail "cmake configure; see $WORK/configure.log"
 log "building (the first build takes about 15 minutes)"
-cmake --build "$BUILD" -j "${JOBS:-$(nproc)}" > "$WORK/build.log" 2>&1 || fail "build; see $WORK/build.log"
+cmake --build "$BUILD" -j "${HEADSUP_PHOENIX_JOBS:-$(nproc)}" > "$WORK/build.log" 2>&1 || fail "build; see $WORK/build.log"
 [ -x "$SERVER/xi_map" ] || fail "no xi_map after the build"
 
-# 5. A private MariaDB holding Phoenix's database. Always stopped on exit.
+# A private MariaDB holding Phoenix's database, always stopped on exit.
 stop_db() {
     if [ -S "$SOCKET" ]; then
         mariadb-admin --no-defaults -S "$SOCKET" -u root shutdown > /dev/null 2>&1 || true
@@ -120,30 +131,40 @@ log "loading the database (dbtool update full)"
 (cd "$SERVER" && "$VENV/bin/python" tools/dbtool.py update full < /dev/null > "$WORK/dbtool.log" 2>&1) ||
     fail "dbtool; see $WORK/dbtool.log"
 
-# 6. Run the map server until the dump module writes every loaded mob and exits, several times: some mobs change
-#    aggression while the server runs (elementals, the Ghrah forms), and compact.py counts a mob as aggressive if any
-#    run saw it attack. Every dump is kept, so later refreshes of the same commit merge it too.
+# Several runs: some mobs change aggression while the server runs (elementals, the Ghrah forms, mobs that sleep at
+# night), and compact.py counts a mob as aggressive if any run saw it attack. The runs start at hours spread over one
+# Vana'diel day (faketime shifts the server's clock), so day and night both show. Every dump is kept, so later
+# refreshes of the same commit merge it too.
+# A run writes to a .part file first, so a run that dies never leaves a partial dump among the snapshots.
 mkdir -p "$SNAPSHOTS"
 stamp="$(date +%Y%m%d-%H%M%S)"
 dumps=()
 for run in $(seq "$DUMPS"); do
     dump="$SNAPSHOTS/$stamp-$run.json"
-    log "running xi_map until dump $run of $DUMPS is written"
-    (cd "$SERVER" && HEADSUP_DUMP_PATH="$dump" timeout 1200 ./xi_map --ip 127.0.0.1 --port 54230 < /dev/null \
-        > "$WORK/map.log" 2>&1) || fail "xi_map; see $WORK/map.log"
-    [ -s "$dump" ] || fail "xi_map wrote no dump; see $WORK/map.log"
+    offset=$(((run - 1) * VANADIEL_DAY / DUMPS))
+    log "running xi_map until dump $run of $DUMPS is written (clock +${offset}s)"
+    status=0
+    (cd "$SERVER" && timeout "$MAP_TIMEOUT" faketime -f "+${offset}" env "${LIVE_SETTINGS[@]}" HEADSUP_DUMP_PATH="$dump.part" \
+        ./xi_map --ip 127.0.0.1 --port "$MAP_PORT" < /dev/null > "$WORK/map.log" 2>&1) || status=$?
+    if [ "$status" -ne 0 ] || [ ! -s "$dump.part" ]; then
+        rm -f "$dump.part"
+        [ "$status" -eq 124 ] && fail "xi_map wrote no dump within $MAP_TIMEOUT seconds; see $WORK/map.log"
+        fail "xi_map exited with status $status and no dump; see $WORK/map.log"
+    fi
+    mv "$dump.part" "$dump"
     dumps+=("$dump")
 done
 
-# 7. Compact and validate into a staging folder; only then replace data/.
 rm -rf "$STAGE"
 # This run's dumps go first: they carry every field the current dump module writes.
 earlier=()
 for snapshot in "$SNAPSHOTS"/*.json; do
     case "$snapshot" in "$SNAPSHOTS/$stamp"-*) ;; *) earlier+=("$snapshot") ;; esac
 done
-python3 "$ROOT/tools/phoenix/compact.py" "${dumps[@]}" "${earlier[@]}" "$STAGE" "$COMMIT"
-python3 "$ROOT/tools/phoenix/validate.py" "$STAGE/phoenix_mobs.tsv" || fail "validation; data/ left unchanged"
+python3 "$ROOT/tools/phoenix/compact.py" "${dumps[@]}" "${earlier[@]}" "$STAGE" "$COMMIT" ||
+    fail "compact; data/ left unchanged"
+python3 "$ROOT/tools/phoenix/validate.py" "$STAGE/phoenix_mobs.tsv" "$STAGE/phoenix_rules.json" ||
+    fail "validation; data/ left unchanged"
 mkdir -p "$ROOT/data"
-cp "$STAGE/phoenix_mobs.tsv" "$STAGE/phoenix_mobs.meta" "$ROOT/data/"
-log "data/phoenix_mobs.tsv and data/phoenix_mobs.meta updated"
+cp "$STAGE/phoenix_mobs.tsv" "$STAGE/phoenix_mobs.meta" "$STAGE/phoenix_rules.json" "$ROOT/data/"
+log "data/phoenix_mobs.tsv, data/phoenix_mobs.meta and data/phoenix_rules.json updated"

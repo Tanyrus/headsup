@@ -19,7 +19,7 @@ namespace headsup
         }
 
         // The Phoenix palette of Cadence's settings window (github.com/KiplingFFXI/cadence, cadence/ui/theme.lua), the
-        // colors of phoenix-xi.com: square corners, 1 px borders and a red accent.
+        // colors of phoenix-xi.com.
         constexpr ImVec4 kBackground   = Hex(0x180E0E, 0.96f);
         constexpr ImVec4 kCard         = Hex(0x291C1C);
         constexpr ImVec4 kControl      = Hex(0x321F1F);
@@ -42,7 +42,8 @@ namespace headsup
 
         // XIUI's config window layout: a sidebar of pages, each with settings and color settings tabs.
         constexpr float kSidebarWidth  = 170.0f;
-        constexpr float kPageHeight    = 32.0f;  // a sidebar button
+        constexpr float kSidebarButtonHeight = 32.0f;
+        constexpr float kSidebarSpacing      = 2.0f;
         constexpr float kAccentWidth   = 3.0f;   // the bar beside the selected page and under the selected tab
         constexpr float kContentWidth  = 440.0f;
         constexpr float kTabWidth      = 140.0f;
@@ -51,13 +52,21 @@ namespace headsup
         constexpr float kNumberWidth   = 56.0f;  // the box to type a slider's value in
         constexpr float kTipWidth      = 300.0f;
         constexpr float kChipWidth     = 52.0f;
+        constexpr float kSideColumn    = 200.0f; // where a player icon's side buttons start in its row
+        constexpr float kSideWidth     = 64.0f;
         constexpr float kOffAlpha      = 0.45f;  // settings of a feature that is off are drawn this faint
         // One size for every page, the tallest included; a longer page scrolls.
         constexpr float kWindowWidth   = 700.0f;
         constexpr float kWindowHeight  = 560.0f;
-        // XIUI's corners.
+        // XIUI's corners and spacing.
         constexpr float kWindowRounding = 6.0f;
         constexpr float kRounding       = 4.0f;
+        constexpr float kBorderSize     = 1.0f; // the window's, and a chip's
+        constexpr ImVec2 kWindowPadding = ImVec2(14.0f, 12.0f);
+        constexpr ImVec2 kFramePadding  = ImVec2(8.0f, 4.0f);
+        constexpr ImVec2 kItemSpacing   = ImVec2(8.0f, 7.0f);
+        constexpr ImVec2 kCellPadding   = ImVec2(12.0f, 0.0f);
+        constexpr float kGrabMinSize    = 10.0f;
 
         enum Page : int
         {
@@ -78,21 +87,29 @@ namespace headsup
             kTextSection       = 1u << 4,
             kTextColorsSection = 1u << 5,
             kConColorsSection  = 1u << 6,
-            kDebugOutlines     = 1u << 7,
-            kDebugNameplates   = 1u << 8,
-            kDebugFrame        = 1u << 9,
+            kDebugOutlinesSection   = 1u << 7,
+            kDebugNameplatesSection = 1u << 8,
+            kDebugFrameSection      = 1u << 9,
+            kPlayerIconsSection     = 1u << 10,
         };
 
         const char* const kCategoryLabels[kCategoryCount] = {"Aggressive", "Passive", "No data", "Aggressive NM",
             "Passive NM"};
+        const char* const kPlayerIconLabels[kPlayerIconCount] = {"GM", "Mentor", "New adventurer", "Level sync", "Away",
+            "Linkshell", "Bazaar", "Seeking party"};
+        const char* const kIconSideLabels[kIconSideCount] = {"Left", "Right", "Hide"};
+        const char* const kPlayerIconTips[kPlayerIconCount] = {"A game master.", "A mentor.", "A new adventurer.",
+            "Level synced, outside battlefields.", "Away from the keyboard.", "In a linkshell, in the linkshell's color.",
+            "Has a bazaar set up.", "Seeking a party."};
         const char* const kCategoryTips[kCategoryCount] = {
-            "Aggressive mobs that would attack you at your level: not Too Weak, unless you are resting.",
+            "Aggressive mobs that would attack you at your level: not Too Weak, unless you are sitting or resting.",
             "Mobs that would leave you alone: passive, or aggressive but Too Weak for you.",
             "Mobs the Phoenix data does not list, so HeadsUp cannot tell.",
             "Notorious monsters that would attack you.",
             "Notorious monsters that would leave you alone."};
         // Ordinary mobs, notorious monsters, then mobs with no data.
-        const int kCategoryOrder[kCategoryCount] = {0, 1, 3, 4, 2};
+        const Category kCategoryOrder[kCategoryCount] = {Category::WillAttack, Category::WontAttack, Category::NmWillAttack,
+            Category::NmWontAttack, Category::Unknown};
         const char* const kShadeLabels[kLabelShadeCount] = {"Unknown level", "Too Weak", "Easy Prey", "Decent Challenge",
             "Even Match", "Tough", "Very Tough"};
 
@@ -138,13 +155,13 @@ namespace headsup
             s.WindowRounding = kWindowRounding;
             s.ChildRounding = s.FrameRounding = s.PopupRounding = s.GrabRounding = s.TabRounding = s.ScrollbarRounding =
                 kRounding;
-            s.WindowBorderSize = 1.0f;
+            s.WindowBorderSize = kBorderSize;
             s.FrameBorderSize  = 0.0f;
-            s.WindowPadding    = ImVec2(14.0f, 12.0f);
-            s.FramePadding     = ImVec2(8.0f, 4.0f);
-            s.ItemSpacing      = ImVec2(8.0f, 7.0f);
-            s.CellPadding      = ImVec2(12.0f, 0.0f);
-            s.GrabMinSize      = 10.0f;
+            s.WindowPadding    = kWindowPadding;
+            s.FramePadding     = kFramePadding;
+            s.ItemSpacing      = kItemSpacing;
+            s.CellPadding      = kCellPadding;
+            s.GrabMinSize      = kGrabMinSize;
         }
 
         struct ButtonColors
@@ -170,29 +187,35 @@ namespace headsup
                 slot = was;
             }
 
-            bool Button(const char* label, const ImVec2& size, const ButtonColors& colors)
+            // Draws a button-like item in these colors, putting the style's back after it.
+            template <typename Draw>
+            bool WithButtonColors(const ButtonColors& colors, Draw draw)
             {
                 ImVec4* c           = style.Colors;
                 const ImVec4 was[3] = {c[ImGuiCol_Button], c[ImGuiCol_ButtonHovered], c[ImGuiCol_ButtonActive]};
                 c[ImGuiCol_Button]        = colors.normal;
                 c[ImGuiCol_ButtonHovered] = colors.hovered;
                 c[ImGuiCol_ButtonActive]  = colors.active;
-                const bool pressed        = gui->Button(label, size);
+                const bool pressed        = draw();
                 c[ImGuiCol_Button]        = was[0];
                 c[ImGuiCol_ButtonHovered] = was[1];
                 c[ImGuiCol_ButtonActive]  = was[2];
                 return pressed;
             }
 
-            // A dropdown of the installed fonts (FontChoices), each a flat full-width button: ImGui's selectables are
-            // overloaded.
-            void FontDropdown(const char* label, std::string& font, const std::vector<std::string>& installed)
+            bool Button(const char* label, const ImVec2& size, const ButtonColors& colors)
+            {
+                return WithButtonColors(colors, [&] { return gui->Button(label, size); });
+            }
+
+            // A dropdown of fonts (FontChoices), each a flat full-width button: ImGui's selectables are overloaded.
+            void FontDropdown(const char* label, std::string& font, const std::vector<std::string>& choices)
             {
                 gui->SetNextItemWidth(kControlWidth);
                 if (!gui->BeginCombo(label, font.c_str(), ImGuiComboFlags_HeightLarge)) return;
                 const ImVec2 align    = style.ButtonTextAlign;
                 style.ButtonTextAlign = ImVec2(0.0f, 0.5f);
-                for (const std::string& name : FontChoices(installed, font))
+                for (const std::string& name : choices)
                 {
                     const bool picked = name == font;
                     if (Button(name.c_str(), ImVec2(-FLT_MIN, 0.0f), ButtonColors{picked ? kRowPicked : kClear, kRowHovered, kTint}))
@@ -240,16 +263,9 @@ namespace headsup
                 char arrow[48], label[48];
                 std::snprintf(arrow, sizeof(arrow), "##section arrow %s", title);
                 std::snprintf(label, sizeof(label), "%s##section", title);
-                ImVec4* c                 = style.Colors;
-                const ImVec4 was[3]       = {c[ImGuiCol_Button], c[ImGuiCol_ButtonHovered], c[ImGuiCol_ButtonActive]};
-                c[ImGuiCol_Button]        = header.normal;
-                c[ImGuiCol_ButtonHovered] = header.hovered;
-                c[ImGuiCol_ButtonActive]  = header.active;
-                bool toggled              = gui->ArrowButton(arrow, open ? ImGuiDir_Down : ImGuiDir_Right);
-                c[ImGuiCol_Button]        = was[0];
-                c[ImGuiCol_ButtonHovered] = was[1];
-                c[ImGuiCol_ButtonActive]  = was[2];
+                bool toggled = WithButtonColors(header, [&] { return gui->ArrowButton(arrow, open ? ImGuiDir_Down : ImGuiDir_Right); });
                 gui->SameLine(0.0f, 0.0f);
+                ImVec4* c             = style.Colors;
                 const ImVec2 align    = style.ButtonTextAlign;
                 const ImVec4 text     = c[ImGuiCol_Text];
                 style.ButtonTextAlign = ImVec2(0.0f, 0.5f);
@@ -273,6 +289,29 @@ namespace headsup
             {
                 save |= gui->Checkbox(label, &value);
                 Help(tip);
+            }
+
+            // The label, then Left, Right and Hide buttons in a column, the chosen one lit.
+            void SideChoice(const char* label, IconSide& side, const char* tip)
+            {
+                const float rowStart = gui->GetCursorPosX();
+                gui->AlignTextToFramePadding();
+                gui->TextUnformatted(label);
+                Help(tip);
+                for (int option = 0; option < kIconSideCount; ++option)
+                {
+                    gui->SameLine();
+                    if (option == 0) gui->SetCursorPosX(rowStart + kSideColumn);
+                    char id[48];
+                    std::snprintf(id, sizeof(id), "%s##side %s", kIconSideLabels[option], label);
+                    const bool picked         = static_cast<int>(side) == option;
+                    const ButtonColors colors = picked ? ButtonColors{kRowPicked, kRowHovered, kTint} : ButtonColors{kCard, kHover, kTint};
+                    if (Button(id, ImVec2(kSideWidth, 0.0f), colors) && !picked)
+                    {
+                        side = static_cast<IconSide>(option);
+                        save = true;
+                    }
+                }
             }
 
             // A slider, then a box to type the value in, then the label. Typed values are clamped with the rest.
@@ -317,9 +356,10 @@ namespace headsup
             {
                 ImVec4* c           = style.Colors;
                 const ImVec4 was[2] = {c[ImGuiCol_Text], c[ImGuiCol_Border]};
+                const float border  = style.FrameBorderSize;
                 c[ImGuiCol_Text]      = on ? kText : kHeading;
                 c[ImGuiCol_Border]    = on ? kAccent : kBorder;
-                style.FrameBorderSize = 1.0f;
+                style.FrameBorderSize = kBorderSize;
                 char label[32];
                 std::snprintf(label, sizeof(label), "%s##%s", on ? "ON" : "OFF", id);
                 if (Button(label, ImVec2(kChipWidth, 0.0f), on ? ButtonColors{kAccent, kAccentHover, kAccent} : ButtonColors{kClear, kHover, kTint}))
@@ -327,7 +367,7 @@ namespace headsup
                     on   = !on;
                     save = true;
                 }
-                style.FrameBorderSize = 0.0f;
+                style.FrameBorderSize = border;
                 c[ImGuiCol_Text]      = was[0];
                 c[ImGuiCol_Border]    = was[1];
             }
@@ -354,7 +394,7 @@ namespace headsup
         void DrawSidebar(Ui& ui, int& page)
         {
             const ImVec2 spacing = ui.style.ItemSpacing;
-            ui.style.ItemSpacing = ImVec2(0.0f, 2.0f);
+            ui.style.ItemSpacing = ImVec2(0.0f, kSidebarSpacing);
             for (int p = 0; p < kPageCount; ++p)
             {
                 const bool picked = p == page;
@@ -362,10 +402,10 @@ namespace headsup
                 std::snprintf(bar, sizeof(bar), "##bar%d", p);
                 std::snprintf(label, sizeof(label), "%s##page", kPageLabels[p]);
                 const ButtonColors accent = picked ? ButtonColors{kAccent, kAccent, kAccent} : ButtonColors{kClear, kClear, kClear};
-                bool pressed              = ui.Button(bar, ImVec2(kAccentWidth, kPageHeight), accent);
+                bool pressed              = ui.Button(bar, ImVec2(kAccentWidth, kSidebarButtonHeight), accent);
                 ui.gui->SameLine();
                 const ButtonColors colors = picked ? ButtonColors{kPicked, kPicked, kPicked} : ButtonColors{kClear, kHover, kTint};
-                pressed |= ui.Button(label, ImVec2(kSidebarWidth - kAccentWidth, kPageHeight), colors);
+                pressed |= ui.Button(label, ImVec2(kSidebarWidth - kAccentWidth, kSidebarButtonHeight), colors);
                 if (pressed) page = p;
             }
             ui.style.ItemSpacing = spacing;
@@ -414,8 +454,11 @@ namespace headsup
             }
             if (ui.Section("Mobs to outline", kMobsSection, collapsed))
             {
-                for (const int c : kCategoryOrder)
+                for (const Category category : kCategoryOrder)
+                {
+                    const int c = CategoryIndex(category);
                     ui.Check(kCategoryLabels[c], s.show[c], kCategoryTips[c]);
+                }
             }
             ui.Fade(false);
             if (!status.stencilAvailable) ui.Colored(kAccent, "Outlines are unavailable: the depth buffer has no stencil bits.");
@@ -426,8 +469,9 @@ namespace headsup
             ui.Fade(!s.enabled);
             if (ui.Section("Mob colors", kMobColorsSection, collapsed))
             {
-                for (const int c : kCategoryOrder)
+                for (const Category category : kCategoryOrder)
                 {
+                    const int c = CategoryIndex(category);
                     ui.Fade(!s.enabled || !s.show[c]);
                     ui.Swatch(kCategoryLabels[c], s.color[c], kCategoryTips[c]);
                 }
@@ -440,19 +484,20 @@ namespace headsup
             ui.Fade(!s.enabled);
             if (ui.Section("Display", kDisplaySection, collapsed))
             {
-                ui.Check("Replace mob names", s.replaceNameplates,
+                ui.Check("Replace mob names", s.replaceMobNames,
                     "Hides the game's mob names and draws them in the font below, in the game's color.");
                 ui.Check("Replace player names", s.replacePlayerNames,
-                    "The same for players, you included. Players get only their name: levels and icons come from mob data.");
+                    "The same for players, you included. Levels and MobDB icons are for mobs only.");
                 ui.Check("Replace NPC names", s.replaceNpcNames, "The same for NPCs.");
                 ui.Fade(!s.enabled || !s.replacePlayerNames);
                 ui.Check("Show player icons", s.showPlayerIcons,
                     "Beside replaced player names: seeking party, bazaar, linkshell in its color, away, mentor, new "
-                    "adventurer and GM, in XIUI's HQ versions of the game's icons.");
+                    "adventurer, GM and level sync, in XIUI's HQ versions of the game's icons. Under Player icons, each "
+                    "can go left or right of the name, or be hidden.");
                 ui.Fade(!s.enabled || !s.replacePlayerNames || !s.showPlayerIcons);
                 ui.Check("Center name and icons", s.centerNameAndIcons,
                     "Centers a player's name and the icons beside it together over them, as the game does. Off, the name "
-                    "alone is centered and the icons hang to its left.");
+                    "alone is centered and the icons hang to its sides.");
                 ui.Fade(!s.enabled);
                 ui.Check("Show level and con", s.showLabels,
                     "Lv 20-23 EP-DC: the level range from the Phoenix data and how it cons to you. After you /check the "
@@ -460,12 +505,19 @@ namespace headsup
                 ui.Check("Show icons", s.showIcons,
                     "XIUI's MobDB icons: aggressive or passive, whether it links, and how it detects you.");
                 ui.Check("Replace target cursor", s.replaceCursor,
-                    "Hides the game's cursor over your target and draws an arrow above its nameplate instead: one color for "
+                    "Hides the game's cursor over your target and draws HeadsUp's above its nameplate instead: one color for "
                     "your target, one while you are locked on, and one for the sub-target cursor.");
                 ui.Fade(!s.enabled || !s.replaceCursor);
                 ui.Check("Phoenix feather cursor", s.cursorFeather,
                     "Phoenix's feather icon instead of the arrow, in the same colors.");
             }
+            ui.Fade(!s.enabled || !s.replacePlayerNames || !s.showPlayerIcons);
+            if (ui.Section("Player icons", kPlayerIconsSection, collapsed))
+            {
+                for (int i = 0; i < kPlayerIconCount; ++i)
+                    ui.SideChoice(kPlayerIconLabels[i], s.playerIconSide[i], kPlayerIconTips[i]);
+            }
+            ui.Fade(!s.enabled);
             if (ui.Section("Text", kTextSection, collapsed))
             {
                 ui.FontDropdown("Font", s.fontName, fonts);
@@ -480,12 +532,16 @@ namespace headsup
                 ui.Fade(!s.enabled || !s.showLabels);
                 ui.SliderInt("Level and con size", s.labelSize, kMinTextSize, kMaxTextSize, "%d px", "The level line's height.");
                 ui.Fade(!s.enabled || !s.showIcons);
-                ui.SliderInt("Icon size", s.iconSize, kMinTextSize, kMaxTextSize, "%d px", "Each icon's width and height.");
+                ui.SliderInt("Icon size", s.iconSize, kMinTextSize, kMaxTextSize, "%d px",
+                    "Each MobDB icon's width and height. Player icons have their own size below.");
+                ui.Fade(!s.enabled || !s.replacePlayerNames || !s.showPlayerIcons);
+                ui.SliderInt("Player icon size", s.playerIconSize, kMinPlayerIconSize, kMaxPlayerIconSize, "%d%%",
+                    "The icons beside player names, as a share of the name's height, so they grow and shrink with it.");
                 ui.Fade(!s.enabled || !s.replaceCursor);
                 ui.SliderInt("Cursor size", s.cursorSize, kMinTextSize, kMaxTextSize, "%d px", "The target cursor's height.");
                 ui.Fade(!s.enabled);
                 ui.Check("Scale with distance", s.scaleWithDistance,
-                    "Sizes grow and shrink with the game's own name size as a mob comes closer or moves away.");
+                    "Sizes grow and shrink with the game's own name size as the name comes closer or moves away.");
             }
             ui.Fade(false);
         }
@@ -505,12 +561,12 @@ namespace headsup
                 ui.Fade(!s.enabled);
                 ui.Swatch("Text outline", s.textOutline, "The edge around the name and the level text.");
                 ui.Fade(!s.enabled || !s.showIcons);
-                ui.Swatch("Icon tint", s.iconTint, "Multiplies the icons' colors. White keeps them as they are.");
+                ui.Swatch("Icon tint", s.iconTint, "Multiplies the MobDB icons' colors. White keeps them as they are.");
                 ui.Fade(!s.enabled || !s.replaceCursor);
-                ui.Swatch("Target cursor", s.cursorColor, "The arrow over your target.");
-                ui.Swatch("Locked-on cursor", s.lockedCursorColor, "The arrow over your target while you are locked on.");
+                ui.Swatch("Target cursor", s.cursorColor, "The cursor over your target.");
+                ui.Swatch("Locked-on cursor", s.lockedCursorColor, "The cursor over your target while you are locked on.");
                 ui.Swatch("Sub-target cursor", s.subCursorColor,
-                    "The arrow over the mob you are picking for a spell or ability.");
+                    "The cursor over what you are picking for a spell, an ability or a trade.");
             }
             ui.Fade(!s.enabled || !s.showLabels);
             if (ui.Section("Level and con", kConColorsSection, collapsed))
@@ -550,14 +606,14 @@ namespace headsup
         void DrawDebug(Ui& ui, const MenuStatus& status, uint32_t& collapsed, bool& requested)
         {
             char outlined[32], meshes[32], shown[32], letters[64], frame[48], level[32];
-            if (ui.Section("Outlines", kDebugOutlines, collapsed))
+            if (ui.Section("Outlines", kDebugOutlinesSection, collapsed))
             {
                 std::snprintf(outlined, sizeof(outlined), "%u", status.outlinedMobs);
                 std::snprintf(meshes, sizeof(meshes), "%u", status.meshes);
                 DebugRows(ui, "##debugOutlines", {{"Mobs outlined", outlined}, {"Meshes outlined last frame", meshes},
                     {"Stencil buffer", status.stencilAvailable ? "available" : "missing: no outlines"}});
             }
-            if (ui.Section("Nameplates", kDebugNameplates, collapsed))
+            if (ui.Section("Nameplates", kDebugNameplatesSection, collapsed))
             {
                 std::snprintf(shown, sizeof(shown), "%u", status.nameplates);
                 std::snprintf(letters, sizeof(letters), "%u in the scene, %u from mobs, %u hidden", status.lettersInScene,
@@ -565,20 +621,20 @@ namespace headsup
                 DebugRows(ui, "##debugNameplates", {{"Nameplates shown", shown},
                     {"Drawn", status.drewInScene ? "into the scene, behind walls" : "on top"}, {"Game name letters", letters}});
             }
-            if (ui.Section("Frame", kDebugFrame, collapsed))
+            if (ui.Section("Frame", kDebugFrameSection, collapsed))
             {
                 std::snprintf(frame, sizeof(frame), "%.2f ms (%.0f fps)", status.frameMs,
                     status.frameMs > 0.0 ? 1000.0 / status.frameMs : 0.0);
                 if (status.playerLevel > 0)
-                    std::snprintf(level, sizeof(level), "%d%s", status.playerLevel, status.sitting ? ", resting" : "");
+                    std::snprintf(level, sizeof(level), "%d%s", status.playerLevel, status.sitting ? ", sitting" : "");
                 else
                     std::snprintf(level, sizeof(level), "unknown");
                 DebugRows(ui, "##debugFrame", {{"Frame time", frame}, {"Your level", level}});
             }
             ui.gui->Spacing();
             if (ui.Button("Write debug report", ImVec2(0.0f, 0.0f), ButtonColors{kControl, kHover, kTint})) requested = true;
-            ui.Help("The same as /hu debug: writes what every mob's outline and nameplate show to logs/headsup, then "
-                    "records 120 frames of nameplate data.");
+            ui.Help("The same as /hu debug: writes what every outline and nameplate show to logs/headsup, then records "
+                    "the next frames' nameplate data.");
         }
 
     }
@@ -619,8 +675,10 @@ namespace headsup
                     if (m_ColorsTab)
                         DrawNameplateColors(ui, s, m_Collapsed);
                     else
-                        if (m_Fonts.empty()) m_Fonts = InstalledFontFamilies();
+                    {
+                        if (m_Fonts.empty()) m_Fonts = FontChoices(InstalledFontFamilies(), s.fontName);
                         DrawNameplateSettings(ui, s, m_Collapsed, m_Fonts);
+                    }
                     break;
                 default:
                     DrawDebug(ui, status, m_Collapsed, m_DebugRequested);

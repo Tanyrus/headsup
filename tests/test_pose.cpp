@@ -1,4 +1,6 @@
 #include "pose.h"
+#include "boxes.h"
+#include "nameplate.h"
 #include "test.h"
 
 #include <cmath>
@@ -13,17 +15,10 @@ namespace
     const float kProjection[16] = {0.747742f, 0.0f, 0.0f, 0.0f, 0.0f, 1.26042f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, -1.0f, 0.0f, 0.0f,
         -0.1f, 0.0f};
 
-    Camera TownCamera() { return MakeCamera(kView, kProjection, 2560.0f, 1440.0f); }
+    Camera TownCamera() { return MakeCamera(kView, kProjection, 1440.0f); }
 
-    bool Near(float a, float b) { return std::fabs(a - b) < 0.5f; }
+    bool Near(float a, float b) { return test::Near(a, b, 0.5f); } // a pixel row
 
-    ScreenBox Glyph(float x0, float y0, float x1, float y1)
-    {
-        ScreenBox b;
-        b.Add(x0, y0);
-        b.Add(x1, y1);
-        return b;
-    }
 }
 
 TEST(statuses_give_the_pose)
@@ -36,6 +31,16 @@ TEST(statuses_give_the_pose)
     CHECK(PoseFromStatus(63) == Pose::Chair); // the default chair
     CHECK(PoseFromStatus(83) == Pose::Chair); // the last chair key item
     CHECK(PoseFromStatus(84) == Pose::Standing);
+}
+
+TEST(sitting_for_aggro_is_phoenixs_rule)
+{
+    // Phoenix's isSitting: resting, sitting and the first eleven chairs let Too Weak aggressive mobs aggro; later chairs
+    // only look seated.
+    for (const uint32_t status : {33u, 47u, 63u, 73u})
+        CHECK(IsSittingStatus(status));
+    for (const uint32_t status : {0u, 1u, 62u, 74u, 83u})
+        CHECK(!IsSittingStatus(status));
 }
 
 TEST(a_standing_players_name_stays_where_the_game_puts_it)
@@ -86,10 +91,10 @@ TEST(a_seated_players_name_is_placed_on_screen_when_the_games_is_above_it)
     // Shio in a chair, with the game's name above the top of the screen and their head in view.
     const Camera camera     = TownCamera();
     const WorldPoint feet   = FromEntityPosition(61.957f, -97.996f, -0.917f);
-    const ScreenBox letters = Glyph(1945.6f, -102.1f, 2221.6f, -51.4f);
+    const ScreenBox letters = test::Box(1945.6f, -102.1f, 2221.6f, -51.4f);
     const ScreenBox placed  = PlaceName(letters, nullptr, &camera, feet, Pose::Chair);
-    CHECK(!NameOnScreen(&letters, 2560.0f, 1440.0f));
-    CHECK(NameOnScreen(&placed, 2560.0f, 1440.0f));
+    CHECK(!NameOnScreen(letters, 2560.0f, 1440.0f));
+    CHECK(NameOnScreen(placed, 2560.0f, 1440.0f));
     CHECK(std::fabs(placed.Height() - letters.Height()) < 0.01f && std::fabs(placed.CenterX() - letters.CenterX()) < 0.01f);
     float game = 0.0f, ours = 0.0f;
     CHECK(HeightAtRow(camera, feet, letters.maxY, game) && HeightAtRow(camera, feet, placed.maxY, ours));
@@ -98,8 +103,8 @@ TEST(a_seated_players_name_is_placed_on_screen_when_the_games_is_above_it)
 
 TEST(a_name_is_placed_over_its_whole_nameplate)
 {
-    const ScreenBox letters = Glyph(1000.0f, 200.0f, 1080.0f, 210.0f);
-    const ScreenBox whole   = Glyph(960.0f, 198.0f, 1080.0f, 213.0f);
+    const ScreenBox letters = test::Box(1000.0f, 200.0f, 1080.0f, 210.0f);
+    const ScreenBox whole   = test::Box(960.0f, 198.0f, 1080.0f, 213.0f);
     const ScreenBox placed  = PlaceName(letters, &whole, nullptr, WorldPoint{}, Pose::Chair); // no camera: not lowered
     CHECK(std::fabs(placed.CenterX() - 1020.0f) < 0.01f && placed.minY == letters.minY && placed.maxY == letters.maxY);
 }

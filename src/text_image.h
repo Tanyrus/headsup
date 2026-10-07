@@ -5,7 +5,9 @@
 
 namespace headsup
 {
-    // Antialiased text as GDI draws it: one coverage byte per pixel, rows top to bottom.
+    constexpr int kBytesPerPixel = 4; // A8R8G8B8 textures and GDI's 32-bit bitmaps
+
+    // Antialiased coverage, of GDI's text or a filled shape: one byte per pixel, rows top to bottom.
     struct Coverage
     {
         int width = 0;
@@ -21,9 +23,9 @@ namespace headsup
         std::vector<uint32_t> argb;
     };
 
-    // The text in color over an outline in outlineColor: the text's coverage grown by radius pixels. The coverage needs
-    // a margin of radius empty pixels for the outline to fit.
-    Image OutlinedText(const Coverage& text, int radius, uint32_t color, uint32_t outlineColor);
+    // The coverage in color over an outline in outlineColor: the coverage grown by radius pixels. It needs a margin of
+    // radius empty pixels for the outline to fit.
+    Image Outlined(const Coverage& coverage, int radius, uint32_t color, uint32_t outlineColor);
 
     // The texture side that holds this many pixels: the next power of two, which every Direct3D 8 card accepts.
     int TextureSide(int pixels);

@@ -7,11 +7,6 @@ namespace headsup
     namespace
     {
 #include "generated/icons.inc"
-
-        const IconBitmap kIcons[] = {kIconAggroNQ, kIconAggroHQ, kIconPassiveNQ, kIconPassiveHQ, kIconLink, kIconSight,
-            kIconTrueSight, kIconSound, kIconScent, kIconMagic, kIconJA, kIconBlood, kIconInvite, kIconBazaar, kIconLinkshell,
-            kIconAway, kIconMentor, kIconNewAdventurer, kIconGm};
-        static_assert(std::size(kIcons) == kIconCount, "one bitmap per Icon, in Icon order");
     }
 
     IconSet IconsFor(const MobRecord* mob)
@@ -20,10 +15,8 @@ namespace headsup
         if (mob == nullptr) return set;
         auto add = [&](Icon icon) { set.icons[set.count++] = icon; };
 
-        const bool notorious  = (mob->flags & kMobNotorious) != 0;
-        const bool aggressive = (mob->flags & (kMobAggressive | kMobAlwaysAggro)) != 0 &&
-                                (mob->flags & (kMobNoAggro | kMobNeutral)) == 0;
-        if (aggressive)
+        const bool notorious = (mob->flags & kMobNotorious) != 0;
+        if (IsAggressive(*mob))
             add(notorious ? Icon::AggroHQ : Icon::AggroNQ);
         else
             add(notorious ? Icon::PassiveHQ : Icon::PassiveNQ);
@@ -42,7 +35,6 @@ namespace headsup
 
     const IconBitmap& IconImage(Icon icon)
     {
-        const auto i = static_cast<unsigned>(icon);
-        return kIcons[i < kIconCount ? i : 0];
+        return kIcons[static_cast<size_t>(icon)];
     }
 }

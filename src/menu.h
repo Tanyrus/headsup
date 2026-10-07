@@ -43,6 +43,6 @@ namespace headsup
         int m_Page           = 0;     // the sidebar's selected page
         bool m_ColorsTab     = false; // that page's "Color Settings" tab instead of "Settings"
         uint32_t m_Collapsed = 0;     // one bit per collapsed section
-        std::vector<std::string> m_Fonts; // installed in Windows, read when the menu first opens
+        std::vector<std::string> m_Fonts; // FontChoices, read when the Nameplates page's Settings tab first opens
     };
 }

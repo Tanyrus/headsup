@@ -17,14 +17,14 @@ namespace headsup
         return i < kConCount ? kConShades[i] : LabelShade::Unknown;
     }
 
-    Label MakeLabel(const MobRecord* mob, const CheckResult* examined, int playerLevel)
+    Label MakeLabel(const MobRecord* mob, const CheckResult* checked, int playerLevel)
     {
         Label label{};
         label.shade = LabelShade::Unknown;
-        if (examined != nullptr && examined->level > 0)
+        if (checked != nullptr && checked->level > 0)
         {
-            std::snprintf(label.text, sizeof(label.text), "Lv %d %s", examined->level, Abbrev(examined->con));
-            label.shade = ShadeFor(examined->con);
+            std::snprintf(label.text, sizeof(label.text), "Lv %d %s", checked->level, Abbrev(checked->con));
+            label.shade = ShadeFor(checked->con);
             return label;
         }
         if (mob == nullptr || mob->maxLevel == 0)
@@ -44,8 +44,8 @@ namespace headsup
             std::snprintf(label.text, sizeof(label.text), "Lv %s ??", levels);
             return label;
         }
-        const Con easiest = Difficulty(playerLevel, low);
-        const Con hardest = Difficulty(playerLevel, high);
+        const Con easiest = Difficulty(playerLevel, low + mob->expLevelMod);
+        const Con hardest = Difficulty(playerLevel, high + mob->expLevelMod);
         if (easiest == hardest)
             std::snprintf(label.text, sizeof(label.text), "Lv %s %s", levels, Abbrev(hardest));
         else

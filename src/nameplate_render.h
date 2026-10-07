@@ -1,29 +1,28 @@
 #pragma once
 
 #include "Ashita.h"
+#include "game_cursor.h"
+#include "game_names.h"
 #include "icons.h"
 #include "nameplate.h"
-#include "text_image.h"
-#include "outline.h"
 #include "settings.h"
+#include "text_image.h"
 #include "tracker.h"
 
 #include <cstdint>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 namespace headsup
 {
-    // Draws each visible entity's nameplate as textured quads: for a mob the icon row and the level and con line, for any
-    // entity whose kind is replaced its name, and for the target the cursor. Text is drawn with GDI into a texture per
-    // entity and line, redrawn only when the text, font, size or colors change; each icon has one texture.
+    // Draws each entity's nameplate as textured quads: the name of any entity whose kind is replaced, with a player's
+    // icons beside it; a mob's level line and MobDB icons; and the cursor over the target or the sub-target candidate.
+    // Text and the cursor are drawn with GDI into a texture per entity and line, redrawn only when what they show
+    // changes; each icon has one texture.
     class NameplateRenderer
     {
     public:
-        static constexpr size_t kMaxPlates = 128;
-
         // Where an entity's nameplate went, for /hu debug.
         struct Shown
         {
@@ -33,42 +32,47 @@ namespace headsup
             uint32_t nameColor;
         };
 
-        // The entities that get a target cursor, by entity index (0 for none): the target and, while a sub-target is
-        // being picked, the candidate under the sub-target cursor. locked: the player is locked on to the target.
-        struct CursorTargets
-        {
-            uint16_t target    = 0;
-            uint16_t subTarget = 0;
-            bool locked        = false;
-        };
-
         void SetDevice(IDirect3DDevice8* device) { m_Device = device; }
-        // Lays out the nameplate of every entity whose name is on screen (labels only where LabelVisible) in the pixels of
-        // the image it will be drawn into: toX and toY turn back-buffer pixels into those (1 for the back buffer itself).
-        // now, in seconds, makes the target cursor bob.
-        void Update(const Tracker& tracker, const OutlineRenderer& outline, const Settings& settings, float toX, float toY,
-            const CursorTargets& cursors, double now);
-        // Forgets the last layout, for a frame whose nameplates could not be drawn.
+        // Lays out the nameplate of every entity whose name is on screen in the pixels of the image it will be drawn
+        // into: toX and toY turn back-buffer pixels into those (1 for the back buffer itself). now, in seconds, makes the
+        // cursor bob.
+        void Update(const Tracker& tracker, const GameNames& names, const Settings& settings, float toX, float toY,
+            const CursorTargets& targets, double now);
+        // Forgets the last layout, for a frame whose nameplates were not drawn.
         void Clear();
-        // Draws the last layout into the bound render target. With depthTest, each nameplate sits at its name's depth,
-        // so whatever the scene has in front of the name covers it. Changes render states: the caller restores them.
+        // Releases the plates' textures too, while nameplates are off.
+        void ReleasePlates();
+        // Draws the last layout into the bound render target, farthest first and cursors last. With depthTest, each
+        // nameplate sits at its name's depth, so whatever the scene has in front covers it. Changes render states.
         void Draw(bool depthTest);
         // Releases every texture.
         void Release();
 
         const std::vector<Shown>& LastShown() const { return m_Shown; }
-        // The names that got our target cursor in the last layout: the game's cursor over them is hidden.
+        // The entities that got HeadsUp's cursor in the last layout: the game's cursor there is blocked.
         const std::vector<CursorName>& CursorNames() const { return m_CursorNames; }
-        // True once, when a text texture could not be made; names and labels stay off until the plugin reloads.
-        bool TakeFailure();
-        // True once, when an icon texture could not be made; icons stay off until the plugin reloads.
-        bool TakeIconFailure();
+        // Once a texture for names or for icons could not be made, that part stays off until the plugin reloads.
+        bool NamesFailed() const { return m_Failed; }
+        bool IconsFailed() const { return m_IconsFailed; }
+        // What failed, once, after it did; empty otherwise.
+        std::string TakeFailure();
+        std::string TakeIconFailure();
 
     private:
-        struct TextTexture
+        // What a texture shows: its text (empty for a cursor), font (or cursor shape), weight, size and colors.
+        struct TextureKey
+        {
+            std::string text, font;
+            bool bold = false;
+            int height = 0;
+            uint32_t color = 0, outline = 0;
+            bool operator==(const TextureKey&) const = default;
+        };
+
+        struct PlateTexture
         {
             IDirect3DTexture8* texture = nullptr;
-            std::string key;          // the text, font, size and colors it was drawn with
+            TextureKey key;
             float width  = 0.0f;      // pixels of the drawn image
             float height = 0.0f;
             float u = 0.0f, v = 0.0f; // the image's share of its power-of-two texture
@@ -77,13 +81,19 @@ namespace headsup
 
         struct Plate
         {
-            TextTexture name;
-            TextTexture label;
-            TextTexture cursor;
+            PlateTexture name;
+            PlateTexture label;
+            PlateTexture cursor;
             int nameRaster   = 0; // the pixel height each is drawn at, for RasterHeight
             int labelRaster  = 0;
             int cursorRaster = 0;
-            uint32_t frame  = 0;
+            uint32_t frame   = 0;
+        };
+
+        struct IconTexture
+        {
+            IDirect3DTexture8* texture = nullptr;
+            float u = 0.0f, v = 0.0f;
         };
 
         struct Quad
@@ -93,22 +103,23 @@ namespace headsup
             uint32_t tint;
         };
 
-        bool Prepare(TextTexture& t, const char* text, uint32_t color, int pixelHeight, const Settings& settings);
-        bool PrepareCursor(TextTexture& t, uint32_t color, int pixelHeight, const Settings& settings);
-        bool Upload(TextTexture& t, const Image& image, std::string key);
+        bool Prepare(PlateTexture& t, const char* text, uint32_t color, int pixelHeight, const Settings& settings);
+        bool PrepareCursor(PlateTexture& t, uint32_t color, int pixelHeight, const Settings& settings);
+        bool Upload(PlateTexture& t, const Image& image, TextureKey key);
         IDirect3DTexture8* CreateTexture(const void* bgra, int width, int height, float& u, float& v);
-        IDirect3DTexture8* IconTexture(Icon icon);
+        const IconTexture* Icon(Icon icon);
+        void Fail(std::string what);
 
         IDirect3DDevice8* m_Device = nullptr;
         std::unordered_map<uint16_t, Plate> m_Plates; // by entity index
-        IDirect3DTexture8* m_IconTextures[kIconCount] = {};
+        IconTexture m_IconTextures[kIconCount] = {};
         std::vector<Quad> m_Quads;
         std::vector<Shown> m_Shown;
         std::vector<CursorName> m_CursorNames;
-        uint32_t m_Frame          = 0;
-        bool m_Failed             = false;
-        bool m_FailurePending     = false;
-        bool m_IconsFailed        = false;
-        bool m_IconFailurePending = false;
+        uint32_t m_Frame           = 0;
+        bool m_Failed              = false;
+        bool m_IconsFailed         = false;
+        std::string m_Failure;     // what failed, until taken
+        std::string m_IconFailure;
     };
 }

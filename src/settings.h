@@ -2,6 +2,7 @@
 
 #include "classifier.h"
 #include "labels.h"
+#include "player_status.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -19,8 +20,9 @@ namespace headsup
     constexpr float kMinThickness = 1.0f, kMaxThickness = 16.0f;            // render-target pixels
     constexpr int kMinSmoothness = 4, kMaxSmoothness = 16;                  // shifted copies per mesh
     constexpr float kMinOutlineDistance = 5.0f, kMaxOutlineDistance = 60.0f; // yalms
-    constexpr int kMinTextSize = 8, kMaxTextSize = 48;   // pixels: name, label and icon sizes
+    constexpr int kMinTextSize = 8, kMaxTextSize = 48;   // pixels: name, label, icon and cursor sizes
     constexpr int kMinNameRaise = 0, kMaxNameRaise = 40; // pixels
+    constexpr int kMinPlayerIconSize = 50, kMaxPlayerIconSize = 150; // percent of the name's letter height
     constexpr const char* kDefaultFont = "Trebuchet MS";
     constexpr size_t kMaxFontName      = 31; // a Windows font name's longest, without its terminator
 
@@ -31,7 +33,7 @@ namespace headsup
         int smoothness     = 4;     // shifted copies per mesh
         float maxDistance  = 50.0f; // yalms
         bool showLabels    = true;  // level and con above every mob's name
-        bool replaceNameplates = true;  // hide the game's mob nameplates and draw HeadsUp's (with the name)
+        bool replaceMobNames   = true;  // hide the game's mob names and draw HeadsUp's
         bool showIcons         = true;  // the MobDB icon row
         bool scaleWithDistance = true;  // sizes follow the game's name size, like the game's names do
         std::string fontName   = kDefaultFont; // a font family installed in Windows
@@ -39,11 +41,13 @@ namespace headsup
         int nameSize           = 15;    // pixels
         int labelSize          = 13;    // pixels
         int iconSize           = 16;    // pixels
+        int playerIconSize     = 100;   // percent of the name's letter height
         bool replacePlayerNames = true; // players' names, you included, in the font below
         bool replaceNpcNames   = true;
         bool replaceCursor     = true;  // our target cursor above the target's nameplate, instead of the game's
         bool cursorFeather     = true;  // Phoenix's feather instead of the arrow
         bool showPlayerIcons   = true;  // seeking party, bazaar, linkshell and the rest beside replaced player names
+        IconSide playerIconSide[kPlayerIconCount] = {}; // by PlayerIcon: every one left of the name
         bool centerNameAndIcons = true;  // a player's name and icons centered together over them, rather than the name
         Color cursorColor      = {{1.00f, 1.00f, 1.00f}}; // the target: white
         Color lockedCursorColor = {{0.65f, 0.40f, 1.00f}}; // locked on: purple
@@ -73,7 +77,7 @@ namespace headsup
         };
     };
 
-    // Whether anything of the nameplate is drawn: the master switch, and labels, icons or the replacement.
+    // Whether anything of the nameplate is drawn: the master switch, and labels, icons, names or the cursor.
     bool NameplatesOn(const Settings& s);
     // Whether HeadsUp draws any kind of name (mobs, players or NPCs), hiding the game's.
     bool ReplacesNames(const Settings& s);
@@ -98,6 +102,6 @@ namespace headsup
     Settings LoadSettings(SettingsStore& store);
     void SaveSettings(const Settings& s, SettingsStore& store);
 
-    // Opaque D3DCOLOR (A8R8G8B8) for D3DRS_TEXTUREFACTOR.
+    // Opaque D3DCOLOR (A8R8G8B8) for D3DRS_TEXTUREFACTOR, from a color Clamp has kept in 0-1.
     uint32_t ToArgb(const Color& c);
 }

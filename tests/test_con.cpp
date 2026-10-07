@@ -5,7 +5,8 @@
 
 using namespace headsup;
 
-// Expected values are read from the era table in src/con_tables.inc.
+// Expected values are read from Phoenix's era table and curve (modules/era/lua/globals/toau_experience_points.lua at
+// 9b93232a), which its map server loads.
 
 TEST(even_match_at_75)
 {
@@ -32,6 +33,7 @@ TEST(low_level_bracket)
 TEST(level_difference_is_clamped_to_the_table)
 {
     CHECK_EQ(BaseExp(1, 99), 600u);
+    CHECK_EQ(BaseExp(99, 1), 0u);
 }
 
 TEST(unknown_player_level_gives_no_exp)
@@ -42,7 +44,7 @@ TEST(unknown_player_level_gives_no_exp)
 
 TEST(player_levels_above_99_use_99)
 {
-    CHECK_EQ(BaseExp(120, 99), BaseExp(99, 99));
+    CHECK_EQ(BaseExp(120, 99), 100u); // an even match at 99
 }
 
 TEST(difficulty_follows_the_era_curve)
@@ -56,6 +58,8 @@ TEST(difficulty_follows_the_era_curve)
     CHECK(Difficulty(75, 76) == Con::Tough);
     CHECK(Difficulty(75, 77) == Con::Tough);
     CHECK(Difficulty(75, 78) == Con::VeryTough);
+    CHECK(Difficulty(75, 82) == Con::VeryTough);       // +7: 360
+    CHECK(Difficulty(75, 83) == Con::IncrediblyTough); // +8: 400
     CHECK(Difficulty(20, 26) == Con::IncrediblyTough);
 }
 

@@ -20,7 +20,7 @@ namespace
 
 TEST(text_sits_on_an_outline_grown_around_it)
 {
-    const Image image = OutlinedText(Dot(5, 255), 1, 0xFFFFFF80u, 0xFF000000u);
+    const Image image = Outlined(Dot(5, 255), 1, 0xFFFFFF80u, 0xFF000000u);
     CHECK_EQ(image.width, 5);
     CHECK_EQ(image.height, 5);
     CHECK_EQ(Pixel(image, 2, 2), 0xFFFFFF80u);
@@ -34,14 +34,14 @@ TEST(partly_covered_text_blends_over_its_outline)
 {
     // Coverage 128 is 0.502 for both the text and the outline under it: alpha 0.502 + 0.502 * 0.498 = 0.752, and the
     // color is 0.502 / 0.752 text over the black outline.
-    const Image image = OutlinedText(Dot(3, 128), 1, 0xFFFFFFFFu, 0xFF000000u);
+    const Image image = Outlined(Dot(3, 128), 1, 0xFFFFFFFFu, 0xFF000000u);
     CHECK_EQ(Pixel(image, 1, 1), 0xC0AAAAAAu);
     CHECK_EQ(Pixel(image, 0, 1), 0x80000000u);
 }
 
 TEST(no_outline_keeps_the_text_coverage)
 {
-    const Image image = OutlinedText(Dot(3, 64), 0, 0xFF66FF66u, 0xFF000000u);
+    const Image image = Outlined(Dot(3, 64), 0, 0xFF66FF66u, 0xFF000000u);
     CHECK_EQ(Pixel(image, 1, 1), 0x4066FF66u);
     CHECK_EQ(Pixel(image, 0, 1), 0u);
 }

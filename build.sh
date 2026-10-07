@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
-# Build, test and install headsup.dll.
-#   ./build.sh test      generate data, run the Python and native unit tests
-#   ./build.sh plugin    test, check the Ashita ABI, cross-compile build/headsup.dll
-#   ./build.sh install   plugin, then install it into the game's plugins folder (the default)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 OUT="$ROOT/build"
 PLUGINS_DIR="${HEADSUP_PLUGINS_DIR:-$HOME/Games/PhoenixXI/plugins}"
-PURE_SOURCES=(con.cpp mobdata.cpp classifier.cpp settings.cpp tracker.cpp outline_math.cpp labels.cpp examine.cpp nameplate.cpp icons.cpp text_image.cpp shapes.cpp player_status.cpp pose.cpp)
-PLUGIN_SOURCES=("${PURE_SOURCES[@]}" outline.cpp text_raster.cpp nameplate_render.cpp menu.cpp plugin.cpp)
+PURE_SOURCES=(con.cpp mobdata.cpp classifier.cpp settings.cpp tracker.cpp outline_math.cpp labels.cpp check.cpp nameplate.cpp icons.cpp text_image.cpp shapes.cpp player_status.cpp pose.cpp commands.cpp game_glyphs.cpp game_cursor.cpp)
+PLUGIN_SOURCES=("${PURE_SOURCES[@]}" d3d_util.cpp game_names.cpp outline.cpp text_raster.cpp nameplate_render.cpp menu.cpp plugin.cpp)
+# dev/, ignored by git, holds a developer's tools; when it exists they are built in and plugin.cpp's HEADSUP_DEV hooks call them.
+DEV_SOURCES=()
+DEV_FLAGS=()
+if [[ -d "$ROOT/dev" ]]; then
+    DEV_SOURCES=("$ROOT"/dev/*.cpp)
+    DEV_FLAGS=(-DHEADSUP_DEV -I"$ROOT/dev")
+fi
 
 generate() {
     python3 "$ROOT/tools/gen_mobdata.py"
+    python3 "$ROOT/tools/gen_rules.py"
     python3 "$ROOT/tools/gen_icons.py"
     python3 "$ROOT/tools/gen_shapes.py"
 }
@@ -28,11 +32,12 @@ abi_check() { python3 "$ROOT/tools/abi_check.py"; }
 
 plugin() {
     mkdir -p "$OUT"
+    # The SDK's Registry.h passes an int* where Windows wants an LPDWORD, which only -fpermissive accepts.
     i686-w64-mingw32-g++ -std=c++20 -O2 -shared \
-        -I"$ROOT/shim" -I"$ROOT/third_party/ashita-sdk" -I"$ROOT/src" \
-        -fpermissive -Wno-unknown-pragmas -Wno-attributes \
+        -isystem "$ROOT/shim" -isystem "$ROOT/third_party/ashita-sdk" -I"$ROOT/src" "${DEV_FLAGS[@]}" \
+        -Wall -Wextra -Werror -fpermissive \
         -static -static-libgcc -static-libstdc++ -Wl,--kill-at \
-        -o "$OUT/headsup.dll" "${PLUGIN_SOURCES[@]/#/$ROOT/src/}" -lpsapi -lgdi32
+        -o "$OUT/headsup.dll" "${PLUGIN_SOURCES[@]/#/$ROOT/src/}" "${DEV_SOURCES[@]}" -lpsapi -lgdi32
     echo "built $OUT/headsup.dll"
 }
 

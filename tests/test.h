@@ -1,9 +1,10 @@
 #pragma once
 
-// Minimal test framework: TEST(name) registers a case, CHECK/CHECK_EQ throw on failure.
 #include <cstdio>
 #include <functional>
 #include <string>
+#include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -32,6 +33,27 @@ namespace test
     };
 
     inline std::string Where(const char* file, int line) { return std::string(file) + ":" + std::to_string(line) + ": "; }
+
+    // Text compares as text, even as two const char*.
+    template <typename A, typename B>
+    bool Same(const A& a, const B& b)
+    {
+        if constexpr (std::is_convertible_v<A, std::string_view> && std::is_convertible_v<B, std::string_view>)
+            return std::string_view(a) == std::string_view(b);
+        else
+            return a == b;
+    }
+
+    template <typename T>
+    std::string Show(const T& v)
+    {
+        if constexpr (std::is_enum_v<T>)
+            return std::to_string(static_cast<std::underlying_type_t<T>>(v));
+        else if constexpr (std::is_arithmetic_v<T>)
+            return std::to_string(v);
+        else
+            return '"' + std::string(v) + '"';
+    }
 }
 
 #define TEST_CAT2(a, b) a##b
@@ -52,7 +74,7 @@ namespace test
     {                                                                                                  \
         const auto va_ = (a);                                                                          \
         const auto vb_ = (b);                                                                          \
-        if (!(va_ == vb_))                                                                             \
+        if (!test::Same(va_, vb_))                                                                     \
             throw test::Failure{test::Where(__FILE__, __LINE__) + "CHECK_EQ(" #a ", " #b "): " +       \
-                                std::to_string(va_) + " != " + std::to_string(vb_)};                   \
+                                test::Show(va_) + " != " + test::Show(vb_)};                           \
     } while (0)
