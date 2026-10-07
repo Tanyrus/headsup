@@ -38,7 +38,8 @@ done
 mkdir -p "$WORK/tmp"
 export TMPDIR="$WORK/tmp"
 
-# 1. Phoenix source at the pinned commit, with the submodules the server needs.
+# 1. Phoenix source at the pinned commit, with the submodules the server needs. phoenix_ac is staff only: it is
+#    never fetched, and its modules are taken out of the module list.
 if [ ! -d "$SERVER/.git" ]; then
     git init -q "$SERVER"
     git -C "$SERVER" remote add origin "$PHOENIX_URL"
@@ -48,8 +49,9 @@ if [ "$(git -C "$SERVER" rev-parse -q --verify HEAD || true)" != "$COMMIT" ]; th
     git -C "$SERVER" fetch -q --depth 1 origin "$COMMIT"
     git -C "$SERVER" checkout -q -f --detach FETCH_HEAD
 fi
-log "updating submodules (phoenix_ac, ximeshes, navmeshes)"
-git -C "$SERVER" submodule update -q --init --checkout --depth 1 modules/phoenix_ac ximeshes navmeshes
+log "updating submodules (ximeshes, navmeshes)"
+git -C "$SERVER" submodule update -q --init --checkout --depth 1 ximeshes navmeshes
+sed -i '/^phoenix_ac\//d' "$SERVER/modules/init.txt"
 
 # 2. Live runs with the temporary patches: two enabled fishing modules need them, and one of them changes the
 #    YAML merge. Skip a patch that is already applied.

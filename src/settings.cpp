@@ -1,6 +1,7 @@
 #include "settings.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <string>
@@ -39,8 +40,22 @@ namespace headsup
             return std::isfinite(v) ? std::clamp(static_cast<int>(std::lround(v)), lo, hi) : fallback;
         }
 
-        const char* const kFontFamilies[kFontCount] = {"Arial", "Tahoma", "Verdana", "Trebuchet MS", "Courier New",
-            "Times New Roman"};
+        // Fonts were once saved by their place in this list.
+        const char* const kOldFonts[] = {"Arial", "Tahoma", "Verdana", "Trebuchet MS", "Courier New", "Times New Roman"};
+        constexpr int kOldFontCount   = static_cast<int>(sizeof(kOldFonts) / sizeof(kOldFonts[0]));
+
+        std::string LoadFontName(SettingsStore& store)
+        {
+            const int old = LoadInt(store, "fontIndex", -1, -1, kOldFontCount);
+            return store.GetString("fontName", old >= 0 && old < kOldFontCount ? kOldFonts[old] : kDefaultFont);
+        }
+
+        bool SameIgnoringCase(const std::string& a, const std::string& b)
+        {
+            return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), [](char x, char y) {
+                return std::tolower(static_cast<unsigned char>(x)) == std::tolower(static_cast<unsigned char>(y));
+            });
+        }
     }
 
     bool ReplacesNames(const Settings& s)
@@ -54,9 +69,21 @@ namespace headsup
                                 s.replaceCursor);
     }
 
-    const char* FontFamily(int index)
+    std::vector<std::string> FontChoices(std::vector<std::string> installed, const std::string& current)
     {
-        return index >= 0 && index < kFontCount ? kFontFamilies[index] : kFontFamilies[0];
+        installed.push_back(current);
+        installed.erase(std::remove_if(installed.begin(), installed.end(),
+                            [](const std::string& name) { return name.empty() || name[0] == '@'; }),
+            installed.end());
+        auto lower = [](const std::string& name) {
+            std::string l = name;
+            for (char& ch : l)
+                ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+            return l;
+        };
+        std::sort(installed.begin(), installed.end(), [&](const std::string& a, const std::string& b) { return lower(a) < lower(b); });
+        installed.erase(std::unique(installed.begin(), installed.end(), SameIgnoringCase), installed.end());
+        return installed;
     }
 
     Settings Clamp(Settings s)
@@ -65,7 +92,7 @@ namespace headsup
         s.thickness   = ClampFloat(s.thickness, kMinThickness, kMaxThickness, d.thickness);
         s.smoothness  = std::clamp(s.smoothness, kMinSmoothness, kMaxSmoothness);
         s.maxDistance = ClampFloat(s.maxDistance, kMinOutlineDistance, kMaxOutlineDistance, d.maxDistance);
-        s.fontIndex   = std::clamp(s.fontIndex, 0, kFontCount - 1);
+        if (s.fontName.empty() || s.fontName.size() > kMaxFontName) s.fontName = d.fontName;
         s.nameSize    = std::clamp(s.nameSize, kMinTextSize, kMaxTextSize);
         s.labelSize   = std::clamp(s.labelSize, kMinTextSize, kMaxTextSize);
         s.iconSize    = std::clamp(s.iconSize, kMinTextSize, kMaxTextSize);
@@ -95,12 +122,11 @@ namespace headsup
         s.replaceNameplates = store.GetBool("replaceNameplates", s.replaceNameplates);
         s.showIcons         = store.GetBool("showIcons", s.showIcons);
         s.scaleWithDistance = store.GetBool("scaleWithDistance", s.scaleWithDistance);
-        s.fontIndex         = LoadInt(store, "fontIndex", s.fontIndex, 0, kFontCount - 1);
+        s.fontName          = LoadFontName(store);
         s.fontBold          = store.GetBool("fontBold", s.fontBold);
         s.nameSize          = LoadInt(store, "nameSize", s.nameSize, kMinTextSize, kMaxTextSize);
         s.labelSize         = LoadInt(store, "labelSize", s.labelSize, kMinTextSize, kMaxTextSize);
         s.iconSize          = LoadInt(store, "iconSize", s.iconSize, kMinTextSize, kMaxTextSize);
-        s.hideBehindWalls   = store.GetBool("hideBehindWalls", s.hideBehindWalls);
         s.replacePlayerNames = store.GetBool("replacePlayerNames", s.replacePlayerNames);
         s.replaceNpcNames   = store.GetBool("replaceNpcNames", s.replaceNpcNames);
         s.replaceCursor     = store.GetBool("replaceCursor", s.replaceCursor);
@@ -143,7 +169,7 @@ namespace headsup
         setBool("replaceNameplates", s.replaceNameplates);
         setBool("showIcons", s.showIcons);
         setBool("scaleWithDistance", s.scaleWithDistance);
-        setFloat("fontIndex", static_cast<float>(s.fontIndex));
+        store.Set("fontName", s.fontName.c_str());
         setBool("fontBold", s.fontBold);
         setFloat("nameSize", static_cast<float>(s.nameSize));
         setFloat("labelSize", static_cast<float>(s.labelSize));
@@ -152,7 +178,6 @@ namespace headsup
             for (int i = 0; i < 3; ++i)
                 setFloat(base + kChannelKeys[i], c.v[i]);
         };
-        setBool("hideBehindWalls", s.hideBehindWalls);
         setBool("replacePlayerNames", s.replacePlayerNames);
         setBool("replaceNpcNames", s.replaceNpcNames);
         setBool("replaceCursor", s.replaceCursor);

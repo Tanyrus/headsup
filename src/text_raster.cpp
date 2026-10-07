@@ -7,6 +7,28 @@
 
 namespace headsup
 {
+    namespace
+    {
+        int CALLBACK AddFamily(const LOGFONTA* font, const TEXTMETRICA* metrics, DWORD type, LPARAM families)
+        {
+            (void)metrics;
+            if ((type & TRUETYPE_FONTTYPE) != 0) reinterpret_cast<std::vector<std::string>*>(families)->push_back(font->lfFaceName);
+            return 1;
+        }
+    }
+
+    std::vector<std::string> InstalledFontFamilies()
+    {
+        std::vector<std::string> families;
+        HDC dc = CreateCompatibleDC(nullptr);
+        if (dc == nullptr) return families;
+        LOGFONTA every{};
+        every.lfCharSet = DEFAULT_CHARSET;
+        EnumFontFamiliesExA(dc, &every, AddFamily, reinterpret_cast<LPARAM>(&families), 0);
+        DeleteDC(dc);
+        return families;
+    }
+
     bool RasterizeText(const char* text, const char* family, int pixelHeight, bool bold, int margin, Coverage& out)
     {
         out      = Coverage{};

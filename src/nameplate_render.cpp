@@ -67,13 +67,13 @@ namespace headsup
     bool NameplateRenderer::Prepare(TextTexture& t, const char* text, uint32_t color, int pixelHeight, const Settings& settings)
     {
         const uint32_t outline = ToArgb(settings.textOutline);
-        const std::string key  = std::string(text) + '\n' + std::to_string(settings.fontIndex) + ' ' +
+        const std::string key  = std::string(text) + '\n' + settings.fontName + ' ' +
                                 std::to_string(settings.fontBold) + ' ' + std::to_string(pixelHeight) + ' ' +
                                 std::to_string(color) + ' ' + std::to_string(outline);
         if (t.texture != nullptr && t.key == key) return true;
         const int radius = OutlineRadius(pixelHeight);
         Coverage coverage;
-        if (!RasterizeText(text, FontFamily(settings.fontIndex), pixelHeight, settings.fontBold, radius, coverage)) return false;
+        if (!RasterizeText(text, settings.fontName.c_str(), pixelHeight, settings.fontBold, radius, coverage)) return false;
         return Upload(t, OutlinedText(coverage, radius, color, outline), key);
     }
 
@@ -120,8 +120,6 @@ namespace headsup
         m_Shown.clear();
         m_Quads.clear();
         m_CursorNames.clear();
-        m_ReplacedLast = std::unordered_set<uint16_t>(m_Replacing.begin(), m_Replacing.end());
-        m_Replacing.clear();
         const uint32_t iconTint  = ToArgb(settings.iconTint);
         const float screenWidth  = outline.BackBufferWidth();
         const float screenHeight = outline.BackBufferHeight();
@@ -139,23 +137,23 @@ namespace headsup
                 const ActorInfo* info = tracker.Find(actor);
                 if (info == nullptr) continue;
                 const ScreenBox* plate = outline.NameplateBox(info->index);
-                if (!LabelVisible(plate, outline.MeshDraws(info->index), outline.PlateFramesInRow(info->index), screenWidth,
-                        screenHeight))
-                    continue; // the camera cannot see this entity well enough
-                const bool replaceKind = info->kind == EntityKind::Mob      ? settings.replaceNameplates
-                                         : info->kind == EntityKind::Player ? settings.replacePlayerNames
-                                                                            : settings.replaceNpcNames;
-                const bool replace   = replaceKind && info->name[0] != '\0';
-                const bool showName  = replace && m_ReplacedLast.count(info->index) != 0;
-                const bool showLabel = settings.showLabels && info->alive && info->label.text[0] != '\0';
-                const int iconCount  = settings.showIcons && info->alive && !m_IconsFailed ? info->icons.count : 0;
+                if (plate == nullptr) continue;
+                // Checked where our name goes: a seated player's head can be in view with the game's name above the screen.
+                const ScreenBox* whole = outline.WholeNameplate(info->index);
+                ScreenBox anchor       = PlaceName(*plate, whole, outline.SceneCamera(), info->feet, info->pose);
+                if (!NameOnScreen(&anchor, screenWidth, screenHeight)) continue;
+                // Labels and mob icons wait until the camera sees the entity well enough; a name never does.
+                const bool steady = LabelVisible(plate, outline.MeshDraws(info->index), outline.PlateFramesInRow(info->index),
+                    screenWidth, screenHeight);
+                const bool showName  = ReplacesName(settings, *info);
+                const bool showLabel = steady && settings.showLabels && info->alive && info->label.text[0] != '\0';
+                const int iconCount  = steady && settings.showIcons && info->alive && !m_IconsFailed ? info->icons.count : 0;
                 const bool picked    = settings.replaceCursor && info->index == cursors.subTarget;
                 const bool showCursor = picked || (settings.replaceCursor && info->index == cursors.target);
-                if (!replace && !showLabel && iconCount == 0 && !showCursor) continue;
+                if (!showName && !showLabel && iconCount == 0 && !showCursor) continue;
                 if (m_Shown.size() == kMaxPlates) break;
                 Plate& p = m_Plates[info->index];
                 p.frame  = m_Frame;
-                if (replace) m_Replacing.push_back(info->index);
 
                 // Scale smoothly like the game's names, by the height of its letters. Text is drawn at a nearby size and
                 // stretched to fit, so it is redrawn only when its size moves a step.
@@ -195,8 +193,6 @@ namespace headsup
                     iconSize, showCursor ? p.cursor.width * cursorFit / toX : 0.0f, showCursor ? p.cursor.height * cursorFit / toY : 0.0f,
                     p.cursor.tip, nameIconCount, nameIconSize, settings.centerNameAndIcons};
                 // Over the entity: a player's name and icons are centered together, so the letters alone sit off to one side.
-                const ScreenBox* whole = outline.WholeNameplate(info->index);
-                ScreenBox anchor       = whole != nullptr ? CenteredOver(*plate, *whole) : *plate;
                 if (showName)
                 {
                     const float raise = static_cast<float>(settings.nameRaise) * scale;
@@ -261,7 +257,6 @@ namespace headsup
     {
         m_Quads.clear();
         m_Shown.clear();
-        m_Replacing.clear();
         m_CursorNames.clear();
     }
 

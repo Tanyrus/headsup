@@ -16,16 +16,21 @@ replace the game's mob nameplates with its own. It never targets or checks anyth
 
 - `/load headsup`
 - `/headsup` or `/hu` opens the settings window, laid out like XIUI's in Phoenix's colors: an ON/OFF chip for
-  outlines and nameplates, a sidebar of pages with the status under it, and `settings` and `color settings` tabs.
+  outlines and nameplates, a sidebar of pages with the status under it, and `Settings` and `Color Settings` tabs.
   Every setting has a `(?)` that explains it and every slider a box to type its value in:
-  - Outlines: thickness, smoothness, max distance and which mob types to outline; their colors
-  - Nameplates: replace the game's, level and con, icons, replace the target cursor, hide behind walls, font, bold,
-    sizes, scale with distance, the feather cursor; own name color, text outline, icon tint, cursor colors and one
-    color per con
+  - Outlines: thickness (1 px), smoothness (4 copies), max distance (50 yalms) and which mob types to outline
+    (Aggressive and both NMs; not Passive or No data); their colors
+  - Nameplates: replace the game's names, level and con, icons, player icons, replace the target cursor, the feather
+    cursor, font, bold, sizes and scale with distance (all on except bold); own name color, text outline, icon tint,
+    cursor colors and one color per con
   - Debug: what outlines and nameplates did last frame, and a button for `/hu debug`
 - `/hu on` and `/hu off` turn outlines and nameplates on and off. `/hu help` lists the commands.
 - `/hu debug` writes what every mob with a nameplate shows (data, label, icons, name color, positions) to
   `logs/headsup/debug-<time>.txt`, then adds 120 frames of nameplate data to the same file.
+- `/hu drawdump [seconds]` writes every draw call of one frame, after the delay, to `logs/headsup/drawdump-<time>.txt`:
+  hook, vertex format, render states, texture, render target, the entity the game credits it to, its box and depth,
+  and whether HeadsUp blocked it; with the target window's cursor positions, each player's status from packets and
+  render flags, the scene camera, and each player's pose and name box. It is how the game's drawing was worked out.
 
 Settings are saved to `config/headsup/settings.ini`.
 
@@ -45,7 +50,9 @@ mentor, new adventurer and GM. Seeking party, bazaar and linkshell come from the
 (Render.Flags1 bits 20 and 27, Flags2 bit 9, and the linkshell color), so they show as soon as HeadsUp loads; away,
 mentor, new adventurer and GM come from the server's player updates (packets 0x00D and 0x037) once seen. The name
 and icons are centered together over the player, as the game does; with `Center name and icons` off, the name alone is
-centered and the icons hang to its left.
+centered and the icons hang to its left. The game leaves the name of a player resting, sitting on the ground or
+sitting in a chair at standing height (higher still in a chair, by the chair's height), well above their lowered head;
+HeadsUp projects their feet with the scene's camera and brings the name down to a share of that height for the pose.
 
 | Icon | Meaning |
 |---|---|
@@ -54,24 +61,27 @@ centered and the icons hang to its left.
 | Sight, True Sight, Sound, Scent | How it detects you. True Sight sees through Invisible or Sneak |
 | Magic, JA, Blood | Detects spellcasting, job abilities and weapon skills, or low HP |
 
-Font family (Arial, Tahoma, Verdana, Trebuchet MS, Courier New or Times New Roman), bold, and the name, level and
-icon sizes are in the menu. With `Scale with distance` on, they grow and shrink with the game's own name size.
+The font is a dropdown of every TrueType and OpenType family installed in Windows (Trebuchet MS by default), saved by
+name. Bold, and the name, level and icon sizes, are in the menu too. With `Scale with distance` on (the default), they
+grow and shrink with the game's own name size.
 
 The menu also sets the colors: one for each con on the level line (Easy Prey covers Incredibly Easy Prey, Very Tough
 covers Incredibly Tough, and a gray for unknown levels), the text outline, an icon tint (white keeps the icons' own
 colors), and an optional name color that replaces the game's.
 
-A nameplate appears only when the camera can see the mob: the game drew its body and its name this frame and the
-frame before, and some of the name is on screen. Mobs beyond the draw distance, off screen or with names turned off
-get none. With `Hide behind walls` on (the default), nameplates are drawn into the 3D scene at the depth of the game's
-name, so walls and terrain in front of a name cover it like the game's own, and the game's menus sit on top.
+A replaced name shows whenever the game's would. A mob's level line and icons appear only when the camera can see
+it: the game drew its body and its name this frame and the frame before, and some of the name is on screen. Mobs
+beyond the draw distance, off screen or with names turned off get none. Nameplates are always drawn into the 3D scene
+at the depth of the game's name, so walls and terrain in front of a name cover it like the game's own, and the game's
+menus sit on top.
 
 With `Replace target cursor` on, your target's nameplate gets a bobbing arrow on top: white for your target, purple
 while you are locked on and gold for what you are picking with the sub-target cursor, each color in the menu, and
 `Phoenix feather cursor` swaps the arrow for Phoenix's feather icon in the same colors. The
-game's own cursor over it is hidden: the small quad the game draws in its UI layer, centered just above the name, while
-that entity is being drawn. It works for mobs, players and NPCs alike; a target whose name the game does not draw
-keeps the game's cursor.
+game's own cursor is hidden: the small quad the game draws in its UI layer at the cursor position its target window
+keeps (m_AnkX/Y, m_SubAnkX/Y for the sub-target), read in the same frame, or over the name while that entity is being
+drawn. Once one is seen, any arrow drawn from its texture is hidden too: the arrows are taller than wide, unlike the
+menu's pointer from the same texture. It works for mobs, players and NPCs alike.
 
 ## Level and con
 
@@ -106,20 +116,23 @@ itself.
   on the stack. Nameplates are placed when the game finishes drawing the frame's names, so they move with them.
 - **Drawing nameplates:** the text is drawn with Windows GDI into a texture per mob and line, redrawn only when its
   text, font, size or colors change; the icons are decoded from their PNGs at build time. The game draws its 3D scene
-  into an off-screen image and copies it to the back buffer; with `Hide behind walls` on, nameplates are drawn into
-  that image just before the copy, depth-tested at the name's depth, otherwise on top at the end of the frame.
-- **Replacing nameplates:** in replace mode the game's mob name letters are measured, then blocked from drawing. A
-  letter is hidden only where HeadsUp drew that mob's name the frame before, only if it is the size of that name's
-  letters, and never inside a player's or NPC's own name. Our name appears once the game's is hidden, so the two never
-  overlap. The name color is read from the hidden letters.
+  into an off-screen image and copies it to the back buffer; nameplates are drawn into that image just before the
+  copy, depth-tested at the name's depth, or on top at the end of a frame where no copy was seen.
+- **Replacing nameplates:** the game's name letters and icons are measured, then blocked from drawing. Whether to
+  block one is decided in the frame it is drawn, from the entity the game credits it to: every letter and icon of a
+  name whose kind HeadsUp replaces is blocked wherever it is, so a name moving fast, coming on screen or drawn larger
+  as the sub-target never shows the game's for a frame. A letter credited to a kept name, or to no one, is blocked
+  only inside a replaced name, and a letter inside a kept name never is. Our name shows whenever the game's would; the
+  name color is read from the blocked letters.
 
 ## Mob data
 
 `data/phoenix_mobs.tsv` lists every mob Phoenix's map server loads (`data/phoenix_mobs.meta` names the Phoenix
 commit). `tools/phoenix/refresh.sh` regenerates it:
 
-1. clones Phoenix at `tools/phoenix/PHOENIX_COMMIT` with its submodules and temporary patches
-2. builds the map server with every module plus `tools/phoenix/headsup_dump`
+1. clones Phoenix at `tools/phoenix/PHOENIX_COMMIT` with its temporary patches and the mesh submodules (not the
+   staff-only `phoenix_ac`, whose modules are left out)
+2. builds the map server with every other module plus `tools/phoenix/headsup_dump`
 3. loads Phoenix's database into a private MariaDB
 4. runs the map server until the dump module writes every loaded mob, five times (`HEADSUP_PHOENIX_DUMPS`)
 5. merges and validates the dumps, then updates `data/`

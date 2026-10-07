@@ -1,7 +1,9 @@
 #include "menu.h"
 
 #include "Ashita.h"
+#include "text_raster.h"
 
+#include <cfloat>
 #include <cstdio>
 #include <initializer_list>
 #include <utility>
@@ -182,6 +184,29 @@ namespace headsup
                 return pressed;
             }
 
+            // A dropdown of the installed fonts (FontChoices), each a flat full-width button: ImGui's selectables are
+            // overloaded.
+            void FontDropdown(const char* label, std::string& font, const std::vector<std::string>& installed)
+            {
+                gui->SetNextItemWidth(kControlWidth);
+                if (!gui->BeginCombo(label, font.c_str(), ImGuiComboFlags_HeightLarge)) return;
+                const ImVec2 align    = style.ButtonTextAlign;
+                style.ButtonTextAlign = ImVec2(0.0f, 0.5f);
+                for (const std::string& name : FontChoices(installed, font))
+                {
+                    const bool picked = name == font;
+                    if (Button(name.c_str(), ImVec2(-FLT_MIN, 0.0f), ButtonColors{picked ? kRowPicked : kClear, kRowHovered, kTint}))
+                    {
+                        font = name;
+                        save = true;
+                        gui->CloseCurrentPopup();
+                    }
+                    if (picked) gui->SetItemDefaultFocus();
+                }
+                style.ButtonTextAlign = align;
+                gui->EndCombo();
+            }
+
             // A (?) after the last item; pointing at it explains the setting, even while the setting is faded.
             void Help(const char* tip)
             {
@@ -346,10 +371,10 @@ namespace headsup
             ui.style.ItemSpacing = spacing;
         }
 
-        // "settings" and "color settings", each with an accent line under it while selected.
+        // "Settings" and "Color Settings", each with an accent line under it while selected.
         void DrawTabs(Ui& ui, bool& colorsTab, bool hasColors)
         {
-            const char* const labels[2] = {"settings", "color settings"};
+            const char* const labels[2] = {"Settings", "Color Settings"};
             const int tabs              = hasColors ? 2 : 1;
             // No gap under the tabs: a row's gap is taken when its last item is placed.
             const float spacingY   = ui.style.ItemSpacing.y;
@@ -410,7 +435,7 @@ namespace headsup
             ui.Fade(false);
         }
 
-        void DrawNameplateSettings(Ui& ui, Settings& s, uint32_t& collapsed)
+        void DrawNameplateSettings(Ui& ui, Settings& s, uint32_t& collapsed, const std::vector<std::string>& fonts)
         {
             ui.Fade(!s.enabled);
             if (ui.Section("Display", kDisplaySection, collapsed))
@@ -440,17 +465,10 @@ namespace headsup
                 ui.Fade(!s.enabled || !s.replaceCursor);
                 ui.Check("Phoenix feather cursor", s.cursorFeather,
                     "Phoenix's feather icon instead of the arrow, in the same colors.");
-                ui.Fade(!s.enabled);
-                ui.Check("Hide behind walls", s.hideBehindWalls,
-                    "Walls and terrain in front of a name cover its nameplate, like the game's own names, and the game's "
-                    "menus sit on top. Off: nameplates are always on top.");
             }
             if (ui.Section("Text", kTextSection, collapsed))
             {
-                // The slider's text is the font's name: ImGui's combo box and selectables are overloaded.
-                ui.gui->SetNextItemWidth(kControlWidth);
-                ui.gui->SliderInt("Font", &s.fontIndex, 0, kFontCount - 1, FontFamily(s.fontIndex), ImGuiSliderFlags_AlwaysClamp);
-                ui.save |= ui.gui->IsItemDeactivatedAfterEdit();
+                ui.FontDropdown("Font", s.fontName, fonts);
                 ui.gui->SameLine();
                 ui.Check("Bold", s.fontBold, "Bold names and level text.");
                 const bool anyNames = ReplacesNames(s);
@@ -601,7 +619,8 @@ namespace headsup
                     if (m_ColorsTab)
                         DrawNameplateColors(ui, s, m_Collapsed);
                     else
-                        DrawNameplateSettings(ui, s, m_Collapsed);
+                        if (m_Fonts.empty()) m_Fonts = InstalledFontFamilies();
+                        DrawNameplateSettings(ui, s, m_Collapsed, m_Fonts);
                     break;
                 default:
                     DrawDebug(ui, status, m_Collapsed, m_DebugRequested);

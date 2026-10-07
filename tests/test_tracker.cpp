@@ -18,7 +18,7 @@ namespace
     ActorInput Mob(ActorPtr actor, uint32_t serverId, const char* name, float distance = 10.0f, bool alive = true)
     {
         return ActorInput{actor, static_cast<uint16_t>(serverId & 0xFFF), serverId, EntityKind::Mob, alive, distance, name,
-            nullptr, nullptr};
+            nullptr, nullptr, Pose::Standing, WorldPoint{}};
     }
 
     ActorInput BountyHunter(ActorPtr actor, float distance = 10.0f, bool alive = true)
@@ -28,15 +28,24 @@ namespace
 
     ActorInput Player(ActorPtr actor)
     {
-        return ActorInput{actor, 1052, 0x00012345, EntityKind::Player, true, 0.0f, "Carrott", nullptr, nullptr};
+        return ActorInput{actor, 1052, 0x00012345, EntityKind::Player, true, 0.0f, "Carrott", nullptr, nullptr, Pose::Standing, WorldPoint{}};
     }
 
     ActorInput Npc(ActorPtr actor)
     {
-        return ActorInput{actor, 1100, 0x01011234, EntityKind::Npc, true, 3.0f, "Home Point #1", nullptr, nullptr};
+        return ActorInput{actor, 1100, 0x01011234, EntityKind::Npc, true, 3.0f, "Home Point #1", nullptr, nullptr, Pose::Standing, WorldPoint{}};
     }
 
     const PlayerState kLevel20{20, false};
+
+    // Outlines for every category, whatever the defaults show.
+    Settings EveryCategory()
+    {
+        Settings s;
+        for (bool& shown : s.show)
+            shown = true;
+        return s;
+    }
 }
 
 TEST(players_and_npcs_keep_their_names_without_outlines)
@@ -53,6 +62,34 @@ TEST(players_and_npcs_keep_their_names_without_outlines)
     CHECK(player->label.text[0] == '\0' && npc->icons.count == 0); // levels and icons come from mob data
     CHECK_EQ(t.OutlinedCount(), 0u);
     CHECK(t.Actors() == (std::vector<ActorPtr>{0x1000, 0x1100}));
+}
+
+TEST(a_name_is_replaced_when_its_kind_is_and_it_has_one)
+{
+    Settings s;
+    s.replaceNameplates = true;
+    s.replacePlayerNames = false;
+    s.replaceNpcNames    = true;
+    Tracker t;
+    ActorInput unnamed = Npc(0x1300);
+    unnamed.name       = "";
+    t.Update({BountyHunter(0x1000), Player(0x1100), Npc(0x1200), unnamed}, kLevel20, s);
+    CHECK(ReplacesName(s, *t.Find(0x1000)));
+    CHECK(!ReplacesName(s, *t.Find(0x1100)));
+    CHECK(ReplacesName(s, *t.Find(0x1200)));
+    CHECK(!ReplacesName(s, *t.Find(0x1300)));
+}
+
+TEST(players_keep_their_pose_and_feet)
+{
+    Tracker t;
+    ActorInput seated = Player(0x1100);
+    seated.pose       = Pose::Chair;
+    seated.feet       = WorldPoint{61.9f, -0.9f, -98.0f};
+    t.Update({seated, Player(0x1200)}, kLevel20, Settings{});
+    CHECK(t.Find(0x1100)->pose == Pose::Chair);
+    CHECK_EQ(t.Find(0x1100)->feet.z, -98.0f);
+    CHECK(t.Find(0x1200)->pose == Pose::Standing);
 }
 
 TEST(players_get_their_status_icons_and_linkshell_color)
@@ -74,7 +111,7 @@ TEST(players_get_their_status_icons_and_linkshell_color)
 TEST(each_category_gets_its_colour)
 {
     Tracker t;
-    const Settings s;
+    const Settings s = EveryCategory();
     t.Update({BountyHunter(0x2000), Mob(0x3000, kSnipper, "Snipper"), Mob(0x4000, 1, "Nobody Here"),
                  Mob(0x5000, kBeachMonk, "Beach Monk"), Mob(0x6000, kMetalShears, "Metal Shears")},
         kLevel20, s);
@@ -89,7 +126,7 @@ TEST(each_category_gets_its_colour)
 TEST(a_name_that_does_not_match_the_data_is_unknown)
 {
     Tracker t;
-    const Settings s;
+    const Settings s = EveryCategory();
     t.Update({Mob(0x2000, kBountyHunter, "Snipper")}, kLevel20, s);
     CHECK_EQ(t.Find(0x2000)->argb, ToArgb(s.color[2]));
 }
@@ -106,7 +143,8 @@ TEST(hidden_category_is_not_outlined)
 TEST(mobs_beyond_max_distance_are_not_outlined)
 {
     Tracker t;
-    t.Update({BountyHunter(0x2000, 40.0f), BountyHunter(0x3000, 40.5f)}, kLevel20, Settings{});
+    const Settings s;
+    t.Update({BountyHunter(0x2000, s.maxDistance), BountyHunter(0x3000, s.maxDistance + 0.5f)}, kLevel20, s);
     CHECK(t.Find(0x2000)->outline);
     CHECK(!t.Find(0x3000)->outline);
 }
@@ -153,7 +191,7 @@ TEST(an_examined_spawn_uses_its_level_for_label_and_category)
 {
     // Level 10 is Too Weak at 20, so the aggressive Goblin Bounty Hunter won't attack.
     Tracker t;
-    const Settings s;
+    const Settings s = EveryCategory();
     const CheckResult check{10, Con::TooWeak};
     ActorInput input = BountyHunter(0x2000);
     input.examined   = &check;
@@ -165,9 +203,10 @@ TEST(an_examined_spawn_uses_its_level_for_label_and_category)
 TEST(outlined_count_includes_only_outlined_mobs)
 {
     Tracker t;
-    Settings s;
-    s.show[1] = false;
-    t.Update({Player(0x1000), BountyHunter(0x2000), Mob(0x3000, kSnipper, "Snipper"), BountyHunter(0x4000, 50.0f)}, kLevel20, s);
+    Settings s = EveryCategory();
+    s.show[1]  = false;
+    t.Update({Player(0x1000), BountyHunter(0x2000), Mob(0x3000, kSnipper, "Snipper"), BountyHunter(0x4000, s.maxDistance + 10.0f)},
+        kLevel20, s);
     CHECK_EQ(t.OutlinedCount(), 1u);
     CHECK(t.Find(0x2000)->outline);
 }

@@ -6,6 +6,14 @@
 
 namespace headsup
 {
+    bool ReplacesName(const Settings& settings, const ActorInfo& info)
+    {
+        const bool kind = info.kind == EntityKind::Mob      ? settings.replaceNameplates
+                          : info.kind == EntityKind::Player ? settings.replacePlayerNames
+                                                            : settings.replaceNpcNames;
+        return kind && info.name[0] != '\0';
+    }
+
     void Tracker::Update(const std::vector<ActorInput>& actors, const PlayerState& player, const Settings& settings)
     {
         m_Actors.clear();
@@ -20,6 +28,8 @@ namespace headsup
             info.index       = a.index;
             info.kind        = a.kind;
             info.alive       = a.alive;
+            info.pose        = a.pose;
+            info.feet        = a.feet;
             const char* name = a.name != nullptr ? a.name : "";
             std::snprintf(info.name, sizeof(info.name), "%s", name);
             if (a.kind == EntityKind::Mob)

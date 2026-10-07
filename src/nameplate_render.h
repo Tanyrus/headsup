@@ -43,8 +43,8 @@ namespace headsup
         };
 
         void SetDevice(IDirect3DDevice8* device) { m_Device = device; }
-        // Lays out the nameplate of every mob the camera can see (LabelVisible) in the pixels of the image it will be
-        // drawn into: toX and toY turn back-buffer pixels into those (1 for the back buffer itself).
+        // Lays out the nameplate of every entity whose name is on screen (labels only where LabelVisible) in the pixels of
+        // the image it will be drawn into: toX and toY turn back-buffer pixels into those (1 for the back buffer itself).
         // now, in seconds, makes the target cursor bob.
         void Update(const Tracker& tracker, const OutlineRenderer& outline, const Settings& settings, float toX, float toY,
             const CursorTargets& cursors, double now);
@@ -57,9 +57,6 @@ namespace headsup
         void Release();
 
         const std::vector<Shown>& LastShown() const { return m_Shown; }
-        // Mobs whose names this frame replaces. Their name is drawn only from the second such frame, once the game's
-        // letters are hidden, so the two never overlap.
-        const std::vector<uint16_t>& ReplacingNames() const { return m_Replacing; }
         // The names that got our target cursor in the last layout: the game's cursor over them is hidden.
         const std::vector<CursorName>& CursorNames() const { return m_CursorNames; }
         // True once, when a text texture could not be made; names and labels stay off until the plugin reloads.
@@ -107,9 +104,7 @@ namespace headsup
         IDirect3DTexture8* m_IconTextures[kIconCount] = {};
         std::vector<Quad> m_Quads;
         std::vector<Shown> m_Shown;
-        std::vector<uint16_t> m_Replacing;
         std::vector<CursorName> m_CursorNames;
-        std::unordered_set<uint16_t> m_ReplacedLast;
         uint32_t m_Frame          = 0;
         bool m_Failed             = false;
         bool m_FailurePending     = false;

@@ -12,6 +12,8 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <ctime>
 #include <string>
 #include <unordered_map>
@@ -52,6 +54,11 @@ namespace
 
         bool GetBool(const char* key, bool fallback) override { return m_Config->GetBool(kConfigAlias, kSection, key, fallback); }
         float GetFloat(const char* key, float fallback) override { return m_Config->GetFloat(kConfigAlias, kSection, key, fallback); }
+        std::string GetString(const char* key, const char* fallback) override
+        {
+            const char* value = m_Config->GetString(kConfigAlias, kSection, key);
+            return value != nullptr ? value : fallback;
+        }
         void Set(const char* key, const char* value) override { m_Config->SetValue(kConfigAlias, kSection, key, value); }
 
     private:
@@ -89,8 +96,37 @@ class HeadsUp final : public IPlugin
     std::unordered_map<uint16_t, headsup::PlayerStatus> m_PlayerStatus; // other players, by target index
     std::optional<headsup::PlayerStatus> m_OwnStatus;
     std::vector<headsup::PlayerStatus> m_Statuses; // this frame's, for the tracker's inputs
+    std::vector<headsup::CursorAnchor> m_Anchors;   // see GameCursorAnchors
     bool m_DebugPending = false;
     bool m_PlatesPlaced = false; // placed this frame, in the scene or at the back-buffer EndScene
+
+    // /hu drawdump [seconds]: every draw call of one frame, after the given delay, with the target window, the players'
+    // status and render flags, the scene camera and the players' poses, to logs/headsup/drawdump-<time>.txt.
+    struct DrawRecord
+    {
+        char hook; // P DrawPrimitive, I DrawIndexedPrimitive, U DrawPrimitiveUP, X DrawIndexedPrimitiveUP
+        uint32_t type, count;
+        DWORD shader, zenable, alphablend, srcblend, destblend;
+        uintptr_t texture, target;
+        uint32_t targetWidth, targetHeight;
+        bool hasBox;
+        bool hidden; // HeadsUp blocked it
+        float x0, y0, x1, y1, z0, z1; // pretransformed vertices
+        float wx, wy, wz;             // the world matrix's translation
+        int owner;
+    };
+    enum class DumpState
+    {
+        Idle,
+        Waiting,
+        Recording,
+    };
+    DumpState m_DumpState = DumpState::Idle;
+    double m_DumpAt       = 0.0;
+    std::vector<DrawRecord> m_DrawLog;
+    D3DMATRIX m_DumpView{}, m_DumpProj{}; // the camera, from a fixed-function scene draw
+    D3DVIEWPORT8 m_DumpViewport{};
+    bool m_DumpHaveCamera = false;
     bool m_Drawing      = false; // drawing nameplates: our own draws come back through the hooks
     bool m_DrewInScene  = false; // this frame, for /hu debug
     IDirect3DDevice8* m_Device = nullptr;
@@ -159,11 +195,19 @@ public:
         }
         else if (args[1] == "debug")
             m_DebugPending = true;
+        else if (args[1] == "drawdump")
+        {
+            const double delay = args.size() > 2 ? std::atof(args[2].c_str()) : 0.0;
+            m_DumpAt           = Now() + delay;
+            m_DumpState        = DumpState::Waiting;
+            Print("recording one frame of draw calls" + std::string(delay > 0.0 ? " in " + args[2] + " seconds" : ""));
+        }
         else
         {
             Print("/headsup or /hu: open or close the settings window");
             Print("/hu on | /hu off: turn outlines and nameplates on or off");
             Print("/hu debug: write what every mob's outline and nameplate show to logs/headsup");
+            Print("/hu drawdump [seconds]: write every draw call of one frame, after the delay, to logs/headsup");
         }
         return true;
     }
@@ -211,15 +255,19 @@ public:
         UNREFERENCED_PARAMETER(window);
         UNREFERENCED_PARAMETER(dirty);
         MeasureFrame();
+        if (m_DumpState == DumpState::Recording)
+            WriteDrawDump();
+        else if (m_DumpState == DumpState::Waiting && Now() >= m_DumpAt)
+        {
+            m_DrawLog.clear();
+            m_DumpHaveCamera = false;
+            m_DumpState      = DumpState::Recording;
+        }
         m_Outline.NewFrame();
         if (m_Outline.TakeStencilWarning())
             Print("a mob could not be outlined: the game's depth buffer has no stencil bits.");
-        // A frame whose nameplates were not drawn must not hide the game's names in the next.
-        if (!m_PlatesPlaced)
-        {
-            m_Nameplates.Clear();
-            m_Outline.SetReplacedNames(m_Nameplates.ReplacingNames());
-        }
+        // A frame whose nameplates were not drawn keeps none of the last layout.
+        if (!m_PlatesPlaced) m_Nameplates.Clear();
         m_PlatesPlaced = false;
         if (m_Nameplates.TakeFailure())
             Print("names and labels are off: a text texture could not be made.");
@@ -259,13 +307,16 @@ public:
         UNREFERENCED_PARAMETER(type);
         UNREFERENCED_PARAMETER(startVertex);
         UNREFERENCED_PARAMETER(primCount);
-        if (!m_Drawing) DrawNameplatesBeforeSceneCopy();
+        if (m_Drawing) return false;
+        RecordDraw('P', type, primCount, nullptr, 0, 0);
+        DrawNameplatesBeforeSceneCopy();
         return false;
     }
 
     bool Direct3DDrawIndexedPrimitive(D3DPRIMITIVETYPE type, UINT minIndex, UINT numVertices, UINT startIndex, UINT primCount) override
     {
         if (m_Drawing) return false;
+        RecordDraw('I', type, primCount, nullptr, 0, 0);
         DrawNameplatesBeforeSceneCopy();
         return m_Outline.OnDrawIndexed(type, minIndex, numVertices, startIndex, primCount, m_Tracker, m_Settings);
     }
@@ -273,14 +324,16 @@ public:
     bool Direct3DDrawPrimitiveUP(D3DPRIMITIVETYPE type, UINT primCount, const void* vertices, UINT stride) override
     {
         if (m_Drawing) return false;
+        RecordDraw('U', type, primCount, vertices, stride, headsup::VertexCount(type, primCount));
         DrawNameplatesBeforeSceneCopy();
-        // The game's target cursor over a mob that has ours is not drawn.
-        if (m_Settings.enabled && m_Settings.replaceCursor &&
-            m_Outline.IsGameCursorDraw(type, primCount, vertices, stride, m_Tracker, m_Nameplates.CursorNames()))
-            return true;
-        // In replace mode the game's own mob nameplate letters are measured, then blocked.
-        return m_Outline.OnDrawUP(type, primCount, vertices, stride, m_Tracker, headsup::NameplatesOn(m_Settings),
-            headsup::ReplacesNames(m_Settings));
+        // The game's target cursor is not drawn where ours replaces it.
+        bool blocked = m_Settings.enabled && m_Settings.replaceCursor &&
+                       m_Outline.IsGameCursorDraw(type, primCount, vertices, stride, m_Tracker, m_Nameplates.CursorNames(),
+                           GameCursorAnchors());
+        // The game's names are measured, and those HeadsUp replaces are blocked.
+        if (!blocked) blocked = m_Outline.OnDrawUP(type, primCount, vertices, stride, m_Tracker, m_Settings);
+        if (m_DumpState == DumpState::Recording && !m_DrawLog.empty()) m_DrawLog.back().hidden = blocked;
+        return blocked;
     }
 
     bool Direct3DDrawIndexedPrimitiveUP(D3DPRIMITIVETYPE type, UINT minIndex, UINT numVertices, UINT primCount,
@@ -294,7 +347,9 @@ public:
         UNREFERENCED_PARAMETER(indexFormat);
         UNREFERENCED_PARAMETER(vertices);
         UNREFERENCED_PARAMETER(stride);
-        if (!m_Drawing) DrawNameplatesBeforeSceneCopy();
+        if (m_Drawing) return false;
+        RecordDraw('X', type, primCount, vertices, stride, numVertices);
+        DrawNameplatesBeforeSceneCopy();
         return false;
     }
 
@@ -324,7 +379,6 @@ private:
     void DrawNameplates(float toX, float toY, bool depthTest)
     {
         m_Nameplates.Update(m_Tracker, m_Outline, m_Settings, toX, toY, m_CursorTargets, Now());
-        m_Outline.SetReplacedNames(m_Nameplates.ReplacingNames());
         m_Nameplates.Draw(depthTest);
         m_PlatesPlaced = true;
     }
@@ -334,7 +388,7 @@ private:
     // game's names, and sit under the game's menus. The copy is the first draw to the back buffer after the names.
     void DrawNameplatesBeforeSceneCopy()
     {
-        if (!m_Settings.enabled || !m_Settings.hideBehindWalls || !headsup::NameplatesOn(m_Settings) ||
+        if (!m_Settings.enabled || !headsup::NameplatesOn(m_Settings) ||
             m_Outline.TargetScaleX() <= 0.0f || m_Outline.TargetScaleY() <= 0.0f || !m_Outline.SceneCopyStarting())
             return;
         m_Outline.FinishText();
@@ -343,6 +397,180 @@ private:
             DrawNameplates(1.0f / m_Outline.TargetScaleX(), 1.0f / m_Outline.TargetScaleY(), true);
             m_DrewInScene = true;
         });
+    }
+
+    void RecordDraw(char hook, D3DPRIMITIVETYPE type, UINT count, const void* vertices, UINT stride, uint32_t vertexCount)
+    {
+        if (m_DumpState != DumpState::Recording || m_Device == nullptr) return;
+        DrawRecord r{};
+        r.hook  = hook;
+        r.type  = static_cast<uint32_t>(type);
+        r.count = count;
+        m_Device->GetVertexShader(&r.shader);
+        m_Device->GetRenderState(D3DRS_ZENABLE, &r.zenable);
+        m_Device->GetRenderState(D3DRS_ALPHABLENDENABLE, &r.alphablend);
+        m_Device->GetRenderState(D3DRS_SRCBLEND, &r.srcblend);
+        m_Device->GetRenderState(D3DRS_DESTBLEND, &r.destblend);
+        IDirect3DBaseTexture8* texture = nullptr;
+        if (SUCCEEDED(m_Device->GetTexture(0, &texture)) && texture != nullptr)
+        {
+            r.texture = reinterpret_cast<uintptr_t>(texture);
+            texture->Release();
+        }
+        IDirect3DSurface8* target = nullptr;
+        if (SUCCEEDED(m_Device->GetRenderTarget(&target)) && target != nullptr)
+        {
+            r.target = reinterpret_cast<uintptr_t>(target);
+            D3DSURFACE_DESC desc{};
+            if (SUCCEEDED(target->GetDesc(&desc))) r.targetWidth = desc.Width, r.targetHeight = desc.Height;
+            target->Release();
+        }
+        const bool pretransformed = r.shader < 0x10000 && (r.shader & D3DFVF_POSITION_MASK) == D3DFVF_XYZRHW;
+        if (pretransformed && vertices != nullptr && stride >= 3 * sizeof(float) && vertexCount > 0 && vertexCount <= 4096)
+        {
+            r.hasBox = true;
+            r.x0 = r.y0 = r.z0 = 1e9f;
+            r.x1 = r.y1 = r.z1 = -1e9f;
+            for (uint32_t i = 0; i < vertexCount; ++i)
+            {
+                float xyz[3];
+                std::memcpy(xyz, static_cast<const uint8_t*>(vertices) + static_cast<size_t>(i) * stride, sizeof(xyz));
+                r.x0 = std::min(r.x0, xyz[0]), r.x1 = std::max(r.x1, xyz[0]);
+                r.y0 = std::min(r.y0, xyz[1]), r.y1 = std::max(r.y1, xyz[1]);
+                r.z0 = std::min(r.z0, xyz[2]), r.z1 = std::max(r.z1, xyz[2]);
+            }
+        }
+        else if (!pretransformed)
+        {
+            D3DMATRIX world{};
+            m_Device->GetTransform(D3DTS_WORLD, &world);
+            r.wx = world._41, r.wy = world._42, r.wz = world._43;
+        }
+        const headsup::ActorInfo* owner = m_Outline.DrawOwner(m_Tracker);
+        r.owner                           = owner != nullptr ? owner->index : -1;
+        if (!m_DumpHaveCamera && !pretransformed && r.shader < 0x10000 && owner != nullptr && r.targetWidth > 2000)
+        {
+            m_Device->GetTransform(D3DTS_VIEW, &m_DumpView);
+            m_Device->GetTransform(D3DTS_PROJECTION, &m_DumpProj);
+            m_Device->GetViewport(&m_DumpViewport);
+            m_DumpHaveCamera = true;
+        }
+        m_DrawLog.push_back(r);
+    }
+
+    void WriteDrawDump()
+    {
+        m_DumpState = DumpState::Idle;
+        const std::string logs = std::string(m_AshitaCore->GetInstallPath()) + "logs";
+        CreateDirectoryA(logs.c_str(), nullptr);
+        CreateDirectoryA((logs + "\\headsup").c_str(), nullptr);
+        char file[48];
+        const std::time_t now = std::time(nullptr);
+        std::strftime(file, sizeof(file), "\\headsup\\drawdump-%Y%m%d-%H%M%S.txt", std::localtime(&now));
+        const std::string path = logs + file;
+        std::FILE* out         = std::fopen(path.c_str(), "w");
+        if (out == nullptr)
+        {
+            Print("could not write " + path);
+            return;
+        }
+        IEntity* entity = m_AshitaCore->GetMemoryManager()->GetEntity();
+        ITarget* target = m_AshitaCore->GetMemoryManager()->GetTarget();
+        IConfigurationManager* config = m_AshitaCore->GetConfigurationManager();
+        std::fprintf(out, "back buffer %.0fx%.0f, menu %.0fx%.0f, sub-target active %u\n", m_Outline.BackBufferWidth(),
+            m_Outline.BackBufferHeight(), config->GetFloat("boot", "ffxi.registry", "0037", 0.0f),
+            config->GetFloat("boot", "ffxi.registry", "0038", 0.0f), target->GetIsSubTargetActive());
+        if (const Ashita::FFXI::targetwindow_t* window = target->GetRawStructureWindow())
+            std::fprintf(out, "window: sub %u ank num %u ank (%d,%d) sub ank (%d,%d)\n", window->m_Sub, window->m_AnkNum,
+                window->m_AnkX, window->m_AnkY, window->m_SubAnkX, window->m_SubAnkY);
+        for (uint32_t t = 0; t < 2; ++t)
+        {
+            const uint32_t index = target->GetTargetIndex(t);
+            std::fprintf(out, "target %u: index %u '%s' active %u arrow active %u arrow (%.2f,%.2f,%.2f,%.2f)", t, index,
+                EntityName(entity, index), target->GetIsActive(t), target->GetIsArrowActive(t),
+                target->GetArrowPositionX(t), target->GetArrowPositionY(t), target->GetArrowPositionZ(t),
+                target->GetArrowPositionW(t));
+            if (index != 0 && index < entity->GetEntityMapSize() && entity->GetRawEntity(index) != nullptr)
+            {
+                std::fprintf(out, " entity at (%.2f,%.2f,%.2f)", entity->GetLocalPositionX(index),
+                    entity->GetLocalPositionY(index), entity->GetLocalPositionZ(index));
+                if (const headsup::ScreenBox* plate = m_Outline.NameplateBox(static_cast<uint16_t>(index)))
+                    std::fprintf(out, " name box (%.0f,%.0f)-(%.0f,%.0f)", plate->minX, plate->minY, plate->maxX, plate->maxY);
+            }
+            std::fprintf(out, "\n");
+        }
+        for (const headsup::CursorName& n : m_Nameplates.CursorNames())
+            std::fprintf(out, "our cursor over %u, name (%.1f,%.1f)-(%.1f,%.1f)\n", n.index, n.name.minX, n.name.minY, n.name.maxX,
+                n.name.maxY);
+        // Players: their status from the packets beside the render flags the game keeps, to find where it keeps them.
+        IParty* party       = m_AshitaCore->GetMemoryManager()->GetParty();
+        const uint32_t self = party->GetMemberTargetIndex(0);
+        std::fprintf(out, "players: index name | packet seek bazaar ls away mentor new gm lscolor | memory flags0-8 lscolor\n");
+        for (uint32_t i = 0; i < std::min<uint32_t>(entity->GetEntityMapSize(), kMaxEntities); ++i)
+        {
+            if (entity->GetRawEntity(i) == nullptr || (entity->GetSpawnFlags(i) & kSpawnFlagPlayer) == 0) continue;
+            const headsup::PlayerStatus* st = PlayerStatusOf(i, self);
+            std::fprintf(out, "player %u '%s'%s |", i, EntityName(entity, i), i == self ? " (you)" : "");
+            if (st != nullptr)
+                std::fprintf(out, " %d %d %d %d %d %d %d %08X |", st->seekingParty, st->bazaar, st->linkshell, st->away, st->mentor,
+                    st->newAdventurer, st->gm, static_cast<unsigned>(st->linkshellArgb));
+            else
+                std::fprintf(out, " unknown |");
+            std::fprintf(out, " %08X %08X %08X %08X %08X %08X %08X %08X %08X %08X\n", static_cast<unsigned>(entity->GetRenderFlags0(i)),
+                static_cast<unsigned>(entity->GetRenderFlags1(i)), static_cast<unsigned>(entity->GetRenderFlags2(i)),
+                static_cast<unsigned>(entity->GetRenderFlags3(i)), static_cast<unsigned>(entity->GetRenderFlags4(i)),
+                static_cast<unsigned>(entity->GetRenderFlags5(i)), static_cast<unsigned>(entity->GetRenderFlags6(i)),
+                static_cast<unsigned>(entity->GetRenderFlags7(i)), static_cast<unsigned>(entity->GetRenderFlags8(i)),
+                static_cast<unsigned>(entity->GetLinkshellColor(i)));
+        }
+        // Poses: where the game puts each player's name against where they stand, with the camera to project them.
+        if (m_DumpHaveCamera)
+        {
+            auto matrix = [&](const char* name, const D3DMATRIX& m) {
+                std::fprintf(out, "%s", name);
+                for (int row = 0; row < 4; ++row)
+                    for (int col = 0; col < 4; ++col)
+                        std::fprintf(out, " %.6g", m.m[row][col]);
+                std::fprintf(out, "\n");
+            };
+            matrix("view", m_DumpView);
+            matrix("projection", m_DumpProj);
+            std::fprintf(out, "viewport %lu %lu %lu %lu\n", static_cast<unsigned long>(m_DumpViewport.X),
+                static_cast<unsigned long>(m_DumpViewport.Y), static_cast<unsigned long>(m_DumpViewport.Width),
+                static_cast<unsigned long>(m_DumpViewport.Height));
+        }
+        else
+            std::fprintf(out, "no camera seen\n");
+        std::fprintf(out, "poses: index name | status modelSize hitboxSize | position x y z | whole name box\n");
+        for (uint32_t i = 0; i < std::min<uint32_t>(entity->GetEntityMapSize(), kMaxEntities); ++i)
+        {
+            if (entity->GetRawEntity(i) == nullptr || (entity->GetSpawnFlags(i) & kSpawnFlagPlayer) == 0) continue;
+            std::fprintf(out, "pose %u '%s' | %lu %.4f %.4f | %.3f %.3f %.3f |", i, EntityName(entity, i),
+                static_cast<unsigned long>(entity->GetStatus(i)), entity->GetModelSize(i), entity->GetModelHitboxSize(i),
+                entity->GetLocalPositionX(i), entity->GetLocalPositionY(i), entity->GetLocalPositionZ(i));
+            if (const headsup::ScreenBox* whole = m_Outline.WholeNameplate(static_cast<uint16_t>(i)))
+                std::fprintf(out, " (%.1f,%.1f)-(%.1f,%.1f)\n", whole->minX, whole->minY, whole->maxX, whole->maxY);
+            else
+                std::fprintf(out, " none\n");
+        }
+        std::fprintf(out, "seq hook type count shader z blend src dst texture target(size) owner | box (x0,y0)-(x1,y1) z z0-z1 or world (x,y,z)\n");
+        for (size_t i = 0; i < m_DrawLog.size(); ++i)
+        {
+            const DrawRecord& r = m_DrawLog[i];
+            std::fprintf(out, "%4u %c%c %u %4u %08lX %lu %lu %2lu %2lu %08X %08X(%ux%u) %4d |", static_cast<unsigned>(i), r.hook,
+                r.hidden ? 'H' : ' ',
+                r.type, r.count, static_cast<unsigned long>(r.shader), static_cast<unsigned long>(r.zenable),
+                static_cast<unsigned long>(r.alphablend), static_cast<unsigned long>(r.srcblend),
+                static_cast<unsigned long>(r.destblend), static_cast<unsigned>(r.texture), static_cast<unsigned>(r.target),
+                r.targetWidth, r.targetHeight, r.owner);
+            if (r.hasBox)
+                std::fprintf(out, " box (%.1f,%.1f)-(%.1f,%.1f) z %.5f-%.5f\n", r.x0, r.y0, r.x1, r.y1, r.z0, r.z1);
+            else
+                std::fprintf(out, " world (%.2f,%.2f,%.2f)\n", r.wx, r.wy, r.wz);
+        }
+        std::fclose(out);
+        Print(std::string("wrote ") + std::to_string(m_DrawLog.size()) + " draw calls to " + path);
+        m_DrawLog.clear();
     }
 
     void Print(const std::string& message)
@@ -415,6 +643,21 @@ private:
     }
 
     // While a sub-target is being picked, slot 1 holds the target and slot 0 the candidate under the sub-target cursor.
+    // Where the game is drawing its target cursors this frame, for either of our cursor targets.
+    const std::vector<headsup::CursorAnchor>& GameCursorAnchors()
+    {
+        m_Anchors.clear();
+        const Ashita::FFXI::targetwindow_t* window = m_AshitaCore->GetMemoryManager()->GetTarget()->GetRawStructureWindow();
+        if (window == nullptr) return m_Anchors;
+        for (const uint16_t index : {m_CursorTargets.target, m_CursorTargets.subTarget})
+        {
+            if (index == 0) continue;
+            m_Anchors.push_back({index, static_cast<float>(window->m_AnkX), static_cast<float>(window->m_AnkY)});
+            m_Anchors.push_back({index, static_cast<float>(window->m_SubAnkX), static_cast<float>(window->m_SubAnkY)});
+        }
+        return m_Anchors;
+    }
+
     void UpdateCursorTargets()
     {
         ITarget* target   = m_AshitaCore->GetMemoryManager()->GetTarget();
@@ -448,11 +691,14 @@ private:
                                       : (flags & kSpawnFlagPlayer) != 0 ? headsup::EntityKind::Player
                                                                         : headsup::EntityKind::Npc;
             const bool isMob        = kind == headsup::EntityKind::Mob;
+            const bool isPlayer     = kind == headsup::EntityKind::Player;
             const bool alive        = entity->GetHPPercent(i) > 0;
             if (isMob && !alive) m_Checks.Forget(serverId); // the next spawn rolls a new level
             m_Inputs.push_back(headsup::ActorInput{static_cast<headsup::ActorPtr>(actor), static_cast<uint16_t>(i),
                 serverId, kind, alive, headsup::DistanceFromSquared(entity->GetDistance(i)), EntityName(entity, i),
-                isMob ? m_Checks.Result(serverId, now) : nullptr, CurrentStatus(entity, i, kind, self)});
+                isMob ? m_Checks.Result(serverId, now) : nullptr, CurrentStatus(entity, i, kind, self),
+                isPlayer ? headsup::PoseFromStatus(entity->GetStatus(i)) : headsup::Pose::Standing,
+                headsup::FromEntityPosition(entity->GetLocalPositionX(i), entity->GetLocalPositionY(i), entity->GetLocalPositionZ(i))});
         }
         m_Player.level   = player->GetMainJobLevel();
         m_Player.sitting = headsup::IsSittingStatus(entity->GetStatus(party->GetMemberTargetIndex(0)));

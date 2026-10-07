@@ -3,7 +3,10 @@
 #include "classifier.h"
 #include "labels.h"
 
+#include <cstddef>
 #include <cstdint>
+#include <string>
+#include <vector>
 
 namespace headsup
 {
@@ -16,29 +19,30 @@ namespace headsup
     constexpr float kMinThickness = 1.0f, kMaxThickness = 16.0f;            // render-target pixels
     constexpr int kMinSmoothness = 4, kMaxSmoothness = 16;                  // shifted copies per mesh
     constexpr float kMinOutlineDistance = 5.0f, kMaxOutlineDistance = 60.0f; // yalms
-    constexpr int kMinTextSize = 8, kMaxTextSize = 48;
-    constexpr int kMinNameRaise = 0, kMaxNameRaise = 40; // pixels                      // pixels: name, label and icon sizes
+    constexpr int kMinTextSize = 8, kMaxTextSize = 48;   // pixels: name, label and icon sizes
+    constexpr int kMinNameRaise = 0, kMaxNameRaise = 40; // pixels
+    constexpr const char* kDefaultFont = "Trebuchet MS";
+    constexpr size_t kMaxFontName      = 31; // a Windows font name's longest, without its terminator
 
     struct Settings
     {
         bool enabled       = true;
-        float thickness    = 4.0f;  // render-target pixels
-        int smoothness     = 8;     // shifted copies per mesh
-        float maxDistance  = 40.0f; // yalms
+        float thickness    = 1.0f;  // render-target pixels
+        int smoothness     = 4;     // shifted copies per mesh
+        float maxDistance  = 50.0f; // yalms
         bool showLabels    = true;  // level and con above every mob's name
-        bool replaceNameplates = false; // hide the game's mob nameplates and draw HeadsUp's (with the name)
+        bool replaceNameplates = true;  // hide the game's mob nameplates and draw HeadsUp's (with the name)
         bool showIcons         = true;  // the MobDB icon row
-        bool scaleWithDistance = false; // sizes follow the game's name size, like the game's names do
-        int fontIndex          = 0;     // into FontFamily's list
-        bool fontBold          = true;
+        bool scaleWithDistance = true;  // sizes follow the game's name size, like the game's names do
+        std::string fontName   = kDefaultFont; // a font family installed in Windows
+        bool fontBold          = false;
         int nameSize           = 15;    // pixels
         int labelSize          = 13;    // pixels
         int iconSize           = 16;    // pixels
-        bool hideBehindWalls   = true;  // nameplates drawn into the 3D scene, so walls cover them like the game's names
-        bool replacePlayerNames = false; // players' names, you included, in the font below
-        bool replaceNpcNames   = false;
-        bool replaceCursor     = false; // our target cursor above the target's nameplate, instead of the game's
-        bool cursorFeather     = false; // Phoenix's feather instead of the arrow
+        bool replacePlayerNames = true; // players' names, you included, in the font below
+        bool replaceNpcNames   = true;
+        bool replaceCursor     = true;  // our target cursor above the target's nameplate, instead of the game's
+        bool cursorFeather     = true;  // Phoenix's feather instead of the arrow
         bool showPlayerIcons   = true;  // seeking party, bazaar, linkshell and the rest beside replaced player names
         bool centerNameAndIcons = true;  // a player's name and icons centered together over them, rather than the name
         Color cursorColor      = {{1.00f, 1.00f, 1.00f}}; // the target: white
@@ -59,7 +63,7 @@ namespace headsup
         };
         Color textOutline = {{0.00f, 0.00f, 0.00f}};
         Color iconTint    = {{1.00f, 1.00f, 1.00f}}; // white keeps the icons' own colors
-        bool show[kCategoryCount]   = {true, true, true, true, true}; // indexed by Category
+        bool show[kCategoryCount]   = {true, false, false, true, true}; // indexed by Category: no passive or unknown
         Color color[kCategoryCount] = {
             {{1.00f, 0.15f, 0.15f}}, // aggressive: red
             {{0.20f, 1.00f, 0.30f}}, // passive: green
@@ -74,9 +78,9 @@ namespace headsup
     // Whether HeadsUp draws any kind of name (mobs, players or NPCs), hiding the game's.
     bool ReplacesNames(const Settings& s);
 
-    constexpr int kFontCount = 6;
-    // Arial, Tahoma, Verdana, Trebuchet MS, Courier New, Times New Roman; Arial for anything out of range.
-    const char* FontFamily(int index);
+    // The fonts to offer: the installed families (as GDI lists them, once per character set and with vertical variants
+    // named @...), each once and sorted, with current added when it is not installed.
+    std::vector<std::string> FontChoices(std::vector<std::string> installed, const std::string& current);
 
     // Key/value persistence: Ashita's configuration manager in the plugin, an in-memory map in tests.
     class SettingsStore
@@ -85,6 +89,7 @@ namespace headsup
         virtual ~SettingsStore()                                 = default;
         virtual bool GetBool(const char* key, bool fallback)     = 0;
         virtual float GetFloat(const char* key, float fallback)  = 0;
+        virtual std::string GetString(const char* key, const char* fallback) = 0;
         virtual void Set(const char* key, const char* value)     = 0;
     };
 

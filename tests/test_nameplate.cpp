@@ -210,66 +210,98 @@ TEST(fewer_than_three_glyphs_are_not_a_nameplate)
     CHECK(NameplateFromGlyphs({Glyph(10, 10, 17, 20), Glyph(17, 10, 24, 20), Glyph(24, 10, 31, 20)}).valid);
 }
 
-TEST(a_replaced_names_letters_are_hidden)
+TEST(a_replaced_names_letters_are_hidden_wherever_they_are)
+{
+    // Names move between frames and the sub-target's is drawn larger, so neither where nor how big matters.
+    CHECK(HideReplacedGlyph(Glyph(1010.0f, 201.0f, 1017.0f, 211.0f), true, 10.0f, {}));
+    CHECK(HideReplacedGlyph(Glyph(400.0f, 520.0f, 407.0f, 530.0f), true, 10.0f, {}));
+    CHECK(HideReplacedGlyph(Glyph(1010.0f, 201.0f, 1021.0f, 216.0f), true, 10.0f, {}));
+    // Not the screen-sized quad the game sometimes credits to a mob.
+    CHECK(!HideReplacedGlyph(Glyph(667.0f, 401.0f, 2731.0f, 563.0f), true, 10.0f, {}));
+}
+
+TEST(a_letter_in_a_kept_name_stays_whoever_it_is_credited_to)
+{
+    // A letter of a kept name, credited to a replaced mob by a stale stack pointer.
+    const ScreenBox kept = Glyph(1000.0f, 200.0f, 1080.0f, 210.0f);
+    CHECK(!HideReplacedGlyph(Glyph(1010.0f, 201.0f, 1017.0f, 211.0f), true, 10.0f, {kept}));
+    CHECK(HideReplacedGlyph(Glyph(400.0f, 520.0f, 407.0f, 530.0f), true, 10.0f, {kept}));
+}
+
+TEST(a_replaced_names_icons_are_hidden_wherever_they_are)
+{
+    // From a capture: a square icon 1.5 letters tall, in another texture.
+    CHECK(HideReplacedGlyph(Glyph(985.0f, 198.0f, 1000.0f, 213.0f), false, 10.0f, {}));
+    CHECK(HideReplacedGlyph(Glyph(800.0f, 640.0f, 815.0f, 655.0f), false, 10.0f, {}));
+    // A close player: letters 34 px tall and the icons as one 90x51 strip, wider than any letter.
+    CHECK(HideReplacedGlyph(Glyph(1091.0f, 634.0f, 1181.0f, 685.0f), false, 34.0f, {}));
+    // The sub-target's, drawn larger than its letters were the frame before.
+    CHECK(HideReplacedGlyph(Glyph(1091.0f, 634.0f, 1226.0f, 710.0f), false, 34.0f, {}));
+    // Not a quad many times the letters' height, such as the one the game draws over the whole model.
+    CHECK(!HideReplacedGlyph(Glyph(667.0f, 600.0f, 1400.0f, 900.0f), false, 34.0f, {}));
+    // Not before any letters have been seen to size them by.
+    CHECK(!HideReplacedGlyph(Glyph(985.0f, 198.0f, 1000.0f, 213.0f), false, 0.0f, {}));
+}
+
+TEST(a_stray_letter_is_hidden_only_in_a_replaced_name)
 {
     const ScreenBox replaced = Glyph(1000.0f, 200.0f, 1080.0f, 210.0f);
-    const std::vector<ScreenBox> plates{replaced};
-    CHECK(HideGlyph(Glyph(1010.0f, 201.0f, 1017.0f, 211.0f), true, GlyphOwner::Replaced, &replaced, plates));
-    // Whoever the game says drew it: the first quad of a name is often credited to the entity drawn before it.
-    CHECK(HideGlyph(Glyph(1010.0f, 201.0f, 1017.0f, 211.0f), true, GlyphOwner::None, nullptr, plates));
-    CHECK(HideGlyph(Glyph(990.0f, 214.0f, 997.0f, 224.0f), true, GlyphOwner::None, nullptr, plates)); // moved a little
-    // Credited to the mob and near its name: the name moved further during a fast turn.
-    CHECK(HideGlyph(Glyph(1100.0f, 230.0f, 1107.0f, 240.0f), true, GlyphOwner::Replaced, &replaced, plates));
+    // Credited to no one: the first quad of a name is often credited to the entity drawn before it.
+    CHECK(HideStrayLetter(Glyph(1010.0f, 201.0f, 1017.0f, 211.0f), nullptr, {replaced}));
+    CHECK(HideStrayLetter(Glyph(990.0f, 214.0f, 997.0f, 224.0f), nullptr, {replaced})); // moved a little
+    CHECK(!HideStrayLetter(Glyph(400.0f, 520.0f, 407.0f, 530.0f), nullptr, {replaced}));
+    CHECK(!HideStrayLetter(Glyph(1010.0f, 201.0f, 1017.0f, 211.0f), nullptr, {}));
+    // A 24 px quad just above the name, such as a target cursor.
+    CHECK(!HideStrayLetter(Glyph(1028.0f, 172.0f, 1052.0f, 196.0f), nullptr, {replaced}));
 }
 
-TEST(a_name_that_was_not_replaced_keeps_its_letters)
+TEST(a_kept_names_letters_inside_it_are_never_hidden)
 {
-    // Our name was not drawn last frame (at the screen edge, no body, past the plate limit, or just appeared), so the
-    // game's must stay.
-    CHECK(!HideGlyph(Glyph(1010.0f, 201.0f, 1017.0f, 211.0f), true, GlyphOwner::Kept, nullptr, {}));
-}
-
-TEST(player_and_npc_letters_inside_their_own_name_are_never_hidden)
-{
-    // The player's name overlapping a replaced mob name, as in melee.
+    // A kept player's name overlapping a replaced mob's, as in melee, and one beside it on the same line.
     const ScreenBox mob    = Glyph(1000.0f, 200.0f, 1080.0f, 210.0f);
     const ScreenBox player = Glyph(1040.0f, 196.0f, 1110.0f, 206.0f);
-    CHECK(!HideGlyph(Glyph(1050.0f, 197.0f, 1057.0f, 207.0f), true, GlyphOwner::Kept, &player, {mob}));
-    // Next to the mob's name on the same line.
+    CHECK(!HideStrayLetter(Glyph(1050.0f, 197.0f, 1057.0f, 207.0f), &player, {mob}));
     const ScreenBox beside = Glyph(1090.0f, 200.0f, 1150.0f, 210.0f);
-    CHECK(!HideGlyph(Glyph(1090.0f, 200.0f, 1097.0f, 210.0f), true, GlyphOwner::Kept, &beside, {mob}));
+    CHECK(!HideStrayLetter(Glyph(1090.0f, 200.0f, 1097.0f, 210.0f), &beside, {mob}));
 }
 
-TEST(a_kept_name_is_never_hidden_whatever_its_kind)
+TEST(a_glyph_beside_a_name_is_one_of_its_icons)
 {
-    // A mob whose name stays the game's, under a player's replaced name.
-    const ScreenBox player = Glyph(1000.0f, 200.0f, 1080.0f, 210.0f);
-    const ScreenBox mob    = Glyph(1030.0f, 202.0f, 1100.0f, 212.0f);
-    CHECK(!HideGlyph(Glyph(1040.0f, 203.0f, 1047.0f, 213.0f), true, GlyphOwner::Kept, &mob, {player}));
-    CHECK(HideGlyph(Glyph(1010.0f, 201.0f, 1017.0f, 211.0f), true, GlyphOwner::Replaced, &player, {player}));
-}
-
-TEST(a_replaced_players_icons_beside_the_name_are_hidden)
-{
-    // From a capture: a square icon 1.5 letters tall right against the name's first letter, in another texture.
     const ScreenBox name = Glyph(1000.0f, 200.0f, 1080.0f, 210.0f);
-    const ScreenBox icon = Glyph(985.0f, 198.0f, 1000.0f, 213.0f);
-    CHECK(HideGlyph(icon, false, GlyphOwner::Replaced, &name, {name}));
-    CHECK(HideGlyph(Glyph(925.0f, 198.0f, 940.0f, 213.0f), false, GlyphOwner::Replaced, &name, {name})); // a row of them
-    CHECK(!HideGlyph(icon, false, GlyphOwner::Kept, &name, {}));                      // a kept name keeps its icons
-    CHECK(!HideGlyph(icon, false, GlyphOwner::None, nullptr, {name}));                // whose, the game did not say
-    CHECK(!HideGlyph(Glyph(800.0f, 198.0f, 815.0f, 213.0f), false, GlyphOwner::Replaced, &name, {name})); // far away
-    CHECK(!HideGlyph(Glyph(985.0f, 240.0f, 1000.0f, 255.0f), false, GlyphOwner::Replaced, &name, {name})); // below
+    CHECK(BesideName(Glyph(985.0f, 198.0f, 1000.0f, 213.0f), name));
+    CHECK(BesideName(Glyph(925.0f, 198.0f, 940.0f, 213.0f), name)); // a row of them
+    CHECK(!BesideName(Glyph(800.0f, 198.0f, 815.0f, 213.0f), name)); // far away
+    CHECK(!BesideName(Glyph(985.0f, 240.0f, 1000.0f, 255.0f), name)); // below
 }
 
-TEST(a_near_players_icon_strip_is_hidden_however_large)
+TEST(the_games_cursor_sits_on_its_anchor)
 {
-    // From a capture: a player close to the camera, letters 34 px tall, and the game's icons as one 90x51 strip,
-    // wider than any letter but scaled with the name.
-    const ScreenBox name = Glyph(1181.0f, 641.0f, 1469.0f, 675.0f);
-    CHECK(HideGlyph(Glyph(1091.0f, 634.0f, 1181.0f, 685.0f), false, GlyphOwner::Replaced, &name, {name}));
-    // Not a quad many times the name's height, such as the one the game draws over the whole model.
-    CHECK(!HideGlyph(Glyph(667.0f, 600.0f, 1400.0f, 900.0f), false, GlyphOwner::Replaced, &name, {name}));
+    // From captures: the game's cursor quads in the UI image and the anchors its target window held.
+    CHECK(AtCursorAnchor(Glyph(1185.5f, 216.5f, 1205.5f, 248.5f), 1196.0f, 249.0f));
+    CHECK(AtCursorAnchor(Glyph(713.5f, 300.5f, 733.5f, 332.5f), 724.0f, 333.0f));
+    CHECK(AtCursorAnchor(Glyph(713.5f, 290.5f, 733.5f, 322.5f), 724.0f, 333.0f)); // bobbing
+    CHECK(!AtCursorAnchor(Glyph(743.5f, 300.5f, 763.5f, 332.5f), 724.0f, 333.0f));
+    CHECK(!AtCursorAnchor(Glyph(713.5f, 380.5f, 733.5f, 412.5f), 724.0f, 333.0f));
+    // The target window's text, credited to the target too.
+    CHECK(!AtCursorAnchor(Glyph(1796.5f, 995.5f, 1805.5f, 1006.5f), 1196.0f, 249.0f));
+}
+
+TEST(the_target_arrow_is_taller_than_wide)
+{
+    // From a capture: the target arrow, and the menu's pointer drawn from the same texture.
+    CHECK(LooksLikeTargetArrow(Glyph(1185.5f, 216.5f, 1205.5f, 248.5f)));
+    CHECK(!LooksLikeTargetArrow(Glyph(4.5f, 810.5f, 36.5f, 830.5f)));
+}
+
+TEST(a_name_shows_whenever_some_of_it_is_on_screen)
+{
+    // Unlike labels, from its first frame and without its body: the game's own name is hidden either way.
+    const ScreenBox plate = Glyph(1000.0f, 200.0f, 1080.0f, 210.0f);
+    CHECK(NameOnScreen(&plate, 2560.0f, 1440.0f));
+    CHECK(!LabelVisible(&plate, 0, 1, 2560.0f, 1440.0f));
+    const ScreenBox above = Glyph(1000.0f, -40.0f, 1080.0f, -30.0f);
+    CHECK(!NameOnScreen(&above, 2560.0f, 1440.0f));
+    CHECK(!NameOnScreen(nullptr, 2560.0f, 1440.0f));
 }
 
 TEST(name_icons_line_up_against_the_name)
@@ -300,23 +332,6 @@ TEST(a_name_and_its_icons_can_be_centered_together)
     CHECK(Near(LayoutNameplate(plate, sizes, true).nameX, 990.0f));
 }
 
-TEST(only_letters_of_the_names_size_are_hidden)
-{
-    const ScreenBox replaced = Glyph(1000.0f, 200.0f, 1080.0f, 210.0f);
-    // A 24 px quad just above the name, such as a target cursor.
-    CHECK(!HideGlyph(Glyph(1028.0f, 172.0f, 1052.0f, 196.0f), true, GlyphOwner::None, nullptr, {replaced}));
-    // The screen-sized quad the game sometimes credits to a mob.
-    CHECK(!HideGlyph(Glyph(667.0f, 401.0f, 2731.0f, 563.0f), true, GlyphOwner::Replaced, &replaced, {replaced}));
-}
-
-TEST(stray_letters_far_from_the_name_are_kept)
-{
-    const ScreenBox replaced = Glyph(1000.0f, 200.0f, 1080.0f, 210.0f);
-    // A letter of another name, credited to the mob by a stale stack pointer.
-    CHECK(!HideGlyph(Glyph(400.0f, 520.0f, 407.0f, 530.0f), true, GlyphOwner::Replaced, &replaced, {replaced}));
-    CHECK(!HideGlyph(Glyph(400.0f, 520.0f, 407.0f, 530.0f), true, GlyphOwner::Kept, nullptr, {replaced}));
-}
-
 TEST(a_letters_shown_color_applies_the_modulate_scale_and_is_opaque)
 {
     CHECK_EQ(ShownColor(0x80604020u, 2), 0xFFC08040u);
@@ -328,11 +343,25 @@ TEST(a_letters_shown_color_applies_the_modulate_scale_and_is_opaque)
 TEST(name_color_is_the_most_common_letter_color)
 {
     const ScreenBox plate = Glyph(1000.0f, 200.0f, 1080.0f, 210.0f);
-    const std::vector<GlyphDraw> glyphs{{Glyph(1000, 200, 1007, 210), 0xFFFFFF80, 0}, {Glyph(1007, 200, 1014, 210), 0xFFFFFF80, 0},
-        {Glyph(1014, 200, 1021, 210), 0xFF000000, 0}, {Glyph(400, 520, 407, 530), 0xFFFF0000, 0}, {Glyph(410, 520, 417, 530), 0xFFFF0000, 0},
-        {Glyph(420, 520, 427, 530), 0xFFFF0000, 0}};
+    const std::vector<GlyphDraw> glyphs{{Glyph(1000, 200, 1007, 210), 0xFFFFFF80, 0, 0.0f}, {Glyph(1007, 200, 1014, 210), 0xFFFFFF80, 0, 0.0f},
+        {Glyph(1014, 200, 1021, 210), 0xFF000000, 0, 0.0f}, {Glyph(400, 520, 407, 530), 0xFFFF0000, 0, 0.0f}, {Glyph(410, 520, 417, 530), 0xFFFF0000, 0, 0.0f},
+        {Glyph(420, 520, 427, 530), 0xFFFF0000, 0, 0.0f}};
     CHECK_EQ(NameColor(glyphs, plate), 0xFFFFFF80u); // letters outside the nameplate do not count
     CHECK_EQ(NameColor({}, plate), 0xFFFFFFFFu);
+}
+
+TEST(a_names_depth_comes_from_its_letters)
+{
+    // From a capture looking steeply down: Jax's letters at 0.98687, the game's icon strip beside them, and a large quad
+    // the game drew into another image at 0.98736, credited to Jax that frame. Behind the letters, it would put our
+    // nameplate behind the top of Jax's head.
+    constexpr uintptr_t kFont = 1, kIcons = 2, kOther = 3;
+    const std::vector<GlyphDraw> glyphs{{Glyph(1732.7f, 471.4f, 1830.6f, 526.4f), kWhite, kIcons, 0.98687f},
+        {Glyph(1000.0f, 474.0f, 1936.0f, 687.0f), kWhite, kOther, 0.98736f},
+        {Glyph(1830.6f, 478.7f, 1850.1f, 504.4f), kWhite, kFont, 0.98687f},
+        {Glyph(1850.1f, 478.7f, 1902.3f, 515.4f), kWhite, kFont, 0.98687f}};
+    CHECK_EQ(NameDepth(glyphs, kFont), 0.98687f);
+    CHECK_EQ(NameDepth({}, kFont), 0.0f);
 }
 
 TEST(replace_mode_stacks_icons_label_and_name)

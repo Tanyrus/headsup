@@ -55,12 +55,16 @@ namespace headsup
     // been drawn for kStableFrames frames in a row, and some of the nameplate is on screen.
     bool LabelVisible(const ScreenBox* plate, uint32_t meshDraws, uint32_t plateFramesInRow, float screenWidth, float screenHeight);
 
+    // Whether some of a name is on screen. A replaced name shows whenever the game's would, as the game's is hidden.
+    bool NameOnScreen(const ScreenBox* plate, float screenWidth, float screenHeight);
+
     // One nameplate glyph draw and the color the game shows it in (white when the draw has none).
     struct GlyphDraw
     {
         ScreenBox box;
         uint32_t argb;
         uintptr_t texture; // the font's for letters; a name's icons use others
+        float depth;
     };
 
     // The color the game shows for a letter: its vertex color times the texture stage's modulate scale (1, 2 or 4),
@@ -70,24 +74,22 @@ namespace headsup
     // The game's color for a name: the most common color among the letters inside its nameplate box; white if none.
     uint32_t NameColor(const std::vector<GlyphDraw>& glyphs, const ScreenBox& plate);
 
+    // The depth of a name: the deepest of its letters (font), 0 without any. The game credits other quads to the same
+    // entity, some deeper than the name, which would put our nameplate behind its own head when seen from above.
+    float NameDepth(const std::vector<GlyphDraw>& glyphs, uintptr_t font);
+
     // Whose name a glyph belongs to, by the stack scan: an entity whose name HeadsUp replaced last frame, one whose name
     // it kept, or nobody.
-    enum class GlyphOwner : uint8_t
-    {
-        None,
-        Replaced,
-        Kept,
-    };
+    // Whether to hide a quad the game credits to an entity whose name HeadsUp replaces. A letter of the font (letter)
+    // is hidden wherever it is, as names move between frames and the sub-target's is drawn larger, unless it is inside a
+    // kept name (keptPlates, the previous frame's), where it was credited to the wrong entity. A quad in another texture
+    // is hidden when it is sized like the name's icons, by letterHeight, the name's letters' height (0 before any).
+    bool HideReplacedGlyph(const ScreenBox& glyph, bool letter, float letterHeight, const std::vector<ScreenBox>& keptPlates);
 
-    // Whether to hide a glyph of the game's names. letter: drawn with the font's texture; anything else beside a name is
-    // one of its icons. ownerPlate is the owner's previous name.
-    // A letter counts only for names HeadsUp replaced in the previous frame (replacedPlates), and only if it is as tall
-    // as that name's letters: hidden inside such a name (padded by two letter heights), or when the game credits it to
-    // a Replaced owner whose name is within six letter heights (a stale stack pointer). A Kept owner's letter inside its
-    // own name is never hidden.
-    // An icon is hidden when its Replaced owner's name is beside it (BesideName).
-    bool HideGlyph(const ScreenBox& glyph, bool letter, GlyphOwner owner, const ScreenBox* ownerPlate,
-        const std::vector<ScreenBox>& replacedPlates);
+    // Whether to hide a letter the game credits to a kept name (ownPlate, its previous box) or to no one (nullptr): only
+    // inside a name replaced in the previous frame (padded by two letter heights) and as tall as its letters, and never
+    // inside its own.
+    bool HideStrayLetter(const ScreenBox& glyph, const ScreenBox* ownPlate, const std::vector<ScreenBox>& replacedPlates);
 
     // Measured sizes of a nameplate's lines (0 for a line that is not shown).
     struct LineSizes
@@ -129,12 +131,25 @@ namespace headsup
         ScreenBox name; // back-buffer pixels
     };
 
+    // Where the game draws its target cursor over an entity: the cursor's bottom center, in its UI image's pixels.
+    struct CursorAnchor
+    {
+        uint16_t index;
+        float x, y;
+    };
+    // Whether a quad the game draws in its UI layer (in its pixels) sits on the anchor: centered on it, with its bottom
+    // on it or up to the quad's height above, as the cursor bobs.
+    bool AtCursorAnchor(const ScreenBox& quad, float anchorX, float anchorY);
+    // Whether a quad in the target arrow's texture is one of the arrows: they are taller than wide, and the menu's
+    // pointer, drawn from the same texture, is wider.
+    bool LooksLikeTargetArrow(const ScreenBox& quad);
+
     // The letters' box moved sideways so it is centered where the whole nameplate is: the game centers a name and the
     // icons beside it together over the entity, so this is where the entity is.
     ScreenBox CenteredOver(const ScreenBox& letters, const ScreenBox& whole);
 
     // Whether a quad the game draws beside a name is one of its icons: on the name's line, up to eight letter heights to
-    // its left, and sized like the name (the game's icon strip is 1.5 letters tall and up to 2.7 wide).
+    // its left, and sized like the name's icons.
     bool BesideName(const ScreenBox& glyph, const ScreenBox& name);
 
     // Whether a quad the game draws in its UI layer is its target cursor over this name (both in back-buffer pixels):

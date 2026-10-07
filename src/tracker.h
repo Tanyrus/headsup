@@ -4,6 +4,7 @@
 #include "icons.h"
 #include "labels.h"
 #include "player_status.h"
+#include "pose.h"
 #include "settings.h"
 
 #include <cstdint>
@@ -33,6 +34,8 @@ namespace headsup
         const char* name; // only read during Update
         const CheckResult* examined; // this spawn's latest /check, or nullptr; only read during Update
         const PlayerStatus* status;  // a player's last known status, or nullptr; only read during Update
+        Pose pose;                   // a player's; others stand
+        WorldPoint feet;
     };
 
     struct ActorInfo
@@ -48,10 +51,15 @@ namespace headsup
         IconSet icons{};            // the MobDB icon row: every living mob with data
         IconSet nameIcons{};        // a player's icons, beside the name
         uint32_t linkshellArgb = 0; // a player's linkshell color, for its icon
+        Pose pose              = Pose::Standing;
+        WorldPoint feet{};
     };
 
     // Per-frame table of every entity's actor pointer and name, and each mob's level, icons and outline decision. A
     // draw's owner is the first actor pointer of any kind on the stack.
+    // Whether HeadsUp draws this entity's name in place of the game's: its kind's is replaced and it has one.
+    bool ReplacesName(const Settings& settings, const ActorInfo& info);
+
     class Tracker
     {
     public:

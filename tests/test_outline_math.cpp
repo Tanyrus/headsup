@@ -52,12 +52,23 @@ TEST(offsets_are_the_requested_pixels_from_the_centre)
     }
 }
 
+namespace
+{
+    // The mob in these tests has no data, so its outline needs the unknown category on.
+    Settings OutliningUnknown()
+    {
+        Settings s;
+        s.show[static_cast<int>(Category::Unknown)] = true;
+        return s;
+    }
+}
+
 TEST(owner_is_the_first_tracked_pointer_of_any_kind)
 {
     Tracker t;
-    t.Update({ActorInput{0x1000, 1052, 0, EntityKind::Player, true, 0.0f, "Carrott", nullptr, nullptr},
-                 ActorInput{0x2000, 0, 0, EntityKind::Mob, true, 10.0f, "Beach Monk", nullptr, nullptr}},
-        PlayerState{20, false}, Settings{});
+    t.Update({ActorInput{0x1000, 1052, 0, EntityKind::Player, true, 0.0f, "Carrott", nullptr, nullptr, Pose::Standing, WorldPoint{}},
+                 ActorInput{0x2000, 0, 0, EntityKind::Mob, true, 10.0f, "Beach Monk", nullptr, nullptr, Pose::Standing, WorldPoint{}}},
+        PlayerState{20, false}, OutliningUnknown());
 
     const uint32_t playerDraw[] = {0x5, 0x1234, 0x1000, 0x2000}; // stale mob pointer above the live player
     const ActorInfo* owner      = FindOwner(std::begin(playerDraw), std::end(playerDraw), t);

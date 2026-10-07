@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <map>
 #include <string>
+#include <vector>
 
 using namespace headsup;
 
@@ -23,6 +24,11 @@ namespace
         {
             const auto it = values.find(key);
             return it == values.end() ? fallback : std::strtof(it->second.c_str(), nullptr);
+        }
+        std::string GetString(const char* key, const char* fallback) override
+        {
+            const auto it = values.find(key);
+            return it == values.end() ? fallback : it->second;
         }
         void Set(const char* key, const char* value) override { values[key] = value; }
     };
@@ -47,13 +53,12 @@ namespace
         CHECK(a.replaceNameplates == b.replaceNameplates);
         CHECK(a.showIcons == b.showIcons);
         CHECK(a.scaleWithDistance == b.scaleWithDistance);
-        CHECK_EQ(a.fontIndex, b.fontIndex);
+        CHECK(a.fontName == b.fontName);
         CHECK(a.fontBold == b.fontBold);
         CHECK_EQ(a.nameSize, b.nameSize);
         CHECK_EQ(a.labelSize, b.labelSize);
         CHECK_EQ(a.iconSize, b.iconSize);
         CHECK(a.ownNameColor == b.ownNameColor);
-        CHECK(a.hideBehindWalls == b.hideBehindWalls);
         CHECK(a.replacePlayerNames == b.replacePlayerNames);
         CHECK(a.replaceNpcNames == b.replaceNpcNames);
         CHECK(a.replaceCursor == b.replaceCursor);
@@ -93,20 +98,19 @@ TEST(settings_round_trip)
     s.smoothness        = 12;
     s.maxDistance       = 25.0f;
     s.showLabels        = false;
-    s.replaceNameplates = true;
+    s.replaceNameplates = false;
     s.showIcons         = false;
-    s.scaleWithDistance = true;
-    s.fontIndex         = 3;
-    s.fontBold          = false;
+    s.scaleWithDistance = false;
+    s.fontName          = "Georgia";
+    s.fontBold          = true;
     s.nameSize          = 20;
     s.labelSize         = 9;
     s.iconSize          = 24;
     s.ownNameColor      = true;
-    s.hideBehindWalls   = false;
-    s.replacePlayerNames = true;
-    s.replaceNpcNames   = true;
-    s.replaceCursor     = true;
-    s.cursorFeather     = true;
+    s.replacePlayerNames = false;
+    s.replaceNpcNames   = false;
+    s.replaceCursor     = false;
+    s.cursorFeather     = false;
     s.showPlayerIcons   = false;
     s.centerNameAndIcons = false;
     s.lockedCursorColor = Color{{0.125f, 0.25f, 0.5f}};
@@ -137,18 +141,47 @@ TEST(out_of_range_values_are_clamped)
     store.values["thickness"]   = "99";
     store.values["smoothness"]  = "2";
     store.values["maxDistance"] = "-5";
-    store.values["fontIndex"]   = "9";
     store.values["nameSize"]    = "100";
     store.values["labelSize"]   = "2";
     const Settings s = LoadSettings(store);
     CHECK_EQ(s.thickness, kMaxThickness);
     CHECK_EQ(s.smoothness, kMinSmoothness);
     CHECK_EQ(s.maxDistance, kMinOutlineDistance);
-    CHECK_EQ(s.fontIndex, kFontCount - 1);
     CHECK_EQ(s.nameSize, kMaxTextSize);
     CHECK_EQ(s.labelSize, kMinTextSize);
-    CHECK(std::string(FontFamily(-1)) == FontFamily(0));
-    CHECK(std::string(FontFamily(kFontCount)) == FontFamily(0));
+}
+
+TEST(a_font_name_windows_cannot_use_falls_back_to_the_default)
+{
+    MapStore store;
+    store.values["fontName"] = "";
+    CHECK(LoadSettings(store).fontName == kDefaultFont);
+    store.values["fontName"] = std::string(kMaxFontName + 1, 'x');
+    CHECK(LoadSettings(store).fontName == kDefaultFont);
+    store.values["fontName"] = std::string(kMaxFontName, 'x');
+    CHECK(LoadSettings(store).fontName == std::string(kMaxFontName, 'x'));
+}
+
+TEST(a_font_saved_by_its_place_in_the_old_list_keeps_its_name)
+{
+    MapStore store;
+    store.values["fontIndex"] = "4";
+    CHECK(LoadSettings(store).fontName == "Courier New");
+    store.values["fontIndex"] = "9";
+    CHECK(LoadSettings(store).fontName == kDefaultFont);
+    store.values["fontName"] = "Georgia"; // a name, once saved, wins
+    CHECK(LoadSettings(store).fontName == "Georgia");
+}
+
+TEST(the_font_list_is_the_installed_families_sorted_once_each)
+{
+    // GDI lists a family once per character set, and vertical variants with an @.
+    const std::vector<std::string> choices =
+        FontChoices({"Verdana", "@MS Gothic", "arial", "Verdana", "Trebuchet MS", "MS Gothic", ""}, "Trebuchet MS");
+    CHECK((choices == std::vector<std::string>{"arial", "MS Gothic", "Trebuchet MS", "Verdana"}));
+    // The chosen font stays in the list when it is not installed, so the dropdown can show it.
+    const std::vector<std::string> missing = FontChoices({"Verdana"}, "Gill Sans");
+    CHECK((missing == std::vector<std::string>{"Gill Sans", "Verdana"}));
 }
 
 TEST(clamp_bounds_every_field)
@@ -158,7 +191,7 @@ TEST(clamp_bounds_every_field)
     s.thickness   = 0.0f;
     s.smoothness  = 99;
     s.maxDistance = 1000.0f;
-    s.fontIndex   = -3;
+    s.fontName    = "";
     s.nameSize    = 100;
     s.labelSize   = 0;
     s.iconSize    = 49;
@@ -179,7 +212,7 @@ TEST(clamp_bounds_every_field)
     CHECK_EQ(c.thickness, kMinThickness);
     CHECK_EQ(c.smoothness, kMaxSmoothness);
     CHECK_EQ(c.maxDistance, kMaxOutlineDistance);
-    CHECK_EQ(c.fontIndex, 0);
+    CHECK(c.fontName == kDefaultFont);
     CHECK_EQ(c.nameSize, kMaxTextSize);
     CHECK_EQ(c.labelSize, kMinTextSize);
     CHECK_EQ(c.iconSize, kMaxTextSize);
@@ -222,7 +255,8 @@ TEST(v1_settings_files_still_load)
 TEST(any_replaced_kind_of_name_counts)
 {
     Settings s;
-    CHECK(!ReplacesNames(s)); // nothing is replaced by default
+    s.replaceNameplates = s.replacePlayerNames = s.replaceNpcNames = false;
+    CHECK(!ReplacesNames(s));
     for (bool Settings::*kind : {&Settings::replaceNameplates, &Settings::replacePlayerNames, &Settings::replaceNpcNames})
     {
         Settings one = s;
@@ -235,9 +269,10 @@ TEST(any_replaced_kind_of_name_counts)
 
 TEST(nameplates_need_the_master_switch_and_a_part)
 {
-    CHECK(NameplatesOn(Settings{})); // labels and icons are on by default
+    CHECK(NameplatesOn(Settings{}));
     Settings none;
     none.showLabels = none.showIcons = false;
+    none.replaceNameplates = none.replacePlayerNames = none.replaceNpcNames = none.replaceCursor = false;
     CHECK(!NameplatesOn(none));
     for (bool Settings::*part : {&Settings::showLabels, &Settings::showIcons, &Settings::replaceNameplates,
              &Settings::replacePlayerNames, &Settings::replaceNpcNames, &Settings::replaceCursor})
