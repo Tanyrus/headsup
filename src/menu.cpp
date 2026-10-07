@@ -504,6 +504,11 @@ namespace headsup
                     "mob, its exact level, until it respawns.");
                 ui.Check("Show icons", s.showIcons,
                     "XIUI's MobDB icons: aggressive or passive, whether it links, and how it detects you.");
+                ui.Fade(!s.enabled || (!s.showLabels && !s.showIcons));
+                ui.Check("Hide level and icons in combat", s.hideInCombat,
+                    "Takes the level line and icons off a mob once you or your party has claimed it. Its name and the "
+                    "cursor stay.");
+                ui.Fade(!s.enabled);
                 ui.Check("Replace target cursor", s.replaceCursor,
                     "Hides the game's cursor over your target and draws HeadsUp's above its nameplate instead: one color for "
                     "your target, one while you are locked on, and one for the sub-target cursor.");

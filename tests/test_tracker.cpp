@@ -255,3 +255,24 @@ TEST(squared_distance_becomes_yalms_and_keeps_nan)
     CHECK_EQ(DistanceFromSquared(-1.0f), 0.0f);
     CHECK(std::isnan(DistanceFromSquared(std::nanf(""))));
 }
+
+TEST(a_mob_claimed_by_you_or_your_party_is_in_combat_with_you)
+{
+    // A mob's claim: the claimer's server ID in its low 16 bits, and 1 in its high 16 while it is claimed.
+    const std::vector<uint32_t> party{0x00012345, 0x01098ABC};
+    CHECK(ClaimedByParty(0x00012345, party));  // you
+    CHECK(ClaimedByParty(0x00018ABC, party));  // a party member, by the low half of their ID
+    CHECK(!ClaimedByParty(0x00002345, party)); // the claim ended; the last claimer stays
+    CHECK(!ClaimedByParty(0x00011111, party)); // someone else's
+    CHECK(!ClaimedByParty(0x00012345, {}));
+}
+
+TEST(a_mob_in_combat_with_you_is_marked)
+{
+    ActorInput fought = BountyHunter(0x2000);
+    fought.fighting   = true;
+    Tracker t;
+    t.Update({Player(0x1000), fought, Mob(0x3000, kSnipper, "Snipper")}, kLevel20, Settings{});
+    CHECK(t.Find(0x2000)->fighting);
+    CHECK(!t.Find(0x3000)->fighting);
+}

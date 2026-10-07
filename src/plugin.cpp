@@ -40,6 +40,7 @@ namespace
     constexpr double kFrameTimeWeight    = 0.05; // smoothing of the menu's frame time
     constexpr int32_t kChatMode          = 1;    // the chat mode Ashita's own plugins print in
     constexpr uint32_t kPartyIconMembers = 5;    // the other members of your party, whose buffs the game keeps
+    constexpr uint32_t kPartyMembers     = 18;   // you, your party and the two other alliance parties
 
     // The entity's name, or "" for an empty or out-of-range slot.
     const char* EntityName(IEntity* entity, uint32_t index)
@@ -88,6 +89,7 @@ class HeadsUp final : public IPlugin
     std::unordered_map<uint16_t, headsup::PlayerStatus> m_PlayerStatus; // other players, by target index
     std::unordered_set<uint16_t> m_LevelSynced; // players, you included, by target index, from packets
     std::unordered_set<uint32_t> m_BuffSynced;  // you and your party, from the buffs the game keeps, this frame
+    std::vector<uint32_t> m_PartyIds;            // server IDs of you, your party and alliance, this frame
     std::optional<headsup::PlayerStatus> m_OwnStatus;
     bool m_DebugPending = false;
     bool m_PlatesPlaced = false; // placed this frame, in the scene or at the back-buffer EndScene
@@ -556,6 +558,9 @@ private:
         IParty* party   = m_AshitaCore->GetMemoryManager()->GetParty();
         IPlayer* player = m_AshitaCore->GetMemoryManager()->GetPlayer();
         m_Inputs.clear();
+        m_PartyIds.clear();
+        for (uint32_t member = 0; member < kPartyMembers; ++member)
+            if (party->GetMemberIsActive(member) != 0) m_PartyIds.push_back(party->GetMemberServerId(member));
         m_BuffSynced.clear();
         if (headsup::LevelSyncInBuffs(player->GetBuffs())) m_BuffSynced.insert(party->GetMemberTargetIndex(0));
         for (uint32_t member = 0; member < kPartyIconMembers; ++member)
@@ -580,7 +585,8 @@ private:
                 serverId, kind, alive, headsup::DistanceFromSquared(entity->GetDistance(i)), EntityName(entity, i),
                 isMob ? m_Checks.Result(serverId, now) : nullptr, CurrentStatus(entity, i, kind, self),
                 isPlayer ? headsup::PoseFromStatus(entity->GetStatus(i)) : headsup::Pose::Standing,
-                headsup::FromEntityPosition(entity->GetLocalPositionX(i), entity->GetLocalPositionY(i), entity->GetLocalPositionZ(i))});
+                headsup::FromEntityPosition(entity->GetLocalPositionX(i), entity->GetLocalPositionY(i), entity->GetLocalPositionZ(i)),
+                isMob && headsup::ClaimedByParty(entity->GetClaimStatus(i), m_PartyIds)});
         }
         m_Player.level   = player->GetMainJobLevel();
         m_Player.sitting = headsup::IsSittingStatus(entity->GetStatus(party->GetMemberTargetIndex(0)));

@@ -22,6 +22,7 @@ namespace headsup
         };
         constexpr BoolKey kBools[] = {{"enabled", &Settings::enabled}, {"showLabels", &Settings::showLabels},
             {"replaceMobNames", &Settings::replaceMobNames}, {"showIcons", &Settings::showIcons},
+            {"hideInCombat", &Settings::hideInCombat},
             {"scaleWithDistance", &Settings::scaleWithDistance}, {"fontBold", &Settings::fontBold},
             {"replacePlayerNames", &Settings::replacePlayerNames}, {"replaceNpcNames", &Settings::replaceNpcNames},
             {"replaceCursor", &Settings::replaceCursor}, {"cursorFeather", &Settings::cursorFeather},

@@ -18,6 +18,15 @@ namespace headsup
         return (flags & kSpawnFlagPlayer) != 0 ? EntityKind::Player : EntityKind::Npc;
     }
 
+    bool ClaimedByParty(uint32_t claimStatus, const std::vector<uint32_t>& partyServerIds)
+    {
+        constexpr int kClaimedShift  = 16;
+        constexpr uint32_t kIdBits   = 0xFFFF;
+        if ((claimStatus >> kClaimedShift) == 0) return false;
+        return std::any_of(partyServerIds.begin(), partyServerIds.end(),
+            [&](uint32_t id) { return (id & kIdBits) == (claimStatus & kIdBits); });
+    }
+
     bool ReplacesName(const Settings& settings, const ActorInfo& info)
     {
         const bool kind = info.kind == EntityKind::Mob      ? settings.replaceMobNames
@@ -42,6 +51,7 @@ namespace headsup
             info.alive       = a.alive;
             info.pose        = a.pose;
             info.feet        = a.feet;
+            info.fighting    = a.fighting;
             std::snprintf(info.name, sizeof(info.name), "%s", a.name);
             if (a.kind == EntityKind::Mob)
             {

@@ -48,10 +48,11 @@ namespace headsup
         bool alive;
         bool hasLabel;
         int mobIcons, leftIcons, rightIcons; // a player's icons either side of the name
+        bool fighting;                       // a mob claimed by you or your party
     };
     // The name when it is replaced, with a player's icons beside it; the level line and MobDB icons of a living mob the
-    // camera sees steadily; and the cursor over the target or the sub-target candidate. No icons once their textures
-    // have failed.
+    // camera sees steadily, unless it is in combat with you and the settings hide them then; and the cursor over the
+    // target or the sub-target candidate. No icons once their textures have failed.
     PlateLines ChooseLines(const PlateFacts& facts, const Settings& settings, const CursorTargets& targets, bool iconsFailed);
 
     // Measured sizes of a nameplate's lines (0 for a line that is not shown).

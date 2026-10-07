@@ -31,7 +31,7 @@ namespace
 {
     PlateFacts Facts(uint16_t index)
     {
-        return PlateFacts{index, true, true, true, true, 3, 2, 1};
+        return PlateFacts{index, true, true, true, true, 3, 2, 1, false};
     }
 }
 
@@ -60,6 +60,20 @@ TEST(a_plate_shows_the_lines_its_entity_and_the_settings_allow)
     PlateFacts nothing = kept;
     nothing.steady     = false;
     CHECK(!ChooseLines(nothing, s, CursorTargets{}, false).Any());
+}
+
+TEST(a_mob_in_combat_can_lose_its_level_and_icons)
+{
+    Settings s;
+    PlateFacts fighting = Facts(0x220);
+    fighting.fighting   = true;
+    const PlateLines shown = ChooseLines(fighting, s, CursorTargets{}, false);
+    CHECK(shown.label && shown.icons == 3); // off by default
+    s.hideInCombat = true;
+    const PlateLines hidden = ChooseLines(fighting, s, CursorTargets{0x220, 0, false}, false);
+    CHECK(!hidden.label && hidden.icons == 0);
+    CHECK(hidden.name && hidden.leftIcons == 2 && hidden.cursor == CursorKind::Target); // the rest stays
+    CHECK(ChooseLines(Facts(0x220), s, CursorTargets{}, false).label);                   // a mob not in combat keeps them
 }
 
 TEST(the_cursor_marks_the_target_locked_on_or_being_picked)

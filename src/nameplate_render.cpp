@@ -157,7 +157,7 @@ namespace headsup
                 const PlateLines lines = ChooseLines(PlateFacts{info->index, ReplacesName(settings, *info),
                                                          Steady(names.FramesSinceMesh(info->index), names.PlateFramesInRow(info->index)),
                                                          info->alive, info->label.text[0] != '\0', info->icons.count, info->nameIcons.left.count,
-                                                         info->nameIcons.right.count},
+                                                         info->nameIcons.right.count, info->fighting},
                     settings, targets, m_IconsFailed);
                 if (!lines.Any()) continue;
                 Plate& p = m_Plates[info->index];

@@ -62,6 +62,7 @@ namespace
         CHECK(a.replaceCursor == b.replaceCursor);
         CHECK(a.cursorFeather == b.cursorFeather);
         CHECK(a.chocoboPointer == b.chocoboPointer);
+        CHECK(a.hideInCombat == b.hideInCombat);
         CHECK(a.showPlayerIcons == b.showPlayerIcons);
         CHECK(a.centerNameAndIcons == b.centerNameAndIcons);
         CheckSameColor(a.cursorColor, b.cursorColor);
@@ -88,6 +89,11 @@ namespace
 TEST(the_game_keeps_its_own_mouse_pointer_by_default)
 {
     CHECK(!Settings{}.chocoboPointer);
+}
+
+TEST(mobs_keep_their_level_and_icons_in_combat_by_default)
+{
+    CHECK(!Settings{}.hideInCombat);
 }
 
 TEST(every_player_icon_shows_left_of_the_name_by_default)
@@ -141,6 +147,7 @@ TEST(settings_round_trip)
     s.replaceCursor     = false;
     s.cursorFeather     = false;
     s.chocoboPointer    = true;
+    s.hideInCombat      = true;
     s.showPlayerIcons   = false;
     s.centerNameAndIcons = false;
     s.lockedCursorColor = Color{{0.125f, 0.25f, 0.5f}};

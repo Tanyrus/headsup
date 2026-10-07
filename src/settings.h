@@ -35,6 +35,7 @@ namespace headsup
         bool showLabels    = true;  // level and con above every mob's name
         bool replaceMobNames   = true;  // hide the game's mob names and draw HeadsUp's
         bool showIcons         = true;  // the MobDB icon row
+        bool hideInCombat      = false; // no level line or icons on a mob claimed by you or your party
         bool scaleWithDistance = true;  // sizes follow the game's name size, like the game's names do
         std::string fontName   = kDefaultFont; // a font family installed in Windows
         bool fontBold          = false;
