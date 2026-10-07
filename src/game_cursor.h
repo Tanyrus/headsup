@@ -16,6 +16,11 @@ namespace headsup
         uint16_t subTarget = 0;
         bool locked        = false;
         bool outOfRange    = false; // the candidate being picked is out of range of the spell or ability
+        // Where the game puts its arrows over the target and the candidate (its target window's anchors), on screen;
+        // known only once the menu's size is.
+        bool anchored    = false;
+        float anchorX    = 0.0f, anchorY = 0.0f;
+        float subAnchorX = 0.0f, subAnchorY = 0.0f;
     };
     // While a sub-target is picked, the game draws its arrow over the candidate red when it is out of range of the spell
     // or ability and blue when it is in range; its arrow over the target stays gray. From an arrow's color: whether

@@ -76,6 +76,57 @@ TEST(a_mob_in_combat_can_lose_its_level_and_icons)
     CHECK(ChooseLines(Facts(0x220), s, CursorTargets{}, false).label);                   // a mob not in combat keeps them
 }
 
+namespace
+{
+    // The game's arrow anchors on screen: from a capture targeting a Telepoint, which has no name, its anchor sat one
+    // unit above it at (1400, 608).
+    CursorTargets Anchored(uint16_t target, uint16_t subTarget)
+    {
+        CursorTargets t{target, subTarget, false};
+        t.anchored   = true;
+        t.anchorX    = 1400.0f, t.anchorY = 608.0f;
+        t.subAnchorX = 900.0f, t.subAnchorY = 300.0f;
+        return t;
+    }
+}
+
+TEST(a_target_without_a_name_gets_a_cursor_at_the_games_arrow)
+{
+    const Settings s;
+    const auto lone = LoneCursors(Anchored(554, 0), s, {});
+    CHECK_EQ(lone.size(), 1u);
+    CHECK(lone[0].index == 554 && lone[0].kind == CursorKind::Target && lone[0].x == 1400.0f && lone[0].y == 608.0f);
+    CHECK(LoneCursors(Anchored(554, 0), s, {554}).empty()); // its nameplate already has one
+    CHECK(LoneCursors(Anchored(0, 0), s, {}).empty());
+    CursorTargets unknown = Anchored(554, 0);
+    unknown.anchored      = false; // the menu's size was not known
+    CHECK(LoneCursors(unknown, s, {}).empty());
+    Settings off = s;
+    off.replaceCursor = false;
+    CHECK(LoneCursors(Anchored(554, 0), off, {}).empty());
+}
+
+TEST(while_picking_the_candidate_takes_the_sub_anchor_and_the_target_the_main_one)
+{
+    const Settings s;
+    CursorTargets t = Anchored(1105, 554);
+    t.outOfRange    = true;
+    const auto lone = LoneCursors(t, s, {});
+    CHECK_EQ(lone.size(), 2u);
+    CHECK(lone[0].index == 554 && lone[0].kind == CursorKind::OutOfRange && lone[0].x == 900.0f && lone[0].y == 300.0f);
+    CHECK(lone[1].index == 1105 && lone[1].kind == CursorKind::Target && lone[1].x == 1400.0f);
+    const auto same = LoneCursors(Anchored(554, 554), s, {}); // picking the target itself: one cursor, the candidate's
+    CHECK(same.size() == 1u && same[0].kind == CursorKind::SubTarget && same[0].y == 300.0f);
+}
+
+TEST(a_lone_cursor_points_at_its_anchor)
+{
+    // A 20x32 arrow pointing from its middle: its tip on the anchor, the rest above it.
+    const CursorSpot spot = CursorAtAnchor(1400.0f, 608.0f, 20.0f, 32.0f, 0.5f);
+    CHECK(Near(spot.x, 1390.0f) && Near(spot.y, 576.0f));
+    CHECK(Near(CursorAtAnchor(1400.0f, 608.0f, 20.0f, 32.0f, 0.25f).x, 1395.0f));
+}
+
 TEST(the_cursor_marks_the_target_locked_on_or_being_picked)
 {
     const Settings s;

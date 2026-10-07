@@ -6,6 +6,7 @@
 #include "settings.h"
 
 #include <cstdint>
+#include <vector>
 
 namespace headsup
 {
@@ -54,6 +55,27 @@ namespace headsup
     // camera sees steadily, unless it is in combat with you and the settings hide them then; and the cursor over the
     // target or the sub-target candidate. No icons once their textures have failed.
     PlateLines ChooseLines(const PlateFacts& facts, const Settings& settings, const CursorTargets& targets, bool iconsFailed);
+
+    // The cursor over an entity: the candidate being picked (in or out of range), else the target (locked on or not).
+    CursorKind CursorFor(uint16_t index, const Settings& settings, const CursorTargets& targets);
+
+    // A cursor over a target with no game name to hang it on, such as a Telepoint, at the game's arrow anchor.
+    struct LoneCursor
+    {
+        uint16_t index;
+        CursorKind kind;
+        float x, y; // the anchor on screen
+    };
+    // The candidate's at the sub anchor while picking, then the target's at the main one, for each without a cursor on
+    // its nameplate (withCursor).
+    std::vector<LoneCursor> LoneCursors(const CursorTargets& targets, const Settings& settings, const std::vector<uint16_t>& withCursor);
+
+    // The top-left corner of a cursor width by height whose point, tip across its width, sits on the anchor.
+    struct CursorSpot
+    {
+        float x, y;
+    };
+    CursorSpot CursorAtAnchor(float anchorX, float anchorY, float width, float height, float tip);
 
     // Measured sizes of a nameplate's lines (0 for a line that is not shown).
     struct LineSizes

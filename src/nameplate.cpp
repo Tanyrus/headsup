@@ -46,14 +46,35 @@ namespace headsup
         const bool playerIcons = lines.name && settings.showPlayerIcons && !iconsFailed;
         lines.leftIcons        = playerIcons ? facts.leftIcons : 0;
         lines.rightIcons       = playerIcons ? facts.rightIcons : 0;
-        if (settings.replaceCursor && facts.index != 0)
-        {
-            if (facts.index == targets.subTarget)
-                lines.cursor = targets.outOfRange ? CursorKind::OutOfRange : CursorKind::SubTarget;
-            else if (facts.index == targets.target)
-                lines.cursor = targets.locked ? CursorKind::Locked : CursorKind::Target;
-        }
+        lines.cursor = CursorFor(facts.index, settings, targets);
         return lines;
+    }
+
+    CursorKind CursorFor(uint16_t index, const Settings& settings, const CursorTargets& targets)
+    {
+        if (!settings.replaceCursor || index == 0) return CursorKind::None;
+        if (index == targets.subTarget) return targets.outOfRange ? CursorKind::OutOfRange : CursorKind::SubTarget;
+        if (index == targets.target) return targets.locked ? CursorKind::Locked : CursorKind::Target;
+        return CursorKind::None;
+    }
+
+    std::vector<LoneCursor> LoneCursors(const CursorTargets& targets, const Settings& settings, const std::vector<uint16_t>& withCursor)
+    {
+        std::vector<LoneCursor> lone;
+        if (!targets.anchored) return lone;
+        auto add = [&](uint16_t index, float x, float y) {
+            const CursorKind kind = CursorFor(index, settings, targets);
+            if (kind == CursorKind::None || std::find(withCursor.begin(), withCursor.end(), index) != withCursor.end()) return;
+            lone.push_back(LoneCursor{index, kind, x, y});
+        };
+        add(targets.subTarget, targets.subAnchorX, targets.subAnchorY);
+        if (targets.target != targets.subTarget) add(targets.target, targets.anchorX, targets.anchorY);
+        return lone;
+    }
+
+    CursorSpot CursorAtAnchor(float anchorX, float anchorY, float width, float height, float tip)
+    {
+        return CursorSpot{anchorX - width * tip, anchorY - height};
     }
 
     NameplateLayout LayoutNameplate(const ScreenBox& plate, const LineSizes& sizes, bool showName)

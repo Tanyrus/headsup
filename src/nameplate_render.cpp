@@ -24,6 +24,14 @@ namespace headsup
         constexpr float kPixelCenter      = 0.5f; // Direct3D 8 samples pixel centers at half-pixel offsets
         constexpr float kPercent          = 100.0f;
 
+        uint32_t CursorColor(CursorKind kind, const Settings& settings)
+        {
+            return ToArgb(kind == CursorKind::SubTarget    ? settings.subCursorColor
+                          : kind == CursorKind::OutOfRange ? settings.outOfRangeCursorColor
+                          : kind == CursorKind::Locked     ? settings.lockedCursorColor
+                                                           : settings.cursorColor);
+        }
+
         int OutlineRadius(int pixelHeight)
         {
             return std::max(1, static_cast<int>(std::lround(static_cast<float>(pixelHeight) * kOutlinePerHeight)));
@@ -177,10 +185,7 @@ namespace headsup
                 p.labelRaster  = raster(labelShown, p.labelRaster);
                 p.cursorRaster = raster(cursorShown, p.cursorRaster);
                 const bool showCursor      = lines.cursor != CursorKind::None;
-                const uint32_t cursorColor = ToArgb(lines.cursor == CursorKind::SubTarget    ? settings.subCursorColor
-                                                    : lines.cursor == CursorKind::OutOfRange ? settings.outOfRangeCursorColor
-                                                    : lines.cursor == CursorKind::Locked     ? settings.lockedCursorColor
-                                                                                             : settings.cursorColor);
+                const uint32_t cursorColor = CursorColor(lines.cursor, settings);
                 const uint32_t nameColor = settings.ownNameColor ? ToArgb(settings.nameColor) : names.NameplateColor(info->index);
                 const uint32_t labelColor = ToArgb(settings.labelColor[static_cast<int>(info->label.shade)]);
                 if ((lines.name && !Prepare(p.name, info->name, nameColor, p.nameRaster, settings)) ||
@@ -253,6 +258,29 @@ namespace headsup
                 m_Shown.push_back(Shown{info->index, layout.nameX, layout.nameY, layout.labelX, layout.labelY, layout.iconsX,
                     layout.iconsY, shownHeight(lines.name, nameShown), shownHeight(lines.label, labelShown),
                     static_cast<int>(std::lround(iconSize)), drawn, nameColor});
+            }
+        }
+
+        // Targets with no game name, such as a Telepoint, get their cursor at the game's arrow anchor, at the cursor's
+        // own size and on top: there is no name to scale by or to sit behind walls with.
+        if (NameplatesOn(settings) && !m_Failed && m_Device != nullptr)
+        {
+            std::vector<uint16_t> withCursor;
+            for (const CursorName& c : m_CursorNames)
+                withCursor.push_back(c.index);
+            for (const LoneCursor& lone : LoneCursors(targets, settings, withCursor))
+            {
+                Plate& p                = m_Plates[lone.index];
+                p.frame                 = m_Frame;
+                const float cursorShown = static_cast<float>(settings.cursorSize) * toY;
+                p.cursorRaster          = RasterHeight(cursorShown, p.cursorRaster);
+                if (!PrepareCursor(p.cursor, CursorColor(lone.kind, settings), p.cursorRaster, settings)) break;
+                const float fit     = cursorShown / static_cast<float>(p.cursorRaster);
+                const float height  = p.cursor.height * fit / toY;
+                const CursorSpot at = CursorAtAnchor(lone.x, lone.y, p.cursor.width * fit / toX, height, p.cursor.tip);
+                addQuad(cursorQuads, p.cursor.texture, at.x, at.y + CursorBob(now, height), p.cursor.width * fit,
+                    p.cursor.height * fit, p.cursor.u, p.cursor.v, 0.0f, kWhite);
+                m_CursorNames.push_back(CursorName{lone.index, ScreenBox{}});
             }
         }
 

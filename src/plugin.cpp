@@ -39,6 +39,11 @@ namespace
     constexpr int kCaptureMobs           = 16;   // nameplates listed per captured frame
     constexpr double kFrameTimeWeight    = 0.05; // smoothing of the menu's frame time
     constexpr int32_t kChatMode          = 1;    // the chat mode Ashita's own plugins print in
+    // The game's menu resolution, which its target window's arrow anchors are in, from its registry settings.
+    constexpr const char* kBootConfig    = "boot";
+    constexpr const char* kRegistry      = "ffxi.registry";
+    constexpr const char* kMenuWidth     = "0037";
+    constexpr const char* kMenuHeight    = "0038";
     constexpr uint32_t kPartyIconMembers = 5;    // the other members of your party, whose buffs the game keeps
     constexpr uint32_t kPartyMembers     = 18;   // you, your party and the two other alliance parties
 
@@ -550,6 +555,19 @@ private:
         if (!m_Picking) m_Names.ForgetPickRange();
         m_CursorTargets.outOfRange = m_Picking && m_Names.PickOutOfRange();
         m_Names.SetEnlarged(m_Picking ? m_CursorTargets.subTarget : uint16_t{0});
+        IConfigurationManager* config = m_AshitaCore->GetConfigurationManager();
+        const float menuWidth = config->GetFloat(kBootConfig, kRegistry, kMenuWidth, 0.0f);
+        const float menuHeight = config->GetFloat(kBootConfig, kRegistry, kMenuHeight, 0.0f);
+        const Ashita::FFXI::targetwindow_t* window = target->GetRawStructureWindow();
+        if (window != nullptr && menuWidth > 0.0f && menuHeight > 0.0f && m_Names.BackBufferWidth() > 0.0f)
+        {
+            const float x = m_Names.BackBufferWidth() / menuWidth, y = m_Names.BackBufferHeight() / menuHeight;
+            m_CursorTargets.anchored   = true;
+            m_CursorTargets.anchorX    = static_cast<float>(window->m_AnkX) * x;
+            m_CursorTargets.anchorY    = static_cast<float>(window->m_AnkY) * y;
+            m_CursorTargets.subAnchorX = static_cast<float>(window->m_SubAnkX) * x;
+            m_CursorTargets.subAnchorY = static_cast<float>(window->m_SubAnkY) * y;
+        }
     }
 
     void UpdateTracker(double now)
