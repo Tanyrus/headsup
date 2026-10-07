@@ -52,6 +52,7 @@ namespace headsup
         m_Meshes           = 0;
         m_ClearedThisFrame = false;
         m_TargetSurface    = 0; // a render target recreated at the same address may have a new size
+        m_UiSurface        = 0;
         FinishText();
         m_TextFinished = false;
         ReadBackBufferSize();
@@ -67,34 +68,46 @@ namespace headsup
         if (m_TextFinished) return;
         m_TextFinished = true;
         m_PlatesLast.clear();
+        m_WholeLast.clear();
         m_NameColorsLast.clear();
         m_DepthsLast.clear();
         m_GlyphCountsLast.clear();
+        // The font is the texture most of this frame's glyphs use; a name's box and color come from its letters alone.
+        std::unordered_map<uintptr_t, size_t> textures;
+        for (const auto& [index, glyphs] : m_Glyphs)
+            for (const GlyphDraw& g : glyphs)
+                ++textures[g.texture];
+        size_t most = 0;
+        for (const auto& [texture, count] : textures)
+            if (count > most) m_FontTexture = texture, most = count;
         std::unordered_map<uint16_t, uint32_t> runs;
         std::vector<ScreenBox> boxes;
+        std::vector<GlyphDraw> letters;
         for (const auto& [index, glyphs] : m_Glyphs)
         {
             m_GlyphCountsLast[index] = static_cast<uint32_t>(glyphs.size());
+            letters.clear();
             boxes.clear();
             for (const GlyphDraw& g : glyphs)
+            {
+                if (g.texture != m_FontTexture) continue;
+                letters.push_back(g);
                 boxes.push_back(g.box);
+            }
             const ScreenBox plate = NameplateFromGlyphs(boxes);
             if (!plate.valid) continue;
             m_PlatesLast[index]     = plate;
-            m_NameColorsLast[index] = NameColor(glyphs, plate);
+            m_NameColorsLast[index] = NameColor(letters, plate);
+            ScreenBox whole = plate;
+            for (const GlyphDraw& g : glyphs)
+                if (g.texture != m_FontTexture && BesideName(g.box, plate)) whole.Add(g.box);
+            m_WholeLast[index] = whole;
             m_DepthsLast[index]     = m_Depths[index];
             runs[index] = PlateFramesInRow(index) + 1;
         }
         m_PlateRuns.swap(runs);
         m_Glyphs.clear();
         m_Depths.clear();
-        m_OtherPlatesLast.clear();
-        for (auto& [index, glyphs] : m_OtherGlyphs)
-        {
-            const ScreenBox plate = NameplateFromGlyphs(std::move(glyphs));
-            if (plate.valid) m_OtherPlatesLast[index] = plate;
-        }
-        m_OtherGlyphs.clear();
         m_TextStatsLast = m_TextStats;
         m_TextStats     = TextDrawStats{};
         m_MeshDrawsLast.swap(m_MeshDraws);
@@ -136,6 +149,47 @@ namespace headsup
         return it == m_PlatesLast.end() ? nullptr : &it->second;
     }
 
+    const ScreenBox* OutlineRenderer::WholeNameplate(uint16_t index) const
+    {
+        const auto it = m_WholeLast.find(index);
+        return it == m_WholeLast.end() ? nullptr : &it->second;
+    }
+
+    bool OutlineRenderer::IsGameCursorDraw(D3DPRIMITIVETYPE type, UINT primCount, const void* vertices, UINT stride,
+        const Tracker& tracker, const std::vector<CursorName>& names)
+    {
+        if (names.empty() || m_Device == nullptr || m_BackBufferWidth <= 0.0f || VertexCount(type, primCount) != kQuadVertices)
+            return false;
+        DWORD vs = 0;
+        if (FAILED(m_Device->GetVertexShader(&vs)) || IsDeclarationHandle(vs) || (vs & D3DFVF_POSITION_MASK) != D3DFVF_XYZRHW)
+            return false;
+        ScreenBox box;
+        if (!UiQuadBox(vertices, stride, box)) return false;
+        IDirect3DSurface8* target = nullptr;
+        if (FAILED(m_Device->GetRenderTarget(&target)) || target == nullptr) return false;
+        if (reinterpret_cast<uintptr_t>(target) != m_UiSurface)
+        {
+            D3DSURFACE_DESC desc{};
+            if (FAILED(target->GetDesc(&desc)) || desc.Width == 0 || desc.Height == 0)
+            {
+                target->Release();
+                return false;
+            }
+            m_UiSurface = reinterpret_cast<uintptr_t>(target);
+            m_UiScaleX  = m_BackBufferWidth / static_cast<float>(desc.Width);
+            m_UiScaleY  = m_BackBufferHeight / static_cast<float>(desc.Height);
+        }
+        target->Release();
+        const ScreenBox quad = box.Scaled(m_UiScaleX, m_UiScaleY);
+        for (const CursorName& n : names)
+        {
+            if (!IsGameCursor(quad, n.name)) continue;
+            const ActorInfo* owner = FindOwnerOnStack(tracker);
+            return owner != nullptr && owner->index == n.index;
+        }
+        return false;
+    }
+
     bool OutlineRenderer::SceneCopyStarting()
     {
         if (!TextPending() || m_TargetSurface == 0 || m_TargetSurface == m_BackBuffer) return false;
@@ -149,7 +203,7 @@ namespace headsup
     bool OutlineRenderer::OnDrawUP(D3DPRIMITIVETYPE type, UINT primCount, const void* vertices, UINT stride,
         const Tracker& tracker, bool collect, bool hide)
     {
-        if (!collect || m_Device == nullptr || tracker.Mobs().empty() || m_BackBufferWidth <= 0.0f) return false;
+        if (!collect || m_Device == nullptr || tracker.Actors().empty() || m_BackBufferWidth <= 0.0f) return false;
         DWORD vs = 0;
         if (FAILED(m_Device->GetVertexShader(&vs)) || IsDeclarationHandle(vs) || (vs & D3DFVF_POSITION_MASK) != D3DFVF_XYZRHW)
             return false;
@@ -179,25 +233,25 @@ namespace headsup
         }
         target->Release();
         const ScreenBox glyph = box.Scaled(m_TargetScaleX, m_TargetScaleY);
+        uintptr_t texture     = 0;
+        IDirect3DBaseTexture8* bound = nullptr;
+        if (SUCCEEDED(m_Device->GetTexture(0, &bound)) && bound != nullptr)
+        {
+            texture = reinterpret_cast<uintptr_t>(bound);
+            bound->Release();
+        }
+        const bool letter = m_FontTexture == 0 || texture == m_FontTexture;
 
         const ActorInfo* owner     = FindOwnerOnStack(tracker);
         GlyphOwner kind            = GlyphOwner::None;
         const ScreenBox* ownerName = nullptr;
         if (owner == nullptr)
             ++m_TextStats.noOwner;
-        else if (!owner->isMob)
-        {
-            ++m_TextStats.otherOwner;
-            kind = GlyphOwner::Other;
-            m_OtherGlyphs[owner->index].push_back(glyph);
-            const auto it = m_OtherPlatesLast.find(owner->index);
-            if (it != m_OtherPlatesLast.end()) ownerName = &it->second;
-        }
         else
         {
-            kind = GlyphOwner::Mob;
-            if (m_Replaced.count(owner->index) != 0) ownerName = NameplateBox(owner->index);
-            ++m_TextStats.owned;
+            ++(owner->kind == EntityKind::Mob ? m_TextStats.owned : m_TextStats.otherOwner);
+            kind      = m_Replaced.count(owner->index) != 0 ? GlyphOwner::Replaced : GlyphOwner::Kept;
+            ownerName = NameplateBox(owner->index);
             uint32_t argb = kWhite;
             if ((vs & D3DFVF_DIFFUSE) != 0 && stride >= kPretransformedPositionBytes + sizeof(argb))
             {
@@ -207,11 +261,11 @@ namespace headsup
                 m_Device->GetTextureStageState(0, D3DTSS_COLOROP, &op);
                 argb = ShownColor(argb, op == D3DTOP_MODULATE4X ? 4 : op == D3DTOP_MODULATE2X ? 2 : 1);
             }
-            m_Glyphs[owner->index].push_back(GlyphDraw{glyph, argb});
+            m_Glyphs[owner->index].push_back(GlyphDraw{glyph, argb, texture});
             float& nameDepth = m_Depths[owner->index];
             nameDepth        = std::max(nameDepth, depth);
         }
-        if (!hide || !HideGlyph(glyph, kind, ownerName, m_ReplacedPlates)) return false;
+        if (!hide || !HideGlyph(glyph, letter, kind, ownerName, m_ReplacedPlates)) return false;
         ++m_TextStats.hidden;
         return true;
     }
@@ -265,12 +319,12 @@ namespace headsup
     {
         if (m_InDraw || m_Device == nullptr) return false;
         const bool outlines = settings.enabled && tracker.OutlinedCount() > 0;
-        const bool bodies   = NameplatesOn(settings) && !tracker.Mobs().empty(); // nameplates need to know who was drawn
+        const bool bodies   = NameplatesOn(settings) && !tracker.Actors().empty(); // nameplates need to know who was drawn
         if (!outlines && !bodies) return false;
         if (!IsCharacterModelDraw()) return false;
         const ActorInfo* owner = FindOwnerOnStack(tracker);
         if (owner == nullptr) return false;
-        if (owner->isMob) ++m_MeshDraws[owner->index];
+        ++m_MeshDraws[owner->index];
         if (!outlines || !owner->outline) return false;
         m_StencilAvailable = BoundSurfaceHasStencil();
         if (!m_StencilAvailable)

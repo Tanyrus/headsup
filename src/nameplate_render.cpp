@@ -1,6 +1,7 @@
 #include "nameplate_render.h"
 
 #include "nameplate.h"
+#include "shapes.h"
 #include "text_image.h"
 #include "text_raster.h"
 
@@ -19,9 +20,14 @@ namespace headsup
             float u, v;
         };
         constexpr DWORD kQuadFvf          = D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1;
-        constexpr float kOutlinePerHeight = 0.1f;  // text outline width, per pixel of text height
+        constexpr float kOutlinePerHeight = 0.1f;  // outline width, per pixel of text or cursor height
         constexpr float kPixelCenter      = 0.5f;  // Direct3D 8 samples pixel centers at half-pixel offsets
         constexpr int kBytesPerPixel      = 4;
+
+        int OutlineRadius(int pixelHeight)
+        {
+            return std::max(1, static_cast<int>(std::lround(static_cast<float>(pixelHeight) * kOutlinePerHeight)));
+        }
 
         void ReleaseText(IDirect3DTexture8*& texture)
         {
@@ -65,15 +71,34 @@ namespace headsup
                                 std::to_string(settings.fontBold) + ' ' + std::to_string(pixelHeight) + ' ' +
                                 std::to_string(color) + ' ' + std::to_string(outline);
         if (t.texture != nullptr && t.key == key) return true;
-        const int radius = std::max(1, static_cast<int>(std::lround(static_cast<float>(pixelHeight) * kOutlinePerHeight)));
+        const int radius = OutlineRadius(pixelHeight);
         Coverage coverage;
         if (!RasterizeText(text, FontFamily(settings.fontIndex), pixelHeight, settings.fontBold, radius, coverage)) return false;
-        const Image image = OutlinedText(coverage, radius, color, outline);
+        return Upload(t, OutlinedText(coverage, radius, color, outline), key);
+    }
+
+    bool NameplateRenderer::PrepareCursor(TextTexture& t, uint32_t color, int pixelHeight, const Settings& settings)
+    {
+        const uint32_t outline = ToArgb(settings.textOutline);
+        const std::string key  = std::string(settings.cursorFeather ? "feather " : "arrow ") + std::to_string(pixelHeight) +
+                                ' ' + std::to_string(color) + ' ' + std::to_string(outline);
+        if (t.texture != nullptr && t.key == key) return true;
+        const int radius        = OutlineRadius(pixelHeight);
+        const Shape& shape      = settings.cursorFeather ? FeatherShape() : ArrowShape();
+        const Coverage coverage = ShapeCoverage(shape, pixelHeight, radius);
+        if (!Upload(t, OutlinedText(coverage, radius, color, outline), key)) return false;
+        const float width = static_cast<float>(coverage.width - 2 * radius);
+        t.tip             = (static_cast<float>(radius) + ShapeTip(shape) * width) / static_cast<float>(coverage.width);
+        return true;
+    }
+
+    bool NameplateRenderer::Upload(TextTexture& t, const Image& image, std::string key)
+    {
         float u = 0.0f, v = 0.0f;
         IDirect3DTexture8* texture = CreateTexture(image.argb.data(), image.width, image.height, u, v);
         if (texture == nullptr) return false;
         ReleaseText(t.texture);
-        t = TextTexture{texture, key, static_cast<float>(image.width), static_cast<float>(image.height), u, v};
+        t = TextTexture{texture, std::move(key), static_cast<float>(image.width), static_cast<float>(image.height), u, v};
         return true;
     }
 
@@ -89,36 +114,44 @@ namespace headsup
     }
 
     void NameplateRenderer::Update(const Tracker& tracker, const OutlineRenderer& outline, const Settings& settings, float toX,
-        float toY)
+        float toY, const CursorTargets& cursors, double now)
     {
         ++m_Frame;
         m_Shown.clear();
         m_Quads.clear();
+        m_CursorNames.clear();
         m_ReplacedLast = std::unordered_set<uint16_t>(m_Replacing.begin(), m_Replacing.end());
         m_Replacing.clear();
         const uint32_t iconTint  = ToArgb(settings.iconTint);
         const float screenWidth  = outline.BackBufferWidth();
         const float screenHeight = outline.BackBufferHeight();
-        auto addQuad = [&](IDirect3DTexture8* texture, float x, float y, float width, float height, float u, float v, float depth,
-                           uint32_t tint) {
+        // Cursors are drawn after every nameplate, so another name never covers one.
+        std::vector<Quad> cursorQuads;
+        auto addQuad = [&](std::vector<Quad>& into, IDirect3DTexture8* texture, float x, float y, float width, float height, float u,
+                           float v, float depth, uint32_t tint) {
             // Whole pixels in the target keep the text as sharp as it was drawn.
-            m_Quads.push_back(Quad{texture, std::round(x * toX), std::round(y * toY), width, height, u, v, depth, tint});
+            into.push_back(Quad{texture, std::round(x * toX), std::round(y * toY), width, height, u, v, depth, tint});
         };
         if (NameplatesOn(settings) && !m_Failed && m_Device != nullptr)
         {
-            for (const ActorPtr actor : tracker.Mobs())
+            for (const ActorPtr actor : tracker.Actors())
             {
                 const ActorInfo* info = tracker.Find(actor);
                 if (info == nullptr) continue;
                 const ScreenBox* plate = outline.NameplateBox(info->index);
                 if (!LabelVisible(plate, outline.MeshDraws(info->index), outline.PlateFramesInRow(info->index), screenWidth,
                         screenHeight))
-                    continue; // the camera cannot see this mob well enough
-                const bool replace   = settings.replaceNameplates && info->name[0] != '\0';
+                    continue; // the camera cannot see this entity well enough
+                const bool replaceKind = info->kind == EntityKind::Mob      ? settings.replaceNameplates
+                                         : info->kind == EntityKind::Player ? settings.replacePlayerNames
+                                                                            : settings.replaceNpcNames;
+                const bool replace   = replaceKind && info->name[0] != '\0';
                 const bool showName  = replace && m_ReplacedLast.count(info->index) != 0;
                 const bool showLabel = settings.showLabels && info->alive && info->label.text[0] != '\0';
                 const int iconCount  = settings.showIcons && info->alive && !m_IconsFailed ? info->icons.count : 0;
-                if (!replace && !showLabel && iconCount == 0) continue;
+                const bool picked    = settings.replaceCursor && info->index == cursors.subTarget;
+                const bool showCursor = picked || (settings.replaceCursor && info->index == cursors.target);
+                if (!replace && !showLabel && iconCount == 0 && !showCursor) continue;
                 if (m_Shown.size() == kMaxPlates) break;
                 Plate& p = m_Plates[info->index];
                 p.frame  = m_Frame;
@@ -130,41 +163,75 @@ namespace headsup
                 const float nameShown  = static_cast<float>(settings.nameSize) * scale * toY;
                 const float labelShown = static_cast<float>(settings.labelSize) * scale * toY;
                 const float iconSize   = static_cast<float>(settings.iconSize) * scale;
+                const float cursorShown = static_cast<float>(settings.cursorSize) * scale * toY;
                 auto raster            = [&](float shown, int current) {
                     return settings.scaleWithDistance ? RasterHeight(shown, current) : std::max(1, static_cast<int>(std::lround(shown)));
                 };
                 p.nameRaster              = raster(nameShown, p.nameRaster);
                 p.labelRaster             = raster(labelShown, p.labelRaster);
+                p.cursorRaster            = raster(cursorShown, p.cursorRaster);
+                const uint32_t cursorColor = ToArgb(picked           ? settings.subCursorColor
+                                                    : cursors.locked ? settings.lockedCursorColor
+                                                                     : settings.cursorColor);
                 const uint32_t nameColor =
                     settings.ownNameColor ? ToArgb(settings.nameColor) : outline.NameplateColor(info->index);
                 const uint32_t labelColor = ToArgb(settings.labelColor[static_cast<int>(info->label.shade)]);
                 if ((showName && !Prepare(p.name, info->name, nameColor, p.nameRaster, settings)) ||
-                    (showLabel && !Prepare(p.label, info->label.text, labelColor, p.labelRaster, settings)))
+                    (showLabel && !Prepare(p.label, info->label.text, labelColor, p.labelRaster, settings)) ||
+                    (showCursor && !PrepareCursor(p.cursor, cursorColor, p.cursorRaster, settings)))
                 {
                     m_Failed = m_FailurePending = true;
                     break;
                 }
                 const float nameFit  = nameShown / static_cast<float>(p.nameRaster);
-                const float labelFit = labelShown / static_cast<float>(p.labelRaster);
+                const float labelFit  = labelShown / static_cast<float>(p.labelRaster);
+                const float cursorFit = cursorShown / static_cast<float>(p.cursorRaster);
+                // A player's icons are as tall as the name's letters.
+                const int nameIconCount = showName && settings.showPlayerIcons && !m_IconsFailed ? info->nameIcons.count : 0;
+                const float nameIconSize = nameShown / toY;
 
                 const LineSizes sizes{showName ? p.name.width * nameFit / toX : 0.0f, showName ? p.name.height * nameFit / toY : 0.0f,
                     showLabel ? p.label.width * labelFit / toX : 0.0f, showLabel ? p.label.height * labelFit / toY : 0.0f, iconCount,
-                    iconSize};
-                const NameplateLayout layout = LayoutNameplate(*plate, sizes, showName);
+                    iconSize, showCursor ? p.cursor.width * cursorFit / toX : 0.0f, showCursor ? p.cursor.height * cursorFit / toY : 0.0f,
+                    p.cursor.tip, nameIconCount, nameIconSize, settings.centerNameAndIcons};
+                // Over the entity: a player's name and icons are centered together, so the letters alone sit off to one side.
+                const ScreenBox* whole = outline.WholeNameplate(info->index);
+                ScreenBox anchor       = whole != nullptr ? CenteredOver(*plate, *whole) : *plate;
+                if (showName)
+                {
+                    const float raise = static_cast<float>(settings.nameRaise) * scale;
+                    anchor.minY -= raise;
+                    anchor.maxY -= raise;
+                }
+                const NameplateLayout layout = LayoutNameplate(anchor, sizes, showName);
                 const float depth            = outline.NameplateDepth(info->index);
                 if (showName)
-                    addQuad(p.name.texture, layout.nameX, layout.nameY, p.name.width * nameFit, p.name.height * nameFit, p.name.u,
+                    addQuad(m_Quads, p.name.texture, layout.nameX, layout.nameY, p.name.width * nameFit, p.name.height * nameFit, p.name.u,
                         p.name.v, depth, kWhite);
                 if (showLabel)
-                    addQuad(p.label.texture, layout.labelX, layout.labelY, p.label.width * labelFit, p.label.height * labelFit,
+                    addQuad(m_Quads, p.label.texture, layout.labelX, layout.labelY, p.label.width * labelFit, p.label.height * labelFit,
                         p.label.u, p.label.v, depth, kWhite);
                 int drawn = 0;
                 for (; drawn < iconCount; ++drawn)
                 {
                     IDirect3DTexture8* icon = IconTexture(info->icons.icons[drawn]);
                     if (icon == nullptr) break;
-                    addQuad(icon, layout.iconsX + static_cast<float>(drawn) * layout.iconStep, layout.iconsY, iconSize * toX,
+                    addQuad(m_Quads, icon, layout.iconsX + static_cast<float>(drawn) * layout.iconStep, layout.iconsY, iconSize * toX,
                         iconSize * toY, 1.0f, 1.0f, depth, iconTint);
+                }
+                for (int i = 0; i < nameIconCount; ++i)
+                {
+                    const Icon kind         = info->nameIcons.icons[i];
+                    IDirect3DTexture8* icon = IconTexture(kind);
+                    if (icon == nullptr) break;
+                    addQuad(m_Quads, icon, layout.nameIconsX + static_cast<float>(i) * layout.nameIconStep, layout.nameIconsY,
+                        nameIconSize * toX, nameIconSize * toY, 1.0f, 1.0f, depth, kind == Icon::Linkshell ? info->linkshellArgb : kWhite);
+                }
+                if (showCursor)
+                {
+                    addQuad(cursorQuads, p.cursor.texture, layout.cursorX, layout.cursorY + CursorBob(now, sizes.cursorHeight),
+                        p.cursor.width * cursorFit, p.cursor.height * cursorFit, p.cursor.u, p.cursor.v, depth, kWhite);
+                    m_CursorNames.push_back(CursorName{info->index, whole != nullptr ? *whole : *plate});
                 }
                 auto shownHeight = [&](bool shown, float pixels) { return shown ? static_cast<int>(std::lround(pixels / toY)) : 0; };
                 m_Shown.push_back(Shown{info->index, layout.nameX, layout.nameY, layout.labelX, layout.labelY, layout.iconsX,
@@ -172,6 +239,8 @@ namespace headsup
                     static_cast<int>(std::lround(iconSize)), drawn, nameColor});
             }
         }
+
+        m_Quads.insert(m_Quads.end(), cursorQuads.begin(), cursorQuads.end());
 
         // Mobs without a nameplate this frame give their textures back.
         for (auto it = m_Plates.begin(); it != m_Plates.end();)
@@ -183,6 +252,7 @@ namespace headsup
             }
             ReleaseText(it->second.name.texture);
             ReleaseText(it->second.label.texture);
+            ReleaseText(it->second.cursor.texture);
             it = m_Plates.erase(it);
         }
     }
@@ -192,6 +262,7 @@ namespace headsup
         m_Quads.clear();
         m_Shown.clear();
         m_Replacing.clear();
+        m_CursorNames.clear();
     }
 
     void NameplateRenderer::Draw(bool depthTest)
@@ -247,6 +318,7 @@ namespace headsup
         {
             ReleaseText(plate.name.texture);
             ReleaseText(plate.label.texture);
+            ReleaseText(plate.cursor.texture);
         }
         m_Plates.clear();
         for (IDirect3DTexture8*& texture : m_IconTextures)

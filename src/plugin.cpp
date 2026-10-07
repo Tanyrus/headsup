@@ -5,6 +5,7 @@
 #include "menu.h"
 #include "mobdata.h"
 #include "outline.h"
+#include "player_status.h"
 #include "settings.h"
 #include "tracker.h"
 
@@ -13,6 +14,8 @@
 #include <cstdio>
 #include <ctime>
 #include <string>
+#include <unordered_map>
+#include <optional>
 #include <vector>
 
 namespace
@@ -22,7 +25,10 @@ namespace
     constexpr const char* kConfigFile    = "headsup/settings.ini";   // relative to Ashita's config folder
     constexpr const char* kOldConfigFile = "aggroglow\\settings.ini"; // the plugin's settings under its old name
     constexpr const char* kSection       = "settings";
-    constexpr uint32_t kSpawnFlagMob   = 0x10;  // IEntity::GetSpawnFlags
+    constexpr uint32_t kSpawnFlagPlayer = 0x01; // IEntity::GetSpawnFlags
+    constexpr uint32_t kSpawnFlagMob   = 0x10;
+    constexpr uint32_t kLockedOn       = 0x01;  // ITarget::GetLockedOnFlags
+    constexpr uint16_t kZoneInPacket   = 0x00A;
     constexpr uint32_t kMaxEntities    = 4096;  // more than the client's entity map holds
     constexpr int kCaptureFrames       = 120;   // frames /hu debug records
     constexpr int kCaptureMobs         = 16;    // nameplates listed per captured frame
@@ -80,11 +86,15 @@ class HeadsUp final : public IPlugin
     headsup::Menu m_Menu;
     headsup::PlayerState m_Player;
     headsup::CheckResults m_Checks;
+    std::unordered_map<uint16_t, headsup::PlayerStatus> m_PlayerStatus; // other players, by target index
+    std::optional<headsup::PlayerStatus> m_OwnStatus;
+    std::vector<headsup::PlayerStatus> m_Statuses; // this frame's, for the tracker's inputs
     bool m_DebugPending = false;
     bool m_PlatesPlaced = false; // placed this frame, in the scene or at the back-buffer EndScene
     bool m_Drawing      = false; // drawing nameplates: our own draws come back through the hooks
     bool m_DrewInScene  = false; // this frame, for /hu debug
     IDirect3DDevice8* m_Device = nullptr;
+    headsup::NameplateRenderer::CursorTargets m_CursorTargets;
     int m_CaptureLeft   = 0; // frames /hu debug still records
     std::string m_CapturePath;
     std::string m_Capture;
@@ -158,7 +168,8 @@ public:
         return true;
     }
 
-    // The reply to the player's own /check: the mob's exact level, for its label until it respawns. Chat shows it.
+    // Players' statuses, for the icons beside their names, and the reply to the player's own /check: the mob's exact
+    // level, for its label until it respawns. Every packet still reaches the game.
     bool HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data, uint8_t* modified, uint32_t sizeChunk,
         const uint8_t* dataChunk, bool injected, bool blocked) override
     {
@@ -167,6 +178,23 @@ public:
         UNREFERENCED_PARAMETER(dataChunk);
         UNREFERENCED_PARAMETER(injected);
         UNREFERENCED_PARAMETER(blocked);
+        if (id == kZoneInPacket) m_PlayerStatus.clear(); // target indexes are reused in the next zone
+        if (id == headsup::kOtherPlayerPacket)
+        {
+            if (const auto update = headsup::ParseOtherPlayer(data, size))
+            {
+                if (update->despawn)
+                    m_PlayerStatus.erase(update->index);
+                else if (update->status)
+                    m_PlayerStatus[update->index] = *update->status;
+            }
+            return false;
+        }
+        if (id == headsup::kOwnStatusPacket)
+        {
+            if (const auto own = headsup::ParseOwnStatus(data, size)) m_OwnStatus = *own;
+            return false;
+        }
         if (id != headsup::kCheckReplyPacket) return false;
         const auto reply = headsup::ParseCheckReply(data, size);
         if (!reply) return false;
@@ -207,6 +235,7 @@ public:
         m_DrewInScene          = false;
         const double now       = Now();
         UpdateTracker(now);
+        UpdateCursorTargets();
         const auto& letters = m_Outline.TextStatsLastFrame();
         const headsup::MenuStatus status{m_Tracker.OutlinedCount(), m_Outline.MeshesLastFrame(),
             static_cast<uint32_t>(m_Nameplates.LastShown().size()), m_FrameMs, m_Outline.StencilAvailable(), drewInScene,
@@ -245,9 +274,13 @@ public:
     {
         if (m_Drawing) return false;
         DrawNameplatesBeforeSceneCopy();
+        // The game's target cursor over a mob that has ours is not drawn.
+        if (m_Settings.enabled && m_Settings.replaceCursor &&
+            m_Outline.IsGameCursorDraw(type, primCount, vertices, stride, m_Tracker, m_Nameplates.CursorNames()))
+            return true;
         // In replace mode the game's own mob nameplate letters are measured, then blocked.
         return m_Outline.OnDrawUP(type, primCount, vertices, stride, m_Tracker, headsup::NameplatesOn(m_Settings),
-            m_Settings.enabled && m_Settings.replaceNameplates);
+            headsup::ReplacesNames(m_Settings));
     }
 
     bool Direct3DDrawIndexedPrimitiveUP(D3DPRIMITIVETYPE type, UINT minIndex, UINT numVertices, UINT primCount,
@@ -290,7 +323,7 @@ private:
     // Lays out and draws the nameplates into the bound render target, toX and toY pixels per back-buffer pixel.
     void DrawNameplates(float toX, float toY, bool depthTest)
     {
-        m_Nameplates.Update(m_Tracker, m_Outline, m_Settings, toX, toY);
+        m_Nameplates.Update(m_Tracker, m_Outline, m_Settings, toX, toY, m_CursorTargets, Now());
         m_Outline.SetReplacedNames(m_Nameplates.ReplacingNames());
         m_Nameplates.Draw(depthTest);
         m_PlatesPlaced = true;
@@ -364,6 +397,36 @@ private:
         m_LastPresent = now;
     }
 
+    // A player's status from the game's memory, known at once, with what only the packets carry once seen.
+    const headsup::PlayerStatus* CurrentStatus(IEntity* entity, uint32_t index, headsup::EntityKind kind, uint32_t self)
+    {
+        if (kind != headsup::EntityKind::Player) return nullptr;
+        const headsup::PlayerStatus memory = headsup::StatusFromRender(entity->GetRenderFlags1(index), entity->GetRenderFlags2(index),
+            entity->GetLinkshellColor(index));
+        m_Statuses.push_back(headsup::WithPacketStatus(memory, PlayerStatusOf(index, self)));
+        return &m_Statuses.back();
+    }
+
+    const headsup::PlayerStatus* PlayerStatusOf(uint32_t index, uint32_t self) const
+    {
+        if (index == self) return m_OwnStatus ? &*m_OwnStatus : nullptr;
+        const auto it = m_PlayerStatus.find(static_cast<uint16_t>(index));
+        return it != m_PlayerStatus.end() ? &it->second : nullptr;
+    }
+
+    // While a sub-target is being picked, slot 1 holds the target and slot 0 the candidate under the sub-target cursor.
+    void UpdateCursorTargets()
+    {
+        ITarget* target   = m_AshitaCore->GetMemoryManager()->GetTarget();
+        IEntity* entity   = m_AshitaCore->GetMemoryManager()->GetEntity();
+        const bool picking = target->GetIsSubTargetActive() != 0;
+        auto index         = [&](uint32_t slot) {
+            const uint32_t i = target->GetTargetIndex(slot);
+            return i < entity->GetEntityMapSize() ? static_cast<uint16_t>(i) : uint16_t{0};
+        };
+        m_CursorTargets = {index(picking ? 1 : 0), picking ? index(0) : uint16_t{0}, (target->GetLockedOnFlags() & kLockedOn) != 0};
+    }
+
     void UpdateTracker(double now)
     {
         IEntity* entity = m_AshitaCore->GetMemoryManager()->GetEntity();
@@ -371,18 +434,25 @@ private:
         IPlayer* player = m_AshitaCore->GetMemoryManager()->GetPlayer();
         m_Inputs.clear();
         const uint32_t count = std::min<uint32_t>(entity->GetEntityMapSize(), kMaxEntities);
+        const uint32_t self  = party->GetMemberTargetIndex(0);
+        m_Statuses.clear();
+        m_Statuses.reserve(count); // the inputs point into it, so it must not grow
         for (uint32_t i = 0; i < count; ++i)
         {
             if (entity->GetRawEntity(i) == nullptr) continue;
             const uintptr_t actor = entity->GetActorPointer(i);
             if (actor == 0) continue;
             const uint32_t serverId = entity->GetServerId(i);
-            const bool isMob        = (entity->GetSpawnFlags(i) & kSpawnFlagMob) != 0;
+            const uint32_t flags    = entity->GetSpawnFlags(i);
+            const auto kind         = (flags & kSpawnFlagMob) != 0      ? headsup::EntityKind::Mob
+                                      : (flags & kSpawnFlagPlayer) != 0 ? headsup::EntityKind::Player
+                                                                        : headsup::EntityKind::Npc;
+            const bool isMob        = kind == headsup::EntityKind::Mob;
             const bool alive        = entity->GetHPPercent(i) > 0;
             if (isMob && !alive) m_Checks.Forget(serverId); // the next spawn rolls a new level
             m_Inputs.push_back(headsup::ActorInput{static_cast<headsup::ActorPtr>(actor), static_cast<uint16_t>(i),
-                serverId, isMob, alive, headsup::DistanceFromSquared(entity->GetDistance(i)), EntityName(entity, i),
-                isMob ? m_Checks.Result(serverId, now) : nullptr});
+                serverId, kind, alive, headsup::DistanceFromSquared(entity->GetDistance(i)), EntityName(entity, i),
+                isMob ? m_Checks.Result(serverId, now) : nullptr, CurrentStatus(entity, i, kind, self)});
         }
         m_Player.level   = player->GetMainJobLevel();
         m_Player.sitting = headsup::IsSittingStatus(entity->GetStatus(party->GetMemberTargetIndex(0)));
@@ -411,7 +481,7 @@ private:
             GetVersion(), m_Outline.BackBufferWidth(), m_Outline.BackBufferHeight(), m_Player.level,
             m_Player.sitting ? " (sitting)" : "", m_Tracker.OutlinedCount(),
             static_cast<unsigned>(m_Nameplates.LastShown().size()), m_Settings.replaceNameplates ? "on" : "off");
-        for (const headsup::ActorPtr actor : m_Tracker.Mobs())
+        for (const headsup::ActorPtr actor : m_Tracker.Actors())
         {
             const headsup::ActorInfo* info = m_Tracker.Find(actor);
             if (info == nullptr || (!info->outline && m_Outline.NameplateBox(info->index) == nullptr)) continue;
@@ -460,7 +530,7 @@ private:
             static_cast<unsigned>(m_Nameplates.LastShown().size()), m_DrewInScene ? 'S' : '-', m_Outline.TargetScaleY());
         m_Capture += line;
         int listed = 0;
-        for (const headsup::ActorPtr actor : m_Tracker.Mobs())
+        for (const headsup::ActorPtr actor : m_Tracker.Actors())
         {
             const headsup::ActorInfo* info = m_Tracker.Find(actor);
             const headsup::ScreenBox* plate = info != nullptr ? m_Outline.NameplateBox(info->index) : nullptr;

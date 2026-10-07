@@ -7,12 +7,13 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 OUT="$ROOT/build"
 PLUGINS_DIR="${HEADSUP_PLUGINS_DIR:-$HOME/Games/PhoenixXI/plugins}"
-PURE_SOURCES=(con.cpp mobdata.cpp classifier.cpp settings.cpp tracker.cpp outline_math.cpp labels.cpp examine.cpp nameplate.cpp icons.cpp text_image.cpp)
+PURE_SOURCES=(con.cpp mobdata.cpp classifier.cpp settings.cpp tracker.cpp outline_math.cpp labels.cpp examine.cpp nameplate.cpp icons.cpp text_image.cpp shapes.cpp player_status.cpp)
 PLUGIN_SOURCES=("${PURE_SOURCES[@]}" outline.cpp text_raster.cpp nameplate_render.cpp menu.cpp plugin.cpp)
 
 generate() {
     python3 "$ROOT/tools/gen_mobdata.py"
     python3 "$ROOT/tools/gen_icons.py"
+    python3 "$ROOT/tools/gen_shapes.py"
 }
 
 unit_tests() {

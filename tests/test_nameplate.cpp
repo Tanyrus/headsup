@@ -79,6 +79,16 @@ TEST(any_vertex_outside_the_scene_depth_rejects_the_draw)
     CHECK(!WorldTextBox(quad.data(), sizeof(Vertex), 4, box, depth));
 }
 
+TEST(a_ui_quad_gives_its_box)
+{
+    ScreenBox box;
+    CHECK(UiQuadBox(Quad(1068.5f, 162.5f, 1088.5f, 194.5f, 0.0f).data(), sizeof(Vertex), box)); // the game's cursor
+    CHECK(Near(box.minX, 1068.5f) && Near(box.maxY, 194.5f));
+    CHECK(!UiQuadBox(Quad(10, 10, 20, 20, 0.5f).data(), sizeof(Vertex), box)); // in the scene, not the UI
+    CHECK(!UiQuadBox(nullptr, sizeof(Vertex), box));
+    CHECK(!UiQuadBox(Quad(10, 10, 20, 20, 0.0f).data(), 12, box));
+}
+
 TEST(unusable_draws_are_rejected)
 {
     const auto quad = Quad(10, 10, 20, 20, 0.5f);
@@ -204,19 +214,19 @@ TEST(a_replaced_names_letters_are_hidden)
 {
     const ScreenBox replaced = Glyph(1000.0f, 200.0f, 1080.0f, 210.0f);
     const std::vector<ScreenBox> plates{replaced};
-    CHECK(HideGlyph(Glyph(1010.0f, 201.0f, 1017.0f, 211.0f), GlyphOwner::Mob, &replaced, plates));
+    CHECK(HideGlyph(Glyph(1010.0f, 201.0f, 1017.0f, 211.0f), true, GlyphOwner::Replaced, &replaced, plates));
     // Whoever the game says drew it: the first quad of a name is often credited to the entity drawn before it.
-    CHECK(HideGlyph(Glyph(1010.0f, 201.0f, 1017.0f, 211.0f), GlyphOwner::None, nullptr, plates));
-    CHECK(HideGlyph(Glyph(990.0f, 214.0f, 997.0f, 224.0f), GlyphOwner::None, nullptr, plates)); // moved a little
+    CHECK(HideGlyph(Glyph(1010.0f, 201.0f, 1017.0f, 211.0f), true, GlyphOwner::None, nullptr, plates));
+    CHECK(HideGlyph(Glyph(990.0f, 214.0f, 997.0f, 224.0f), true, GlyphOwner::None, nullptr, plates)); // moved a little
     // Credited to the mob and near its name: the name moved further during a fast turn.
-    CHECK(HideGlyph(Glyph(1100.0f, 230.0f, 1107.0f, 240.0f), GlyphOwner::Mob, &replaced, plates));
+    CHECK(HideGlyph(Glyph(1100.0f, 230.0f, 1107.0f, 240.0f), true, GlyphOwner::Replaced, &replaced, plates));
 }
 
 TEST(a_name_that_was_not_replaced_keeps_its_letters)
 {
     // Our name was not drawn last frame (at the screen edge, no body, past the plate limit, or just appeared), so the
     // game's must stay.
-    CHECK(!HideGlyph(Glyph(1010.0f, 201.0f, 1017.0f, 211.0f), GlyphOwner::Mob, nullptr, {}));
+    CHECK(!HideGlyph(Glyph(1010.0f, 201.0f, 1017.0f, 211.0f), true, GlyphOwner::Kept, nullptr, {}));
 }
 
 TEST(player_and_npc_letters_inside_their_own_name_are_never_hidden)
@@ -224,27 +234,87 @@ TEST(player_and_npc_letters_inside_their_own_name_are_never_hidden)
     // The player's name overlapping a replaced mob name, as in melee.
     const ScreenBox mob    = Glyph(1000.0f, 200.0f, 1080.0f, 210.0f);
     const ScreenBox player = Glyph(1040.0f, 196.0f, 1110.0f, 206.0f);
-    CHECK(!HideGlyph(Glyph(1050.0f, 197.0f, 1057.0f, 207.0f), GlyphOwner::Other, &player, {mob}));
+    CHECK(!HideGlyph(Glyph(1050.0f, 197.0f, 1057.0f, 207.0f), true, GlyphOwner::Kept, &player, {mob}));
     // Next to the mob's name on the same line.
     const ScreenBox beside = Glyph(1090.0f, 200.0f, 1150.0f, 210.0f);
-    CHECK(!HideGlyph(Glyph(1090.0f, 200.0f, 1097.0f, 210.0f), GlyphOwner::Other, &beside, {mob}));
+    CHECK(!HideGlyph(Glyph(1090.0f, 200.0f, 1097.0f, 210.0f), true, GlyphOwner::Kept, &beside, {mob}));
+}
+
+TEST(a_kept_name_is_never_hidden_whatever_its_kind)
+{
+    // A mob whose name stays the game's, under a player's replaced name.
+    const ScreenBox player = Glyph(1000.0f, 200.0f, 1080.0f, 210.0f);
+    const ScreenBox mob    = Glyph(1030.0f, 202.0f, 1100.0f, 212.0f);
+    CHECK(!HideGlyph(Glyph(1040.0f, 203.0f, 1047.0f, 213.0f), true, GlyphOwner::Kept, &mob, {player}));
+    CHECK(HideGlyph(Glyph(1010.0f, 201.0f, 1017.0f, 211.0f), true, GlyphOwner::Replaced, &player, {player}));
+}
+
+TEST(a_replaced_players_icons_beside_the_name_are_hidden)
+{
+    // From a capture: a square icon 1.5 letters tall right against the name's first letter, in another texture.
+    const ScreenBox name = Glyph(1000.0f, 200.0f, 1080.0f, 210.0f);
+    const ScreenBox icon = Glyph(985.0f, 198.0f, 1000.0f, 213.0f);
+    CHECK(HideGlyph(icon, false, GlyphOwner::Replaced, &name, {name}));
+    CHECK(HideGlyph(Glyph(925.0f, 198.0f, 940.0f, 213.0f), false, GlyphOwner::Replaced, &name, {name})); // a row of them
+    CHECK(!HideGlyph(icon, false, GlyphOwner::Kept, &name, {}));                      // a kept name keeps its icons
+    CHECK(!HideGlyph(icon, false, GlyphOwner::None, nullptr, {name}));                // whose, the game did not say
+    CHECK(!HideGlyph(Glyph(800.0f, 198.0f, 815.0f, 213.0f), false, GlyphOwner::Replaced, &name, {name})); // far away
+    CHECK(!HideGlyph(Glyph(985.0f, 240.0f, 1000.0f, 255.0f), false, GlyphOwner::Replaced, &name, {name})); // below
+}
+
+TEST(a_near_players_icon_strip_is_hidden_however_large)
+{
+    // From a capture: a player close to the camera, letters 34 px tall, and the game's icons as one 90x51 strip,
+    // wider than any letter but scaled with the name.
+    const ScreenBox name = Glyph(1181.0f, 641.0f, 1469.0f, 675.0f);
+    CHECK(HideGlyph(Glyph(1091.0f, 634.0f, 1181.0f, 685.0f), false, GlyphOwner::Replaced, &name, {name}));
+    // Not a quad many times the name's height, such as the one the game draws over the whole model.
+    CHECK(!HideGlyph(Glyph(667.0f, 600.0f, 1400.0f, 900.0f), false, GlyphOwner::Replaced, &name, {name}));
+}
+
+TEST(name_icons_line_up_against_the_name)
+{
+    const ScreenBox plate = Glyph(1000.0f, 200.0f, 1080.0f, 210.0f);
+    LineSizes sizes{100.0f, 18.0f, 0.0f, 0.0f, 0, 16.0f};
+    sizes.nameIconCount = 2;
+    sizes.nameIconSize  = 16.0f;
+    const NameplateLayout l = LayoutNameplate(plate, sizes, true);
+    CHECK(Near(l.nameX, 990.0f));                // the name stays centered on the game's
+    CHECK(Near(l.nameIconsX, 954.0f));           // two 16 px icons and their gap, 2 px left of it
+    CHECK(Near(l.nameIconsY, 197.0f));           // centered on the name's 18 px
+    CHECK(Near(l.nameIconStep, 18.0f));
+}
+
+TEST(a_name_and_its_icons_can_be_centered_together)
+{
+    const ScreenBox plate = Glyph(1000.0f, 200.0f, 1080.0f, 210.0f);
+    LineSizes sizes{100.0f, 18.0f, 0.0f, 0.0f, 0, 16.0f, 20.0f, 16.0f};
+    sizes.nameIconCount     = 2;
+    sizes.nameIconSize      = 16.0f;
+    sizes.centerNameAndIcons = true;
+    const NameplateLayout l = LayoutNameplate(plate, sizes, true);
+    CHECK(Near(l.nameIconsX, 972.0f)); // 34 px of icons, a 2 px gap and the 100 px name, centered on 1040
+    CHECK(Near(l.nameX, 1008.0f));
+    CHECK(Near(l.cursorX, 1030.0f)); // the cursor stays over the center
+    sizes.nameIconCount = 0;
+    CHECK(Near(LayoutNameplate(plate, sizes, true).nameX, 990.0f));
 }
 
 TEST(only_letters_of_the_names_size_are_hidden)
 {
     const ScreenBox replaced = Glyph(1000.0f, 200.0f, 1080.0f, 210.0f);
     // A 24 px quad just above the name, such as a target cursor.
-    CHECK(!HideGlyph(Glyph(1028.0f, 172.0f, 1052.0f, 196.0f), GlyphOwner::None, nullptr, {replaced}));
+    CHECK(!HideGlyph(Glyph(1028.0f, 172.0f, 1052.0f, 196.0f), true, GlyphOwner::None, nullptr, {replaced}));
     // The screen-sized quad the game sometimes credits to a mob.
-    CHECK(!HideGlyph(Glyph(667.0f, 401.0f, 2731.0f, 563.0f), GlyphOwner::Mob, &replaced, {replaced}));
+    CHECK(!HideGlyph(Glyph(667.0f, 401.0f, 2731.0f, 563.0f), true, GlyphOwner::Replaced, &replaced, {replaced}));
 }
 
 TEST(stray_letters_far_from_the_name_are_kept)
 {
     const ScreenBox replaced = Glyph(1000.0f, 200.0f, 1080.0f, 210.0f);
     // A letter of another name, credited to the mob by a stale stack pointer.
-    CHECK(!HideGlyph(Glyph(400.0f, 520.0f, 407.0f, 530.0f), GlyphOwner::Mob, &replaced, {replaced}));
-    CHECK(!HideGlyph(Glyph(400.0f, 520.0f, 407.0f, 530.0f), GlyphOwner::Other, nullptr, {replaced}));
+    CHECK(!HideGlyph(Glyph(400.0f, 520.0f, 407.0f, 530.0f), true, GlyphOwner::Replaced, &replaced, {replaced}));
+    CHECK(!HideGlyph(Glyph(400.0f, 520.0f, 407.0f, 530.0f), true, GlyphOwner::Kept, nullptr, {replaced}));
 }
 
 TEST(a_letters_shown_color_applies_the_modulate_scale_and_is_opaque)
@@ -258,9 +328,9 @@ TEST(a_letters_shown_color_applies_the_modulate_scale_and_is_opaque)
 TEST(name_color_is_the_most_common_letter_color)
 {
     const ScreenBox plate = Glyph(1000.0f, 200.0f, 1080.0f, 210.0f);
-    const std::vector<GlyphDraw> glyphs{{Glyph(1000, 200, 1007, 210), 0xFFFFFF80}, {Glyph(1007, 200, 1014, 210), 0xFFFFFF80},
-        {Glyph(1014, 200, 1021, 210), 0xFF000000}, {Glyph(400, 520, 407, 530), 0xFFFF0000}, {Glyph(410, 520, 417, 530), 0xFFFF0000},
-        {Glyph(420, 520, 427, 530), 0xFFFF0000}};
+    const std::vector<GlyphDraw> glyphs{{Glyph(1000, 200, 1007, 210), 0xFFFFFF80, 0}, {Glyph(1007, 200, 1014, 210), 0xFFFFFF80, 0},
+        {Glyph(1014, 200, 1021, 210), 0xFF000000, 0}, {Glyph(400, 520, 407, 530), 0xFFFF0000, 0}, {Glyph(410, 520, 417, 530), 0xFFFF0000, 0},
+        {Glyph(420, 520, 427, 530), 0xFFFF0000, 0}};
     CHECK_EQ(NameColor(glyphs, plate), 0xFFFFFF80u); // letters outside the nameplate do not count
     CHECK_EQ(NameColor({}, plate), 0xFFFFFFFFu);
 }
@@ -284,6 +354,74 @@ TEST(label_mode_stacks_above_the_game_name)
     CHECK(Near(l.iconsX, 1032.0f) && Near(l.iconsY, 164.0f));
     const NameplateLayout iconsOnly = LayoutNameplate(plate, LineSizes{0.0f, 0.0f, 0.0f, 0.0f, 2, 16.0f}, false);
     CHECK(Near(iconsOnly.iconsY, 182.0f));
+}
+
+TEST(the_cursor_sits_above_the_top_line)
+{
+    const ScreenBox plate = Glyph(1000.0f, 200.0f, 1080.0f, 210.0f);
+    const NameplateLayout withIcons =
+        LayoutNameplate(plate, LineSizes{100.0f, 18.0f, 80.0f, 16.0f, 3, 16.0f, 20.0f, 16.0f}, true);
+    CHECK(Near(withIcons.cursorX, 1030.0f) && Near(withIcons.cursorY, 147.0f)); // 2 px above the icons at 165
+    const NameplateLayout labelOnly =
+        LayoutNameplate(plate, LineSizes{0.0f, 0.0f, 80.0f, 16.0f, 0, 16.0f, 20.0f, 16.0f}, false);
+    CHECK(Near(labelOnly.cursorY, 164.0f)); // 2 px above the label at 182
+}
+
+TEST(the_cursors_point_sits_over_the_center)
+{
+    const ScreenBox plate = Glyph(1000.0f, 200.0f, 1080.0f, 210.0f);
+    LineSizes sizes{0.0f, 0.0f, 80.0f, 16.0f, 0, 16.0f, 20.0f, 16.0f};
+    sizes.cursorTip = 0.25f; // a shape that points from a quarter of its width
+    CHECK(Near(LayoutNameplate(plate, sizes, false).cursorX, 1035.0f));
+}
+
+TEST(the_games_cursor_is_the_quad_right_above_the_name)
+{
+    // From a capture: Goblin Tinkerer's name at (1407,261)-(1472,267) and the game's 20x32 cursor at
+    // (1068.5,162.5)-(1088.5,194.5) in the 1920x1080 UI, which is 4/3 smaller than the 2560x1440 screen.
+    const ScreenBox name   = Glyph(1407.0f, 261.0f, 1472.0f, 267.0f);
+    const ScreenBox cursor = Glyph(1068.5f, 162.5f, 1088.5f, 194.5f).Scaled(4.0f / 3.0f, 4.0f / 3.0f);
+    CHECK(IsGameCursor(cursor, name));
+    CHECK(!IsGameCursor(Glyph(1484.7f, 216.7f, 1511.3f, 259.3f), name));        // beside the name
+    CHECK(!IsGameCursor(Glyph(1424.7f, 126.7f, 1451.3f, 169.3f), name));        // well above it
+    CHECK(!IsGameCursor(Glyph(1424.7f, 256.7f, 1451.3f, 299.3f), name));        // reaching below its top
+    CHECK(!IsGameCursor(Glyph(0.0f, 0.0f, 2560.0f, 1440.0f), name));          // the screen-sized copy
+    CHECK(!IsGameCursor(Glyph(48.1f, 855.8f, 98.8f, 878.8f), name));           // the target window
+}
+
+TEST(the_games_cursor_is_centered_on_a_players_name_and_icons)
+{
+    // From a capture: Shio's letters at (933.9,444.8)-(1054.8,466.7) with the game's icon strip against their left, and
+    // the game's cursor at (713.5,300.5)-(733.5,332.5) in the 1920x1080 UI.
+    const ScreenBox letters = Glyph(933.9f, 444.8f, 1054.8f, 466.7f);
+    const ScreenBox icons   = Glyph(875.4f, 444.8f, 933.9f, 477.7f);
+    const ScreenBox cursor  = Glyph(713.5f, 300.5f, 733.5f, 332.5f).Scaled(4.0f / 3.0f, 4.0f / 3.0f);
+    CHECK(BesideName(icons, letters));
+    ScreenBox whole = letters;
+    whole.Add(icons);
+    CHECK(IsGameCursor(cursor, whole));
+    CHECK(!IsGameCursor(cursor, letters)); // centered on the letters alone, it would be missed
+}
+
+TEST(a_name_is_centered_over_its_entity_not_its_letters)
+{
+    // Shio: the game centers the letters and its icons together over the player, at x 965.1.
+    const ScreenBox letters  = Glyph(933.9f, 444.8f, 1054.8f, 466.7f);
+    const ScreenBox whole    = Glyph(875.4f, 444.8f, 1054.8f, 477.7f);
+    const ScreenBox centered = CenteredOver(letters, whole);
+    CHECK(Near(centered.CenterX(), 965.1f));
+    CHECK(Near(centered.Width(), letters.Width()) && Near(centered.minY, letters.minY) && Near(centered.maxY, letters.maxY));
+    CHECK(Near(CenteredOver(letters, letters).minX, letters.minX)); // no icons: nothing moves
+}
+
+TEST(the_cursor_bobs_a_little_and_repeats)
+{
+    for (double t = 0.0; t < 3.0; t += 0.05)
+    {
+        const float bob = CursorBob(t, 20.0f);
+        CHECK(bob <= 0.0f && bob >= -3.0f); // at most 15% of its height, upward
+        CHECK(Near(bob, CursorBob(t + 1.2, 20.0f)));
+    }
 }
 
 TEST(scale_follows_the_game_name_with_limits)

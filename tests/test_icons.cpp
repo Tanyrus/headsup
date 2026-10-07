@@ -72,8 +72,9 @@ TEST(every_icon_has_its_pixels)
     for (int i = 0; i < kIconCount; ++i)
     {
         const IconBitmap& icon = IconImage(static_cast<Icon>(i));
-        CHECK_EQ(icon.width, 32u); // every MobDB icon is 32x32
-        CHECK_EQ(icon.height, 32u);
+        const uint32_t side    = i < static_cast<int>(Icon::Invite) ? 32u : 64u; // MobDB's, then XIUI's player icons
+        CHECK_EQ(icon.width, side);
+        CHECK_EQ(icon.height, side);
         bool drawn = false;
         for (uint32_t p = 0; p < icon.width * icon.height; ++p)
             drawn |= icon.bgra[p * 4 + 3] != 0;

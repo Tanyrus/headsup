@@ -9,7 +9,8 @@ namespace headsup
 #include "generated/icons.inc"
 
         const IconBitmap kIcons[] = {kIconAggroNQ, kIconAggroHQ, kIconPassiveNQ, kIconPassiveHQ, kIconLink, kIconSight,
-            kIconTrueSight, kIconSound, kIconScent, kIconMagic, kIconJA, kIconBlood};
+            kIconTrueSight, kIconSound, kIconScent, kIconMagic, kIconJA, kIconBlood, kIconInvite, kIconBazaar, kIconLinkshell,
+            kIconAway, kIconMentor, kIconNewAdventurer, kIconGm};
         static_assert(std::size(kIcons) == kIconCount, "one bitmap per Icon, in Icon order");
     }
 

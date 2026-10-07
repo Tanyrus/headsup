@@ -54,6 +54,17 @@ namespace
         CHECK_EQ(a.iconSize, b.iconSize);
         CHECK(a.ownNameColor == b.ownNameColor);
         CHECK(a.hideBehindWalls == b.hideBehindWalls);
+        CHECK(a.replacePlayerNames == b.replacePlayerNames);
+        CHECK(a.replaceNpcNames == b.replaceNpcNames);
+        CHECK(a.replaceCursor == b.replaceCursor);
+        CHECK(a.cursorFeather == b.cursorFeather);
+        CHECK(a.showPlayerIcons == b.showPlayerIcons);
+        CHECK(a.centerNameAndIcons == b.centerNameAndIcons);
+        CheckSameColor(a.cursorColor, b.cursorColor);
+        CheckSameColor(a.lockedCursorColor, b.lockedCursorColor);
+        CheckSameColor(a.subCursorColor, b.subCursorColor);
+        CHECK_EQ(a.cursorSize, b.cursorSize);
+        CHECK_EQ(a.nameRaise, b.nameRaise);
         CheckSameColor(a.nameColor, b.nameColor);
         for (int k = 0; k < kLabelShadeCount; ++k)
             CheckSameColor(a.labelColor[k], b.labelColor[k]);
@@ -92,6 +103,17 @@ TEST(settings_round_trip)
     s.iconSize          = 24;
     s.ownNameColor      = true;
     s.hideBehindWalls   = false;
+    s.replacePlayerNames = true;
+    s.replaceNpcNames   = true;
+    s.replaceCursor     = true;
+    s.cursorFeather     = true;
+    s.showPlayerIcons   = false;
+    s.centerNameAndIcons = false;
+    s.lockedCursorColor = Color{{0.125f, 0.25f, 0.5f}};
+    s.cursorColor       = Color{{0.25f, 0.75f, 0.5f}};
+    s.subCursorColor    = Color{{0.5f, 0.25f, 0.75f}};
+    s.cursorSize        = 31;
+    s.nameRaise         = 12;
     s.nameColor         = Color{{0.5f, 0.25f, 0.125f}};
     for (int k = 0; k < kLabelShadeCount; ++k)
         s.labelColor[k] = Color{{0.0625f * static_cast<float>(k), 0.5f, 0.25f}};
@@ -140,13 +162,19 @@ TEST(clamp_bounds_every_field)
     s.nameSize    = 100;
     s.labelSize   = 0;
     s.iconSize    = 49;
+    s.cursorSize  = 2;
+    s.nameRaise   = 99;
     s.color[0]    = Color{{2.0f, -1.0f, 0.5f}};
     s.nameColor   = s.color[0];
     s.labelColor[kLabelShadeCount - 1] = s.color[0];
     s.textOutline = s.color[0];
     s.iconTint    = s.color[0];
+    s.cursorColor = s.color[0];
+    s.subCursorColor = s.color[0];
+    s.lockedCursorColor = s.color[0];
     const Settings c = Clamp(s);
-    for (const Color& clamped : {c.nameColor, c.labelColor[kLabelShadeCount - 1], c.textOutline, c.iconTint})
+    for (const Color& clamped : {c.nameColor, c.labelColor[kLabelShadeCount - 1], c.textOutline, c.iconTint, c.cursorColor,
+             c.subCursorColor, c.lockedCursorColor})
         CheckSameColor(clamped, Color{{1.0f, 0.0f, 0.5f}});
     CHECK_EQ(c.thickness, kMinThickness);
     CHECK_EQ(c.smoothness, kMaxSmoothness);
@@ -155,6 +183,8 @@ TEST(clamp_bounds_every_field)
     CHECK_EQ(c.nameSize, kMaxTextSize);
     CHECK_EQ(c.labelSize, kMinTextSize);
     CHECK_EQ(c.iconSize, kMaxTextSize);
+    CHECK_EQ(c.cursorSize, kMinTextSize);
+    CHECK_EQ(c.nameRaise, kMaxNameRaise);
     CHECK_EQ(c.color[0].v[0], 1.0f);
     CHECK_EQ(c.color[0].v[1], 0.0f);
     CHECK_EQ(c.color[0].v[2], 0.5f);
@@ -189,15 +219,33 @@ TEST(v1_settings_files_still_load)
     CHECK_EQ(s.color[kNmWontAttack].v[0], 1.0f);
 }
 
-TEST(nameplates_need_the_master_switch_and_a_part)
+TEST(any_replaced_kind_of_name_counts)
 {
     Settings s;
-    CHECK(NameplatesOn(s)); // labels and icons are on by default
-    s.showLabels = false;
-    s.showIcons  = false;
-    CHECK(!NameplatesOn(s));
-    s.replaceNameplates = true;
-    CHECK(NameplatesOn(s));
-    s.enabled = false;
-    CHECK(!NameplatesOn(s));
+    CHECK(!ReplacesNames(s)); // nothing is replaced by default
+    for (bool Settings::*kind : {&Settings::replaceNameplates, &Settings::replacePlayerNames, &Settings::replaceNpcNames})
+    {
+        Settings one = s;
+        one.*kind    = true;
+        CHECK(ReplacesNames(one));
+        one.enabled = false;
+        CHECK(!ReplacesNames(one));
+    }
+}
+
+TEST(nameplates_need_the_master_switch_and_a_part)
+{
+    CHECK(NameplatesOn(Settings{})); // labels and icons are on by default
+    Settings none;
+    none.showLabels = none.showIcons = false;
+    CHECK(!NameplatesOn(none));
+    for (bool Settings::*part : {&Settings::showLabels, &Settings::showIcons, &Settings::replaceNameplates,
+             &Settings::replacePlayerNames, &Settings::replaceNpcNames, &Settings::replaceCursor})
+    {
+        Settings s  = none;
+        s.*part     = true;
+        CHECK(NameplatesOn(s));
+        s.enabled = false;
+        CHECK(!NameplatesOn(s));
+    }
 }

@@ -6,7 +6,7 @@
 
 namespace headsup
 {
-    // The MobDB icons XIUI shows (third_party/mobdb-icons).
+    // The MobDB icons XIUI shows (third_party/mobdb-icons), then XIUI's player icons (third_party/xiui-icons).
     enum class Icon : uint8_t
     {
         AggroNQ,
@@ -21,8 +21,15 @@ namespace headsup
         Magic,
         Ability, // JA.png: job abilities and weapon skills
         Blood,   // low HP
+        Invite,  // seeking a party
+        Bazaar,
+        Linkshell,
+        Away,
+        Mentor,
+        NewAdventurer,
+        Gm,
     };
-    constexpr int kIconCount = 12;
+    constexpr int kIconCount = 19;
 
     // A mob's icons, left to right.
     struct IconSet

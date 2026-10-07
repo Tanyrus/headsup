@@ -415,13 +415,32 @@ namespace headsup
             ui.Fade(!s.enabled);
             if (ui.Section("Display", kDisplaySection, collapsed))
             {
-                ui.Check("Replace game nameplates", s.replaceNameplates,
+                ui.Check("Replace mob names", s.replaceNameplates,
                     "Hides the game's mob names and draws them in the font below, in the game's color.");
+                ui.Check("Replace player names", s.replacePlayerNames,
+                    "The same for players, you included. Players get only their name: levels and icons come from mob data.");
+                ui.Check("Replace NPC names", s.replaceNpcNames, "The same for NPCs.");
+                ui.Fade(!s.enabled || !s.replacePlayerNames);
+                ui.Check("Show player icons", s.showPlayerIcons,
+                    "Beside replaced player names: seeking party, bazaar, linkshell in its color, away, mentor, new "
+                    "adventurer and GM, in XIUI's HQ versions of the game's icons.");
+                ui.Fade(!s.enabled || !s.replacePlayerNames || !s.showPlayerIcons);
+                ui.Check("Center name and icons", s.centerNameAndIcons,
+                    "Centers a player's name and the icons beside it together over them, as the game does. Off, the name "
+                    "alone is centered and the icons hang to its left.");
+                ui.Fade(!s.enabled);
                 ui.Check("Show level and con", s.showLabels,
                     "Lv 20-23 EP-DC: the level range from the Phoenix data and how it cons to you. After you /check the "
                     "mob, its exact level, until it respawns.");
                 ui.Check("Show icons", s.showIcons,
                     "XIUI's MobDB icons: aggressive or passive, whether it links, and how it detects you.");
+                ui.Check("Replace target cursor", s.replaceCursor,
+                    "Hides the game's cursor over your target and draws an arrow above its nameplate instead: one color for "
+                    "your target, one while you are locked on, and one for the sub-target cursor.");
+                ui.Fade(!s.enabled || !s.replaceCursor);
+                ui.Check("Phoenix feather cursor", s.cursorFeather,
+                    "Phoenix's feather icon instead of the arrow, in the same colors.");
+                ui.Fade(!s.enabled);
                 ui.Check("Hide behind walls", s.hideBehindWalls,
                     "Walls and terrain in front of a name cover its nameplate, like the game's own names, and the game's "
                     "menus sit on top. Off: nameplates are always on top.");
@@ -434,13 +453,18 @@ namespace headsup
                 ui.save |= ui.gui->IsItemDeactivatedAfterEdit();
                 ui.gui->SameLine();
                 ui.Check("Bold", s.fontBold, "Bold names and level text.");
-                ui.Fade(!s.enabled || !s.replaceNameplates);
+                const bool anyNames = ReplacesNames(s);
+                ui.Fade(!anyNames);
                 ui.SliderInt("Name size", s.nameSize, kMinTextSize, kMaxTextSize, "%d px",
-                    "The name's height, with Replace game nameplates on.");
+                    "The height of the names HeadsUp draws.");
+                ui.SliderInt("Raise names", s.nameRaise, kMinNameRaise, kMaxNameRaise, "%d px",
+                    "How far above the game's own spot the names HeadsUp draws sit, with everything above them.");
                 ui.Fade(!s.enabled || !s.showLabels);
                 ui.SliderInt("Level and con size", s.labelSize, kMinTextSize, kMaxTextSize, "%d px", "The level line's height.");
                 ui.Fade(!s.enabled || !s.showIcons);
                 ui.SliderInt("Icon size", s.iconSize, kMinTextSize, kMaxTextSize, "%d px", "Each icon's width and height.");
+                ui.Fade(!s.enabled || !s.replaceCursor);
+                ui.SliderInt("Cursor size", s.cursorSize, kMinTextSize, kMaxTextSize, "%d px", "The target cursor's height.");
                 ui.Fade(!s.enabled);
                 ui.Check("Scale with distance", s.scaleWithDistance,
                     "Sizes grow and shrink with the game's own name size as a mob comes closer or moves away.");
@@ -453,16 +477,22 @@ namespace headsup
             ui.Fade(!s.enabled);
             if (ui.Section("Name and text", kTextColorsSection, collapsed))
             {
-                ui.Fade(!s.enabled || !s.replaceNameplates);
+                const bool anyNames = ReplacesNames(s);
+                ui.Fade(!anyNames);
                 ui.save |= ui.gui->Checkbox("##ownNameColor", &s.ownNameColor);
                 ui.gui->SameLine();
-                ui.Fade(!s.enabled || !s.replaceNameplates || !s.ownNameColor);
+                ui.Fade(!anyNames || !s.ownNameColor);
                 ui.Swatch("Own name color", s.nameColor,
                     "Off: names keep the game's color, which shows who claimed the mob. On: every name takes this color.");
                 ui.Fade(!s.enabled);
                 ui.Swatch("Text outline", s.textOutline, "The edge around the name and the level text.");
                 ui.Fade(!s.enabled || !s.showIcons);
                 ui.Swatch("Icon tint", s.iconTint, "Multiplies the icons' colors. White keeps them as they are.");
+                ui.Fade(!s.enabled || !s.replaceCursor);
+                ui.Swatch("Target cursor", s.cursorColor, "The arrow over your target.");
+                ui.Swatch("Locked-on cursor", s.lockedCursorColor, "The arrow over your target while you are locked on.");
+                ui.Swatch("Sub-target cursor", s.subCursorColor,
+                    "The arrow over the mob you are picking for a spell or ability.");
             }
             ui.Fade(!s.enabled || !s.showLabels);
             if (ui.Section("Level and con", kConColorsSection, collapsed))

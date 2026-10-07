@@ -12,19 +12,19 @@ namespace headsup
         m_Min      = UINT32_MAX;
         m_Max      = 0;
         m_Outlined = 0;
-        m_Mobs.clear();
+        m_Order.clear();
         for (const ActorInput& a : actors)
         {
             if (a.actor == 0) continue;
             ActorInfo info;
-            info.index = a.index;
-            info.isMob = a.isMob;
-            info.alive = a.alive;
-            if (a.isMob)
+            info.index       = a.index;
+            info.kind        = a.kind;
+            info.alive       = a.alive;
+            const char* name = a.name != nullptr ? a.name : "";
+            std::snprintf(info.name, sizeof(info.name), "%s", name);
+            if (a.kind == EntityKind::Mob)
             {
-                const char* name     = a.name != nullptr ? a.name : "";
                 const MobRecord* mob = FindMob(a.serverId, name);
-                std::snprintf(info.name, sizeof(info.name), "%s", name);
                 if (a.alive)
                 {
                     info.label = MakeLabel(mob, a.examined, player.level);
@@ -41,8 +41,13 @@ namespace headsup
                         ++m_Outlined;
                     }
                 }
-                m_Mobs.push_back(a.actor);
             }
+            if (a.kind == EntityKind::Player && a.status != nullptr)
+            {
+                info.nameIcons     = PlayerIcons(*a.status);
+                info.linkshellArgb = a.status->linkshellArgb;
+            }
+            m_Order.push_back(a.actor);
             m_Actors[a.actor] = info;
             m_Min = std::min(m_Min, a.actor);
             m_Max = std::max(m_Max, a.actor);

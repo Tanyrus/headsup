@@ -17,7 +17,8 @@ namespace
 
     ActorInput Mob(ActorPtr actor, uint32_t serverId, const char* name, float distance = 10.0f, bool alive = true)
     {
-        return ActorInput{actor, static_cast<uint16_t>(serverId & 0xFFF), serverId, true, alive, distance, name, nullptr};
+        return ActorInput{actor, static_cast<uint16_t>(serverId & 0xFFF), serverId, EntityKind::Mob, alive, distance, name,
+            nullptr, nullptr};
     }
 
     ActorInput BountyHunter(ActorPtr actor, float distance = 10.0f, bool alive = true)
@@ -27,22 +28,47 @@ namespace
 
     ActorInput Player(ActorPtr actor)
     {
-        return ActorInput{actor, 1052, 0x00012345, false, true, 0.0f, "Carrott", nullptr};
+        return ActorInput{actor, 1052, 0x00012345, EntityKind::Player, true, 0.0f, "Carrott", nullptr, nullptr};
+    }
+
+    ActorInput Npc(ActorPtr actor)
+    {
+        return ActorInput{actor, 1100, 0x01011234, EntityKind::Npc, true, 3.0f, "Home Point #1", nullptr, nullptr};
     }
 
     const PlayerState kLevel20{20, false};
 }
 
-TEST(players_are_tracked_without_outline_or_nameplate)
+TEST(players_and_npcs_keep_their_names_without_outlines)
 {
     Tracker t;
-    t.Update({Player(0x1000)}, kLevel20, Settings{});
-    const ActorInfo* info = t.Find(0x1000);
-    CHECK(info != nullptr);
-    CHECK(!info->outline && !info->isMob);
-    CHECK(info->name[0] == '\0');
+    t.Update({Player(0x1000), Npc(0x1100)}, kLevel20, Settings{});
+    const ActorInfo* player = t.Find(0x1000);
+    const ActorInfo* npc    = t.Find(0x1100);
+    CHECK(player != nullptr && npc != nullptr);
+    CHECK(player->kind == EntityKind::Player && npc->kind == EntityKind::Npc);
+    CHECK(std::string(player->name) == "Carrott");
+    CHECK(std::string(npc->name) == "Home Point #1");
+    CHECK(!player->outline && !npc->outline);
+    CHECK(player->label.text[0] == '\0' && npc->icons.count == 0); // levels and icons come from mob data
     CHECK_EQ(t.OutlinedCount(), 0u);
-    CHECK(t.Mobs().empty());
+    CHECK(t.Actors() == (std::vector<ActorPtr>{0x1000, 0x1100}));
+}
+
+TEST(players_get_their_status_icons_and_linkshell_color)
+{
+    PlayerStatus status;
+    status.bazaar = status.linkshell = true;
+    status.linkshellArgb = 0xFF8F1FFF;
+    ActorInput player    = Player(0x1000);
+    player.status        = &status;
+    Tracker t;
+    t.Update({player, Player(0x1100)}, kLevel20, Settings{});
+    const ActorInfo* shopping = t.Find(0x1000);
+    CHECK_EQ(shopping->nameIcons.count, 2);
+    CHECK(shopping->nameIcons.icons[0] == Icon::Linkshell && shopping->nameIcons.icons[1] == Icon::Bazaar);
+    CHECK_EQ(shopping->linkshellArgb, 0xFF8F1FFFu);
+    CHECK_EQ(t.Find(0x1100)->nameIcons.count, 0); // no status seen yet
 }
 
 TEST(each_category_gets_its_colour)
@@ -154,7 +180,7 @@ TEST(every_mob_gets_nameplate_data_at_any_distance)
     s.show[1] = false;
     t.Update({Player(0x1000), BountyHunter(0x2000, 100.0f), Mob(0x3000, kSnipper, "Snipper")}, kLevel20, s);
     const ActorInfo* far = t.Find(0x2000);
-    CHECK(far->isMob && far->alive && !far->outline);
+    CHECK(far->kind == EntityKind::Mob && far->alive && !far->outline);
     CHECK_EQ(far->index, 0x220);
     CHECK(std::string(far->name) == "Goblin Bounty Hunter");
     CHECK(std::string(far->label.text) == "Lv 17-20 EP-EM");
@@ -164,7 +190,7 @@ TEST(every_mob_gets_nameplate_data_at_any_distance)
     CHECK(!hidden->outline);
     CHECK(std::string(hidden->label.text) == "Lv 19-20 DC-EM");
     CHECK(hidden->icons.icons[0] == Icon::PassiveNQ);
-    CHECK(t.Mobs() == (std::vector<ActorPtr>{0x2000, 0x3000}));
+    CHECK(t.Actors() == (std::vector<ActorPtr>{0x1000, 0x2000, 0x3000})); // in entity order
 }
 
 TEST(dead_mobs_keep_only_their_name)

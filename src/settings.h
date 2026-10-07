@@ -16,7 +16,8 @@ namespace headsup
     constexpr float kMinThickness = 1.0f, kMaxThickness = 16.0f;            // render-target pixels
     constexpr int kMinSmoothness = 4, kMaxSmoothness = 16;                  // shifted copies per mesh
     constexpr float kMinOutlineDistance = 5.0f, kMaxOutlineDistance = 60.0f; // yalms
-    constexpr int kMinTextSize = 8, kMaxTextSize = 48;                      // pixels: name, label and icon sizes
+    constexpr int kMinTextSize = 8, kMaxTextSize = 48;
+    constexpr int kMinNameRaise = 0, kMaxNameRaise = 40; // pixels                      // pixels: name, label and icon sizes
 
     struct Settings
     {
@@ -34,6 +35,17 @@ namespace headsup
         int labelSize          = 13;    // pixels
         int iconSize           = 16;    // pixels
         bool hideBehindWalls   = true;  // nameplates drawn into the 3D scene, so walls cover them like the game's names
+        bool replacePlayerNames = false; // players' names, you included, in the font below
+        bool replaceNpcNames   = false;
+        bool replaceCursor     = false; // our target cursor above the target's nameplate, instead of the game's
+        bool cursorFeather     = false; // Phoenix's feather instead of the arrow
+        bool showPlayerIcons   = true;  // seeking party, bazaar, linkshell and the rest beside replaced player names
+        bool centerNameAndIcons = true;  // a player's name and icons centered together over them, rather than the name
+        Color cursorColor      = {{1.00f, 1.00f, 1.00f}}; // the target: white
+        Color lockedCursorColor = {{0.65f, 0.40f, 1.00f}}; // locked on: purple
+        Color subCursorColor   = {{0.99f, 0.82f, 0.09f}}; // the sub-target: gold, like XIUI's sub-target tint
+        int cursorSize         = 20;    // pixels tall
+        int nameRaise          = 6;     // pixels the names HeadsUp draws sit above the game's, with all above them
         bool ownNameColor      = false; // names in nameColor instead of the game's color
         Color nameColor        = {{1.00f, 1.00f, 1.00f}};
         Color labelColor[kLabelShadeCount] = {
@@ -59,6 +71,8 @@ namespace headsup
 
     // Whether anything of the nameplate is drawn: the master switch, and labels, icons or the replacement.
     bool NameplatesOn(const Settings& s);
+    // Whether HeadsUp draws any kind of name (mobs, players or NPCs), hiding the game's.
+    bool ReplacesNames(const Settings& s);
 
     constexpr int kFontCount = 6;
     // Arial, Tahoma, Verdana, Trebuchet MS, Courier New, Times New Roman; Arial for anything out of range.

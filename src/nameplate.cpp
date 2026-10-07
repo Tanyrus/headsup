@@ -14,7 +14,10 @@ namespace headsup
         constexpr float kRunGapLetters      = 2.0f;   // a gap wider than this many letter heights ends a name
         constexpr float kHidePadLetters     = 2.0f;   // around any mob's previous nameplate
         constexpr float kOwnerPadLetters    = 6.0f;   // around the owning mob's previous nameplate
-        constexpr float kOwnPadLetters      = 1.0f;   // around a player's or NPC's own previous name
+        constexpr float kOwnPadLetters      = 1.0f;   // around a kept name, the owner's own
+        constexpr float kIconReachLetters   = 8.0f;   // how far left of a name the game's icons reach
+        constexpr float kMaxIconHeightLetters = 2.0f; // the game's icon strip: 1.5 letters tall, up to 2.7 wide
+        constexpr float kMaxIconWidthLetters  = 4.0f;
         constexpr float kMinLetterRatio     = 0.6f;   // a glyph this much shorter or taller than a name's letters
         constexpr float kMaxLetterRatio     = 1.6f;   // is not one of them
         constexpr float kNameLabelGap       = -3.0f;  // pixels: the text boxes overlap, the fonts' own spacing is enough
@@ -23,6 +26,11 @@ namespace headsup
         constexpr float kLettersPerScreen   = 180.0f; // a typical game letter is this fraction of the screen height
         constexpr float kMinScale           = 0.5f;
         constexpr float kMaxScale           = 2.5f;
+        constexpr float kMinCursorSide      = 4.0f;   // pixels: the game's target cursor is about 27x43 on 1440p
+        constexpr float kMaxCursorSide      = 128.0f;
+        constexpr float kCursorReach        = 0.5f;   // of its height: how far above the name its bottom may be
+        constexpr double kBobPeriod         = 1.2;    // seconds
+        constexpr float kBobShare           = 0.15f;  // of the cursor's height
         constexpr float kRasterSmallest     = 6.0f;   // pixels
         constexpr float kRasterStep         = 1.25f;
         constexpr float kRasterOverscale    = 1.05f;  // text is scaled up this much before it is redrawn larger
@@ -169,14 +177,16 @@ namespace headsup
         return best;
     }
 
-    bool HideGlyph(const ScreenBox& glyph, GlyphOwner owner, const ScreenBox* ownerPlate,
+    bool HideGlyph(const ScreenBox& glyph, bool isLetter, GlyphOwner owner, const ScreenBox* ownerPlate,
         const std::vector<ScreenBox>& replacedPlates)
     {
-        if (!glyph.valid || glyph.Width() > kMaxGlyphSize || glyph.Height() > kMaxGlyphSize) return false;
+        if (!glyph.valid) return false;
+        const float x = glyph.CenterX();
+        const float y = glyph.CenterY();
+        if (!isLetter) return owner == GlyphOwner::Replaced && ownerPlate != nullptr && BesideName(glyph, *ownerPlate);
+        if (glyph.Width() > kMaxGlyphSize || glyph.Height() > kMaxGlyphSize) return false;
         const float letter = std::max(glyph.Height(), 1.0f);
-        const float x      = glyph.CenterX();
-        const float y      = glyph.CenterY();
-        if (owner == GlyphOwner::Other && ownerPlate != nullptr && Inside(x, y, *ownerPlate, kOwnPadLetters * letter))
+        if (owner == GlyphOwner::Kept && ownerPlate != nullptr && Inside(x, y, *ownerPlate, kOwnPadLetters * letter))
             return false;
         auto sameLetters = [&](const ScreenBox& plate) {
             const float ratio = letter / std::max(plate.Height(), 1.0f);
@@ -184,7 +194,7 @@ namespace headsup
         };
         for (const ScreenBox& plate : replacedPlates)
             if (sameLetters(plate) && Inside(x, y, plate, kHidePadLetters * letter)) return true;
-        return owner == GlyphOwner::Mob && ownerPlate != nullptr && sameLetters(*ownerPlate) &&
+        return owner == GlyphOwner::Replaced && ownerPlate != nullptr && sameLetters(*ownerPlate) &&
                Inside(x, y, *ownerPlate, kOwnerPadLetters * letter);
     }
 
@@ -193,9 +203,12 @@ namespace headsup
         NameplateLayout l{};
         const float centerX = plate.CenterX();
         float bottom        = plate.minY - kLineGap; // the next line up ends here
+        const float nameIconsWidth =
+            sizes.nameIconCount > 0 ? sizes.nameIconCount * sizes.nameIconSize + (sizes.nameIconCount - 1) * kIconGap : 0.0f;
         if (showName)
         {
-            l.nameX = centerX - sizes.nameWidth * 0.5f;
+            const float shift = sizes.centerNameAndIcons && sizes.nameIconCount > 0 ? (nameIconsWidth + kIconGap) * 0.5f : 0.0f;
+            l.nameX           = centerX - sizes.nameWidth * 0.5f + shift;
             l.nameY = plate.CenterY() - sizes.nameHeight * 0.5f;
             bottom  = l.nameY - kNameLabelGap;
         }
@@ -209,7 +222,67 @@ namespace headsup
         l.iconsX        = centerX - row * 0.5f;
         l.iconsY        = bottom - sizes.iconSize;
         l.iconStep      = sizes.iconSize + kIconGap;
+        if (sizes.iconCount > 0) bottom = l.iconsY - kLineGap;
+        l.nameIconStep = sizes.nameIconSize + kIconGap;
+        l.nameIconsX   = l.nameX - kIconGap - nameIconsWidth;
+        l.nameIconsY   = l.nameY + (sizes.nameHeight - sizes.nameIconSize) * 0.5f;
+        l.cursorX = centerX - sizes.cursorWidth * sizes.cursorTip;
+        l.cursorY = bottom - sizes.cursorHeight;
         return l;
+    }
+
+    ScreenBox CenteredOver(const ScreenBox& letters, const ScreenBox& whole)
+    {
+        ScreenBox moved = letters;
+        const float dx  = whole.CenterX() - letters.CenterX();
+        moved.minX += dx;
+        moved.maxX += dx;
+        return moved;
+    }
+
+    bool BesideName(const ScreenBox& glyph, const ScreenBox& name)
+    {
+        if (!glyph.valid || !name.valid) return false;
+        // Sized like the name: a close player's icon strip is wider than any letter.
+        const float h = std::max(name.Height(), 1.0f);
+        if (glyph.Height() > kMaxIconHeightLetters * h || glyph.Width() > kMaxIconWidthLetters * h) return false;
+        const float x = glyph.CenterX(), y = glyph.CenterY();
+        return y >= name.minY - h && y <= name.maxY + h && x >= name.minX - kIconReachLetters * h && x <= name.maxX + h;
+    }
+
+    bool UiQuadBox(const void* vertices, uint32_t stride, ScreenBox& box)
+    {
+        box = ScreenBox{};
+        if (vertices == nullptr || stride < kPretransformedPositionBytes) return false;
+        const auto* bytes = static_cast<const uint8_t*>(vertices);
+        for (uint32_t i = 0; i < kQuadVertices; ++i)
+        {
+            float xyz[3];
+            std::memcpy(xyz, bytes + static_cast<size_t>(i) * stride, sizeof(xyz));
+            if (xyz[2] != 0.0f || !std::isfinite(xyz[0]) || !std::isfinite(xyz[1]))
+            {
+                box = ScreenBox{};
+                return false;
+            }
+            box.Add(xyz[0], xyz[1]);
+        }
+        return true;
+    }
+
+    bool IsGameCursor(const ScreenBox& quad, const ScreenBox& name)
+    {
+        if (!quad.valid || !name.valid) return false;
+        const float w = quad.Width(), h = quad.Height();
+        if (w < kMinCursorSide || h < kMinCursorSide || w > kMaxCursorSide || h > kMaxCursorSide) return false;
+        if (std::fabs(quad.CenterX() - name.CenterX()) > w * 0.5f) return false;
+        return quad.maxY <= name.maxY && quad.maxY >= name.minY - h * kCursorReach;
+    }
+
+    float CursorBob(double seconds, float height)
+    {
+        constexpr double kTwoPi = 6.283185307179586;
+        const double phase      = std::sin(kTwoPi * seconds / kBobPeriod);
+        return -static_cast<float>((phase + 1.0) * 0.5) * height * kBobShare;
     }
 
     float DistanceScale(float letterHeight, float screenHeight)

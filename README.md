@@ -19,8 +19,9 @@ replace the game's mob nameplates with its own. It never targets or checks anyth
   outlines and nameplates, a sidebar of pages with the status under it, and `settings` and `color settings` tabs.
   Every setting has a `(?)` that explains it and every slider a box to type its value in:
   - Outlines: thickness, smoothness, max distance and which mob types to outline; their colors
-  - Nameplates: replace the game's, level and con, icons, hide behind walls, font, bold, sizes, scale with distance;
-    own name color, text outline, icon tint and one color per con
+  - Nameplates: replace the game's, level and con, icons, replace the target cursor, hide behind walls, font, bold,
+    sizes, scale with distance, the feather cursor; own name color, text outline, icon tint, cursor colors and one
+    color per con
   - Debug: what outlines and nameplates did last frame, and a button for `/hu debug`
 - `/hu on` and `/hu off` turn outlines and nameplates on and off. `/hu help` lists the commands.
 - `/hu debug` writes what every mob with a nameplate shows (data, label, icons, name color, positions) to
@@ -35,9 +36,16 @@ Above every mob's name, whether or not it is outlined:
 1. a row of icons (`Show icons`)
 2. its level and con (`Show level and con above names`)
 
-With `Replace game nameplates` on, the game's own mob names are hidden and HeadsUp draws the name too, in the color
-the game uses for it (so claim status stays visible), with the icons and level above it. Dead mobs keep just their
-name. Player and NPC names are never touched.
+With `Replace mob names` on, the game's own mob names are hidden and HeadsUp draws the name too, in the color the
+game uses for it (so claim status stays visible), with the icons and level above it. Dead mobs keep just their name.
+`Replace player names` and `Replace NPC names` do the same for players (you included) and NPCs, which get only their
+name. A name whose kind is not replaced is never touched. With `Show player icons` on, a replaced player name gets
+the game's icons beside it in XIUI's HQ versions: seeking party, bazaar, linkshell (in the linkshell's color), away,
+mentor, new adventurer and GM. Seeking party, bazaar and linkshell come from the flags the game keeps for every player
+(Render.Flags1 bits 20 and 27, Flags2 bit 9, and the linkshell color), so they show as soon as HeadsUp loads; away,
+mentor, new adventurer and GM come from the server's player updates (packets 0x00D and 0x037) once seen. The name
+and icons are centered together over the player, as the game does; with `Center name and icons` off, the name alone is
+centered and the icons hang to its left.
 
 | Icon | Meaning |
 |---|---|
@@ -57,6 +65,13 @@ A nameplate appears only when the camera can see the mob: the game drew its body
 frame before, and some of the name is on screen. Mobs beyond the draw distance, off screen or with names turned off
 get none. With `Hide behind walls` on (the default), nameplates are drawn into the 3D scene at the depth of the game's
 name, so walls and terrain in front of a name cover it like the game's own, and the game's menus sit on top.
+
+With `Replace target cursor` on, your target's nameplate gets a bobbing arrow on top: white for your target, purple
+while you are locked on and gold for what you are picking with the sub-target cursor, each color in the menu, and
+`Phoenix feather cursor` swaps the arrow for Phoenix's feather icon in the same colors. The
+game's own cursor over it is hidden: the small quad the game draws in its UI layer, centered just above the name, while
+that entity is being drawn. It works for mobs, players and NPCs alike; a target whose name the game does not draw
+keeps the game's cursor.
 
 ## Level and con
 
@@ -148,5 +163,8 @@ MinGW and MSVC.
 - **Experience tables and aggro rules:** ported from Phoenix (phoenixffxi/Phoenix, GPL-3.0).
 - **Ashita SDK:** `third_party/ashita-sdk`, AshitaXI/Ashita-v4beta at commit 4171c74.
 - **Icons:** `third_party/mobdb-icons`, from ThornyFFXI/mobdb (MIT License), the set XIUI uses.
+- **Player icons:** `third_party/xiui-icons`, from XIUI (tirem/xiui, MIT License).
+- **Feather cursor:** `third_party/phoenix-feather`, Phoenix's feather icon from the phoenix-platform repository
+  (phoenix-icon.svg on the phoenix-xi.com media page). It has no license file; see its `SOURCE.md`.
 - **Settings window colors:** the Phoenix palette of KiplingFFXI/cadence's settings window, the colors of
   phoenix-xi.com.

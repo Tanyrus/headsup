@@ -43,9 +43,15 @@ namespace headsup
             "Times New Roman"};
     }
 
+    bool ReplacesNames(const Settings& s)
+    {
+        return s.enabled && (s.replaceNameplates || s.replacePlayerNames || s.replaceNpcNames);
+    }
+
     bool NameplatesOn(const Settings& s)
     {
-        return s.enabled && (s.showLabels || s.showIcons || s.replaceNameplates);
+        return s.enabled && (s.showLabels || s.showIcons || s.replaceNameplates || s.replacePlayerNames || s.replaceNpcNames ||
+                                s.replaceCursor);
     }
 
     const char* FontFamily(int index)
@@ -63,11 +69,16 @@ namespace headsup
         s.nameSize    = std::clamp(s.nameSize, kMinTextSize, kMaxTextSize);
         s.labelSize   = std::clamp(s.labelSize, kMinTextSize, kMaxTextSize);
         s.iconSize    = std::clamp(s.iconSize, kMinTextSize, kMaxTextSize);
+        s.cursorSize  = std::clamp(s.cursorSize, kMinTextSize, kMaxTextSize);
+        s.nameRaise   = std::clamp(s.nameRaise, kMinNameRaise, kMaxNameRaise);
         s.nameColor = ClampColor(s.nameColor, d.nameColor);
         for (int k = 0; k < kLabelShadeCount; ++k)
             s.labelColor[k] = ClampColor(s.labelColor[k], d.labelColor[k]);
         s.textOutline = ClampColor(s.textOutline, d.textOutline);
         s.iconTint    = ClampColor(s.iconTint, d.iconTint);
+        s.cursorColor = ClampColor(s.cursorColor, d.cursorColor);
+        s.subCursorColor = ClampColor(s.subCursorColor, d.subCursorColor);
+        s.lockedCursorColor = ClampColor(s.lockedCursorColor, d.lockedCursorColor);
         for (int c = 0; c < kCategoryCount; ++c)
             s.color[c] = ClampColor(s.color[c], d.color[c]);
         return s;
@@ -90,6 +101,17 @@ namespace headsup
         s.labelSize         = LoadInt(store, "labelSize", s.labelSize, kMinTextSize, kMaxTextSize);
         s.iconSize          = LoadInt(store, "iconSize", s.iconSize, kMinTextSize, kMaxTextSize);
         s.hideBehindWalls   = store.GetBool("hideBehindWalls", s.hideBehindWalls);
+        s.replacePlayerNames = store.GetBool("replacePlayerNames", s.replacePlayerNames);
+        s.replaceNpcNames   = store.GetBool("replaceNpcNames", s.replaceNpcNames);
+        s.replaceCursor     = store.GetBool("replaceCursor", s.replaceCursor);
+        s.cursorFeather     = store.GetBool("cursorFeather", s.cursorFeather);
+        s.showPlayerIcons   = store.GetBool("showPlayerIcons", s.showPlayerIcons);
+        s.centerNameAndIcons = store.GetBool("centerNameAndIcons", s.centerNameAndIcons);
+        s.cursorSize        = LoadInt(store, "cursorSize", s.cursorSize, kMinTextSize, kMaxTextSize);
+        s.nameRaise         = LoadInt(store, "nameRaise", s.nameRaise, kMinNameRaise, kMaxNameRaise);
+        LoadColor(store, "cursorColor", s.cursorColor);
+        LoadColor(store, "subCursorColor", s.subCursorColor);
+        LoadColor(store, "lockedCursorColor", s.lockedCursorColor);
         s.ownNameColor      = store.GetBool("ownNameColor", s.ownNameColor);
         LoadColor(store, "nameColor", s.nameColor);
         for (int k = 0; k < kLabelShadeCount; ++k)
@@ -131,6 +153,17 @@ namespace headsup
                 setFloat(base + kChannelKeys[i], c.v[i]);
         };
         setBool("hideBehindWalls", s.hideBehindWalls);
+        setBool("replacePlayerNames", s.replacePlayerNames);
+        setBool("replaceNpcNames", s.replaceNpcNames);
+        setBool("replaceCursor", s.replaceCursor);
+        setBool("cursorFeather", s.cursorFeather);
+        setBool("showPlayerIcons", s.showPlayerIcons);
+        setBool("centerNameAndIcons", s.centerNameAndIcons);
+        setFloat("cursorSize", static_cast<float>(s.cursorSize));
+        setFloat("nameRaise", static_cast<float>(s.nameRaise));
+        setColor("cursorColor", s.cursorColor);
+        setColor("subCursorColor", s.subCursorColor);
+        setColor("lockedCursorColor", s.lockedCursorColor);
         setBool("ownNameColor", s.ownNameColor);
         setColor("nameColor", s.nameColor);
         for (int k = 0; k < kLabelShadeCount; ++k)

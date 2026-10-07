@@ -56,6 +56,14 @@ def png(width, height, rgba, interlace=0, kind=0, color_type=6):
     return SIGNATURE + chunk(b'IHDR', header) + chunk(b'IDAT', zlib.compress(bytes(raw))) + chunk(b'IEND', b'')
 
 
+def palette_png(width, height, indices, palette, alphas, with_palette=True):
+    raw = b''.join(bytes([0]) + bytes(indices[y * width:(y + 1) * width]) for y in range(height))
+    header = struct.pack('>IIBBBBB', width, height, 8, 3, 0, 0, 0)
+    colors = chunk(b'PLTE', bytes(v for rgb in palette for v in rgb)) if with_palette else b''
+    return (SIGNATURE + chunk(b'IHDR', header) + colors + chunk(b'tRNS', bytes(alphas)) +
+            chunk(b'IDAT', zlib.compress(raw)) + chunk(b'IEND', b''))
+
+
 def pixels(width, height):
     return bytes((i * 37 + 11) & 0xFF for i in range(width * height * 4))
 
@@ -74,6 +82,17 @@ class Decode(unittest.TestCase):
                 with self.subTest(interlace=interlace, kind=kind):
                     self.assertEqual(gen.decode_bgra(png(9, 10, rgba, interlace, kind)), (9, 10, bgra(rgba)))
 
+    def test_palette_pngs_use_their_colors_and_transparency(self):
+        palette = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
+        png = palette_png(3, 1, [0, 1, 2], palette, [0, 128])  # the third color has no alpha entry: opaque
+        self.assertEqual(gen.decode_bgra(png), (3, 1, bytes([0, 0, 255, 0, 0, 255, 0, 128, 255, 0, 0, 255])))
+
+    def test_a_palette_png_needs_its_palette(self):
+        with self.assertRaises(gen.IconError):
+            gen.decode_bgra(palette_png(1, 1, [0], [(1, 2, 3)], [], with_palette=False))
+        with self.assertRaises(gen.IconError):
+            gen.decode_bgra(palette_png(1, 1, [5], [(1, 2, 3)], []))  # an index past the palette
+
     def test_only_complete_8_bit_rgba_pngs_are_accepted(self):
         with self.assertRaises(gen.IconError):
             gen.decode_bgra(png(2, 2, bytes(12), color_type=2))
@@ -87,8 +106,9 @@ class GenIcons(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.dir = pathlib.Path(self.tmp.name)
-        for name in gen.ICONS:
-            (self.dir / f'{name}.png').write_bytes(png(2, 1, bytes([1, 2, 3, 4, 5, 6, 7, 8])))
+        for _, path in gen.ICONS:
+            (self.dir / path).parent.mkdir(exist_ok=True)
+            (self.dir / path).write_bytes(png(2, 1, bytes([1, 2, 3, 4, 5, 6, 7, 8])))
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -100,10 +120,10 @@ class GenIcons(unittest.TestCase):
         self.assertEqual(text.count('const IconBitmap kIcon'), len(gen.ICONS))
 
     def test_a_missing_or_unreadable_icon_fails(self):
-        (self.dir / 'Link.png').write_bytes(b'GIF89a')
+        (self.dir / 'mobdb-icons' / 'Link.png').write_bytes(b'GIF89a')
         with self.assertRaises(gen.IconError):
             gen.generate(self.dir)
-        (self.dir / 'Link.png').unlink()
+        (self.dir / 'mobdb-icons' / 'Link.png').unlink()
         with self.assertRaises(gen.IconError):
             gen.generate(self.dir)
 
