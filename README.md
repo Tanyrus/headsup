@@ -13,7 +13,7 @@ put it in Ashita's `plugins` folder. Load it with `/load headsup`; `/hu` opens i
 > the Phoenix version it was built from, so a monster changed on the live server since then can show the wrong color,
 > level or icons.
 
-![Settings window](screenshots/settings.png)
+![Settings window](resources/settings.png)
 
 ## Aggro outlines
 
@@ -30,8 +30,6 @@ Each monster gets a colored border, from Phoenix's own mob data and your level:
 
 Green and gray are off until you turn them on in the settings.
 
-![Aggro outlines](screenshots/outlines.png)
-
 ## Nameplates
 
 Above a monster's name: a row of icons (aggressive or passive, links, and how it detects you: sight, true sight,
@@ -39,18 +37,16 @@ sound, scent, magic, job abilities, low HP) and its level and con, colored like 
 line shows its exact level for that spawn. With mob IDs turned on, a placeholder shows `[PH]` on its level line, and
 an optional timer above your name counts down to the respawn of each placeholder you see die.
 
-![Monster nameplates](screenshots/mob-nameplates.png)
+![A Goblin Leecher's red outline and nameplate](resources/nameplate_and_outline.png)
 
 Players get XIUI's HQ status icons beside their names: seeking party, bazaar, linkshell in its color, away, mentor,
 new adventurer, GM and level sync. Each icon can sit left or right of the name, or be hidden. The names of players
 sitting, resting or in a chair are lowered to their heads.
 
-![Player nameplates](screenshots/player-nameplates.png)
-
 Your target gets a bobbing arrow, or Phoenix's feather, in place of the game's cursor: one color for your target,
 another while locked on, and another for the sub-target you are picking.
 
-![Target cursor](screenshots/cursor.png)
+![A player's nameplate with their icons and the feather cursor](resources/player_nameplate.png)
 
 It can also put PlayOnline's chocobo back as your mouse pointer, the one the PlayOnline Viewer had.
 
