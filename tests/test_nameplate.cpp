@@ -68,6 +68,9 @@ TEST(the_cursor_marks_the_target_locked_on_or_being_picked)
     CHECK(ChooseLines(Facts(1105), s, CursorTargets{1105, 0, true}, false).cursor == CursorKind::Locked);
     CHECK(ChooseLines(Facts(0x220), s, CursorTargets{1105, 0x220, true}, false).cursor == CursorKind::SubTarget);
     CHECK(ChooseLines(Facts(0x221), s, CursorTargets{1105, 0x220, false}, false).cursor == CursorKind::None);
+    // Picking something out of range for the spell or ability: only the candidate's cursor says so.
+    CHECK(ChooseLines(Facts(0x220), s, CursorTargets{1105, 0x220, false, true}, false).cursor == CursorKind::OutOfRange);
+    CHECK(ChooseLines(Facts(1105), s, CursorTargets{1105, 0x220, false, true}, false).cursor == CursorKind::Target);
     Settings off = s;
     off.replaceCursor = false;
     CHECK(ChooseLines(Facts(1105), off, CursorTargets{1105, 0, false}, false).cursor == CursorKind::None);

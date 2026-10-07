@@ -544,6 +544,8 @@ private:
         m_Picking       = target->GetIsSubTargetActive() != 0;
         m_CursorTargets = headsup::TargetsFromSlots(m_Picking, target->GetTargetIndex(0), target->GetTargetIndex(1),
             (target->GetLockedOnFlags() & kLockedOn) != 0, m_AshitaCore->GetMemoryManager()->GetEntity()->GetEntityMapSize());
+        if (!m_Picking) m_Names.ForgetPickRange();
+        m_CursorTargets.outOfRange = m_Picking && m_Names.PickOutOfRange();
     }
 
     void UpdateTracker(double now)

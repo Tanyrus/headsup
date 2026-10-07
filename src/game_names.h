@@ -48,6 +48,11 @@ namespace headsup
         // read against the target window's anchors (JudgeGameCursor).
         bool IsGameCursorDraw(D3DPRIMITIVETYPE type, UINT primCount, const void* vertices, UINT stride, const Tracker& tracker,
             const std::vector<CursorName>& names, bool picking, ITarget* target);
+        // Whether the candidate being picked is out of range of the spell or ability, as the game's own arrow last showed
+        // it (PickedOutOfRange); it draws that arrow after HeadsUp's nameplates, so this is the frame before's.
+        bool PickOutOfRange() const { return m_PickOutOfRange; }
+        // Picking ended: the next pick starts in range until the game's arrow says otherwise.
+        void ForgetPickRange() { m_PickOutOfRange = false; }
         // A character body was drawn for this entity.
         void CountMesh(uint16_t index) { ++m_MeshDraws[index]; }
 
@@ -127,6 +132,7 @@ namespace headsup
         uintptr_t m_SceneDepth   = 0; // and its depth surface
         TargetScale m_Ui;             // the UI image's scale
         uintptr_t m_ArrowTexture = 0; // the game's target arrows, once seen
+        bool m_PickOutOfRange    = false; // from the game's arrow over the candidate being picked
         Camera m_Camera{};
         bool m_HaveCamera = false;
     };

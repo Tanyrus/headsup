@@ -123,3 +123,11 @@ TEST(once_learned_any_arrow_in_its_texture_is_blocked)
     CHECK(!JudgeGameCursor(CursorQuad{pointer, pointer.Scaled(4.0f / 3.0f, 4.0f / 3.0f), kArrows}, kArrows, kFont, kAnchor,
         kShio, std::nullopt).block);
 }
+
+TEST(the_games_picking_arrow_is_red_out_of_range_and_blue_in_range)
+{
+    // From two captures picking the same player: far, then close. The arrow over the main target stays gray.
+    CHECK(PickedOutOfRange(0xFFD04040) == std::optional<bool>(true));
+    CHECK(PickedOutOfRange(0xFF4040D0) == std::optional<bool>(false));
+    CHECK(!PickedOutOfRange(0xFF808080).has_value());
+}

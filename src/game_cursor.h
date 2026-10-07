@@ -15,7 +15,13 @@ namespace headsup
         uint16_t target    = 0;
         uint16_t subTarget = 0;
         bool locked        = false;
+        bool outOfRange    = false; // the candidate being picked is out of range of the spell or ability
     };
+    // While a sub-target is picked, the game draws its arrow over the candidate red when it is out of range of the spell
+    // or ability and blue when it is in range; its arrow over the target stays gray. From an arrow's color: whether
+    // the candidate is out of range, or nothing for a gray arrow.
+    std::optional<bool> PickedOutOfRange(uint32_t argb);
+
     // From ITarget's two slots: while a sub-target is being picked, slot 1 holds the target and slot 0 the candidate.
     // An index past the entity map counts as none.
     CursorTargets TargetsFromSlots(bool picking, uint32_t slot0, uint32_t slot1, bool locked, uint32_t entityCount);

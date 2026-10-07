@@ -157,6 +157,12 @@ namespace headsup
         const CursorVerdict verdict   = JudgeGameCursor(quad, m_ArrowTexture, m_Last.font, anchors, names,
             owner != nullptr ? std::optional<uint16_t>(owner->index) : std::nullopt);
         if (verdict.learnArrow) m_ArrowTexture = quad.texture;
+        uint32_t argb = 0;
+        if (verdict.block && (fvf & D3DFVF_DIFFUSE) != 0 && stride >= kPretransformedPositionBytes + sizeof(argb))
+        {
+            std::memcpy(&argb, static_cast<const uint8_t*>(vertices) + kPretransformedPositionBytes, sizeof(argb));
+            if (const auto outOfRange = PickedOutOfRange(argb)) m_PickOutOfRange = *outOfRange;
+        }
         return verdict.block;
     }
 }

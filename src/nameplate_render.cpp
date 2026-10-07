@@ -177,9 +177,10 @@ namespace headsup
                 p.labelRaster  = raster(labelShown, p.labelRaster);
                 p.cursorRaster = raster(cursorShown, p.cursorRaster);
                 const bool showCursor      = lines.cursor != CursorKind::None;
-                const uint32_t cursorColor = ToArgb(lines.cursor == CursorKind::SubTarget ? settings.subCursorColor
-                                                    : lines.cursor == CursorKind::Locked  ? settings.lockedCursorColor
-                                                                                          : settings.cursorColor);
+                const uint32_t cursorColor = ToArgb(lines.cursor == CursorKind::SubTarget    ? settings.subCursorColor
+                                                    : lines.cursor == CursorKind::OutOfRange ? settings.outOfRangeCursorColor
+                                                    : lines.cursor == CursorKind::Locked     ? settings.lockedCursorColor
+                                                                                             : settings.cursorColor);
                 const uint32_t nameColor = settings.ownNameColor ? ToArgb(settings.nameColor) : names.NameplateColor(info->index);
                 const uint32_t labelColor = ToArgb(settings.labelColor[static_cast<int>(info->label.shade)]);
                 if ((lines.name && !Prepare(p.name, info->name, nameColor, p.nameRaster, settings)) ||

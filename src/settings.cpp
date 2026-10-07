@@ -58,6 +58,7 @@ namespace headsup
             Color Settings::*field;
         };
         constexpr ColorKey kColors[] = {{"cursorColor", &Settings::cursorColor}, {"subCursorColor", &Settings::subCursorColor},
+            {"outOfRangeCursorColor", &Settings::outOfRangeCursorColor},
             {"lockedCursorColor", &Settings::lockedCursorColor}, {"nameColor", &Settings::nameColor},
             {"textOutline", &Settings::textOutline}, {"iconTint", &Settings::iconTint}};
 

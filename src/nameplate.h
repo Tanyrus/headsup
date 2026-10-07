@@ -25,6 +25,7 @@ namespace headsup
         Target,
         Locked,    // the target, while locked on
         SubTarget, // the candidate while picking a sub-target
+        OutOfRange, // that candidate, out of range of the spell or ability
     };
     struct PlateLines
     {

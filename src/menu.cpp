@@ -571,6 +571,9 @@ namespace headsup
                 ui.Swatch("Locked-on cursor", s.lockedCursorColor, "The cursor over your target while you are locked on.");
                 ui.Swatch("Sub-target cursor", s.subCursorColor,
                     "The cursor over what you are picking for a spell, an ability or a trade.");
+                ui.Swatch("Out of range cursor", s.outOfRangeCursorColor,
+                    "The cursor over what you are picking while it is out of range of the spell or ability, as the game's "
+                    "own cursor turns red.");
             }
             ui.Fade(!s.enabled || !s.showLabels);
             if (ui.Section("Level and con", kConColorsSection, collapsed))

@@ -1,5 +1,7 @@
 #include "game_cursor.h"
 
+#include "argb.h"
+
 #include <algorithm>
 #include <cmath>
 
@@ -12,6 +14,13 @@ namespace headsup
         constexpr float kCursorReach   = 0.5f; // of its height: how far above the name its bottom may be
         constexpr float kAnchorSlack   = 2.0f; // UI pixels between the game's cursor and its anchor
         constexpr float kMinArrowHeight = 16.0f; // UI pixels: the arrows are 32 tall, the window's letters at most 12
+    }
+
+    std::optional<bool> PickedOutOfRange(uint32_t argb)
+    {
+        const uint8_t red = Channel(argb, kRedShift), blue = Channel(argb, kBlueShift);
+        if (red == blue) return std::nullopt;
+        return red > blue;
     }
 
     CursorTargets TargetsFromSlots(bool picking, uint32_t slot0, uint32_t slot1, bool locked, uint32_t entityCount)

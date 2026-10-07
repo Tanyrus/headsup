@@ -53,6 +53,7 @@ namespace headsup
         Color cursorColor      = {{1.00f, 1.00f, 1.00f}}; // the target: white
         Color lockedCursorColor = {{0.65f, 0.40f, 1.00f}}; // locked on: purple
         Color subCursorColor   = {{0.99f, 0.82f, 0.09f}}; // the sub-target: gold, like XIUI's sub-target tint
+        Color outOfRangeCursorColor = {{1.00f, 0.25f, 0.25f}}; // the sub-target out of range: red, as the game shows it
         int cursorSize         = 20;    // pixels tall
         int nameRaise          = 6;     // pixels the names HeadsUp draws sit above the game's, with all above them
         bool ownNameColor      = false; // names in nameColor instead of the game's color

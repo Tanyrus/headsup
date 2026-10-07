@@ -45,7 +45,7 @@ namespace headsup
         if (settings.replaceCursor && facts.index != 0)
         {
             if (facts.index == targets.subTarget)
-                lines.cursor = CursorKind::SubTarget;
+                lines.cursor = targets.outOfRange ? CursorKind::OutOfRange : CursorKind::SubTarget;
             else if (facts.index == targets.target)
                 lines.cursor = targets.locked ? CursorKind::Locked : CursorKind::Target;
         }

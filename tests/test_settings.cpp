@@ -67,6 +67,7 @@ namespace
         CheckSameColor(a.cursorColor, b.cursorColor);
         CheckSameColor(a.lockedCursorColor, b.lockedCursorColor);
         CheckSameColor(a.subCursorColor, b.subCursorColor);
+        CheckSameColor(a.outOfRangeCursorColor, b.outOfRangeCursorColor);
         CHECK_EQ(a.cursorSize, b.cursorSize);
         CHECK_EQ(a.nameRaise, b.nameRaise);
         CheckSameColor(a.nameColor, b.nameColor);
@@ -145,6 +146,7 @@ TEST(settings_round_trip)
     s.lockedCursorColor = Color{{0.125f, 0.25f, 0.5f}};
     s.cursorColor       = Color{{0.25f, 0.75f, 0.5f}};
     s.subCursorColor    = Color{{0.5f, 0.25f, 0.75f}};
+    s.outOfRangeCursorColor = Color{{0.75f, 0.125f, 0.25f}};
     s.cursorSize        = 31;
     s.nameRaise         = 12;
     s.nameColor         = Color{{0.5f, 0.25f, 0.125f}};
@@ -165,6 +167,7 @@ TEST(settings_round_trip)
     CHECK(store.values.count("nmWontAttackShow") == 1);
     CHECK(store.values.count("labelVeryToughR") == 1);
     CHECK(store.values.count("iconLevelSync") == 1);
+    CHECK(store.values.count("outOfRangeCursorColorR") == 1);
     CHECK(store.values.count("iconSeekingParty") == 1);
 }
 
