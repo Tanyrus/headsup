@@ -1,0 +1,80 @@
+name: Release
+
+# A version tag is released once its commit is on main: a tag pushed before its pull request merges waits for it.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+# The merge and the tag can arrive together; one run at a time keeps them from releasing the same tag twice.
+concurrency: release
+
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.unreleased.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - id: unreleased
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for tag in $(git tag --merged origin/main --list 'v*' --sort=-version:refname); do
+            if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+              echo "tag=$tag" >> "$GITHUB_OUTPUT"
+              echo "releasing $tag"
+              break
+            fi
+          done
+
+  build:
+    needs: find
+    if: needs.find.outputs.tag != ''
+    runs-on: ubuntu-latest
+    # Arch's MinGW and GCC match the toolchain HeadsUp is developed with; the build treats warnings as errors.
+    container: archlinux:latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Install the toolchain
+        run: pacman -Syu --noconfirm --needed git gcc mingw-w64-gcc python
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.find.outputs.tag }}
+      - name: Check the plugin's version matches the tag
+        env:
+          TAG: ${{ needs.find.outputs.tag }}
+        run: |
+          version="${TAG#v}"
+          version="${version%.*}"
+          if ! grep -qE "kVersion +=  *${version//./\\.};" src/plugin.cpp; then
+            echo "src/plugin.cpp's kVersion is not $version, the major.minor of tag $TAG" >&2
+            exit 1
+          fi
+      - name: Build and test
+        run: ./build.sh plugin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: headsup
+          path: build/headsup.dll
+          if-no-files-found: error
+
+  release:
+    needs: [find, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: headsup
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.find.outputs.tag }}
+        run: gh release create "$TAG" headsup.dll --repo "$GITHUB_REPOSITORY" --verify-tag --title "HeadsUp $TAG" --generate-notes

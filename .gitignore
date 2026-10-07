@@ -1,0 +1,10 @@
+/build/
+/src/generated/
+/dev/
+__pycache__/
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
