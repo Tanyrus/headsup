@@ -9,11 +9,23 @@ namespace headsup
 {
     namespace
     {
-        constexpr float kMinCursorSide = 4.0f; // back-buffer pixels
-        constexpr float kMaxCursorSide = 128.0f;
-        constexpr float kCursorReach   = 0.5f; // of its height: how far above the name its bottom may be
-        constexpr float kAnchorSlack   = 2.0f; // UI pixels between the game's cursor and its anchor
+        // Back-buffer pixels: the game's cursor is about 27x43 on 1440p.
+        constexpr float kMinCursorSide  = 4.0f;
+        constexpr float kMaxCursorSide  = 128.0f;
+        constexpr float kCursorReach    = 0.5f;
+        constexpr float kAnchorSlack    = 2.0f;  // UI pixels
         constexpr float kMinArrowHeight = 16.0f; // UI pixels: the arrows are 32 tall, the window's letters at most 12
+
+        bool CursorSized(const ScreenBox& quad)
+        {
+            const float w = quad.Width(), h = quad.Height();
+            return quad.valid && w >= kMinCursorSide && h >= kMinCursorSide && w <= kMaxCursorSide && h <= kMaxCursorSide;
+        }
+
+        bool InArrowTexture(const CursorQuad& quad, uintptr_t arrowTexture)
+        {
+            return arrowTexture != 0 && quad.texture == arrowTexture && LooksLikeTargetArrow(quad.ui);
+        }
     }
 
     std::optional<bool> PickedOutOfRange(uint32_t argb)
@@ -27,6 +39,18 @@ namespace headsup
     {
         auto index = [&](uint32_t slot) { return slot < entityCount ? static_cast<uint16_t>(slot) : uint16_t{0}; };
         return picking ? CursorTargets{index(slot1), index(slot0), locked} : CursorTargets{index(slot0), 0, locked};
+    }
+
+    void PlaceAnchors(CursorTargets& targets, const CursorWindow& window, float menuWidth, float menuHeight,
+        float backBufferWidth, float backBufferHeight)
+    {
+        if (menuWidth <= 0.0f || menuHeight <= 0.0f || backBufferWidth <= 0.0f || backBufferHeight <= 0.0f) return;
+        const float x = backBufferWidth / menuWidth, y = backBufferHeight / menuHeight;
+        targets.anchored   = true;
+        targets.anchorX    = window.ankX * x;
+        targets.anchorY    = window.ankY * y;
+        targets.subAnchorX = window.subAnkX * x;
+        targets.subAnchorY = window.subAnkY * y;
     }
 
     std::vector<CursorAnchor> GameCursorAnchors(const std::vector<CursorName>& names, const CursorWindow& window, bool picking)
@@ -48,25 +72,11 @@ namespace headsup
 
     bool LooksLikeTargetArrow(const ScreenBox& quad) { return quad.valid && quad.Height() > quad.Width(); }
 
-    bool CursorSized(const ScreenBox& quad)
-    {
-        const float w = quad.Width(), h = quad.Height();
-        return quad.valid && w >= kMinCursorSide && h >= kMinCursorSide && w <= kMaxCursorSide && h <= kMaxCursorSide;
-    }
-
     bool IsGameCursor(const ScreenBox& quad, const ScreenBox& name)
     {
         if (!name.valid || !CursorSized(quad)) return false;
         if (std::fabs(quad.CenterX() - name.CenterX()) > quad.Width() * 0.5f) return false;
         return quad.maxY <= name.maxY && quad.maxY >= name.minY - quad.Height() * kCursorReach;
-    }
-
-    namespace
-    {
-        bool InArrowTexture(const CursorQuad& quad, uintptr_t arrowTexture)
-        {
-            return arrowTexture != 0 && quad.texture == arrowTexture && LooksLikeTargetArrow(quad.ui);
-        }
     }
 
     bool MayBeGameCursor(const CursorQuad& quad, uintptr_t arrowTexture, const std::vector<CursorAnchor>& anchors,

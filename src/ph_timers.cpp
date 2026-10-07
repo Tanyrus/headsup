@@ -10,11 +10,18 @@ namespace headsup
 {
     namespace
     {
-        constexpr int kZoneShift          = 12; // a server ID's zone sits above its target index
-        constexpr uint32_t kZoneBits      = 0xFFF;
-        constexpr int kSecondsPerMinute   = 60;
-        constexpr int kSecondsPerHour     = 3600;
-        constexpr const char* kUpText     = "up";
+        constexpr uint32_t kZoneBits         = 0xFFF;
+        constexpr int kSecondsPerMinute      = 60;
+        constexpr int kSecondsPerHour        = 3600;
+        constexpr const char* kUpText        = "up";
+        constexpr const char* kUnknownNmName = "NM";
+    }
+
+    std::optional<PhSighting> SightingOf(const MobRecord* mob, bool alive, bool bodyDrawn)
+    {
+        if (mob == nullptr || mob->placeholderOf == 0) return std::nullopt;
+        const MobRecord* nm = MobById(mob->placeholderOf);
+        return PhSighting{mob->id, mob->respawn, nm != nullptr ? nm->name : kUnknownNmName, alive, bodyDrawn};
     }
 
     void PhTimers::Update(double now, const std::vector<PhSighting>& placeholders)
@@ -25,7 +32,7 @@ namespace headsup
             const auto before = m_WasAlive.find(ph.serverId);
             if (ph.alive)
                 m_Timers.erase(ph.serverId);
-            else if (ph.respawnSeconds > 0 && before != m_WasAlive.end() && before->second && ph.onScreen)
+            else if (ph.respawnSeconds > 0 && before != m_WasAlive.end() && before->second && ph.bodyDrawn)
                 m_Timers[ph.serverId] = Timer{ph.serverId, ph.nmName, now + kDeathToDespawnSeconds + ph.respawnSeconds};
             inRange[ph.serverId] = ph.alive;
         }
@@ -37,7 +44,7 @@ namespace headsup
     {
         std::vector<const Timer*> here;
         for (const auto& [serverId, timer] : m_Timers)
-            if (((serverId >> kZoneShift) & kZoneBits) == zone) here.push_back(&timer);
+            if (((serverId >> kTargetIndexWidth) & kZoneBits) == zone) here.push_back(&timer);
         std::sort(here.begin(), here.end(), [](const Timer* a, const Timer* b) { return a->dueAt < b->dueAt; });
         std::vector<TimerLine> lines;
         for (const Timer* timer : here)

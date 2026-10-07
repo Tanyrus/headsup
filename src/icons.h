@@ -7,19 +7,18 @@
 
 namespace headsup
 {
-
-    // The longest row: a mob's aggro, link, sight or true sight, sound, scent, magic, ability and blood.
+    // The longest row: a mob's aggro, link, sight or true sight, sound, scent, magic, ability and blood, or every player
+    // icon on one side.
     constexpr int kMaxIcons = 8;
 
-    // A row of icons, left to right: a mob's MobDB icons or a player's status icons.
     struct IconSet
     {
         Icon icons[kMaxIcons];
         int count = 0;
     };
 
-    // XIUI's order: aggressive or passive (HQ for notorious monsters), link, then detection. The aggro icon is the
-    // mob's nature (it aggros at all), not whether it would attack this player. Empty without data.
+    // In XIUI's order. The aggro icon is the mob's nature (whether it aggros at all), not whether it would attack this
+    // player.
     IconSet IconsFor(const MobRecord* mob);
 
     // An icon's pixels, rows top to bottom, each B, G, R, A as D3DFMT_A8R8G8B8 keeps it in memory.

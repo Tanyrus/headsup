@@ -1,12 +1,12 @@
 #pragma once
 
+#include "game_names.h"
 #include "settings.h"
+#include "tracker.h"
 
 #include <cstdint>
 #include <string>
 #include <vector>
-
-struct IGuiManager;
 
 namespace headsup
 {
@@ -18,12 +18,9 @@ namespace headsup
         uint32_t nameplates;
         double frameMs;
         bool stencilAvailable;
-        bool drewInScene;       // nameplates went into the game's scene image, behind walls
-        uint32_t lettersInScene; // the game's name letters
-        uint32_t lettersFromMobs;
-        uint32_t lettersHidden;
-        int playerLevel;
-        bool sitting;
+        bool drewInScene; // nameplates went into the game's scene image, behind walls
+        GameNames::TextDrawStats letters;
+        PlayerState player;
     };
 
     // The /headsup settings window. Uses only IGuiManager functions that are safe across the MinGW/MSVC ABI
@@ -33,14 +30,14 @@ namespace headsup
     public:
         bool open = false;
 
-        // Draws the window when open. Returns true when a change should be saved now.
+        // True when a change should be saved now.
         bool Draw(IGuiManager* gui, Settings& settings, const MenuStatus& status);
         // True once after the Debug page's button was pressed: write the /hu debug report.
         bool TakeDebugRequest();
 
     private:
         bool m_DebugRequested = false;
-        int m_Page           = 0;     // the sidebar's selected page
+        int m_Page           = 0;
         bool m_ColorsTab     = false; // that page's "Color Settings" tab instead of "Settings"
         uint32_t m_Collapsed = 0;     // one bit per collapsed section
         std::vector<std::string> m_Fonts; // FontChoices, read when the Nameplates page's Settings tab first opens

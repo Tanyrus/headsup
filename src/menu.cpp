@@ -1,7 +1,6 @@
 #include "menu.h"
 
 #include "Ashita.h"
-#include "text_raster.h"
 
 #include <cfloat>
 #include <cstdio>
@@ -39,6 +38,18 @@ namespace headsup
         constexpr ImVec4 kRowPicked    = Hex(0xC55151, 0.45f);
         constexpr ImVec4 kRowHovered   = Hex(0xC55151, 0.70f);
         constexpr ImVec4 kClear        = Hex(0x000000, 0.0f);
+
+        struct ButtonColors
+        {
+            ImVec4 normal, hovered, active;
+        };
+        constexpr ButtonColors kFlatButton{kClear, kHover, kTint};
+        constexpr ButtonColors kCardButton{kCard, kHover, kTint};
+        constexpr ButtonColors kControlButton{kControl, kHover, kTint};
+        constexpr ButtonColors kRowButton{kRowPicked, kRowHovered, kTint};
+        constexpr ButtonColors kPickedButton{kPicked, kPicked, kPicked};
+        constexpr ButtonColors kAccentBar{kAccent, kAccent, kAccent};
+        constexpr ButtonColors kNoBar{kClear, kClear, kClear};
 
         // XIUI's config window layout: a sidebar of pages, each with settings and color settings tabs.
         constexpr float kSidebarWidth  = 170.0f;
@@ -172,19 +183,14 @@ namespace headsup
             s.GrabMinSize      = kGrabMinSize;
         }
 
-        struct ButtonColors
-        {
-            ImVec4 normal, hovered, active;
-        };
-
-        // Draws through Ashita's ImGui. PushStyleColor and PushStyleVar are overloaded, so colors and sizes are set in
-        // the style itself while an item draws (tools/abi_check.py).
+        // PushStyleColor and PushStyleVar are overloaded, so colors and sizes are set in the style itself while an item
+        // draws (tools/abi_check.py).
         struct Ui
         {
             IGuiManager* gui;
             ImGuiStyle& style;
             float alpha; // the window's own, before fading
-            bool save = false;
+            bool changed = false;
 
             void Colored(const ImVec4& color, const char* text)
             {
@@ -195,7 +201,6 @@ namespace headsup
                 slot = was;
             }
 
-            // Draws a button-like item in these colors, putting the style's back after it.
             template <typename Draw>
             bool WithButtonColors(const ButtonColors& colors, Draw draw)
             {
@@ -216,11 +221,11 @@ namespace headsup
                 return WithButtonColors(colors, [&] { return gui->Button(label, size); });
             }
 
-            // A dropdown of fonts (FontChoices), each a flat full-width button: ImGui's selectables are overloaded.
-            void FontDropdown(const char* label, std::string& font, const std::vector<std::string>& choices)
+            // Each font is a flat full-width button: ImGui's selectables are overloaded.
+            void FontDropdown(std::string& font, const std::vector<std::string>& choices)
             {
                 gui->SetNextItemWidth(kControlWidth);
-                if (!gui->BeginCombo(label, font.c_str(), ImGuiComboFlags_HeightLarge)) return;
+                if (!gui->BeginCombo("Font", font.c_str(), ImGuiComboFlags_HeightLarge)) return;
                 const ImVec2 align    = style.ButtonTextAlign;
                 style.ButtonTextAlign = ImVec2(0.0f, 0.5f);
                 for (const std::string& name : choices)
@@ -228,8 +233,8 @@ namespace headsup
                     const bool picked = name == font;
                     if (Button(name.c_str(), ImVec2(-FLT_MIN, 0.0f), ButtonColors{picked ? kRowPicked : kClear, kRowHovered, kTint}))
                     {
-                        font = name;
-                        save = true;
+                        font    = name;
+                        changed = true;
                         gui->CloseCurrentPopup();
                     }
                     if (picked) gui->SetItemDefaultFocus();
@@ -238,7 +243,7 @@ namespace headsup
                 gui->EndCombo();
             }
 
-            // A (?) after the last item; pointing at it explains the setting, even while the setting is faded.
+            // A (?) after the last item that explains the setting, even while the setting is faded.
             void Help(const char* tip)
             {
                 gui->SameLine();
@@ -246,7 +251,6 @@ namespace headsup
                 Tip(tip);
             }
 
-            // The tip, while the last item is pointed at.
             void Tip(const char* tip)
             {
                 if (!gui->IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) return;
@@ -261,24 +265,22 @@ namespace headsup
             }
 
             // A full-width header with an arrow, like XIUI's collapsing sections (CollapsingHeader is overloaded).
-            // Returns whether the section is open.
             bool Section(const char* title, uint32_t bit, uint32_t& collapsed)
             {
                 gui->Spacing();
-                const bool open     = (collapsed & bit) == 0;
-                const ButtonColors header{kCard, kHover, kTint};
+                const bool open = (collapsed & bit) == 0;
                 // Headers share the window with the sidebar, whose pages can have the same names.
                 char arrow[48], label[48];
                 std::snprintf(arrow, sizeof(arrow), "##section arrow %s", title);
                 std::snprintf(label, sizeof(label), "%s##section", title);
-                bool toggled = WithButtonColors(header, [&] { return gui->ArrowButton(arrow, open ? ImGuiDir_Down : ImGuiDir_Right); });
+                bool toggled = WithButtonColors(kCardButton, [&] { return gui->ArrowButton(arrow, open ? ImGuiDir_Down : ImGuiDir_Right); });
                 gui->SameLine(0.0f, 0.0f);
                 ImVec4* c             = style.Colors;
                 const ImVec2 align    = style.ButtonTextAlign;
                 const ImVec4 text     = c[ImGuiCol_Text];
                 style.ButtonTextAlign = ImVec2(0.0f, 0.5f);
                 c[ImGuiCol_Text]      = kHeading;
-                toggled |= Button(label, ImVec2(kContentWidth - gui->GetFrameHeight(), 0.0f), header);
+                toggled |= Button(label, ImVec2(kContentWidth - gui->GetFrameHeight(), 0.0f), kCardButton);
                 c[ImGuiCol_Text]      = text;
                 style.ButtonTextAlign = align;
                 if (toggled) collapsed ^= bit;
@@ -295,11 +297,10 @@ namespace headsup
 
             void Check(const char* label, bool& value, const char* tip)
             {
-                save |= gui->Checkbox(label, &value);
+                changed |= gui->Checkbox(label, &value);
                 Help(tip);
             }
 
-            // The label, then a button per option in a column, the chosen one lit.
             template <typename Enum>
             void Choice(const char* label, Enum& value, const char* const* options, int count, const char* tip)
             {
@@ -314,27 +315,26 @@ namespace headsup
                     char id[48];
                     std::snprintf(id, sizeof(id), "%s##choice %s", options[option], label);
                     const bool picked         = static_cast<int>(value) == option;
-                    const ButtonColors colors = picked ? ButtonColors{kRowPicked, kRowHovered, kTint} : ButtonColors{kCard, kHover, kTint};
-                    if (Button(id, ImVec2(kChoiceWidth, 0.0f), colors) && !picked)
+                    if (Button(id, ImVec2(kChoiceWidth, 0.0f), picked ? kRowButton : kCardButton) && !picked)
                     {
-                        value = static_cast<Enum>(option);
-                        save  = true;
+                        value   = static_cast<Enum>(option);
+                        changed = true;
                     }
                 }
             }
 
-            // A slider, then a box to type the value in, then the label. Typed values are clamped with the rest.
+            // Typed values are clamped with the rest, after the window is drawn.
             void SliderInt(const char* label, int& value, int lo, int hi, const char* format, const char* tip)
             {
                 char id[48];
                 std::snprintf(id, sizeof(id), "##%s", label);
                 gui->SetNextItemWidth(kControlWidth);
                 gui->SliderInt(id, &value, lo, hi, format, ImGuiSliderFlags_AlwaysClamp);
-                save |= gui->IsItemDeactivatedAfterEdit();
+                changed |= gui->IsItemDeactivatedAfterEdit();
                 gui->SameLine();
                 gui->SetNextItemWidth(kNumberWidth);
                 gui->InputInt(label, &value, 0, 0, 0);
-                save |= gui->IsItemDeactivatedAfterEdit();
+                changed |= gui->IsItemDeactivatedAfterEdit();
                 Help(tip);
             }
 
@@ -345,23 +345,23 @@ namespace headsup
                 std::snprintf(id, sizeof(id), "##%s", label);
                 gui->SetNextItemWidth(kControlWidth);
                 gui->SliderFloat(id, &value, lo, hi, format, ImGuiSliderFlags_AlwaysClamp);
-                save |= gui->IsItemDeactivatedAfterEdit();
+                changed |= gui->IsItemDeactivatedAfterEdit();
                 gui->SameLine();
                 gui->SetNextItemWidth(kNumberWidth);
                 gui->InputFloat(label, &value, 0.0f, 0.0f, number, 0);
-                save |= gui->IsItemDeactivatedAfterEdit();
+                changed |= gui->IsItemDeactivatedAfterEdit();
                 Help(tip);
             }
 
             void Swatch(const char* label, Color& color, const char* tip)
             {
                 gui->ColorEdit3(label, color.v, ImGuiColorEditFlags_NoInputs);
-                save |= gui->IsItemDeactivatedAfterEdit();
+                changed |= gui->IsItemDeactivatedAfterEdit();
                 Help(tip);
             }
 
             // An ON/OFF chip, filled when on and outlined when off, like the filter chips on phoenix-xi.com.
-            void Chip(const char* id, bool& on)
+            void Chip(bool& on)
             {
                 ImVec4* c           = style.Colors;
                 const ImVec4 was[2] = {c[ImGuiCol_Text], c[ImGuiCol_Border]};
@@ -370,11 +370,11 @@ namespace headsup
                 c[ImGuiCol_Border]    = on ? kAccent : kBorder;
                 style.FrameBorderSize = kBorderSize;
                 char label[32];
-                std::snprintf(label, sizeof(label), "%s##%s", on ? "ON" : "OFF", id);
-                if (Button(label, ImVec2(kChipWidth, 0.0f), on ? ButtonColors{kAccent, kAccentHover, kAccent} : ButtonColors{kClear, kHover, kTint}))
+                std::snprintf(label, sizeof(label), "%s##enabled", on ? "ON" : "OFF");
+                if (Button(label, ImVec2(kChipWidth, 0.0f), on ? ButtonColors{kAccent, kAccentHover, kAccent} : kFlatButton))
                 {
-                    on   = !on;
-                    save = true;
+                    on      = !on;
+                    changed = true;
                 }
                 style.FrameBorderSize = border;
                 c[ImGuiCol_Text]      = was[0];
@@ -389,17 +389,16 @@ namespace headsup
             ui.gui->AlignTextToFramePadding();
             ui.Colored(kText, "HeadsUp");
             ui.gui->SameLine();
-            ui.Chip("enabled", s.enabled);
+            ui.Chip(s.enabled);
             ui.Tip("Turns every outline and nameplate on or off, the same as /hu on and /hu off.");
             ui.gui->SameLine();
             const float size = ui.gui->GetFrameHeight();
             ui.gui->SetCursorPosX(ui.gui->GetWindowWidth() - ui.style.WindowPadding.x - size);
-            if (ui.Button("x##close", ImVec2(size, size), ButtonColors{kClear, kHover, kTint})) open = false;
+            if (ui.Button("x##close", ImVec2(size, size), kFlatButton)) open = false;
             ui.Tip("Close. /hu opens it again.");
             ui.gui->Spacing();
         }
 
-        // The pages, each a full-width button with an accent bar beside the selected one.
         void DrawSidebar(Ui& ui, int& page)
         {
             const ImVec2 spacing = ui.style.ItemSpacing;
@@ -410,17 +409,14 @@ namespace headsup
                 char bar[16], label[32];
                 std::snprintf(bar, sizeof(bar), "##bar%d", p);
                 std::snprintf(label, sizeof(label), "%s##page", kPageLabels[p]);
-                const ButtonColors accent = picked ? ButtonColors{kAccent, kAccent, kAccent} : ButtonColors{kClear, kClear, kClear};
-                bool pressed              = ui.Button(bar, ImVec2(kAccentWidth, kSidebarButtonHeight), accent);
+                bool pressed = ui.Button(bar, ImVec2(kAccentWidth, kSidebarButtonHeight), picked ? kAccentBar : kNoBar);
                 ui.gui->SameLine();
-                const ButtonColors colors = picked ? ButtonColors{kPicked, kPicked, kPicked} : ButtonColors{kClear, kHover, kTint};
-                pressed |= ui.Button(label, ImVec2(kSidebarWidth - kAccentWidth, kSidebarButtonHeight), colors);
+                pressed |= ui.Button(label, ImVec2(kSidebarWidth - kAccentWidth, kSidebarButtonHeight), picked ? kPickedButton : kFlatButton);
                 if (pressed) page = p;
             }
             ui.style.ItemSpacing = spacing;
         }
 
-        // "Settings" and "Color Settings", each with an accent line under it while selected.
         void DrawTabs(Ui& ui, bool& colorsTab, bool hasColors)
         {
             const char* const labels[2] = {"Settings", "Color Settings"};
@@ -430,10 +426,9 @@ namespace headsup
             ui.style.ItemSpacing.y = 0.0f;
             for (int t = 0; t < tabs; ++t)
             {
-                const bool picked         = (t == 1) == colorsTab;
-                const ButtonColors colors = picked ? ButtonColors{kPicked, kPicked, kPicked} : ButtonColors{kControl, kHover, kTint};
+                const bool picked = (t == 1) == colorsTab;
                 if (t > 0) ui.gui->SameLine();
-                if (ui.Button(labels[t], ImVec2(kTabWidth, kTabHeight), colors)) colorsTab = t == 1;
+                if (ui.Button(labels[t], ImVec2(kTabWidth, kTabHeight), picked ? kPickedButton : kControlButton)) colorsTab = t == 1;
             }
             for (int t = 0; t < tabs; ++t)
             {
@@ -441,8 +436,7 @@ namespace headsup
                 char line[16];
                 std::snprintf(line, sizeof(line), "##line%d", t);
                 if (t > 0) ui.gui->SameLine();
-                const ButtonColors accent = picked ? ButtonColors{kAccent, kAccent, kAccent} : ButtonColors{kClear, kClear, kClear};
-                ui.Button(line, ImVec2(kTabWidth, kAccentWidth), accent);
+                ui.Button(line, ImVec2(kTabWidth, kAccentWidth), picked ? kAccentBar : kNoBar);
             }
             ui.style.ItemSpacing.y = spacingY;
             ui.gui->Spacing();
@@ -490,7 +484,7 @@ namespace headsup
 
         void DrawNameplateSettings(Ui& ui, Settings& s, uint32_t& collapsed, const std::vector<std::string>& fonts)
         {
-            const bool anyNames = ReplacesNames(s);
+            const bool anyNames = ReplacesAnyName(s);
             ui.Fade(!s.enabled);
             if (ui.Section("Names", kNamesSection, collapsed))
             {
@@ -502,7 +496,7 @@ namespace headsup
             }
             if (ui.Section("Text", kTextSection, collapsed))
             {
-                ui.FontDropdown("Font", s.fontName, fonts);
+                ui.FontDropdown(s.fontName, fonts);
                 ui.gui->SameLine();
                 ui.Check("Bold", s.fontBold, "Bold names and level text.");
                 ui.Fade(!anyNames);
@@ -534,7 +528,7 @@ namespace headsup
             ui.Fade(!s.enabled || (!s.showLabels && s.mobId == MobIdFormat::Off && !s.showIcons));
             if (ui.Section("Hide level and icons", kHideSection, collapsed))
             {
-                ui.Check("On mobs your party claimed", s.hideInCombat,
+                ui.Check("On mobs your party claimed", s.hideClaimedByParty,
                     "Takes the level line and icons off a mob once you or your party has claimed it. Its name and the "
                     "cursor stay.");
                 ui.Check("On mobs anyone claimed", s.hideClaimed, "Takes the level line and icons off any mob someone has claimed.");
@@ -596,9 +590,9 @@ namespace headsup
             ui.Fade(!s.enabled);
             if (ui.Section("Text and icons", kTextColorsSection, collapsed))
             {
-                const bool anyNames = ReplacesNames(s);
+                const bool anyNames = ReplacesAnyName(s);
                 ui.Fade(!anyNames);
-                ui.save |= ui.gui->Checkbox("##ownNameColor", &s.ownNameColor);
+                ui.changed |= ui.gui->Checkbox("##ownNameColor", &s.ownNameColor);
                 ui.gui->SameLine();
                 ui.Fade(!anyNames || !s.ownNameColor);
                 ui.Swatch("Own name color", s.nameColor,
@@ -621,7 +615,7 @@ namespace headsup
                     {
                         ui.gui->TableNextColumn();
                         ui.gui->ColorEdit3(kShadeLabels[k], s.labelColor[k].v, ImGuiColorEditFlags_NoInputs);
-                        ui.save |= ui.gui->IsItemDeactivatedAfterEdit();
+                        ui.changed |= ui.gui->IsItemDeactivatedAfterEdit();
                     }
                     ui.gui->EndTable();
                 }
@@ -640,7 +634,6 @@ namespace headsup
             ui.Fade(false);
         }
 
-        // Label and value rows; the table lines the values up.
         void DebugRows(Ui& ui, const char* id, std::initializer_list<std::pair<const char*, const char*>> rows)
         {
             if (!ui.gui->BeginTable(id, 2, ImGuiTableFlags_SizingFixedFit)) return;
@@ -667,8 +660,8 @@ namespace headsup
             if (ui.Section("Nameplates", kDebugNameplatesSection, collapsed))
             {
                 std::snprintf(shown, sizeof(shown), "%u", status.nameplates);
-                std::snprintf(letters, sizeof(letters), "%u in the scene, %u from mobs, %u hidden", status.lettersInScene,
-                    status.lettersFromMobs, status.lettersHidden);
+                std::snprintf(letters, sizeof(letters), "%u in the scene, %u from mobs, %u hidden", status.letters.inScene,
+                    status.letters.fromMobs, status.letters.hidden);
                 DebugRows(ui, "##debugNameplates", {{"Nameplates shown", shown},
                     {"Drawn", status.drewInScene ? "into the scene, behind walls" : "on top"}, {"Game name letters", letters}});
             }
@@ -676,18 +669,36 @@ namespace headsup
             {
                 std::snprintf(frame, sizeof(frame), "%.2f ms (%.0f fps)", status.frameMs,
                     status.frameMs > 0.0 ? 1000.0 / status.frameMs : 0.0);
-                if (status.playerLevel > 0)
-                    std::snprintf(level, sizeof(level), "%d%s", status.playerLevel, status.sitting ? ", sitting" : "");
+                if (status.player.level > 0)
+                    std::snprintf(level, sizeof(level), "%d%s", status.player.level, status.player.sitting ? ", sitting" : "");
                 else
                     std::snprintf(level, sizeof(level), "unknown");
                 DebugRows(ui, "##debugFrame", {{"Frame time", frame}, {"Your level", level}});
             }
             ui.gui->Spacing();
-            if (ui.Button("Write debug report", ImVec2(0.0f, 0.0f), ButtonColors{kControl, kHover, kTint})) requested = true;
+            if (ui.Button("Write debug report", ImVec2(0.0f, 0.0f), kControlButton)) requested = true;
             ui.Help("The same as /hu debug: writes what every outline and nameplate show to logs/headsup, then records "
                     "the next frames' nameplate data.");
         }
 
+        int CALLBACK AddFamily(const LOGFONTA* font, const TEXTMETRICA* metrics, DWORD type, LPARAM families)
+        {
+            (void)metrics;
+            if ((type & TRUETYPE_FONTTYPE) != 0) reinterpret_cast<std::vector<std::string>*>(families)->push_back(font->lfFaceName);
+            return 1;
+        }
+
+        std::vector<std::string> InstalledFontFamilies()
+        {
+            std::vector<std::string> families;
+            HDC dc = CreateCompatibleDC(nullptr);
+            if (dc == nullptr) return families;
+            LOGFONTA every{};
+            every.lfCharSet = DEFAULT_CHARSET;
+            EnumFontFamiliesExA(dc, &every, AddFamily, reinterpret_cast<LPARAM>(&families), 0);
+            DeleteDC(dc);
+            return families;
+        }
     }
 
     bool Menu::Draw(IGuiManager* gui, Settings& s, const MenuStatus& status)
@@ -742,7 +753,7 @@ namespace headsup
         style = ashita;
 
         s = Clamp(s);
-        return ui.save;
+        return ui.changed;
     }
 
     bool Menu::TakeDebugRequest()

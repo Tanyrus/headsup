@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Ashita.h"
-#include "d3d_util.h"
 #include "game_cursor.h"
 #include "game_glyphs.h"
 #include "pose.h"
@@ -15,80 +14,56 @@
 
 namespace headsup
 {
-    // What HeadsUp learns from the game drawing its scene: each name's box, color and depth (FrameNames), the scene
-    // image and its camera, which bodies were drawn, and which of the game's glyphs and cursors to block.
     class GameNames
     {
     public:
         void SetDevice(IDirect3DDevice8* device) { m_Device = device; }
 
-        // Called at Present: finishes this frame's names if nothing did, then starts the next frame.
         void NewFrame();
-        // The zone changed: the camera seen before means nothing in the new one.
+        // A camera seen in another zone means nothing in this one.
         void ForgetCamera() { m_HaveCamera = false; }
 
-        // Turns this frame's glyphs into names (ReadFrameNames), once: when the game has drawn its names, before ours.
         void FinishText();
-        // Whether this frame has glyphs of the game's names not yet turned into names.
-        bool TextPending() const { return !m_TextFinished && !m_Glyphs.empty(); }
-        // Whether this frame has seen any glyph of the game's names.
+        // Unlike TextPending, still true after FinishText: EndScene draws on top if drawing into the scene failed.
         bool NamesThisFrame() const { return m_NamesThisFrame; }
 
-        // What may be blocked: nothing HeadsUp cannot draw in its place, once its name or icon textures have failed.
         struct Blocking
         {
             bool names = true;
             bool icons = true;
         };
-        // Measures the game's in-scene glyphs (and the camera, from an entity's fixed-function draw) while nameplates are
-        // on. Returns true, for the caller to block it, for a glyph HideGameGlyph hides, decided in the frame it is drawn.
         bool OnDrawUP(D3DPRIMITIVETYPE type, UINT primCount, const void* vertices, UINT stride, const Tracker& tracker,
             const Settings& settings, Blocking blocking);
-        // Whether a DrawPrimitiveUP is the game's target cursor where HeadsUp draws its own (names: this frame's cursors),
-        // read against the target window's anchors (JudgeGameCursor).
         bool IsGameCursorDraw(D3DPRIMITIVETYPE type, UINT primCount, const void* vertices, UINT stride, const Tracker& tracker,
             const std::vector<CursorName>& names, bool picking, ITarget* target);
-        // Whether the candidate being picked is out of range of the spell or ability, as the game's own arrow last showed
-        // it (PickedOutOfRange); it draws that arrow after HeadsUp's nameplates, so this is the frame before's.
+        // The game draws its arrow after our nameplates, so this is the frame before's.
         bool PickOutOfRange() const { return m_PickOutOfRange; }
-        // The candidate being picked, whose name the game draws enlarged; 0 for none.
         void SetEnlarged(uint16_t index) { m_Enlarged = index; }
-        // Picking ended: the next pick starts in range until the game's arrow says otherwise.
         void ForgetPickRange() { m_PickOutOfRange = false; }
-        // A character body was drawn for this entity.
         void CountMesh(uint16_t index) { ++m_MeshDraws[index]; }
 
-        // True when the game is about to copy its scene image, holding this frame's names, to the back buffer: the moment
-        // to draw into that image (see plugin.cpp).
+        // The game is about to copy its scene image, names included, to the back buffer: the last moment to draw into it.
         bool SceneCopyStarting();
-        // The image this frame's names were drawn into, its depth surface, and its pixels to the back buffer's.
         IDirect3DSurface8* SceneTarget() const { return reinterpret_cast<IDirect3DSurface8*>(m_Scene.surface); }
         IDirect3DSurface8* SceneDepth() const { return reinterpret_cast<IDirect3DSurface8*>(m_SceneDepth); }
         float TargetScaleX() const { return m_Scene.x; }
         float TargetScaleY() const { return m_Scene.y; }
         float BackBufferWidth() const { return m_BackBufferWidth; }
         float BackBufferHeight() const { return m_BackBufferHeight; }
-        // The scene's camera, this frame's or the last one seen in this zone; nullptr before any.
         const Camera* SceneCamera() const { return m_HaveCamera ? &m_Camera : nullptr; }
 
-        // The frame that just ended, or this one once FinishText has run: an entity's name in back-buffer pixels
-        // (nullptr without one), with the game's icons beside it, and its depth, color and run.
+        // The frame that just ended, or this one once FinishText has run.
         const ScreenBox* NameplateBox(uint16_t index) const { return Find(m_Last.plates, index); }
         const ScreenBox* WholeNameplate(uint16_t index) const { return Find(m_Last.wholes, index); }
         float NameplateDepth(uint16_t index) const { return Value(m_Last.depths, index, 0.0f); }
         uint32_t NameplateColor(uint16_t index) const { return Value(m_Last.colors, index, kWhite); }
-        uint32_t PlateFramesInRow(uint16_t index) const { return Value(m_Last.runs, index, 0u); }
-        // The name's letter height over its last few frames, steady through a frame or two of stray glyphs.
+        uint32_t PlateFramesInRow(uint16_t index) const { return Value(m_Last.framesInRow, index, 0u); }
         float NameSize(uint16_t index) const { return Value(m_Last.sizes, index, 0.0f); }
         uint32_t GlyphsLastFrame(uint16_t index) const { return Value(m_Last.glyphCounts, index, 0u); }
-        // The texture the names' letters were drawn from; 0 before any.
         uintptr_t FontTexture() const { return m_Last.font; }
-        // Character body draws of an entity: 0 when the game did not draw its body.
         uint32_t MeshDraws(uint16_t index) const { return Value(m_MeshDrawsLast, index, 0u); }
-        // Frames since the game last drew an entity's body: 0 this frame; UINT32_MAX never.
         uint32_t FramesSinceMesh(uint16_t index) const;
 
-        // Counts of the game's in-scene glyph draws, for /hu debug and the Debug page.
         struct TextDrawStats
         {
             uint32_t inScene = 0, fromMobs = 0, fromOthers = 0, noOwner = 0, hidden = 0;
@@ -96,6 +71,13 @@ namespace headsup
         const TextDrawStats& TextStatsLastFrame() const { return m_TextStatsLast; }
 
     private:
+        struct TargetScale
+        {
+            uintptr_t surface = 0; // 0 to read again: a target made at the same address may differ
+            float x = 1.0f, y = 1.0f;
+            bool Read(IDirect3DSurface8* target, float backBufferWidth, float backBufferHeight);
+        };
+
         template <typename Map>
         static const typename Map::mapped_type* Find(const Map& map, uint16_t index)
         {
@@ -109,6 +91,7 @@ namespace headsup
             return found != nullptr ? *found : fallback;
         }
 
+        bool TextPending() const { return !m_TextFinished && !m_Glyphs.empty(); }
         void CaptureCamera(const Tracker& tracker);
         void ReadBackBufferSize();
 
@@ -117,29 +100,27 @@ namespace headsup
         float m_BackBufferHeight   = 0.0f;
         uintptr_t m_BackBuffer     = 0;
 
-        // This frame, reset by NewFrame.
-        std::unordered_map<uint16_t, std::vector<GlyphDraw>> m_Glyphs; // by entity index
-        TextureUse m_TextureUse;                                       // for the font, from every quad, letter or not
-        std::unordered_set<uint16_t> m_KeptNow;                        // entities whose names stay the game's
+        std::unordered_map<uint16_t, std::vector<GlyphDraw>> m_Glyphs;
+        TextureUse m_TextureUse;
+        std::unordered_set<uint16_t> m_KeptNow;
         std::unordered_map<uint16_t, uint32_t> m_MeshDraws;
         TextDrawStats m_TextStats;
         bool m_TextFinished   = false;
         bool m_NamesThisFrame = false;
         bool m_CameraSeen     = false;
 
-        // Snapshots by FinishText.
         FrameNames m_Last;
         std::unordered_map<uint16_t, uint32_t> m_MeshDrawsLast;
-        std::unordered_map<uint16_t, uint32_t> m_LastMeshFrame; // the frame each entity's body was last drawn in
+        std::unordered_map<uint16_t, uint32_t> m_LastMeshFrame;
         uint32_t m_Frame = 0;
         TextDrawStats m_TextStatsLast;
 
-        uintptr_t m_NamesImage   = 0; // the render target names' letters go to (InNamesImage)
-        TargetScale m_Scene;          // that image's scale
-        uintptr_t m_SceneDepth   = 0; // and its depth surface
-        TargetScale m_Ui;             // the UI image's scale
-        uintptr_t m_ArrowTexture = 0; // the game's target arrows, once seen
-        bool m_PickOutOfRange    = false; // from the game's arrow over the candidate being picked
+        uintptr_t m_NamesImage   = 0;
+        TargetScale m_Scene;
+        uintptr_t m_SceneDepth   = 0;
+        TargetScale m_Ui;
+        uintptr_t m_ArrowTexture = 0;
+        bool m_PickOutOfRange    = false;
         uint16_t m_Enlarged      = 0;
         Camera m_Camera{};
         bool m_HaveCamera = false;

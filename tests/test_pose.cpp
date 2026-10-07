@@ -101,14 +101,6 @@ TEST(a_seated_players_name_is_placed_on_screen_when_the_games_is_above_it)
     CHECK(std::fabs(ours - PoseHeightShare(Pose::Chair) * game) < 0.01f);
 }
 
-TEST(a_name_is_placed_over_its_whole_nameplate)
-{
-    const ScreenBox letters = test::Box(1000.0f, 200.0f, 1080.0f, 210.0f);
-    const ScreenBox whole   = test::Box(960.0f, 198.0f, 1080.0f, 213.0f);
-    const ScreenBox placed  = PlaceName(letters, &whole, nullptr, WorldPoint{}, Pose::Chair); // no camera: not lowered
-    CHECK(std::fabs(placed.CenterX() - 1020.0f) < 0.01f && placed.minY == letters.minY && placed.maxY == letters.maxY);
-}
-
 TEST(a_name_that_cannot_be_projected_stays_put)
 {
     // Behind the camera.

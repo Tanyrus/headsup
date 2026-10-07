@@ -1,7 +1,5 @@
 #include "d3d_util.h"
 
-#include "outline_math.h"
-
 #include <algorithm>
 
 namespace headsup
@@ -37,15 +35,5 @@ namespace headsup
         const auto* tib     = reinterpret_cast<const NT_TIB*>(NtCurrentTeb());
         const uintptr_t end = std::min<uintptr_t>(reinterpret_cast<uintptr_t>(tib->StackBase), sp + kStackScanBytes);
         return FindOwner(reinterpret_cast<const uint32_t*>(sp & ~uintptr_t{3}), reinterpret_cast<const uint32_t*>(end & ~uintptr_t{3}), tracker);
-    }
-
-    bool TargetScale::Read(IDirect3DSurface8* target, float backBufferWidth, float backBufferHeight)
-    {
-        D3DSURFACE_DESC desc{};
-        if (FAILED(target->GetDesc(&desc)) || desc.Width == 0 || desc.Height == 0) return false;
-        surface = reinterpret_cast<uintptr_t>(target);
-        x       = backBufferWidth / static_cast<float>(desc.Width);
-        y       = backBufferHeight / static_cast<float>(desc.Height);
-        return true;
     }
 }

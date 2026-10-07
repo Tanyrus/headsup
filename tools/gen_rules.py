@@ -17,7 +17,7 @@ KEYS = ['firstDifference', 'baseExp', 'difficulty', 'incrediblyEasyPrey', 'sitti
 # Phoenix's EMobDifficulty in order; the plugin's Con has the same names.
 CONS = ['TooWeak', 'IncrediblyEasyPrey', 'EasyPrey', 'DecentChallenge', 'EvenMatch', 'Tough', 'VeryTough',
         'IncrediblyTough']
-COLUMNS = 20  # GetBaseExp's player level brackets, 1-5 to 96-100
+LEVEL_BRACKETS = 20  # GetBaseExp's player levels 1-5 to 96-100
 MAX_EXP = 0xFFFF
 MAX_LEVEL = 0xFFFF
 MAX_ANIMATION = 0xFF
@@ -43,8 +43,8 @@ def parse(text: str, source: str = RULES_NAME):
     if not isinstance(rows, list) or not rows:
         raise DataError(f'{source}: baseExp has no rows')
     for n, row in enumerate(rows):
-        if not isinstance(row, list) or len(row) != COLUMNS:
-            raise DataError(f'{source}: baseExp row {n} must have {COLUMNS} columns')
+        if not isinstance(row, list) or len(row) != LEVEL_BRACKETS:
+            raise DataError(f'{source}: baseExp row {n} must have {LEVEL_BRACKETS} columns')
         for value in row:
             whole(value, 0, MAX_EXP, f'{source}: baseExp row {n}')
     steps = rules['difficulty']
@@ -87,7 +87,7 @@ def generate(rules, commit: str) -> str:
              '    // Base experience by level difference (mob - player) from kFirstDifference, a column per five player '
              'levels.',
              f'    constexpr int kFirstDifference = {rules["firstDifference"]};',
-             f'    constexpr uint16_t kBaseExp[{len(rules["baseExp"])}][{COLUMNS}] = {{']
+             f'    constexpr uint16_t kBaseExp[{len(rules["baseExp"])}][{LEVEL_BRACKETS}] = {{']
     lines += ['        {' + ', '.join(str(v) for v in row) + '},' for row in rules['baseExp']]
     lines += ['    };', '',
               '    // /check: the first step whose experience the mob gives reaches minExp, hardest first.',

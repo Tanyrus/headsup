@@ -1,8 +1,7 @@
 #include "nameplate_render.h"
 
+#include "argb.h"
 #include "game_glyphs.h"
-#include "shapes.h"
-#include "text_raster.h"
 
 #include <algorithm>
 #include <cmath>
@@ -32,6 +31,11 @@ namespace headsup
                                                            : settings.cursorColor);
         }
 
+        int ExactHeight(float shown)
+        {
+            return std::max(1, static_cast<int>(std::lround(shown)));
+        }
+
         int OutlineRadius(int pixelHeight)
         {
             return std::max(1, static_cast<int>(std::lround(static_cast<float>(pixelHeight) * kOutlinePerHeight)));
@@ -42,12 +46,66 @@ namespace headsup
             if (texture != nullptr) texture->Release();
             texture = nullptr;
         }
+
+        bool RasterizeText(const char* text, const char* family, int pixelHeight, bool bold, int margin, Coverage& out)
+        {
+            out      = Coverage{};
+            HDC dc   = CreateCompatibleDC(nullptr);
+            // A negative height asks for the character height, without the font's internal leading.
+            HFONT font = CreateFontA(-pixelHeight, 0, 0, 0, bold ? FW_BOLD : FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+                OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_DONTCARE, family);
+            bool drawn = false;
+            if (dc != nullptr && font != nullptr)
+            {
+                const HGDIOBJ oldFont = SelectObject(dc, font);
+                const int length      = static_cast<int>(std::strlen(text));
+                SIZE size{};
+                GetTextExtentPoint32A(dc, text, length, &size);
+                const int width  = size.cx + 2 * margin;
+                const int height = size.cy + 2 * margin;
+                BITMAPINFO info{};
+                info.bmiHeader.biSize        = sizeof(info.bmiHeader);
+                info.bmiHeader.biWidth       = width;
+                info.bmiHeader.biHeight      = -height; // rows top to bottom
+                info.bmiHeader.biPlanes      = 1;
+                info.bmiHeader.biBitCount    = kBytesPerPixel * 8;
+                info.bmiHeader.biCompression = BI_RGB;
+                void* bits                   = nullptr;
+                const HBITMAP bitmap         = CreateDIBSection(dc, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
+                if (bitmap != nullptr && bits != nullptr)
+                {
+                    const HGDIOBJ oldBitmap = SelectObject(dc, bitmap);
+                    const size_t pixels     = static_cast<size_t>(width) * static_cast<size_t>(height);
+                    std::memset(bits, 0, pixels * kBytesPerPixel);
+                    SetBkMode(dc, TRANSPARENT);
+                    SetTextColor(dc, RGB(255, 255, 255));
+                    TextOutA(dc, margin, margin, text, length);
+                    GdiFlush();
+                    const auto* bgrx = static_cast<const uint8_t*>(bits);
+                    out.width        = width;
+                    out.height       = height;
+                    out.alpha.resize(pixels);
+                    for (size_t i = 0; i < pixels; ++i)
+                    {
+                        const uint8_t* bgr = bgrx + i * kBytesPerPixel;
+                        out.alpha[i]       = std::max({bgr[0], bgr[1], bgr[2]});
+                    }
+                    SelectObject(dc, oldBitmap);
+                    drawn = true;
+                }
+                if (bitmap != nullptr) DeleteObject(bitmap);
+                SelectObject(dc, oldFont);
+            }
+            if (font != nullptr) DeleteObject(font);
+            if (dc != nullptr) DeleteDC(dc);
+            return drawn;
+        }
     }
 
-    void NameplateRenderer::Fail(std::string what)
+    void NameplateRenderer::FailNames(std::string what)
     {
-        m_Failed = true;
-        m_Failure = std::move(what);
+        m_NamesFailed = true;
+        m_NameFailure = std::move(what);
     }
 
     IDirect3DTexture8* NameplateRenderer::CreateTexture(const void* bgra, int width, int height, float& u, float& v)
@@ -86,7 +144,7 @@ namespace headsup
         Coverage coverage;
         if (!RasterizeText(text, settings.fontName.c_str(), pixelHeight, settings.fontBold, radius, coverage))
         {
-            Fail("GDI could not draw text in " + settings.fontName + " at " + std::to_string(pixelHeight) + " px");
+            FailNames("GDI could not draw text in " + settings.fontName + " at " + std::to_string(pixelHeight) + " px");
             return false;
         }
         return Upload(t, Outlined(coverage, radius, color, key.outline), std::move(key));
@@ -111,7 +169,7 @@ namespace headsup
         IDirect3DTexture8* texture = CreateTexture(image.argb.data(), image.width, image.height, u, v);
         if (texture == nullptr)
         {
-            Fail("Direct3D could not make a " + std::to_string(image.width) + "x" + std::to_string(image.height) + " texture");
+            FailNames("Direct3D could not make a " + std::to_string(image.width) + "x" + std::to_string(image.height) + " texture");
             return false;
         }
         ReleaseTexture(t.texture);
@@ -119,7 +177,7 @@ namespace headsup
         return true;
     }
 
-    const NameplateRenderer::IconTexture* NameplateRenderer::Icon(headsup::Icon icon)
+    const NameplateRenderer::IconTexture* NameplateRenderer::IconTextureFor(Icon icon)
     {
         IconTexture& t = m_IconTextures[static_cast<size_t>(icon)];
         if (t.texture != nullptr) return &t;
@@ -150,7 +208,7 @@ namespace headsup
             // Whole pixels in the target keep the text as sharp as it was drawn.
             into.push_back(Quad{texture, std::round(x * toX), std::round(y * toY), width, height, u, v, depth, tint});
         };
-        if (NameplatesOn(settings) && !m_Failed && m_Device != nullptr)
+        if (NameplatesOn(settings) && !m_NamesFailed && m_Device != nullptr)
         {
             for (const ActorPtr actor : tracker.Actors())
             {
@@ -162,19 +220,13 @@ namespace headsup
                 const ScreenBox* whole = names.WholeNameplate(info->index);
                 ScreenBox anchor       = PlaceName(*plate, whole, names.SceneCamera(), info->feet, info->pose);
                 if (!NameOnScreen(anchor, screenWidth, screenHeight)) continue;
-                const PlateLines lines = ChooseLines(PlateFacts{info->index, ReplacesName(settings, *info),
-                                                         Steady(names.FramesSinceMesh(info->index), names.PlateFramesInRow(info->index)),
-                                                         info->alive, info->label.text[0] != '\0', info->icons.count, info->nameIcons.left.count,
-                                                         info->nameIcons.right.count, info->fighting, info->claimed, info->tooWeak,
-                                                         tracker.Player().engaged},
-                    settings, targets, m_IconsFailed);
+                const bool steady      = Steady(names.FramesSinceMesh(info->index), names.PlateFramesInRow(info->index));
+                const PlateLines lines = ChooseLines(*info, steady, tracker.Player().engaged, settings, targets, m_IconsFailed);
                 const bool timersHere = info->index == selfIndex && !selfTimers.empty();
                 if (!lines.Any() && !timersHere) continue;
                 Plate& p = m_Plates[info->index];
                 p.frame  = m_Frame;
 
-                // Scale smoothly like the game's names, by the height of its letters. Text is drawn at a nearby size and
-                // stretched to fit, so it is redrawn only when its size moves a step.
                 const float scale       = settings.scaleWithDistance ? DistanceScale(names.NameSize(info->index), screenHeight) : 1.0f;
                 const float nameShown   = static_cast<float>(settings.nameSize) * scale * toY;
                 const float labelShown  = static_cast<float>(settings.labelSize) * scale * toY;
@@ -182,7 +234,7 @@ namespace headsup
                 const float iconSize    = static_cast<float>(settings.iconSize) * scale;
                 const float cursorShown = static_cast<float>(settings.cursorSize) * scale * toY;
                 auto raster             = [&](float shown, int current) {
-                    return settings.scaleWithDistance ? RasterHeight(shown, current) : std::max(1, static_cast<int>(std::lround(shown)));
+                    return settings.scaleWithDistance ? RasterHeight(shown, current) : ExactHeight(shown);
                 };
                 p.nameRaster   = raster(nameShown, p.nameRaster);
                 p.labelRaster  = raster(labelShown, p.labelRaster);
@@ -198,7 +250,6 @@ namespace headsup
                 const float nameFit   = nameShown / static_cast<float>(p.nameRaster);
                 const float labelFit  = labelShown / static_cast<float>(p.labelRaster);
                 const float cursorFit = cursorShown / static_cast<float>(p.cursorRaster);
-                // Your placeholder timers, between your name and the cursor over you.
                 for (size_t i = timersHere ? selfTimers.size() : 0; i < p.timers.size(); ++i)
                     ReleaseTexture(p.timers[i].texture);
                 p.timers.resize(timersHere ? selfTimers.size() : 0);
@@ -211,23 +262,30 @@ namespace headsup
                     const TimerLine& line = selfTimers[timersReady];
                     if (!Prepare(p.timers[timersReady], line.text.c_str(), line.up ? upColor : kWhite, p.timerRaster, settings)) break;
                 }
-                // A player's icons are a share of the name's height.
-                const float nameIconSize = nameShown / toY * static_cast<float>(settings.playerIconSize) / kPercent;
+                const float playerIconSize = nameShown / toY * static_cast<float>(settings.playerIconSize) / kPercent;
 
                 LineSizes sizes;
-                if (lines.name) sizes.nameWidth = p.name.width * nameFit / toX, sizes.nameHeight = p.name.height * nameFit / toY;
-                if (lines.label) sizes.labelWidth = p.label.width * labelFit / toX, sizes.labelHeight = p.label.height * labelFit / toY;
-                sizes.iconCount = lines.icons;
-                sizes.iconSize  = iconSize;
+                if (lines.name)
+                {
+                    sizes.nameWidth  = p.name.width * nameFit / toX;
+                    sizes.nameHeight = p.name.height * nameFit / toY;
+                }
+                if (lines.label)
+                {
+                    sizes.labelWidth  = p.label.width * labelFit / toX;
+                    sizes.labelHeight = p.label.height * labelFit / toY;
+                }
+                sizes.mobIconCount = lines.mobIconCount;
+                sizes.iconSize     = iconSize;
                 if (showCursor)
                 {
                     sizes.cursorWidth  = p.cursor.width * cursorFit / toX;
                     sizes.cursorHeight = p.cursor.height * cursorFit / toY;
                     sizes.cursorTip    = p.cursor.tip;
                 }
-                sizes.leftIconCount      = lines.leftIcons;
-                sizes.rightIconCount     = lines.rightIcons;
-                sizes.nameIconSize       = nameIconSize;
+                sizes.leftIconCount      = lines.leftIconCount;
+                sizes.rightIconCount     = lines.rightIconCount;
+                sizes.playerIconSize     = playerIconSize;
                 sizes.centerNameAndIcons = settings.centerNameAndIcons;
                 sizes.timerCount         = timersReady;
                 for (int i = 0; i < timersReady; ++i)
@@ -247,29 +305,29 @@ namespace headsup
                     addQuad(m_Quads, p.label.texture, layout.labelX, layout.labelY, p.label.width * labelFit, p.label.height * labelFit,
                         p.label.u, p.label.v, depth, kWhite);
                 int drawn = 0;
-                for (; drawn < lines.icons; ++drawn)
+                for (; drawn < lines.mobIconCount; ++drawn)
                 {
-                    const IconTexture* icon = Icon(info->icons.icons[drawn]);
+                    const IconTexture* icon = IconTextureFor(info->mobIcons.icons[drawn]);
                     if (icon == nullptr) break;
                     addQuad(m_Quads, icon->texture, layout.iconsX + static_cast<float>(drawn) * layout.iconStep, layout.iconsY,
                         iconSize * toX, iconSize * toY, icon->u, icon->v, depth, iconTint);
                 }
-                auto addNameIcons = [&](const IconSet& row, int count, float x) {
+                auto addPlayerIcons = [&](const IconSet& row, int count, float x) {
                     for (int i = 0; i < count; ++i)
                     {
-                        const headsup::Icon kind = row.icons[i];
-                        const IconTexture* icon  = Icon(kind);
+                        const Icon kind         = row.icons[i];
+                        const IconTexture* icon = IconTextureFor(kind);
                         if (icon == nullptr) return;
-                        addQuad(m_Quads, icon->texture, x + static_cast<float>(i) * layout.nameIconStep, layout.nameIconsY,
-                            nameIconSize * toX, nameIconSize * toY, icon->u, icon->v, depth,
-                            kind == headsup::Icon::Linkshell ? info->linkshellArgb : kWhite);
+                        addQuad(m_Quads, icon->texture, x + static_cast<float>(i) * layout.playerIconStep, layout.playerIconsY,
+                            playerIconSize * toX, playerIconSize * toY, icon->u, icon->v, depth,
+                            kind == Icon::Linkshell ? info->linkshellArgb : kWhite);
                     }
                 };
-                addNameIcons(info->nameIcons.left, lines.leftIcons, layout.leftIconsX);
-                addNameIcons(info->nameIcons.right, lines.rightIcons, layout.rightIconsX);
+                addPlayerIcons(info->playerIcons.left, lines.leftIconCount, layout.leftIconsX);
+                addPlayerIcons(info->playerIcons.right, lines.rightIconCount, layout.rightIconsX);
                 if (showCursor)
                 {
-                    addQuad(cursorQuads, p.cursor.texture, layout.cursorX, layout.cursorY + CursorBob(now, sizes.cursorHeight),
+                    addQuad(cursorQuads, p.cursor.texture, layout.cursor.x, layout.cursor.y + CursorBob(now, sizes.cursorHeight),
                         p.cursor.width * cursorFit, p.cursor.height * cursorFit, p.cursor.u, p.cursor.v, depth, kWhite);
                     m_CursorNames.push_back(CursorName{info->index, whole != nullptr ? *whole : *plate});
                 }
@@ -287,19 +345,18 @@ namespace headsup
             }
         }
 
-        // Targets with no game name, such as a Telepoint, get their cursor at the game's arrow anchor, at the cursor's
-        // own size and on top: there is no name to scale by or to sit behind walls with.
-        if (NameplatesOn(settings) && !m_Failed && m_Device != nullptr)
+        // A lone cursor is drawn at exactly its own size and on top: there is no name to scale by or to sit behind walls with.
+        if (NameplatesOn(settings) && !m_NamesFailed && m_Device != nullptr)
         {
-            std::vector<uint16_t> withCursor;
+            std::vector<uint16_t> withNameplateCursor;
             for (const CursorName& c : m_CursorNames)
-                withCursor.push_back(c.index);
-            for (const LoneCursor& lone : LoneCursors(targets, settings, withCursor))
+                withNameplateCursor.push_back(c.index);
+            for (const LoneCursor& lone : LoneCursors(targets, settings, withNameplateCursor))
             {
                 Plate& p                = m_Plates[lone.index];
                 p.frame                 = m_Frame;
                 const float cursorShown = static_cast<float>(settings.cursorSize) * toY;
-                p.cursorRaster          = RasterHeight(cursorShown, p.cursorRaster);
+                p.cursorRaster          = ExactHeight(cursorShown);
                 if (!PrepareCursor(p.cursor, CursorColor(lone.kind, settings), p.cursorRaster, settings)) break;
                 const float fit     = cursorShown / static_cast<float>(p.cursorRaster);
                 const float height  = p.cursor.height * fit / toY;
@@ -310,11 +367,9 @@ namespace headsup
             }
         }
 
-        // Nearer names over farther ones, then every cursor on top.
         std::stable_sort(m_Quads.begin(), m_Quads.end(), [](const Quad& a, const Quad& b) { return a.depth > b.depth; });
         m_Quads.insert(m_Quads.end(), cursorQuads.begin(), cursorQuads.end());
 
-        // Entities without a nameplate this frame give their textures back.
         for (auto it = m_Plates.begin(); it != m_Plates.end();)
         {
             if (it->second.frame == m_Frame)
@@ -406,7 +461,7 @@ namespace headsup
         Clear();
     }
 
-    std::string NameplateRenderer::TakeFailure() { return std::exchange(m_Failure, std::string()); }
+    std::string NameplateRenderer::TakeNameFailure() { return std::exchange(m_NameFailure, std::string()); }
 
     std::string NameplateRenderer::TakeIconFailure() { return std::exchange(m_IconFailure, std::string()); }
 }

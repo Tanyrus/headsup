@@ -13,13 +13,12 @@ MOBS = [
      'aggro': True, 'alwaysAggro': 0, 'noAggro': 0, 'type': 0,
      'link': True, 'detects': 0x001 | 0x002, 'trueDetection': False, 'expLevelMod': 0, 'follows': False,
      'placeholderOf': 17199700},
-    # A mob from a dump made before link, detection, the level mod and following were exported: they read as none.
-    # Its m_neutral, the AI's calm right after a spawn, is ignored.
     {'id': 17199105, 'zone': 103, 'name': 'Stag_Crab', 'minLevel': 15, 'maxLevel': 17, 'respawn': 0,
-     'aggro': True, 'alwaysAggro': 1, 'noAggro': 0, 'neutral': True, 'type': 0x04},
-    {'id': 17272838, 'zone': 121, 'name': 'Guardian_Treant', 'minLevel': 32, 'maxLevel': 32, 'respawn': -1,
+     'aggro': True, 'alwaysAggro': 1, 'noAggro': 0, 'type': 0x04,
+     'link': False, 'detects': 0x002, 'trueDetection': False, 'expLevelMod': 0, 'follows': False, 'placeholderOf': 0},
+    {'id': 17272838, 'zone': 121, 'name': 'Guardian_Treant', 'minLevel': 32, 'maxLevel': 32, 'respawn': 960,
      'aggro': False, 'alwaysAggro': 0, 'noAggro': 1, 'type': 0x02 | 0x10,
-     'link': False, 'detects': 0x100, 'trueDetection': True, 'expLevelMod': -2, 'follows': True},
+     'link': False, 'detects': 0x100, 'trueDetection': True, 'expLevelMod': -2, 'follows': True, 'placeholderOf': 0},
 ]
 
 # As the dump module writes them: differences out past the table, which GetBaseExp clamps to, and cons as numbers.
@@ -58,9 +57,10 @@ class Compact(unittest.TestCase):
         self.assertEqual(self.rows[2], ['17199648', '103', 'Goblin Bounty Hunter', '17', '20', '33', '300', '3', '0',
                                         '17199700'])
 
-    def test_flags_negative_respawn_and_the_level_mod(self):
-        self.assertEqual(self.rows[1][5:], [str(1 | 2), '0', '0', '0', '0'])  # aggro + always aggro (fished ignored)
-        self.assertEqual(self.rows[3][5:], [str(4 | 8 | 16 | 64 | 128), '0', '256', '-2', '0'])  # + true detection, follows
+    def test_flags_respawn_detection_and_the_level_mod(self):
+        self.assertEqual(self.rows[1][5:], [str(1 | 2), '0', '2', '0', '0'])  # aggro + always aggro (fished ignored)
+        # no aggro + notorious + true detection + follows (battlefield ignored)
+        self.assertEqual(self.rows[3][5:], [str(4 | 8 | 64 | 128), '960', '256', '-2', '0'])
 
     def test_meta(self):
         self.assertIn('phoenix_commit\tabc123\n', self.meta)
@@ -91,7 +91,8 @@ class Trim(unittest.TestCase):
 
 def mob(**fields):
     base = {'id': 16797854, 'zone': 5, 'name': 'Ice_Elemental', 'minLevel': 76, 'maxLevel': 77, 'respawn': 300,
-            'aggro': False, 'alwaysAggro': 0, 'noAggro': 0, 'type': 0}
+            'aggro': False, 'alwaysAggro': 0, 'noAggro': 0, 'type': 0, 'link': False, 'detects': 0x020,
+            'trueDetection': False, 'expLevelMod': 0, 'follows': False, 'placeholderOf': 0}
     base.update(fields)
     return base
 
@@ -108,10 +109,6 @@ class MergeSnapshots(unittest.TestCase):
         rows, _ = self.compact_rows([mob(aggro=False)], [mob(aggro=True)])
         self.assertEqual(rows[0][5], '1')
 
-    def test_the_calm_after_a_spawn_does_not_hide_an_attacking_mob(self):
-        rows, _ = self.compact_rows([mob(aggro=False)], [mob(aggro=True, neutral=True)])
-        self.assertEqual(rows[0][5], '1')
-
     def test_a_mob_the_dump_saw_attacking_during_its_run_counts(self):
         # The Ghrahs turn aggressive and back every minute, so a dump can end on their passive form.
         attacking, passive = {'aggro': True, 'alwaysAggro': 0, 'noAggro': 0}, {'aggro': False, 'alwaysAggro': 0, 'noAggro': 0}
@@ -122,32 +119,24 @@ class MergeSnapshots(unittest.TestCase):
         rows, _ = self.compact_rows([mob(aggro=False, seenAttacking=passive)])
         self.assertEqual(rows[0][5], '0')
 
+    def test_the_dumped_state_comes_before_the_one_seen_before_the_spawn(self):
+        # Lioumere: the run saw it attack before its spawn script set AlwaysAggro.
+        spawned = mob(aggro=True, alwaysAggro=1, seenAttacking={'aggro': True, 'alwaysAggro': 0, 'noAggro': 0})
+        for snapshots in ([[spawned]], [[mob()], [spawned]]):
+            with self.subTest(snapshots=len(snapshots)):
+                rows, _ = self.compact_rows(*snapshots)
+                self.assertEqual(rows[0][5], str(1 | 2))
+
     def test_passive_in_every_snapshot_keeps_the_first(self):
         rows, _ = self.compact_rows([mob(aggro=False)], [mob(aggro=True, noAggro=1)])
         self.assertEqual(rows[0][5], '0')
 
-    def test_identity_comes_from_the_first_snapshot_and_levels_span_all(self):
-        rows, _ = self.compact_rows([mob(name="Ice_Elemental", minLevel=76, maxLevel=77, respawn=300)],
-                                    [mob(name='Label_Only', minLevel=75, maxLevel=78, respawn=999)])
-        self.assertEqual(rows[0][2:5] + [rows[0][6]], ['Ice Elemental', '75', '78', '300'])
-
-    def test_link_and_detection_come_from_the_first_snapshot(self):
-        rows, _ = self.compact_rows([mob(link=True, detects=0x002, trueDetection=False)],
-                                    [mob(link=False, detects=0x101, trueDetection=True)])
-        self.assertEqual((rows[0][5], rows[0][7]), ('32', '2'))
-
-    def test_added_fields_come_from_a_snapshot_that_has_them(self):
-        rows, _ = self.compact_rows([mob(aggro=True)],
-                                    [mob(link=True, detects=0x002, trueDetection=True, expLevelMod=-2, follows=True)])
-        self.assertEqual((rows[0][5], rows[0][7], rows[0][8]), (str(1 | 32 | 64 | 128), '2', '-2'))
-
-    def test_the_placeholder_comes_from_the_first_snapshot_that_has_it(self):
-        rows, _ = self.compact_rows([mob()], [mob(placeholderOf=16797860)], [mob(placeholderOf=0)])
-        self.assertEqual(rows[0][9], '16797860')
-
-    def test_a_follower_that_attacks_in_an_old_snapshot_stays_a_follower(self):
-        rows, _ = self.compact_rows([mob(aggro=False, expLevelMod=0, follows=True)], [mob(aggro=True)])
-        self.assertEqual(rows[0][5], str(1 | 128))
+    def test_all_but_the_levels_and_aggro_come_from_the_first_snapshot(self):
+        first = mob(minLevel=76, maxLevel=77, link=True, detects=0x002, expLevelMod=-2, placeholderOf=16797860)
+        later = mob(zone=6, name='Label_Only', minLevel=75, maxLevel=78, respawn=999, type=0x02, detects=0x101,
+                    trueDetection=True, follows=True)
+        rows, _ = self.compact_rows([first], [later])
+        self.assertEqual(rows[0], ['16797854', '5', 'Ice Elemental', '75', '78', '32', '300', '2', '-2', '16797860'])
 
     def test_mobs_from_any_snapshot_are_kept_and_counted(self):
         rows, meta = self.compact_rows([mob()], [mob(), mob(id=16797855)])
@@ -156,20 +145,11 @@ class MergeSnapshots(unittest.TestCase):
 
 
 class Rules(unittest.TestCase):
-    def test_dumps_from_before_the_rules_still_merge(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            rows, _, rules = run_compact(tmp, [mob(id=16797855)], dump([mob()]))
-        self.assertEqual([r[0] for r in rows[1:]], ['16797854', '16797855'])
-        self.assertEqual(rules['firstDifference'], -2)
-
     def assertCompactFails(self, message, *dumps):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(compact.schema.DataError) as caught:
                 run_compact(tmp, *dumps)
         self.assertIn(message, str(caught.exception))
-
-    def test_no_dump_with_the_rules_is_an_error(self):
-        self.assertCompactFails('no dump carries the rules', [mob()])
 
     def test_dumps_that_disagree_are_an_error(self):
         other = dict(RULES, sittingAnimations=[33])
@@ -185,8 +165,14 @@ class Rules(unittest.TestCase):
         broken = dict(RULES, baseExp=[[0] * 19])
         self.assertCompactFails('phoenix_rules.json: baseExp row 0 must have 20 columns', dump([mob()], broken))
 
-    def test_a_dump_without_mobs_names_its_file(self):
+    def test_a_dump_without_mobs_or_rules_names_its_file(self):
         self.assertCompactFails('run-0.json: not a dump this compact.py reads', {'rules': RULES})
+        self.assertCompactFails('run-0.json: not a dump this compact.py reads', [mob()])
+
+    def test_a_mob_without_a_field_names_its_file(self):
+        broken = mob()
+        del broken['detects'], broken['follows']
+        self.assertCompactFails('run-1.json: mob 16797854 has no detects, follows', dump([mob()]), dump([broken]))
 
 
 class CompactRejects(unittest.TestCase):
@@ -197,9 +183,12 @@ class CompactRejects(unittest.TestCase):
             compact.compact([path], tmp, 'abc123')
 
     def test_a_value_the_plugin_cannot_hold(self):
-        with self.assertRaises(compact.schema.DataError) as caught:
-            self.compact_one(json.dumps(dump([mob(detects=0x10000)])))
-        self.assertIn('detects must be a whole number from 0 to 65535', str(caught.exception))
+        for fields, message in (({'detects': 0x10000}, 'detects must be a whole number from 0 to 65535'),
+                                ({'respawn': -1}, 'respawn must be a whole number from 0 to 4294967295')):
+            with self.subTest(fields=fields):
+                with self.assertRaises(compact.schema.DataError) as caught:
+                    self.compact_one(json.dumps(dump([mob(**fields)])))
+                self.assertIn(message, str(caught.exception))
 
     def test_a_truncated_dump_names_its_file(self):
         with self.assertRaises(compact.schema.DataError) as caught:
@@ -215,7 +204,7 @@ def record(mob_id, zone, name, lo, hi, flags, respawn, detects, level_mod=0, pla
 class Validate(unittest.TestCase):
     RECORDS = dict([
         record(17199105, 103, 'Stag Crab', 15, 17, 3, 0, 2),
-        record(17272838, 121, 'Guardian Treant', 32, 32, 28, 0, 2),
+        record(17272838, 121, 'Guardian Treant', 32, 32, 12, 0, 2),
         record(17199322, 103, 'Snipper', 19, 20, 0, 300, 2),
         record(17199648, 103, 'Goblin Bounty Hunter', 17, 20, 33, 300, 1),
         record(17190918, 101, 'Wild Rabbit', 1, 1, 0, 60, 257, -2),
@@ -232,12 +221,14 @@ class Validate(unittest.TestCase):
     def test_wrong_level_and_aggro_fail(self):
         records = dict(self.RECORDS)
         records.update([record(17199322, 103, 'Snipper', 19, 21, 1, 300, 2)])
-        self.assertEqual(len(self.check(records)), 2)
+        self.assertEqual(self.check(records), ['17199322: expected Snipper 19-20, got Snipper 19-21',
+                                               '17199322 Snipper: expected aggressive=False'])
 
     def test_missing_link_or_detection_fails(self):
         records = dict(self.RECORDS)
         records.update([record(17199648, 103, 'Goblin Bounty Hunter', 17, 20, 1, 300, 0)])
-        self.assertEqual(len(self.check(records)), 2)
+        self.assertEqual(self.check(records), ['17199648 Goblin Bounty Hunter: expected links=True',
+                                               '17199648 Goblin Bounty Hunter: expected detects 1, got 0'])
 
     def test_a_missing_level_mod_fails(self):
         records = dict(self.RECORDS)
@@ -249,13 +240,9 @@ class Validate(unittest.TestCase):
         records.update([record(17191195, 101, 'Carrion Worm', 4, 5, 0, 180, 2)])
         self.assertEqual(self.check(records), ['17191195: expected a placeholder of 17191196, got 0'])
 
-    def test_dumps_without_any_detection_fail(self):
-        records = {mob_id: dict(r, detects=0) for mob_id, r in self.RECORDS.items()}
-        self.assertIn('no mob has any detection: the dumps predate link and detection',
-                      self.check(records, expected={}))
-
     def test_too_few_mobs_or_zones_fail(self):
-        self.assertEqual(len(self.check(self.RECORDS, min_mobs=8, min_zones=4)), 2)
+        self.assertEqual(self.check(self.RECORDS, min_mobs=8, min_zones=4),
+                         ['only 7 mobs (expected at least 8)', 'only 3 zones (expected at least 4)'])
 
     def test_load_reads_every_column(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -274,12 +261,15 @@ class ValidateRules(unittest.TestCase):
         self.assertEqual(validate.check_rules(self.GOOD), [])
 
     def test_an_even_match_must_give_100_in_every_bracket(self):
-        uneven = dict(self.GOOD, baseExp=[[0] * 20, [100] * 19 + [90], [120] * 20])
-        self.assertEqual(len(validate.check_rules(uneven)), 1)
-        self.assertEqual(len(validate.check_rules(dict(self.GOOD, firstDifference=1))), 1)  # no row for 0
+        uneven = [100] * 19 + [90]
+        self.assertEqual(validate.check_rules(dict(self.GOOD, baseExp=[[0] * 20, uneven, [120] * 20])),
+                         [f'an even match should give 100 experience in every bracket, got {uneven}'])
+        self.assertEqual(validate.check_rules(dict(self.GOOD, firstDifference=1)),  # no row for 0
+                         ['an even match should give 100 experience in every bracket, got None'])
 
     def test_resting_and_sitting_must_count(self):
-        self.assertEqual(len(validate.check_rules(dict(self.GOOD, sittingAnimations=[47, 63]))), 1)
+        self.assertEqual(validate.check_rules(dict(self.GOOD, sittingAnimations=[47, 63])),
+                         ['resting (33) and /sit (47) should count as sitting, got [47, 63]'])
 
 
 if __name__ == '__main__':

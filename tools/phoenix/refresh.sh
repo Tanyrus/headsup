@@ -12,12 +12,15 @@
 #   HEADSUP_PHOENIX_DUMPS      server runs to snapshot, default 5, about three minutes each
 #   HEADSUP_PHOENIX_SNAPSHOTS  where every run's dumps are kept, one folder per Phoenix commit, settings and dump
 #                              module, default ~/.cache/headsup-snapshots; each refresh merges all of that folder's dumps
-#   HEADSUP_PHOENIX_JOBS       parallel build jobs, default nproc
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 WORK="${HEADSUP_PHOENIX_DIR:-$HOME/.cache/headsup-phoenix}"
-PORT="${HEADSUP_PHOENIX_DB_PORT:-3307}"
+DB_PORT="${HEADSUP_PHOENIX_DB_PORT:-3307}"
 MAP_PORT="${HEADSUP_PHOENIX_MAP_PORT:-54230}"
+HOST=127.0.0.1
+DB_NAME=xidb
+DB_USER=xi
+DB_PASSWORD=xi
 MAP_TIMEOUT=1200 # seconds for one server run to write its dump
 VANADIEL_DAY=3456 # real seconds in a Vana'diel day: 24 hours of 144 s
 DUMPS="${HEADSUP_PHOENIX_DUMPS:-5}"
@@ -91,10 +94,9 @@ cmake -G Ninja -S "$SERVER" -B "$BUILD" -DCMAKE_BUILD_TYPE=Release -DTRACY_ENABL
     -DWARNINGS_AS_ERRORS=FALSE -DENABLE_CLANG_TIDY=OFF -DPython_EXECUTABLE="$VENV/bin/python" \
     > "$WORK/configure.log" 2>&1 || fail "cmake configure; see $WORK/configure.log"
 log "building (the first build takes about 15 minutes)"
-cmake --build "$BUILD" -j "${HEADSUP_PHOENIX_JOBS:-$(nproc)}" > "$WORK/build.log" 2>&1 || fail "build; see $WORK/build.log"
+cmake --build "$BUILD" > "$WORK/build.log" 2>&1 || fail "build; see $WORK/build.log"
 [ -x "$SERVER/xi_map" ] || fail "no xi_map after the build"
 
-# A private MariaDB holding Phoenix's database, always stopped on exit.
 stop_db() {
     if [ -S "$SOCKET" ]; then
         mariadb-admin --no-defaults -S "$SOCKET" -u root shutdown > /dev/null 2>&1 || true
@@ -111,8 +113,8 @@ if [ ! -d "$DB/data/mysql" ]; then
     mariadb-install-db --no-defaults --datadir="$DB/data" --auth-root-authentication-method=normal --skip-test-db \
         > "$WORK/db-install.log" 2>&1 || fail "mariadb-install-db; see $WORK/db-install.log"
 fi
-log "starting MariaDB on 127.0.0.1:$PORT"
-mariadbd --no-defaults --datadir="$DB/data" --socket="$SOCKET" --port="$PORT" --bind-address=127.0.0.1 \
+log "starting MariaDB on $HOST:$DB_PORT"
+mariadbd --no-defaults --datadir="$DB/data" --socket="$SOCKET" --port="$DB_PORT" --bind-address="$HOST" \
     --pid-file="$DB/mariadb.pid" --log-error="$DB/error.log" --tmpdir="$TMPDIR" --character-set-server=utf8mb4 \
     --collation-server=utf8mb4_general_ci --max-allowed-packet=256M &
 for _ in $(seq 120); do
@@ -120,48 +122,39 @@ for _ in $(seq 120); do
     sleep 0.5
 done
 [ -S "$SOCKET" ] || fail "MariaDB did not start; see $DB/error.log"
-mariadb --no-defaults -S "$SOCKET" -u root -e "CREATE DATABASE IF NOT EXISTS xidb CHARACTER SET utf8mb4 \
-    COLLATE utf8mb4_general_ci; CREATE USER IF NOT EXISTS 'xi'@'127.0.0.1' IDENTIFIED BY 'xi'; \
-    GRANT ALL PRIVILEGES ON xidb.* TO 'xi'@'127.0.0.1'; FLUSH PRIVILEGES;"
+mariadb --no-defaults -S "$SOCKET" -u root -e "CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4 \
+    COLLATE utf8mb4_general_ci; CREATE USER IF NOT EXISTS '$DB_USER'@'$HOST' IDENTIFIED BY '$DB_PASSWORD'; \
+    GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'$HOST'; FLUSH PRIVILEGES;"
 [ -f "$SERVER/tools/config.yaml" ] ||
     printf -- "- mysql_bin: /usr/bin/\n- auto_backup: 0\n- auto_update_client: false\n- db_ver: ''\n" > "$SERVER/tools/config.yaml"
-export XI_NETWORK_SQL_HOST=127.0.0.1 XI_NETWORK_SQL_PORT="$PORT" XI_NETWORK_SQL_LOGIN=xi XI_NETWORK_SQL_PASSWORD=xi \
-    XI_NETWORK_SQL_DATABASE=xidb
+export XI_NETWORK_SQL_HOST="$HOST" XI_NETWORK_SQL_PORT="$DB_PORT" XI_NETWORK_SQL_LOGIN="$DB_USER" \
+    XI_NETWORK_SQL_PASSWORD="$DB_PASSWORD" XI_NETWORK_SQL_DATABASE="$DB_NAME"
 log "loading the database (dbtool update full)"
 (cd "$SERVER" && "$VENV/bin/python" tools/dbtool.py update full < /dev/null > "$WORK/dbtool.log" 2>&1) ||
     fail "dbtool; see $WORK/dbtool.log"
 
-# Several runs: some mobs change aggression while the server runs (elementals, the Ghrah forms, mobs that sleep at
-# night), and compact.py counts a mob as aggressive if any run saw it attack. The runs start at hours spread over one
-# Vana'diel day (faketime shifts the server's clock), so day and night both show. Every dump is kept, so later
-# refreshes of the same commit merge it too.
-# A run writes to a .part file first, so a run that dies never leaves a partial dump among the snapshots.
+# The runs start at hours spread over one Vana'diel day (faketime shifts the clock), so mobs that sleep at night are
+# also seen awake. A run writes to a .part file first, so a run that dies never leaves a partial dump among the
+# snapshots.
 mkdir -p "$SNAPSHOTS"
 stamp="$(date +%Y%m%d-%H%M%S)"
-dumps=()
 for run in $(seq "$DUMPS"); do
     dump="$SNAPSHOTS/$stamp-$run.json"
     offset=$(((run - 1) * VANADIEL_DAY / DUMPS))
     log "running xi_map until dump $run of $DUMPS is written (clock +${offset}s)"
     status=0
     (cd "$SERVER" && timeout "$MAP_TIMEOUT" faketime -f "+${offset}" env "${LIVE_SETTINGS[@]}" HEADSUP_DUMP_PATH="$dump.part" \
-        ./xi_map --ip 127.0.0.1 --port "$MAP_PORT" < /dev/null > "$WORK/map.log" 2>&1) || status=$?
+        ./xi_map --ip "$HOST" --port "$MAP_PORT" < /dev/null > "$WORK/map.log" 2>&1) || status=$?
     if [ "$status" -ne 0 ] || [ ! -s "$dump.part" ]; then
         rm -f "$dump.part"
         [ "$status" -eq 124 ] && fail "xi_map wrote no dump within $MAP_TIMEOUT seconds; see $WORK/map.log"
         fail "xi_map exited with status $status and no dump; see $WORK/map.log"
     fi
     mv "$dump.part" "$dump"
-    dumps+=("$dump")
 done
 
 rm -rf "$STAGE"
-# This run's dumps go first: they carry every field the current dump module writes.
-earlier=()
-for snapshot in "$SNAPSHOTS"/*.json; do
-    case "$snapshot" in "$SNAPSHOTS/$stamp"-*) ;; *) earlier+=("$snapshot") ;; esac
-done
-python3 "$ROOT/tools/phoenix/compact.py" "${dumps[@]}" "${earlier[@]}" "$STAGE" "$COMMIT" ||
+python3 "$ROOT/tools/phoenix/compact.py" "$SNAPSHOTS"/*.json "$STAGE" "$COMMIT" ||
     fail "compact; data/ left unchanged"
 python3 "$ROOT/tools/phoenix/validate.py" "$STAGE/phoenix_mobs.tsv" "$STAGE/phoenix_rules.json" ||
     fail "validation; data/ left unchanged"

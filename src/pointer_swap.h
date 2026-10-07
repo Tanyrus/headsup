@@ -23,7 +23,6 @@ namespace headsup
         bool Running() const { return m_Slot != nullptr; }
         // Called each frame: steps the chocobo's animation while it shows.
         void Animate();
-        // The redirected SetCursor's work.
         HCURSOR OnSetCursor(HCURSOR cursor);
 
     private:

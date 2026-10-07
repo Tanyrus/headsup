@@ -3,8 +3,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 OUT="$ROOT/build"
 PLUGINS_DIR="${HEADSUP_PLUGINS_DIR:-$HOME/Games/PhoenixXI/plugins}"
-PURE_SOURCES=(con.cpp cursor_file.cpp mobdata.cpp ph_timers.cpp classifier.cpp settings.cpp tracker.cpp outline_math.cpp labels.cpp check.cpp nameplate.cpp icons.cpp text_image.cpp shapes.cpp player_status.cpp pose.cpp commands.cpp game_glyphs.cpp game_cursor.cpp)
-PLUGIN_SOURCES=("${PURE_SOURCES[@]}" d3d_util.cpp game_names.cpp outline.cpp pointer_swap.cpp text_raster.cpp nameplate_render.cpp menu.cpp plugin.cpp)
+PURE_SOURCES=(con.cpp cursor_file.cpp mobdata.cpp ph_timers.cpp settings.cpp tracker.cpp outline_math.cpp labels.cpp check.cpp nameplate.cpp icons.cpp plate_image.cpp player_status.cpp pose.cpp commands.cpp game_glyphs.cpp game_cursor.cpp)
+PLUGIN_SOURCES=("${PURE_SOURCES[@]}" d3d_util.cpp game_names.cpp outline.cpp pointer_swap.cpp nameplate_render.cpp menu.cpp plugin.cpp)
 # dev/, ignored by git, holds a developer's tools; when it exists they are built in and plugin.cpp's HEADSUP_DEV hooks call them.
 DEV_SOURCES=()
 DEV_FLAGS=()
@@ -18,13 +18,12 @@ generate() {
     python3 "$ROOT/tools/gen_rules.py"
     python3 "$ROOT/tools/gen_icons.py"
     python3 "$ROOT/tools/gen_shapes.py"
-    python3 "$ROOT/tools/gen_pointer.py"
 }
 
 unit_tests() {
     mkdir -p "$OUT"
     python3 -m unittest discover -s "$ROOT/tests" -p 'test_*.py'
-    g++ -std=c++20 -O1 -Wall -Wextra -Werror -I"$ROOT/src" -I"$ROOT/tests" -o "$OUT/unit_tests" \
+    g++ -std=c++20 -O1 -Wall -Wextra -Werror -I"$ROOT/src" -o "$OUT/unit_tests" \
         "${PURE_SOURCES[@]/#/$ROOT/src/}" "$ROOT"/tests/*.cpp
     "$OUT/unit_tests"
 }

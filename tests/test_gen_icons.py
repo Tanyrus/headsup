@@ -92,7 +92,7 @@ class Decode(unittest.TestCase):
         with self.assertRaises(gen.IconError):
             gen.decode_bgra(palette_png(1, 1, [5], [(1, 2, 3)], []))  # an index past the palette
 
-    def test_only_complete_8_bit_rgba_pngs_are_accepted(self):
+    def test_only_complete_8_bit_rgba_or_palette_pngs_are_accepted(self):
         with self.assertRaises(gen.IconError):
             gen.decode_bgra(png(2, 2, bytes(12), color_type=2))
         with self.assertRaises(gen.IconError):
@@ -178,6 +178,21 @@ class GenIcons(unittest.TestCase):
         (self.dir / 'mobdb-icons' / 'Link.png').unlink()
         with self.assertRaises(gen.IconError):
             gen.generate(self.dir)
+
+
+class Pointer(unittest.TestCase):
+    def test_the_cursor_file_is_embedded_byte_for_byte(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / 'pointer.ani'
+            path.write_bytes(bytes(range(18)))
+            text = gen.generate_pointer(path)
+        self.assertIn('const unsigned char kChocoboPointerFile[] = {\n'
+                      '    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,\n'
+                      '    0x10, 0x11,\n};', text)
+
+    def test_a_missing_file_fails(self):
+        with tempfile.TemporaryDirectory() as tmp, self.assertRaises(gen.IconError):
+            gen.generate_pointer(pathlib.Path(tmp) / 'missing.ani')
 
 
 if __name__ == '__main__':

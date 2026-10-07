@@ -14,44 +14,81 @@ namespace headsup
 
         constexpr double kJiffiesPerSecond = 60.0;
         constexpr size_t kBytesPerPixel    = 4;
-        constexpr uint16_t kCursorType     = 2;  // in a cursor file's header; icons are 1
-        constexpr size_t kDirectorySize    = 6;  // reserved, type, count
-        constexpr size_t kEntrySize        = 16; // width, height, colors, reserved, hotspot x, y, image size, offset
+        constexpr size_t kRgbSize          = 3; // blue, green, red: a 24-bit pixel, or a palette color without its pad byte
+        constexpr size_t kPaletteEntrySize = 4;
+        constexpr uint32_t kMaxCursorSide  = 256; // a cursor file's directory gives each side in a byte, 0 meaning 256
+
+        constexpr size_t kDirectoryType  = 2;
+        constexpr size_t kDirectoryCount = 4;
+        constexpr size_t kDirectorySize  = 6;
+        constexpr uint16_t kCursorType   = 2; // icons are 1
+        constexpr size_t kEntryHotX      = 4;
+        constexpr size_t kEntryHotY      = 6;
+        constexpr size_t kEntryBytes     = 8;
+        constexpr size_t kEntryOffset    = 12;
+        constexpr size_t kEntrySize      = 16;
+
         constexpr uint32_t kInfoHeaderSize = 40; // BITMAPINFOHEADER
-        constexpr uint32_t kUncompressed   = 0;  // BI_RGB
-        constexpr uint32_t kFramesAreCursors = 1; // the animated cursor header's AF_ICON flag
-        constexpr size_t kChunkHeader      = 8;  // four-letter id, then size
+        constexpr size_t kDibWidth         = 4;
+        constexpr size_t kDibHeight        = 8;
+        constexpr size_t kDibBitCount      = 14;
+        constexpr size_t kDibCompression   = 16;
+        constexpr size_t kDibColorsUsed    = 32;
+        constexpr uint32_t kUncompressed   = 0; // BI_RGB
 
-        bool Is(const uint8_t* at, const char* id) { return std::memcmp(at, id, 4) == 0; }
+        constexpr size_t kIdSize             = 4; // a chunk's or a form's four letters
+        constexpr size_t kChunkHeader        = kIdSize + sizeof(uint32_t);
+        constexpr size_t kRiffHeaderSize     = kChunkHeader + kIdSize;
+        constexpr size_t kAniHeaderSize      = 36;
+        constexpr size_t kAniRate            = 28;
+        constexpr size_t kAniFlags           = 32;
+        constexpr uint32_t kFramesAreCursors = 1; // AF_ICON
 
-        bool Opaque(const uint8_t* pixel) { return pixel[3] != 0; }
+        bool Is(const uint8_t* at, const char* id) { return std::memcmp(at, id, kIdSize) == 0; }
 
-        // One frame from a cursor file: its first image.
-        std::optional<CursorFrame> ReadCursor(const uint8_t* data, size_t size)
+        bool IsOpaque(const uint8_t* pixel) { return pixel[3] != 0; }
+
+        // DIB rows are padded to whole 32-bit words.
+        size_t RowBytes(uint32_t width, uint32_t bpp) { return (static_cast<size_t>(width) * bpp + 31) / 32 * 4; }
+
+        std::optional<CursorFrame> ReadFirstCursor(const uint8_t* data, size_t size)
         {
             if (data == nullptr || size < kDirectorySize + kEntrySize) return std::nullopt;
-            if (ReadAt<uint16_t>(data, 2) != kCursorType || ReadAt<uint16_t>(data, 4) == 0) return std::nullopt;
-            const uint16_t hotX = ReadAt<uint16_t>(data, kDirectorySize + 4), hotY = ReadAt<uint16_t>(data, kDirectorySize + 6);
-            const uint32_t length = ReadAt<uint32_t>(data, kDirectorySize + 8), offset = ReadAt<uint32_t>(data, kDirectorySize + 12);
+            if (ReadAt<uint16_t>(data, kDirectoryType) != kCursorType || ReadAt<uint16_t>(data, kDirectoryCount) == 0)
+                return std::nullopt;
+            const uint8_t* entry  = data + kDirectorySize;
+            const uint16_t hotX   = ReadAt<uint16_t>(entry, kEntryHotX);
+            const uint16_t hotY   = ReadAt<uint16_t>(entry, kEntryHotY);
+            const uint32_t length = ReadAt<uint32_t>(entry, kEntryBytes);
+            const uint32_t offset = ReadAt<uint32_t>(entry, kEntryOffset);
             if (offset > size || length > size - offset || length < kInfoHeaderSize) return std::nullopt;
-            const uint8_t* dib = data + offset;
+            const uint8_t* dib    = data + offset;
             const auto headerSize = ReadAt<uint32_t>(dib, 0);
-            const auto width = ReadAt<int32_t>(dib, 4), doubled = ReadAt<int32_t>(dib, 8);
-            const auto bpp = ReadAt<uint16_t>(dib, 14);
-            if (headerSize != kInfoHeaderSize || ReadAt<uint32_t>(dib, 16) != kUncompressed || width <= 0 || doubled <= 0) return std::nullopt;
-            if (bpp != 1 && bpp != 4 && bpp != 8 && bpp != 24 && bpp != 32) return std::nullopt;
-            const auto w = static_cast<uint32_t>(width), h = static_cast<uint32_t>(doubled) / 2; // the color, then the mask
-            const uint32_t used = ReadAt<uint32_t>(dib, 32);
-            const size_t colors = bpp <= 8 ? (used != 0 ? used : size_t{1} << bpp) : 0;
-            const size_t stride = (static_cast<size_t>(w) * bpp + 31) / 32 * 4, maskStride = (w + 31) / 32 * 4;
-            const size_t paletteAt = headerSize, pixelsAt = paletteAt + colors * 4, maskAt = pixelsAt + stride * h;
+            const auto width      = ReadAt<int32_t>(dib, kDibWidth);
+            const auto doubled    = ReadAt<int32_t>(dib, kDibHeight); // the color image, then the mask
+            const auto bpp        = ReadAt<uint16_t>(dib, kDibBitCount);
+            const uint32_t used   = ReadAt<uint32_t>(dib, kDibColorsUsed);
+            if (headerSize != kInfoHeaderSize || ReadAt<uint32_t>(dib, kDibCompression) != kUncompressed) return std::nullopt;
+            if (bpp != 1 && bpp != 4 && bpp != 8 && bpp != 24) return std::nullopt;
+            if (width <= 0 || doubled <= 0) return std::nullopt;
+            const auto w = static_cast<uint32_t>(width), h = static_cast<uint32_t>(doubled) / 2;
+            const bool paletted = bpp <= 8;
+            // Bounded before the sizes below are worked out, which in the 32-bit plugin could otherwise wrap.
+            if (w > kMaxCursorSide || h > kMaxCursorSide || (paletted && used > (size_t{1} << bpp))) return std::nullopt;
+            const size_t colors     = paletted ? (used != 0 ? used : size_t{1} << bpp) : 0;
+            const size_t stride     = RowBytes(w, bpp);
+            const size_t maskStride = RowBytes(w, 1);
+            const size_t pixelsAt   = headerSize + colors * kPaletteEntrySize;
+            const size_t maskAt     = pixelsAt + stride * h;
             if (maskAt + maskStride * h > length) return std::nullopt;
 
             CursorFrame frame;
             CursorImage& image = frame.image;
-            image.width = w, image.height = h, image.hotX = hotX, image.hotY = hotY;
+            image.width        = w;
+            image.height       = h;
+            image.hotX         = hotX;
+            image.hotY         = hotY;
             image.bgra.resize(static_cast<size_t>(w) * h * kBytesPerPixel);
-            bool anyAlpha = false;
             for (uint32_t y = 0; y < h; ++y)
             {
                 const uint8_t* row  = dib + pixelsAt + stride * (h - 1 - y); // rows are kept bottom up
@@ -59,46 +96,37 @@ namespace headsup
                 for (uint32_t x = 0; x < w; ++x)
                 {
                     uint8_t* out = image.bgra.data() + (static_cast<size_t>(y) * w + x) * kBytesPerPixel;
-                    if (bpp == 32)
-                        std::memcpy(out, row + x * 4, 4), anyAlpha |= out[3] != 0;
-                    else if (bpp == 24)
-                        std::memcpy(out, row + x * 3, 3);
+                    if (!paletted)
+                        std::memcpy(out, row + x * kRgbSize, kRgbSize);
                     else
                     {
                         const size_t bit   = static_cast<size_t>(x) * bpp;
                         const size_t index = row[bit / 8] >> (8 - bpp - bit % 8) & ((1u << bpp) - 1);
                         if (index >= colors) return std::nullopt;
-                        std::memcpy(out, dib + paletteAt + index * 4, 3);
+                        std::memcpy(out, dib + headerSize + index * kPaletteEntrySize, kRgbSize);
                     }
-                    if (bpp != 32) out[3] = (mask[x / 8] >> (7 - x % 8) & 1) != 0 ? 0 : 255;
+                    out[3] = (mask[x / 8] >> (7 - x % 8) & 1) != 0 ? 0 : 255;
                 }
             }
-            if (bpp == 32 && !anyAlpha) // an alpha channel left empty: the mask says what shows
-            {
-                for (uint32_t y = 0; y < h; ++y)
-                    for (uint32_t x = 0; x < w; ++x)
-                        image.bgra[(static_cast<size_t>(y) * w + x) * kBytesPerPixel + 3] =
-                            (dib[maskAt + maskStride * (h - 1 - y) + x / 8] >> (7 - x % 8) & 1) != 0 ? 0 : 255;
-            }
-            frame.resource.resize(4 + length);
-            std::memcpy(frame.resource.data(), &hotX, 2);
-            std::memcpy(frame.resource.data() + 2, &hotY, 2);
-            std::memcpy(frame.resource.data() + 4, dib, length);
+            frame.resource.resize(sizeof(hotX) + sizeof(hotY) + length);
+            std::memcpy(frame.resource.data(), &hotX, sizeof(hotX));
+            std::memcpy(frame.resource.data() + sizeof(hotX), &hotY, sizeof(hotY));
+            std::memcpy(frame.resource.data() + sizeof(hotX) + sizeof(hotY), dib, length);
             return frame;
         }
     }
 
     std::vector<CursorFrame> ReadCursorFile(const uint8_t* data, size_t size)
     {
-        if (data == nullptr || size < 12) return {};
+        if (data == nullptr || size < kRiffHeaderSize) return {};
         if (!Is(data, "RIFF"))
         {
-            auto frame = ReadCursor(data, size);
+            auto frame = ReadFirstCursor(data, size);
             return frame ? std::vector<CursorFrame>{*frame} : std::vector<CursorFrame>{};
         }
-        if (!Is(data + 8, "ACON")) return {};
+        if (!Is(data + kChunkHeader, "ACON")) return {};
         // Some files give the RIFF size as the whole file's: read to whichever ends first.
-        const size_t end = std::min(size, kChunkHeader + static_cast<size_t>(ReadAt<uint32_t>(data, 4)));
+        const size_t end = std::min(size, kChunkHeader + static_cast<size_t>(ReadAt<uint32_t>(data, kIdSize)));
         uint32_t defaultJiffies = 0, flags = 0;
         std::vector<uint32_t> rates;
         std::vector<CursorFrame> frames;
@@ -107,29 +135,33 @@ namespace headsup
             while (at + kChunkHeader <= stop)
             {
                 const uint8_t* chunk = data + at;
-                const size_t length  = ReadAt<uint32_t>(chunk, 4);
+                const size_t length  = ReadAt<uint32_t>(chunk, kIdSize);
                 if (length > stop - at - kChunkHeader) return false;
                 const uint8_t* body = chunk + kChunkHeader;
-                if (Is(chunk, "anih") && length >= 36)
-                    defaultJiffies = ReadAt<uint32_t>(body, 28), flags = ReadAt<uint32_t>(body, 32), header = true;
-                else if (Is(chunk, "rate"))
-                    for (size_t i = 0; i + 4 <= length; i += 4)
-                        rates.push_back(ReadAt<uint32_t>(body, i));
-                else if (Is(chunk, "LIST") && length >= 4 && Is(body, "fram"))
+                if (Is(chunk, "anih") && length >= kAniHeaderSize)
                 {
-                    if (!self(at + kChunkHeader + 4, at + kChunkHeader + length, self)) return false;
+                    defaultJiffies = ReadAt<uint32_t>(body, kAniRate);
+                    flags          = ReadAt<uint32_t>(body, kAniFlags);
+                    header         = true;
+                }
+                else if (Is(chunk, "rate"))
+                    for (size_t i = 0; i + sizeof(uint32_t) <= length; i += sizeof(uint32_t))
+                        rates.push_back(ReadAt<uint32_t>(body, i));
+                else if (Is(chunk, "LIST") && length >= kIdSize && Is(body, "fram"))
+                {
+                    if (!self(at + kChunkHeader + kIdSize, at + kChunkHeader + length, self)) return false;
                 }
                 else if (Is(chunk, "icon"))
                 {
-                    auto frame = ReadCursor(body, length);
+                    auto frame = ReadFirstCursor(body, length);
                     if (!frame) return false;
                     frames.push_back(std::move(*frame));
                 }
-                at += kChunkHeader + length + (length & 1);
+                at += kChunkHeader + length + (length & 1); // chunks are padded to an even length
             }
             return true;
         };
-        if (!walk(12, end, walk) || !header || (flags & kFramesAreCursors) == 0 || frames.empty()) return {};
+        if (!walk(kRiffHeaderSize, end, walk) || !header || (flags & kFramesAreCursors) == 0 || frames.empty()) return {};
         for (size_t i = 0; i < frames.size(); ++i)
             frames[i].seconds = static_cast<double>(i < rates.size() ? rates[i] : defaultJiffies) / kJiffiesPerSecond;
         return frames;
@@ -170,14 +202,12 @@ namespace headsup
         if (a.bgra.size() != b.bgra.size()) return false;
         for (size_t at = 0; at < a.bgra.size(); at += kBytesPerPixel)
         {
-            const bool shown = Opaque(a.bgra.data() + at);
-            if (shown != Opaque(b.bgra.data() + at)) return false;
-            if (shown && std::memcmp(a.bgra.data() + at, b.bgra.data() + at, 3) != 0) return false;
+            const bool shown = IsOpaque(a.bgra.data() + at);
+            if (shown != IsOpaque(b.bgra.data() + at)) return false;
+            if (shown && std::memcmp(a.bgra.data() + at, b.bgra.data() + at, kRgbSize) != 0) return false;
         }
         return true;
     }
-
-    std::vector<uint8_t> ChocoboPointerFile() { return {std::begin(kChocoboPointerFile), std::end(kChocoboPointerFile)}; }
 
     std::vector<CursorFrame> ChocoboPointer() { return ReadCursorFile(kChocoboPointerFile, sizeof(kChocoboPointerFile)); }
 }

@@ -2,7 +2,6 @@
 #include "test.h"
 
 #include <cmath>
-#include <iterator>
 
 using namespace headsup;
 
@@ -58,45 +57,4 @@ TEST(offsets_are_the_requested_pixels_from_the_centre_all_around)
     CHECK(std::fabs(dx * 1920.0f - 4.0f) < 1e-3f && std::fabs(dy) < 1e-6f); // the first copy goes right
     OutlineOffset(2, 8, 4.0f, 3840.0f, 2160.0f, dx, dy);
     CHECK(std::fabs(dx) < 1e-6f && std::fabs(dy * 1080.0f - 4.0f) < 1e-3f); // a quarter turn later, along y
-}
-
-namespace
-{
-    // The mob in these tests has no data, so its outline needs the unknown category on.
-    Settings OutliningUnknown()
-    {
-        Settings s;
-        s.show[static_cast<int>(Category::Unknown)] = true;
-        return s;
-    }
-}
-
-TEST(owner_is_the_first_tracked_pointer_of_any_kind)
-{
-    Tracker t;
-    t.Update({ActorInput{0x1000, 1052, 0, EntityKind::Player, true, 0.0f, "Carrott", nullptr, std::nullopt, Pose::Standing, WorldPoint{}},
-                 ActorInput{0x2000, 0, 0, EntityKind::Mob, true, 10.0f, "Beach Monk", nullptr, std::nullopt, Pose::Standing, WorldPoint{}}},
-        PlayerState{20, false}, OutliningUnknown());
-
-    const uint32_t playerDraw[] = {0x5, 0x1234, 0x1000, 0x2000}; // stale mob pointer above the live player
-    const ActorInfo* owner      = FindOwner(std::begin(playerDraw), std::end(playerDraw), t);
-    CHECK(owner != nullptr);
-    CHECK(!owner->outline);
-
-    const uint32_t mobDraw[] = {0x5, 0x2000, 0x1000};
-    owner = FindOwner(std::begin(mobDraw), std::end(mobDraw), t);
-    CHECK(owner != nullptr);
-    CHECK(owner->outline);
-
-    const uint32_t noActor[] = {0x5, 0x6};
-    CHECK(FindOwner(std::begin(noActor), std::end(noActor), t) == nullptr);
-}
-
-TEST(stencil_formats)
-{
-    CHECK(HasStencilBits(75));
-    CHECK(HasStencilBits(73));
-    CHECK(HasStencilBits(79));
-    CHECK(!HasStencilBits(77)); // D24X8
-    CHECK(!HasStencilBits(80)); // D16
 }

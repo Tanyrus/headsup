@@ -46,8 +46,8 @@ namespace headsup
 
     bool OutlineRenderer::TakeStencilWarning() { return std::exchange(m_StencilWarningPending, false); }
 
-    // Character model meshes: indexed, a vertex declaration handle, an identity world matrix (skinned straight into world
-    // space) and a depth-stencil surface bound (the sun/shadow-map pass renders without one).
+    // Characters are skinned straight into world space, so their world matrix is identity; the sun's shadow-map pass
+    // binds no depth surface.
     bool OutlineRenderer::IsCharacterModelDraw()
     {
         DWORD vs = 0;
@@ -66,7 +66,8 @@ namespace headsup
         IDirect3DSurface8* depth = nullptr;
         if (FAILED(m_Device->GetDepthStencilSurface(&depth)) || depth == nullptr) return false;
         D3DSURFACE_DESC desc{};
-        const bool hasStencil = SUCCEEDED(depth->GetDesc(&desc)) && HasStencilBits(static_cast<uint32_t>(desc.Format));
+        const bool hasStencil = SUCCEEDED(depth->GetDesc(&desc)) &&
+                                (desc.Format == D3DFMT_D15S1 || desc.Format == D3DFMT_D24S8 || desc.Format == D3DFMT_D24X4S4);
         depth->Release();
         return hasStencil;
     }
@@ -107,7 +108,6 @@ namespace headsup
         m_InDraw  = true;
         auto draw = [&] { m_Device->DrawIndexedPrimitive(type, minIndex, numVertices, startIndex, primCount); };
 
-        // The mesh as the game drew it, also marking its visible pixels with this mob's stencil value.
         m_Device->SetRenderState(D3DRS_STENCILENABLE, TRUE);
         m_Device->SetRenderState(D3DRS_STENCILFUNC, D3DCMP_ALWAYS);
         m_Device->SetRenderState(D3DRS_STENCILREF, owner.stencilRef);
@@ -118,7 +118,6 @@ namespace headsup
         m_Device->SetRenderState(D3DRS_STENCILZFAIL, D3DSTENCILOP_KEEP);
         draw();
 
-        // Solid-colour copies shifted around the silhouette, drawn only where the stencil is not this mob.
         m_Device->SetRenderState(D3DRS_STENCILFUNC, D3DCMP_NOTEQUAL);
         m_Device->SetRenderState(D3DRS_STENCILPASS, D3DSTENCILOP_KEEP);
         m_Device->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);

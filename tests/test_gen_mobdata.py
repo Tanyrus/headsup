@@ -14,15 +14,13 @@ GOOD = (HEADER + '\n17190918\t101\tWild Rabbit\t1\t1\t0\t60\t257\t-2\t0\n'
 
 class Parse(unittest.TestCase):
     def test_rows(self):
-        records = gen.parse(GOOD)
-        self.assertEqual(len(records), 3)
-        self.assertEqual(records[2], {'id': 17199648, 'zone': 103, 'name': 'Goblin Bounty Hunter', 'minLevel': 17,
-                                      'maxLevel': 20, 'flags': 161, 'respawn': 300, 'detects': 259, 'expLevelMod': 0,
-                                      'placeholderOf': 0})
-        self.assertEqual(records[1]['placeholderOf'], 17191196)
-
-    def test_a_level_mod_can_be_negative(self):
-        self.assertEqual(gen.parse(GOOD)[0]['expLevelMod'], -2)
+        self.assertEqual(gen.parse(GOOD), [
+            {'id': 17190918, 'zone': 101, 'name': 'Wild Rabbit', 'minLevel': 1, 'maxLevel': 1, 'flags': 0, 'respawn': 60,
+             'detects': 257, 'expLevelMod': -2, 'placeholderOf': 0},
+            {'id': 17191194, 'zone': 101, 'name': 'Carrion Worm', 'minLevel': 4, 'maxLevel': 5, 'flags': 0, 'respawn': 180,
+             'detects': 2, 'expLevelMod': 0, 'placeholderOf': 17191196},
+            {'id': 17199648, 'zone': 103, 'name': 'Goblin Bounty Hunter', 'minLevel': 17, 'maxLevel': 20, 'flags': 161,
+             'respawn': 300, 'detects': 259, 'expLevelMod': 0, 'placeholderOf': 0}])
 
     def assertBadRow(self, row, message):
         with self.assertRaises(gen.DataError) as caught:
@@ -70,13 +68,14 @@ class Output(unittest.TestCase):
         self.assertIn('const MobRecord kMobs[] = {', text)
 
     def test_the_plugin_gets_every_bit_under_its_cpp_name(self):
-        text = gen.generate_flags()
-        self.assertIn('enum MobFlag : uint8_t', text)
-        self.assertIn('        kMobAlwaysAggro = 2,', text)
-        self.assertIn('        kMobTrueDetection = 64,', text)
-        self.assertIn('        kMobFollows = 128,', text)
-        self.assertIn('enum MobDetect : uint16_t', text)
-        self.assertIn('        kDetectLowHp = 4,', text)
+        self.assertIn('    enum MobFlag : uint8_t\n    {\n'
+                      '        kMobAggressive = 1,\n        kMobAlwaysAggro = 2,\n        kMobNoAggro = 4,\n'
+                      '        kMobNotorious = 8,\n        kMobLink = 32,\n        kMobTrueDetection = 64,\n'
+                      '        kMobFollows = 128,\n    };\n', gen.generate_flags())
+        self.assertIn('    enum MobDetect : uint16_t\n    {\n'
+                      '        kDetectSight = 1,\n        kDetectHearing = 2,\n        kDetectLowHp = 4,\n'
+                      '        kDetectMagic = 32,\n        kDetectAbility = 64,\n        kDetectScent = 256,\n    };\n',
+                      gen.generate_flags())
 
     def test_a_meta_file_without_the_commit_is_an_error(self):
         with tempfile.TemporaryDirectory() as tmp:

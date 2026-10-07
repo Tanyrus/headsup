@@ -38,17 +38,14 @@ def load(path):
     return {r['id']: r for r in schema.parse(pathlib.Path(path).read_text(encoding='utf-8'), str(path))}
 
 
-def check(records, expected=EXPECTED, min_mobs=MIN_MOBS, min_zones=MIN_ZONES, level_mods=EXPECTED_LEVEL_MODS,
-          placeholders=EXPECTED_PLACEHOLDERS):
+def check(records, min_mobs=MIN_MOBS, min_zones=MIN_ZONES):
     problems = []
     if len(records) < min_mobs:
         problems.append(f'only {len(records)} mobs (expected at least {min_mobs})')
     zones = len({r['zone'] for r in records.values()})
     if zones < min_zones:
         problems.append(f'only {zones} zones (expected at least {min_zones})')
-    if not any(r['detects'] for r in records.values()):
-        problems.append('no mob has any detection: the dumps predate link and detection')
-    for mob_id, (name, lo, hi, aggressive, links, detects) in expected.items():
+    for mob_id, (name, lo, hi, aggressive, links, detects) in EXPECTED.items():
         r = records.get(mob_id)
         if r is None:
             problems.append(f'{mob_id} {name}: missing')
@@ -61,11 +58,11 @@ def check(records, expected=EXPECTED, min_mobs=MIN_MOBS, min_zones=MIN_ZONES, le
             problems.append(f'{mob_id} {name}: expected links={links}')
         if detects is not None and r['detects'] != detects:
             problems.append(f"{mob_id} {name}: expected detects {int(detects)}, got {r['detects']}")
-    for mob_id, mod in level_mods.items():
+    for mob_id, mod in EXPECTED_LEVEL_MODS.items():
         r = records.get(mob_id)
         if r is None or r['expLevelMod'] != mod:
             problems.append(f"{mob_id}: expected level mod {mod}, got {None if r is None else r['expLevelMod']}")
-    for mob_id, nm in placeholders.items():
+    for mob_id, nm in EXPECTED_PLACEHOLDERS.items():
         r = records.get(mob_id)
         if r is None or r['placeholderOf'] != nm:
             problems.append(f"{mob_id}: expected a placeholder of {nm}, got {None if r is None else r['placeholderOf']}")

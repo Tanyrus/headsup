@@ -26,19 +26,16 @@ namespace headsup
         Bazaar,
         SeekingParty,
     };
-    constexpr int kPlayerIconCount = 8;
-    constexpr int PlayerIconIndex(PlayerIcon icon) { return static_cast<int>(icon); }
+    constexpr int kPlayerIconCount = static_cast<int>(PlayerIcon::SeekingParty) + 1;
 
-    // Where a player icon goes: either side of the name, or nowhere.
     enum class IconSide : uint8_t
     {
         Left,
         Right,
         Hidden,
     };
-    constexpr int kIconSideCount = 3;
+    constexpr int kIconSideCount = static_cast<int>(IconSide::Hidden) + 1;
 
-    // What the game shows beside a player's name.
     struct PlayerStatus
     {
         bool seekingParty  = false;
@@ -49,7 +46,7 @@ namespace headsup
         bool newAdventurer = false;
         bool gm            = false;
         bool levelSync     = false;
-        uint32_t linkshellArgb = kWhite; // the linkshell's color
+        uint32_t linkshellArgb = kWhite;
     };
 
     struct PlayerUpdate
@@ -71,22 +68,19 @@ namespace headsup
     std::optional<PlayerStatus> ParseOwnStatus(const uint8_t* data, uint32_t size);
     std::optional<LevelSyncUpdate> ParseCharSync(const uint8_t* data, uint32_t size);
 
-    // What the game keeps for every player in memory, so it is known as soon as HeadsUp loads: seeking a party, a
-    // linkshell with its color (blue, green, red) and a bazaar. The bits were matched against the packets for the same
-    // players in a capture.
+    // The game keeps these for every player, so they show as soon as HeadsUp loads; the bits were matched against the
+    // same players' packets in a capture.
     PlayerStatus StatusFromRender(uint32_t flags1, uint32_t flags2, uint32_t linkshellBgr);
 
-    // Level sync from the buffs the game keeps, so it is known as soon as HeadsUp loads: your own (IPlayer's buffs), and
-    // each other member of your party's status icons as packet 0x076 carries them, each icon's low byte in its slot and
-    // its high bits two per slot in bitMask. Both hold kStatusIconSlots.
+    // Your buffs, and a party member's status icons as packet 0x076 packs them (each icon's low byte in its slot, its
+    // high bits two per slot in bitMask), are known as soon as HeadsUp loads. Both hold kStatusIconSlots.
     constexpr int kStatusIconSlots = 32;
     bool LevelSyncInBuffs(const int16_t* buffs);
     bool LevelSyncInPartyIcons(const uint8_t* icons, uint64_t bitMask);
 
-    // The memory's status with away, mentor, new adventurer and GM from the packets, when HeadsUp has seen them.
+    // Away, mentor, new adventurer and GM are only in the packets; memory is current for the rest.
     PlayerStatus WithPacketStatus(const PlayerStatus& memory, const PlayerStatus* packet);
 
-    // The status's icons the settings show, each on the side of the name it is set to, in PlayerIcon order.
     struct PlayerIconRows
     {
         IconSet left, right;

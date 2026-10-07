@@ -1,10 +1,11 @@
-#include "shapes.h"
+#include "plate_image.h"
+
+#include "argb.h"
 
 #include <algorithm>
 #include <cmath>
 #include <iterator>
 #include <utility>
-#include <vector>
 
 namespace headsup
 {
@@ -15,6 +16,47 @@ namespace headsup
         const ShapePoint kArrowPoints[] = {{0.0f, 0.0f}, {1.0f, 0.0f}, {0.5f, 1.0f}};
         constexpr float kArrowAspect    = 0.8f;
         constexpr int kRowSamples       = 4; // per pixel row; columns are covered exactly
+    }
+
+    Image Outlined(const Coverage& coverage, int radius, uint32_t color, uint32_t outlineColor)
+    {
+        Image image{coverage.width, coverage.height, std::vector<uint32_t>(coverage.alpha.size(), 0)};
+        auto alphaAt = [&](int x, int y) { return coverage.alpha[static_cast<size_t>(y * coverage.width + x)]; };
+        for (int y = 0; y < coverage.height; ++y)
+        {
+            for (int x = 0; x < coverage.width; ++x)
+            {
+                uint8_t grown = 0;
+                for (int dy = -radius; dy <= radius; ++dy)
+                {
+                    for (int dx = -radius; dx <= radius; ++dx)
+                    {
+                        const int nx = x + dx, ny = y + dy;
+                        if (dx * dx + dy * dy > radius * radius + radius) continue; // a disc, with its diagonals at 1
+                        if (nx >= 0 && ny >= 0 && nx < coverage.width && ny < coverage.height) grown = std::max(grown, alphaAt(nx, ny));
+                    }
+                }
+                const float a     = static_cast<float>(alphaAt(x, y)) / 255.0f;
+                const float o     = static_cast<float>(grown) / 255.0f;
+                const float alpha = a + o * (1.0f - a);
+                if (alpha <= 0.0f) continue;
+                auto mix = [&](int shift) {
+                    const float c = static_cast<float>(Channel(color, shift)), oc = static_cast<float>(Channel(outlineColor, shift));
+                    return static_cast<uint8_t>(std::lround((c * a + oc * o * (1.0f - a)) / alpha));
+                };
+                image.argb[static_cast<size_t>(y * coverage.width + x)] =
+                    Argb(static_cast<uint8_t>(std::lround(alpha * 255.0f)), mix(kRedShift), mix(kGreenShift), mix(kBlueShift));
+            }
+        }
+        return image;
+    }
+
+    int TextureSide(int pixels)
+    {
+        int side = 1;
+        while (side < pixels)
+            side *= 2;
+        return side;
     }
 
     const Shape& ArrowShape()

@@ -3,7 +3,9 @@
 
 #include <cmath>
 
+#include <iterator>
 #include <string>
+#include <unordered_set>
 
 using namespace headsup;
 
@@ -19,8 +21,8 @@ namespace
 
     ActorInput Mob(ActorPtr actor, uint32_t serverId, const char* name, float distance = 10.0f, bool alive = true)
     {
-        return ActorInput{actor, static_cast<uint16_t>(serverId & 0xFFF), serverId, EntityKind::Mob, alive, distance, name,
-            nullptr, std::nullopt, Pose::Standing, WorldPoint{}};
+        return ActorInput{.actor = actor, .index = static_cast<uint16_t>(serverId & 0xFFF), .serverId = serverId,
+            .kind = EntityKind::Mob, .alive = alive, .distance = distance, .name = name};
     }
 
     ActorInput BountyHunter(ActorPtr actor, float distance = 10.0f, bool alive = true)
@@ -30,15 +32,18 @@ namespace
 
     ActorInput Player(ActorPtr actor)
     {
-        return ActorInput{actor, 1052, 0x00012345, EntityKind::Player, true, 0.0f, "Carrott", nullptr, std::nullopt, Pose::Standing, WorldPoint{}};
+        return ActorInput{.actor = actor, .index = 1052, .serverId = 0x00012345, .kind = EntityKind::Player, .alive = true,
+            .distance = 0.0f, .name = "Carrott"};
     }
 
     ActorInput Npc(ActorPtr actor)
     {
-        return ActorInput{actor, 1100, 0x01011234, EntityKind::Npc, true, 3.0f, "Home Point #1", nullptr, std::nullopt, Pose::Standing, WorldPoint{}};
+        return ActorInput{.actor = actor, .index = 1100, .serverId = 0x01011234, .kind = EntityKind::Npc, .alive = true,
+            .distance = 3.0f, .name = "Home Point #1"};
     }
 
     const PlayerState kLevel20{20, false};
+    const PlayerState kLevel75{75, false};
 
     // Outlines for every category, whatever the defaults show.
     Settings EveryCategory()
@@ -47,6 +52,49 @@ namespace
         for (bool& shown : s.show)
             shown = true;
         return s;
+    }
+}
+
+TEST(a_mob_attacks_as_phoenixs_aggro_check_decides)
+{
+    CHECK(Classify(nullptr, 0, kLevel75) == Category::Unknown);
+    struct Row
+    {
+        const char* why;
+        uint8_t flags;
+        uint8_t minLevel, maxLevel;
+        int16_t levelMod;
+        int checkedLevel;
+        PlayerState player;
+        Category expected;
+    };
+    const PlayerState sitting{75, true}, unknown{0, false};
+    for (const Row& r : {
+             Row{"passive", 0, 70, 75, 0, 0, kLevel75, Category::WontAttack},
+             Row{"aggressive even match", kMobAggressive, 75, 75, 0, 0, kLevel75, Category::WillAttack},
+             Row{"aggressive but Too Weak", kMobAggressive, 50, 55, 0, 0, kLevel75, Category::WontAttack},
+             Row{"the top of the range decides", kMobAggressive, 50, 56, 0, 0, kLevel75, Category::WillAttack},
+             Row{"Too Weak still attacks you sitting", kMobAggressive, 50, 55, 0, 0, sitting, Category::WillAttack},
+             Row{"your level unknown", kMobAggressive, 1, 1, 0, 0, unknown, Category::WillAttack},
+             Row{"a level a spawn script sets", kMobAggressive, 0, 0, 0, 0, kLevel75, Category::WillAttack},
+             Row{"a check gives a scripted mob its level", kMobAggressive, 0, 0, 0, 55, kLevel75, Category::WontAttack},
+             Row{"always aggro ignores Too Weak", kMobAlwaysAggro, 50, 55, 0, 0, kLevel75, Category::WillAttack},
+             Row{"no aggro wins", kMobAggressive | kMobAlwaysAggro | kMobNoAggro, 75, 75, 0, 0, kLevel75, Category::WontAttack},
+             // Phoenix lets a mob with the Follow roam flag follow instead, even an always-aggro one.
+             Row{"followers never attack", kMobAggressive | kMobAlwaysAggro | kMobFollows, 75, 75, 0, 0, kLevel75, Category::WontAttack},
+             // At 75, level 56 gives 15 exp (Easy Prey) and 55 none.
+             Row{"a lowering level mod counts", kMobAggressive, 50, 56, -1, 0, kLevel75, Category::WontAttack},
+             Row{"a raising level mod counts", kMobAggressive, 50, 55, 1, 0, kLevel75, Category::WillAttack},
+             Row{"a checked level already has the mod", kMobAggressive, 50, 56, -1, 56, kLevel75, Category::WillAttack},
+             Row{"a checked level replaces the range", kMobAggressive, 50, 56, 0, 55, kLevel75, Category::WontAttack},
+             Row{"a notorious monster that attacks", kMobAggressive | kMobNotorious, 75, 75, 0, 0, kLevel75, Category::NmWillAttack},
+             Row{"a passive notorious monster", kMobNotorious, 75, 75, 0, 0, kLevel75, Category::NmWontAttack},
+             Row{"a Too Weak notorious monster", kMobAggressive | kMobNotorious, 50, 55, 0, 0, kLevel75, Category::NmWontAttack},
+         })
+    {
+        const MobRecord mob{kBountyHunter, "Test Mob", r.minLevel, r.maxLevel, r.flags, 300, 0, r.levelMod, 0};
+        auto outcome = [&](Category c) { return std::string(r.why) + ": " + std::to_string(CategoryIndex(c)); };
+        CHECK_EQ(outcome(Classify(&mob, r.checkedLevel, r.player)), outcome(r.expected));
     }
 }
 
@@ -61,7 +109,7 @@ TEST(players_and_npcs_keep_their_names_without_outlines)
     CHECK(std::string(player->name) == "Carrott");
     CHECK(std::string(npc->name) == "Home Point #1");
     CHECK(!player->outline && !npc->outline);
-    CHECK(player->label.text[0] == '\0' && npc->icons.count == 0); // levels and icons come from mob data
+    CHECK(player->label.text[0] == '\0' && npc->mobIcons.count == 0); // levels and icons come from mob data
     CHECK_EQ(t.OutlinedCount(), 0u);
     CHECK(t.Actors() == (std::vector<ActorPtr>{0x1000, 0x1100}));
 }
@@ -69,6 +117,7 @@ TEST(players_and_npcs_keep_their_names_without_outlines)
 TEST(a_name_is_replaced_when_its_kind_is_and_it_has_one)
 {
     ActorInput unnamed = Npc(0x1300);
+    unnamed.index      = 1101;
     unnamed.name       = "";
     const std::vector<ActorInput> everyone{BountyHunter(0x1000), Player(0x1100), Npc(0x1200), unnamed};
     struct Case
@@ -89,7 +138,24 @@ TEST(a_name_is_replaced_when_its_kind_is_and_it_has_one)
         CHECK(ReplacesName(s, *t.Find(0x1100)) == c.player);
         CHECK(ReplacesName(s, *t.Find(0x1200)) == c.npc);
         CHECK(!ReplacesName(s, *t.Find(0x1300)));
+        std::unordered_set<uint16_t> kept{1101};
+        if (!c.mob) kept.insert(0x220);
+        if (!c.player) kept.insert(1052);
+        if (!c.npc) kept.insert(1100);
+        CHECK(KeptNames(t, s) == kept);
     }
+}
+
+TEST(owner_is_the_first_tracked_pointer_of_any_kind)
+{
+    Tracker t;
+    t.Update({Player(0x1000), BountyHunter(0x2000)}, kLevel20, Settings{});
+    const uint32_t playerDraw[] = {0x5, 0x1234, 0x1000, 0x2000}; // stale mob pointer above the live player
+    CHECK(FindOwner(std::begin(playerDraw), std::end(playerDraw), t) == t.Find(0x1000));
+    const uint32_t mobDraw[] = {0x5, 0x2000, 0x1000};
+    CHECK(FindOwner(std::begin(mobDraw), std::end(mobDraw), t) == t.Find(0x2000));
+    const uint32_t noActor[] = {0x5, 0x6};
+    CHECK(FindOwner(std::begin(noActor), std::end(noActor), t) == nullptr);
 }
 
 TEST(spawn_flags_give_the_kind)
@@ -123,14 +189,14 @@ TEST(players_get_their_status_icons_and_linkshell_color)
     Tracker t;
     t.Update({player, Player(0x1100)}, kLevel20, Settings{});
     const ActorInfo* shopping = t.Find(0x1000);
-    CHECK_EQ(shopping->nameIcons.left.count, 2);
-    CHECK(shopping->nameIcons.left.icons[0] == Icon::Linkshell && shopping->nameIcons.left.icons[1] == Icon::Bazaar);
+    CHECK_EQ(shopping->playerIcons.left.count, 2);
+    CHECK(shopping->playerIcons.left.icons[0] == Icon::Linkshell && shopping->playerIcons.left.icons[1] == Icon::Bazaar);
     CHECK_EQ(shopping->linkshellArgb, 0xFF8F1FFFu);
-    CHECK_EQ(t.Find(0x1100)->nameIcons.left.count, 0); // no status seen yet
+    CHECK_EQ(t.Find(0x1100)->playerIcons.left.count, 0); // no status seen yet
     Settings right;
-    right.playerIconSide[PlayerIconIndex(PlayerIcon::Bazaar)] = IconSide::Right;
+    right.playerIconSide[static_cast<int>(PlayerIcon::Bazaar)] = IconSide::Right;
     t.Update({player}, kLevel20, right);
-    CHECK(t.Find(0x1000)->nameIcons.left.count == 1 && t.Find(0x1000)->nameIcons.right.icons[0] == Icon::Bazaar);
+    CHECK(t.Find(0x1000)->playerIcons.left.count == 1 && t.Find(0x1000)->playerIcons.right.icons[0] == Icon::Bazaar);
 }
 
 TEST(each_category_gets_its_colour)
@@ -251,12 +317,12 @@ TEST(every_mob_gets_nameplate_data_at_any_distance)
     CHECK_EQ(far->index, 0x220);
     CHECK(std::string(far->name) == "Goblin Bounty Hunter");
     CHECK(std::string(far->label.text) == "Lv 17-20 EP-EM");
-    CHECK(far->icons.count >= 1);
-    CHECK(far->icons.icons[0] == Icon::AggroNQ);
+    CHECK(far->mobIcons.count >= 1);
+    CHECK(far->mobIcons.icons[0] == Icon::AggroNQ);
     const ActorInfo* hidden = t.Find(0x3000);
     CHECK(!hidden->outline);
     CHECK(std::string(hidden->label.text) == "Lv 19-20 DC-EM");
-    CHECK(hidden->icons.icons[0] == Icon::PassiveNQ);
+    CHECK(hidden->mobIcons.icons[0] == Icon::PassiveNQ);
     CHECK(t.Actors() == (std::vector<ActorPtr>{0x1000, 0x2000, 0x3000})); // in entity order
 }
 
@@ -268,7 +334,7 @@ TEST(dead_mobs_keep_only_their_name)
     CHECK(!dead->outline);
     CHECK(std::string(dead->name) == "Goblin Bounty Hunter");
     CHECK(dead->label.text[0] == '\0');
-    CHECK_EQ(dead->icons.count, 0);
+    CHECK_EQ(dead->mobIcons.count, 0);
 }
 
 TEST(squared_distance_becomes_yalms_and_keeps_nan)
@@ -279,7 +345,7 @@ TEST(squared_distance_becomes_yalms_and_keeps_nan)
     CHECK(std::isnan(DistanceFromSquared(std::nanf(""))));
 }
 
-TEST(a_mob_claimed_by_you_or_your_party_is_in_combat_with_you)
+TEST(a_claim_by_you_or_your_party_is_told_from_anyone_elses)
 {
     // A mob's claim: the claimer's server ID in its low 16 bits, and 1 in its high 16 while it is claimed.
     const std::vector<uint32_t> party{0x00012345, 0x01098ABC};
@@ -290,12 +356,12 @@ TEST(a_mob_claimed_by_you_or_your_party_is_in_combat_with_you)
     CHECK(!ClaimedByParty(0x00012345, {}));
 }
 
-TEST(a_mob_in_combat_with_you_is_marked)
+TEST(a_mob_your_party_claimed_is_marked)
 {
-    ActorInput fought = BountyHunter(0x2000);
-    fought.fighting   = true;
+    ActorInput ours     = BountyHunter(0x2000);
+    ours.claimedByParty = true;
     Tracker t;
-    t.Update({Player(0x1000), fought, Mob(0x3000, kSnipper, "Snipper")}, kLevel20, Settings{});
-    CHECK(t.Find(0x2000)->fighting);
-    CHECK(!t.Find(0x3000)->fighting);
+    t.Update({Player(0x1000), ours, Mob(0x3000, kSnipper, "Snipper")}, kLevel20, Settings{});
+    CHECK(t.Find(0x2000)->claimedByParty);
+    CHECK(!t.Find(0x3000)->claimedByParty);
 }

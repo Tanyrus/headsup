@@ -10,12 +10,13 @@ namespace headsup
         std::string current;
         for (const char* p = command; *p; ++p)
         {
-            if (*p == ' ' || *p == '\t')
-            {
-                if (!current.empty()) words.push_back(current), current.clear();
-            }
-            else
+            if (*p != ' ' && *p != '\t')
                 current += static_cast<char>(std::tolower(static_cast<unsigned char>(*p)));
+            else if (!current.empty())
+            {
+                words.push_back(current);
+                current.clear();
+            }
         }
         if (!current.empty()) words.push_back(current);
         return words;

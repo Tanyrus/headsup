@@ -59,19 +59,19 @@ def returned_interfaces(text):
     found = {}
     for m in INTERFACE.finditer(text):
         for d in RETURNING.finditer(m.group(2)):
-            target = re.fullmatch(r'\s*(I[A-Z][A-Za-z0-9_]*)\s*\*\s*', d.group(1))
+            target = INTERFACE_POINTER.fullmatch(d.group(1).strip())
             if target:
                 found.setdefault(m.group(1), {})[d.group(2)] = target.group(1)
     return found
 
 
-def unlisted_interfaces(sources, text, calls, listed):
+def unlisted_interfaces(sources, text, declared, calls, listed):
     """SDK interfaces the sources name as a pointer, or reach through a call on a listed one, that are not listed."""
     used = set(INTERFACE_POINTER.findall(sources))
     for iface, methods in returned_interfaces(text).items():
         if iface in listed:
             used |= {target for method, target in methods.items() if method in calls}
-    return sorted((used & set(interfaces(text))) - set(listed) - NOT_CALLED)
+    return sorted((used & set(declared)) - set(listed) - NOT_CALLED)
 
 
 def msvc_order(decls):
@@ -113,7 +113,7 @@ def main() -> int:
                         for path in (ROOT / folder).glob(pattern))
     calls = set(CALL.findall(sources))
     problems += [f'the plugin uses {name}, which is not in CALLED_INTERFACES and so is not checked'
-                 for name in unlisted_interfaces(sources, text, calls, CALLED_INTERFACES)]
+                 for name in unlisted_interfaces(sources, text, found, calls, CALLED_INTERFACES)]
     checked = 0
     returns = struct_returns(text)
     for iface in CALLED_INTERFACES:

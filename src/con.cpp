@@ -32,11 +32,6 @@ namespace headsup
         return Con::TooWeak;
     }
 
-    bool IsTooWeak(int playerLevel, int mobLevel)
-    {
-        return Difficulty(playerLevel, mobLevel) == Con::TooWeak;
-    }
-
     const char* Abbrev(Con con)
     {
         static const char* const kAbbrev[kConCount] = {"TW", "IEP", "EP", "DC", "EM", "T", "VT", "IT"};

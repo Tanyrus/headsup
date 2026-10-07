@@ -49,8 +49,10 @@ class Parse(unittest.TestCase):
     def test_missing_or_extra_keys(self):
         broken = rules()
         del broken['incrediblyEasyPrey']
-        with self.assertRaises(gen.DataError):
-            gen.parse(json.dumps(broken))
+        with self.assertRaises(gen.DataError) as caught:
+            gen.parse(json.dumps(broken), 'x.json')
+        self.assertIn('x.json: expected the keys firstDifference baseExp', str(caught.exception))
+        self.assertBad('expected the keys firstDifference baseExp', extra=1)
         self.assertBad('incrediblyEasyPrey must have minLevel and minExp', incrediblyEasyPrey={'minLevel': 1})
 
     def test_not_json(self):

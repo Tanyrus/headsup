@@ -6,7 +6,6 @@ namespace headsup
 {
     namespace
     {
-        constexpr uint32_t kTargetIndexBits    = 0xFFF; // a server ID's last three hex digits
         constexpr const char* kPlaceholderMark = "[PH]";
 
         constexpr LabelShade kConShades[kConCount] = {LabelShade::TooWeak, LabelShade::EasyPrey, LabelShade::EasyPrey,

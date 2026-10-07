@@ -12,22 +12,19 @@ TEST(even_match_at_75)
 {
     CHECK_EQ(BaseExp(75, 75), 100u);
     CHECK(Difficulty(75, 75) == Con::EvenMatch);
-    CHECK(!IsTooWeak(75, 75));
 }
 
 TEST(too_weak_boundary_at_75)
 {
     CHECK_EQ(BaseExp(75, 56), 15u);
-    CHECK(!IsTooWeak(75, 56));
     CHECK_EQ(BaseExp(75, 55), 0u);
-    CHECK(IsTooWeak(75, 55));
 }
 
 TEST(low_level_bracket)
 {
     CHECK_EQ(BaseExp(10, 3), 20u);
     CHECK_EQ(BaseExp(10, 2), 15u);
-    CHECK(IsTooWeak(10, 1));
+    CHECK(Difficulty(10, 1) == Con::TooWeak);
 }
 
 TEST(level_difference_is_clamped_to_the_table)

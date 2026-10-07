@@ -24,7 +24,10 @@ Each monster gets a colored border, from Phoenix's own mob data and your level:
 | Green | Won't attack you, or is too weak to bother you |
 | Gold-orange | A notorious monster that will attack you |
 | Gold | A notorious monster that won't |
+| Purple | A lottery placeholder for a notorious monster |
 | Gray | Not in the mob data |
+
+Green and gray are off until you turn them on in the settings.
 
 ![Aggro outlines](screenshots/outlines.png)
 
@@ -32,7 +35,8 @@ Each monster gets a colored border, from Phoenix's own mob data and your level:
 
 Above a monster's name: a row of icons (aggressive or passive, links, and how it detects you: sight, true sight,
 sound, scent, magic, job abilities, low HP) and its level and con, colored like `/check`. After you `/check` it, the
-line shows its exact level for that spawn.
+line shows its exact level for that spawn. With mob IDs turned on, a placeholder shows `[PH]` on its level line, and
+an optional timer above your name counts down to the respawn of each placeholder you see die.
 
 ![Monster nameplates](screenshots/mob-nameplates.png)
 

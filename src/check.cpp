@@ -6,17 +6,18 @@ namespace headsup
 {
     namespace
     {
-        constexpr uint16_t kFirstCheckMessage = 0xAA; // 0xAA-0xB2: the con, then the defense/evasion remark
-        constexpr uint16_t kLastCheckMessage  = 0xB2;
-        constexpr uint32_t kCheckTypeBase     = 0x40; // the reply's check type field: 0x40 + Con
+        constexpr uint16_t kFirstCheckMessage  = 0xAA; // 0xAA-0xB2: the con, then the defense/evasion remark
+        constexpr uint16_t kLastCheckMessage   = 0xB2;
+        constexpr uint32_t kCheckTypeBase      = 0x40;  // the reply's check type field: 0x40 + Con
+        constexpr double kDefaultCheckLifetime = 600.0; // seconds, when the data has no respawn time
 
         // Byte offsets, counting Ashita's 4-byte packet header.
-        constexpr size_t kReplyServerId      = 0x08;
-        constexpr size_t kReplyLevel         = 0x0C;
-        constexpr size_t kReplyCheckType     = 0x10;
-        constexpr size_t kReplyTargetIndex   = 0x16;
-        constexpr size_t kReplyMessage       = 0x18;
-        constexpr size_t kReplyMinSize       = kReplyMessage + sizeof(uint16_t);
+        constexpr size_t kReplyServerId    = 0x08;
+        constexpr size_t kReplyLevel       = 0x0C;
+        constexpr size_t kReplyCheckType   = 0x10;
+        constexpr size_t kReplyTargetIndex = 0x16;
+        constexpr size_t kReplyMessage     = 0x18;
+        constexpr size_t kReplyMinSize     = kReplyMessage + sizeof(uint16_t);
     }
 
     std::optional<CheckReply> ParseCheckReply(const uint8_t* data, uint32_t size)

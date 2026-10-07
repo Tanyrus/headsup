@@ -14,21 +14,17 @@ namespace headsup
     {
     public:
         void SetDevice(IDirect3DDevice8* device) { m_Device = device; }
-        // Called at Present.
         void NewFrame();
 
-        // True while drawing a mesh's copies, whose draws come back through the hooks for the caller to ignore.
+        // Our own draws come back through the hooks, for the caller to ignore.
         bool Drawing() const { return m_InDraw; }
-        // The entity a DrawIndexedPrimitive of a character body belongs to; nullptr for any other draw.
         const ActorInfo* CharacterMeshOwner(const Tracker& tracker);
-        // Draws an outlined mob's mesh and its outline. Returns true when it did, and the caller must then block the
-        // game's own draw; false, drawing nothing, when the bound depth surface has no stencil bits.
+        // True when it drew the mesh itself, and the caller must then block the game's draw.
         bool DrawOutlined(D3DPRIMITIVETYPE type, UINT minIndex, UINT numVertices, UINT startIndex, UINT primCount,
             const ActorInfo& owner, const Settings& settings);
 
         uint32_t MeshesLastFrame() const { return m_MeshesLast; }
         bool StencilAvailable() const { return m_StencilAvailable; }
-        // True once, the first time a mob could not be outlined because its depth buffer has no stencil bits.
         bool TakeStencilWarning();
 
     private:

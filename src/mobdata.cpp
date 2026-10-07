@@ -10,7 +10,6 @@ namespace headsup
     {
 #include "generated/mobdata.inc"
 
-        // Moves i to the next letter or digit; false when there is none.
         bool NextAlnum(std::string_view s, size_t& i)
         {
             while (i < s.size() && !std::isalnum(static_cast<unsigned char>(s[i])))

@@ -20,6 +20,23 @@ namespace headsup
         return (flags & kSpawnFlagPlayer) != 0 ? EntityKind::Player : EntityKind::Npc;
     }
 
+    Category Classify(const MobRecord* mob, int checkedLevel, const PlayerState& player)
+    {
+        if (mob == nullptr) return Category::Unknown;
+        const bool notorious  = (mob->flags & kMobNotorious) != 0;
+        const Category attack = notorious ? Category::NmWillAttack : Category::WillAttack;
+        const Category ignore = notorious ? Category::NmWontAttack : Category::WontAttack;
+
+        if (!IsAggressive(*mob)) return ignore;
+        if (mob->flags & kMobAlwaysAggro) return attack;
+        // Unknown player level, or a level only a spawn script knows: warn rather than paint an aggressive mob safe.
+        if (player.level <= 0 || (checkedLevel <= 0 && mob->maxLevel == 0)) return attack;
+        // This spawn's checked level, else the top of the range: if any spawn of this mob can aggro, warn.
+        const int level = checkedLevel > 0 ? checkedLevel : mob->maxLevel + mob->expLevelMod;
+        if (Difficulty(player.level, level) != Con::TooWeak) return attack;
+        return player.sitting ? attack : ignore;
+    }
+
     bool IsClaimed(uint32_t claimStatus) { return (claimStatus >> kClaimedShift) != 0; }
 
     bool ClaimedByParty(uint32_t claimStatus, const std::vector<uint32_t>& partyServerIds)
@@ -54,24 +71,26 @@ namespace headsup
             info.alive       = a.alive;
             info.pose        = a.pose;
             info.feet        = a.feet;
-            info.fighting    = a.fighting;
-            info.claimed     = a.claimed;
+            info.claimedByParty = a.claimedByParty;
+            info.claimed        = a.claimed;
             std::snprintf(info.name, sizeof(info.name), "%s", a.name);
             if (a.kind == EntityKind::Mob)
             {
-                const MobRecord* mob = FindMob(a.serverId, a.name);
+                const MobRecord* mob   = FindMob(a.serverId, a.name);
+                const bool placeholder = mob != nullptr && mob->placeholderOf != 0;
                 if (a.alive)
                 {
                     const Label level = MakeLabel(mob, a.checked, player.level);
                     info.tooWeak      = level.shade == LabelShade::TooWeak;
                     info.label        = LevelLine(level, settings.showLabels,
-                        MobIdText(a.serverId, mob != nullptr && mob->placeholderOf != 0, settings.mobId, settings.markPlaceholders));
-                    info.icons = IconsFor(mob);
+                        MobIdText(a.serverId, placeholder, settings.mobId, settings.markPlaceholders));
+                    info.mobIcons = IconsFor(mob);
                 }
                 if (settings.enabled && a.alive && a.distance <= settings.maxDistance)
                 {
-                    const int category = CategoryIndex(OutlineCategory(mob, a.checked ? a.checked->level : 0, player,
-                        settings.show[CategoryIndex(Category::Placeholder)]));
+                    const bool placeholderColor = placeholder && settings.show[CategoryIndex(Category::Placeholder)];
+                    const int category = CategoryIndex(placeholderColor ? Category::Placeholder
+                                                                        : Classify(mob, a.checked ? a.checked->level : 0, player));
                     if (settings.show[category])
                     {
                         info.outline    = true;
@@ -83,7 +102,7 @@ namespace headsup
             }
             if (a.kind == EntityKind::Player && a.status)
             {
-                info.nameIcons     = PlayerIcons(*a.status, settings);
+                info.playerIcons   = PlayerIcons(*a.status, settings);
                 info.linkshellArgb = a.status->linkshellArgb;
             }
             m_Order.push_back(a.actor);
@@ -98,6 +117,21 @@ namespace headsup
         if (actor < m_Min || actor > m_Max) return nullptr; // cheap reject for the stack scan
         const auto it = m_Actors.find(actor);
         return it == m_Actors.end() ? nullptr : &it->second;
+    }
+
+    const ActorInfo* FindOwner(const uint32_t* begin, const uint32_t* end, const Tracker& tracker)
+    {
+        for (const uint32_t* p = begin; p < end; ++p)
+            if (const ActorInfo* info = tracker.Find(*p)) return info;
+        return nullptr;
+    }
+
+    std::unordered_set<uint16_t> KeptNames(const Tracker& tracker, const Settings& settings)
+    {
+        std::unordered_set<uint16_t> kept;
+        for (const ActorPtr actor : tracker.Actors())
+            if (const ActorInfo* info = tracker.Find(actor); !ReplacesName(settings, *info)) kept.insert(info->index);
+        return kept;
     }
 
     float DistanceFromSquared(float squared)

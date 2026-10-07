@@ -9,7 +9,7 @@ namespace headsup
 {
     namespace
     {
-        // 0x00D, counting Ashita's 4-byte header.
+        // Offsets count Ashita's 4-byte packet header.
         constexpr size_t kOtherIndex    = 0x08;
         constexpr size_t kOtherSend     = 0x0A;
         constexpr size_t kOtherFlags1   = 0x20;
@@ -21,12 +21,11 @@ namespace headsup
         constexpr int kOtherSeekBit     = 11;
         constexpr int kOtherAwayBit     = 14;
         constexpr int kOtherLinkshellBit = 17;
-        constexpr int kOtherGmShift     = 24;   // 3-bit GM level
+        constexpr int kOtherGmShift     = 24;
         constexpr int kOtherBazaarBit   = 31;
-        constexpr int kOtherNewBit      = 23;   // in the third word
+        constexpr int kOtherNewBit      = 23;
         constexpr int kOtherMentorBit   = 24;
 
-        // 0x037.
         constexpr size_t kOwnFlags0     = 0x28;
         constexpr size_t kOwnFlags1     = 0x2C;
         constexpr size_t kOwnRed        = 0x31; // then green and blue
@@ -36,11 +35,10 @@ namespace headsup
         constexpr int kOwnAwayBit       = 7;
         constexpr int kOwnLinkshellBit  = 25;
         constexpr int kOwnGmShift       = 29;
-        constexpr int kOwnBazaarBit     = 29;   // in the second word
-        constexpr int kOwnNewBit        = 3;    // in the fourth word
+        constexpr int kOwnBazaarBit     = 29;
+        constexpr int kOwnNewBit        = 3;
         constexpr int kOwnMentorBit     = 4;
 
-        // 0x067.
         constexpr size_t kSyncKind         = 0x04;
         constexpr uint8_t kSyncCharacter   = 0x02;
         constexpr size_t kSyncIndex        = 0x06;
@@ -50,19 +48,18 @@ namespace headsup
 
         constexpr uint32_t kGmLevelMask = 0x7;
 
-        constexpr int kLevelSyncEffect   = 269; // the Level Sync status effect, and its icon
+        constexpr int kLevelSyncEffect   = 269; // the status effect's ID, which its icon shares
         constexpr int kIconHighBits      = 2;   // per slot in a party member's icon mask, each worth 256
         constexpr uint64_t kIconHighMask = 0x3;
         constexpr int kIconLowBits       = 8;
 
-        // Each PlayerIcon's image.
         constexpr Icon kPlayerIconImages[kPlayerIconCount] = {Icon::Gm, Icon::Mentor, Icon::NewAdventurer, Icon::LevelSync,
             Icon::Away, Icon::Linkshell, Icon::Bazaar, Icon::Invite};
+        static_assert(kPlayerIconCount <= kMaxIcons);
 
-        // Render flags in the entity's memory.
-        constexpr int kRenderSeekBit      = 20; // Flags1
+        constexpr int kRenderSeekBit      = 20;
         constexpr int kRenderLinkshellBit = 27;
-        constexpr int kRenderBazaarBit    = 9;  // Flags2
+        constexpr int kRenderBazaarBit    = 9;
 
         bool Bit(uint32_t word, int bit)
         {

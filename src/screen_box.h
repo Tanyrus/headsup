@@ -4,7 +4,6 @@
 
 namespace headsup
 {
-    // An axis-aligned screen rectangle in pixels.
     struct ScreenBox
     {
         float minX = 0.0f;
@@ -50,12 +49,4 @@ namespace headsup
         float CenterX() const { return (minX + maxX) * 0.5f; }
         float CenterY() const { return (minY + maxY) * 0.5f; }
     };
-
-    // Below this, a box's height counts as this: a degenerate letter would otherwise scale its padding to nothing.
-    constexpr float kMinLetterHeight = 1.0f;
-
-    inline bool Inside(float x, float y, const ScreenBox& box, float pad)
-    {
-        return box.valid && x >= box.minX - pad && x <= box.maxX + pad && y >= box.minY - pad && y <= box.maxY + pad;
-    }
 }

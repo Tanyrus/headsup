@@ -23,7 +23,6 @@ class MobFlag(enum.IntFlag):
     ALWAYS_AGGRO = 2     # MobMod AlwaysAggro: aggros even when Too Weak
     NO_AGGRO = 4         # MobMod NoAggro
     NOTORIOUS = 8        # MobType Notorious
-    BATTLEFIELD = 16     # MobType Battlefield
     LINK = 32            # m_Link: links with its family
     TRUE_DETECTION = 64  # m_TrueDetection: true sight or true sound
     FOLLOWS = 128        # RoamFlag Follow: follows players instead of aggroing

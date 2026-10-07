@@ -25,16 +25,9 @@ class Layouts(unittest.TestCase):
     def test_parses_declarations_in_order(self):
         self.assertEqual([n for n, _ in self.methods(SAMPLE)], ['A', 'Pos', 'Size', 'Pos', 'Size', 'B', 'Log'])
 
-    def test_rejects_overloads_and_variadics(self):
-        bad = abi.unstable_methods(self.methods(SAMPLE))
-        self.assertEqual(bad['Pos'], 'overloaded')
-        self.assertEqual(bad['Size'], 'overloaded')
-        self.assertEqual(bad['Log'], 'variadic')
-
-    def test_methods_outside_split_groups_keep_their_slot(self):
-        bad = abi.unstable_methods(self.methods(SAMPLE))
-        self.assertNotIn('A', bad)
-        self.assertNotIn('B', bad)
+    def test_only_overloads_and_variadics_are_rejected(self):
+        self.assertEqual(abi.unstable_methods(self.methods(SAMPLE)),
+                         {'Pos': 'overloaded', 'Size': 'overloaded', 'Log': 'variadic'})
 
     def test_method_between_split_overloads_moves(self):
         text = SAMPLE.replace('virtual void Size(int x) = 0;', 'virtual void Mid(int x) = 0;')
@@ -81,13 +74,16 @@ struct IChat
 };
 """
 
+    def unlisted(self, sources, calls, listed):
+        return abi.unlisted_interfaces(sources, self.TEXT, abi.interfaces(self.TEXT), calls, listed)
+
     def test_an_interface_named_or_reached_must_be_listed(self):
-        self.assertEqual(abi.unlisted_interfaces('IChat* chat;', self.TEXT, set(), ['ICore']), ['IChat'])
-        self.assertEqual(abi.unlisted_interfaces('', self.TEXT, {'GetFonts'}, ['ICore']), ['IFonts'])
-        self.assertEqual(abi.unlisted_interfaces('IChat* chat;', self.TEXT, {'GetChat'}, ['ICore', 'IChat']), [])
+        self.assertEqual(self.unlisted('IChat* chat;', set(), ['ICore']), ['IChat'])
+        self.assertEqual(self.unlisted('', {'GetFonts'}, ['ICore']), ['IFonts'])
+        self.assertEqual(self.unlisted('IChat* chat;', {'GetChat'}, ['ICore', 'IChat']), [])
 
     def test_a_pointer_to_something_that_is_not_an_interface_is_ignored(self):
-        self.assertEqual(abi.unlisted_interfaces('IDirect3DDevice8* device;', self.TEXT, set(), ['ICore']), [])
+        self.assertEqual(self.unlisted('IDirect3DDevice8* device;', set(), ['ICore']), [])
 
 
 if __name__ == '__main__':

@@ -66,6 +66,27 @@ TEST(the_cursor_targets_come_from_the_target_slots)
     CHECK_EQ(TargetsFromSlots(false, 5000, 0, false, 2304).target, 0); // past the entity map
 }
 
+TEST(the_target_windows_anchors_scale_from_the_menu_to_the_back_buffer)
+{
+    const CursorWindow window{724.0f, 333.0f, 1294.0f, 329.0f};
+    CursorTargets targets;
+    PlaceAnchors(targets, window, 1280.0f, 720.0f, 2560.0f, 1080.0f); // twice as wide, half again as tall
+    CHECK(targets.anchored);
+    CHECK(targets.anchorX == 1448.0f && targets.anchorY == 499.5f);
+    CHECK(targets.subAnchorX == 2588.0f && targets.subAnchorY == 493.5f);
+    struct Sizes
+    {
+        float menuWidth, menuHeight, backBufferWidth, backBufferHeight;
+    };
+    for (const Sizes& unknown : {Sizes{0.0f, 720.0f, 2560.0f, 1080.0f}, Sizes{1280.0f, 0.0f, 2560.0f, 1080.0f},
+             Sizes{1280.0f, 720.0f, 0.0f, 0.0f}})
+    {
+        CursorTargets none;
+        PlaceAnchors(none, window, unknown.menuWidth, unknown.menuHeight, unknown.backBufferWidth, unknown.backBufferHeight);
+        CHECK(!none.anchored);
+    }
+}
+
 TEST(the_game_draws_cursors_at_the_target_windows_anchors)
 {
     const CursorWindow window{724.0f, 333.0f, 1294.0f, 329.0f};

@@ -20,7 +20,6 @@ namespace
     };
     static_assert(sizeof(Vertex) == 28);
 
-    // A glyph quad as a 4-vertex triangle strip.
     std::vector<Vertex> Quad(float x0, float y0, float x1, float y1, float z)
     {
         return {{x0, y0, z, 1.0f, 0xFFFFFFFF, 0, 0}, {x1, y0, z, 1.0f, 0xFFFFFFFF, 1, 0},
@@ -353,26 +352,23 @@ TEST(a_frames_names_come_from_the_font_the_most_glyphs_use)
     CHECK_EQ(names.colors.at(0x220), 0xFFFFFF80u);
     CHECK_EQ(names.depths.at(0x430), 0.97f);
     CHECK_EQ(names.glyphCounts.at(0x220), 5u);
-    CHECK_EQ(names.runs.at(0x220), 1u);
+    CHECK_EQ(names.framesInRow.at(0x220), 1u);
     CHECK_EQ(names.replacedPlates.size(), 1u);
     CHECK_EQ(names.keptPlates.size(), 1u);
     CHECK(Near(names.keptPlates[0].minX, 600.0f));
-    CHECK(Near(names.letterHeight, 10.0f));
 }
 
-TEST(names_keep_their_run_and_the_last_frames_font_and_letters)
+TEST(names_count_their_frames_in_a_row_and_keep_the_last_frames_font)
 {
     const std::unordered_map<uint16_t, std::vector<GlyphDraw>> glyphs{{0x220, Drawn(1000.0f, 200.0f, 0.98f, kWhite, false)}};
     FrameNames last;
-    last.runs[0x220] = 4;
+    last.framesInRow[0x220] = 4;
     const FrameNames names = ReadFrameNames(glyphs, UseOf(glyphs), {}, last);
-    CHECK_EQ(names.runs.at(0x220), 5u);
-    last.font         = kFont;
-    last.letterHeight = 12.0f;
-    const FrameNames empty = ReadFrameNames({}, {}, {}, last); // no glyphs: nothing to vote on or measure
+    CHECK_EQ(names.framesInRow.at(0x220), 5u);
+    last.font              = kFont;
+    const FrameNames empty = ReadFrameNames({}, {}, {}, last); // no glyphs: nothing to vote on
     CHECK_EQ(empty.font, kFont);
-    CHECK_EQ(empty.letterHeight, 12.0f);
-    CHECK(empty.plates.empty() && empty.runs.empty());
+    CHECK(empty.plates.empty() && empty.framesInRow.empty());
 }
 
 TEST(a_wrong_font_gives_way_to_the_texture_most_scene_quads_use)
@@ -400,7 +396,7 @@ TEST(names_credited_to_one_entity_go_back_to_where_they_were)
     const FrameNames names = ReadFrameNames({{0x183, all}}, {{kFont, 8}}, {}, last);
     CHECK(Near(names.plates.at(0x183).minX, 1001.0f) && Near(names.plates.at(0x183).maxX, 1029.0f));
     CHECK(Near(names.plates.at(0x42A).minX, 1800.0f) && Near(names.plates.at(0x42A).minY, 301.0f));
-    CHECK_EQ(names.runs.at(0x42A), 5u);
+    CHECK_EQ(names.framesInRow.at(0x42A), 5u);
 }
 
 TEST(a_name_stacked_under_another_goes_back_to_its_own)
@@ -453,27 +449,12 @@ TEST(a_frame_knows_its_largest_name)
     const FrameNames names = ReadFrameNames({{1, Drawn(100.0f, 100.0f, 0.9f, kWhite, false)}, {2, Drawn(300.0f, 100.0f, 0.9f, kWhite, false)},
                                                 {3, close}},
         {{kFont, 12}}, {}, FrameNames{});
-    CHECK(Near(names.letterHeight, 10.0f)); // the median name's, against the largest
     CHECK(Near(names.largestLetterHeight, 40.0f));
     CHECK(Near(ReadFrameNames({}, {}, {}, names).largestLetterHeight, 40.0f)); // the last frame's when none
 }
 
-TEST(a_frames_letter_height_is_the_median_names)
-{
-    // One huge name close to the camera does not size every new name's icons.
-    std::unordered_map<uint16_t, std::vector<GlyphDraw>> glyphs{{1, Drawn(100.0f, 100.0f, 0.9f, kWhite, false)},
-        {2, Drawn(300.0f, 100.0f, 0.9f, kWhite, false)}};
-    std::vector<GlyphDraw> close;
-    for (int i = 0; i < 4; ++i)
-        close.push_back({Box(500.0f + static_cast<float>(i) * 30.0f, 100.0f, 530.0f + static_cast<float>(i) * 30.0f, 140.0f), kWhite, kFont, 0.9f});
-    glyphs[3] = close;
-    CHECK(Near(ReadFrameNames(glyphs, UseOf(glyphs), {}, FrameNames{}).letterHeight, 10.0f));
-}
-
 namespace
 {
-    // One frame of a four-letter name with letters this tall, enlarged by the game when `enlarged` is its index; returns
-    // the size its nameplate scales by.
     float NextSize(FrameNames& names, float letterHeight, uint16_t enlarged = 0)
     {
         std::vector<GlyphDraw> letters;
@@ -547,14 +528,14 @@ TEST(a_picked_name_stays_where_it_was_while_the_game_enlarges_it_downward)
     CHECK(Near(frame(names, 19.3f, 0).maxY, 480.6f + 19.3f));
 }
 
-TEST(a_glyph_is_blocked_by_its_owners_name_or_the_frames_letters)
+TEST(a_glyph_is_blocked_by_its_owners_name_or_the_frames_largest)
 {
     FrameNames last;
-    last.letterHeight = 10.0f;
-    const ScreenBox icon = Box(985.0f, 198.0f, 1000.0f, 213.0f);
-    const ScreenBox name = Box(1000.0f, 200.0f, 1080.0f, 210.0f);
-    CHECK(HideGameGlyph(icon, false, true, nullptr, 0.0f, last)); // a new name: sized by the frame's letters
-    last.letterHeight = 2.0f;
+    last.largestLetterHeight = 10.0f;
+    const ScreenBox icon     = Box(985.0f, 198.0f, 1000.0f, 213.0f);
+    const ScreenBox name     = Box(1000.0f, 200.0f, 1080.0f, 210.0f);
+    CHECK(HideGameGlyph(icon, false, true, nullptr, 0.0f, last)); // a new name: sized by the frame's largest
+    last.largestLetterHeight = 2.0f;
     CHECK(!HideGameGlyph(icon, false, true, nullptr, 0.0f, last));
     CHECK(HideGameGlyph(icon, false, true, &name, name.Height(), last)); // its own name sizes it when it had one
     CHECK(!HideGameGlyph(icon, false, false, &name, name.Height(), last)); // a kept name keeps its icons
@@ -581,11 +562,10 @@ TEST(every_part_of_a_replaced_name_is_hidden_however_big_the_name)
     // From the dumps: the game also draws, with a name, a wide translucent bar and glowing squares from its font, and a
     // name close to the camera has icons as big as its 34 px letters. Each is hidden with the name it belongs to.
     FrameNames last;
-    last.letterHeight        = 9.0f;
     last.largestLetterHeight = 33.8f;
-    const ScreenBox bar      = Box(1190.0f, 650.0f, 1368.0f, 693.0f); // 178 by 43
-    const ScreenBox squares  = Box(1200.0f, 640.0f, 1266.0f, 694.0f); // 66 by 54
-    const ScreenBox icon     = Box(1244.0f, 347.0f, 1334.0f, 398.0f); // 90 by 51
+    const ScreenBox bar      = Box(1190.0f, 650.0f, 1368.0f, 693.0f);
+    const ScreenBox squares  = Box(1200.0f, 640.0f, 1266.0f, 694.0f);
+    const ScreenBox icon     = Box(1244.0f, 347.0f, 1334.0f, 398.0f);
     CHECK(HideGameGlyph(bar, true, true, nullptr, 31.6f, last));
     CHECK(HideGameGlyph(squares, true, true, nullptr, 0.0f, last));
     // Your linkshell icon credited to a Rock Lizard with 8 px letters: sized by the frame's biggest name.
@@ -598,7 +578,7 @@ TEST(every_part_of_a_replaced_name_is_hidden_however_big_the_name)
 TEST(a_returning_names_icons_are_sized_by_the_name_it_last_had)
 {
     // From a capture zoomed in on yourself: your name went for a frame and, as it came back, the game drew your
-    // linkshell icon (90 by 51 px) before your letters. Sized by the frame's other names, it was shown.
+    // linkshell icon (90 by 51 px) before your letters. Sized by the frame's other names, it would show.
     const FrameNames names = NextFrame(NextFrame(FrameNames{}, true), false);
     const ScreenBox icon   = Box(1244.0f, 347.0f, 1334.0f, 398.0f);
     CHECK(Near(LastLetterHeight(names, 0x424), 34.0f));

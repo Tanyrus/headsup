@@ -5,15 +5,30 @@ using namespace headsup;
 
 namespace
 {
-    constexpr uint16_t kEastRonfaure = 101;
-    constexpr uint32_t kWorm         = 17191194; // a Carrion Worm, Bigmouth Billy's placeholder, on a 180 s respawn
-    constexpr uint32_t kOtherWorm    = 17191195;
-    constexpr uint32_t kLaTheineMob  = 17195258; // zone 102
+    constexpr uint16_t kEastRonfaure  = 101;
+    constexpr uint32_t kWorm          = 17191194; // a Carrion Worm, Bigmouth Billy's placeholder, on a 180 s respawn
+    constexpr uint32_t kBigmouthBilly = 17191196;
+    constexpr uint32_t kOtherWorm     = 17191195;
+    constexpr uint32_t kLaTheineMob   = 17195258; // zone 102
 
-    PhSighting Worm(bool alive, bool onScreen = true, uint32_t serverId = kWorm)
+    PhSighting Worm(bool alive, bool bodyDrawn = true, uint32_t serverId = kWorm)
     {
-        return PhSighting{serverId, 180, "Bigmouth Billy", alive, onScreen};
+        return PhSighting{serverId, 180, "Bigmouth Billy", alive, bodyDrawn};
     }
+}
+
+TEST(a_placeholder_is_seen_with_its_respawn_and_its_nms_name)
+{
+    const MobRecord* worm = FindMob(kWorm, "Carrion Worm");
+    const auto seen       = SightingOf(worm, false, true);
+    CHECK(seen.has_value());
+    CHECK(seen->serverId == kWorm && seen->respawnSeconds == 180 && seen->nmName == "Bigmouth Billy");
+    CHECK(!seen->alive && seen->bodyDrawn);
+    CHECK(!SightingOf(FindMob(kBigmouthBilly, "Bigmouth Billy"), true, true).has_value()); // not a placeholder
+    CHECK(!SightingOf(nullptr, true, true).has_value());
+    MobRecord orphan     = *worm;
+    orphan.placeholderOf = 1; // an NM the data does not have
+    CHECK(SightingOf(&orphan, true, true)->nmName == "NM");
 }
 
 TEST(a_placeholder_you_see_die_gets_its_respawn_timer)
@@ -30,10 +45,10 @@ TEST(a_placeholder_you_see_die_gets_its_respawn_timer)
 
 TEST(a_placeholder_you_did_not_see_die_gets_none)
 {
-    PhTimers offScreen;
-    offScreen.Update(100.0, {Worm(true, false)});
-    offScreen.Update(101.0, {Worm(false, false)});
-    CHECK(offScreen.Lines(kEastRonfaure, 101.0).empty());
+    PhTimers unseen;
+    unseen.Update(100.0, {Worm(true, false)});
+    unseen.Update(101.0, {Worm(false, false)});
+    CHECK(unseen.Lines(kEastRonfaure, 101.0).empty());
 
     PhTimers alreadyDead; // came into range as a corpse
     alreadyDead.Update(100.0, {Worm(false)});

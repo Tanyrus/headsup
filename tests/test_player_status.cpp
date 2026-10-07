@@ -49,22 +49,22 @@ namespace
     }
 
     constexpr uint8_t kGeneral = 0x04, kDespawn = 0x20;
-}
 
-struct Expected
-{
-    bool seekingParty, bazaar, linkshell, away, mentor, newAdventurer, gm;
-};
+    struct Expected
+    {
+        bool seekingParty, bazaar, linkshell, away, mentor, newAdventurer, gm;
+    };
 
-void CheckStatus(const PlayerStatus& s, const Expected& e)
-{
-    CHECK(s.seekingParty == e.seekingParty);
-    CHECK(s.bazaar == e.bazaar);
-    CHECK(s.linkshell == e.linkshell);
-    CHECK(s.away == e.away);
-    CHECK(s.mentor == e.mentor);
-    CHECK(s.newAdventurer == e.newAdventurer);
-    CHECK(s.gm == e.gm);
+    void CheckStatus(const PlayerStatus& s, const Expected& e)
+    {
+        CHECK(s.seekingParty == e.seekingParty);
+        CHECK(s.bazaar == e.bazaar);
+        CHECK(s.linkshell == e.linkshell);
+        CHECK(s.away == e.away);
+        CHECK(s.mentor == e.mentor);
+        CHECK(s.newAdventurer == e.newAdventurer);
+        CHECK(s.gm == e.gm);
+    }
 }
 
 TEST(each_flag_of_another_players_update_comes_from_its_own_bit)
@@ -184,10 +184,10 @@ TEST(player_icons_in_order_left_of_the_name_by_default)
 TEST(each_player_icon_goes_to_its_side_or_nowhere)
 {
     Settings s;
-    s.playerIconSide[PlayerIconIndex(PlayerIcon::LevelSync)] = IconSide::Right;
-    s.playerIconSide[PlayerIconIndex(PlayerIcon::Gm)]        = IconSide::Right;
-    s.playerIconSide[PlayerIconIndex(PlayerIcon::Away)]      = IconSide::Hidden;
-    s.playerIconSide[PlayerIconIndex(PlayerIcon::Bazaar)]    = IconSide::Hidden;
+    s.playerIconSide[static_cast<int>(PlayerIcon::LevelSync)] = IconSide::Right;
+    s.playerIconSide[static_cast<int>(PlayerIcon::Gm)]        = IconSide::Right;
+    s.playerIconSide[static_cast<int>(PlayerIcon::Away)]      = IconSide::Hidden;
+    s.playerIconSide[static_cast<int>(PlayerIcon::Bazaar)]    = IconSide::Hidden;
     const PlayerIconRows rows = PlayerIcons(Everything(), s);
     CheckRow(rows.left, {Icon::Mentor, Icon::NewAdventurer, Icon::Linkshell, Icon::Invite});
     CheckRow(rows.right, {Icon::Gm, Icon::LevelSync});

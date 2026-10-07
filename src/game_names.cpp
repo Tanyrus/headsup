@@ -1,9 +1,31 @@
 #include "game_names.h"
 
-#include <cstring>
+#include "bytes.h"
+#include "d3d_util.h"
+
+#include <optional>
 
 namespace headsup
 {
+    namespace
+    {
+        std::optional<uint32_t> FirstVertexColor(DWORD fvf, const void* vertices, UINT stride)
+        {
+            if ((fvf & D3DFVF_DIFFUSE) == 0 || stride < kPretransformedPositionBytes + sizeof(uint32_t)) return std::nullopt;
+            return ReadAt<uint32_t>(static_cast<const uint8_t*>(vertices), kPretransformedPositionBytes);
+        }
+    }
+
+    bool GameNames::TargetScale::Read(IDirect3DSurface8* target, float backBufferWidth, float backBufferHeight)
+    {
+        D3DSURFACE_DESC desc{};
+        if (FAILED(target->GetDesc(&desc)) || desc.Width == 0 || desc.Height == 0) return false;
+        surface = reinterpret_cast<uintptr_t>(target);
+        x       = backBufferWidth / static_cast<float>(desc.Width);
+        y       = backBufferHeight / static_cast<float>(desc.Height);
+        return true;
+    }
+
     void GameNames::NewFrame()
     {
         FinishText();
@@ -111,6 +133,7 @@ namespace headsup
         target->Release();
         if (!inNames) return false;
         ++m_TextStats.inScene;
+        if (!m_NamesThisFrame) m_KeptNow = KeptNames(tracker, settings);
         m_NamesThisFrame = true;
 
         // Pretransformed coordinates are render-target pixels; nameplates are placed in back-buffer pixels.
@@ -124,15 +147,13 @@ namespace headsup
             ++(owner->kind == EntityKind::Mob ? m_TextStats.fromMobs : m_TextStats.fromOthers);
             replaced  = ReplacesName(settings, *owner);
             ownerName = NameplateBox(owner->index);
-            if (!replaced) m_KeptNow.insert(owner->index);
             uint32_t argb = kWhite;
-            if ((fvf & D3DFVF_DIFFUSE) != 0 && stride >= kPretransformedPositionBytes + sizeof(argb))
+            if (const auto diffuse = FirstVertexColor(fvf, vertices, stride))
             {
-                std::memcpy(&argb, static_cast<const uint8_t*>(vertices) + kPretransformedPositionBytes, sizeof(argb));
                 // FFXI keeps the PS2's color math, where 0x80 is full intensity and the draw doubles it.
                 DWORD op = D3DTOP_MODULATE;
                 m_Device->GetTextureStageState(0, D3DTSS_COLOROP, &op);
-                argb = ShownColor(argb, op == D3DTOP_MODULATE4X ? 4 : op == D3DTOP_MODULATE2X ? 2 : 1);
+                argb = ShownColor(*diffuse, op == D3DTOP_MODULATE4X ? 4 : op == D3DTOP_MODULATE2X ? 2 : 1);
             }
             m_Glyphs[owner->index].push_back(GlyphDraw{glyph, argb, texture, depth});
         }
@@ -171,12 +192,9 @@ namespace headsup
         const CursorVerdict verdict   = JudgeGameCursor(quad, m_ArrowTexture, m_Last.font, anchors, names,
             owner != nullptr ? std::optional<uint16_t>(owner->index) : std::nullopt);
         if (verdict.learnArrow) m_ArrowTexture = quad.texture;
-        uint32_t argb = 0;
-        if (verdict.block && (fvf & D3DFVF_DIFFUSE) != 0 && stride >= kPretransformedPositionBytes + sizeof(argb))
-        {
-            std::memcpy(&argb, static_cast<const uint8_t*>(vertices) + kPretransformedPositionBytes, sizeof(argb));
-            if (const auto outOfRange = PickedOutOfRange(argb)) m_PickOutOfRange = *outOfRange;
-        }
+        if (verdict.block)
+            if (const auto argb = FirstVertexColor(fvf, vertices, stride))
+                if (const auto outOfRange = PickedOutOfRange(*argb)) m_PickOutOfRange = *outOfRange;
         return verdict.block;
     }
 }

@@ -21,7 +21,6 @@ namespace headsup
         uint32_t placeholderOf; // the NM it is a lottery placeholder for, by server ID; 0 when none
     };
 
-    // Whether the mob aggros at all: aggressive or always-aggro, and neither no-aggro nor a follower.
     bool IsAggressive(const MobRecord& mob);
 
     // Whether two names have the same letters and digits, ignoring case. Phoenix drops apostrophes the client shows:

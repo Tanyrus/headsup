@@ -15,7 +15,7 @@ namespace headsup
 
     Mat4 ShiftProjection(const Mat4& p, float dxNdc, float dyNdc)
     {
-        // Row-vector convention (clip = v * P): column 0 (x) gains dx times column 3 (w), column 1 (y) gains dy times it.
+        // D3D's row vectors (clip = v * P): x and y gain dx and dy times w.
         Mat4 r = p;
         for (int row = 0; row < 4; ++row)
         {
@@ -30,17 +30,5 @@ namespace headsup
         const float angle = 2.0f * std::numbers::pi_v<float> * static_cast<float>(tap) / static_cast<float>(taps);
         dxNdc = 2.0f * px * std::cos(angle) / width;
         dyNdc = 2.0f * px * std::sin(angle) / height;
-    }
-
-    const ActorInfo* FindOwner(const uint32_t* begin, const uint32_t* end, const Tracker& tracker)
-    {
-        for (const uint32_t* p = begin; p < end; ++p)
-            if (const ActorInfo* info = tracker.Find(*p)) return info;
-        return nullptr;
-    }
-
-    bool HasStencilBits(uint32_t depthFormat)
-    {
-        return depthFormat == kFormatD15S1 || depthFormat == kFormatD24S8 || depthFormat == kFormatD24X4S4;
     }
 }

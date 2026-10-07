@@ -10,6 +10,8 @@ namespace headsup
     namespace
     {
         constexpr const char* kGameModule    = "FFXiMain.dll";
+        constexpr const char* kUser32        = "user32.dll"; // matched without case, as the import table spells it USER32
+        constexpr const char* kSetCursor     = "SetCursor";
         constexpr const char* kReplacedPointers[] = {"mousenor.ani", "mousehit.ani"}; // the normal and the hover pointers
         constexpr DWORD kCursorFormat        = 0x00030000; // what CreateIconFromResourceEx expects of an icon or cursor
 
@@ -97,12 +99,12 @@ namespace headsup
             m_Frames.push_back(frame);
         }
 
-        g_RealSetCursor = reinterpret_cast<SetCursorFn>(reinterpret_cast<void*>(GetProcAddress(GetModuleHandleA("user32.dll"), "SetCursor")));
-        void** slot     = ImportSlot(game, "USER32.dll", reinterpret_cast<void*>(g_RealSetCursor));
+        g_RealSetCursor = reinterpret_cast<SetCursorFn>(reinterpret_cast<void*>(GetProcAddress(GetModuleHandleA(kUser32), kSetCursor)));
+        void** slot     = ImportSlot(game, kUser32, reinterpret_cast<void*>(g_RealSetCursor));
         if (slot == nullptr || !Write(slot, reinterpret_cast<void*>(&SetCursorHook)))
         {
             Release();
-            return std::string("could not reach ") + kGameModule + "'s SetCursor";
+            return std::string("could not reach ") + kGameModule + "'s " + kSetCursor;
         }
         m_Slot = slot;
         g_Swap = this;

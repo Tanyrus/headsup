@@ -13,8 +13,7 @@ namespace headsup
 {
     namespace
     {
-        // Every setting's key in config/headsup/settings.ini. Whole numbers are stored as floats, like every other
-        // number in the file.
+        // Whole numbers are stored as floats, like every other number in settings.ini.
         struct BoolKey
         {
             const char* key;
@@ -22,7 +21,8 @@ namespace headsup
         };
         constexpr BoolKey kBools[] = {{"enabled", &Settings::enabled}, {"showLabels", &Settings::showLabels},
             {"replaceMobNames", &Settings::replaceMobNames}, {"showIcons", &Settings::showIcons},
-            {"hideInCombat", &Settings::hideInCombat}, {"hideClaimed", &Settings::hideClaimed},
+            // The setting's first name, which saved files carry.
+            {"hideInCombat", &Settings::hideClaimedByParty}, {"hideClaimed", &Settings::hideClaimed},
             {"hideTooWeak", &Settings::hideTooWeak}, {"hideWhileEngaged", &Settings::hideWhileEngaged},
             {"markPlaceholders", &Settings::markPlaceholders}, {"phTimers", &Settings::phTimers},
             {"scaleWithDistance", &Settings::scaleWithDistance}, {"fontBold", &Settings::fontBold},
@@ -113,7 +113,7 @@ namespace headsup
         }
     }
 
-    bool ReplacesNames(const Settings& s)
+    bool ReplacesAnyName(const Settings& s)
     {
         return s.enabled && (s.replaceMobNames || s.replacePlayerNames || s.replaceNpcNames);
     }

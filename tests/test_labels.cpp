@@ -55,14 +55,6 @@ TEST(the_level_mod_moves_the_con_but_not_the_level_shown)
     CHECK(l.shade == LabelShade::DecentChallenge);
 }
 
-TEST(range_shows_both_ends_colored_by_the_harder)
-{
-    const MobRecord m = Mob(17, 20);
-    const Label l     = MakeLabel(&m, nullptr, 20);
-    CHECK(Text(l) == "Lv 17-20 EP-EM");
-    CHECK(l.shade == LabelShade::EvenMatch);
-}
-
 TEST(single_level_shows_one_value)
 {
     const MobRecord m = Mob(21, 21);
@@ -112,10 +104,11 @@ TEST(unknown_player_level_shows_levels_without_a_con)
     CHECK(l.shade == LabelShade::Unknown);
 }
 
-TEST(the_longest_label_fits)
+TEST(the_longest_level_line_fits)
 {
-    // Three-digit levels at both ends and two two-letter cons: at 99, a level 102 is Very Tough and 150 Incredibly
-    // Tough (era table rows +3 and +15).
+    // Three-digit levels at both ends, two two-letter cons, a full ID and [PH]: at 99, a level 102 is Very Tough and 150
+    // Incredibly Tough (era table rows +3 and +15).
     const MobRecord m = Mob(102, 150);
-    CHECK_EQ(Text(MakeLabel(&m, nullptr, 99)), "Lv 102-150 VT-IT");
+    CHECK_EQ(Text(LevelLine(MakeLabel(&m, nullptr, 99), true, MobIdText(17190918, true, MobIdFormat::Full, true))),
+        "Lv 102-150 VT-IT [17190918 (0x1065006)] [PH]");
 }

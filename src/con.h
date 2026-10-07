@@ -31,8 +31,6 @@ namespace headsup
     // Phoenix's charutils::CheckMob with the difficulty curve its map server loads.
     Con Difficulty(int playerLevel, int mobLevel);
 
-    bool IsTooWeak(int playerLevel, int mobLevel);
-
-    // TW, IEP, EP, DC, EM, T, VT, IT; "??" for anything else.
+    // "??" for a value outside Con.
     const char* Abbrev(Con con);
 }

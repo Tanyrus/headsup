@@ -2,6 +2,7 @@
 #include "test.h"
 
 #include <cstring>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -9,6 +10,10 @@ using namespace headsup;
 
 namespace
 {
+#include "generated/pointer.inc"
+
+    const std::vector<uint8_t> kChocoboFile(std::begin(kChocoboPointerFile), std::end(kChocoboPointerFile));
+
     // BGRA of a pixel, top-left origin.
     std::vector<uint8_t> Pixel(const CursorImage& image, uint32_t x, uint32_t y)
     {
@@ -30,22 +35,42 @@ namespace
         if (body.size() % 2 != 0) out.push_back(0);
     }
 
+    // A frame's BITMAPINFOHEADER: its height counts the color image and then the mask.
+    std::vector<uint8_t> InfoHeader(uint32_t width, uint32_t height, uint16_t bpp, uint32_t colorsUsed)
+    {
+        std::vector<uint8_t> dib;
+        Put32(dib, 40);
+        Put32(dib, width);
+        Put32(dib, height * 2);
+        Put16(dib, 1);
+        Put16(dib, bpp);
+        for (int unused = 0; unused < 4; ++unused) // compression (none), image size and resolution
+            Put32(dib, 0);
+        Put32(dib, colorsUsed);
+        Put32(dib, 0);
+        return dib;
+    }
+
+    std::vector<uint8_t> CursorFile(const std::vector<uint8_t>& dib, uint32_t width, uint32_t height, uint16_t hotX, uint16_t hotY)
+    {
+        std::vector<uint8_t> file;
+        Put16(file, 0);
+        Put16(file, 2); // a cursor
+        Put16(file, 1);
+        file.insert(file.end(), {static_cast<uint8_t>(width), static_cast<uint8_t>(height), 0, 0}); // 0 is 256
+        Put16(file, hotX);
+        Put16(file, hotY);
+        Put32(file, static_cast<uint32_t>(dib.size()));
+        Put32(file, 22);
+        file.insert(file.end(), dib.begin(), dib.end());
+        return file;
+    }
+
     // A 2x2 cursor file at 8 or 4 bits, hotspot (1, 0): palette 0 red, 1 green, 2 blue; rows top to bottom are
     // (red, green) and (blue, transparent).
     std::vector<uint8_t> TinyCursor(uint16_t bpp = 8)
     {
-        std::vector<uint8_t> dib;
-        Put32(dib, 40);
-        Put32(dib, 2);
-        Put32(dib, 4); // the color and the mask
-        Put16(dib, 1);
-        Put16(dib, bpp);
-        Put32(dib, 0);
-        Put32(dib, 0);
-        Put32(dib, 0);
-        Put32(dib, 0);
-        Put32(dib, 3); // colors used
-        Put32(dib, 0);
+        std::vector<uint8_t> dib = InfoHeader(2, 2, bpp, 3);
         const uint8_t palette[] = {0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 0};
         dib.insert(dib.end(), palette, palette + sizeof(palette));
         // Rows bottom up, each padded to 4 bytes: (blue, red), then (red, green); at 4 bits the first pixel is the high half.
@@ -54,18 +79,17 @@ namespace
         dib.insert(dib.end(), pixels, pixels + 8);
         const uint8_t mask[] = {0x40, 0, 0, 0, 0x00, 0, 0, 0}; // bottom row: the second pixel transparent
         dib.insert(dib.end(), mask, mask + sizeof(mask));
+        return CursorFile(dib, 2, 2, 1, 0);
+    }
 
-        std::vector<uint8_t> file;
-        Put16(file, 0);
-        Put16(file, 2); // a cursor
-        Put16(file, 1);
-        file.insert(file.end(), {2, 2, 0, 0});
-        Put16(file, 1); // hotspot x
-        Put16(file, 0); // hotspot y
-        Put32(file, static_cast<uint32_t>(dib.size()));
-        Put32(file, 22);
-        file.insert(file.end(), dib.begin(), dib.end());
-        return file;
+    // Every pixel palette color 0 and none masked out.
+    std::vector<uint8_t> PlainCursor(uint32_t width, uint32_t height, uint16_t bpp, uint32_t colorsUsed)
+    {
+        std::vector<uint8_t> dib  = InfoHeader(width, height, bpp, colorsUsed);
+        const size_t rowBytes     = (width * bpp + 31) / 32 * 4;
+        const size_t maskRowBytes = (width + 31) / 32 * 4;
+        dib.resize(dib.size() + colorsUsed * 4 + (rowBytes + maskRowBytes) * height);
+        return CursorFile(dib, width, height, 0, 0);
     }
 }
 
@@ -97,6 +121,17 @@ TEST(a_cursor_file_decodes_to_its_colors_hotspot_and_transparency)
     CHECK(std::memcmp(frames[0].resource.data() + 4, file.data() + 22, file.size() - 22) == 0);
 }
 
+TEST(a_cursor_larger_than_its_format_allows_is_not_read)
+{
+    // In the 32-bit plugin, a larger side or palette could wrap the size checks and read past the frame.
+    auto frames = [](const std::vector<uint8_t>& file) { return ReadCursorFile(file.data(), file.size()).size(); };
+    CHECK_EQ(frames(PlainCursor(256, 256, 1, 2)), 1u); // a cursor file's largest
+    CHECK_EQ(frames(PlainCursor(257, 1, 1, 2)), 0u);
+    CHECK_EQ(frames(PlainCursor(1, 257, 1, 2)), 0u);
+    CHECK_EQ(frames(PlainCursor(2, 2, 8, 256)), 1u);
+    CHECK_EQ(frames(PlainCursor(2, 2, 8, 257)), 0u); // more colors than 8 bits can pick from
+}
+
 TEST(the_chocobo_pointer_has_two_frames_each_shown_five_sixths_of_a_second)
 {
     // From third_party/playonline-chocobo/chocobo.ani, read independently with Python: a rate chunk of 50 jiffies per
@@ -119,7 +154,7 @@ TEST(the_chocobo_pointer_has_two_frames_each_shown_five_sixths_of_a_second)
 TEST(an_animation_without_a_rate_chunk_uses_its_header_rate)
 {
     // The chocobo's two frames, in a file that gives 10 jiffies per frame in its header and no rate chunk.
-    const auto chocobo = ChocoboPointerFile();
+    const std::vector<uint8_t>& chocobo = kChocoboFile;
     std::vector<uint8_t> icons;
     for (size_t at = 0; at + 8 <= chocobo.size(); ++at)
     {
@@ -157,7 +192,7 @@ TEST(the_frame_shown_follows_the_clock_and_loops)
 
 TEST(only_whole_cursor_files_are_read)
 {
-    const auto chocobo = ChocoboPointerFile();
+    const std::vector<uint8_t>& chocobo = kChocoboFile;
     CHECK(ReadCursorFile(chocobo.data(), 100).empty());               // cut short
     CHECK(ReadCursorFile(nullptr, 0).empty());
     const uint8_t gif[] = {'G', 'I', 'F', '8', '9', 'a', 0, 0, 0, 0, 0, 0};
