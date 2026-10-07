@@ -7,7 +7,7 @@
 #include <cstring>
 #include <unordered_map>
 
-namespace aggroglow
+namespace headsup
 {
     namespace
     {
@@ -23,7 +23,9 @@ namespace aggroglow
         constexpr float kLettersPerScreen   = 180.0f; // a typical game letter is this fraction of the screen height
         constexpr float kMinScale           = 0.5f;
         constexpr float kMaxScale           = 2.5f;
-        constexpr int kSizeStep             = 2;      // pixels a font size must move before it changes
+        constexpr float kRasterSmallest     = 6.0f;   // pixels
+        constexpr float kRasterStep         = 1.25f;
+        constexpr float kRasterOverscale    = 1.05f;  // text is scaled up this much before it is redrawn larger
 
         bool Inside(float x, float y, const ScreenBox& box, float pad)
         {
@@ -77,9 +79,10 @@ namespace aggroglow
         }
     }
 
-    bool WorldTextBox(const void* vertices, uint32_t stride, uint32_t count, ScreenBox& box)
+    bool WorldTextBox(const void* vertices, uint32_t stride, uint32_t count, ScreenBox& box, float& depth)
     {
-        box = ScreenBox{};
+        box   = ScreenBox{};
+        depth = 0.0f;
         if (vertices == nullptr || stride < kPretransformedPositionBytes || count == 0 || count > kMaxTextVertices) return false;
         const auto* bytes = static_cast<const uint8_t*>(vertices);
         for (uint32_t i = 0; i < count; ++i)
@@ -92,6 +95,7 @@ namespace aggroglow
                 return false;
             }
             box.Add(xyz[0], xyz[1]);
+            depth = std::max(depth, xyz[2]);
         }
         return true;
     }
@@ -208,17 +212,20 @@ namespace aggroglow
         return l;
     }
 
-    int ScaledSize(int base, float letterHeight, float screenHeight)
+    float DistanceScale(float letterHeight, float screenHeight)
     {
-        float factor = screenHeight > 0.0f ? letterHeight / (screenHeight / kLettersPerScreen) : 1.0f;
-        if (!std::isfinite(factor)) factor = 1.0f;
-        factor = std::clamp(factor, kMinScale, kMaxScale);
-        return static_cast<int>(std::lround(static_cast<float>(base) * factor));
+        const float factor = screenHeight > 0.0f ? letterHeight / (screenHeight / kLettersPerScreen) : 1.0f;
+        return std::isfinite(factor) ? std::clamp(factor, kMinScale, kMaxScale) : 1.0f;
     }
 
-    int SteppedSize(int current, int target)
+    int RasterHeight(float pixels, int current)
     {
-        return current > 0 && std::abs(target - current) < kSizeStep ? current : target;
+        const auto drawn = static_cast<float>(current);
+        if (current > 0 && pixels <= drawn * kRasterOverscale && pixels * kRasterStep >= drawn) return current;
+        float size = kRasterSmallest;
+        while (size < pixels)
+            size *= kRasterStep;
+        return static_cast<int>(std::lround(size));
     }
 
 }

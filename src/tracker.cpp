@@ -1,9 +1,10 @@
 #include "tracker.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 
-namespace aggroglow
+namespace headsup
 {
     void Tracker::Update(const std::vector<ActorInput>& actors, const PlayerState& player, const Settings& settings)
     {
@@ -53,5 +54,11 @@ namespace aggroglow
         if (actor < m_Min || actor > m_Max) return nullptr; // cheap reject for the stack scan
         const auto it = m_Actors.find(actor);
         return it == m_Actors.end() ? nullptr : &it->second;
+    }
+
+    float DistanceFromSquared(float squared)
+    {
+        if (std::isnan(squared)) return squared;
+        return squared > 0.0f ? std::sqrt(squared) : 0.0f;
     }
 }

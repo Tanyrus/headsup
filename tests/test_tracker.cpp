@@ -1,9 +1,11 @@
 #include "test.h"
 #include "tracker.h"
 
+#include <cmath>
+
 #include <string>
 
-using namespace aggroglow;
+using namespace headsup;
 
 namespace
 {
@@ -175,3 +177,10 @@ TEST(dead_mobs_keep_only_their_name)
     CHECK_EQ(dead->icons.count, 0);
 }
 
+TEST(squared_distance_becomes_yalms_and_keeps_nan)
+{
+    // Ashita reports squared distances. A NaN must stay NaN so no distance limit passes it; std::max(0, NaN) is 0.
+    CHECK_EQ(DistanceFromSquared(16.0f), 4.0f);
+    CHECK_EQ(DistanceFromSquared(-1.0f), 0.0f);
+    CHECK(std::isnan(DistanceFromSquared(std::nanf(""))));
+}

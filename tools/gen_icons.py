@@ -1,29 +1,103 @@
 #!/usr/bin/env python3
 """Generate src/generated/icons.inc from the MobDB icons in third_party/mobdb-icons (MIT License, ThornyFFXI).
 
-The PNG files are compiled into the plugin as byte arrays; Ashita decodes them when an icon primitive is created.
+Each PNG is decoded here and compiled into the plugin as raw pixels, ready to copy into a Direct3D texture.
 """
 import pathlib
+import struct
 import sys
+import zlib
 
-# src/icons.cpp builds its table from these arrays in aggroglow::Icon order.
+# src/icons.cpp builds its table from these bitmaps in headsup::Icon order.
 ICONS = ['AggroNQ', 'AggroHQ', 'PassiveNQ', 'PassiveHQ', 'Link', 'Sight', 'TrueSight', 'Sound', 'Scent', 'Magic', 'JA',
          'Blood']
 PNG_SIGNATURE = b'\x89PNG\r\n\x1a\n'
-# src/icons.cpp reads the width and height from the IHDR chunk that must follow the signature.
-IHDR_TYPE = slice(12, 16)
-MAX_BYTES = 64 * 1024
+RGBA_8_BIT = (8, 6)  # bit depth, color type
+BYTES_PER_PIXEL = 4
+MAX_SIDE = 64
+# Adam7 interlacing: each pass's first column, first row, column step and row step.
+ADAM7 = [(0, 0, 8, 8), (4, 0, 8, 8), (0, 4, 4, 8), (2, 0, 4, 4), (0, 2, 2, 4), (1, 0, 2, 2), (0, 1, 1, 2)]
 
 
 class IconError(ValueError):
     pass
 
 
-def c_array(name: str, data: bytes) -> str:
-    lines = [f'const unsigned char kPng{name}[] = {{']
-    for start in range(0, len(data), 16):
-        lines.append('    ' + ' '.join(f'0x{b:02x},' for b in data[start:start + 16]))
+def paeth(left: int, up: int, up_left: int) -> int:
+    p = left + up - up_left
+    pa, pb, pc = abs(p - left), abs(p - up), abs(p - up_left)
+    return left if pa <= pb and pa <= pc else up if pb <= pc else up_left
+
+
+def unfilter(raw: bytes, pos: int, width: int, height: int) -> tuple[list[bytearray], int]:
+    stride = width * BYTES_PER_PIXEL
+    rows, prev = [], bytearray(stride)
+    for _ in range(height):
+        if pos + 1 + stride > len(raw):
+            raise IconError('image data ends early')
+        kind, row = raw[pos], bytearray(raw[pos + 1:pos + 1 + stride])
+        pos += 1 + stride
+        for i in range(stride):
+            left = row[i - BYTES_PER_PIXEL] if i >= BYTES_PER_PIXEL else 0
+            up_left = prev[i - BYTES_PER_PIXEL] if i >= BYTES_PER_PIXEL else 0
+            predictions = (0, left, prev[i], (left + prev[i]) // 2, paeth(left, prev[i], up_left))
+            if kind >= len(predictions):
+                raise IconError(f'unknown row filter {kind}')
+            row[i] = (row[i] + predictions[kind]) & 0xFF
+        rows.append(row)
+        prev = row
+    return rows, pos
+
+
+def decode_bgra(data: bytes) -> tuple[int, int, bytes]:
+    """Width, height and the pixels of an 8-bit RGBA PNG, rows top to bottom, each pixel B, G, R, A as
+    D3DFMT_A8R8G8B8 keeps it in memory."""
+    if not data.startswith(PNG_SIGNATURE):
+        raise IconError('not a PNG')
+    header, compressed, pos = None, b'', len(PNG_SIGNATURE)
+    while pos + 8 <= len(data):
+        length, kind = struct.unpack('>I4s', data[pos:pos + 8])
+        body = data[pos + 8:pos + 8 + length]
+        pos += 12 + length
+        if kind == b'IHDR':
+            header = struct.unpack('>IIBBBBB', body)
+        elif kind == b'IDAT':
+            compressed += body
+        elif kind == b'IEND':
+            break
+    if header is None:
+        raise IconError('no IHDR chunk')
+    width, height, depth, color, _, _, interlace = header
+    if (depth, color) != RGBA_8_BIT:
+        raise IconError(f'bit depth {depth} and color type {color}; only 8-bit RGBA is supported')
+    if not 0 < width <= MAX_SIDE or not 0 < height <= MAX_SIDE:
+        raise IconError(f'{width}x{height} pixels; at most {MAX_SIDE}x{MAX_SIDE}')
+    try:
+        raw = zlib.decompress(compressed)
+    except zlib.error as error:
+        raise IconError(f'image data does not decompress: {error}') from None
+
+    rgba, pos = bytearray(width * height * BYTES_PER_PIXEL), 0
+    for x0, y0, dx, dy in ADAM7 if interlace else [(0, 0, 1, 1)]:
+        columns, lines = range(x0, width, dx), range(y0, height, dy)
+        if not columns or not lines:
+            continue
+        rows, pos = unfilter(raw, pos, len(columns), len(lines))
+        for y, row in zip(lines, rows):
+            for i, x in enumerate(columns):
+                at = (y * width + x) * BYTES_PER_PIXEL
+                rgba[at:at + BYTES_PER_PIXEL] = row[i * BYTES_PER_PIXEL:(i + 1) * BYTES_PER_PIXEL]
+    bgra = bytearray(rgba)
+    bgra[0::4], bgra[2::4] = rgba[2::4], rgba[0::4]
+    return width, height, bytes(bgra)
+
+
+def c_bitmap(name: str, width: int, height: int, bgra: bytes) -> str:
+    lines = [f'const unsigned char kBgra{name}[] = {{']
+    for start in range(0, len(bgra), 16):
+        lines.append('    ' + ' '.join(f'0x{b:02x},' for b in bgra[start:start + 16]))
     lines.append('};')
+    lines.append(f'const IconBitmap kIcon{name} = {{kBgra{name}, {width}, {height}}};')
     return '\n'.join(lines)
 
 
@@ -33,10 +107,10 @@ def generate(icon_dir: pathlib.Path) -> str:
         path = pathlib.Path(icon_dir) / f'{name}.png'
         if not path.is_file():
             raise IconError(f'missing icon {path}')
-        data = path.read_bytes()
-        if not data.startswith(PNG_SIGNATURE) or data[IHDR_TYPE] != b'IHDR' or len(data) > MAX_BYTES:
-            raise IconError(f'{path} is not a PNG of at most {MAX_BYTES} bytes')
-        parts.append(c_array(name, data))
+        try:
+            parts.append(c_bitmap(name, *decode_bgra(path.read_bytes())))
+        except IconError as error:
+            raise IconError(f'{path}: {error}') from None
     return '\n'.join(parts) + '\n'
 
 

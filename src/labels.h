@@ -5,7 +5,7 @@
 
 #include <cstdint>
 
-namespace aggroglow
+namespace headsup
 {
     // Which of the settings' level/con colors a label is drawn in.
     enum class LabelShade : uint8_t

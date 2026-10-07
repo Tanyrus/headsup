@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string_view>
 
-namespace aggroglow
+namespace headsup
 {
     // Bits of MobRecord::flags (the flags column of data/phoenix_mobs.tsv).
     enum MobFlag : uint8_t

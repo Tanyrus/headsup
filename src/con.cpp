@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-namespace aggroglow
+namespace headsup
 {
     namespace
     {

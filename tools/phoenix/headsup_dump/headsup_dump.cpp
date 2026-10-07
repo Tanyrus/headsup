@@ -1,10 +1,10 @@
 /************************************************************************
- * aggroglow_dump
+ * headsup_dump
  *
- * A Phoenix C++ module added by aggroglow's tools/phoenix/refresh.sh. Once
+ * A Phoenix C++ module added by headsup's tools/phoenix/refresh.sh. Once
  * the map server has been running for 20 time-server ticks (zones have
  * spawned their mobs and run their spawn scripts), it writes every loaded
- * mob to $AGGROGLOW_DUMP_PATH as JSON and exits the process.
+ * mob to $HEADSUP_DUMP_PATH as JSON and exits the process.
  ************************************************************************/
 
 #include "map/ai/ai_container.h"
@@ -45,7 +45,7 @@ namespace
     }
 }
 
-class AggroGlowDumpModule : public CPPModule
+class HeadsUpDumpModule : public CPPModule
 {
     int ticks = 0;
 
@@ -57,11 +57,11 @@ class AggroGlowDumpModule : public CPPModule
     {
         if (++ticks != kDumpTick) return;
 
-        const char* path = std::getenv("AGGROGLOW_DUMP_PATH");
-        FILE* out        = std::fopen(path != nullptr ? path : "aggroglow_mobs.json", "wb");
+        const char* path = std::getenv("HEADSUP_DUMP_PATH");
+        FILE* out        = std::fopen(path != nullptr ? path : "headsup_mobs.json", "wb");
         if (out == nullptr)
         {
-            ShowError("aggroglow_dump: cannot open the output file");
+            ShowError("headsup_dump: cannot open the output file");
             std::_Exit(1);
         }
 
@@ -86,9 +86,9 @@ class AggroGlowDumpModule : public CPPModule
         });
         std::fputs("\n]\n", out);
         std::fclose(out);
-        ShowInfo("aggroglow_dump: wrote %zu mobs", count);
+        ShowInfo("headsup_dump: wrote %zu mobs", count);
         std::_Exit(0);
     }
 };
 
-REGISTER_CPP_MODULE(AggroGlowDumpModule);
+REGISTER_CPP_MODULE(HeadsUpDumpModule);

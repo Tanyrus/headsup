@@ -46,5 +46,26 @@ class Layouts(unittest.TestCase):
         self.assertEqual(bad['Mid'], 'slot 2 under MinGW but 3 under MSVC')
 
 
+class StructReturns(unittest.TestCase):
+    TEXT = """
+struct Vec2
+{
+    float x, y;
+};
+struct IGui
+{
+    virtual IMGUI_API Vec2 GetSize(void) const = 0;
+    virtual IMGUI_API Vec2* GetSizePointer(void) = 0;
+    virtual IMGUI_API const Vec2& GetSizeReference(void) = 0;
+    virtual IMGUI_API float GetWidth(void) = 0;
+    virtual IMGUI_API void SetSize(const Vec2& size) = 0;
+};
+"""
+
+    def test_only_a_struct_returned_by_value_is_rejected(self):
+        # MSVC returns it through a hidden pointer from a member function; MinGW expects it in registers.
+        self.assertEqual(abi.struct_returns(self.TEXT), {'IGui': {'GetSize'}})
+
+
 if __name__ == '__main__':
     unittest.main()

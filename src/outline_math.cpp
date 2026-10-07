@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-namespace aggroglow
+namespace headsup
 {
     bool IsIdentity(const Mat4& m, float epsilon)
     {

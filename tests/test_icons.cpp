@@ -4,7 +4,7 @@
 #include <cstring>
 #include <vector>
 
-using namespace aggroglow;
+using namespace headsup;
 
 namespace
 {
@@ -67,14 +67,16 @@ TEST(true_detection_replaces_sight)
     CHECK(List(IconsFor(&sound)) == (std::vector<Icon>{Icon::PassiveNQ, Icon::TrueSight, Icon::Sound}));
 }
 
-TEST(every_icon_has_an_embedded_png)
+TEST(every_icon_has_its_pixels)
 {
     for (int i = 0; i < kIconCount; ++i)
     {
-        const IconPng& png = IconImage(static_cast<Icon>(i));
-        CHECK(png.size > 8);
-        CHECK(std::memcmp(png.data, "\x89PNG\r\n\x1a\n", 8) == 0);
-        CHECK_EQ(png.width, 32u); // every MobDB icon is 32x32
-        CHECK_EQ(png.height, 32u);
+        const IconBitmap& icon = IconImage(static_cast<Icon>(i));
+        CHECK_EQ(icon.width, 32u); // every MobDB icon is 32x32
+        CHECK_EQ(icon.height, 32u);
+        bool drawn = false;
+        for (uint32_t p = 0; p < icon.width * icon.height; ++p)
+            drawn |= icon.bgra[p * 4 + 3] != 0;
+        CHECK(drawn);
     }
 }

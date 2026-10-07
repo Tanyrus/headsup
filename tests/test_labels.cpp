@@ -3,7 +3,7 @@
 
 #include <string>
 
-using namespace aggroglow;
+using namespace headsup;
 
 namespace
 {

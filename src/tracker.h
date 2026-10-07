@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace aggroglow
+namespace headsup
 {
     using ActorPtr = uint32_t; // FFXI is a 32-bit process
 
@@ -56,4 +56,8 @@ namespace aggroglow
         ActorPtr m_Min = 0;
         ActorPtr m_Max = 0;
     };
+
+    // Yalms from Ashita's squared entity distance. A NaN stays NaN, so no distance limit passes it; a negative value
+    // becomes 0.
+    float DistanceFromSquared(float squared);
 }

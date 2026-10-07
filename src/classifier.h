@@ -5,7 +5,7 @@
 
 #include <cstdint>
 
-namespace aggroglow
+namespace headsup
 {
     enum class Category : uint8_t
     {

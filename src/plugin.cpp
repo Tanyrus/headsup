@@ -17,14 +17,14 @@
 
 namespace
 {
-    constexpr const char* kName        = "aggroglow";
-    constexpr const char* kConfigAlias = "aggroglow";
-    constexpr const char* kConfigFile  = "aggroglow/settings.ini"; // relative to Ashita's config folder
-    constexpr const char* kSection     = "settings";
+    constexpr const char* kName          = "headsup";
+    constexpr const char* kConfigAlias   = "headsup";
+    constexpr const char* kConfigFile    = "headsup/settings.ini";   // relative to Ashita's config folder
+    constexpr const char* kOldConfigFile = "aggroglow\\settings.ini"; // the plugin's settings under its old name
+    constexpr const char* kSection       = "settings";
     constexpr uint32_t kSpawnFlagMob   = 0x10;  // IEntity::GetSpawnFlags
-    constexpr uint32_t kStatusEvent    = 4;     // IEntity::GetStatus: in an event or cutscene
     constexpr uint32_t kMaxEntities    = 4096;  // more than the client's entity map holds
-    constexpr int kCaptureFrames       = 120;   // frames /ag debug records
+    constexpr int kCaptureFrames       = 120;   // frames /hu debug records
     constexpr int kCaptureMobs         = 16;    // nameplates listed per captured frame
     constexpr double kFrameTimeWeight  = 0.05;  // smoothing of the menu's frame time
 
@@ -37,7 +37,7 @@ namespace
     }
 
     // Settings persistence through Ashita's configuration manager.
-    class AshitaStore final : public aggroglow::SettingsStore
+    class AshitaStore final : public headsup::SettingsStore
     {
     public:
         explicit AshitaStore(IConfigurationManager* config)
@@ -70,23 +70,26 @@ namespace
     }
 }
 
-class AggroGlow final : public IPlugin
+class HeadsUp final : public IPlugin
 {
     IAshitaCore* m_AshitaCore = nullptr;
-    aggroglow::Settings m_Settings;
-    aggroglow::Tracker m_Tracker;
-    aggroglow::OutlineRenderer m_Outline;
-    aggroglow::NameplateRenderer m_Nameplates;
-    aggroglow::Menu m_Menu;
-    aggroglow::PlayerState m_Player;
-    aggroglow::Examiner m_Examiner;
+    headsup::Settings m_Settings;
+    headsup::Tracker m_Tracker;
+    headsup::OutlineRenderer m_Outline;
+    headsup::NameplateRenderer m_Nameplates;
+    headsup::Menu m_Menu;
+    headsup::PlayerState m_Player;
+    headsup::CheckResults m_Checks;
     bool m_DebugPending = false;
-    bool m_PlatesPlaced = false; // placed this frame at the back-buffer EndScene
-    int m_CaptureLeft   = 0; // frames /ag debug still records
+    bool m_PlatesPlaced = false; // placed this frame, in the scene or at the back-buffer EndScene
+    bool m_Drawing      = false; // drawing nameplates: our own draws come back through the hooks
+    bool m_DrewInScene  = false; // this frame, for /hu debug
+    IDirect3DDevice8* m_Device = nullptr;
+    int m_CaptureLeft   = 0; // frames /hu debug still records
     std::string m_CapturePath;
     std::string m_Capture;
     double m_CaptureLast = 0.0;
-    std::vector<aggroglow::ActorInput> m_Inputs;
+    std::vector<headsup::ActorInput> m_Inputs;
     LARGE_INTEGER m_QpcFrequency{};
     LARGE_INTEGER m_LastPresent{};
     double m_FrameMs = 0.0;
@@ -112,7 +115,6 @@ public:
         m_AshitaCore = core;
         QueryPerformanceFrequency(&m_QpcFrequency);
         LoadSettings();
-        m_Nameplates.Initialize(core->GetFontManager(), core->GetPrimitiveManager());
         return true;
     }
 
@@ -123,7 +125,9 @@ public:
 
     bool Direct3DInitialize(IDirect3DDevice8* device) override
     {
+        m_Device = device;
         m_Outline.SetDevice(device);
+        m_Nameplates.SetDevice(device);
         return true;
     }
 
@@ -133,7 +137,7 @@ public:
         UNREFERENCED_PARAMETER(injected);
         if (command == nullptr) return false;
         const std::vector<std::string> args = SplitLower(command);
-        if (args.empty() || (args[0] != "/aggroglow" && args[0] != "/ag")) return false;
+        if (args.empty() || (args[0] != "/headsup" && args[0] != "/hu")) return false;
 
         if (args.size() == 1)
             m_Menu.open = !m_Menu.open;
@@ -147,14 +151,14 @@ public:
             m_DebugPending = true;
         else
         {
-            Print("/aggroglow or /ag: open or close the settings window");
-            Print("/ag on | /ag off: turn outlines and nameplates on or off");
-            Print("/ag debug: write what every mob's outline and nameplate show to logs/aggroglow");
+            Print("/headsup or /hu: open or close the settings window");
+            Print("/hu on | /hu off: turn outlines and nameplates on or off");
+            Print("/hu debug: write what every mob's outline and nameplate show to logs/headsup");
         }
         return true;
     }
 
-    // /check replies, manual or automatic, become the exact label; the reply to an automatic check is hidden.
+    // The reply to the player's own /check: the mob's exact level, for its label until it respawns. Chat shows it.
     bool HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data, uint8_t* modified, uint32_t sizeChunk,
         const uint8_t* dataChunk, bool injected, bool blocked) override
     {
@@ -163,12 +167,13 @@ public:
         UNREFERENCED_PARAMETER(dataChunk);
         UNREFERENCED_PARAMETER(injected);
         UNREFERENCED_PARAMETER(blocked);
-        if (id != aggroglow::kCheckReplyPacket) return false;
-        const auto reply = aggroglow::ParseCheckReply(data, size);
+        if (id != headsup::kCheckReplyPacket) return false;
+        const auto reply = headsup::ParseCheckReply(data, size);
         if (!reply) return false;
         IEntity* entity = m_AshitaCore->GetMemoryManager()->GetEntity();
-        const aggroglow::MobRecord* mob = aggroglow::FindMob(reply->serverId, EntityName(entity, reply->targetIndex));
-        return m_Examiner.Received(*reply, aggroglow::ExamineCooldown(mob), Now());
+        const headsup::MobRecord* mob = headsup::FindMob(reply->serverId, EntityName(entity, reply->targetIndex));
+        m_Checks.Received(*reply, headsup::CheckLifetime(mob), Now());
+        return false;
     }
 
     void Direct3DPresent(const RECT* source, const RECT* dest, HWND window, const RGNDATA* dirty) override
@@ -181,55 +186,130 @@ public:
         m_Outline.NewFrame();
         if (m_Outline.TakeStencilWarning())
             Print("a mob could not be outlined: the game's depth buffer has no stencil bits.");
-        // For frames where the back-buffer EndScene did not place them.
-        if (!m_PlatesPlaced) PlaceNameplates();
+        // A frame whose nameplates were not drawn must not hide the game's names in the next.
+        if (!m_PlatesPlaced)
+        {
+            m_Nameplates.Clear();
+            m_Outline.SetReplacedNames(m_Nameplates.ReplacingNames());
+        }
         m_PlatesPlaced = false;
         if (m_Nameplates.TakeFailure())
-            Print("names and labels are off: Ashita could not create a font object.");
+            Print("names and labels are off: a text texture could not be made.");
         if (m_Nameplates.TakeIconFailure())
-            Print("icons are off: an icon texture could not be loaded.");
+            Print("icons are off: an icon texture could not be made.");
         if (m_DebugPending)
         {
             m_DebugPending = false;
             WriteDebugReport();
         }
         CaptureFrame();
-        const double now = Now();
+        const bool drewInScene = m_DrewInScene;
+        m_DrewInScene          = false;
+        const double now       = Now();
         UpdateTracker(now);
-        AutoExamine(now);
-        const aggroglow::MenuStatus status{m_Tracker.OutlinedCount(), m_Outline.MeshesLastFrame(),
-            static_cast<uint32_t>(m_Nameplates.LastShown().size()), m_FrameMs, m_Outline.StencilAvailable()};
+        const auto& letters = m_Outline.TextStatsLastFrame();
+        const headsup::MenuStatus status{m_Tracker.OutlinedCount(), m_Outline.MeshesLastFrame(),
+            static_cast<uint32_t>(m_Nameplates.LastShown().size()), m_FrameMs, m_Outline.StencilAvailable(), drewInScene,
+            letters.inScene, letters.owned, letters.hidden, m_Player.level, m_Player.sitting};
         if (m_Menu.Draw(m_AshitaCore->GetGuiManager(), m_Settings, status))
             SaveSettings();
+        if (m_Menu.TakeDebugRequest()) m_DebugPending = true;
     }
 
     // The game draws nameplates into its scene image, copies it to the back buffer and ends that scene before Present.
-    // Placing our nameplates here, in the same frame, keeps them from trailing the game's by a frame.
+    // Unless they were drawn into the scene, our nameplates go on top here, in the same frame as the game's names.
     void Direct3DEndScene(bool isRenderingBackBuffer) override
     {
-        if (!isRenderingBackBuffer || !m_Outline.TextPending()) return;
+        if (m_Drawing || !isRenderingBackBuffer || m_PlatesPlaced || !m_Outline.TextPending()) return;
         m_Outline.FinishText();
-        PlaceNameplates();
-        m_PlatesPlaced = true;
+        WithSavedState([&] { DrawNameplates(1.0f, 1.0f, false); });
+    }
+
+    bool Direct3DDrawPrimitive(D3DPRIMITIVETYPE type, UINT startVertex, UINT primCount) override
+    {
+        UNREFERENCED_PARAMETER(type);
+        UNREFERENCED_PARAMETER(startVertex);
+        UNREFERENCED_PARAMETER(primCount);
+        if (!m_Drawing) DrawNameplatesBeforeSceneCopy();
+        return false;
     }
 
     bool Direct3DDrawIndexedPrimitive(D3DPRIMITIVETYPE type, UINT minIndex, UINT numVertices, UINT startIndex, UINT primCount) override
     {
+        if (m_Drawing) return false;
+        DrawNameplatesBeforeSceneCopy();
         return m_Outline.OnDrawIndexed(type, minIndex, numVertices, startIndex, primCount, m_Tracker, m_Settings);
     }
 
     bool Direct3DDrawPrimitiveUP(D3DPRIMITIVETYPE type, UINT primCount, const void* vertices, UINT stride) override
     {
+        if (m_Drawing) return false;
+        DrawNameplatesBeforeSceneCopy();
         // In replace mode the game's own mob nameplate letters are measured, then blocked.
-        return m_Outline.OnDrawUP(type, primCount, vertices, stride, m_Tracker, aggroglow::NameplatesOn(m_Settings),
+        return m_Outline.OnDrawUP(type, primCount, vertices, stride, m_Tracker, headsup::NameplatesOn(m_Settings),
             m_Settings.enabled && m_Settings.replaceNameplates);
     }
 
-private:
-    void PlaceNameplates()
+    bool Direct3DDrawIndexedPrimitiveUP(D3DPRIMITIVETYPE type, UINT minIndex, UINT numVertices, UINT primCount,
+        const void* indices, D3DFORMAT indexFormat, const void* vertices, UINT stride) override
     {
-        m_Nameplates.Update(m_Tracker, m_Outline, m_Settings);
+        UNREFERENCED_PARAMETER(type);
+        UNREFERENCED_PARAMETER(minIndex);
+        UNREFERENCED_PARAMETER(numVertices);
+        UNREFERENCED_PARAMETER(primCount);
+        UNREFERENCED_PARAMETER(indices);
+        UNREFERENCED_PARAMETER(indexFormat);
+        UNREFERENCED_PARAMETER(vertices);
+        UNREFERENCED_PARAMETER(stride);
+        if (!m_Drawing) DrawNameplatesBeforeSceneCopy();
+        return false;
+    }
+
+private:
+    // Saves the game's render states, render target and depth surface around draw, which may change any of them.
+    template <typename Draw>
+    bool WithSavedState(Draw draw)
+    {
+        DWORD saved = 0;
+        if (m_Device == nullptr || FAILED(m_Device->CreateStateBlock(D3DSBT_ALL, &saved))) return false;
+        IDirect3DSurface8* target = nullptr;
+        IDirect3DSurface8* depth  = nullptr;
+        m_Device->GetRenderTarget(&target);
+        m_Device->GetDepthStencilSurface(&depth);
+        m_Drawing = true;
+        draw();
+        m_Drawing = false;
+        m_Device->SetRenderTarget(target, depth);
+        m_Device->ApplyStateBlock(saved); // after SetRenderTarget, which resets the viewport
+        m_Device->DeleteStateBlock(saved);
+        if (target != nullptr) target->Release();
+        if (depth != nullptr) depth->Release();
+        return true;
+    }
+
+    // Lays out and draws the nameplates into the bound render target, toX and toY pixels per back-buffer pixel.
+    void DrawNameplates(float toX, float toY, bool depthTest)
+    {
+        m_Nameplates.Update(m_Tracker, m_Outline, m_Settings, toX, toY);
         m_Outline.SetReplacedNames(m_Nameplates.ReplacingNames());
+        m_Nameplates.Draw(depthTest);
+        m_PlatesPlaced = true;
+    }
+
+    // The game draws its 3D scene, names included, into an off-screen image and then copies that to the back buffer.
+    // Drawn into the image just before the copy, at the name's depth, our nameplates are hidden by walls like the
+    // game's names, and sit under the game's menus. The copy is the first draw to the back buffer after the names.
+    void DrawNameplatesBeforeSceneCopy()
+    {
+        if (!m_Settings.enabled || !m_Settings.hideBehindWalls || !headsup::NameplatesOn(m_Settings) ||
+            m_Outline.TargetScaleX() <= 0.0f || m_Outline.TargetScaleY() <= 0.0f || !m_Outline.SceneCopyStarting())
+            return;
+        m_Outline.FinishText();
+        WithSavedState([&] {
+            if (FAILED(m_Device->SetRenderTarget(m_Outline.SceneTarget(), m_Outline.SceneDepth()))) return;
+            DrawNameplates(1.0f / m_Outline.TargetScaleX(), 1.0f / m_Outline.TargetScaleY(), true);
+            m_DrewInScene = true;
+        });
     }
 
     void Print(const std::string& message)
@@ -240,21 +320,29 @@ private:
 
     void LoadSettings()
     {
+        // The plugin was called AggroGlow: its settings carry over once, and the old file is left as it was.
+        const std::string configs = std::string(m_AshitaCore->GetInstallPath()) + "config\\";
+        const std::string current = configs + "headsup\\settings.ini";
+        if (GetFileAttributesA(current.c_str()) == INVALID_FILE_ATTRIBUTES)
+        {
+            CreateDirectoryA((configs + "headsup").c_str(), nullptr);
+            CopyFileA((configs + kOldConfigFile).c_str(), current.c_str(), TRUE);
+        }
         IConfigurationManager* config = m_AshitaCore->GetConfigurationManager();
         config->Load(kConfigAlias, kConfigFile); // a missing file leaves every value at its default
         AshitaStore store(config);
-        m_Settings = aggroglow::LoadSettings(store);
+        m_Settings = headsup::LoadSettings(store);
     }
 
     void SaveSettings()
     {
-        const std::string folder = std::string(m_AshitaCore->GetInstallPath()) + "config\\aggroglow";
+        const std::string folder = std::string(m_AshitaCore->GetInstallPath()) + "config\\headsup";
         CreateDirectoryA(folder.c_str(), nullptr);
         IConfigurationManager* config = m_AshitaCore->GetConfigurationManager();
         AshitaStore store(config);
-        aggroglow::SaveSettings(m_Settings, store);
+        headsup::SaveSettings(m_Settings, store);
         if (!config->Save(kConfigAlias, kConfigFile))
-            Print("could not save config/aggroglow/settings.ini");
+            Print("could not save config/headsup/settings.ini");
     }
 
     double Now() const
@@ -291,48 +379,25 @@ private:
             const uint32_t serverId = entity->GetServerId(i);
             const bool isMob        = (entity->GetSpawnFlags(i) & kSpawnFlagMob) != 0;
             const bool alive        = entity->GetHPPercent(i) > 0;
-            if (isMob && !alive) m_Examiner.Forget(serverId); // the next spawn rolls a new level
-            m_Inputs.push_back(aggroglow::ActorInput{static_cast<aggroglow::ActorPtr>(actor), static_cast<uint16_t>(i),
-                serverId, isMob, alive, aggroglow::DistanceFromSquared(entity->GetDistance(i)), EntityName(entity, i),
-                isMob ? m_Examiner.Result(serverId, now) : nullptr});
+            if (isMob && !alive) m_Checks.Forget(serverId); // the next spawn rolls a new level
+            m_Inputs.push_back(headsup::ActorInput{static_cast<headsup::ActorPtr>(actor), static_cast<uint16_t>(i),
+                serverId, isMob, alive, headsup::DistanceFromSquared(entity->GetDistance(i)), EntityName(entity, i),
+                isMob ? m_Checks.Result(serverId, now) : nullptr});
         }
         m_Player.level   = player->GetMainJobLevel();
-        m_Player.sitting = aggroglow::IsSittingStatus(entity->GetStatus(party->GetMemberTargetIndex(0)));
+        m_Player.sitting = headsup::IsSittingStatus(entity->GetStatus(party->GetMemberTargetIndex(0)));
         m_Tracker.Update(m_Inputs, m_Player, m_Settings);
     }
 
-    // Sends a /check for the main target when the spec's conditions hold (section 4). The main target is slot 1
-    // while the sub-target cursor is up.
-    void AutoExamine(double now)
-    {
-        if (!m_Settings.autoExamine) return;
-        IEntity* entity      = m_AshitaCore->GetMemoryManager()->GetEntity();
-        ITarget* target      = m_AshitaCore->GetMemoryManager()->GetTarget();
-        IParty* party        = m_AshitaCore->GetMemoryManager()->GetParty();
-        const uint32_t index = target->GetTargetIndex(target->GetIsSubTargetActive() != 0 ? 1 : 0);
-        if (index == 0 || index >= entity->GetEntityMapSize() || entity->GetRawEntity(index) == nullptr) return;
-        if ((entity->GetSpawnFlags(index) & kSpawnFlagMob) == 0) return;
-        const uint32_t serverId         = entity->GetServerId(index);
-        const aggroglow::MobRecord* mob = aggroglow::FindMob(serverId, EntityName(entity, index));
-        const bool inEvent              = entity->GetStatus(party->GetMemberTargetIndex(0)) == kStatusEvent;
-        const aggroglow::ExamineTarget candidate{mob, entity->GetHPPercent(index) > 0,
-            aggroglow::DistanceFromSquared(entity->GetDistance(index)), m_Player.level, inEvent};
-        if (!aggroglow::IsExamineEligible(candidate) || !m_Examiner.CanSend(serverId, now)) return;
-        auto packet = aggroglow::BuildCheckRequest(serverId, static_cast<uint16_t>(index));
-        m_AshitaCore->GetPacketManager()->AddOutgoingPacket(aggroglow::kCheckRequestPacket, static_cast<uint32_t>(packet.size()),
-            packet.data());
-        m_Examiner.Sent(serverId, aggroglow::ExamineCooldown(mob), now);
-    }
-
-    // /ag debug: what each mob's outline and nameplate showed in the last frame, written to logs/aggroglow/.
+    // /hu debug: what each mob's outline and nameplate showed in the last frame, written to logs/headsup/.
     void WriteDebugReport()
     {
         const std::string logs = std::string(m_AshitaCore->GetInstallPath()) + "logs";
         CreateDirectoryA(logs.c_str(), nullptr);
-        CreateDirectoryA((logs + "\\aggroglow").c_str(), nullptr);
+        CreateDirectoryA((logs + "\\headsup").c_str(), nullptr);
         char file[48];
         const std::time_t now = std::time(nullptr);
-        std::strftime(file, sizeof(file), "\\aggroglow\\debug-%Y%m%d-%H%M%S.txt", std::localtime(&now));
+        std::strftime(file, sizeof(file), "\\headsup\\debug-%Y%m%d-%H%M%S.txt", std::localtime(&now));
         const std::string path = logs + file;
         std::FILE* out = std::fopen(path.c_str(), "w");
         if (out == nullptr)
@@ -342,17 +407,17 @@ private:
         }
 
         IEntity* entity = m_AshitaCore->GetMemoryManager()->GetEntity();
-        std::fprintf(out, "aggroglow %.2f: back buffer %.0fx%.0f, player level %d%s, %u outlined, %u nameplates, replace %s\n",
+        std::fprintf(out, "headsup %.2f: back buffer %.0fx%.0f, player level %d%s, %u outlined, %u nameplates, replace %s\n",
             GetVersion(), m_Outline.BackBufferWidth(), m_Outline.BackBufferHeight(), m_Player.level,
             m_Player.sitting ? " (sitting)" : "", m_Tracker.OutlinedCount(),
             static_cast<unsigned>(m_Nameplates.LastShown().size()), m_Settings.replaceNameplates ? "on" : "off");
-        for (const aggroglow::ActorPtr actor : m_Tracker.Mobs())
+        for (const headsup::ActorPtr actor : m_Tracker.Mobs())
         {
-            const aggroglow::ActorInfo* info = m_Tracker.Find(actor);
+            const headsup::ActorInfo* info = m_Tracker.Find(actor);
             if (info == nullptr || (!info->outline && m_Outline.NameplateBox(info->index) == nullptr)) continue;
             const char* name                = EntityName(entity, info->index);
             const uint32_t serverId         = entity->GetServerId(info->index);
-            const aggroglow::MobRecord* mob = aggroglow::FindMob(serverId, name);
+            const headsup::MobRecord* mob = headsup::FindMob(serverId, name);
             std::fprintf(out, "#%u %u '%s' ", info->index, serverId, name);
             if (mob != nullptr)
                 std::fprintf(out, "data Lv %u-%u flags %u detects %u respawn %u", mob->minLevel, mob->maxLevel, mob->flags,
@@ -360,10 +425,10 @@ private:
             else
                 std::fprintf(out, "no data");
             std::fprintf(out, " | %s outline %08X label '%s' %08X icons %d", info->alive ? "alive" : "dead",
-                static_cast<unsigned>(info->argb), info->label.text, static_cast<unsigned>(aggroglow::ToArgb(m_Settings.labelColor[static_cast<int>(info->label.shade)])), info->icons.count);
-            if (const aggroglow::CheckResult* checked = m_Examiner.Result(serverId, Now()))
-                std::fprintf(out, " | examined Lv %d %s", checked->level, aggroglow::Abbrev(checked->con));
-            if (const aggroglow::ScreenBox* plate = m_Outline.NameplateBox(info->index))
+                static_cast<unsigned>(info->argb), info->label.text, static_cast<unsigned>(headsup::ToArgb(m_Settings.labelColor[static_cast<int>(info->label.shade)])), info->icons.count);
+            if (const headsup::CheckResult* checked = m_Checks.Result(serverId, Now()))
+                std::fprintf(out, " | checked Lv %d %s", checked->level, headsup::Abbrev(checked->con));
+            if (const headsup::ScreenBox* plate = m_Outline.NameplateBox(info->index))
                 std::fprintf(out, " | plate (%.1f,%.1f)-(%.1f,%.1f)", plate->minX, plate->minY, plate->maxX, plate->maxY);
             else
                 std::fprintf(out, " | no plate");
@@ -377,32 +442,33 @@ private:
         std::fclose(out);
         Print("wrote " + path + "; recording " + std::to_string(kCaptureFrames) + " frames");
         m_CapturePath = path;
-        m_Capture     = "\nframe  dt(ms)  name letters: in-scene owned no-owner other hidden | nameplates shown | per mob with a "
-                    "nameplate: index r<frames in row> m<body meshes> (nameplate box)\n";
+        m_Capture     = "\nframe  dt(ms)  name letters: in-scene owned no-owner other hidden | nameplates shown, S if drawn into the scene, s<scene to screen scale> | per mob "
+                    "with a nameplate: index r<frames in row> m<body meshes> g<glyphs> c<name color> (nameplate box)\n";
         m_CaptureLeft = kCaptureFrames;
         m_CaptureLast = Now();
     }
 
-    // One line per frame after /ag debug: where nameplate draws went and what the labels did.
+    // One line per frame after /hu debug: where nameplate draws went and what the labels did.
     void CaptureFrame()
     {
         if (m_CaptureLeft <= 0) return;
         const double now = Now();
         const auto& stats = m_Outline.TextStatsLastFrame();
         char line[200];
-        std::snprintf(line, sizeof(line), "f%03d %6.1f  %3u %3u %3u %3u %3u | %2u |", kCaptureFrames - m_CaptureLeft,
+        std::snprintf(line, sizeof(line), "f%03d %6.1f  %3u %3u %3u %3u %3u | %2u %c s%.3f |", kCaptureFrames - m_CaptureLeft,
             (now - m_CaptureLast) * 1000.0, stats.inScene, stats.owned, stats.noOwner, stats.otherOwner, stats.hidden,
-            static_cast<unsigned>(m_Nameplates.LastShown().size()));
+            static_cast<unsigned>(m_Nameplates.LastShown().size()), m_DrewInScene ? 'S' : '-', m_Outline.TargetScaleY());
         m_Capture += line;
         int listed = 0;
-        for (const aggroglow::ActorPtr actor : m_Tracker.Mobs())
+        for (const headsup::ActorPtr actor : m_Tracker.Mobs())
         {
-            const aggroglow::ActorInfo* info = m_Tracker.Find(actor);
-            const aggroglow::ScreenBox* plate = info != nullptr ? m_Outline.NameplateBox(info->index) : nullptr;
+            const headsup::ActorInfo* info = m_Tracker.Find(actor);
+            const headsup::ScreenBox* plate = info != nullptr ? m_Outline.NameplateBox(info->index) : nullptr;
             if (plate == nullptr || ++listed > kCaptureMobs) continue;
-            std::snprintf(line, sizeof(line), " %u r%u m%u (%.0f-%.0f,%.0f-%.0f)", info->index,
-                m_Outline.PlateFramesInRow(info->index), m_Outline.MeshDraws(info->index), plate->minX, plate->maxX,
-                plate->minY, plate->maxY);
+            std::snprintf(line, sizeof(line), " %u r%u m%u g%u c%06X (%.0f-%.0f,%.0f-%.0f)", info->index,
+                m_Outline.PlateFramesInRow(info->index), m_Outline.MeshDraws(info->index), m_Outline.GlyphsLastFrame(info->index),
+                static_cast<unsigned>(m_Outline.NameplateColor(info->index) & 0xFFFFFF), plate->minX, plate->maxX, plate->minY,
+                plate->maxY);
             m_Capture += line;
         }
         m_Capture += "\n";
@@ -428,7 +494,7 @@ extern "C" __declspec(dllexport) double __stdcall expGetInterfaceVersion(void)
 extern "C" __declspec(dllexport) IPlugin* __stdcall expCreatePlugin(const char* args)
 {
     UNREFERENCED_PARAMETER(args);
-    return new AggroGlow();
+    return new HeadsUp();
 }
 
 extern "C" __declspec(dllexport) void __stdcall expDestroyPlugin(void* instance)

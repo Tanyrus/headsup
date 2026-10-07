@@ -11,7 +11,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace aggroglow
+namespace headsup
 {
     // Outlines mob meshes in DrawIndexedPrimitive; measures, or hides, the game's mob name letters in DrawPrimitiveUP.
     class OutlineRenderer
@@ -22,13 +22,34 @@ namespace aggroglow
         // Called at Present: starts the next frame, finishing this frame's nameplates if EndScene did not.
         void NewFrame();
 
-        // Turns this frame's collected glyphs into nameplate boxes (and snapshots per-mob mesh counts). Call once the
-        // frame's nameplates are drawn, i.e. at the back-buffer EndScene; NewFrame calls it when nothing else did.
+        // Turns this frame's collected glyphs into nameplate boxes (and snapshots per-mob mesh counts), once per frame:
+        // when the game has drawn its names, before our nameplates are laid out. NewFrame calls it when nothing else did.
         void FinishText();
         // True when this frame has collected nameplate glyphs that FinishText has not yet turned into boxes.
         bool TextPending() const;
+        // True when glyphs are pending and the game is about to draw to the back buffer after drawing them into its
+        // scene image: the moment to draw into that image before it is copied (see plugin.cpp).
+        bool SceneCopyStarting();
+        // The render target and depth surface this frame's nameplate glyphs were drawn into.
+        IDirect3DSurface8* SceneTarget() const { return reinterpret_cast<IDirect3DSurface8*>(m_TargetSurface); }
+        IDirect3DSurface8* SceneDepth() const { return reinterpret_cast<IDirect3DSurface8*>(m_SceneDepth); }
+        // Scene-image pixels to back-buffer pixels.
+        float TargetScaleX() const { return m_TargetScaleX; }
+        float TargetScaleY() const { return m_TargetScaleY; }
+        // How many glyphs the game drew for a mob in the frame that just ended, for /hu debug.
+        uint32_t GlyphsLastFrame(uint16_t index) const
+        {
+            const auto it = m_GlyphCountsLast.find(index);
+            return it == m_GlyphCountsLast.end() ? 0 : it->second;
+        }
+        // The depth the game drew a mob's name at in the frame that just ended; 0 without a nameplate.
+        float NameplateDepth(uint16_t index) const
+        {
+            const auto it = m_DepthsLast.find(index);
+            return it == m_DepthsLast.end() ? 0.0f : it->second;
+        }
 
-        // The mobs whose names AggroGlow drew over this frame's boxes: their letters are hidden in the next frame.
+        // The mobs whose names HeadsUp drew over this frame's boxes: their letters are hidden in the next frame.
         void SetReplacedNames(const std::vector<uint16_t>& indices);
 
         // Returns true when it drew the mesh itself; the caller must then block the original call.
@@ -45,7 +66,7 @@ namespace aggroglow
         const ScreenBox* NameplateBox(uint16_t index) const;
         float BackBufferWidth() const { return m_BackBufferWidth; }
 
-        // Per-frame counts of in-scene pretransformed text draws, for /ag debug.
+        // Per-frame counts of in-scene pretransformed text draws, for /hu debug.
         struct TextDrawStats
         {
             uint32_t inScene = 0, owned = 0, noOwner = 0, otherOwner = 0, hidden = 0;
@@ -98,6 +119,10 @@ namespace aggroglow
         std::unordered_set<uint16_t> m_Replaced;                            // see SetReplacedNames
         std::vector<ScreenBox> m_ReplacedPlates;
         uintptr_t m_TargetSurface = 0;                                 // render target the scale was read for
+        uintptr_t m_SceneDepth    = 0;                                 // its depth surface
+        uintptr_t m_BackBuffer    = 0;
+        std::unordered_map<uint16_t, float> m_Depths, m_DepthsLast;    // farthest glyph depth by entity index
+        std::unordered_map<uint16_t, uint32_t> m_GlyphCountsLast;
         float m_TargetScaleX = 1.0f, m_TargetScaleY = 1.0f;            // render-target to back-buffer pixels
         std::unordered_map<uint16_t, ScreenBox> m_PlatesLast;          // the frame that just ended
         bool m_TextFinished = false;

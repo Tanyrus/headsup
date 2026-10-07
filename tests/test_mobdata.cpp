@@ -1,7 +1,7 @@
 #include "mobdata.h"
 #include "test.h"
 
-using namespace aggroglow;
+using namespace headsup;
 
 // Expected values are read from data/phoenix_mobs.tsv (zone 103 is Valkurm Dunes).
 

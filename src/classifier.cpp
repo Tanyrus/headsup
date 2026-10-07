@@ -1,6 +1,6 @@
 #include "classifier.h"
 
-namespace aggroglow
+namespace headsup
 {
     bool IsSittingStatus(uint32_t status)
     {

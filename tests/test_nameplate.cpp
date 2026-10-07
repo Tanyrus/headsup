@@ -4,7 +4,7 @@
 #include <cmath>
 #include <vector>
 
-using namespace aggroglow;
+using namespace headsup;
 
 namespace
 {
@@ -44,12 +44,15 @@ TEST(vertex_counts_by_primitive_type)
 TEST(nameplate_glyph_gives_its_box)
 {
     // A nameplate letter: drawn inside the scene, at depth 0.997.
-    const auto quad = Quad(389.016f, 601.077f, 396.38f, 610.281f, 0.997f);
+    auto quad = Quad(389.016f, 601.077f, 396.38f, 610.281f, 0.997f);
+    quad[2].z = 0.998f;
     ScreenBox box;
-    CHECK(WorldTextBox(quad.data(), sizeof(Vertex), 4, box));
+    float depth = 0.0f;
+    CHECK(WorldTextBox(quad.data(), sizeof(Vertex), 4, box, depth));
     CHECK(box.valid);
     CHECK(Near(box.minX, 389.016f) && Near(box.maxX, 396.38f));
     CHECK(Near(box.minY, 601.077f) && Near(box.maxY, 610.281f));
+    CHECK(Near(depth, 0.998f)); // the farthest corner
 }
 
 TEST(hud_text_at_depth_zero_is_rejected)
@@ -57,7 +60,8 @@ TEST(hud_text_at_depth_zero_is_rejected)
     // The target bar's copy of a mob's name: HUD text at depth 0.
     const auto quad = Quad(45.5f, 881.5f, 50.5f, 891.5f, 0.0f);
     ScreenBox box;
-    CHECK(!WorldTextBox(quad.data(), sizeof(Vertex), 4, box));
+    float depth = 0.0f;
+    CHECK(!WorldTextBox(quad.data(), sizeof(Vertex), 4, box, depth));
     CHECK(!box.valid);
 }
 
@@ -66,23 +70,25 @@ TEST(any_vertex_outside_the_scene_depth_rejects_the_draw)
     auto quad = Quad(10, 10, 20, 20, 0.5f);
     quad[3].z = 1.0f;
     ScreenBox box;
-    CHECK(!WorldTextBox(quad.data(), sizeof(Vertex), 4, box));
+    float depth = 0.0f;
+    CHECK(!WorldTextBox(quad.data(), sizeof(Vertex), 4, box, depth));
     quad[3].z = std::nanf("");
-    CHECK(!WorldTextBox(quad.data(), sizeof(Vertex), 4, box));
+    CHECK(!WorldTextBox(quad.data(), sizeof(Vertex), 4, box, depth));
     quad[3].z = 0.5f;
     quad[3].x = INFINITY;
-    CHECK(!WorldTextBox(quad.data(), sizeof(Vertex), 4, box));
+    CHECK(!WorldTextBox(quad.data(), sizeof(Vertex), 4, box, depth));
 }
 
 TEST(unusable_draws_are_rejected)
 {
     const auto quad = Quad(10, 10, 20, 20, 0.5f);
     ScreenBox box;
-    CHECK(!WorldTextBox(nullptr, sizeof(Vertex), 4, box));
-    CHECK(!WorldTextBox(quad.data(), 12, 4, box));
-    CHECK(!WorldTextBox(quad.data(), sizeof(Vertex), 0, box));
+    float depth = 0.0f;
+    CHECK(!WorldTextBox(nullptr, sizeof(Vertex), 4, box, depth));
+    CHECK(!WorldTextBox(quad.data(), 12, 4, box, depth));
+    CHECK(!WorldTextBox(quad.data(), sizeof(Vertex), 0, box, depth));
     std::vector<Vertex> many(kMaxTextVertices + 1, quad[0]);
-    CHECK(!WorldTextBox(many.data(), sizeof(Vertex), kMaxTextVertices + 1, box));
+    CHECK(!WorldTextBox(many.data(), sizeof(Vertex), kMaxTextVertices + 1, box, depth));
 }
 
 TEST(render_target_box_scales_to_the_back_buffer)
@@ -280,20 +286,25 @@ TEST(label_mode_stacks_above_the_game_name)
     CHECK(Near(iconsOnly.iconsY, 182.0f));
 }
 
-TEST(sizes_follow_the_game_name_with_limits)
+TEST(scale_follows_the_game_name_with_limits)
 {
     // 1440p: a typical game letter is 8 px (1440 / 180).
-    CHECK_EQ(ScaledSize(15, 8.0f, 1440.0f), 15);
-    CHECK_EQ(ScaledSize(15, 16.0f, 1440.0f), 30);
-    CHECK_EQ(ScaledSize(15, 100.0f, 1440.0f), 38); // at most 2.5x
-    CHECK_EQ(ScaledSize(15, 1.0f, 1440.0f), 8);    // at least 0.5x
+    CHECK(Near(DistanceScale(8.0f, 1440.0f), 1.0f));
+    CHECK(Near(DistanceScale(10.0f, 1440.0f), 1.25f)); // smoothly, not in whole pixels
+    CHECK(Near(DistanceScale(100.0f, 1440.0f), 2.5f)); // at most 2.5x
+    CHECK(Near(DistanceScale(1.0f, 1440.0f), 0.5f));   // at least 0.5x
+    CHECK(Near(DistanceScale(std::nanf(""), 1440.0f), 1.0f));
+    CHECK(Near(DistanceScale(8.0f, 0.0f), 1.0f));
 }
 
-TEST(sizes_change_only_in_steps_of_two)
+TEST(text_is_redrawn_only_when_its_size_moves_a_step)
 {
-    CHECK_EQ(SteppedSize(0, 15), 15); // first size
-    CHECK_EQ(SteppedSize(15, 16), 15);
-    CHECK_EQ(SteppedSize(15, 14), 15);
-    CHECK_EQ(SteppedSize(15, 17), 17);
-    CHECK_EQ(SteppedSize(15, 13), 13);
+    CHECK_EQ(RasterHeight(15.0f, 0), 18);  // the first size at or above it: 6 px times 1.25 steps
+    CHECK_EQ(RasterHeight(15.0f, 18), 18); // shrunk by less than a step: drawn smaller
+    CHECK_EQ(RasterHeight(14.5f, 18), 18);
+    CHECK_EQ(RasterHeight(18.8f, 18), 18); // grown by less than 5%: drawn a little larger
+    CHECK_EQ(RasterHeight(19.0f, 18), 23);
+    CHECK_EQ(RasterHeight(14.0f, 18), 15);
+    CHECK_EQ(RasterHeight(15.2f, 15), 15); // and back up is not a step yet: no flicker at the edge
+    CHECK_EQ(RasterHeight(2.0f, 0), 6);    // the smallest
 }

@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace aggroglow
+namespace headsup
 {
     // An axis-aligned screen rectangle in pixels.
     struct ScreenBox
@@ -33,9 +33,9 @@ namespace aggroglow
 
     // The box of a pretransformed (XYZRHW) draw when it is text placed in the 3D scene: every vertex depth strictly
     // between 0 and 1, as the game draws nameplates. HUD text, such as the target bar's copy of a mob's name, is drawn
-    // at depth 0 and is rejected, as are draws of more than kMaxTextVertices vertices.
+    // at depth 0 and is rejected, as are draws of more than kMaxTextVertices vertices. depth is the farthest vertex's.
     constexpr uint32_t kMaxTextVertices = 256;
-    bool WorldTextBox(const void* vertices, uint32_t stride, uint32_t count, ScreenBox& box);
+    bool WorldTextBox(const void* vertices, uint32_t stride, uint32_t count, ScreenBox& box, float& depth);
 
     // Glyph quads larger than this (back-buffer pixels) are not letters: the game also draws screen-sized in-scene quads,
     // and on some frames one is attributed to whichever mob is on the stack.
@@ -77,7 +77,7 @@ namespace aggroglow
         Other, // a player or NPC
     };
 
-    // Replace mode: whether to hide a glyph of a mob's name. Only names AggroGlow replaced in the previous frame count
+    // Replace mode: whether to hide a glyph of a mob's name. Only names HeadsUp replaced in the previous frame count
     // (replacedPlates), and only glyphs as tall as that name's letters. Hidden inside such a name (padded by two letter
     // heights), or when the game credits it to a mob whose replaced name is within six letter heights (a stale stack
     // pointer). ownerPlate is the owner's previous name: for a mob, only if it was replaced. A player's or NPC's glyph
@@ -105,10 +105,12 @@ namespace aggroglow
     };
     NameplateLayout LayoutNameplate(const ScreenBox& plate, const LineSizes& sizes, bool showName);
 
-    // A text or icon size scaled like the game's names: base x (letterHeight / (screenHeight / 180)), clamped to
-    // 0.5x-2.5x, rounded to whole pixels.
-    int ScaledSize(int base, float letterHeight, float screenHeight);
-    // Keeps the current size until the target differs by 2 px or more, so fonts do not re-render every frame.
-    int SteppedSize(int current, int target);
+    // How much to scale text and icons to follow the game's names: letterHeight / (screenHeight / 180), the typical
+    // letter, clamped to 0.5x-2.5x. Not rounded, so sizes change smoothly.
+    float DistanceScale(float letterHeight, float screenHeight);
+    // The pixel height to draw text at when it is shown pixels tall: a size from 6 px in steps of 1.25x, which is then
+    // scaled to the shown size. current, the size it is drawn at now, is kept while the shown size is no more than a
+    // step below it or 5% above it, so text is redrawn only when its size has really changed.
+    int RasterHeight(float pixels, int current);
 
 }

@@ -5,7 +5,7 @@
 #include <map>
 #include <string>
 
-using namespace aggroglow;
+using namespace headsup;
 
 namespace
 {
@@ -44,7 +44,6 @@ namespace
         CHECK_EQ(a.smoothness, b.smoothness);
         CHECK_EQ(a.maxDistance, b.maxDistance);
         CHECK(a.showLabels == b.showLabels);
-        CHECK(a.autoExamine == b.autoExamine);
         CHECK(a.replaceNameplates == b.replaceNameplates);
         CHECK(a.showIcons == b.showIcons);
         CHECK(a.scaleWithDistance == b.scaleWithDistance);
@@ -54,6 +53,7 @@ namespace
         CHECK_EQ(a.labelSize, b.labelSize);
         CHECK_EQ(a.iconSize, b.iconSize);
         CHECK(a.ownNameColor == b.ownNameColor);
+        CHECK(a.hideBehindWalls == b.hideBehindWalls);
         CheckSameColor(a.nameColor, b.nameColor);
         for (int k = 0; k < kLabelShadeCount; ++k)
             CheckSameColor(a.labelColor[k], b.labelColor[k]);
@@ -82,7 +82,6 @@ TEST(settings_round_trip)
     s.smoothness        = 12;
     s.maxDistance       = 25.0f;
     s.showLabels        = false;
-    s.autoExamine       = true;
     s.replaceNameplates = true;
     s.showIcons         = false;
     s.scaleWithDistance = true;
@@ -92,6 +91,7 @@ TEST(settings_round_trip)
     s.labelSize         = 9;
     s.iconSize          = 24;
     s.ownNameColor      = true;
+    s.hideBehindWalls   = false;
     s.nameColor         = Color{{0.5f, 0.25f, 0.125f}};
     for (int k = 0; k < kLabelShadeCount; ++k)
         s.labelColor[k] = Color{{0.0625f * static_cast<float>(k), 0.5f, 0.25f}};

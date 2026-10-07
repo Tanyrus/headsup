@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Turn one or more aggroglow_dump JSON files of the same server into phoenix_mobs.tsv and phoenix_mobs.meta.
+"""Turn one or more headsup_dump JSON files of the same server into phoenix_mobs.tsv and phoenix_mobs.meta.
 
 Usage: compact.py DUMP_JSON [DUMP_JSON ...] OUT_DIR PHOENIX_COMMIT
 

@@ -2,7 +2,7 @@
 
 #include <cstdio>
 
-namespace aggroglow
+namespace headsup
 {
     namespace
     {

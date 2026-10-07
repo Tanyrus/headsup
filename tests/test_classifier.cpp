@@ -1,7 +1,7 @@
 #include "classifier.h"
 #include "test.h"
 
-using namespace aggroglow;
+using namespace headsup;
 
 namespace
 {

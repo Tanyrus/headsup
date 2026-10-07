@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace aggroglow
+namespace headsup
 {
     // /check difficulty in Phoenix's EMobDifficulty order: the 0x029 check reply carries 0x40 + this value.
     enum class Con : uint8_t

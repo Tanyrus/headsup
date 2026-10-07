@@ -1,30 +1,30 @@
 #!/usr/bin/env bash
-# Regenerate data/phoenix_mobs.tsv from Phoenix's own map server (spec: docs/specs/2026-10-06-aggroglow-v2-design.md,
-# section 1). Builds Phoenix at tools/phoenix/PHOENIX_COMMIT with every module plus tools/phoenix/aggroglow_dump,
+# Regenerate data/phoenix_mobs.tsv from Phoenix's own map server (spec: docs/specs/2026-10-06-headsup-v2-design.md,
+# section 1). Builds Phoenix at tools/phoenix/PHOENIX_COMMIT with every module plus tools/phoenix/headsup_dump,
 # loads its database into a private MariaDB, runs xi_map until the dump module writes every loaded mob, then
 # compacts and validates the dump. data/ is only written when validation passes.
 #
-#   AGGROGLOW_PHOENIX_DIR   work folder, default ~/.cache/aggroglow-phoenix (about 6 GB; never under /tmp)
-#   AGGROGLOW_PHOENIX_DB_PORT  MariaDB port, default 3307
-#   AGGROGLOW_PHOENIX_DUMPS    server runs to snapshot, default 5, about a minute each (a mob counts as aggressive
+#   HEADSUP_PHOENIX_DIR   work folder, default ~/.cache/headsup-phoenix (about 6 GB; never under /tmp)
+#   HEADSUP_PHOENIX_DB_PORT  MariaDB port, default 3307
+#   HEADSUP_PHOENIX_DUMPS    server runs to snapshot, default 5, about a minute each (a mob counts as aggressive
 #                              if any run saw it attack)
-#   AGGROGLOW_PHOENIX_SNAPSHOTS  where every run's dumps are kept, one folder per Phoenix commit, default
-#                              ~/.cache/aggroglow-snapshots; each refresh merges all of that commit's dumps
+#   HEADSUP_PHOENIX_SNAPSHOTS  where every run's dumps are kept, one folder per Phoenix commit, default
+#                              ~/.cache/headsup-snapshots; each refresh merges all of that commit's dumps
 #   JOBS                    parallel build jobs, default nproc
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-WORK="${AGGROGLOW_PHOENIX_DIR:-$HOME/.cache/aggroglow-phoenix}"
-PORT="${AGGROGLOW_PHOENIX_DB_PORT:-3307}"
-DUMPS="${AGGROGLOW_PHOENIX_DUMPS:-5}"
+WORK="${HEADSUP_PHOENIX_DIR:-$HOME/.cache/headsup-phoenix}"
+PORT="${HEADSUP_PHOENIX_DB_PORT:-3307}"
+DUMPS="${HEADSUP_PHOENIX_DUMPS:-5}"
 COMMIT="$(tr -d '[:space:]' < "$ROOT/tools/phoenix/PHOENIX_COMMIT")"
 PHOENIX_URL=https://github.com/phoenixffxi/Phoenix.git
 SERVER="$WORK/server"
 BUILD="$WORK/build"
 VENV="$WORK/venv"
 DB="$WORK/db"
-SOCKET="${XDG_RUNTIME_DIR:-$WORK}/aggroglow-phoenix.sock" # under 108 characters, unlike a path inside $WORK
+SOCKET="${XDG_RUNTIME_DIR:-$WORK}/headsup-phoenix.sock" # under 108 characters, unlike a path inside $WORK
 STAGE="$WORK/out"
-SNAPSHOTS="${AGGROGLOW_PHOENIX_SNAPSHOTS:-$HOME/.cache/aggroglow-snapshots}/$COMMIT"
+SNAPSHOTS="${HEADSUP_PHOENIX_SNAPSHOTS:-$HOME/.cache/headsup-snapshots}/$COMMIT"
 
 log() { printf '[refresh] %s\n' "$*"; }
 fail() { printf '[refresh] FAILED: %s\n' "$*" >&2; exit 1; }
@@ -61,11 +61,11 @@ for patch in "$SERVER"/modules/temp_patch/*.patch; do
 done
 
 # 3. The dump module, loaded after every other module. Copy only on change so the build stays incremental.
-mkdir -p "$SERVER/modules/aggroglow_dump"
-cmp -s "$ROOT/tools/phoenix/aggroglow_dump/aggroglow_dump.cpp" "$SERVER/modules/aggroglow_dump/aggroglow_dump.cpp" ||
-    cp "$ROOT/tools/phoenix/aggroglow_dump/aggroglow_dump.cpp" "$SERVER/modules/aggroglow_dump/aggroglow_dump.cpp"
-grep -qx 'aggroglow_dump/' "$SERVER/modules/init.txt" ||
-    printf '\n# aggroglow: dump every loaded mob (tools/phoenix/refresh.sh)\naggroglow_dump/\n' >> "$SERVER/modules/init.txt"
+mkdir -p "$SERVER/modules/headsup_dump"
+cmp -s "$ROOT/tools/phoenix/headsup_dump/headsup_dump.cpp" "$SERVER/modules/headsup_dump/headsup_dump.cpp" ||
+    cp "$ROOT/tools/phoenix/headsup_dump/headsup_dump.cpp" "$SERVER/modules/headsup_dump/headsup_dump.cpp"
+grep -qx 'headsup_dump/' "$SERVER/modules/init.txt" ||
+    printf '\n# headsup: dump every loaded mob (tools/phoenix/refresh.sh)\nheadsup_dump/\n' >> "$SERVER/modules/init.txt"
 
 # 4. Build xi_map.
 if [ ! -x "$VENV/bin/python" ]; then
@@ -127,7 +127,7 @@ dumps=()
 for run in $(seq "$DUMPS"); do
     dump="$SNAPSHOTS/$stamp-$run.json"
     log "running xi_map until dump $run of $DUMPS is written"
-    (cd "$SERVER" && AGGROGLOW_DUMP_PATH="$dump" timeout 1200 ./xi_map --ip 127.0.0.1 --port 54230 < /dev/null \
+    (cd "$SERVER" && HEADSUP_DUMP_PATH="$dump" timeout 1200 ./xi_map --ip 127.0.0.1 --port 54230 < /dev/null \
         > "$WORK/map.log" 2>&1) || fail "xi_map; see $WORK/map.log"
     [ -s "$dump" ] || fail "xi_map wrote no dump; see $WORK/map.log"
     dumps+=("$dump")

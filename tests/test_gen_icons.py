@@ -1,43 +1,109 @@
 import importlib.util
-import struct
 import pathlib
+import struct
 import tempfile
 import unittest
+import zlib
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 _spec = importlib.util.spec_from_file_location('gen_icons', ROOT / 'tools' / 'gen_icons.py')
 gen = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(gen)
 
-PNG = b'\x89PNG\r\n\x1a\n' + struct.pack('>I4sII', 13, b'IHDR', 32, 32)
+SIGNATURE = b'\x89PNG\r\n\x1a\n'
+# The seven Adam7 passes: first column, first row, column step, row step.
+ADAM7 = [(0, 0, 8, 8), (4, 0, 8, 8), (0, 4, 4, 8), (2, 0, 4, 4), (0, 2, 2, 4), (1, 0, 2, 2), (0, 1, 1, 2)]
+
+
+def predictor(kind, left, up, up_left):
+    if kind == 1:
+        return left
+    if kind == 2:
+        return up
+    if kind == 3:
+        return (left + up) // 2
+    if kind == 4:
+        p = left + up - up_left
+        pa, pb, pc = abs(p - left), abs(p - up), abs(p - up_left)
+        return left if pa <= pb and pa <= pc else up if pb <= pc else up_left
+    return 0
+
+
+def filtered(row, prev, kind):
+    out = bytearray()
+    for i, value in enumerate(row):
+        left = row[i - 4] if i >= 4 else 0
+        up_left = prev[i - 4] if i >= 4 else 0
+        out.append((value - predictor(kind, left, prev[i], up_left)) & 0xFF)
+    return bytes(out)
+
+
+def chunk(kind, body):
+    return struct.pack('>I', len(body)) + kind + body + struct.pack('>I', zlib.crc32(kind + body))
+
+
+def png(width, height, rgba, interlace=0, kind=0, color_type=6):
+    raw = bytearray()
+    for x0, y0, dx, dy in ADAM7 if interlace else [(0, 0, 1, 1)]:
+        columns = range(x0, width, dx)
+        prev = bytes(len(columns) * 4)
+        for y in range(y0, height, dy):
+            row = b''.join(rgba[(y * width + x) * 4:(y * width + x) * 4 + 4] for x in columns)
+            if row:
+                raw += bytes([kind]) + filtered(row, prev, kind)
+                prev = row
+    header = struct.pack('>IIBBBBB', width, height, 8, color_type, 0, 0, interlace)
+    return SIGNATURE + chunk(b'IHDR', header) + chunk(b'IDAT', zlib.compress(bytes(raw))) + chunk(b'IEND', b'')
+
+
+def pixels(width, height):
+    return bytes((i * 37 + 11) & 0xFF for i in range(width * height * 4))
+
+
+def bgra(rgba):
+    out = bytearray(rgba)
+    out[0::4], out[2::4] = rgba[2::4], rgba[0::4]
+    return bytes(out)
+
+
+class Decode(unittest.TestCase):
+    def test_every_filter_and_both_layouts_give_the_pixels_back(self):
+        rgba = pixels(9, 10)
+        for interlace in (0, 1):
+            for kind in range(5):
+                with self.subTest(interlace=interlace, kind=kind):
+                    self.assertEqual(gen.decode_bgra(png(9, 10, rgba, interlace, kind)), (9, 10, bgra(rgba)))
+
+    def test_only_complete_8_bit_rgba_pngs_are_accepted(self):
+        with self.assertRaises(gen.IconError):
+            gen.decode_bgra(png(2, 2, bytes(12), color_type=2))
+        with self.assertRaises(gen.IconError):
+            gen.decode_bgra(b'GIF89a')
+        with self.assertRaises(gen.IconError):
+            gen.decode_bgra(png(2, 2, pixels(2, 2))[:-30])  # image data cut short
 
 
 class GenIcons(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.dir = pathlib.Path(self.tmp.name)
-        for n, name in enumerate(gen.ICONS):
-            (self.dir / f'{name}.png').write_bytes(PNG + bytes([n]))
+        for name in gen.ICONS:
+            (self.dir / f'{name}.png').write_bytes(png(2, 1, bytes([1, 2, 3, 4, 5, 6, 7, 8])))
 
     def tearDown(self):
         self.tmp.cleanup()
 
-    def test_one_named_array_per_icon(self):
+    def test_one_bitmap_per_icon(self):
         text = gen.generate(self.dir)
-        self.assertIn('const unsigned char kPngAggroNQ[] = {\n'
-                      '    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,\n'
-                      '    0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x20, 0x00,\n};', text)
-        self.assertEqual(text.count('const unsigned char kPng'), len(gen.ICONS))
+        self.assertIn('const unsigned char kBgraAggroNQ[] = {\n    0x03, 0x02, 0x01, 0x04, 0x07, 0x06, 0x05, 0x08,\n};\n'
+                      'const IconBitmap kIconAggroNQ = {kBgraAggroNQ, 2, 1};', text)
+        self.assertEqual(text.count('const IconBitmap kIcon'), len(gen.ICONS))
 
-    def test_missing_or_non_png_files_fail(self):
-        (self.dir / 'Link.png').unlink()
-        with self.assertRaises(gen.IconError):
-            gen.generate(self.dir)
+    def test_a_missing_or_unreadable_icon_fails(self):
         (self.dir / 'Link.png').write_bytes(b'GIF89a')
         with self.assertRaises(gen.IconError):
             gen.generate(self.dir)
-        # The plugin reads each icon's size from the header that follows the signature.
-        (self.dir / 'Link.png').write_bytes(PNG[:8] + b'\x00\x00\x00\x0dtEXt')
+        (self.dir / 'Link.png').unlink()
         with self.assertRaises(gen.IconError):
             gen.generate(self.dir)
 

@@ -4,7 +4,7 @@
 #include <cctype>
 #include <iterator>
 
-namespace aggroglow
+namespace headsup
 {
     namespace
     {

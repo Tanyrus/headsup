@@ -6,6 +6,9 @@ up next to its first declaration. A method that is not overloaded keeps its slot
 group around it is split, so this emulates both layouts and compares slots for every interface method the sources
 call. Overloaded and variadic methods are rejected outright, and IPluginBase (whose vtable the plugin builds) must
 have neither. clang's MSVC vftable dump confirmed this model for IGuiManager.
+
+A method that returns a struct by value is rejected too: MSVC member functions return it through a hidden pointer,
+while MinGW expects a small one such as ImVec2 back in registers, so Ashita writes the result to a stray address.
 """
 import pathlib
 import re
@@ -14,11 +17,12 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SDK = ROOT / 'third_party' / 'ashita-sdk'
 CALLED_INTERFACES = ['IAshitaCore', 'IMemoryManager', 'IEntity', 'IParty', 'IPlayer', 'IChatManager',
-                     'IConfigurationManager', 'IGuiManager', 'IFontManager', 'IFontObject', 'IPrimitiveObject',
-                     'IPacketManager', 'ITarget', 'IPrimitiveManager']
+                     'IConfigurationManager', 'IGuiManager', 'ITarget']
 INTERFACE = re.compile(r'^(?:struct|interface)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{(.*?)^\};', re.M | re.S)
 DECL = re.compile(r'virtual\s+[^;]*?\b([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)\s*(?:const)?\s*=\s*0\s*;')
 CALL = re.compile(r'->\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(')
+STRUCT = re.compile(r'^\s*struct\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?::[^{;]*)?\{', re.M)
+RETURNING = re.compile(r'virtual\s+([^;(]*?)\b([A-Za-z_][A-Za-z0-9_]*)\s*\([^;]*\)\s*(?:const)?\s*=\s*0\s*;')
 
 
 def interfaces(text):
@@ -28,6 +32,22 @@ def interfaces(text):
         decls = [(d.group(1), '...' in d.group(2)) for d in DECL.finditer(m.group(2))]
         if decls:
             found[m.group(1)] = decls
+    return found
+
+
+def struct_returns(text):
+    """Interface name -> names of its methods that return a struct the headers define, by value."""
+    structs = set(STRUCT.findall(text))
+    found = {}
+    for m in INTERFACE.finditer(text):
+        names = set()
+        for d in RETURNING.finditer(m.group(2)):
+            returned = d.group(1)
+            words = returned.split()
+            if words and words[-1] in structs and '*' not in returned and '&' not in returned:
+                names.add(d.group(2))
+        if names:
+            found[m.group(1)] = names
     return found
 
 
@@ -70,11 +90,14 @@ def main() -> int:
     for source in (ROOT / 'src').glob('*.cpp'):
         calls |= set(CALL.findall(source.read_text(errors='replace')))
     checked = 0
+    returns = struct_returns(text)
     for iface in CALLED_INTERFACES:
         if iface not in found:
             problems.append(f'{iface} not found in the SDK')
             continue
         bad = unstable_methods(found[iface])
+        for name in returns.get(iface, ()):
+            bad.setdefault(name, 'returns a struct by value')
         for call in sorted(calls & {n for n, _ in found[iface]}):
             checked += 1
             if call in bad:

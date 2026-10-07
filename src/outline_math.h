@@ -4,7 +4,7 @@
 
 #include <cstdint>
 
-namespace aggroglow
+namespace headsup
 {
     struct Mat4
     {

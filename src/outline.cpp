@@ -6,7 +6,7 @@
 #include <cstring>
 #include <iterator>
 
-namespace aggroglow
+namespace headsup
 {
     namespace
     {
@@ -52,7 +52,7 @@ namespace aggroglow
         m_Meshes           = 0;
         m_ClearedThisFrame = false;
         m_TargetSurface    = 0; // a render target recreated at the same address may have a new size
-        if (!m_TextFinished) FinishText();
+        FinishText();
         m_TextFinished = false;
         ReadBackBufferSize();
     }
@@ -64,13 +64,17 @@ namespace aggroglow
 
     void OutlineRenderer::FinishText()
     {
+        if (m_TextFinished) return;
         m_TextFinished = true;
         m_PlatesLast.clear();
         m_NameColorsLast.clear();
+        m_DepthsLast.clear();
+        m_GlyphCountsLast.clear();
         std::unordered_map<uint16_t, uint32_t> runs;
         std::vector<ScreenBox> boxes;
         for (const auto& [index, glyphs] : m_Glyphs)
         {
+            m_GlyphCountsLast[index] = static_cast<uint32_t>(glyphs.size());
             boxes.clear();
             for (const GlyphDraw& g : glyphs)
                 boxes.push_back(g.box);
@@ -78,10 +82,12 @@ namespace aggroglow
             if (!plate.valid) continue;
             m_PlatesLast[index]     = plate;
             m_NameColorsLast[index] = NameColor(glyphs, plate);
+            m_DepthsLast[index]     = m_Depths[index];
             runs[index] = PlateFramesInRow(index) + 1;
         }
         m_PlateRuns.swap(runs);
         m_Glyphs.clear();
+        m_Depths.clear();
         m_OtherPlatesLast.clear();
         for (auto& [index, glyphs] : m_OtherGlyphs)
         {
@@ -101,6 +107,7 @@ namespace aggroglow
         IDirect3DSurface8* back = nullptr;
         if (FAILED(m_Device->GetBackBuffer(0, D3DBACKBUFFER_TYPE_MONO, &back)) || back == nullptr) return;
         D3DSURFACE_DESC desc{};
+        m_BackBuffer = reinterpret_cast<uintptr_t>(back); // the swap chain keeps it alive
         if (SUCCEEDED(back->GetDesc(&desc)))
         {
             m_BackBufferWidth  = static_cast<float>(desc.Width);
@@ -129,6 +136,16 @@ namespace aggroglow
         return it == m_PlatesLast.end() ? nullptr : &it->second;
     }
 
+    bool OutlineRenderer::SceneCopyStarting()
+    {
+        if (!TextPending() || m_TargetSurface == 0 || m_TargetSurface == m_BackBuffer) return false;
+        IDirect3DSurface8* target = nullptr;
+        if (FAILED(m_Device->GetRenderTarget(&target)) || target == nullptr) return false;
+        const bool copying = reinterpret_cast<uintptr_t>(target) == m_BackBuffer;
+        target->Release();
+        return copying;
+    }
+
     bool OutlineRenderer::OnDrawUP(D3DPRIMITIVETYPE type, UINT primCount, const void* vertices, UINT stride,
         const Tracker& tracker, bool collect, bool hide)
     {
@@ -137,8 +154,9 @@ namespace aggroglow
         if (FAILED(m_Device->GetVertexShader(&vs)) || IsDeclarationHandle(vs) || (vs & D3DFVF_POSITION_MASK) != D3DFVF_XYZRHW)
             return false;
         ScreenBox box;
+        float depth          = 0.0f;
         const uint32_t count = VertexCount(type, primCount);
-        if (!WorldTextBox(vertices, stride, count, box)) return false; // cheap: rejects HUD text
+        if (!WorldTextBox(vertices, stride, count, box, depth)) return false; // cheap: rejects HUD text
         ++m_TextStats.inScene;
 
         // Pretransformed coordinates are render-target pixels; nameplates are placed in back-buffer pixels.
@@ -153,6 +171,9 @@ namespace aggroglow
                 return false;
             }
             m_TargetSurface = reinterpret_cast<uintptr_t>(target);
+            IDirect3DSurface8* sceneDepth = nullptr;
+            m_SceneDepth = SUCCEEDED(m_Device->GetDepthStencilSurface(&sceneDepth)) ? reinterpret_cast<uintptr_t>(sceneDepth) : 0;
+            if (sceneDepth != nullptr) sceneDepth->Release();
             m_TargetScaleX  = m_BackBufferWidth / static_cast<float>(desc.Width);
             m_TargetScaleY  = m_BackBufferHeight / static_cast<float>(desc.Height);
         }
@@ -187,6 +208,8 @@ namespace aggroglow
                 argb = ShownColor(argb, op == D3DTOP_MODULATE4X ? 4 : op == D3DTOP_MODULATE2X ? 2 : 1);
             }
             m_Glyphs[owner->index].push_back(GlyphDraw{glyph, argb});
+            float& nameDepth = m_Depths[owner->index];
+            nameDepth        = std::max(nameDepth, depth);
         }
         if (!hide || !HideGlyph(glyph, kind, ownerName, m_ReplacedPlates)) return false;
         ++m_TextStats.hidden;

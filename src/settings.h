@@ -5,7 +5,7 @@
 
 #include <cstdint>
 
-namespace aggroglow
+namespace headsup
 {
     // Opaque: outline copies take alpha from the mob's texture, where it shapes hair and cloth cut-outs.
     struct Color
@@ -25,8 +25,7 @@ namespace aggroglow
         int smoothness     = 8;     // shifted copies per mesh
         float maxDistance  = 40.0f; // yalms
         bool showLabels    = true;  // level and con above every mob's name
-        bool autoExamine   = false; // /check the targeted mob once per respawn when it would give exp
-        bool replaceNameplates = false; // hide the game's mob nameplates and draw AggroGlow's (with the name)
+        bool replaceNameplates = false; // hide the game's mob nameplates and draw HeadsUp's (with the name)
         bool showIcons         = true;  // the MobDB icon row
         bool scaleWithDistance = false; // sizes follow the game's name size, like the game's names do
         int fontIndex          = 0;     // into FontFamily's list
@@ -34,6 +33,7 @@ namespace aggroglow
         int nameSize           = 15;    // pixels
         int labelSize          = 13;    // pixels
         int iconSize           = 16;    // pixels
+        bool hideBehindWalls   = true;  // nameplates drawn into the 3D scene, so walls cover them like the game's names
         bool ownNameColor      = false; // names in nameColor instead of the game's color
         Color nameColor        = {{1.00f, 1.00f, 1.00f}};
         Color labelColor[kLabelShadeCount] = {
@@ -49,11 +49,11 @@ namespace aggroglow
         Color iconTint    = {{1.00f, 1.00f, 1.00f}}; // white keeps the icons' own colors
         bool show[kCategoryCount]   = {true, true, true, true, true}; // indexed by Category
         Color color[kCategoryCount] = {
-            {{1.00f, 0.15f, 0.15f}}, // will attack: red
-            {{0.20f, 1.00f, 0.30f}}, // won't attack: green
+            {{1.00f, 0.15f, 0.15f}}, // aggressive: red
+            {{0.20f, 1.00f, 0.30f}}, // passive: green
             {{0.70f, 0.70f, 0.70f}}, // unknown: gray
-            {{1.00f, 0.60f, 0.10f}}, // NM will attack: gold-orange
-            {{1.00f, 0.84f, 0.00f}}, // NM won't attack: gold
+            {{1.00f, 0.60f, 0.10f}}, // aggressive NM: gold-orange
+            {{1.00f, 0.84f, 0.00f}}, // passive NM: gold
         };
     };
 

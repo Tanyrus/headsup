@@ -4,7 +4,7 @@
 #include <cmath>
 #include <iterator>
 
-using namespace aggroglow;
+using namespace headsup;
 
 namespace
 {

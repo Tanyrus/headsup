@@ -4,7 +4,7 @@
 
 #include <cstdint>
 
-namespace aggroglow
+namespace headsup
 {
     // The MobDB icons XIUI shows (third_party/mobdb-icons).
     enum class Icon : uint8_t
@@ -35,14 +35,13 @@ namespace aggroglow
     // mob's nature (it aggros at all), not whether it would attack this player. Empty without data.
     IconSet IconsFor(const MobRecord* mob);
 
-    struct IconPng
+    // An icon's pixels, rows top to bottom, each B, G, R, A as D3DFMT_A8R8G8B8 keeps it in memory.
+    struct IconBitmap
     {
-        const unsigned char* data;
-        uint32_t size;
+        const unsigned char* bgra;
         uint32_t width;
         uint32_t height;
     };
 
-    // The embedded PNG for an icon.
-    const IconPng& IconImage(Icon icon);
+    const IconBitmap& IconImage(Icon icon);
 }

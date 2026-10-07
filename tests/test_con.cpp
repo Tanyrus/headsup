@@ -3,7 +3,7 @@
 
 #include <string>
 
-using namespace aggroglow;
+using namespace headsup;
 
 // Expected values are read from the era table in src/con_tables.inc.
 

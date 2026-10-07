@@ -5,7 +5,7 @@
 #include <cstdio>
 #include <string>
 
-namespace aggroglow
+namespace headsup
 {
     namespace
     {
@@ -81,7 +81,6 @@ namespace aggroglow
         s.smoothness     = LoadInt(store, "smoothness", s.smoothness, kMinSmoothness, kMaxSmoothness);
         s.maxDistance    = store.GetFloat("maxDistance", s.maxDistance);
         s.showLabels     = store.GetBool("showLabels", s.showLabels);
-        s.autoExamine    = store.GetBool("autoExamine", s.autoExamine);
         s.replaceNameplates = store.GetBool("replaceNameplates", s.replaceNameplates);
         s.showIcons         = store.GetBool("showIcons", s.showIcons);
         s.scaleWithDistance = store.GetBool("scaleWithDistance", s.scaleWithDistance);
@@ -90,6 +89,7 @@ namespace aggroglow
         s.nameSize          = LoadInt(store, "nameSize", s.nameSize, kMinTextSize, kMaxTextSize);
         s.labelSize         = LoadInt(store, "labelSize", s.labelSize, kMinTextSize, kMaxTextSize);
         s.iconSize          = LoadInt(store, "iconSize", s.iconSize, kMinTextSize, kMaxTextSize);
+        s.hideBehindWalls   = store.GetBool("hideBehindWalls", s.hideBehindWalls);
         s.ownNameColor      = store.GetBool("ownNameColor", s.ownNameColor);
         LoadColor(store, "nameColor", s.nameColor);
         for (int k = 0; k < kLabelShadeCount; ++k)
@@ -118,7 +118,6 @@ namespace aggroglow
         setFloat("smoothness", static_cast<float>(s.smoothness));
         setFloat("maxDistance", s.maxDistance);
         setBool("showLabels", s.showLabels);
-        setBool("autoExamine", s.autoExamine);
         setBool("replaceNameplates", s.replaceNameplates);
         setBool("showIcons", s.showIcons);
         setBool("scaleWithDistance", s.scaleWithDistance);
@@ -131,6 +130,7 @@ namespace aggroglow
             for (int i = 0; i < 3; ++i)
                 setFloat(base + kChannelKeys[i], c.v[i]);
         };
+        setBool("hideBehindWalls", s.hideBehindWalls);
         setBool("ownNameColor", s.ownNameColor);
         setColor("nameColor", s.nameColor);
         for (int k = 0; k < kLabelShadeCount; ++k)
