@@ -26,7 +26,10 @@ namespace headsup
         }
     }
 
-    bool Steady(uint32_t meshDraws, uint32_t nameFramesInRow) { return meshDraws != 0 && nameFramesInRow >= kStableFrames; }
+    bool Steady(uint32_t framesSinceMesh, uint32_t nameFramesInRow)
+    {
+        return framesSinceMesh <= kMeshGraceFrames && nameFramesInRow >= kStableFrames;
+    }
 
     bool NameOnScreen(const ScreenBox& plate, float screenWidth, float screenHeight)
     {

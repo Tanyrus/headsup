@@ -7,7 +7,9 @@ namespace headsup
     void GameNames::NewFrame()
     {
         FinishText();
+        ++m_Frame;
         m_Glyphs.clear();
+        m_TextureUse.clear();
         m_KeptNow.clear();
         m_MeshDraws.clear();
         m_TextStats      = TextDrawStats{};
@@ -23,9 +25,17 @@ namespace headsup
     {
         if (m_TextFinished) return;
         m_TextFinished  = true;
-        m_Last          = ReadFrameNames(m_Glyphs, m_KeptNow, m_Last);
+        m_Last          = ReadFrameNames(m_Glyphs, m_TextureUse, m_KeptNow, m_Last, m_Enlarged);
         m_MeshDrawsLast = m_MeshDraws;
         m_TextStatsLast = m_TextStats;
+        for (const auto& [index, draws] : m_MeshDraws)
+            m_LastMeshFrame[index] = m_Frame;
+    }
+
+    uint32_t GameNames::FramesSinceMesh(uint16_t index) const
+    {
+        const auto it = m_LastMeshFrame.find(index);
+        return it == m_LastMeshFrame.end() ? UINT32_MAX : m_Frame - it->second;
     }
 
     void GameNames::ReadBackBufferSize()
@@ -77,12 +87,16 @@ namespace headsup
             CaptureCamera(tracker);
             return false;
         }
-        if ((fvf & D3DFVF_POSITION_MASK) != D3DFVF_XYZRHW) return false;
+        // Letters and icons are textured; the quad the game draws over each character is not.
+        if ((fvf & D3DFVF_POSITION_MASK) != D3DFVF_XYZRHW || (fvf & D3DFVF_TEXCOUNT_MASK) == 0) return false;
         ScreenBox box;
         float depth = 0.0f;
         if (!WorldTextBox(vertices, stride, VertexCount(type, primCount), box, depth)) return false; // cheap: rejects HUD text
         const uintptr_t texture = BoundTexture(m_Device);
-        const bool letter       = m_Last.font == 0 || texture == m_Last.font;
+        const ActorInfo* owner  = FindOwnerOnStack(tracker);
+        // Counted before the letter test: a font learned from a frame without names must not keep real letters out.
+        if (owner != nullptr) ++m_TextureUse[texture];
+        const bool letter = m_Last.font == 0 || texture == m_Last.font;
         IDirect3DSurface8* target = nullptr;
         if (FAILED(m_Device->GetRenderTarget(&target)) || target == nullptr) return false;
         const uintptr_t image = reinterpret_cast<uintptr_t>(target);
@@ -101,7 +115,6 @@ namespace headsup
 
         // Pretransformed coordinates are render-target pixels; nameplates are placed in back-buffer pixels.
         const ScreenBox glyph      = box.Scaled(m_Scene.x, m_Scene.y);
-        const ActorInfo* owner     = FindOwnerOnStack(tracker);
         bool replaced              = false;
         const ScreenBox* ownerName = nullptr;
         if (owner == nullptr)
@@ -125,7 +138,8 @@ namespace headsup
         }
         // Only what HeadsUp can draw in its place: its icons go with its names.
         const bool blockable = letter ? blocking.names : blocking.names && blocking.icons;
-        if (!blockable || !HideGameGlyph(glyph, letter, replaced, ownerName, m_Last)) return false;
+        const float ownerHeight = owner != nullptr ? LastLetterHeight(m_Last, owner->index) : 0.0f;
+        if (!blockable || !HideGameGlyph(glyph, letter, replaced, ownerName, ownerHeight, m_Last)) return false;
         ++m_TextStats.hidden;
         return true;
     }

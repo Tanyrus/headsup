@@ -155,7 +155,7 @@ namespace headsup
                 ScreenBox anchor       = PlaceName(*plate, whole, names.SceneCamera(), info->feet, info->pose);
                 if (!NameOnScreen(anchor, screenWidth, screenHeight)) continue;
                 const PlateLines lines = ChooseLines(PlateFacts{info->index, ReplacesName(settings, *info),
-                                                         Steady(names.MeshDraws(info->index), names.PlateFramesInRow(info->index)),
+                                                         Steady(names.FramesSinceMesh(info->index), names.PlateFramesInRow(info->index)),
                                                          info->alive, info->label.text[0] != '\0', info->icons.count, info->nameIcons.left.count,
                                                          info->nameIcons.right.count},
                     settings, targets, m_IconsFailed);

@@ -11,9 +11,12 @@ namespace headsup
 {
     // Frames in a row a name must be drawn before its level line shows, so a one-frame pop never flashes a label.
     constexpr uint32_t kStableFrames = 2;
-    // Whether the camera sees an entity well enough for its level line and MobDB icons: the game drew its body this
-    // frame and its name for kStableFrames frames in a row.
-    bool Steady(uint32_t meshDraws, uint32_t nameFramesInRow);
+    // Frames an entity's body counts as drawn after the game last drew it: some frames credit its draws to whoever else
+    // is on the stack, which made a level line blink.
+    constexpr uint32_t kMeshGraceFrames = 8;
+    // Whether the camera sees an entity well enough for its level line and MobDB icons: the game drew its body within
+    // kMeshGraceFrames frames and its name for kStableFrames frames in a row.
+    bool Steady(uint32_t framesSinceMesh, uint32_t nameFramesInRow);
 
     // Whether some of a name is on screen. A replaced name shows whenever the game's would, as the game's is hidden.
     bool NameOnScreen(const ScreenBox& plate, float screenWidth, float screenHeight);

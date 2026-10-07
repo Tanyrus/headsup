@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <limits>
+#include <map>
 #include <tuple>
 
 namespace headsup
@@ -17,6 +19,7 @@ namespace headsup
         constexpr float kMaxIconWidthLetters  = 8.0f;
         constexpr float kMinLetterRatio       = 0.6f; // a glyph this much shorter or taller than a name's letters
         constexpr float kMaxLetterRatio       = 1.6f; // is not one of them
+        constexpr float kUntangleReach        = 3.0f; // letter heights a name can move in a frame
         // A name's letters share its cap line, and only descenders reach below its baseline, by a fifth of a letter. In a
         // fight the game also draws glowing squares and bars from the name font on name lines, sometimes credited to the
         // mob being fought; none stay inside those lines.
@@ -179,17 +182,48 @@ namespace headsup
         return image == namesImage;
     }
 
-    FrameNames ReadFrameNames(const std::unordered_map<uint16_t, std::vector<GlyphDraw>>& glyphs,
-        const std::unordered_set<uint16_t>& kept, const FrameNames& last)
+    std::unordered_map<uint16_t, std::vector<GlyphDraw>> Untangle(const std::unordered_map<uint16_t, std::vector<GlyphDraw>>& glyphs,
+        const FrameNames& last)
     {
-        FrameNames names;
-        std::unordered_map<uintptr_t, size_t> textures;
+        std::unordered_map<uint16_t, std::vector<GlyphDraw>> untangled;
         for (const auto& [index, drawn] : glyphs)
+        {
+            std::map<float, std::vector<GlyphDraw>> byDepth;
             for (const GlyphDraw& g : drawn)
-                ++textures[g.texture];
-        names.font = last.font;
-        size_t most = 0;
-        for (const auto& [texture, count] : textures)
+                byDepth[g.depth].push_back(g);
+            for (const auto& [depth, group] : byDepth)
+            {
+                uint16_t to = index;
+                if (byDepth.size() > 1)
+                {
+                    ScreenBox box;
+                    for (const GlyphDraw& g : group)
+                        box.Add(g.box);
+                    float nearest = std::numeric_limits<float>::max();
+                    for (const auto& [other, plate] : last.plates)
+                    {
+                        const float dx = std::max({plate.minX - box.CenterX(), 0.0f, box.CenterX() - plate.maxX});
+                        const float dy = std::max({plate.minY - box.CenterY(), 0.0f, box.CenterY() - plate.maxY});
+                        const float distance = std::hypot(dx, dy);
+                        if (distance > kUntangleReach * plate.Height()) continue;
+                        if (distance < nearest || (distance == nearest && other == index)) nearest = distance, to = other;
+                    }
+                }
+                std::vector<GlyphDraw>& out = untangled[to];
+                out.insert(out.end(), group.begin(), group.end());
+            }
+        }
+        return untangled;
+    }
+
+    FrameNames ReadFrameNames(const std::unordered_map<uint16_t, std::vector<GlyphDraw>>& credited, const TextureUse& use,
+        const std::unordered_set<uint16_t>& kept, const FrameNames& last, uint16_t enlarged)
+    {
+        const std::unordered_map<uint16_t, std::vector<GlyphDraw>> glyphs = Untangle(credited, last);
+        FrameNames names;
+        names.font    = last.font;
+        uint32_t most = 0;
+        for (const auto& [texture, count] : use)
             if (count > most) names.font = texture, most = count;
 
         std::vector<float> heights;
@@ -218,20 +252,27 @@ namespace headsup
             names.runs[index] = (run == last.runs.end() ? 0 : run->second) + 1;
             std::vector<float>& recent = names.recentHeights[index];
             if (const auto before = last.recentHeights.find(index); before != last.recentHeights.end()) recent = before->second;
-            recent.push_back(plate.Height());
+            const bool held = index == enlarged && !recent.empty();
+            if (!held) recent.push_back(plate.Height());
             if (recent.size() > kSizeFrames) recent.erase(recent.begin());
             names.sizes[index] = Median(recent);
+            // The game grows a picked name downward from its top edge: the name sits where its normal size would.
+            if (held) names.plates[index].maxY = names.plates[index].minY + names.sizes[index];
             heights.push_back(plate.Height());
         }
-        names.letterHeight = heights.empty() ? last.letterHeight : Median(heights);
+        names.letterHeight        = heights.empty() ? last.letterHeight : Median(heights);
+        names.largestLetterHeight = heights.empty() ? last.largestLetterHeight : *std::max_element(heights.begin(), heights.end());
+        for (const auto& [index, seen] : last.lastSeen)
+            if (seen.framesGone < kRememberedNameFrames) names.lastSeen[index] = {seen.height, seen.framesGone + 1};
+        for (const auto& [index, plate] : names.plates)
+            names.lastSeen[index] = {plate.Height(), 0};
         return names;
     }
 
     bool HideReplacedGlyph(const ScreenBox& glyph, bool letter, float letterHeight, const std::vector<ScreenBox>& keptPlates)
     {
         if (!glyph.valid) return false;
-        if (!letter) return SizedLikeIcons(glyph, letterHeight);
-        if (!LetterSized(glyph)) return false;
+        if (!letter || !LetterSized(glyph)) return SizedLikeIcons(glyph, letterHeight);
         const float pad = kOwnPadLetters * std::max(glyph.Height(), kMinLetterHeight);
         for (const ScreenBox& plate : keptPlates)
             if (Inside(glyph.CenterX(), glyph.CenterY(), plate, pad)) return false;
@@ -253,10 +294,18 @@ namespace headsup
         return false;
     }
 
-    bool HideGameGlyph(const ScreenBox& glyph, bool letter, bool replaced, const ScreenBox* ownerName, const FrameNames& last)
+    float LastLetterHeight(const FrameNames& last, uint16_t index)
+    {
+        const auto seen = last.lastSeen.find(index);
+        return seen != last.lastSeen.end() ? seen->second.height : 0.0f;
+    }
+
+    bool HideGameGlyph(const ScreenBox& glyph, bool letter, bool replaced, const ScreenBox* ownerName, float ownerHeight,
+        const FrameNames& last)
     {
         if (replaced)
-            return HideReplacedGlyph(glyph, letter, ownerName != nullptr ? ownerName->Height() : last.letterHeight, last.keptPlates);
+            return HideReplacedGlyph(glyph, letter, std::max(ownerHeight > 0.0f ? ownerHeight : last.letterHeight, last.largestLetterHeight),
+                last.keptPlates);
         return letter && HideStrayLetter(glyph, ownerName, last.replacedPlates);
     }
 }

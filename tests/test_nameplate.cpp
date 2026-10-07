@@ -11,9 +11,10 @@ using test::Near;
 
 TEST(labels_wait_for_a_drawn_body_and_a_steady_name)
 {
-    CHECK(Steady(18, kStableFrames));
-    CHECK(!Steady(0, kStableFrames));      // body not drawn
-    CHECK(!Steady(18, kStableFrames - 1)); // name just appeared
+    CHECK(Steady(0, kStableFrames));                     // body drawn this frame
+    CHECK(Steady(kMeshGraceFrames, kStableFrames));      // or lately: on some frames the game's draws credit it to another
+    CHECK(!Steady(kMeshGraceFrames + 1, kStableFrames)); // body not drawn
+    CHECK(!Steady(0, kStableFrames - 1));                // name just appeared
 }
 
 TEST(a_name_shows_whenever_some_of_it_is_on_screen)

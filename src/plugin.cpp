@@ -167,7 +167,7 @@ public:
             m_DebugPending = true;
 #ifdef HEADSUP_DEV
         else if (args[1] == "drawdump")
-            Print(m_DrawDump.Start(args.size() > 2 ? args[2] : "", Now()));
+            Print(m_DrawDump.Start(args.size() > 2 ? args[2] : "", Now(), m_AshitaCore, OwnFolder("logs")));
 #endif
         else
         {
@@ -175,7 +175,7 @@ public:
             Print("/hu on | /hu off: turn outlines and nameplates on or off");
             Print("/hu debug: write what every outline and nameplate show to logs/headsup");
 #ifdef HEADSUP_DEV
-            Print("/hu drawdump [seconds | watch | stop]: write every draw call of one frame to logs/headsup, after the delay or the first frame a name suddenly grows");
+            Print("/hu drawdump [seconds | watch | stop]: write every draw call of one frame to logs/headsup after the delay, or watch every frame for name glitches until stopped");
 #endif
         }
         return true;
@@ -247,7 +247,7 @@ public:
         UNREFERENCED_PARAMETER(dirty);
         MeasureFrame();
 #ifdef HEADSUP_DEV
-        if (m_DrawDump.NextFrame(Now(), m_Names, m_Tracker)) WriteDrawDump();
+        if (m_DrawDump.NextFrame(Now(), m_Names, m_Tracker, m_Nameplates)) WriteDrawDump();
 #endif
         m_Outline.NewFrame();
         m_Names.NewFrame();
@@ -419,13 +419,14 @@ private:
     void WriteDrawDump()
     {
         std::string path;
-        std::FILE* out = OpenLog("drawdump", path);
+        std::FILE* out = OpenLog(m_DrawDump.FilePrefix().c_str(), path);
         if (out == nullptr) return;
         const uint32_t self = m_AshitaCore->GetMemoryManager()->GetParty()->GetMemberTargetIndex(0);
         const size_t draws  = m_DrawDump.Write(out, headsup::DrawDump::Sources{m_AshitaCore, m_Names, m_Nameplates.CursorNames(),
-                                                        [&](uint32_t index) { return PlayerStatusOf(index, self); }});
+                                                        m_Nameplates.LastShown(), [&](uint32_t index) { return PlayerStatusOf(index, self); }});
         std::fclose(out);
-        Print("wrote " + std::to_string(draws) + " draw calls to " + path);
+        m_DrawDump.Wrote(path, draws);
+        if (!m_DrawDump.Watching()) Print("wrote " + std::to_string(draws) + " draw calls to " + path);
     }
 #endif
 
@@ -546,6 +547,7 @@ private:
             (target->GetLockedOnFlags() & kLockedOn) != 0, m_AshitaCore->GetMemoryManager()->GetEntity()->GetEntityMapSize());
         if (!m_Picking) m_Names.ForgetPickRange();
         m_CursorTargets.outOfRange = m_Picking && m_Names.PickOutOfRange();
+        m_Names.SetEnlarged(m_Picking ? m_CursorTargets.subTarget : uint16_t{0});
     }
 
     void UpdateTracker(double now)

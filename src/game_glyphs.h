@@ -92,16 +92,45 @@ namespace headsup
         std::unordered_map<uint16_t, std::vector<float>> recentHeights;
         std::unordered_map<uint16_t, float> sizes;
         std::vector<ScreenBox> replacedPlates, keptPlates;
-        float letterHeight = 0.0f; // the median name's; the last frame's when this one has none
+        float letterHeight        = 0.0f; // the median name's; the last frame's when this one has none
+        float largestLetterHeight = 0.0f; // the largest name's; the last frame's when this one has none
+        // Each name's letter height when last drawn and the frames since, for kRememberedNameFrames: a name that comes
+        // back has its icons drawn before its letters.
+        struct Seen
+        {
+            float height;
+            uint32_t framesGone;
+        };
+        std::unordered_map<uint16_t, Seen> lastSeen;
     };
+    constexpr uint32_t kRememberedNameFrames = 60;
+
+    // An entity's letter height when its name was last drawn, within kRememberedNameFrames; 0 otherwise.
+    float LastLetterHeight(const FrameNames& last, uint16_t index);
+    // How many quads the game credited to entities in its scene drew with each texture this frame, in any image.
+    using TextureUse = std::unordered_map<uintptr_t, uint32_t>;
+
+
+    // The game sometimes credits other names' glyphs to whichever entity is on the stack (in a fight, a whole frame's
+    // to one mob). Each name's quads share a depth, so an entity's glyphs at several depths are several names': each
+    // depth's go to the entity whose name was nearest them the frame before (last), itself included, within three of
+    // that name's letter heights; with none that near, they stay where they were credited.
+    std::unordered_map<uint16_t, std::vector<GlyphDraw>> Untangle(const std::unordered_map<uint16_t, std::vector<GlyphDraw>>& glyphs,
+        const FrameNames& last);
+
+    // use: this frame's TextureUse; the font is the texture most of them use, or the last frame's when there are none.
     // kept: the entities whose names stay the game's. last: the frame before, for the font, runs and letter height.
-    FrameNames ReadFrameNames(const std::unordered_map<uint16_t, std::vector<GlyphDraw>>& glyphs,
-        const std::unordered_set<uint16_t>& kept, const FrameNames& last);
+    // enlarged: the entity whose name the game draws enlarged, the candidate being picked for a spell or ability (at a
+    // fixed size, from the same top edge); its size keeps its heights from before, when it has any, and its plate takes
+    // that height from the top. 0 for none.
+    FrameNames ReadFrameNames(const std::unordered_map<uint16_t, std::vector<GlyphDraw>>& glyphs, const TextureUse& use,
+        const std::unordered_set<uint16_t>& kept, const FrameNames& last, uint16_t enlarged = 0);
 
     // Whether to hide a quad the game credits to an entity whose name HeadsUp replaces. A letter of the font (letter)
     // is hidden wherever it is, as names move between frames and the sub-target's is drawn larger, unless it is inside a
-    // kept name (keptPlates, the previous frame's), where it was credited to the wrong entity. A quad in another texture
-    // is hidden when it is sized like the name's icons, by letterHeight, the name's letters' height (0 before any).
+    // kept name (keptPlates, the previous frame's), where it was credited to the wrong entity. Any other part of a name
+    // (its icons, and the bars and squares the game draws from its font) is hidden when it is sized like one, by
+    // letterHeight (0 before any).
     bool HideReplacedGlyph(const ScreenBox& glyph, bool letter, float letterHeight, const std::vector<ScreenBox>& keptPlates);
 
     // Whether to hide a letter the game credits to a kept name (ownPlate, its previous box) or to no one (nullptr): only
@@ -110,6 +139,9 @@ namespace headsup
     bool HideStrayLetter(const ScreenBox& glyph, const ScreenBox* ownPlate, const std::vector<ScreenBox>& replacedPlates);
 
     // Whether to block a glyph of the game's names: HideReplacedGlyph for an entity whose name HeadsUp replaces, sized
-    // by its last name or the last frame's letters, else HideStrayLetter. ownerName: the owner's name in the last frame.
-    bool HideGameGlyph(const ScreenBox& glyph, bool letter, bool replaced, const ScreenBox* ownerName, const FrameNames& last);
+    // by the largest of its own letters (ownerHeight, LastLetterHeight) and the last frame's names: the game credits
+    // parts of a name to whoever is on the stack, so a big name's icon can come credited to a small one. Else
+    // HideStrayLetter. ownerName: the owner's name in the last frame.
+    bool HideGameGlyph(const ScreenBox& glyph, bool letter, bool replaced, const ScreenBox* ownerName, float ownerHeight,
+        const FrameNames& last);
 }

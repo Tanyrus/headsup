@@ -51,6 +51,8 @@ namespace headsup
         // Whether the candidate being picked is out of range of the spell or ability, as the game's own arrow last showed
         // it (PickedOutOfRange); it draws that arrow after HeadsUp's nameplates, so this is the frame before's.
         bool PickOutOfRange() const { return m_PickOutOfRange; }
+        // The candidate being picked, whose name the game draws enlarged; 0 for none.
+        void SetEnlarged(uint16_t index) { m_Enlarged = index; }
         // Picking ended: the next pick starts in range until the game's arrow says otherwise.
         void ForgetPickRange() { m_PickOutOfRange = false; }
         // A character body was drawn for this entity.
@@ -83,6 +85,8 @@ namespace headsup
         uintptr_t FontTexture() const { return m_Last.font; }
         // Character body draws of an entity: 0 when the game did not draw its body.
         uint32_t MeshDraws(uint16_t index) const { return Value(m_MeshDrawsLast, index, 0u); }
+        // Frames since the game last drew an entity's body: 0 this frame; UINT32_MAX never.
+        uint32_t FramesSinceMesh(uint16_t index) const;
 
         // Counts of the game's in-scene glyph draws, for /hu debug and the Debug page.
         struct TextDrawStats
@@ -115,6 +119,7 @@ namespace headsup
 
         // This frame, reset by NewFrame.
         std::unordered_map<uint16_t, std::vector<GlyphDraw>> m_Glyphs; // by entity index
+        TextureUse m_TextureUse;                                       // for the font, from every quad, letter or not
         std::unordered_set<uint16_t> m_KeptNow;                        // entities whose names stay the game's
         std::unordered_map<uint16_t, uint32_t> m_MeshDraws;
         TextDrawStats m_TextStats;
@@ -125,6 +130,8 @@ namespace headsup
         // Snapshots by FinishText.
         FrameNames m_Last;
         std::unordered_map<uint16_t, uint32_t> m_MeshDrawsLast;
+        std::unordered_map<uint16_t, uint32_t> m_LastMeshFrame; // the frame each entity's body was last drawn in
+        uint32_t m_Frame = 0;
         TextDrawStats m_TextStatsLast;
 
         uintptr_t m_NamesImage   = 0; // the render target names' letters go to (InNamesImage)
@@ -133,6 +140,7 @@ namespace headsup
         TargetScale m_Ui;             // the UI image's scale
         uintptr_t m_ArrowTexture = 0; // the game's target arrows, once seen
         bool m_PickOutOfRange    = false; // from the game's arrow over the candidate being picked
+        uint16_t m_Enlarged      = 0;
         Camera m_Camera{};
         bool m_HaveCamera = false;
     };
