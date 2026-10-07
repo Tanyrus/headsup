@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Arch's MinGW and GCC match the toolchain HeadsUp is developed with; the build treats warnings as errors.
+    container: archlinux:latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Install the toolchain
+        run: pacman -Syu --noconfirm --needed git gcc mingw-w64-gcc python
+      - uses: actions/checkout@v4
+      - name: Check the plugin's version matches the tag
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="${tag%.*}"
+          if ! grep -qE "kVersion +=  *${version//./\\.};" src/plugin.cpp; then
+            echo "src/plugin.cpp's kVersion is not $version, the major.minor of tag $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
+      - name: Build and test
+        run: ./build.sh plugin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: headsup
+          path: build/headsup.dll
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: headsup
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" headsup.dll --repo "$GITHUB_REPOSITORY" --title "HeadsUp $GITHUB_REF_NAME" --generate-notes

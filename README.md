@@ -5,7 +5,8 @@ they will attack you, and replaces the game's nameplates with clearer ones: name
 detects you, player status icons and a target cursor. It only reads what the game already shows and the server
 already sends; it never targets or checks anything itself.
 
-Load it with `/load headsup`; `/hu` opens its settings.
+Download `headsup.dll` from the latest release on the [Releases](https://github.com/Tanyrus/headsup/releases) page and
+put it in Ashita's `plugins` folder. Load it with `/load headsup`; `/hu` opens its settings.
 
 > **About the data:** HeadsUp's monster data (levels, aggression, links and detection) is built from Phoenix's own
 > server code: the map server is compiled from Phoenix's public source and records every monster it loads. It matches

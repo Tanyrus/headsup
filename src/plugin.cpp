@@ -30,6 +30,9 @@
 namespace
 {
     constexpr const char* kName              = "headsup";
+    // Ashita takes a plugin's version as one number, so it holds the release tag's major.minor; the release workflow
+    // checks the two agree.
+    constexpr double kVersion                = 0.5;
     constexpr const char* kConfigAlias       = "headsup";
     constexpr const char* kConfigFolder      = "config";
     constexpr const char* kLogsFolder        = "logs";
@@ -131,7 +134,7 @@ public:
         return "Outlines monsters by whether they will attack you and replaces the game's nameplates with its own.";
     }
     const char* GetLink(void) const override { return ""; }
-    double GetVersion(void) const override { return 2.10; }
+    double GetVersion(void) const override { return kVersion; }
     uint32_t GetFlags(void) const override
     {
         return static_cast<uint32_t>(Ashita::PluginFlags::UseCommands | Ashita::PluginFlags::UsePackets |
