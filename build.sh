@@ -3,7 +3,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 OUT="$ROOT/build"
 PLUGINS_DIR="${HEADSUP_PLUGINS_DIR:-$HOME/Games/PhoenixXI/plugins}"
-PURE_SOURCES=(con.cpp cursor_file.cpp mobdata.cpp classifier.cpp settings.cpp tracker.cpp outline_math.cpp labels.cpp check.cpp nameplate.cpp icons.cpp text_image.cpp shapes.cpp player_status.cpp pose.cpp commands.cpp game_glyphs.cpp game_cursor.cpp)
+PURE_SOURCES=(con.cpp cursor_file.cpp mobdata.cpp ph_timers.cpp classifier.cpp settings.cpp tracker.cpp outline_math.cpp labels.cpp check.cpp nameplate.cpp icons.cpp text_image.cpp shapes.cpp player_status.cpp pose.cpp commands.cpp game_glyphs.cpp game_cursor.cpp)
 PLUGIN_SOURCES=("${PURE_SOURCES[@]}" d3d_util.cpp game_names.cpp outline.cpp pointer_swap.cpp text_raster.cpp nameplate_render.cpp menu.cpp plugin.cpp)
 # dev/, ignored by git, holds a developer's tools; when it exists they are built in and plugin.cpp's HEADSUP_DEV hooks call them.
 DEV_SOURCES=()

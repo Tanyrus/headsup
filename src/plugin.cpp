@@ -8,6 +8,7 @@
 #include "mobdata.h"
 #include "nameplate_render.h"
 #include "outline.h"
+#include "ph_timers.h"
 #include "player_status.h"
 #include "pointer_swap.h"
 #include "settings.h"
@@ -84,6 +85,10 @@ class HeadsUp final : public IPlugin
     IAshitaCore* m_AshitaCore = nullptr;
     headsup::Settings m_Settings;
     headsup::Tracker m_Tracker;
+    headsup::PhTimers m_PhTimers;
+    std::vector<headsup::PhSighting> m_PhSightings;
+    std::vector<headsup::TimerLine> m_TimerLines; // above your name
+    uint16_t m_SelfIndex = 0;
     headsup::OutlineRenderer m_Outline;
     headsup::GameNames m_Names;
     headsup::NameplateRenderer m_Nameplates;
@@ -404,7 +409,7 @@ private:
     // Lays out and draws the nameplates into the bound render target, toX and toY pixels per back-buffer pixel.
     void DrawNameplates(float toX, float toY, bool depthTest)
     {
-        m_Nameplates.Update(m_Tracker, m_Names, m_Settings, toX, toY, m_CursorTargets, Now());
+        m_Nameplates.Update(m_Tracker, m_Names, m_Settings, toX, toY, m_CursorTargets, Now(), m_SelfIndex, m_TimerLines);
         m_Nameplates.Draw(depthTest);
         m_PlatesPlaced = true;
     }
@@ -588,6 +593,7 @@ private:
                 m_BuffSynced.insert(party->GetStatusIconsTargetIndex(member));
         const uint32_t count = std::min<uint32_t>(entity->GetEntityMapSize(), headsup::kMaxEntities);
         const uint32_t self  = party->GetMemberTargetIndex(0);
+        m_PhSightings.clear();
         for (uint32_t i = 0; i < count; ++i)
         {
             if (entity->GetRawEntity(i) == nullptr) continue;
@@ -600,6 +606,13 @@ private:
             const bool isPlayer     = kind == headsup::EntityKind::Player;
             const bool alive        = entity->GetHPPercent(i) > 0;
             if (isMob && !alive) m_Checks.Forget(serverId); // the next spawn rolls a new level
+            if (const headsup::MobRecord* ph = isMob && m_Settings.phTimers ? headsup::FindMob(serverId, EntityName(entity, i)) : nullptr;
+                ph != nullptr && ph->placeholderOf != 0)
+            {
+                const headsup::MobRecord* nm = headsup::MobById(ph->placeholderOf);
+                m_PhSightings.push_back(headsup::PhSighting{serverId, ph->respawn, nm != nullptr ? nm->name : "NM", alive,
+                    m_Names.FramesSinceMesh(static_cast<uint16_t>(i)) <= headsup::kMeshGraceFrames});
+            }
             m_Inputs.push_back(headsup::ActorInput{static_cast<headsup::ActorPtr>(actor), static_cast<uint16_t>(i),
                 serverId, kind, alive, headsup::DistanceFromSquared(entity->GetDistance(i)), EntityName(entity, i),
                 isMob ? m_Checks.Result(serverId, now) : nullptr, CurrentStatus(entity, i, kind, self),
@@ -611,6 +624,11 @@ private:
         m_Player.sitting = headsup::IsSittingStatus(entity->GetStatus(party->GetMemberTargetIndex(0)));
         m_Player.engaged = entity->GetStatus(party->GetMemberTargetIndex(0)) == kEngagedStatus;
         m_Tracker.Update(m_Inputs, m_Player, m_Settings);
+        m_SelfIndex = static_cast<uint16_t>(self);
+        // Off, no placeholder is seen, so turning it on never takes one that died meanwhile for a death in view.
+        m_PhTimers.Update(now, m_PhSightings);
+        m_TimerLines.clear();
+        if (m_Settings.phTimers) m_TimerLines = m_PhTimers.Lines(party->GetMemberZone(0), now);
     }
 
     // /hu debug: what each outline and nameplate showed in the last frame, written to logs/headsup/.

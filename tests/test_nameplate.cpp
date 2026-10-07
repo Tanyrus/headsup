@@ -290,6 +290,19 @@ TEST(the_cursor_sits_on_the_name_when_nothing_else_is_above_it)
     CHECK(Near(l.cursorY, 183.0f));
 }
 
+TEST(your_timers_stack_over_your_name_under_the_cursor)
+{
+    // Two 12 px timer lines over the name at y 196, the soonest on top, then the cursor.
+    const ScreenBox plate = Box(1000.0f, 200.0f, 1080.0f, 210.0f);
+    LineSizes sizes;
+    sizes.nameWidth = 100.0f, sizes.nameHeight = 18.0f, sizes.cursorWidth = 20.0f, sizes.cursorHeight = 16.0f;
+    sizes.timerCount = 2, sizes.timerHeight = 12.0f;
+    const NameplateLayout l = LayoutNameplate(plate, sizes, true);
+    CHECK(Near(l.timersY, 173.0f) && Near(l.timerStep, 14.0f)); // the lower ends at 199, overlapping the name by 3 px
+    CHECK(Near(l.centerX, 1040.0f));
+    CHECK(Near(l.cursorY, 155.0f)); // 2 px above the top timer
+}
+
 TEST(the_cursor_bobs_up_to_a_seventh_of_its_height_and_repeats)
 {
     float lowest = 0.0f, highest = -100.0f;

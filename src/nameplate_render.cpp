@@ -134,7 +134,7 @@ namespace headsup
     }
 
     void NameplateRenderer::Update(const Tracker& tracker, const GameNames& names, const Settings& settings, float toX,
-        float toY, const CursorTargets& targets, double now)
+        float toY, const CursorTargets& targets, double now, uint16_t selfIndex, const std::vector<TimerLine>& selfTimers)
     {
         ++m_Frame;
         m_Shown.clear();
@@ -168,7 +168,8 @@ namespace headsup
                                                          info->nameIcons.right.count, info->fighting, info->claimed, info->tooWeak,
                                                          tracker.Player().engaged},
                     settings, targets, m_IconsFailed);
-                if (!lines.Any()) continue;
+                const bool timersHere = info->index == selfIndex && !selfTimers.empty();
+                if (!lines.Any() && !timersHere) continue;
                 Plate& p = m_Plates[info->index];
                 p.frame  = m_Frame;
 
@@ -177,6 +178,7 @@ namespace headsup
                 const float scale       = settings.scaleWithDistance ? DistanceScale(names.NameSize(info->index), screenHeight) : 1.0f;
                 const float nameShown   = static_cast<float>(settings.nameSize) * scale * toY;
                 const float labelShown  = static_cast<float>(settings.labelSize) * scale * toY;
+                const float timerShown  = static_cast<float>(settings.timerSize) * scale * toY;
                 const float iconSize    = static_cast<float>(settings.iconSize) * scale;
                 const float cursorShown = static_cast<float>(settings.cursorSize) * scale * toY;
                 auto raster             = [&](float shown, int current) {
@@ -196,6 +198,19 @@ namespace headsup
                 const float nameFit   = nameShown / static_cast<float>(p.nameRaster);
                 const float labelFit  = labelShown / static_cast<float>(p.labelRaster);
                 const float cursorFit = cursorShown / static_cast<float>(p.cursorRaster);
+                // Your placeholder timers, between your name and the cursor over you.
+                for (size_t i = timersHere ? selfTimers.size() : 0; i < p.timers.size(); ++i)
+                    ReleaseTexture(p.timers[i].texture);
+                p.timers.resize(timersHere ? selfTimers.size() : 0);
+                p.timerRaster          = timersHere ? raster(timerShown, p.timerRaster) : 0;
+                const float timerFit   = timersHere ? timerShown / static_cast<float>(p.timerRaster) : 0.0f;
+                const uint32_t upColor = ToArgb(settings.color[CategoryIndex(Category::Placeholder)]);
+                int timersReady        = 0;
+                for (; timersReady < static_cast<int>(p.timers.size()); ++timersReady)
+                {
+                    const TimerLine& line = selfTimers[timersReady];
+                    if (!Prepare(p.timers[timersReady], line.text.c_str(), line.up ? upColor : kWhite, p.timerRaster, settings)) break;
+                }
                 // A player's icons are a share of the name's height.
                 const float nameIconSize = nameShown / toY * static_cast<float>(settings.playerIconSize) / kPercent;
 
@@ -214,6 +229,9 @@ namespace headsup
                 sizes.rightIconCount     = lines.rightIcons;
                 sizes.nameIconSize       = nameIconSize;
                 sizes.centerNameAndIcons = settings.centerNameAndIcons;
+                sizes.timerCount         = timersReady;
+                for (int i = 0; i < timersReady; ++i)
+                    sizes.timerHeight = std::max(sizes.timerHeight, p.timers[i].height * timerFit / toY);
                 if (lines.name)
                 {
                     const float raise = static_cast<float>(settings.nameRaise) * scale;
@@ -254,6 +272,13 @@ namespace headsup
                     addQuad(cursorQuads, p.cursor.texture, layout.cursorX, layout.cursorY + CursorBob(now, sizes.cursorHeight),
                         p.cursor.width * cursorFit, p.cursor.height * cursorFit, p.cursor.u, p.cursor.v, depth, kWhite);
                     m_CursorNames.push_back(CursorName{info->index, whole != nullptr ? *whole : *plate});
+                }
+                for (int i = 0; i < sizes.timerCount; ++i)
+                {
+                    const PlateTexture& t = p.timers[i];
+                    addQuad(m_Quads, t.texture, layout.centerX - t.width * timerFit / toX / 2.0f,
+                        layout.timersY + static_cast<float>(i) * layout.timerStep, t.width * timerFit, t.height * timerFit, t.u, t.v,
+                        depth, kWhite);
                 }
                 auto shownHeight = [&](bool shown, float pixels) { return shown ? static_cast<int>(std::lround(pixels / toY)) : 0; };
                 m_Shown.push_back(Shown{info->index, layout.nameX, layout.nameY, layout.labelX, layout.labelY, layout.iconsX,
@@ -297,11 +322,19 @@ namespace headsup
                 ++it;
                 continue;
             }
-            ReleaseTexture(it->second.name.texture);
-            ReleaseTexture(it->second.label.texture);
-            ReleaseTexture(it->second.cursor.texture);
+            ReleasePlate(it->second);
             it = m_Plates.erase(it);
         }
+    }
+
+    void NameplateRenderer::ReleasePlate(Plate& plate)
+    {
+        ReleaseTexture(plate.name.texture);
+        ReleaseTexture(plate.label.texture);
+        ReleaseTexture(plate.cursor.texture);
+        for (PlateTexture& timer : plate.timers)
+            ReleaseTexture(timer.texture);
+        plate.timers.clear();
     }
 
     void NameplateRenderer::Clear()
@@ -314,11 +347,7 @@ namespace headsup
     void NameplateRenderer::ReleasePlates()
     {
         for (auto& [index, plate] : m_Plates)
-        {
-            ReleaseTexture(plate.name.texture);
-            ReleaseTexture(plate.label.texture);
-            ReleaseTexture(plate.cursor.texture);
-        }
+            ReleasePlate(plate);
         m_Plates.clear();
     }
 

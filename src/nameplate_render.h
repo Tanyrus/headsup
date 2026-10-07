@@ -5,6 +5,7 @@
 #include "game_names.h"
 #include "icons.h"
 #include "nameplate.h"
+#include "ph_timers.h"
 #include "settings.h"
 #include "text_image.h"
 #include "tracker.h"
@@ -35,9 +36,9 @@ namespace headsup
         void SetDevice(IDirect3DDevice8* device) { m_Device = device; }
         // Lays out the nameplate of every entity whose name is on screen in the pixels of the image it will be drawn
         // into: toX and toY turn back-buffer pixels into those (1 for the back buffer itself). now, in seconds, makes the
-        // cursor bob.
+        // cursor bob. selfTimers: the lines above your own name (selfIndex), soonest first.
         void Update(const Tracker& tracker, const GameNames& names, const Settings& settings, float toX, float toY,
-            const CursorTargets& targets, double now);
+            const CursorTargets& targets, double now, uint16_t selfIndex, const std::vector<TimerLine>& selfTimers);
         // Forgets the last layout, for a frame whose nameplates were not drawn.
         void Clear();
         // Releases the plates' textures too, while nameplates are off.
@@ -87,6 +88,8 @@ namespace headsup
             int nameRaster   = 0; // the pixel height each is drawn at, for RasterHeight
             int labelRaster  = 0;
             int cursorRaster = 0;
+            std::vector<PlateTexture> timers; // your own: the placeholder timers above your name
+            int timerRaster  = 0;
             uint32_t frame   = 0;
         };
 
@@ -109,6 +112,7 @@ namespace headsup
         IDirect3DTexture8* CreateTexture(const void* bgra, int width, int height, float& u, float& v);
         const IconTexture* Icon(Icon icon);
         void Fail(std::string what);
+        static void ReleasePlate(Plate& plate);
 
         IDirect3DDevice8* m_Device = nullptr;
         std::unordered_map<uint16_t, Plate> m_Plates; // by entity index

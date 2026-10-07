@@ -515,6 +515,14 @@ namespace headsup
                 ui.Check("Mark placeholders [PH]", s.markPlaceholders,
                     "[PH] in place of the last three digits (after the whole ID) on a mob whose death can pop a notorious "
                     "monster, from the Phoenix data.");
+                ui.Fade(!s.enabled);
+                ui.Check("Placeholder timers", s.phTimers,
+                    "Above your name, a respawn countdown for each NM placeholder you see die on screen: the NM, the "
+                    "placeholder's last three hex digits and the time left (Bigmouth Billy [11A] 3:15). Phoenix starts it "
+                    "15 seconds after the death, when the body despawns. It reads \"up\" when due, until you see the "
+                    "placeholder alive or five minutes pass.");
+                ui.Fade(!s.enabled || !s.phTimers);
+                ui.SliderInt("Timer size", s.timerSize, kMinTextSize, kMaxTextSize, "%d px", "The timer lines' height.");
                 ui.Fade(!s.enabled || (!s.showLabels && s.mobId == MobIdFormat::Off && !s.showIcons));
                 ui.Check("Hide level and icons in combat", s.hideInCombat,
                     "Takes the level line and icons off a mob once you or your party has claimed it. Its name and the "

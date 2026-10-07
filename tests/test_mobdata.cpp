@@ -1,6 +1,8 @@
 #include "mobdata.h"
 #include "test.h"
 
+#include <string>
+
 using namespace headsup;
 
 // Expected values are read from data/phoenix_mobs.tsv (zone 103 is Valkurm Dunes).
@@ -69,6 +71,13 @@ TEST(a_placeholder_knows_its_nm)
     CHECK_EQ(FindMob(17191194, "Carrion Worm")->placeholderOf, 17191196u);
     CHECK_EQ(FindMob(17191195, "Carrion Worm")->placeholderOf, 17191196u);
     CHECK_EQ(FindMob(17191196, "Bigmouth Billy")->placeholderOf, 0u);
+}
+
+TEST(a_record_by_id_alone_is_found_whatever_its_name)
+{
+    const MobRecord* billy = MobById(17191196);
+    CHECK(billy != nullptr && std::string(billy->name) == "Bigmouth Billy");
+    CHECK(MobById(1) == nullptr);
 }
 
 TEST(unknown_ids_are_not_found)

@@ -54,6 +54,7 @@ namespace
         CHECK(a.fontBold == b.fontBold);
         CHECK_EQ(a.nameSize, b.nameSize);
         CHECK_EQ(a.labelSize, b.labelSize);
+        CHECK_EQ(a.timerSize, b.timerSize);
         CHECK_EQ(a.iconSize, b.iconSize);
         CHECK_EQ(a.playerIconSize, b.playerIconSize);
         CHECK(a.ownNameColor == b.ownNameColor);
@@ -68,6 +69,7 @@ namespace
         CHECK(a.hideWhileEngaged == b.hideWhileEngaged);
         CHECK(a.mobId == b.mobId);
         CHECK(a.markPlaceholders == b.markPlaceholders);
+        CHECK(a.phTimers == b.phTimers);
         CHECK(a.showPlayerIcons == b.showPlayerIcons);
         CHECK(a.centerNameAndIcons == b.centerNameAndIcons);
         CheckSameColor(a.cursorColor, b.cursorColor);
@@ -108,6 +110,7 @@ TEST(mob_ids_are_off_and_placeholders_purple_by_default)
     CHECK(s.mobId == MobIdFormat::Off);
     CHECK(s.markPlaceholders);
     CHECK(s.show[CategoryIndex(Category::Placeholder)]);
+    CHECK(!s.phTimers);
 }
 
 TEST(every_player_icon_shows_left_of_the_name_by_default)
@@ -153,6 +156,7 @@ TEST(settings_round_trip)
     s.fontBold          = true;
     s.nameSize          = 20;
     s.labelSize         = 9;
+    s.timerSize         = 17;
     s.iconSize          = 24;
     s.playerIconSize    = 120;
     s.ownNameColor      = true;
@@ -167,6 +171,7 @@ TEST(settings_round_trip)
     s.hideWhileEngaged  = true;
     s.mobId             = MobIdFormat::Full;
     s.markPlaceholders  = false;
+    s.phTimers          = true;
     s.showPlayerIcons   = false;
     s.centerNameAndIcons = false;
     s.lockedCursorColor = Color{{0.125f, 0.25f, 0.5f}};
@@ -207,12 +212,14 @@ TEST(out_of_range_values_are_clamped)
     store.values["maxDistance"] = "-5";
     store.values["nameSize"]    = "100";
     store.values["labelSize"]   = "2";
+    store.values["timerSize"]   = "99";
     const Settings s = LoadSettings(store);
     CHECK_EQ(s.thickness, kMaxThickness);
     CHECK_EQ(s.smoothness, kMinSmoothness);
     CHECK_EQ(s.maxDistance, kMinOutlineDistance);
     CHECK_EQ(s.nameSize, kMaxTextSize);
     CHECK_EQ(s.labelSize, kMinTextSize);
+    CHECK_EQ(s.timerSize, kMaxTextSize);
 }
 
 TEST(a_whole_number_too_large_for_an_int_is_clamped_like_any_other)
@@ -260,6 +267,7 @@ TEST(clamp_bounds_every_field)
     s.fontName    = "";
     s.nameSize    = 100;
     s.labelSize   = 0;
+    s.timerSize   = 0;
     s.iconSize    = 49;
     s.playerIconSize = 10;
     s.cursorSize  = 2;
@@ -285,6 +293,7 @@ TEST(clamp_bounds_every_field)
     CHECK(c.fontName == kDefaultFont);
     CHECK_EQ(c.nameSize, kMaxTextSize);
     CHECK_EQ(c.labelSize, kMinTextSize);
+    CHECK_EQ(c.timerSize, kMinTextSize);
     CHECK_EQ(c.iconSize, kMaxTextSize);
     CHECK_EQ(c.cursorSize, kMinTextSize);
     CHECK_EQ(c.nameRaise, kMaxNameRaise);

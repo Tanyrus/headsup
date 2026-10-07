@@ -94,17 +94,22 @@ namespace headsup
         int rightIconCount      = 0;
         float nameIconSize      = 0.0f;
         bool centerNameAndIcons = false; // the name and its icons centered together, rather than the name alone
+        int timerCount    = 0; // your placeholder timers' lines
+        float timerHeight = 0.0f;
     };
 
     // Top-left corners of each line, centered on the nameplate. With a name, the name is centered on the game's, and the
     // line above it overlaps its box by 3 px, the font's own space above the letters. Without one, the first line sits
-    // 2 px above the game's name. The label, the icon row and the cursor then each stack 2 px above the line below.
-    // Icons are iconStep apart. A player's icons sit in rows against the name's left and right edges, centered on it.
+    // 2 px above the game's name. The label, the icon row, your timers and the cursor then each stack 2 px above the
+    // line below. Icons are iconStep apart, and timers timerStep, from the top one at timersY, each centered on centerX.
+    // A player's icons sit in rows against the name's left and right edges, centered on it.
     struct NameplateLayout
     {
+        float centerX;
         float nameX, nameY;
         float labelX, labelY;
         float iconsX, iconsY, iconStep;
+        float timersY, timerStep;
         float cursorX, cursorY;
         float leftIconsX, rightIconsX, nameIconsY, nameIconStep;
     };

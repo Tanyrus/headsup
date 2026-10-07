@@ -28,6 +28,9 @@ namespace headsup
     // its "Goblins Dragonfly" is the client's "Goblin's Dragonfly".
     bool SameMobName(std::string_view a, std::string_view b);
 
+    // The record for this server ID whatever its name; nullptr when there is none.
+    const MobRecord* MobById(uint32_t serverId);
+
     // The record for this server ID when its name matches the entity's; nullptr when there is none or the names
     // differ (data older than the server's ID assignments).
     const MobRecord* FindMob(uint32_t serverId, std::string_view displayName);

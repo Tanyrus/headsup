@@ -38,12 +38,17 @@ namespace headsup
         }
     }
 
-    const MobRecord* FindMob(uint32_t serverId, std::string_view displayName)
+    const MobRecord* MobById(uint32_t serverId)
     {
         const auto it = std::lower_bound(std::begin(kMobs), std::end(kMobs), serverId,
             [](const MobRecord& r, uint32_t id) { return r.id < id; });
-        if (it == std::end(kMobs) || it->id != serverId || !SameMobName(it->name, displayName)) return nullptr;
-        return &*it;
+        return it == std::end(kMobs) || it->id != serverId ? nullptr : &*it;
+    }
+
+    const MobRecord* FindMob(uint32_t serverId, std::string_view displayName)
+    {
+        const MobRecord* mob = MobById(serverId);
+        return mob != nullptr && SameMobName(mob->name, displayName) ? mob : nullptr;
     }
 
 }

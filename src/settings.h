@@ -41,11 +41,13 @@ namespace headsup
         bool hideWhileEngaged  = false; // nor on any while you are engaged
         MobIdFormat mobId      = MobIdFormat::Off; // a mob's server ID on its level line
         bool markPlaceholders  = true;  // "[PH]" for a lottery placeholder's ID
+        bool phTimers          = false; // above your name, a respawn timer for each placeholder you see die
         bool scaleWithDistance = true;  // sizes follow the game's name size, like the game's names do
         std::string fontName   = kDefaultFont; // a font family installed in Windows
         bool fontBold          = false;
         int nameSize           = 15;    // pixels
         int labelSize          = 13;    // pixels
+        int timerSize          = 13;    // pixels: your placeholder timers' lines
         int iconSize           = 16;    // pixels
         int playerIconSize     = 100;   // percent of the name's letter height
         bool replacePlayerNames = true; // players' names, you included, in the font below

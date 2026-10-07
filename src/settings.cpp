@@ -24,7 +24,7 @@ namespace headsup
             {"replaceMobNames", &Settings::replaceMobNames}, {"showIcons", &Settings::showIcons},
             {"hideInCombat", &Settings::hideInCombat}, {"hideClaimed", &Settings::hideClaimed},
             {"hideTooWeak", &Settings::hideTooWeak}, {"hideWhileEngaged", &Settings::hideWhileEngaged},
-            {"markPlaceholders", &Settings::markPlaceholders},
+            {"markPlaceholders", &Settings::markPlaceholders}, {"phTimers", &Settings::phTimers},
             {"scaleWithDistance", &Settings::scaleWithDistance}, {"fontBold", &Settings::fontBold},
             {"replacePlayerNames", &Settings::replacePlayerNames}, {"replaceNpcNames", &Settings::replaceNpcNames},
             {"replaceCursor", &Settings::replaceCursor}, {"cursorFeather", &Settings::cursorFeather},
@@ -41,6 +41,7 @@ namespace headsup
         constexpr IntKey kInts[] = {{"smoothness", &Settings::smoothness, kMinSmoothness, kMaxSmoothness},
             {"nameSize", &Settings::nameSize, kMinTextSize, kMaxTextSize},
             {"labelSize", &Settings::labelSize, kMinTextSize, kMaxTextSize},
+            {"timerSize", &Settings::timerSize, kMinTextSize, kMaxTextSize},
             {"iconSize", &Settings::iconSize, kMinTextSize, kMaxTextSize},
             {"cursorSize", &Settings::cursorSize, kMinTextSize, kMaxTextSize},
             {"nameRaise", &Settings::nameRaise, kMinNameRaise, kMaxNameRaise},
@@ -120,7 +121,7 @@ namespace headsup
     bool NameplatesOn(const Settings& s)
     {
         return s.enabled && (s.showLabels || s.mobId != MobIdFormat::Off || s.showIcons || s.replaceMobNames ||
-                                s.replacePlayerNames || s.replaceNpcNames || s.replaceCursor);
+                                s.replacePlayerNames || s.replaceNpcNames || s.replaceCursor || s.phTimers);
     }
 
     std::vector<std::string> FontChoices(std::vector<std::string> installed, const std::string& current)

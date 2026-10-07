@@ -83,6 +83,7 @@ namespace headsup
     {
         NameplateLayout l{};
         const float centerX        = plate.CenterX();
+        l.centerX                  = centerX;
         float bottom               = plate.minY - kLineGap; // the next line up ends here
         // Each side's icons and the gap between them and the name.
         auto beside = [&](int count) { return count > 0 ? RowWidth(count, sizes.nameIconSize) + kIconGap : 0.0f; };
@@ -104,6 +105,9 @@ namespace headsup
         l.iconsY   = bottom - sizes.iconSize;
         l.iconStep = sizes.iconSize + kIconGap;
         if (sizes.iconCount > 0) bottom = l.iconsY - kLineGap;
+        l.timerStep = sizes.timerHeight + kLineGap;
+        l.timersY   = bottom + kLineGap - static_cast<float>(sizes.timerCount) * l.timerStep;
+        if (sizes.timerCount > 0) bottom = l.timersY - kLineGap;
         l.nameIconStep = sizes.nameIconSize + kIconGap;
         l.leftIconsX   = l.nameX - left;
         l.rightIconsX  = l.nameX + sizes.nameWidth + kIconGap;
