@@ -61,6 +61,7 @@ namespace
         CHECK(a.replaceNpcNames == b.replaceNpcNames);
         CHECK(a.replaceCursor == b.replaceCursor);
         CHECK(a.cursorFeather == b.cursorFeather);
+        CHECK(a.chocoboPointer == b.chocoboPointer);
         CHECK(a.showPlayerIcons == b.showPlayerIcons);
         CHECK(a.centerNameAndIcons == b.centerNameAndIcons);
         CheckSameColor(a.cursorColor, b.cursorColor);
@@ -81,6 +82,11 @@ namespace
         for (int i = 0; i < kPlayerIconCount; ++i)
             CHECK(a.playerIconSide[i] == b.playerIconSide[i]);
     }
+}
+
+TEST(the_game_keeps_its_own_mouse_pointer_by_default)
+{
+    CHECK(!Settings{}.chocoboPointer);
 }
 
 TEST(every_player_icon_shows_left_of_the_name_by_default)
@@ -133,6 +139,7 @@ TEST(settings_round_trip)
     s.replaceNpcNames   = false;
     s.replaceCursor     = false;
     s.cursorFeather     = false;
+    s.chocoboPointer    = true;
     s.showPlayerIcons   = false;
     s.centerNameAndIcons = false;
     s.lockedCursorColor = Color{{0.125f, 0.25f, 0.5f}};

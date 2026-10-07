@@ -25,6 +25,7 @@ namespace headsup
             {"scaleWithDistance", &Settings::scaleWithDistance}, {"fontBold", &Settings::fontBold},
             {"replacePlayerNames", &Settings::replacePlayerNames}, {"replaceNpcNames", &Settings::replaceNpcNames},
             {"replaceCursor", &Settings::replaceCursor}, {"cursorFeather", &Settings::cursorFeather},
+            {"chocoboPointer", &Settings::chocoboPointer},
             {"showPlayerIcons", &Settings::showPlayerIcons}, {"centerNameAndIcons", &Settings::centerNameAndIcons},
             {"ownNameColor", &Settings::ownNameColor}};
 

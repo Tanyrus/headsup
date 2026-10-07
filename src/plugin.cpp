@@ -9,6 +9,7 @@
 #include "nameplate_render.h"
 #include "outline.h"
 #include "player_status.h"
+#include "pointer_swap.h"
 #include "settings.h"
 #include "tracker.h"
 #ifdef HEADSUP_DEV
@@ -79,6 +80,8 @@ class HeadsUp final : public IPlugin
     headsup::OutlineRenderer m_Outline;
     headsup::GameNames m_Names;
     headsup::NameplateRenderer m_Nameplates;
+    headsup::PointerSwap m_Pointer;
+    bool m_PointerFailed = false; // said once; tried again when the setting changes
     headsup::Menu m_Menu;
     headsup::PlayerState m_Player;
     headsup::CheckResults m_Checks;
@@ -131,6 +134,7 @@ public:
 
     void Release(void) override
     {
+        m_Pointer.Stop();
         m_Nameplates.Release();
     }
 
@@ -275,6 +279,7 @@ public:
         if (m_Menu.Draw(m_AshitaCore->GetGuiManager(), m_Settings, status))
             SaveSettings();
         if (m_Menu.TakeDebugRequest()) m_DebugPending = true;
+        UpdatePointer();
     }
 
     // The game draws nameplates into its scene image, copies it to the back buffer and ends that scene before Present.
@@ -511,6 +516,26 @@ private:
         if (index == self) return m_OwnStatus ? &*m_OwnStatus : nullptr;
         const auto it = m_PlayerStatus.find(static_cast<uint16_t>(index));
         return it != m_PlayerStatus.end() ? &it->second : nullptr;
+    }
+
+    // The chocobo mouse pointer follows its setting.
+    void UpdatePointer()
+    {
+        if (!m_Settings.enabled || !m_Settings.chocoboPointer)
+        {
+            m_PointerFailed = false;
+            if (m_Pointer.Running()) m_Pointer.Stop();
+            return;
+        }
+        if (!m_Pointer.Running() && !m_PointerFailed)
+        {
+            if (const std::string failure = m_Pointer.Start(); !failure.empty())
+            {
+                m_PointerFailed = true;
+                Print("the chocobo pointer is off: " + failure + ".");
+            }
+        }
+        m_Pointer.Animate();
     }
 
     void UpdateCursorTargets()

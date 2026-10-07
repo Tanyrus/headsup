@@ -46,6 +46,7 @@ namespace headsup
         bool replaceNpcNames   = true;
         bool replaceCursor     = true;  // our target cursor above the target's nameplate, instead of the game's
         bool cursorFeather     = true;  // Phoenix's feather instead of the arrow
+        bool chocoboPointer    = false; // PlayOnline's chocobo in place of the game's mouse pointer
         bool showPlayerIcons   = true;  // seeking party, bazaar, linkshell and the rest beside replaced player names
         IconSide playerIconSide[kPlayerIconCount] = {}; // by PlayerIcon: every one left of the name
         bool centerNameAndIcons = true;  // a player's name and icons centered together over them, rather than the name

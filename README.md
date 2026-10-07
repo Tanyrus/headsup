@@ -47,4 +47,6 @@ another while locked on, and another for the sub-target you are picking.
 
 ![Target cursor](screenshots/cursor.png)
 
+It can also put PlayOnline's chocobo back as your mouse pointer, the one the PlayOnline Viewer had.
+
 Every part has its own switch, and fonts, sizes and colors are in the settings.

@@ -510,6 +510,10 @@ namespace headsup
                 ui.Fade(!s.enabled || !s.replaceCursor);
                 ui.Check("Phoenix feather cursor", s.cursorFeather,
                     "Phoenix's feather icon instead of the arrow, in the same colors.");
+                ui.Fade(!s.enabled);
+                ui.Check("Chocobo mouse pointer", s.chocoboPointer,
+                    "PlayOnline's chocobo in place of the game's mouse pointer, over menus too. The camera arrows stay the "
+                    "game's.");
             }
             ui.Fade(!s.enabled || !s.replacePlayerNames || !s.showPlayerIcons);
             if (ui.Section("Player icons", kPlayerIconsSection, collapsed))
