@@ -63,6 +63,11 @@ namespace
         CHECK(a.cursorFeather == b.cursorFeather);
         CHECK(a.chocoboPointer == b.chocoboPointer);
         CHECK(a.hideInCombat == b.hideInCombat);
+        CHECK(a.hideClaimed == b.hideClaimed);
+        CHECK(a.hideTooWeak == b.hideTooWeak);
+        CHECK(a.hideWhileEngaged == b.hideWhileEngaged);
+        CHECK(a.mobId == b.mobId);
+        CHECK(a.markPlaceholders == b.markPlaceholders);
         CHECK(a.showPlayerIcons == b.showPlayerIcons);
         CHECK(a.centerNameAndIcons == b.centerNameAndIcons);
         CheckSameColor(a.cursorColor, b.cursorColor);
@@ -93,7 +98,16 @@ TEST(the_game_keeps_its_own_mouse_pointer_by_default)
 
 TEST(mobs_keep_their_level_and_icons_in_combat_by_default)
 {
-    CHECK(!Settings{}.hideInCombat);
+    const Settings s;
+    CHECK(!s.hideInCombat && !s.hideClaimed && !s.hideTooWeak && !s.hideWhileEngaged);
+}
+
+TEST(mob_ids_are_off_and_placeholders_purple_by_default)
+{
+    const Settings s;
+    CHECK(s.mobId == MobIdFormat::Off);
+    CHECK(s.markPlaceholders);
+    CHECK(s.show[CategoryIndex(Category::Placeholder)]);
 }
 
 TEST(every_player_icon_shows_left_of_the_name_by_default)
@@ -148,6 +162,11 @@ TEST(settings_round_trip)
     s.cursorFeather     = false;
     s.chocoboPointer    = true;
     s.hideInCombat      = true;
+    s.hideClaimed       = true;
+    s.hideTooWeak       = false; // unlike its neighbors, so a swapped key shows
+    s.hideWhileEngaged  = true;
+    s.mobId             = MobIdFormat::Full;
+    s.markPlaceholders  = false;
     s.showPlayerIcons   = false;
     s.centerNameAndIcons = false;
     s.lockedCursorColor = Color{{0.125f, 0.25f, 0.5f}};
@@ -172,6 +191,8 @@ TEST(settings_round_trip)
     CheckSame(LoadSettings(store), s);
     CHECK(store.values.count("nmWillAttackB") == 1);
     CHECK(store.values.count("nmWontAttackShow") == 1);
+    CHECK(store.values.count("placeholderShow") == 1);
+    CHECK(store.values.at("mobId") == "full");
     CHECK(store.values.count("labelVeryToughR") == 1);
     CHECK(store.values.count("iconLevelSync") == 1);
     CHECK(store.values.count("outOfRangeCursorColorR") == 1);

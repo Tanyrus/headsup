@@ -9,7 +9,7 @@ namespace
 {
     MobRecord Mob(uint8_t flags, uint16_t detects)
     {
-        return MobRecord{17199648, "Goblin Bounty Hunter", 17, 20, flags, 300, detects, 0};
+        return MobRecord{17199648, "Goblin Bounty Hunter", 17, 20, flags, 300, detects, 0, 0};
     }
 
     std::vector<Icon> List(const IconSet& set)

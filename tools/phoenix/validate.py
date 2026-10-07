@@ -24,6 +24,11 @@ MIN_MOBS, MIN_ZONES = 60000, 200
 EXPECTED_LEVEL_MODS = {
     17190918: -2,  # Wild Rabbit, scripts/zones/East_Ronfaure/mobs/Wild_Rabbit.lua
 }
+# placeholder id: its NM's, from the NM's script (entity.phList)
+EXPECTED_PLACEHOLDERS = {
+    17191194: 17191196,  # Carrion Worm for Bigmouth Billy, scripts/zones/East_Ronfaure/mobs/Bigmouth_Billy.lua
+    17191195: 17191196,
+}
 EVEN_MATCH_EXP = 100  # every bracket of every experience table Phoenix ships
 RESTING, SITTING = 33, 47  # xi::Animation Healing and Sit, which CBattleEntity::isSitting names
 
@@ -33,7 +38,8 @@ def load(path):
     return {r['id']: r for r in schema.parse(pathlib.Path(path).read_text(encoding='utf-8'), str(path))}
 
 
-def check(records, expected=EXPECTED, min_mobs=MIN_MOBS, min_zones=MIN_ZONES, level_mods=EXPECTED_LEVEL_MODS):
+def check(records, expected=EXPECTED, min_mobs=MIN_MOBS, min_zones=MIN_ZONES, level_mods=EXPECTED_LEVEL_MODS,
+          placeholders=EXPECTED_PLACEHOLDERS):
     problems = []
     if len(records) < min_mobs:
         problems.append(f'only {len(records)} mobs (expected at least {min_mobs})')
@@ -59,6 +65,10 @@ def check(records, expected=EXPECTED, min_mobs=MIN_MOBS, min_zones=MIN_ZONES, le
         r = records.get(mob_id)
         if r is None or r['expLevelMod'] != mod:
             problems.append(f"{mob_id}: expected level mod {mod}, got {None if r is None else r['expLevelMod']}")
+    for mob_id, nm in placeholders.items():
+        r = records.get(mob_id)
+        if r is None or r['placeholderOf'] != nm:
+            problems.append(f"{mob_id}: expected a placeholder of {nm}, got {None if r is None else r['placeholderOf']}")
     return problems
 
 

@@ -52,8 +52,8 @@ namespace headsup
         constexpr float kNumberWidth   = 56.0f;  // the box to type a slider's value in
         constexpr float kTipWidth      = 300.0f;
         constexpr float kChipWidth     = 52.0f;
-        constexpr float kSideColumn    = 200.0f; // where a player icon's side buttons start in its row
-        constexpr float kSideWidth     = 64.0f;
+        constexpr float kChoiceColumn  = 200.0f; // where a choice's buttons start in its row
+        constexpr float kChoiceWidth   = 64.0f;
         constexpr float kOffAlpha      = 0.45f;  // settings of a feature that is off are drawn this faint
         // One size for every page, the tallest included; a longer page scrolls.
         constexpr float kWindowWidth   = 700.0f;
@@ -94,10 +94,11 @@ namespace headsup
         };
 
         const char* const kCategoryLabels[kCategoryCount] = {"Aggressive", "Passive", "No data", "Aggressive NM",
-            "Passive NM"};
+            "Passive NM", "NM placeholder"};
         const char* const kPlayerIconLabels[kPlayerIconCount] = {"GM", "Mentor", "New adventurer", "Level sync", "Away",
             "Linkshell", "Bazaar", "Seeking party"};
         const char* const kIconSideLabels[kIconSideCount] = {"Left", "Right", "Hide"};
+        const char* const kMobIdLabels[kMobIdFormatCount]  = {"Off", "Last 3", "Full"};
         const char* const kPlayerIconTips[kPlayerIconCount] = {"A game master.", "A mentor.", "A new adventurer.",
             "Level synced, outside battlefields.", "Away from the keyboard.", "In a linkshell, in the linkshell's color.",
             "Has a bazaar set up.", "Seeking a party."};
@@ -106,10 +107,12 @@ namespace headsup
             "Mobs that would leave you alone: passive, or aggressive but Too Weak for you.",
             "Mobs the Phoenix data does not list, so HeadsUp cannot tell.",
             "Notorious monsters that would attack you.",
-            "Notorious monsters that would leave you alone."};
-        // Ordinary mobs, notorious monsters, then mobs with no data.
+            "Notorious monsters that would leave you alone.",
+            "Mobs whose death can pop a notorious monster (lottery placeholders), whether or not they attack. Off, they "
+            "are colored like any mob."};
+        // Ordinary mobs, notorious monsters and their placeholders, then mobs with no data.
         const Category kCategoryOrder[kCategoryCount] = {Category::WillAttack, Category::WontAttack, Category::NmWillAttack,
-            Category::NmWontAttack, Category::Unknown};
+            Category::NmWontAttack, Category::Placeholder, Category::Unknown};
         const char* const kShadeLabels[kLabelShadeCount] = {"Unknown level", "Too Weak", "Easy Prey", "Decent Challenge",
             "Even Match", "Tough", "Very Tough"};
 
@@ -291,25 +294,26 @@ namespace headsup
                 Help(tip);
             }
 
-            // The label, then Left, Right and Hide buttons in a column, the chosen one lit.
-            void SideChoice(const char* label, IconSide& side, const char* tip)
+            // The label, then a button per option in a column, the chosen one lit.
+            template <typename Enum>
+            void Choice(const char* label, Enum& value, const char* const* options, int count, const char* tip)
             {
                 const float rowStart = gui->GetCursorPosX();
                 gui->AlignTextToFramePadding();
                 gui->TextUnformatted(label);
                 Help(tip);
-                for (int option = 0; option < kIconSideCount; ++option)
+                for (int option = 0; option < count; ++option)
                 {
                     gui->SameLine();
-                    if (option == 0) gui->SetCursorPosX(rowStart + kSideColumn);
+                    if (option == 0) gui->SetCursorPosX(rowStart + kChoiceColumn);
                     char id[48];
-                    std::snprintf(id, sizeof(id), "%s##side %s", kIconSideLabels[option], label);
-                    const bool picked         = static_cast<int>(side) == option;
+                    std::snprintf(id, sizeof(id), "%s##choice %s", options[option], label);
+                    const bool picked         = static_cast<int>(value) == option;
                     const ButtonColors colors = picked ? ButtonColors{kRowPicked, kRowHovered, kTint} : ButtonColors{kCard, kHover, kTint};
-                    if (Button(id, ImVec2(kSideWidth, 0.0f), colors) && !picked)
+                    if (Button(id, ImVec2(kChoiceWidth, 0.0f), colors) && !picked)
                     {
-                        side = static_cast<IconSide>(option);
-                        save = true;
+                        value = static_cast<Enum>(option);
+                        save  = true;
                     }
                 }
             }
@@ -504,10 +508,23 @@ namespace headsup
                     "mob, its exact level, until it respawns.");
                 ui.Check("Show icons", s.showIcons,
                     "XIUI's MobDB icons: aggressive or passive, whether it links, and how it detects you.");
-                ui.Fade(!s.enabled || (!s.showLabels && !s.showIcons));
+                ui.Choice("Mob ID", s.mobId, kMobIdLabels, kMobIdFormatCount,
+                    "The mob's ID on its level line: its last three hex digits (Lv 1-3 EM [006]), as players name NM "
+                    "placeholders, or the whole ID in decimal and hex.");
+                ui.Fade(!s.enabled || s.mobId == MobIdFormat::Off);
+                ui.Check("Mark placeholders [PH]", s.markPlaceholders,
+                    "[PH] in place of the last three digits (after the whole ID) on a mob whose death can pop a notorious "
+                    "monster, from the Phoenix data.");
+                ui.Fade(!s.enabled || (!s.showLabels && s.mobId == MobIdFormat::Off && !s.showIcons));
                 ui.Check("Hide level and icons in combat", s.hideInCombat,
                     "Takes the level line and icons off a mob once you or your party has claimed it. Its name and the "
                     "cursor stay.");
+                ui.Check("Hide them on claimed mobs", s.hideClaimed,
+                    "Takes the level line and icons off any mob someone has claimed.");
+                ui.Check("Hide them on Too Weak mobs", s.hideTooWeak,
+                    "Takes the level line and icons off mobs that con Too Weak to you.");
+                ui.Check("Hide them while you fight", s.hideWhileEngaged,
+                    "Takes the level line and icons off every mob while you are engaged.");
                 ui.Fade(!s.enabled);
                 ui.Check("Replace target cursor", s.replaceCursor,
                     "Hides the game's cursor over your target and draws HeadsUp's above its nameplate instead: one color for "
@@ -524,7 +541,7 @@ namespace headsup
             if (ui.Section("Player icons", kPlayerIconsSection, collapsed))
             {
                 for (int i = 0; i < kPlayerIconCount; ++i)
-                    ui.SideChoice(kPlayerIconLabels[i], s.playerIconSide[i], kPlayerIconTips[i]);
+                    ui.Choice(kPlayerIconLabels[i], s.playerIconSide[i], kIconSideLabels, kIconSideCount, kPlayerIconTips[i]);
             }
             ui.Fade(!s.enabled);
             if (ui.Section("Text", kTextSection, collapsed))

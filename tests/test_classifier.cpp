@@ -5,9 +5,9 @@ using namespace headsup;
 
 namespace
 {
-    MobRecord Mob(uint8_t flags, uint8_t minLevel, uint8_t maxLevel, int16_t levelMod = 0)
+    MobRecord Mob(uint8_t flags, uint8_t minLevel, uint8_t maxLevel, int16_t levelMod = 0, uint32_t placeholderOf = 0)
     {
-        return MobRecord{17199648, "Test Mob", minLevel, maxLevel, flags, 300, 0, levelMod};
+        return MobRecord{17199648, "Test Mob", minLevel, maxLevel, flags, 300, 0, levelMod, placeholderOf};
     }
 
     const PlayerState kLevel75{75, false};
@@ -77,6 +77,16 @@ TEST(no_aggro_overrides_aggressive)
 {
     const MobRecord noAggro = Mob(kMobAggressive | kMobAlwaysAggro | kMobNoAggro, 75, 75);
     CHECK(Classify(&noAggro, 0, kLevel75) == Category::WontAttack);
+}
+
+TEST(a_placeholder_glows_its_own_color_while_that_is_on)
+{
+    const MobRecord ph = Mob(kMobAggressive, 75, 75, 0, 17191196);
+    CHECK(OutlineCategory(&ph, 0, kLevel75, true) == Category::Placeholder);
+    CHECK(OutlineCategory(&ph, 0, kLevel75, false) == Category::WillAttack); // off, colored like any mob
+    const MobRecord plain = Mob(kMobAggressive, 75, 75);
+    CHECK(OutlineCategory(&plain, 0, kLevel75, true) == Category::WillAttack);
+    CHECK(OutlineCategory(nullptr, 0, kLevel75, true) == Category::Unknown);
 }
 
 TEST(followers_never_attack)

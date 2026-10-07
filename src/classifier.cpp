@@ -18,4 +18,10 @@ namespace headsup
         if (!IsTooWeak(player.level, level)) return attack;
         return player.sitting ? attack : ignore;
     }
+
+    Category OutlineCategory(const MobRecord* mob, int checkedLevel, const PlayerState& player, bool placeholderColor)
+    {
+        if (placeholderColor && mob != nullptr && mob->placeholderOf != 0) return Category::Placeholder;
+        return Classify(mob, checkedLevel, player);
+    }
 }

@@ -46,6 +46,7 @@ namespace
     constexpr const char* kMenuHeight    = "0038";
     constexpr uint32_t kPartyIconMembers = 5;    // the other members of your party, whose buffs the game keeps
     constexpr uint32_t kPartyMembers     = 18;   // you, your party and the two other alliance parties
+    constexpr uint32_t kEngagedStatus    = 1;    // an entity's status while it fights
 
     // The entity's name, or "" for an empty or out-of-range slot.
     const char* EntityName(IEntity* entity, uint32_t index)
@@ -604,10 +605,11 @@ private:
                 isMob ? m_Checks.Result(serverId, now) : nullptr, CurrentStatus(entity, i, kind, self),
                 isPlayer ? headsup::PoseFromStatus(entity->GetStatus(i)) : headsup::Pose::Standing,
                 headsup::FromEntityPosition(entity->GetLocalPositionX(i), entity->GetLocalPositionY(i), entity->GetLocalPositionZ(i)),
-                isMob && headsup::ClaimedByParty(entity->GetClaimStatus(i), m_PartyIds)});
+                isMob && headsup::ClaimedByParty(entity->GetClaimStatus(i), m_PartyIds), isMob && headsup::IsClaimed(entity->GetClaimStatus(i))});
         }
         m_Player.level   = player->GetMainJobLevel();
         m_Player.sitting = headsup::IsSittingStatus(entity->GetStatus(party->GetMemberTargetIndex(0)));
+        m_Player.engaged = entity->GetStatus(party->GetMemberTargetIndex(0)) == kEngagedStatus;
         m_Tracker.Update(m_Inputs, m_Player, m_Settings);
     }
 

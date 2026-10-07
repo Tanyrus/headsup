@@ -12,9 +12,10 @@ import sys
 TSV_NAME = 'phoenix_mobs.tsv'
 META_NAME = 'phoenix_mobs.meta'
 META_COMMIT_KEY = 'phoenix_commit'
-COLUMNS = ['id', 'zone', 'name', 'minLevel', 'maxLevel', 'flags', 'respawn', 'detects', 'expLevelMod']
+COLUMNS = ['id', 'zone', 'name', 'minLevel', 'maxLevel', 'flags', 'respawn', 'detects', 'expLevelMod', 'placeholderOf']
 LIMITS = {'id': (1, 0xFFFFFFFF), 'zone': (0, 0xFFFF), 'minLevel': (0, 255), 'maxLevel': (0, 255), 'flags': (0, 0xFF),
-          'respawn': (0, 0xFFFFFFFF), 'detects': (0, 0xFFFF), 'expLevelMod': (-0x8000, 0x7FFF)}
+          'respawn': (0, 0xFFFFFFFF), 'detects': (0, 0xFFFF), 'expLevelMod': (-0x8000, 0x7FFF),
+          'placeholderOf': (0, 0xFFFFFFFF)}
 
 
 class MobFlag(enum.IntFlag):
@@ -81,7 +82,7 @@ def c_string(text: str) -> str:
 
 def c_record(r) -> str:
     return (f"    {{{r['id']}u, {c_string(r['name'])}, {r['minLevel']}, {r['maxLevel']}, {r['flags']}, {r['respawn']}u, "
-            f"{r['detects']}, {r['expLevelMod']}}},")
+            f"{r['detects']}, {r['expLevelMod']}, {r['placeholderOf']}u}},")
 
 
 def generate(records, commit: str) -> str:

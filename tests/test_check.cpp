@@ -26,7 +26,7 @@ namespace
 
     MobRecord Mob(uint8_t flags, uint8_t minLevel, uint8_t maxLevel, uint32_t respawn = 300)
     {
-        return MobRecord{kMob, "Goblin Bounty Hunter", minLevel, maxLevel, flags, respawn, 0, 0};
+        return MobRecord{kMob, "Goblin Bounty Hunter", minLevel, maxLevel, flags, respawn, 0, 0, 0};
     }
 
     CheckReply Checked(uint32_t serverId, int level, Con con)

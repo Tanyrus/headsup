@@ -11,7 +11,8 @@ validate = load('tools/phoenix/validate.py')
 MOBS = [
     {'id': 17199648, 'zone': 103, 'name': 'Goblin_Bounty_Hunter', 'minLevel': 17, 'maxLevel': 20, 'respawn': 300,
      'aggro': True, 'alwaysAggro': 0, 'noAggro': 0, 'type': 0,
-     'link': True, 'detects': 0x001 | 0x002, 'trueDetection': False, 'expLevelMod': 0, 'follows': False},
+     'link': True, 'detects': 0x001 | 0x002, 'trueDetection': False, 'expLevelMod': 0, 'follows': False,
+     'placeholderOf': 17199700},
     # A mob from a dump made before link, detection, the level mod and following were exported: they read as none.
     # Its m_neutral, the AI's calm right after a spawn, is ignored.
     {'id': 17199105, 'zone': 103, 'name': 'Stag_Crab', 'minLevel': 15, 'maxLevel': 17, 'respawn': 0,
@@ -52,13 +53,14 @@ class Compact(unittest.TestCase):
 
     def test_rows_are_sorted_by_id_with_display_names(self):
         self.assertEqual(self.rows[0], ['id', 'zone', 'name', 'minLevel', 'maxLevel', 'flags', 'respawn', 'detects',
-                                        'expLevelMod'])
+                                        'expLevelMod', 'placeholderOf'])
         self.assertEqual([row[0] for row in self.rows[1:]], ['17199105', '17199648', '17272838'])
-        self.assertEqual(self.rows[2], ['17199648', '103', 'Goblin Bounty Hunter', '17', '20', '33', '300', '3', '0'])
+        self.assertEqual(self.rows[2], ['17199648', '103', 'Goblin Bounty Hunter', '17', '20', '33', '300', '3', '0',
+                                        '17199700'])
 
     def test_flags_negative_respawn_and_the_level_mod(self):
-        self.assertEqual(self.rows[1][5:], [str(1 | 2), '0', '0', '0'])  # aggro + always aggro (fished ignored)
-        self.assertEqual(self.rows[3][5:], [str(4 | 8 | 16 | 64 | 128), '0', '256', '-2'])  # + true detection, follows
+        self.assertEqual(self.rows[1][5:], [str(1 | 2), '0', '0', '0', '0'])  # aggro + always aggro (fished ignored)
+        self.assertEqual(self.rows[3][5:], [str(4 | 8 | 16 | 64 | 128), '0', '256', '-2', '0'])  # + true detection, follows
 
     def test_meta(self):
         self.assertIn('phoenix_commit\tabc123\n', self.meta)
@@ -139,6 +141,10 @@ class MergeSnapshots(unittest.TestCase):
                                     [mob(link=True, detects=0x002, trueDetection=True, expLevelMod=-2, follows=True)])
         self.assertEqual((rows[0][5], rows[0][7], rows[0][8]), (str(1 | 32 | 64 | 128), '2', '-2'))
 
+    def test_the_placeholder_comes_from_the_first_snapshot_that_has_it(self):
+        rows, _ = self.compact_rows([mob()], [mob(placeholderOf=16797860)], [mob(placeholderOf=0)])
+        self.assertEqual(rows[0][9], '16797860')
+
     def test_a_follower_that_attacks_in_an_old_snapshot_stays_a_follower(self):
         rows, _ = self.compact_rows([mob(aggro=False, expLevelMod=0, follows=True)], [mob(aggro=True)])
         self.assertEqual(rows[0][5], str(1 | 128))
@@ -201,9 +207,9 @@ class CompactRejects(unittest.TestCase):
         self.assertIn('run-1.json: not a complete dump', str(caught.exception))
 
 
-def record(mob_id, zone, name, lo, hi, flags, respawn, detects, level_mod=0):
+def record(mob_id, zone, name, lo, hi, flags, respawn, detects, level_mod=0, placeholder_of=0):
     return mob_id, {'id': mob_id, 'zone': zone, 'name': name, 'minLevel': lo, 'maxLevel': hi, 'flags': flags,
-                    'respawn': respawn, 'detects': detects, 'expLevelMod': level_mod}
+                    'respawn': respawn, 'detects': detects, 'expLevelMod': level_mod, 'placeholderOf': placeholder_of}
 
 
 class Validate(unittest.TestCase):
@@ -213,6 +219,8 @@ class Validate(unittest.TestCase):
         record(17199322, 103, 'Snipper', 19, 20, 0, 300, 2),
         record(17199648, 103, 'Goblin Bounty Hunter', 17, 20, 33, 300, 1),
         record(17190918, 101, 'Wild Rabbit', 1, 1, 0, 60, 257, -2),
+        record(17191194, 101, 'Carrion Worm', 4, 5, 0, 180, 2, 0, 17191196),
+        record(17191195, 101, 'Carrion Worm', 4, 5, 0, 180, 2, 0, 17191196),
     ])
 
     def check(self, records, **limits):
@@ -236,20 +244,25 @@ class Validate(unittest.TestCase):
         records.update([record(17190918, 101, 'Wild Rabbit', 1, 1, 0, 60, 257, 0)])
         self.assertEqual(self.check(records), ['17190918: expected level mod -2, got 0'])
 
+    def test_a_missing_placeholder_fails(self):
+        records = dict(self.RECORDS)
+        records.update([record(17191195, 101, 'Carrion Worm', 4, 5, 0, 180, 2)])
+        self.assertEqual(self.check(records), ['17191195: expected a placeholder of 17191196, got 0'])
+
     def test_dumps_without_any_detection_fail(self):
         records = {mob_id: dict(r, detects=0) for mob_id, r in self.RECORDS.items()}
         self.assertIn('no mob has any detection: the dumps predate link and detection',
                       self.check(records, expected={}))
 
     def test_too_few_mobs_or_zones_fail(self):
-        self.assertEqual(len(self.check(self.RECORDS, min_mobs=6, min_zones=4)), 2)
+        self.assertEqual(len(self.check(self.RECORDS, min_mobs=8, min_zones=4)), 2)
 
     def test_load_reads_every_column(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = pathlib.Path(tmp) / 'mobs.tsv'
-            path.write_text('id\tzone\tname\tminLevel\tmaxLevel\tflags\trespawn\tdetects\texpLevelMod\n'
-                            '17190918\t101\tWild Rabbit\t1\t1\t0\t60\t257\t-2\n')
-            self.assertEqual(validate.load(path), dict([record(17190918, 101, 'Wild Rabbit', 1, 1, 0, 60, 257, -2)]))
+            path.write_text('id\tzone\tname\tminLevel\tmaxLevel\tflags\trespawn\tdetects\texpLevelMod\tplaceholderOf\n'
+                            '17191194\t101\tCarrion Worm\t4\t5\t0\t180\t2\t0\t17191196\n')
+            self.assertEqual(validate.load(path), dict([record(17191194, 101, 'Carrion Worm', 4, 5, 0, 180, 2, 0, 17191196)]))
 
 
 class ValidateRules(unittest.TestCase):

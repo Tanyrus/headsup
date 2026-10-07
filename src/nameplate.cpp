@@ -40,8 +40,10 @@ namespace headsup
     {
         PlateLines lines;
         lines.name      = facts.replaced;
-        const bool mobLines = facts.steady && facts.alive && !(settings.hideInCombat && facts.fighting);
-        lines.label     = mobLines && settings.showLabels && facts.hasLabel;
+        const bool hidden   = (settings.hideInCombat && facts.fighting) || (settings.hideClaimed && facts.claimed) ||
+                            (settings.hideTooWeak && facts.tooWeak) || (settings.hideWhileEngaged && facts.engaged);
+        const bool mobLines = facts.steady && facts.alive && !hidden;
+        lines.label     = mobLines && facts.hasLabel;
         lines.icons     = mobLines && settings.showIcons && !iconsFailed ? facts.mobIcons : 0;
         const bool playerIcons = lines.name && settings.showPlayerIcons && !iconsFailed;
         lines.leftIcons        = playerIcons ? facts.leftIcons : 0;

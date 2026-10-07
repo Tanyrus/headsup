@@ -22,7 +22,9 @@ namespace headsup
         };
         constexpr BoolKey kBools[] = {{"enabled", &Settings::enabled}, {"showLabels", &Settings::showLabels},
             {"replaceMobNames", &Settings::replaceMobNames}, {"showIcons", &Settings::showIcons},
-            {"hideInCombat", &Settings::hideInCombat},
+            {"hideInCombat", &Settings::hideInCombat}, {"hideClaimed", &Settings::hideClaimed},
+            {"hideTooWeak", &Settings::hideTooWeak}, {"hideWhileEngaged", &Settings::hideWhileEngaged},
+            {"markPlaceholders", &Settings::markPlaceholders},
             {"scaleWithDistance", &Settings::scaleWithDistance}, {"fontBold", &Settings::fontBold},
             {"replacePlayerNames", &Settings::replacePlayerNames}, {"replaceNpcNames", &Settings::replaceNpcNames},
             {"replaceCursor", &Settings::replaceCursor}, {"cursorFeather", &Settings::cursorFeather},
@@ -65,7 +67,10 @@ namespace headsup
 
         constexpr const char* kFontKey = "fontName";
         constexpr const char* kShowSuffix = "Show";
-        const char* const kCategoryKeys[kCategoryCount] = {"willAttack", "wontAttack", "unknown", "nmWillAttack", "nmWontAttack"};
+        const char* const kCategoryKeys[kCategoryCount] = {"willAttack", "wontAttack", "unknown", "nmWillAttack", "nmWontAttack",
+            "placeholder"};
+        constexpr const char* kMobIdKey                  = "mobId";
+        const char* const kMobIdNames[kMobIdFormatCount] = {"off", "lastThree", "full"};
         const char* const kChannelKeys[3]               = {"R", "G", "B"};
         const char* const kIconSideNames[kIconSideCount] = {"left", "right", "hide"};
         const char* const kPlayerIconKeys[kPlayerIconCount] = {"iconGm", "iconMentor", "iconNewAdventurer", "iconLevelSync",
@@ -114,8 +119,8 @@ namespace headsup
 
     bool NameplatesOn(const Settings& s)
     {
-        return s.enabled && (s.showLabels || s.showIcons || s.replaceMobNames || s.replacePlayerNames || s.replaceNpcNames ||
-                                s.replaceCursor);
+        return s.enabled && (s.showLabels || s.mobId != MobIdFormat::Off || s.showIcons || s.replaceMobNames ||
+                                s.replacePlayerNames || s.replaceNpcNames || s.replaceCursor);
     }
 
     std::vector<std::string> FontChoices(std::vector<std::string> installed, const std::string& current)
@@ -178,6 +183,9 @@ namespace headsup
             for (int side = 0; side < kIconSideCount; ++side)
                 if (name == kIconSideNames[side]) s.playerIconSide[i] = static_cast<IconSide>(side);
         }
+        const std::string mobId = store.GetString(kMobIdKey, "");
+        for (int f = 0; f < kMobIdFormatCount; ++f)
+            if (mobId == kMobIdNames[f]) s.mobId = static_cast<MobIdFormat>(f);
         return Clamp(s);
     }
 
@@ -212,6 +220,7 @@ namespace headsup
         }
         for (int i = 0; i < kPlayerIconCount; ++i)
             store.Set(kPlayerIconKeys[i], kIconSideNames[static_cast<int>(s.playerIconSide[i])]);
+        store.Set(kMobIdKey, kMobIdNames[static_cast<int>(s.mobId)]);
     }
 
     uint32_t ToArgb(const Color& c)

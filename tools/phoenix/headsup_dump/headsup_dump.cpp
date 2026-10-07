@@ -8,6 +8,7 @@
  * the server loaded to $HEADSUP_DUMP_PATH as JSON and exits.
  ************************************************************************/
 
+#include "common/lua.h"
 #include "map/ai/ai_container.h"
 #include "map/entities/mob_entity.h"
 #include "map/utils/charutils.h"
@@ -61,6 +62,36 @@ namespace
                 out += c;
         }
         return out;
+    }
+
+    // Every NM script's lottery placeholders (entity.phList, as the server loaded it): placeholder server ID to the NM's,
+    // the first when it can roll several.
+    std::unordered_map<uint32, uint32> Placeholders()
+    {
+        std::unordered_map<uint32, uint32> nmOf;
+        const auto zones = ::lua["xi"]["zones"].get<sol::optional<sol::table>>();
+        if (!zones) return nmOf;
+        for (const auto& [zoneName, zone] : *zones)
+        {
+            if (!zone.is<sol::table>()) continue;
+            const auto mobs = zone.as<sol::table>()["mobs"].get<sol::optional<sol::table>>();
+            if (!mobs) continue;
+            for (const auto& [mobName, script] : *mobs)
+            {
+                if (!script.is<sol::table>()) continue;
+                const auto phList = script.as<sol::table>()["phList"].get<sol::optional<sol::table>>();
+                if (!phList) continue;
+                for (const auto& [ph, nm] : *phList)
+                {
+                    if (!ph.is<uint32>()) continue;
+                    if (nm.is<uint32>())
+                        nmOf.try_emplace(ph.as<uint32>(), nm.as<uint32>());
+                    else if (nm.is<sol::table>())
+                        if (const auto first = nm.as<sol::table>()[1].get<sol::optional<uint32>>()) nmOf.try_emplace(ph.as<uint32>(), *first);
+                }
+            }
+        }
+        return nmOf;
     }
 
     // GetBaseExp at every level difference out to the widest, so the table's own size comes from the server.
@@ -193,6 +224,7 @@ class HeadsUpDumpModule : public CPPModule
             std::_Exit(1);
         }
 
+        const std::unordered_map<uint32, uint32> nmOf = Placeholders();
         size_t count       = 0;
         CMobEntity* anyMob = nullptr;
         std::fputs("{\"mobs\":[\n", out);
@@ -203,14 +235,15 @@ class HeadsUpDumpModule : public CPPModule
                 std::fprintf(out,
                     "%s{\"id\":%u,\"zone\":%u,\"name\":\"%s\",\"minLevel\":%u,\"maxLevel\":%u,\"respawn\":%lld,"
                     "\"aggro\":%s,\"alwaysAggro\":%d,\"noAggro\":%d,\"type\":%u,"
-                    "\"link\":%s,\"detects\":%d,\"trueDetection\":%s,\"expLevelMod\":%d,\"follows\":%s",
+                    "\"link\":%s,\"detects\":%d,\"trueDetection\":%s,\"expLevelMod\":%d,\"follows\":%s,\"placeholderOf\":%u",
                     count ? ",\n" : "", PMob->id, static_cast<unsigned>(PZone->GetID()),
                     JsonEscape(PMob->getPacketName()).c_str(), PMob->m_minLevel, PMob->m_maxLevel,
                     static_cast<long long>(respawn), PMob->m_Aggro ? "true" : "false",
                     PMob->getMobMod(xi::MobMod::AlwaysAggro), PMob->getMobMod(xi::MobMod::NoAggro),
                     static_cast<unsigned>(PMob->m_Type), PMob->m_Link != 0 ? "true" : "false",
                     static_cast<int>(PMob->getMobMod(xi::MobMod::Detection)), PMob->m_TrueDetection ? "true" : "false",
-                    static_cast<int>(PMob->getMod(xi::Mod::EXP_LVL_MOD)), follows ? "true" : "false");
+                    static_cast<int>(PMob->getMod(xi::Mod::EXP_LVL_MOD)), follows ? "true" : "false",
+                    nmOf.contains(PMob->id) ? nmOf.at(PMob->id) : 0u);
                 if (const auto seen = seenAttacking.find(PMob); seen != seenAttacking.end())
                     std::fprintf(out, ",\"seenAttacking\":{\"aggro\":%s,\"alwaysAggro\":%d,\"noAggro\":%d}",
                         seen->second.aggro ? "true" : "false", seen->second.alwaysAggro, seen->second.noAggro);
@@ -232,7 +265,7 @@ class HeadsUpDumpModule : public CPPModule
             ShowError("headsup_dump: writing %s failed: %s; the file is incomplete", path, std::strerror(errno));
             std::_Exit(1);
         }
-        ShowInfo("headsup_dump: wrote %zu mobs and the rules to %s", count, path);
+        ShowInfo("headsup_dump: wrote %zu mobs (%zu lottery placeholders) and the rules to %s", count, nmOf.size(), path);
         std::_Exit(0);
     }
 };

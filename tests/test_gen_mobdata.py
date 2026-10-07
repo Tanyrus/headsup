@@ -6,17 +6,20 @@ from tooling import load
 
 gen = load('tools/gen_mobdata.py')
 
-HEADER = 'id\tzone\tname\tminLevel\tmaxLevel\tflags\trespawn\tdetects\texpLevelMod'
-GOOD = (HEADER + '\n17190918\t101\tWild Rabbit\t1\t1\t0\t60\t257\t-2\n'
-        '17199648\t103\tGoblin Bounty Hunter\t17\t20\t161\t300\t259\t0\n')
+HEADER = 'id\tzone\tname\tminLevel\tmaxLevel\tflags\trespawn\tdetects\texpLevelMod\tplaceholderOf'
+GOOD = (HEADER + '\n17190918\t101\tWild Rabbit\t1\t1\t0\t60\t257\t-2\t0\n'
+        '17191194\t101\tCarrion Worm\t4\t5\t0\t180\t2\t0\t17191196\n'
+        '17199648\t103\tGoblin Bounty Hunter\t17\t20\t161\t300\t259\t0\t0\n')
 
 
 class Parse(unittest.TestCase):
     def test_rows(self):
         records = gen.parse(GOOD)
-        self.assertEqual(len(records), 2)
-        self.assertEqual(records[1], {'id': 17199648, 'zone': 103, 'name': 'Goblin Bounty Hunter', 'minLevel': 17,
-                                      'maxLevel': 20, 'flags': 161, 'respawn': 300, 'detects': 259, 'expLevelMod': 0})
+        self.assertEqual(len(records), 3)
+        self.assertEqual(records[2], {'id': 17199648, 'zone': 103, 'name': 'Goblin Bounty Hunter', 'minLevel': 17,
+                                      'maxLevel': 20, 'flags': 161, 'respawn': 300, 'detects': 259, 'expLevelMod': 0,
+                                      'placeholderOf': 0})
+        self.assertEqual(records[1]['placeholderOf'], 17191196)
 
     def test_a_level_mod_can_be_negative(self):
         self.assertEqual(gen.parse(GOOD)[0]['expLevelMod'], -2)
@@ -28,19 +31,20 @@ class Parse(unittest.TestCase):
         self.assertIn(message, str(caught.exception))
 
     def test_bad_rows_name_their_line(self):
-        self.assertBadRow('1\t103\tA\t1\t2\t0\t0\t0', 'expected 9 columns')
-        self.assertBadRow('1\t103\t\t1\t2\t0\t0\t0\t0', 'empty name')
-        self.assertBadRow('1\t103\tA\t1\t300\t0\t0\t0\t0', 'maxLevel must be')
-        self.assertBadRow('1\t103\tA\t-1\t2\t0\t0\t0\t0', 'minLevel must be')
-        self.assertBadRow('1\t103\tA\t5\t2\t0\t0\t0\t0', 'minLevel is above maxLevel')
-        self.assertBadRow('1\t103\tA\t1\t2\t256\t0\t0\t0', 'flags must be')
-        self.assertBadRow('1\t103\tA\t1\t2\t0\t0\t65536\t0', 'detects must be')
-        self.assertBadRow('1\t103\tA\t1\t2\t0\t0\t0\t-32769', 'expLevelMod must be')
-        self.assertBadRow('1\t103\tA\t1\t2\t0\t0\t0\t--2', 'expLevelMod must be')
+        self.assertBadRow('1\t103\tA\t1\t2\t0\t0\t0\t0', 'expected 10 columns')
+        self.assertBadRow('1\t103\t\t1\t2\t0\t0\t0\t0\t0', 'empty name')
+        self.assertBadRow('1\t103\tA\t1\t300\t0\t0\t0\t0\t0', 'maxLevel must be')
+        self.assertBadRow('1\t103\tA\t-1\t2\t0\t0\t0\t0\t0', 'minLevel must be')
+        self.assertBadRow('1\t103\tA\t5\t2\t0\t0\t0\t0\t0', 'minLevel is above maxLevel')
+        self.assertBadRow('1\t103\tA\t1\t2\t256\t0\t0\t0\t0', 'flags must be')
+        self.assertBadRow('1\t103\tA\t1\t2\t0\t0\t65536\t0\t0', 'detects must be')
+        self.assertBadRow('1\t103\tA\t1\t2\t0\t0\t0\t-32769\t0', 'expLevelMod must be')
+        self.assertBadRow('1\t103\tA\t1\t2\t0\t0\t0\t--2\t0', 'expLevelMod must be')
+        self.assertBadRow('1\t103\tA\t1\t2\t0\t0\t0\t0\t-1', 'placeholderOf must be')
 
     def test_ids_must_increase(self):
         with self.assertRaises(gen.DataError) as caught:
-            gen.parse(HEADER + '\n5\t1\tA\t1\t1\t0\t0\t0\t0\n5\t1\tB\t1\t1\t0\t0\t0\t0\n')
+            gen.parse(HEADER + '\n5\t1\tA\t1\t1\t0\t0\t0\t0\t0\n5\t1\tB\t1\t1\t0\t0\t0\t0\t0\n')
         self.assertIn(':3: ids must be strictly increasing', str(caught.exception))
 
     def test_wrong_header(self):
@@ -55,9 +59,10 @@ class Output(unittest.TestCase):
         self.assertEqual(gen.c_string('é'), '"\\303\\251"')
 
     def test_record_line(self):
-        record = gen.parse(GOOD)[1]
-        self.assertEqual(gen.c_record(record), '    {17199648u, "Goblin Bounty Hunter", 17, 20, 161, 300u, 259, 0},')
-        self.assertEqual(gen.c_record(gen.parse(GOOD)[0]), '    {17190918u, "Wild Rabbit", 1, 1, 0, 60u, 257, -2},')
+        records = gen.parse(GOOD)
+        self.assertEqual(gen.c_record(records[2]), '    {17199648u, "Goblin Bounty Hunter", 17, 20, 161, 300u, 259, 0, 0u},')
+        self.assertEqual(gen.c_record(records[0]), '    {17190918u, "Wild Rabbit", 1, 1, 0, 60u, 257, -2, 0u},')
+        self.assertEqual(gen.c_record(records[1]), '    {17191194u, "Carrion Worm", 4, 5, 0, 180u, 2, 0, 17191196u},')
 
     def test_generate_names_the_commit(self):
         text = gen.generate(gen.parse(GOOD), 'abc123')

@@ -37,7 +37,7 @@ TEST(a_mob_aggros_unless_no_aggro_or_a_follower)
     for (const Row& row : {Row{kMobAggressive, true}, Row{kMobAlwaysAggro, true}, Row{0, false},
              Row{kMobAggressive | kMobNoAggro, false}, Row{kMobAlwaysAggro | kMobNoAggro, false}, Row{kMobLink, false},
              Row{kMobAggressive | kMobFollows, false}})
-        CHECK(IsAggressive(MobRecord{1, "Mob", 1, 1, row.flags, 0, 0, 0}) == row.aggressive);
+        CHECK(IsAggressive(MobRecord{1, "Mob", 1, 1, row.flags, 0, 0, 0, 0}) == row.aggressive);
 }
 
 TEST(a_different_name_at_the_id_is_not_a_match)
@@ -61,6 +61,14 @@ TEST(a_starter_mobs_level_mod)
     CHECK(rabbit != nullptr);
     CHECK_EQ(rabbit->expLevelMod, -2);
     CHECK_EQ(FindMob(17199648, "Goblin Bounty Hunter")->expLevelMod, 0);
+}
+
+TEST(a_placeholder_knows_its_nm)
+{
+    // East Ronfaure's Carrion Worms either side of Bigmouth Billy (its script's phList).
+    CHECK_EQ(FindMob(17191194, "Carrion Worm")->placeholderOf, 17191196u);
+    CHECK_EQ(FindMob(17191195, "Carrion Worm")->placeholderOf, 17191196u);
+    CHECK_EQ(FindMob(17191196, "Bigmouth Billy")->placeholderOf, 0u);
 }
 
 TEST(unknown_ids_are_not_found)

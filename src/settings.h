@@ -36,6 +36,11 @@ namespace headsup
         bool replaceMobNames   = true;  // hide the game's mob names and draw HeadsUp's
         bool showIcons         = true;  // the MobDB icon row
         bool hideInCombat      = false; // no level line or icons on a mob claimed by you or your party
+        bool hideClaimed       = false; // nor on one anyone has claimed
+        bool hideTooWeak       = false; // nor on one that cons Too Weak
+        bool hideWhileEngaged  = false; // nor on any while you are engaged
+        MobIdFormat mobId      = MobIdFormat::Off; // a mob's server ID on its level line
+        bool markPlaceholders  = true;  // "[PH]" for a lottery placeholder's ID
         bool scaleWithDistance = true;  // sizes follow the game's name size, like the game's names do
         std::string fontName   = kDefaultFont; // a font family installed in Windows
         bool fontBold          = false;
@@ -70,13 +75,14 @@ namespace headsup
         };
         Color textOutline = {{0.00f, 0.00f, 0.00f}};
         Color iconTint    = {{1.00f, 1.00f, 1.00f}}; // white keeps the icons' own colors
-        bool show[kCategoryCount]   = {true, false, false, true, true}; // indexed by Category: no passive or unknown
+        bool show[kCategoryCount]   = {true, false, false, true, true, true}; // indexed by Category: no passive or unknown
         Color color[kCategoryCount] = {
             {{1.00f, 0.15f, 0.15f}}, // aggressive: red
             {{0.20f, 1.00f, 0.30f}}, // passive: green
             {{0.70f, 0.70f, 0.70f}}, // unknown: gray
             {{1.00f, 0.60f, 0.10f}}, // aggressive NM: gold-orange
             {{1.00f, 0.84f, 0.00f}}, // passive NM: gold
+            {{0.70f, 0.30f, 1.00f}}, // lottery placeholder: purple
         };
     };
 

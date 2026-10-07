@@ -10,6 +10,8 @@ namespace headsup
     {
         constexpr uint32_t kSpawnFlagPlayer = 0x01;
         constexpr uint32_t kSpawnFlagMob    = 0x10;
+        constexpr int kClaimedShift         = 16;
+        constexpr uint32_t kClaimerIdBits   = 0xFFFF;
     }
 
     EntityKind KindFromSpawnFlags(uint32_t flags)
@@ -18,13 +20,13 @@ namespace headsup
         return (flags & kSpawnFlagPlayer) != 0 ? EntityKind::Player : EntityKind::Npc;
     }
 
+    bool IsClaimed(uint32_t claimStatus) { return (claimStatus >> kClaimedShift) != 0; }
+
     bool ClaimedByParty(uint32_t claimStatus, const std::vector<uint32_t>& partyServerIds)
     {
-        constexpr int kClaimedShift  = 16;
-        constexpr uint32_t kIdBits   = 0xFFFF;
-        if ((claimStatus >> kClaimedShift) == 0) return false;
+        if (!IsClaimed(claimStatus)) return false;
         return std::any_of(partyServerIds.begin(), partyServerIds.end(),
-            [&](uint32_t id) { return (id & kIdBits) == (claimStatus & kIdBits); });
+            [&](uint32_t id) { return (id & kClaimerIdBits) == (claimStatus & kClaimerIdBits); });
     }
 
     bool ReplacesName(const Settings& settings, const ActorInfo& info)
@@ -38,6 +40,7 @@ namespace headsup
     void Tracker::Update(const std::vector<ActorInput>& actors, const PlayerState& player, const Settings& settings)
     {
         m_Actors.clear();
+        m_Player   = player;
         m_Min      = UINT32_MAX;
         m_Max      = 0;
         m_Outlined = 0;
@@ -52,18 +55,23 @@ namespace headsup
             info.pose        = a.pose;
             info.feet        = a.feet;
             info.fighting    = a.fighting;
+            info.claimed     = a.claimed;
             std::snprintf(info.name, sizeof(info.name), "%s", a.name);
             if (a.kind == EntityKind::Mob)
             {
                 const MobRecord* mob = FindMob(a.serverId, a.name);
                 if (a.alive)
                 {
-                    info.label = MakeLabel(mob, a.checked, player.level);
+                    const Label level = MakeLabel(mob, a.checked, player.level);
+                    info.tooWeak      = level.shade == LabelShade::TooWeak;
+                    info.label        = LevelLine(level, settings.showLabels,
+                        MobIdText(a.serverId, mob != nullptr && mob->placeholderOf != 0, settings.mobId, settings.markPlaceholders));
                     info.icons = IconsFor(mob);
                 }
                 if (settings.enabled && a.alive && a.distance <= settings.maxDistance)
                 {
-                    const int category = CategoryIndex(Classify(mob, a.checked ? a.checked->level : 0, player));
+                    const int category = CategoryIndex(OutlineCategory(mob, a.checked ? a.checked->level : 0, player,
+                        settings.show[CategoryIndex(Category::Placeholder)]));
                     if (settings.show[category])
                     {
                         info.outline    = true;

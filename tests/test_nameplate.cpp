@@ -31,7 +31,7 @@ namespace
 {
     PlateFacts Facts(uint16_t index)
     {
-        return PlateFacts{index, true, true, true, true, 3, 2, 1, false};
+        return PlateFacts{index, true, true, true, true, 3, 2, 1, false, false, false, false};
     }
 }
 
@@ -54,8 +54,10 @@ TEST(a_plate_shows_the_lines_its_entity_and_the_settings_allow)
     const PlateLines failed = ChooseLines(Facts(0x220), s, CursorTargets{}, true);
     CHECK(failed.icons == 0 && failed.leftIcons == 0 && failed.rightIcons == 0 && failed.name);
     Settings off = s;
-    off.showLabels = off.showIcons = off.showPlayerIcons = false;
-    const PlateLines bare = ChooseLines(Facts(0x220), off, CursorTargets{}, false);
+    off.showIcons = off.showPlayerIcons = false;
+    PlateFacts unlabeled = Facts(0x220); // no level line: level and con off and no ID (LevelLine)
+    unlabeled.hasLabel   = false;
+    const PlateLines bare = ChooseLines(unlabeled, off, CursorTargets{}, false);
     CHECK(bare.name && !bare.label && bare.icons == 0 && bare.leftIcons == 0 && bare.rightIcons == 0);
     PlateFacts nothing = kept;
     nothing.steady     = false;
@@ -74,6 +76,27 @@ TEST(a_mob_in_combat_can_lose_its_level_and_icons)
     CHECK(!hidden.label && hidden.icons == 0);
     CHECK(hidden.name && hidden.leftIcons == 2 && hidden.cursor == CursorKind::Target); // the rest stays
     CHECK(ChooseLines(Facts(0x220), s, CursorTargets{}, false).label);                   // a mob not in combat keeps them
+}
+
+TEST(the_settings_can_hide_the_level_and_icons_of_claimed_or_too_weak_mobs_or_all_while_you_fight)
+{
+    struct Case
+    {
+        bool PlateFacts::*fact;
+        bool Settings::*setting;
+    };
+    for (const Case& c : {Case{&PlateFacts::claimed, &Settings::hideClaimed}, Case{&PlateFacts::tooWeak, &Settings::hideTooWeak},
+             Case{&PlateFacts::engaged, &Settings::hideWhileEngaged}})
+    {
+        PlateFacts facts = Facts(0x220);
+        facts.*c.fact    = true;
+        Settings s;
+        CHECK(ChooseLines(facts, s, CursorTargets{}, false).label); // off by default
+        s.*c.setting            = true;
+        const PlateLines hidden = ChooseLines(facts, s, CursorTargets{}, false);
+        CHECK(!hidden.label && hidden.icons == 0 && hidden.name);
+        CHECK(ChooseLines(Facts(0x220), s, CursorTargets{}, false).label); // only the mobs it is about
+    }
 }
 
 namespace

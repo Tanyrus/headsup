@@ -14,6 +14,8 @@ namespace
     constexpr uint32_t kSnipper       = 17199322; // Snipper: passive, 19-20
     constexpr uint32_t kBeachMonk     = 17199603; // Beach Monk: aggressive notorious, 23
     constexpr uint32_t kBigmouthBilly = 17191196; // Bigmouth Billy: passive notorious, 9-10
+    constexpr uint32_t kCarrionWorm   = 17191194; // Carrion Worm: passive, 4-5, Bigmouth Billy's lottery placeholder
+    constexpr uint32_t kPoisonFunguar = 17195258; // Poison Funguar: aggressive, 14-15, a placeholder in La Theine Plateau
 
     ActorInput Mob(ActorPtr actor, uint32_t serverId, const char* name, float distance = 10.0f, bool alive = true)
     {
@@ -144,6 +146,27 @@ TEST(each_category_gets_its_colour)
     CHECK_EQ(t.Find(0x5000)->argb, ToArgb(s.color[CategoryIndex(Category::NmWillAttack)]));
     CHECK_EQ(t.Find(0x6000)->argb, ToArgb(s.color[CategoryIndex(Category::NmWontAttack)]));
     CHECK_EQ(t.OutlinedCount(), 5u);
+}
+
+TEST(a_mobs_level_line_carries_its_id_or_ph_and_a_placeholder_glows_purple)
+{
+    Tracker t;
+    Settings s;
+    s.mobId           = MobIdFormat::LastThree;
+    ActorInput worm   = Mob(0x2000, kCarrionWorm, "Carrion Worm");
+    worm.claimed      = true;
+    t.Update({worm, BountyHunter(0x3000)}, kLevel20, s);
+    const ActorInfo* ph = t.Find(0x2000);
+    CHECK(std::string(ph->label.text) == "Lv 4-5 TW [PH]");
+    CHECK(ph->tooWeak && ph->claimed);
+    CHECK(ph->outline && ph->argb == ToArgb(s.color[CategoryIndex(Category::Placeholder)]));
+    const ActorInfo* hunter = t.Find(0x3000);
+    CHECK(std::string(hunter->label.text) == "Lv 17-20 EP-EM [220]");
+    CHECK(!hunter->tooWeak && !hunter->claimed);
+    s.show[CategoryIndex(Category::Placeholder)] = false;
+    t.Update({Mob(0x2000, kCarrionWorm, "Carrion Worm"), Mob(0x4000, kPoisonFunguar, "Poison Funguar")}, kLevel20, s);
+    CHECK(!t.Find(0x2000)->outline); // colored like any mob: passive, so not outlined
+    CHECK(t.Find(0x4000)->outline && t.Find(0x4000)->argb == ToArgb(s.color[CategoryIndex(Category::WillAttack)]));
 }
 
 TEST(a_name_that_does_not_match_the_data_is_unknown)

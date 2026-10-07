@@ -18,6 +18,7 @@ namespace headsup
         uint32_t respawn;    // seconds; 0 when the mob is not on a respawn timer
         uint16_t detects;    // MobDetect bits
         int16_t expLevelMod; // added to its level for /check and experience
+        uint32_t placeholderOf; // the NM it is a lottery placeholder for, by server ID; 0 when none
     };
 
     // Whether the mob aggros at all: aggressive or always-aggro, and neither no-aggro nor a follower.

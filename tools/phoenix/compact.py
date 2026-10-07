@@ -53,7 +53,7 @@ def display_name(name: str) -> str:
 
 AGGRO_FIELDS = ('aggro', 'alwaysAggro', 'noAggro')
 # Fields later dump modules added, each group taken from the first snapshot that exported it.
-ADDED_FIELDS = (('link', 'detects', 'trueDetection'), ('expLevelMod', 'follows'))
+ADDED_FIELDS = (('link', 'detects', 'trueDetection'), ('expLevelMod', 'follows'), ('placeholderOf',))
 
 
 def attacks(mob) -> bool:
@@ -89,7 +89,8 @@ def merge(snapshots):
 def row(mob) -> str:
     values = {'id': mob['id'], 'zone': mob['zone'], 'name': display_name(mob['name']), 'minLevel': mob['minLevel'],
               'maxLevel': mob['maxLevel'], 'flags': flags(mob), 'respawn': max(0, int(mob['respawn'])),
-              'detects': int(mob.get('detects', 0)), 'expLevelMod': int(mob.get('expLevelMod', 0))}
+              'detects': int(mob.get('detects', 0)), 'expLevelMod': int(mob.get('expLevelMod', 0)),
+              'placeholderOf': int(mob.get('placeholderOf', 0))}
     return '\t'.join(str(values[column]) for column in schema.COLUMNS)
 
 
