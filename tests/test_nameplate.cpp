@@ -9,14 +9,6 @@ using namespace headsup;
 using test::Box;
 using test::Near;
 
-TEST(labels_wait_for_a_drawn_body_and_a_steady_name)
-{
-    CHECK(Steady(0, kStableFrames));                     // body drawn this frame
-    CHECK(Steady(kMeshGraceFrames, kStableFrames));      // or lately: on some frames the game's draws credit it to another
-    CHECK(!Steady(kMeshGraceFrames + 1, kStableFrames)); // body not drawn
-    CHECK(!Steady(0, kStableFrames - 1));                // name just appeared
-}
-
 TEST(a_name_shows_whenever_some_of_it_is_on_screen)
 {
     for (const ScreenBox& edge : {Box(1000.0f, 200.0f, 1080.0f, 210.0f), Box(-5.0f, 200.0f, 60.0f, 210.0f),
@@ -47,7 +39,6 @@ namespace
 
     struct Frame
     {
-        bool steady      = true;
         bool selfEngaged = false;
         bool iconsFailed = false;
         CursorTargets targets{};
@@ -55,17 +46,15 @@ namespace
 
     PlateLines Lines(const ActorInfo& info, const Settings& settings, const Frame& frame = {})
     {
-        return ChooseLines(info, frame.steady, frame.selfEngaged, settings, frame.targets, frame.iconsFailed);
+        return ChooseLines(info, frame.selfEngaged, settings, frame.targets, frame.iconsFailed);
     }
 }
 
-TEST(a_mob_shows_its_level_line_and_icons_once_its_name_is_steady)
+TEST(a_living_mob_shows_its_level_line_and_icons)
 {
     const Settings s;
     const PlateLines mob = Lines(Mob(0x220), s);
     CHECK(mob.name && mob.label && mob.mobIconCount == 3 && mob.leftIconCount == 0 && mob.cursor == CursorKind::None);
-    const PlateLines early = Lines(Mob(0x220), s, {.steady = false});
-    CHECK(early.name && !early.label && early.mobIconCount == 0 && early.Any()); // the name never waits
     ActorInfo dead = Mob(0x220);
     dead.alive     = false;
     const PlateLines corpse = Lines(dead, s);
@@ -74,9 +63,10 @@ TEST(a_mob_shows_its_level_line_and_icons_once_its_name_is_steady)
     unlabeled.label.text[0] = '\0';
     const PlateLines bare   = Lines(unlabeled, s);
     CHECK(!bare.label && bare.mobIconCount == 3);
-    Settings kept        = s;
-    kept.replaceMobNames = false;
-    CHECK(!Lines(Mob(0x220), kept, {.steady = false}).Any());
+    Settings kept           = s;
+    kept.replaceMobNames    = false;
+    const PlateLines over   = Lines(Mob(0x220), kept); // above the game's own name
+    CHECK(!over.name && over.label && over.mobIconCount == 3);
 }
 
 TEST(a_replaced_players_name_has_their_icons_beside_it)
@@ -277,17 +267,6 @@ TEST(the_cursors_point_sits_over_the_center)
     const ScreenBox plate   = Box(1000.0f, 200.0f, 1080.0f, 210.0f);
     const LineSizes sizes{.labelWidth = 80.0f, .labelHeight = 16.0f, .cursorWidth = 20.0f, .cursorHeight = 16.0f, .cursorTip = 0.25f};
     CHECK(Near(LayoutNameplate(plate, sizes, false).cursor.x, 1035.0f));
-}
-
-TEST(a_name_is_centered_over_its_entity_not_its_letters)
-{
-    // Shio: the game centers the letters and their icons together over the player, at x 965.1.
-    const ScreenBox letters = Box(933.9f, 444.8f, 1054.8f, 466.7f);
-    const ScreenBox whole   = Box(875.4f, 444.8f, 1054.8f, 477.7f);
-    const ScreenBox placed  = PlaceName(letters, &whole, nullptr, WorldPoint{}, Pose::Standing);
-    CHECK(Near(placed.CenterX(), 965.1f));
-    CHECK(Near(placed.Width(), letters.Width()) && Near(placed.minY, letters.minY) && Near(placed.maxY, letters.maxY));
-    CHECK(Near(PlaceName(letters, &letters, nullptr, WorldPoint{}, Pose::Standing).minX, letters.minX)); // no icons: nothing moves
 }
 
 TEST(scale_follows_the_game_name_with_limits)

@@ -1,6 +1,5 @@
 /build/
 /src/generated/
-/dev/
 __pycache__/
 .vscode/
 .idea/

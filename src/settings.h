@@ -1,5 +1,6 @@
 #pragma once
 
+#include "argb.h"
 #include "labels.h"
 #include "player_status.h"
 
@@ -28,6 +29,14 @@ namespace headsup
         float v[3]; // r, g, b in 0-1, the layout ImGui's ColorEdit3 edits
         bool operator==(const Color&) const = default;
     };
+    // From 0xRRGGBB, exactly: ToArgb gives back the same bytes.
+    constexpr Color ColorFromRgb(uint32_t rgb)
+    {
+        constexpr float kFull = 255.0f;
+        return {{Channel(rgb, kRedShift) / kFull, Channel(rgb, kGreenShift) / kFull, Channel(rgb, kBlueShift) / kFull}};
+    }
+    // Phoenix's royal red, the accent of its own theme (phoenix-platform's --phoenix-accent).
+    constexpr uint32_t kPhoenixRed = 0xC55151;
 
     constexpr float kMinThickness = 1.0f, kMaxThickness = 16.0f;            // render-target pixels
     constexpr int kMinSmoothness = 4, kMaxSmoothness = 16;                  // shifted copies per mesh
@@ -70,7 +79,7 @@ namespace headsup
         bool showPlayerIcons   = true;  // seeking party, bazaar, linkshell and the rest beside replaced player names
         IconSide playerIconSide[kPlayerIconCount] = {}; // by PlayerIcon: every one left of the name
         bool centerNameAndIcons = true;  // a player's name and icons centered together over them, rather than the name
-        Color cursorColor      = {{1.00f, 1.00f, 1.00f}}; // the target
+        Color cursorColor      = ColorFromRgb(kPhoenixRed); // the target
         Color lockedCursorColor = {{0.65f, 0.40f, 1.00f}};
         Color subCursorColor   = {{0.99f, 0.82f, 0.09f}}; // like XIUI's sub-target tint
         Color outOfRangeCursorColor = {{1.00f, 0.25f, 0.25f}}; // the sub-target out of range, red as the game shows it

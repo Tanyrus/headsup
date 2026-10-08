@@ -1,6 +1,5 @@
 #include "game_cursor.h"
 #include "boxes.h"
-#include "game_glyphs.h"
 #include "test.h"
 
 using namespace headsup;
@@ -47,7 +46,6 @@ TEST(the_games_cursor_is_centered_on_a_players_name_and_icons)
     const ScreenBox letters = Box(933.9f, 444.8f, 1054.8f, 466.7f);
     const ScreenBox icons   = Box(875.4f, 444.8f, 933.9f, 477.7f);
     const ScreenBox cursor  = Box(713.5f, 300.5f, 733.5f, 332.5f).Scaled(4.0f / 3.0f, 4.0f / 3.0f);
-    CHECK(BesideName(icons, letters));
     ScreenBox whole = letters;
     whole.Add(icons);
     CHECK(IsGameCursor(cursor, whole));

@@ -27,12 +27,12 @@ namespace headsup
         constexpr ImVec4 kText         = Hex(0xFFF8F8);
         constexpr ImVec4 kHeading      = Hex(0xD2ABAB);
         constexpr ImVec4 kMuted        = Hex(0x8A6B6B);
-        constexpr ImVec4 kAccent       = Hex(0xC55151);
+        constexpr ImVec4 kAccent       = Hex(kPhoenixRed);
         constexpr ImVec4 kAccentHover  = Hex(0xFF8D79);
         constexpr ImVec4 kDivider      = Hex(0xD2ABAB, 0.12f);
         constexpr ImVec4 kTrack        = Hex(0x180E0E);
         constexpr ImVec4 kGrabHeld     = Hex(0xD45E5E);
-        constexpr ImVec4 kTint         = Hex(0xC55151, 0.30f); // a box being clicked
+        constexpr ImVec4 kTint         = Hex(kPhoenixRed, 0.30f); // a box being clicked
         constexpr ImVec4 kPicked       = Hex(0xC55151, 0.25f); // the selected page and tab
         constexpr ImVec4 kSelection    = Hex(0xC55151, 0.35f);
         constexpr ImVec4 kRowPicked    = Hex(0xC55151, 0.45f);
@@ -384,10 +384,14 @@ namespace headsup
 
         // The window's own title row, in place of ImGui's title bar so the ON/OFF chip can sit beside the name. Dragging
         // any empty part of the window moves it.
-        void DrawTitle(Ui& ui, Settings& s, bool& open)
+        void DrawTitle(Ui& ui, Settings& s, bool& open, double version)
         {
             ui.gui->AlignTextToFramePadding();
             ui.Colored(kText, "HeadsUp");
+            ui.gui->SameLine();
+            char shown[16];
+            std::snprintf(shown, sizeof(shown), "v%g", version);
+            ui.Colored(kMuted, shown);
             ui.gui->SameLine();
             ui.Chip(s.enabled);
             ui.Tip("Turns every outline and nameplate on or off, the same as /hu on and /hu off.");
@@ -649,7 +653,7 @@ namespace headsup
 
         void DrawDebug(Ui& ui, const MenuStatus& status, uint32_t& collapsed, bool& requested)
         {
-            char outlined[32], meshes[32], shown[32], letters[64], frame[48], level[32];
+            char outlined[32], meshes[32], shown[32], names[64], frame[48], level[32];
             if (ui.Section("Outlines", kDebugOutlinesSection, collapsed))
             {
                 std::snprintf(outlined, sizeof(outlined), "%u", status.outlinedMobs);
@@ -660,10 +664,13 @@ namespace headsup
             if (ui.Section("Nameplates", kDebugNameplatesSection, collapsed))
             {
                 std::snprintf(shown, sizeof(shown), "%u", status.nameplates);
-                std::snprintf(letters, sizeof(letters), "%u in the scene, %u from mobs, %u hidden", status.letters.inScene,
-                    status.letters.fromMobs, status.letters.hidden);
+                if (status.hooked)
+                    std::snprintf(names, sizeof(names), "%u this frame, %u drawn by HeadsUp", status.names.names,
+                        status.names.replaced);
+                else
+                    std::snprintf(names, sizeof(names), "not hooked");
                 DebugRows(ui, "##debugNameplates", {{"Nameplates shown", shown},
-                    {"Drawn", status.drewInScene ? "into the scene, behind walls" : "on top"}, {"Game name letters", letters}});
+                    {"Drawn", status.drewInScene ? "into the scene, behind walls" : "on top"}, {"Game's names", names}});
             }
             if (ui.Section("Frame", kDebugFrameSection, collapsed))
             {
@@ -713,7 +720,7 @@ namespace headsup
         gui->SetNextWindowSize(ImVec2(kWindowWidth, kWindowHeight), ImGuiCond_Always);
         if (gui->Begin("HeadsUp", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar))
         {
-            DrawTitle(ui, s, open);
+            DrawTitle(ui, s, open, status.version);
             if (gui->BeginTable("##layout", 2, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_BordersInnerV))
             {
                 gui->TableSetupColumn("##pages", ImGuiTableColumnFlags_WidthFixed, kSidebarWidth, 0);

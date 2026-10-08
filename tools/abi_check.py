@@ -16,7 +16,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SDK = ROOT / 'third_party' / 'ashita-sdk'
-SOURCE_FOLDERS = ('src', 'dev')  # dev/, a developer's tools, is built in when present
+SOURCE = ROOT / 'src'
 CALLED_INTERFACES = ['IAshitaCore', 'IMemoryManager', 'IEntity', 'IParty', 'IPlayer', 'IChatManager',
                      'IConfigurationManager', 'IGuiManager', 'ITarget']
 NOT_CALLED = {'ILogManager'}  # handed to the plugin, never called
@@ -109,8 +109,10 @@ def main() -> int:
         problems.append('IPluginBase not found in the SDK')
     else:
         problems += [f'IPluginBase::{n} ({why})' for n, why in unstable_methods(found['IPluginBase']).items()]
-    sources = '\n'.join(path.read_text(errors='replace') for folder in SOURCE_FOLDERS for pattern in ('*.cpp', '*.h')
-                        for path in (ROOT / folder).glob(pattern))
+    # Any folder named on the command line, such as a developer's tools when they are built in, is checked too.
+    folders = [SOURCE, *(pathlib.Path(arg) for arg in sys.argv[1:])]
+    sources = '\n'.join(path.read_text(errors='replace') for folder in folders for pattern in ('*.cpp', '*.h')
+                        for path in folder.glob(pattern))
     calls = set(CALL.findall(sources))
     problems += [f'the plugin uses {name}, which is not in CALLED_INTERFACES and so is not checked'
                  for name in unlisted_interfaces(sources, text, found, calls, CALLED_INTERFACES)]

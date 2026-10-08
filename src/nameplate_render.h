@@ -5,6 +5,7 @@
 #include "game_names.h"
 #include "icons.h"
 #include "nameplate.h"
+#include "native_hook.h"
 #include "ph_timers.h"
 #include "settings.h"
 #include "plate_image.h"
@@ -31,7 +32,7 @@ namespace headsup
 
         void SetDevice(IDirect3DDevice8* device) { m_Device = device; }
         // toX and toY turn back-buffer pixels into those of the image the nameplates are drawn into.
-        void Update(const Tracker& tracker, const GameNames& names, const Settings& settings, float toX, float toY,
+        void Update(const Tracker& tracker, const GameNames& names, const NameHook& hook, const Settings& settings, float toX, float toY,
             const CursorTargets& targets, double now, uint16_t selfIndex, const std::vector<TimerLine>& selfTimers);
         void Clear();
         void ReleasePlates();

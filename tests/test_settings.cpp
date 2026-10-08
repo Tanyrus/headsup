@@ -36,7 +36,8 @@ namespace
 
     // A settings.ini as HeadsUp writes it, every value off its default so a renamed or dropped key shows. Saved files
     // carry these keys: a field may be renamed, its key never.
-    constexpr const char* kSavedFile = R"(enabled=false
+    constexpr const char* kSavedFile = R"(settingsVersion=1.0000
+enabled=false
 showLabels=false
 replaceMobNames=false
 showIcons=false
@@ -372,4 +373,43 @@ TEST(nameplates_need_the_master_switch_and_a_part)
     Settings ids = none;
     ids.mobId    = MobIdFormat::LastThree;
     onlyWithTheSwitch(ids);
+}
+
+TEST(a_color_from_hex_draws_as_the_same_hex)
+{
+    // Phoenix's red and a color whose bytes all differ: 0.77 would have drawn C4, not C5.
+    CHECK_EQ(ToArgb(ColorFromRgb(0xC55151)), 0xFFC55151u);
+    CHECK_EQ(ToArgb(ColorFromRgb(0x01FE80)), 0xFF01FE80u);
+}
+
+namespace
+{
+    MapStore TargetCursor(const char* r, const char* g, const char* b)
+    {
+        MapStore store;
+        store.values = {{"cursorColorR", r}, {"cursorColorG", g}, {"cursorColorB", b}};
+        return store;
+    }
+}
+
+TEST(a_white_target_cursor_saved_before_it_was_red_turns_red)
+{
+    // Every setting is saved whenever one changes, so a file from before 0.53 holds the old default, white, as if chosen.
+    MapStore old = TargetCursor("1.0000", "1.0000", "1.0000");
+    CHECK(LoadSettings(old).cursorColor == ColorFromRgb(kPhoenixRed));
+}
+
+TEST(a_white_target_cursor_chosen_since_stays_white)
+{
+    Settings white;
+    white.cursorColor = Color{{1.0f, 1.0f, 1.0f}};
+    MapStore saved;
+    SaveSettings(white, saved);
+    CHECK(LoadSettings(saved).cursorColor == white.cursorColor);
+}
+
+TEST(an_old_target_cursor_of_any_other_color_is_kept)
+{
+    MapStore old = TargetCursor("0.7700", "0.3200", "0.3200");
+    CHECK(LoadSettings(old).cursorColor == (Color{{0.77f, 0.32f, 0.32f}}));
 }

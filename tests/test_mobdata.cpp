@@ -57,6 +57,31 @@ TEST(names_match_without_punctuation_or_case)
     CHECK(!SameMobName("Bat", ""));
 }
 
+TEST(a_record_named_after_phoenixs_template_key_is_the_clients_mob)
+{
+    // Outer Horutoto Ruins' bats: Phoenix's Stink_Bats_OHR template has no display name, so the data holds "Stink Bats
+    // OHR"; the client, and a Windows tester's /hu debug, show "Stink Bats".
+    const MobRecord* bats = FindMob(17571844, "Stink Bats");
+    CHECK(bats != nullptr);
+    CHECK_EQ(bats->minLevel, 15);
+    CHECK_EQ(bats->maxLevel, 18);
+}
+
+TEST(only_whole_tag_words_after_the_clients_name_match)
+{
+    // Every tag seen against the client's own names: zones and areas, jobs, eras, weapons.
+    CHECK(TaggedMobName("Lost Soul war ENS", "Lost Soul"));
+    CHECK(TaggedMobName("Death Jacket CN RFS", "Death Jacket"));
+    CHECK(TaggedMobName("Tapanas Minion past", "Tapana's Minion"));
+    CHECK(!TaggedMobName("Locus Tomb Worm past", "Locus Dire Bat")); // another mob at that ID, in King Ranperre's Tomb
+    CHECK(!TaggedMobName("Chaser Bat past", "Stink Bats"));        // as many letters, then a tag: still another mob
+    CHECK(!TaggedMobName("Bats past", "Bat"));                     // a longer word, not a tag
+    CHECK(!TaggedMobName("Iron CraniumV1", "Iron Cranium"));       // glued on: not a whole word
+    CHECK(!TaggedMobName("Stink Bats", "Stink Bats OHR"));         // the client's name is never the longer
+    CHECK(!TaggedMobName("Stink Bats", "Stink Bats"));             // the same name is SameMobName's
+    CHECK(!TaggedMobName("Lost Soul war ENS", ""));
+}
+
 TEST(a_starter_mobs_level_mod)
 {
     const MobRecord* rabbit = FindMob(17190918, "Wild Rabbit"); // East Ronfaure; its spawn script sets -2

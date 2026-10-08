@@ -2,11 +2,13 @@
 
 #include "check.h"
 #include "commands.h"
+#include "d3d_util.h"
 #include "game_cursor.h"
 #include "game_names.h"
 #include "menu.h"
 #include "mobdata.h"
 #include "nameplate_render.h"
+#include "native_hook.h"
 #include "outline.h"
 #include "ph_timers.h"
 #include "player_status.h"
@@ -14,7 +16,10 @@
 #include "settings.h"
 #include "tracker.h"
 #ifdef HEADSUP_DEV
+#include "codedump.h"
 #include "drawdump.h"
+#include "namedump.h"
+#include "stackdump.h"
 #endif
 
 #include <algorithm>
@@ -32,7 +37,7 @@ namespace
     constexpr const char* kName              = "headsup";
     // Ashita takes a plugin's version as one number, so it holds the release tag's major.minor; the release workflow
     // checks the two agree.
-    constexpr double kVersion                = 0.5;
+    constexpr double kVersion                = 0.55;
     constexpr const char* kConfigAlias       = "headsup";
     constexpr const char* kConfigFolder      = "config";
     constexpr const char* kLogsFolder        = "logs";
@@ -95,6 +100,9 @@ class HeadsUp final : public IPlugin
     headsup::GameNames m_Names;
     headsup::NameplateRenderer m_Nameplates;
     headsup::PointerSwap m_Pointer;
+    headsup::NameHook m_NameHook;
+    bool m_NameHookTried = false;
+    headsup::ScreenBox m_GameNameBox;
     bool m_PointerFailed = false; // said once; tried again when the setting changes
     headsup::Menu m_Menu;
     headsup::PlayerState m_Player;
@@ -113,6 +121,7 @@ class HeadsUp final : public IPlugin
     bool m_Drawing      = false; // drawing nameplates: our own draws come back through the hooks
     bool m_DrewInScene  = false; // this frame
     bool m_StateWarned  = false; // said once that the game's render states could not be saved
+    bool m_RestoreWarned = false; // said once that Direct3D did not put the game's states back
     IDirect3DDevice8* m_Device = nullptr;
     headsup::CursorTargets m_CursorTargets;
     bool m_Picking      = false;
@@ -156,6 +165,7 @@ public:
 
     void Release(void) override
     {
+        if (const std::string failure = m_NameHook.Stop(); !failure.empty()) Print(failure + ".");
         m_Pointer.Stop();
         m_Nameplates.Release();
     }
@@ -166,6 +176,7 @@ public:
         m_Outline.SetDevice(device);
         m_Names.SetDevice(device);
         m_Nameplates.SetDevice(device);
+        m_NameHook.SetDevice(device);
         return true;
     }
 
@@ -190,6 +201,12 @@ public:
 #ifdef HEADSUP_DEV
         else if (args[1] == "drawdump")
             Print(m_DrawDump.Start(args.size() > 2 ? args[2] : "", Now(), m_AshitaCore, OwnFolder(kLogsFolder)));
+        else if (args[1] == "codedump")
+            Print(headsup::WriteCodeDump(OwnFolder(kLogsFolder)));
+        else if (args[1] == "namedump")
+            Print(headsup::ArmNameDump(m_NameHook.Running()));
+        else if (args[1] == "stackdump")
+            Print(headsup::ArmStackDump());
 #endif
         else
         {
@@ -198,6 +215,9 @@ public:
             Print("/hu debug: write what every outline and nameplate show to logs/headsup");
 #ifdef HEADSUP_DEV
             Print("/hu drawdump [seconds | watch | stop]: write every draw call of one frame to logs/headsup after the delay, or watch every frame for name glitches until stopped");
+            Print("/hu codedump: write the client's loaded image to logs/headsup");
+            Print("/hu namedump: write every call into the game's name routine during one frame to logs/headsup");
+            Print("/hu stackdump: write the stack at the character draws of one frame to logs/headsup");
 #endif
         }
         return true;
@@ -261,8 +281,11 @@ public:
         UNREFERENCED_PARAMETER(dirty);
         MeasureFrame();
 #ifdef HEADSUP_DEV
-        if (m_DrawDump.NextFrame(Now(), m_Names, m_Tracker, m_Nameplates)) WriteDrawDump();
+        if (m_DrawDump.NextFrame(Now(), m_Names, m_NameHook, m_Tracker, m_Nameplates)) WriteDrawDump();
+        if (headsup::NameDumpReady()) WriteNameDump();
+        if (headsup::StackDumpReady()) WriteStackDump();
 #endif
+        StartNameHook();
         m_Outline.NewFrame();
         m_Names.NewFrame();
         if (m_Outline.TakeStencilWarning())
@@ -293,20 +316,31 @@ public:
             .frameMs          = m_FrameMs,
             .stencilAvailable = m_Outline.StencilAvailable(),
             .drewInScene      = drewInScene,
-            .letters          = m_Names.TextStatsLastFrame(),
+            .hooked           = m_NameHook.Running(),
+            .names            = m_NameHook.Stats(),
             .player           = m_Player,
+            .version          = kVersion,
         };
         if (m_Menu.Draw(m_AshitaCore->GetGuiManager(), m_Settings, status))
             SaveSettings();
         if (m_Menu.TakeDebugRequest()) m_DebugPending = true;
         UpdatePointer();
+        m_NameHook.NewFrame(NameOwners());
     }
 
     // The game draws nameplates into its scene image, copies it to the back buffer and ends that scene before Present.
     // Unless they were drawn into the scene, our nameplates go on top here, in the same frame as the game's names.
+    void Direct3DBeginScene(bool isRenderingBackBuffer) override
+    {
+        if (!Ours()) RecordDraw(isRenderingBackBuffer ? 'B' : 'b', D3DPT_POINTLIST, 0u, nullptr, 0u, 0u, 0u);
+    }
+
     void Direct3DEndScene(bool isRenderingBackBuffer) override
     {
-        if (Ours() || !isRenderingBackBuffer || m_PlatesPlaced || !m_Names.NamesThisFrame()) return;
+        if (!Ours()) RecordDraw(isRenderingBackBuffer ? 'E' : 'e', D3DPT_POINTLIST, 0u, nullptr, 0u, 0u, 0u);
+        if (Ours() || !isRenderingBackBuffer || m_PlatesPlaced) return;
+        m_Names.UseScene(m_NameHook.SceneTarget(), m_NameHook.SceneDepth());
+        if (!m_Names.NamesThisFrame()) return;
         m_Names.FinishText();
         WithSavedState([&] { DrawNameplates(1.0f, 1.0f, false); });
     }
@@ -330,6 +364,9 @@ public:
         if (!outlines && !bodies) return false;
         const headsup::ActorInfo* owner = m_Outline.CharacterMeshOwner(m_Tracker);
         if (owner == nullptr) return false;
+#ifdef HEADSUP_DEV
+        headsup::CaptureStack(owner->index);
+#endif
         m_Names.CountMesh(owner->index);
         const bool replaced =
             outlines && owner->outline && m_Outline.DrawOutlined(type, minIndex, numVertices, startIndex, primCount, *owner, m_Settings);
@@ -342,10 +379,8 @@ public:
         if (Ours()) return false;
         RecordDraw('U', type, primCount, vertices, stride, 0u, headsup::VertexCount(type, primCount));
         DrawNameplatesBeforeSceneCopy();
-        // The game's names and icons are blocked only while HeadsUp can still draw its own.
-        const bool blocked = BlocksGameCursor(type, primCount, vertices, stride) ||
-                             m_Names.OnDrawUP(type, primCount, vertices, stride, m_Tracker, m_Settings,
-                                 {.names = !m_Nameplates.NamesFailed(), .icons = !m_Nameplates.IconsFailed()});
+        m_Names.OnDrawUP(type, primCount, vertices, stride, m_Tracker, m_Settings);
+        const bool blocked = BlocksGameCursor(type, primCount, vertices, stride);
         if (blocked) MarkHidden();
         return blocked;
     }
@@ -398,24 +433,34 @@ private:
             if (!std::exchange(m_StateWarned, true)) Print("nameplates are not drawn: Direct3D could not save the game's render states.");
             return;
         }
-        IDirect3DSurface8* target = nullptr;
-        IDirect3DSurface8* depth  = nullptr;
+        IDirect3DSurface8* target      = nullptr;
+        IDirect3DSurface8* depth       = nullptr;
+        IDirect3DBaseTexture8* texture = nullptr;
         m_Device->GetRenderTarget(&target);
         m_Device->GetDepthStencilSurface(&depth);
+        m_Device->GetTexture(0, &texture);
+        const headsup::CopyState before = headsup::ReadCopyState(m_Device);
         m_Drawing = true;
         draw();
         m_Drawing = false;
         m_Device->SetRenderTarget(target, depth);
         m_Device->ApplyStateBlock(saved); // after SetRenderTarget, which resets the viewport
         m_Device->DeleteStateBlock(saved);
+        // On Windows the game's scene copy came back without its texture and drew its gray vertex color over the whole
+        // screen. Its states are set again every time: a layer under Direct3D 8 can report a binding it no longer has.
+        if (const std::string lost = headsup::StatesNotRestored(before, headsup::ReadCopyState(m_Device)); !lost.empty())
+            if (!std::exchange(m_RestoreWarned, true))
+                Print("Direct3D did not put back the game's " + lost + " after HeadsUp drew; HeadsUp puts them back itself.");
+        headsup::RestoreCopyState(m_Device, before, texture);
         if (target != nullptr) target->Release();
         if (depth != nullptr) depth->Release();
+        if (texture != nullptr) texture->Release();
     }
 
     // toX and toY: the bound render target's pixels per back-buffer pixel.
     void DrawNameplates(float toX, float toY, bool depthTest)
     {
-        m_Nameplates.Update(m_Tracker, m_Names, m_Settings, toX, toY, m_CursorTargets, Now(), m_SelfIndex, m_TimerLines);
+        m_Nameplates.Update(m_Tracker, m_Names, m_NameHook, m_Settings, toX, toY, m_CursorTargets, Now(), m_SelfIndex, m_TimerLines);
         m_Nameplates.Draw(depthTest);
         m_PlatesPlaced = true;
     }
@@ -425,7 +470,9 @@ private:
     // game's names, and sit under the game's menus. The copy is the first draw to the back buffer after the names.
     void DrawNameplatesBeforeSceneCopy()
     {
-        if (!headsup::NameplatesOn(m_Settings) || !m_Names.SceneCopyStarting()) return;
+        if (!headsup::NameplatesOn(m_Settings)) return;
+        m_Names.UseScene(m_NameHook.SceneTarget(), m_NameHook.SceneDepth());
+        if (!m_Names.SceneCopyStarting()) return;
         m_Names.FinishText();
         WithSavedState([&] {
             if (FAILED(m_Device->SetRenderTarget(m_Names.SceneTarget(), m_Names.SceneDepth()))) return;
@@ -434,13 +481,52 @@ private:
         });
     }
 
+    // Whose names the hook may meet next frame. A name is HeadsUp's only while it can still draw it.
+    std::vector<headsup::NameOwner> NameOwners() const
+    {
+        std::vector<headsup::NameOwner> owners;
+        const bool replacing = headsup::NameplatesOn(m_Settings) && !m_Nameplates.NamesFailed();
+        for (const headsup::ActorPtr actor : m_Tracker.Actors())
+            if (const headsup::ActorInfo* info = m_Tracker.Find(actor))
+                owners.push_back({actor, info->index, replacing && headsup::ReplacesName(m_Settings, *info)});
+        return owners;
+    }
+
+    // At Present, a render boundary: the game is not inside its name routine.
+    void StartNameHook()
+    {
+        if (std::exchange(m_NameHookTried, true)) return;
+        if (const std::string failure = m_NameHook.Start(); !failure.empty())
+            Print("could not hook the game's names: " + failure + ".");
+    }
+
 #ifdef HEADSUP_DEV
+    void WriteStackDump()
+    {
+        std::string path;
+        std::FILE* out = OpenLog("stackdump", path);
+        if (out == nullptr) return;
+        const size_t draws = headsup::WriteStackDump(out, m_Tracker, m_AshitaCore);
+        std::fclose(out);
+        Print("wrote the stack at " + std::to_string(draws) + " character draws to " + path);
+    }
+
+    void WriteNameDump()
+    {
+        std::string path;
+        std::FILE* out = OpenLog("namedump", path);
+        if (out == nullptr) return;
+        const size_t calls = headsup::WriteNameDump(out, m_Tracker, m_NameHook.ModuleBase(), m_NameHook.CallerReturns());
+        std::fclose(out);
+        Print("wrote " + std::to_string(calls) + " name calls to " + path);
+    }
+
     void WriteDrawDump()
     {
         std::string path;
         std::FILE* out = OpenLog(m_DrawDump.FilePrefix().c_str(), path);
         if (out == nullptr) return;
-        const size_t draws = m_DrawDump.Write(out, headsup::DrawDump::Sources{m_AshitaCore, m_Names, m_Nameplates.CursorNames(),
+        const size_t draws = m_DrawDump.Write(out, headsup::DrawDump::Sources{m_AshitaCore, m_Names, m_NameHook, m_Nameplates.CursorNames(),
                                                        m_Nameplates.LastShown(), [&](uint32_t index) { return PlayerStatusOf(index, m_SelfIndex); }});
         std::fclose(out);
         m_DrawDump.Wrote(path, draws);
@@ -570,7 +656,6 @@ private:
             (target->GetLockedOnFlags() & kLockedOn) != 0, m_AshitaCore->GetMemoryManager()->GetEntity()->GetEntityMapSize());
         if (!m_Picking) m_Names.ForgetPickRange();
         m_CursorTargets.outOfRange = m_Picking && m_Names.PickOutOfRange();
-        m_Names.SetEnlarged(m_Picking ? m_CursorTargets.subTarget : uint16_t{0});
         if (const Ashita::FFXI::targetwindow_t* window = target->GetRawStructureWindow())
             headsup::PlaceAnchors(m_CursorTargets,
                 headsup::CursorWindow{static_cast<float>(window->m_AnkX), static_cast<float>(window->m_AnkY),
@@ -664,7 +749,7 @@ private:
         for (const headsup::ActorPtr actor : m_Tracker.Actors())
         {
             const headsup::ActorInfo* info = m_Tracker.Find(actor);
-            if (info == nullptr || (!info->outline && m_Names.NameplateBox(info->index) == nullptr)) continue;
+            if (info == nullptr || (!info->outline && m_NameHook.Drawn(info->index) == nullptr)) continue;
             const char* name                = EntityName(entity, info->index);
             const uint32_t serverId         = entity->GetServerId(info->index);
             const headsup::MobRecord* mob = headsup::FindMob(serverId, name);
@@ -678,10 +763,10 @@ private:
                 static_cast<unsigned>(info->argb), info->label.text, static_cast<unsigned>(headsup::ToArgb(m_Settings.labelColor[static_cast<int>(info->label.shade)])), info->mobIcons.count);
             if (const headsup::CheckResult* checked = m_Checks.Result(serverId, Now()))
                 std::fprintf(out, " | checked Lv %d %s", checked->level, headsup::Abbrev(checked->con));
-            if (const headsup::ScreenBox* plate = m_Names.NameplateBox(info->index))
-                std::fprintf(out, " | plate (%.1f,%.1f)-(%.1f,%.1f)", plate->minX, plate->minY, plate->maxX, plate->maxY);
+            if (const headsup::ScreenBox* plate = GameNameBox(info->index))
+                std::fprintf(out, " | game name (%.1f,%.1f)-(%.1f,%.1f)", plate->minX, plate->minY, plate->maxX, plate->maxY);
             else
-                std::fprintf(out, " | no plate");
+                std::fprintf(out, " | no game name");
             for (const auto& shown : m_Nameplates.LastShown())
                 if (shown.index == info->index)
                     std::fprintf(out, " | name %08X %dpx at (%.1f,%.1f), label %dpx at (%.1f,%.1f), %d icons %dpx at (%.1f,%.1f)",
@@ -692,8 +777,8 @@ private:
         std::fclose(out);
         Print("wrote " + path + "; recording " + std::to_string(kCaptureFrames) + " frames");
         m_CapturePath = path;
-        m_Capture     = "\nframe  dt(ms)  name glyphs: in-scene from-mobs from-others no-owner hidden | nameplates shown, S if drawn into the scene, s<scene to screen scale> | per entity "
-                    "with a nameplate: index r<frames in row> m<body meshes> g<glyphs> c<name color> (nameplate box)\n";
+        m_Capture     = "\nframe  dt(ms)  game's names: hooked replaced | nameplates shown, S if drawn into the scene, s<scene to screen scale> | per entity "
+                    "with a game name: index m<body meshes> c<name color> (name box: center, top-bottom)\n";
         m_CaptureLeft = kCaptureFrames;
         m_CaptureLast = Now();
     }
@@ -701,23 +786,22 @@ private:
     void CaptureFrame()
     {
         if (m_CaptureLeft <= 0) return;
-        const double now = Now();
-        const auto& stats = m_Names.TextStatsLastFrame();
+        const double now               = Now();
+        const headsup::NameStats stats = m_NameHook.Stats();
         char line[200];
-        std::snprintf(line, sizeof(line), "f%03d %6.1f  %3u %3u %3u %3u %3u | %2u %c s%.3f |", kCaptureFrames - m_CaptureLeft,
-            (now - m_CaptureLast) * 1000.0, stats.inScene, stats.fromMobs, stats.fromOthers, stats.noOwner, stats.hidden,
-            static_cast<unsigned>(m_Nameplates.LastShown().size()), m_DrewInScene ? 'S' : '-', m_Names.TargetScaleY());
+        std::snprintf(line, sizeof(line), "f%03d %6.1f  %3u %3u | %2u %c s%.3f |", kCaptureFrames - m_CaptureLeft,
+            (now - m_CaptureLast) * 1000.0, stats.names, stats.replaced, static_cast<unsigned>(m_Nameplates.LastShown().size()),
+            m_DrewInScene ? 'S' : '-', m_Names.TargetScaleY());
         m_Capture += line;
         int listed = 0;
         for (const headsup::ActorPtr actor : m_Tracker.Actors())
         {
             const headsup::ActorInfo* info = m_Tracker.Find(actor);
-            const headsup::ScreenBox* plate = info != nullptr ? m_Names.NameplateBox(info->index) : nullptr;
-            if (plate == nullptr || ++listed > kCapturedPlatesPerFrame) continue;
-            std::snprintf(line, sizeof(line), " %u r%u m%u g%u c%06X (%.0f-%.0f,%.0f-%.0f)", info->index,
-                m_Names.PlateFramesInRow(info->index), m_Names.MeshDraws(info->index), m_Names.GlyphsLastFrame(info->index),
-                static_cast<unsigned>(m_Names.NameplateColor(info->index) & 0xFFFFFF), plate->minX, plate->maxX, plate->minY,
-                plate->maxY);
+            const headsup::NameFrame* frame = info != nullptr ? m_NameHook.Drawn(info->index) : nullptr;
+            if (frame == nullptr || ++listed > kCapturedPlatesPerFrame) continue;
+            const headsup::DrawnName name = headsup::NameFromFrame(*frame, m_Names.TargetScaleX(), m_Names.TargetScaleY());
+            std::snprintf(line, sizeof(line), " %u m%u c%06X (%.0f,%.0f-%.0f)", info->index, m_Names.MeshDraws(info->index),
+                static_cast<unsigned>(name.color & 0xFFFFFF), name.box.CenterX(), name.box.minY, name.box.maxY);
             m_Capture += line;
         }
         m_Capture += "\n";
@@ -734,6 +818,15 @@ private:
                 Print("could not add the frame capture to " + m_CapturePath + "; the report before it is complete");
             m_Capture.clear();
         }
+    }
+
+    // The box of the name the game drew for this entity this frame, in back-buffer pixels.
+    const headsup::ScreenBox* GameNameBox(uint16_t index)
+    {
+        const headsup::NameFrame* frame = m_NameHook.Drawn(index);
+        if (frame == nullptr) return nullptr;
+        m_GameNameBox = headsup::NameFromFrame(*frame, m_Names.TargetScaleX(), m_Names.TargetScaleY()).box;
+        return &m_GameNameBox;
     }
 };
 

@@ -32,20 +32,6 @@ namespace headsup
             if (index == targets.target) return targets.locked ? CursorKind::Locked : CursorKind::Target;
             return CursorKind::None;
         }
-
-        ScreenBox CenteredOver(const ScreenBox& letters, const ScreenBox& whole)
-        {
-            ScreenBox moved = letters;
-            const float dx  = whole.CenterX() - letters.CenterX();
-            moved.minX += dx;
-            moved.maxX += dx;
-            return moved;
-        }
-    }
-
-    bool Steady(uint32_t framesSinceMesh, uint32_t nameFramesInRow)
-    {
-        return framesSinceMesh <= kMeshGraceFrames && nameFramesInRow >= kStableFrames;
     }
 
     bool NameOnScreen(const ScreenBox& plate, float screenWidth, float screenHeight)
@@ -53,9 +39,9 @@ namespace headsup
         return plate.valid && plate.maxX > 0.0f && plate.maxY > 0.0f && plate.minX < screenWidth && plate.minY < screenHeight;
     }
 
-    ScreenBox PlaceName(const ScreenBox& letters, const ScreenBox* whole, const Camera* camera, const WorldPoint& feet, Pose pose)
+    ScreenBox PlaceName(const ScreenBox& name, const Camera* camera, const WorldPoint& feet, Pose pose)
     {
-        ScreenBox placed = whole != nullptr ? CenteredOver(letters, *whole) : letters;
+        ScreenBox placed = name;
         if (camera == nullptr) return placed;
         const float lower = PosedNameRow(*camera, feet, placed.maxY, pose) - placed.maxY;
         placed.minY += lower;
@@ -63,14 +49,14 @@ namespace headsup
         return placed;
     }
 
-    PlateLines ChooseLines(const ActorInfo& info, bool steady, bool selfEngaged, const Settings& settings,
+    PlateLines ChooseLines(const ActorInfo& info, bool selfEngaged, const Settings& settings,
         const CursorTargets& targets, bool iconsFailed)
     {
         PlateLines lines;
         lines.name          = ReplacesName(settings, info);
         const bool hidden   = (settings.hideClaimedByParty && info.claimedByParty) || (settings.hideClaimed && info.claimed) ||
                             (settings.hideTooWeak && info.tooWeak) || (settings.hideWhileEngaged && selfEngaged);
-        const bool mobLines = steady && info.alive && !hidden;
+        const bool mobLines = info.alive && !hidden;
         lines.label         = mobLines && info.label.text[0] != '\0';
         lines.mobIconCount  = mobLines && settings.showIcons && !iconsFailed ? info.mobIcons.count : 0;
         const bool showPlayerIcons = lines.name && settings.showPlayerIcons && !iconsFailed;
