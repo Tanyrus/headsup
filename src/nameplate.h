@@ -11,18 +11,15 @@
 
 namespace headsup
 {
-    // Frames in a row a name must be drawn before its level line shows, so a one-frame pop never flashes a label.
-    constexpr uint32_t kStableFrames = 2;
-    // Some frames credit an entity's body draws to whoever else is on the stack, which made a level line blink.
+    // A body counts as drawn for this many frames after the game last drew it: some frames credit an entity's body draws
+    // to whoever else is on the stack.
     constexpr uint32_t kMeshGraceFrames = 8;
-    bool Steady(uint32_t framesSinceMesh, uint32_t nameFramesInRow);
 
     // Some of a name is enough: a replaced name must show whenever the game's would, as the game's is hidden.
     bool NameOnScreen(const ScreenBox& plate, float screenWidth, float screenHeight);
 
-    // The game centers a name's letters and the icons beside them together over the entity, and a posed player's name
-    // comes down to their head.
-    ScreenBox PlaceName(const ScreenBox& letters, const ScreenBox* whole, const Camera* camera, const WorldPoint& feet, Pose pose);
+    // A posed player's name comes down to their head.
+    ScreenBox PlaceName(const ScreenBox& name, const Camera* camera, const WorldPoint& feet, Pose pose);
 
     enum class CursorKind : uint8_t
     {
@@ -42,7 +39,7 @@ namespace headsup
         CursorKind cursor  = CursorKind::None;
         bool Any() const { return name || label || mobIconCount > 0 || cursor != CursorKind::None; }
     };
-    PlateLines ChooseLines(const ActorInfo& info, bool steady, bool selfEngaged, const Settings& settings,
+    PlateLines ChooseLines(const ActorInfo& info, bool selfEngaged, const Settings& settings,
         const CursorTargets& targets, bool iconsFailed);
 
     // A target with no game name to hang a cursor on, such as a Telepoint, gets its cursor at the game's arrow anchor.

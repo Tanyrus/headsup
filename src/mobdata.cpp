@@ -37,6 +37,21 @@ namespace headsup
         }
     }
 
+    bool TaggedMobName(std::string_view recorded, std::string_view shown)
+    {
+        size_t i = 0, j = 0;
+        while (NextAlnum(shown, j))
+        {
+            if (!NextAlnum(recorded, i) || std::tolower(static_cast<unsigned char>(recorded[i])) !=
+                                               std::tolower(static_cast<unsigned char>(shown[j])))
+                return false;
+            ++i;
+            ++j;
+        }
+        // The client's name is used up mid-record: a tag must follow, after a break between words.
+        return i < recorded.size() && !std::isalnum(static_cast<unsigned char>(recorded[i])) && NextAlnum(recorded, i);
+    }
+
     const MobRecord* MobById(uint32_t serverId)
     {
         const auto it = std::lower_bound(std::begin(kMobs), std::end(kMobs), serverId,
@@ -47,7 +62,7 @@ namespace headsup
     const MobRecord* FindMob(uint32_t serverId, std::string_view displayName)
     {
         const MobRecord* mob = MobById(serverId);
-        return mob != nullptr && SameMobName(mob->name, displayName) ? mob : nullptr;
+        return mob != nullptr && (SameMobName(mob->name, displayName) || TaggedMobName(mob->name, displayName)) ? mob : nullptr;
     }
 
 }

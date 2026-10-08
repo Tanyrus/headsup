@@ -138,11 +138,6 @@ TEST(a_name_is_replaced_when_its_kind_is_and_it_has_one)
         CHECK(ReplacesName(s, *t.Find(0x1100)) == c.player);
         CHECK(ReplacesName(s, *t.Find(0x1200)) == c.npc);
         CHECK(!ReplacesName(s, *t.Find(0x1300)));
-        std::unordered_set<uint16_t> kept{1101};
-        if (!c.mob) kept.insert(0x220);
-        if (!c.player) kept.insert(1052);
-        if (!c.npc) kept.insert(1100);
-        CHECK(KeptNames(t, s) == kept);
     }
 }
 

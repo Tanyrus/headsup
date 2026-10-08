@@ -126,14 +126,6 @@ namespace headsup
         return nullptr;
     }
 
-    std::unordered_set<uint16_t> KeptNames(const Tracker& tracker, const Settings& settings)
-    {
-        std::unordered_set<uint16_t> kept;
-        for (const ActorPtr actor : tracker.Actors())
-            if (const ActorInfo* info = tracker.Find(actor); !ReplacesName(settings, *info)) kept.insert(info->index);
-        return kept;
-    }
-
     float DistanceFromSquared(float squared)
     {
         if (std::isnan(squared)) return squared;

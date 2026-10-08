@@ -1,7 +1,6 @@
 #include "nameplate_render.h"
 
 #include "argb.h"
-#include "game_glyphs.h"
 
 #include <algorithm>
 #include <cmath>
@@ -191,7 +190,7 @@ namespace headsup
         return nullptr;
     }
 
-    void NameplateRenderer::Update(const Tracker& tracker, const GameNames& names, const Settings& settings, float toX,
+    void NameplateRenderer::Update(const Tracker& tracker, const GameNames& names, const NameHook& hook, const Settings& settings, float toX,
         float toY, const CursorTargets& targets, double now, uint16_t selfIndex, const std::vector<TimerLine>& selfTimers)
     {
         ++m_Frame;
@@ -214,20 +213,20 @@ namespace headsup
             {
                 const ActorInfo* info = tracker.Find(actor);
                 if (info == nullptr) continue;
-                const ScreenBox* plate = names.NameplateBox(info->index);
-                if (plate == nullptr) continue;
+                const NameFrame* frame = hook.Drawn(info->index);
+                if (frame == nullptr) continue;
+                const DrawnName gameName = NameFromFrame(*frame, names.TargetScaleX(), names.TargetScaleY());
                 // Checked where our name goes: a seated player's head can be in view with the game's name above the screen.
-                const ScreenBox* whole = names.WholeNameplate(info->index);
-                ScreenBox anchor       = PlaceName(*plate, whole, names.SceneCamera(), info->feet, info->pose);
+                ScreenBox anchor = PlaceName(gameName.box, names.SceneCamera(), info->feet, info->pose);
                 if (!NameOnScreen(anchor, screenWidth, screenHeight)) continue;
-                const bool steady      = Steady(names.FramesSinceMesh(info->index), names.PlateFramesInRow(info->index));
-                const PlateLines lines = ChooseLines(*info, steady, tracker.Player().engaged, settings, targets, m_IconsFailed);
+                // The game drawing the name this frame is all a mob's lines wait for.
+                const PlateLines lines = ChooseLines(*info, tracker.Player().engaged, settings, targets, m_IconsFailed);
                 const bool timersHere = info->index == selfIndex && !selfTimers.empty();
                 if (!lines.Any() && !timersHere) continue;
                 Plate& p = m_Plates[info->index];
                 p.frame  = m_Frame;
 
-                const float scale       = settings.scaleWithDistance ? DistanceScale(names.NameSize(info->index), screenHeight) : 1.0f;
+                const float scale       = settings.scaleWithDistance ? DistanceScale(gameName.box.Height(), screenHeight) : 1.0f;
                 const float nameShown   = static_cast<float>(settings.nameSize) * scale * toY;
                 const float labelShown  = static_cast<float>(settings.labelSize) * scale * toY;
                 const float timerShown  = static_cast<float>(settings.timerSize) * scale * toY;
@@ -241,7 +240,7 @@ namespace headsup
                 p.cursorRaster = raster(cursorShown, p.cursorRaster);
                 const bool showCursor      = lines.cursor != CursorKind::None;
                 const uint32_t cursorColor = CursorColor(lines.cursor, settings);
-                const uint32_t nameColor = settings.ownNameColor ? ToArgb(settings.nameColor) : names.NameplateColor(info->index);
+                const uint32_t nameColor = settings.ownNameColor ? ToArgb(settings.nameColor) : gameName.color;
                 const uint32_t labelColor = ToArgb(settings.labelColor[static_cast<int>(info->label.shade)]);
                 if ((lines.name && !Prepare(p.name, info->name, nameColor, p.nameRaster, settings)) ||
                     (lines.label && !Prepare(p.label, info->label.text, labelColor, p.labelRaster, settings)) ||
@@ -297,7 +296,7 @@ namespace headsup
                     anchor.maxY -= raise;
                 }
                 const NameplateLayout layout = LayoutNameplate(anchor, sizes, lines.name);
-                const float depth            = names.NameplateDepth(info->index);
+                const float depth            = gameName.depth;
                 if (lines.name)
                     addQuad(m_Quads, p.name.texture, layout.nameX, layout.nameY, p.name.width * nameFit, p.name.height * nameFit, p.name.u,
                         p.name.v, depth, kWhite);
@@ -329,7 +328,7 @@ namespace headsup
                 {
                     addQuad(cursorQuads, p.cursor.texture, layout.cursor.x, layout.cursor.y + CursorBob(now, sizes.cursorHeight),
                         p.cursor.width * cursorFit, p.cursor.height * cursorFit, p.cursor.u, p.cursor.v, depth, kWhite);
-                    m_CursorNames.push_back(CursorName{info->index, whole != nullptr ? *whole : *plate});
+                    m_CursorNames.push_back(CursorName{info->index, gameName.box});
                 }
                 for (int i = 0; i < sizes.timerCount; ++i)
                 {

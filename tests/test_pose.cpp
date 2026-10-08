@@ -92,7 +92,7 @@ TEST(a_seated_players_name_is_placed_on_screen_when_the_games_is_above_it)
     const Camera camera     = TownCamera();
     const WorldPoint feet   = FromEntityPosition(61.957f, -97.996f, -0.917f);
     const ScreenBox letters = test::Box(1945.6f, -102.1f, 2221.6f, -51.4f);
-    const ScreenBox placed  = PlaceName(letters, nullptr, &camera, feet, Pose::Chair);
+    const ScreenBox placed  = PlaceName(letters, &camera, feet, Pose::Chair);
     CHECK(!NameOnScreen(letters, 2560.0f, 1440.0f));
     CHECK(NameOnScreen(placed, 2560.0f, 1440.0f));
     CHECK(std::fabs(placed.Height() - letters.Height()) < 0.01f && std::fabs(placed.CenterX() - letters.CenterX()) < 0.01f);

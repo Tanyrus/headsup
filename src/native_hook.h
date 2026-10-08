@@ -1,0 +1,63 @@
+#pragma once
+
+#include "name_frame.h"
+#include "native_locate.h"
+
+#include <cstdint>
+#include <span>
+#include <string>
+#include <vector>
+
+struct IDirect3DDevice8;
+struct IDirect3DSurface8;
+
+namespace headsup
+{
+    // Sends every name the game is about to draw through HeadsUp first: the six bytes at the name routine's hook
+    // (native_locate.h) become a jump to a gate that calls OnName with the routine's frame, then either runs the bytes
+    // it replaced and resumes the routine, or skips to the routine's exit so the game draws nothing.
+    // An entity whose names the hook may meet this frame, and whether HeadsUp draws them instead of the game.
+    struct NameOwner
+    {
+        uint32_t actor;
+        uint16_t index;
+        bool replace;
+    };
+
+    struct NameStats
+    {
+        uint32_t names    = 0; // tracked entities' names the game was about to draw
+        uint32_t replaced = 0; // of those, drawn by HeadsUp instead
+    };
+
+    class NameHook
+    {
+    public:
+        void SetDevice(IDirect3DDevice8* device);
+        ~NameHook() { Stop(); }
+        // Only at a render boundary, where the game cannot be inside the routine. Returns why it could not start, or an
+        // empty string.
+        std::string Start();
+        // Puts the game's bytes back if they are still HeadsUp's. Returns why it could not, or an empty string.
+        std::string Stop();
+        bool Running() const { return m_Site != nullptr; }
+
+        uint32_t ModuleBase() const { return m_ModuleBase; }
+        std::span<const uint32_t> CallerReturns() const;
+
+        // At the end of Present, once everything has read the frame's names: forget them, and say whose the next
+        // frame's are.
+        void NewFrame(std::vector<NameOwner> owners);
+        NameStats Stats() const;
+        // The frame of the name the game drew for this entity this frame, or nullptr.
+        const NameFrame* Drawn(uint16_t index) const;
+        // The image and depth buffer this frame's names went to, from the first one; nullptr before any.
+        IDirect3DSurface8* SceneTarget() const;
+        IDirect3DSurface8* SceneDepth() const;
+
+    private:
+        uint8_t* m_Site       = nullptr;
+        uint8_t m_Patch[sizeof(kNameHookBytes)] = {};
+        uint32_t m_ModuleBase = 0;
+    };
+}

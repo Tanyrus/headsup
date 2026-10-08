@@ -3,14 +3,16 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 OUT="$ROOT/build"
 PLUGINS_DIR="${HEADSUP_PLUGINS_DIR:-$HOME/Games/PhoenixXI/plugins}"
-PURE_SOURCES=(con.cpp cursor_file.cpp mobdata.cpp ph_timers.cpp settings.cpp tracker.cpp outline_math.cpp labels.cpp check.cpp nameplate.cpp icons.cpp plate_image.cpp player_status.cpp pose.cpp commands.cpp game_glyphs.cpp game_cursor.cpp)
-PLUGIN_SOURCES=("${PURE_SOURCES[@]}" d3d_util.cpp game_names.cpp outline.cpp pointer_swap.cpp nameplate_render.cpp menu.cpp plugin.cpp)
-# dev/, ignored by git, holds a developer's tools; when it exists they are built in and plugin.cpp's HEADSUP_DEV hooks call them.
+PURE_SOURCES=(con.cpp cursor_file.cpp mobdata.cpp ph_timers.cpp settings.cpp tracker.cpp outline_math.cpp labels.cpp check.cpp nameplate.cpp icons.cpp plate_image.cpp player_status.cpp pose.cpp commands.cpp game_glyphs.cpp game_cursor.cpp native_locate.cpp name_frame.cpp copy_state.cpp)
+PLUGIN_SOURCES=("${PURE_SOURCES[@]}" d3d_util.cpp game_names.cpp outline.cpp pointer_swap.cpp nameplate_render.cpp menu.cpp plugin.cpp native_hook.cpp)
+# A developer's tools, kept beside the repository and out of it: when they are there, they are built in and plugin.cpp's
+# HEADSUP_DEV hooks call them.
+DEV_DIR="$ROOT/../HeadsUp-dev"
 DEV_SOURCES=()
 DEV_FLAGS=()
-if [[ -d "$ROOT/dev" ]]; then
-    DEV_SOURCES=("$ROOT"/dev/*.cpp)
-    DEV_FLAGS=(-DHEADSUP_DEV -I"$ROOT/dev")
+if [[ -d "$DEV_DIR" ]]; then
+    DEV_SOURCES=("$DEV_DIR"/*.cpp)
+    DEV_FLAGS=(-DHEADSUP_DEV -I"$DEV_DIR")
 fi
 
 generate() {
@@ -28,7 +30,7 @@ unit_tests() {
     "$OUT/unit_tests"
 }
 
-abi_check() { python3 "$ROOT/tools/abi_check.py"; }
+abi_check() { python3 "$ROOT/tools/abi_check.py" "$DEV_DIR"; }
 
 plugin() {
     mkdir -p "$OUT"

@@ -1,6 +1,7 @@
 #pragma once
 
-#include "game_names.h"
+#include "Ashita.h"
+#include "native_hook.h"
 #include "settings.h"
 #include "tracker.h"
 
@@ -19,8 +20,10 @@ namespace headsup
         double frameMs;
         bool stencilAvailable;
         bool drewInScene; // nameplates went into the game's scene image, behind walls
-        GameNames::TextDrawStats letters;
+        bool hooked; // the game's name routine
+        NameStats names;
         PlayerState player;
+        double version; // shown beside the title, so a tester's build can be told apart
     };
 
     // The /headsup settings window. Uses only IGuiManager functions that are safe across the MinGW/MSVC ABI

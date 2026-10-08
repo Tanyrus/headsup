@@ -30,11 +30,8 @@ namespace headsup
     {
         FinishText();
         ++m_Frame;
-        m_Glyphs.clear();
         m_TextureUse.clear();
-        m_KeptNow.clear();
         m_MeshDraws.clear();
-        m_TextStats      = TextDrawStats{};
         m_TextFinished   = false;
         m_NamesThisFrame = false;
         m_CameraSeen     = false;
@@ -47,11 +44,16 @@ namespace headsup
     {
         if (m_TextFinished) return;
         m_TextFinished  = true;
-        m_Last          = ReadFrameNames(m_Glyphs, m_TextureUse, m_KeptNow, m_Last, m_Enlarged);
+        m_Font          = MostUsedTexture(m_TextureUse, m_Font);
         m_MeshDrawsLast = m_MeshDraws;
-        m_TextStatsLast = m_TextStats;
         for (const auto& [index, draws] : m_MeshDraws)
             m_LastMeshFrame[index] = m_Frame;
+    }
+
+    uint32_t GameNames::MeshDraws(uint16_t index) const
+    {
+        const auto it = m_MeshDrawsLast.find(index);
+        return it == m_MeshDrawsLast.end() ? 0 : it->second;
     }
 
     uint32_t GameNames::FramesSinceMesh(uint16_t index) const
@@ -88,6 +90,15 @@ namespace headsup
         m_CameraSeen = m_HaveCamera = true;
     }
 
+    void GameNames::UseScene(IDirect3DSurface8* target, IDirect3DSurface8* depth)
+    {
+        if (target == nullptr || m_TextFinished) return;
+        const uintptr_t image = reinterpret_cast<uintptr_t>(target);
+        if (image != m_Scene.surface && !m_Scene.Read(target, m_BackBufferWidth, m_BackBufferHeight)) return;
+        m_SceneDepth     = reinterpret_cast<uintptr_t>(depth);
+        m_NamesThisFrame = true;
+    }
+
     bool GameNames::SceneCopyStarting()
     {
         if (!TextPending() || m_Scene.surface == 0 || m_Scene.surface == m_BackBuffer) return false;
@@ -98,71 +109,23 @@ namespace headsup
         return copying;
     }
 
-    bool GameNames::OnDrawUP(D3DPRIMITIVETYPE type, UINT primCount, const void* vertices, UINT stride, const Tracker& tracker,
-        const Settings& settings, Blocking blocking)
+    void GameNames::OnDrawUP(D3DPRIMITIVETYPE type, UINT primCount, const void* vertices, UINT stride, const Tracker& tracker,
+        const Settings& settings)
     {
-        if (!NameplatesOn(settings) || m_Device == nullptr || tracker.Actors().empty() || m_BackBufferWidth <= 0.0f) return false;
+        if (!NameplatesOn(settings) || m_Device == nullptr || tracker.Actors().empty() || m_BackBufferWidth <= 0.0f) return;
         DWORD fvf = 0;
-        if (!BoundFvf(m_Device, fvf)) return false;
+        if (!BoundFvf(m_Device, fvf)) return;
         if ((fvf & D3DFVF_POSITION_MASK) == D3DFVF_XYZ)
         {
             CaptureCamera(tracker);
-            return false;
+            return;
         }
-        // Letters and icons are textured; the quad the game draws over each character is not.
-        if ((fvf & D3DFVF_POSITION_MASK) != D3DFVF_XYZRHW || (fvf & D3DFVF_TEXCOUNT_MASK) == 0) return false;
+        // Letters are textured; the quad the game draws over each character is not.
+        if ((fvf & D3DFVF_POSITION_MASK) != D3DFVF_XYZRHW || (fvf & D3DFVF_TEXCOUNT_MASK) == 0) return;
         ScreenBox box;
         float depth = 0.0f;
-        if (!WorldTextBox(vertices, stride, VertexCount(type, primCount), box, depth)) return false; // cheap: rejects HUD text
-        const uintptr_t texture = BoundTexture(m_Device);
-        const ActorInfo* owner  = FindOwnerOnStack(tracker);
-        // Counted before the letter test: a font learned from a frame without names must not keep real letters out.
-        if (owner != nullptr) ++m_TextureUse[texture];
-        const bool letter = m_Last.font == 0 || texture == m_Last.font;
-        IDirect3DSurface8* target = nullptr;
-        if (FAILED(m_Device->GetRenderTarget(&target)) || target == nullptr) return false;
-        const uintptr_t image = reinterpret_cast<uintptr_t>(target);
-        bool inNames          = InNamesImage(letter, image, m_NamesImage);
-        if (inNames && image != m_Scene.surface)
-        {
-            inNames = m_Scene.Read(target, m_BackBufferWidth, m_BackBufferHeight);
-            IDirect3DSurface8* sceneDepth = nullptr;
-            m_SceneDepth = SUCCEEDED(m_Device->GetDepthStencilSurface(&sceneDepth)) ? reinterpret_cast<uintptr_t>(sceneDepth) : 0;
-            if (sceneDepth != nullptr) sceneDepth->Release();
-        }
-        target->Release();
-        if (!inNames) return false;
-        ++m_TextStats.inScene;
-        if (!m_NamesThisFrame) m_KeptNow = KeptNames(tracker, settings);
-        m_NamesThisFrame = true;
-
-        // Pretransformed coordinates are render-target pixels; nameplates are placed in back-buffer pixels.
-        const ScreenBox glyph      = box.Scaled(m_Scene.x, m_Scene.y);
-        bool replaced              = false;
-        const ScreenBox* ownerName = nullptr;
-        if (owner == nullptr)
-            ++m_TextStats.noOwner;
-        else
-        {
-            ++(owner->kind == EntityKind::Mob ? m_TextStats.fromMobs : m_TextStats.fromOthers);
-            replaced  = ReplacesName(settings, *owner);
-            ownerName = NameplateBox(owner->index);
-            uint32_t argb = kWhite;
-            if (const auto diffuse = FirstVertexColor(fvf, vertices, stride))
-            {
-                // FFXI keeps the PS2's color math, where 0x80 is full intensity and the draw doubles it.
-                DWORD op = D3DTOP_MODULATE;
-                m_Device->GetTextureStageState(0, D3DTSS_COLOROP, &op);
-                argb = ShownColor(*diffuse, op == D3DTOP_MODULATE4X ? 4 : op == D3DTOP_MODULATE2X ? 2 : 1);
-            }
-            m_Glyphs[owner->index].push_back(GlyphDraw{glyph, argb, texture, depth});
-        }
-        // Only what HeadsUp can draw in its place: its icons go with its names.
-        const bool blockable = letter ? blocking.names : blocking.names && blocking.icons;
-        const float ownerHeight = owner != nullptr ? LastLetterHeight(m_Last, owner->index) : 0.0f;
-        if (!blockable || !HideGameGlyph(glyph, letter, replaced, ownerName, ownerHeight, m_Last)) return false;
-        ++m_TextStats.hidden;
-        return true;
+        if (!WorldTextBox(vertices, stride, VertexCount(type, primCount), box, depth)) return; // cheap: rejects HUD text
+        if (FindOwnerOnStack(tracker) != nullptr) ++m_TextureUse[BoundTexture(m_Device)];
     }
 
     bool GameNames::IsGameCursorDraw(D3DPRIMITIVETYPE type, UINT primCount, const void* vertices, UINT stride,
@@ -189,7 +152,7 @@ namespace headsup
                 picking);
         if (!MayBeGameCursor(quad, m_ArrowTexture, anchors, names)) return false;
         const ActorInfo* owner        = FindOwnerOnStack(tracker);
-        const CursorVerdict verdict   = JudgeGameCursor(quad, m_ArrowTexture, m_Last.font, anchors, names,
+        const CursorVerdict verdict   = JudgeGameCursor(quad, m_ArrowTexture, m_Font, anchors, names,
             owner != nullptr ? std::optional<uint16_t>(owner->index) : std::nullopt);
         if (verdict.learnArrow) m_ArrowTexture = quad.texture;
         if (verdict.block)

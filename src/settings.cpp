@@ -67,6 +67,11 @@ namespace headsup
             {"textOutline", &Settings::textOutline}, {"iconTint", &Settings::iconTint}};
 
         constexpr const char* kFontKey = "fontName";
+        // Every setting is saved whenever one changes, so a file keeps the defaults of its day. 1: the target cursor's
+        // default became Phoenix's red, and a file from before holding the white it had never chose a color.
+        constexpr const char* kVersionKey = "settingsVersion";
+        constexpr int kSettingsVersion    = 1;
+        constexpr Color kOldCursorColor   = {{1.0f, 1.0f, 1.0f}};
         constexpr const char* kShowSuffix = "Show";
         const char* const kCategoryKeys[kCategoryCount] = {"willAttack", "wontAttack", "unknown", "nmWillAttack", "nmWontAttack",
             "placeholder"};
@@ -187,6 +192,8 @@ namespace headsup
         const std::string mobId = store.GetString(kMobIdKey, "");
         for (int f = 0; f < kMobIdFormatCount; ++f)
             if (mobId == kMobIdNames[f]) s.mobId = static_cast<MobIdFormat>(f);
+        if (store.GetFloat(kVersionKey, 0.0f) < kSettingsVersion && s.cursorColor == kOldCursorColor)
+            s.cursorColor = Settings{}.cursorColor;
         return Clamp(s);
     }
 
@@ -222,6 +229,7 @@ namespace headsup
         for (int i = 0; i < kPlayerIconCount; ++i)
             store.Set(kPlayerIconKeys[i], kIconSideNames[static_cast<int>(s.playerIconSide[i])]);
         store.Set(kMobIdKey, kMobIdNames[static_cast<int>(s.mobId)]);
+        setFloat(kVersionKey, static_cast<float>(kSettingsVersion));
     }
 
     uint32_t ToArgb(const Color& c)

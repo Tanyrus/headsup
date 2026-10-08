@@ -108,10 +108,6 @@ namespace headsup
     // be stale leftovers. nullptr when there is none.
     const ActorInfo* FindOwner(const uint32_t* begin, const uint32_t* end, const Tracker& tracker);
 
-    // The entities whose names stay the game's, by target index: decided from each entity, never from whom the game
-    // credits a glyph to, as in a fight it can credit every name of a frame to one mob.
-    std::unordered_set<uint16_t> KeptNames(const Tracker& tracker, const Settings& settings);
-
     // Yalms from Ashita's squared entity distance. A NaN stays NaN, so no distance limit passes it; a negative value
     // becomes 0.
     float DistanceFromSquared(float squared);
