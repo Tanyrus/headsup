@@ -50,6 +50,28 @@ markPlaceholders=false
 phTimers=true
 scaleWithDistance=false
 fontBold=true
+nameGlow=false
+scaleOwnName=false
+scalePlayerNames=false
+labelFontBold=false
+showOrnament=false
+ownGlowColor=true
+ownOrnamentColor=true
+labelFontName=Cinzel
+glowSize=150.0000
+ornamentWidth=120.0000
+ornamentThickness=9.0000
+nameShadow=50.0000
+labelShadow=150.0000
+glowColorR=0.1000
+glowColorG=0.2000
+glowColorB=0.3000
+ornamentColorR=0.4000
+ornamentColorG=0.5000
+ornamentColorB=0.6000
+labelShadowColorR=0.7000
+labelShadowColorG=0.8000
+labelShadowColorB=0.9000
 replacePlayerNames=false
 replaceNpcNames=false
 replaceCursor=false
@@ -59,13 +81,17 @@ showPlayerIcons=false
 centerNameAndIcons=false
 ownNameColor=true
 smoothness=12.0000
-nameSize=12.0000
+mobNameSize=12.0000
+playerNameSize=13.0000
+selfNameSize=17.0000
+npcNameSize=16.0000
 labelSize=14.0000
 timerSize=17.0000
 iconSize=24.0000
 cursorSize=31.0000
 nameRaise=12.0000
 playerIconSize=120.0000
+glowStrength=150.0000
 thickness=6.5000
 maxDistance=25.0000
 cursorColorR=0.7700
@@ -161,13 +187,32 @@ look=fantasy
         s.showPlayerIcons = s.centerNameAndIcons = false;
         s.ownNameColor   = true;
         s.smoothness     = 12;
-        s.nameSize       = 12;
+        s.mobNameSize    = 12;
+        s.playerNameSize = 13;
+        s.selfNameSize   = 17;
+        s.npcNameSize    = 16;
         s.labelSize      = 14;
         s.timerSize      = 17;
         s.iconSize       = 24;
         s.cursorSize     = 31;
         s.nameRaise      = 12;
         s.playerIconSize = 120;
+        s.glowStrength   = 150;
+        s.nameGlow       = false;
+        s.scaleOwnName = s.scalePlayerNames = false;
+        s.labelFontBold    = false; // the name's is on: a dropped key would take it
+        s.showOrnament     = false;
+        s.ownGlowColor     = true;
+        s.ownOrnamentColor = true;
+        s.labelFontName    = "Cinzel";
+        s.glowSize         = 150;
+        s.ornamentWidth    = 120;
+        s.ornamentThickness = 9;
+        s.nameShadow       = 50;
+        s.labelShadow      = 150;
+        s.glowColor        = Color{{0.1f, 0.2f, 0.3f}};
+        s.ornamentColor    = Color{{0.4f, 0.5f, 0.6f}};
+        s.labelShadowColor = Color{{0.7f, 0.8f, 0.9f}};
         s.thickness      = 6.5f;
         s.maxDistance    = 25.0f;
         s.cursorColor           = Color{{0.77f, 0.32f, 0.31f}};
@@ -253,7 +298,7 @@ TEST(a_whole_number_too_large_for_an_int_is_clamped_like_any_other)
     store.values["labelSize"]  = "-1e10";
     store.values["cursorSize"] = "3e9";
     const Settings s = LoadSettings(store);
-    CHECK_EQ(s.nameSize, kMaxTextSize);
+    CHECK_EQ(s.mobNameSize, kMaxTextSize);
     CHECK_EQ(s.labelSize, kMinTextSize);
     CHECK_EQ(s.cursorSize, kMaxTextSize);
 }
@@ -292,22 +337,32 @@ TEST(clamp_bounds_every_field)
     s.smoothness  = 99;
     s.maxDistance = 1000.0f;
     s.fontName    = "";
-    s.nameSize    = 100;
+    s.mobNameSize = s.playerNameSize = 100;
+    s.selfNameSize = s.npcNameSize = 0;
     s.labelSize   = 0;
     s.timerSize   = 0;
     s.iconSize    = 49;
     s.playerIconSize = 10;
+    s.glowStrength   = 1000;
+    s.glowSize       = 1000;
+    s.ornamentWidth  = 0;
+    s.ornamentThickness = 1000;
+    s.nameShadow     = -5;
+    s.labelShadow    = 1000;
+    s.labelFontName  = "";
     s.cursorSize  = 2;
     s.nameRaise   = 99;
     const Color wild{{2.0f, -1.0f, 0.5f}};
     s.nameColor = s.textOutline = s.iconTint = s.cursorColor = s.subCursorColor = s.lockedCursorColor = wild;
+    s.glowColor = s.ornamentColor = s.labelShadowColor = wild;
     for (Color& c : s.labelColor)
         c = wild;
     for (Color& c : s.color)
         c = wild;
     const Settings c = Clamp(s);
     const Color clamped{{1.0f, 0.0f, 0.5f}};
-    for (const Color& each : {c.nameColor, c.textOutline, c.iconTint, c.cursorColor, c.subCursorColor, c.lockedCursorColor})
+    for (const Color& each : {c.nameColor, c.textOutline, c.iconTint, c.cursorColor, c.subCursorColor, c.lockedCursorColor,
+             c.glowColor, c.ornamentColor, c.labelShadowColor})
         CHECK(each == clamped);
     for (const Color& each : c.labelColor)
         CHECK(each == clamped);
@@ -316,9 +371,17 @@ TEST(clamp_bounds_every_field)
     CHECK_EQ(c.thickness, kMinThickness);
     CHECK_EQ(c.smoothness, kMaxSmoothness);
     CHECK_EQ(c.playerIconSize, kMinPlayerIconSize);
+    CHECK_EQ(c.glowStrength, kMaxGlowStrength);
+    CHECK_EQ(c.glowSize, kMaxGlowSize);
+    CHECK_EQ(c.ornamentWidth, kMinOrnamentWidth);
+    CHECK_EQ(c.ornamentThickness, kMaxOrnamentThickness);
+    CHECK_EQ(c.nameShadow, kMinShadowStrength);
+    CHECK_EQ(c.labelShadow, kMaxShadowStrength);
+    CHECK(c.labelFontName == kDefaultFont);
     CHECK_EQ(c.maxDistance, kMaxOutlineDistance);
     CHECK(c.fontName == kDefaultFont);
-    CHECK_EQ(c.nameSize, kMaxTextSize);
+    CHECK(c.mobNameSize == kMaxTextSize && c.playerNameSize == kMaxTextSize);
+    CHECK(c.selfNameSize == kMinTextSize && c.npcNameSize == kMinTextSize);
     CHECK_EQ(c.labelSize, kMinTextSize);
     CHECK_EQ(c.timerSize, kMinTextSize);
     CHECK_EQ(c.iconSize, kMaxTextSize);
@@ -419,4 +482,22 @@ TEST(an_old_target_cursor_of_any_other_color_is_kept)
 {
     MapStore old = TargetCursor("0.7700", "0.3200", "0.3200");
     CHECK(LoadSettings(old).cursorColor == (Color{{0.77f, 0.32f, 0.32f}}));
+}
+
+TEST(a_file_from_before_the_level_line_had_its_own_font_and_shadow_keeps_the_names)
+{
+    MapStore old;
+    old.values = {{"fontName", "Trebuchet MS"}, {"fontBold", "true"}, {"textOutlineR", "0.2500"}, {"textOutlineG", "0.2400"},
+        {"textOutlineB", "0.5000"}};
+    const Settings s = LoadSettings(old);
+    CHECK(s.labelFontName == "Trebuchet MS" && s.labelFontBold);
+    CHECK(s.labelShadowColor == (Color{{0.25f, 0.24f, 0.5f}}));
+}
+
+TEST(a_file_from_before_each_kind_had_a_name_size_gives_all_of_them_its_one)
+{
+    MapStore old;
+    old.values = {{"nameSize", "20.0000"}};
+    const Settings s = LoadSettings(old);
+    CHECK(s.mobNameSize == 20 && s.playerNameSize == 20 && s.selfNameSize == 20 && s.npcNameSize == 20);
 }

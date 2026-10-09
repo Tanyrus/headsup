@@ -222,10 +222,10 @@ namespace headsup
             }
 
             // Each font is a flat full-width button: ImGui's selectables are overloaded.
-            void FontDropdown(std::string& font, const std::vector<std::string>& choices)
+            void FontDropdown(const char* label, std::string& font, const std::vector<std::string>& choices)
             {
                 gui->SetNextItemWidth(kControlWidth);
-                if (!gui->BeginCombo("Font", font.c_str(), ImGuiComboFlags_HeightLarge)) return;
+                if (!gui->BeginCombo(label, font.c_str(), ImGuiComboFlags_HeightLarge)) return;
                 const ImVec2 align    = style.ButtonTextAlign;
                 style.ButtonTextAlign = ImVec2(0.0f, 0.5f);
                 for (const std::string& name : choices)
@@ -500,17 +500,35 @@ namespace headsup
             }
             if (ui.Section("Text", kTextSection, collapsed))
             {
-                ui.FontDropdown(s.fontName, fonts);
+                ui.FontDropdown("Name font", s.fontName, fonts);
                 ui.gui->SameLine();
-                ui.Check("Bold", s.fontBold, "Bold names and level text.");
+                ui.Check("Bold##name", s.fontBold, "Bold names.");
                 ui.Fade(!anyNames);
-                ui.SliderInt("Name size", s.nameSize, kMinTextSize, kMaxTextSize, "%d px",
-                    "The height of the names HeadsUp draws.");
+                ui.Fade(!s.enabled || !s.replaceMobNames);
+                ui.SliderInt("Mob name size", s.mobNameSize, kMinTextSize, kMaxTextSize, "%d px", "The height of mob names.");
+                ui.Fade(!s.enabled || !s.replacePlayerNames);
+                ui.SliderInt("Your name size", s.selfNameSize, kMinTextSize, kMaxTextSize, "%d px", "The height of your own name.");
+                ui.SliderInt("Player name size", s.playerNameSize, kMinTextSize, kMaxTextSize, "%d px",
+                    "The height of other players' names.");
+                ui.Fade(!s.enabled || !s.replaceNpcNames);
+                ui.SliderInt("NPC name size", s.npcNameSize, kMinTextSize, kMaxTextSize, "%d px", "The height of NPC names.");
+                ui.Fade(!anyNames);
                 ui.SliderInt("Raise names", s.nameRaise, kMinNameRaise, kMaxNameRaise, "%d px",
                     "How far above the game's own spot the names HeadsUp draws sit, with everything above them.");
+                ui.Fade(!s.enabled || !s.replaceMobNames);
+                ui.Check("Glow around mob names", s.nameGlow,
+                    "A soft glow in the mob's outline color: red will attack, green won't, purple is a placeholder.");
+                ui.Fade(!s.enabled || !s.replaceMobNames || !s.nameGlow);
+                ui.SliderInt("Glow strength", s.glowStrength, kMinGlowStrength, kMaxGlowStrength, "%d%%",
+                    "How strong the glow around mob names is.");
+                ui.SliderInt("Glow size", s.glowSize, kMinGlowSize, kMaxGlowSize, "%d%%", "How far the glow spreads from the letters.");
                 ui.Fade(!s.enabled);
                 ui.Check("Scale with distance", s.scaleWithDistance,
                     "Every size grows and shrinks with the game's own name size as the name comes closer or moves away.");
+                ui.Fade(!s.enabled || !s.scaleWithDistance);
+                ui.Check("Scale your name", s.scaleOwnName, "Off, your own name and everything above it stay one size.");
+                ui.Check("Scale other players' names", s.scalePlayerNames,
+                    "Off, other players' names and their icons stay one size at any distance.");
             }
             if (ui.Section("Level and icons", kMobInfoSection, collapsed))
             {
@@ -518,7 +536,17 @@ namespace headsup
                     "Lv 20-23 EP-DC: the level range from the Phoenix data and how it cons to you. After you /check the "
                     "mob, its exact level, until it respawns.");
                 ui.Fade(!s.enabled || !s.showLabels);
+                ui.FontDropdown("Level font", s.labelFontName, fonts);
+                ui.gui->SameLine();
+                ui.Check("Bold##level", s.labelFontBold, "A bold level line and placeholder timers.");
                 ui.SliderInt("Level and con size", s.labelSize, kMinTextSize, kMaxTextSize, "%d px", "The level line's height.");
+                ui.Check("Show ornament", s.showOrnament,
+                    "A thin line with a diamond between a mob's level line and its name, in its outline color.");
+                ui.Fade(!s.enabled || !s.showLabels || !s.showOrnament);
+                ui.SliderInt("Ornament width", s.ornamentWidth, kMinOrnamentWidth, kMaxOrnamentWidth, "%d px",
+                    "The line's length.");
+                ui.SliderInt("Ornament height", s.ornamentThickness, kMinOrnamentThickness, kMaxOrnamentThickness, "%d px",
+                    "The diamond's height.");
                 ui.Fade(!s.enabled);
                 ui.Check("Show icons", s.showIcons,
                     "XIUI's MobDB icons: aggressive or passive, whether it links, and how it detects you.");
@@ -601,8 +629,28 @@ namespace headsup
                 ui.Fade(!anyNames || !s.ownNameColor);
                 ui.Swatch("Own name color", s.nameColor,
                     "Off: names keep the game's color, which shows who claimed the mob. On: every name takes this color.");
+                ui.Fade(!anyNames);
+                ui.Swatch("Name shadow", s.textOutline, "The soft shadow under names, and the edge of the target cursor.");
+                ui.SliderInt("Name shadow strength", s.nameShadow, kMinShadowStrength, kMaxShadowStrength, "%d%%",
+                    "0% draws names with no shadow.");
+                ui.Fade(!s.enabled || !s.showLabels);
+                ui.Swatch("Level shadow", s.labelShadowColor, "The soft shadow under the level line and the placeholder timers.");
+                ui.SliderInt("Level shadow strength", s.labelShadow, kMinShadowStrength, kMaxShadowStrength, "%d%%",
+                    "0% draws the level line with no shadow.");
+                ui.Fade(!s.enabled || !s.replaceMobNames || !s.nameGlow);
+                ui.changed |= ui.gui->Checkbox("##ownGlowColor", &s.ownGlowColor);
+                ui.gui->SameLine();
+                ui.Fade(!s.enabled || !s.replaceMobNames || !s.nameGlow || !s.ownGlowColor);
+                ui.Swatch("Own glow color", s.glowColor,
+                    "Off: a mob's name glows in its outline color, so the glow says whether it will attack. On: every glow "
+                    "takes this color.");
+                ui.Fade(!s.enabled || !s.showLabels || !s.showOrnament);
+                ui.changed |= ui.gui->Checkbox("##ownOrnamentColor", &s.ownOrnamentColor);
+                ui.gui->SameLine();
+                ui.Fade(!s.enabled || !s.showLabels || !s.showOrnament || !s.ownOrnamentColor);
+                ui.Swatch("Own ornament color", s.ornamentColor,
+                    "Off: the ornament takes the mob's outline color. On: every ornament takes this color.");
                 ui.Fade(!s.enabled);
-                ui.Swatch("Text outline", s.textOutline, "The edge around the name and the level text.");
                 ui.Fade(!s.enabled || !s.showIcons);
                 ui.Swatch("Icon tint", s.iconTint, "Multiplies the MobDB icons' colors. White keeps them as they are.");
             }

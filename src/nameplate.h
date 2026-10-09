@@ -94,6 +94,10 @@ namespace headsup
 
     // Not rounded, so sizes change as smoothly as the game's names.
     float DistanceScale(float letterHeight, float screenHeight);
+    // Whether this plate's sizes follow the game's name size; self is your own.
+    bool ScalesWithDistance(const Settings& settings, EntityKind kind, bool self);
+    // The name size the menu sets for this kind of name; self is your own.
+    int NameSize(const Settings& settings, EntityKind kind, bool self);
     // Heights come in steps, and current (the height drawn now) is kept until the shown size falls a step below it or
     // rises a little above it, so text is redrawn only when its size really changes and never flickers between two.
     int RasterHeight(float pixels, int current);

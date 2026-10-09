@@ -40,6 +40,8 @@ namespace headsup
         uint32_t color       = 0;
         uint32_t shadowColor = 0;
         uint32_t glowColor   = 0;
+        float glowStrength   = 1.0f; // times the mockup's glow, which is solid wherever it would pass full
+        float shadowStrength = 1.0f; // times the mockup's shadow, the same way
         int markX            = kNoMarkColumn; // from this column on, the letters take markColor
         uint32_t markColor   = 0;
     };
@@ -51,7 +53,7 @@ namespace headsup
     // The ornament between the level line and the name, width by height inside a margin of BlurMargin(shadowBlur): a
     // hairline across its middle that fades in from both ends and lightens toward its center, under a diamond as tall as
     // the ornament, in the lighter color with a dark shadow.
-    Image Ornament(int width, int height, float shadowBlur, uint32_t color, uint32_t shadowColor);
+    Image Ornament(int width, int height, float shadowBlur, float shadowStrength, uint32_t color, uint32_t shadowColor);
 
     // A power of two, which every Direct3D 8 card accepts.
     int TextureSide(int pixels);

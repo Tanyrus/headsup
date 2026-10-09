@@ -50,6 +50,11 @@ namespace headsup
     constexpr int kMinTextSize = 8, kMaxTextSize = 48;   // pixels: name, label, icon and cursor sizes
     constexpr int kMinNameRaise = 0, kMaxNameRaise = 40; // pixels
     constexpr int kMinPlayerIconSize = 50, kMaxPlayerIconSize = 150; // percent of the name's letter height
+    constexpr int kMinGlowStrength = 25, kMaxGlowStrength = 300;     // percent of the mockup's glow
+    constexpr int kMinGlowSize = 25, kMaxGlowSize = 200;             // percent: a wider glow takes longer to draw
+    constexpr int kMinShadowStrength = 0, kMaxShadowStrength = 200;  // percent of the mockup's shadow
+    constexpr int kMinOrnamentWidth = 20, kMaxOrnamentWidth = 300;   // pixels
+    constexpr int kMinOrnamentThickness = 3, kMaxOrnamentThickness = 24; // pixels
     constexpr const char* kDefaultFont = "Marcellus SC";
     constexpr size_t kMaxFontName      = 31; // a Windows font name's longest, without its terminator
 
@@ -70,10 +75,30 @@ namespace headsup
         bool markPlaceholders  = true;  // "[PH]" for a lottery placeholder's ID
         bool phTimers          = false; // above your name, a respawn timer for each placeholder you see die
         bool scaleWithDistance = true;  // sizes follow the game's name size
+        bool scaleOwnName      = true;  // your own plate too
+        bool scalePlayerNames  = true;  // other players' plates too
         Look look              = Look::Fantasy; // which style the plates are drawn in
         std::string fontName   = kDefaultFont; // a font family installed in Windows
         bool fontBold          = false;
-        int nameSize           = 15;    // pixels
+        bool nameGlow          = true;  // a mob's name glows in its outline color
+        int glowStrength       = 100;   // percent of the mockup's glow
+        int glowSize           = 100;   // percent of the mockup's glow
+        bool ownGlowColor      = false; // the glow in glowColor instead of the outline color
+        Color glowColor        = ColorFromRgb(0xFFB45A); // the mockup's warm glow
+        bool showOrnament      = true;  // between a mob's level line and its name
+        int ornamentWidth      = 90;    // pixels
+        int ornamentThickness  = 6;     // pixels
+        bool ownOrnamentColor  = false; // the ornament in ornamentColor instead of the outline color
+        Color ornamentColor    = ColorFromRgb(0xD9B46A); // the mockup's gold
+        int nameShadow         = 100;   // percent of the mockup's shadow; textOutline is its color
+        std::string labelFontName = kDefaultFont; // the level line and the timers
+        bool labelFontBold     = false;
+        Color labelShadowColor = {{0.00f, 0.00f, 0.00f}};
+        int labelShadow        = 100;   // percent of the mockup's shadow
+        int mobNameSize        = 15;    // pixels
+        int playerNameSize     = 15;    // pixels: other players
+        int selfNameSize       = 15;    // pixels: you
+        int npcNameSize        = 15;    // pixels
         int labelSize          = 13;    // pixels
         int timerSize          = 13;    // pixels: your placeholder timers' lines
         int iconSize           = 16;    // pixels

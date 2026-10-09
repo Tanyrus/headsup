@@ -20,7 +20,7 @@ namespace headsup
         constexpr float kFullCoverage   = static_cast<float>(kFullAlpha);
         constexpr float kSigmaPerBlur   = 0.5f; // a CSS blur radius is two standard deviations
         constexpr float kTapsPerSigma   = 3.0f;
-        constexpr float kGlowStrength   = 0.6f; // the mockup's glow color is at 60%
+        constexpr float kGlowOpacity    = 0.6f; // the mockup's glow color is at 60%
         // The ornament's line, from the mockup's CSS gradient: clear at the ends, the full color 30% of the way in, and
         // lighter from there to the center, where it is Lighter's half way to white.
         constexpr float kLineFadeIn     = 0.3f;
@@ -105,13 +105,14 @@ namespace headsup
             {
                 const auto i = static_cast<size_t>(y * coverage.width + x);
                 Paint paint;
-                if (!glow.empty()) paint.Over(glow[i] * kGlowStrength, layers.glowColor);
+                if (!glow.empty()) paint.Over(std::min(1.0f, glow[i] * kGlowOpacity * layers.glowStrength), layers.glowColor);
                 if (!shadow.empty())
                 {
                     const int above = y - layers.shadowDrop;
+                    auto strong = [&](float cover) { return std::min(1.0f, cover * layers.shadowStrength); };
                     if (above >= 0 && above < coverage.height)
-                        paint.Over(shadow[static_cast<size_t>(above * coverage.width + x)], layers.shadowColor);
-                    paint.Over(shadow[i], layers.shadowColor);
+                        paint.Over(strong(shadow[static_cast<size_t>(above * coverage.width + x)]), layers.shadowColor);
+                    paint.Over(strong(shadow[i]), layers.shadowColor);
                 }
                 paint.Over(Cover(coverage, i), x >= layers.markX ? layers.markColor : layers.color);
                 image.argb[i] = paint.Color();
@@ -148,7 +149,7 @@ namespace headsup
         return image;
     }
 
-    Image Ornament(int width, int height, float shadowBlur, uint32_t color, uint32_t shadowColor)
+    Image Ornament(int width, int height, float shadowBlur, float shadowStrength, uint32_t color, uint32_t shadowColor)
     {
         const int margin = BlurMargin(shadowBlur);
         const int w = std::max(1, width), h = std::max(1, height);
@@ -185,7 +186,7 @@ namespace headsup
                     const float lighten = kLineWhitest * std::max(0.0f, 1.0f - std::abs(along - 0.5f) / kLineBrightSpan);
                     paint.Over(std::min(1.0f, fromEnd / kLineFadeIn), Whiter(color, lighten));
                 }
-                paint.Over(shadow[i], shadowColor);
+                paint.Over(std::min(1.0f, shadow[i] * shadowStrength), shadowColor);
                 paint.Over(Cover(gem, i), gemColor);
                 image.argb[i] = paint.Color();
             }

@@ -140,6 +140,25 @@ namespace headsup
         return std::isfinite(factor) ? std::clamp(factor, kMinScale, kMaxScale) : 1.0f;
     }
 
+    bool ScalesWithDistance(const Settings& settings, EntityKind kind, bool self)
+    {
+        if (!settings.scaleWithDistance) return false;
+        if (self) return settings.scaleOwnName;
+        return kind != EntityKind::Player || settings.scalePlayerNames;
+    }
+
+    int NameSize(const Settings& settings, EntityKind kind, bool self)
+    {
+        if (self) return settings.selfNameSize;
+        switch (kind)
+        {
+            case EntityKind::Mob: return settings.mobNameSize;
+            case EntityKind::Player: return settings.playerNameSize;
+            case EntityKind::Npc: return settings.npcNameSize;
+        }
+        return settings.mobNameSize;
+    }
+
     int RasterHeight(float pixels, int current)
     {
         const auto drawn = static_cast<float>(current);

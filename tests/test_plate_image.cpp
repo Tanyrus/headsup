@@ -135,6 +135,15 @@ TEST(the_glow_is_the_letters_blurred_at_part_strength)
     CHECK((Pixel(image, 15, mid) & 0x00FFFFFFu) == 0x0000FF00u);                   // in the glow's color
 }
 
+TEST(a_stronger_glow_is_denser_up_to_solid)
+{
+    Layers layers{0.0f, 0, 8.0f, 0xFFFFFFFFu, 0xFF000000u, 0xFF00FF00u};
+    layers.glowStrength = 2.0f;
+    CHECK(Near(Alpha(Pixel(Styled(Block(40, 16), layers), 15, 36)), 2.0f * 0.6f * 255.0f * EdgeReach(0.5f, 8.0f), 3.0f));
+    layers.glowStrength = 5.0f; // 0.45 of the block reaches one pixel out, times 0.6 times 5 is past solid
+    CHECK_EQ(Pixel(Styled(Block(40, 16), layers), 15, 36), 0xFF00FF00u);
+}
+
 TEST(the_dark_edge_is_a_soft_shadow_that_falls_a_little_below)
 {
     // A shadow of CSS radius 4 (sigma 2), once in place and once 2 px lower, combined as two layers: a + b (1 - a).
@@ -147,6 +156,17 @@ TEST(the_dark_edge_is_a_soft_shadow_that_falls_a_little_below)
     CHECK(Near(Alpha(Pixel(image, mid, 28)), both(EdgeReach(0.5f, 4.0f), 1.0f - EdgeReach(1.5f, 4.0f)), 4.0f));
     CHECK((Pixel(image, mid, 28) & 0x00FFFFFFu) == 0u); // black
     CHECK_EQ(Pixel(image, mid, mid), 0xFFFFFFFFu);
+}
+
+TEST(a_weaker_shadow_is_lighter_and_none_at_zero)
+{
+    Layers layers{4.0f, 2, 0.0f, 0xFFFFFFFFu, 0xFF000000u, 0};
+    layers.shadowStrength = 0.5f;
+    auto both = [](float a, float b) { return 255.0f * (a + b * (1.0f - a)); };
+    CHECK(Near(Alpha(Pixel(Styled(Block(20, 8), layers), 18, 7)),
+        both(0.5f * EdgeReach(0.5f, 4.0f), 0.5f * EdgeReach(2.5f, 4.0f)), 4.0f));
+    layers.shadowStrength = 0.0f;
+    CHECK_EQ(Pixel(Styled(Block(20, 8), layers), 18, 7), 0u);
 }
 
 TEST(no_glow_and_no_shadow_leave_just_the_letters)
@@ -179,7 +199,7 @@ TEST(the_ornament_is_a_hairline_that_brightens_toward_a_small_diamond)
     // 132 x 9 under a 22 px name, as in the mockup, with a diamond shadow of CSS radius 3 (a 3 px margin).
     const int width = 132, height = 9, margin = 3;
     const uint32_t red = 0xFFFF2626u;
-    const Image image  = Ornament(width, height, 3.0f, red, 0xFF000000u);
+    const Image image  = Ornament(width, height, 3.0f, 1.0f, red, 0xFF000000u);
     CHECK(image.width == width + 2 * margin && image.height == height + 2 * margin);
     const int line = margin + height / 2, center = margin + width / 2;
     CHECK(Alpha(Pixel(image, margin, line)) <= 4);                               // it fades in from nothing at each end
@@ -193,5 +213,6 @@ TEST(the_ornament_is_a_hairline_that_brightens_toward_a_small_diamond)
     CHECK(Alpha(Pixel(image, center, margin)) > 0);                               // as tall as the ornament
     const uint32_t above = Pixel(image, center, margin - 2);                      // with a dark shadow round it
     CHECK(Alpha(above) > 0 && (above & 0x00FFFFFFu) == 0u);
+    CHECK_EQ(Pixel(Ornament(width, height, 3.0f, 0.0f, red, 0xFF000000u), center, margin - 2), 0u); // none at strength 0
     CHECK_EQ(Alpha(Pixel(image, margin + 20, line)), Alpha(Pixel(image, margin + width - 21, line))); // and symmetric
 }

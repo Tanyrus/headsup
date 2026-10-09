@@ -50,16 +50,24 @@ namespace headsup
         std::string TakeIconFailure();
 
     private:
-        // A cursor's text is empty and its font names its shape.
+        // How a texture's text is drawn. A cursor's line font names its shape and its shadow color is its outline's.
+        struct TextLook
+        {
+            LineStyle line;
+            uint32_t color     = 0;
+            uint32_t glow      = 0; // 0 for none
+            float glowStrength = 0.0f, glowSize = 0.0f;
+            size_t markAt      = Label::kNoMark;
+            uint32_t markColor = 0;
+            bool operator==(const TextLook&) const = default;
+        };
+
+        // The ornament's and the cursor's text is empty; only the ornament has a width.
         struct TextureKey
         {
-            std::string text, font;
-            bool bold = false;
-            int height = 0;
-            uint32_t color = 0, outline = 0;
-            uint32_t glow = 0;
-            size_t markAt = Label::kNoMark;
-            uint32_t markColor = 0;
+            std::string text;
+            int height = 0, width = 0;
+            TextLook look;
             bool operator==(const TextureKey&) const = default;
         };
 
@@ -81,6 +89,7 @@ namespace headsup
             PlateTexture cursor;
             PlateTexture ornament;
             int nameRaster   = 0;
+            int ornamentRaster = 0;
             int labelRaster  = 0;
             int cursorRaster = 0;
             std::vector<PlateTexture> timers;
@@ -101,10 +110,9 @@ namespace headsup
             uint32_t tint;
         };
 
-        // A glow of 0 draws none. From markAt on, the text is drawn in markColor.
-        bool Prepare(PlateTexture& t, const char* text, uint32_t color, uint32_t glow, int pixelHeight, const Settings& settings,
-            size_t markAt = Label::kNoMark, uint32_t markColor = 0);
-        bool PrepareOrnament(PlateTexture& t, uint32_t color, int pixelHeight, const Settings& settings);
+        bool Prepare(PlateTexture& t, const char* text, const TextLook& look, int pixelHeight);
+        // The ornament's diamond has the shadow of shadowLine.
+        bool PrepareOrnament(PlateTexture& t, uint32_t color, int pixelHeight, int width, const LineStyle& shadowLine);
         bool PrepareCursor(PlateTexture& t, uint32_t color, int pixelHeight, const Settings& settings);
         bool Upload(PlateTexture& t, const Image& image, TextureKey key);
         IDirect3DTexture8* CreateTexture(const void* bgra, int width, int height, float& u, float& v);

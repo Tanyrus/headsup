@@ -348,3 +348,33 @@ TEST(no_ornament_leaves_the_label_where_it_was)
     sizes.nameWidth = 100.0f, sizes.nameHeight = 18.0f, sizes.labelWidth = 80.0f, sizes.labelHeight = 16.0f;
     CHECK(Near(LayoutNameplate(plate, sizes, true).labelY, 183.0f));
 }
+
+TEST(your_name_and_other_players_names_can_each_keep_one_size)
+{
+    Settings s;
+    CHECK(ScalesWithDistance(s, EntityKind::Player, true) && ScalesWithDistance(s, EntityKind::Player, false));
+    s.scaleOwnName = false;
+    CHECK(!ScalesWithDistance(s, EntityKind::Player, true));
+    CHECK(ScalesWithDistance(s, EntityKind::Player, false)); // everyone else still scales
+    s.scaleOwnName     = true;
+    s.scalePlayerNames = false;
+    CHECK(ScalesWithDistance(s, EntityKind::Player, true));
+    CHECK(!ScalesWithDistance(s, EntityKind::Player, false));
+    CHECK(ScalesWithDistance(s, EntityKind::Mob, false) && ScalesWithDistance(s, EntityKind::Npc, false));
+    s.scalePlayerNames  = true;
+    s.scaleWithDistance = false; // the main switch turns every name off
+    CHECK(!ScalesWithDistance(s, EntityKind::Player, true) && !ScalesWithDistance(s, EntityKind::Mob, false));
+}
+
+TEST(each_kind_of_name_has_its_own_size)
+{
+    Settings s;
+    s.mobNameSize    = 11;
+    s.playerNameSize = 12;
+    s.selfNameSize   = 13;
+    s.npcNameSize    = 14;
+    CHECK_EQ(NameSize(s, EntityKind::Mob, false), 11);
+    CHECK_EQ(NameSize(s, EntityKind::Player, false), 12);
+    CHECK_EQ(NameSize(s, EntityKind::Player, true), 13);
+    CHECK_EQ(NameSize(s, EntityKind::Npc, false), 14);
+}
