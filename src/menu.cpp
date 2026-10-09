@@ -719,6 +719,12 @@ namespace headsup
                 ui.Check("Chocobo mouse pointer", s.chocoboPointer,
                     "PlayOnline's chocobo in place of the game's mouse pointer, over menus too. The camera arrows stay the "
                     "game's.");
+                ui.Check("Fix the game's mouse pointer", s.fixPointer,
+                    "FFXI guesses its window's borders when it reads the mouse, so after a resize its pointer is not where "
+                    "yours is; a click after the mouse crossed another window lands where its pointer was; and the pointer "
+                    "it hides while you type stays hidden over Ashita's windows, this one included. This makes it read the "
+                    "mouse in its true window area, move its pointer to each click first, and show the pointer again when "
+                    "the mouse moves over those windows.");
             }
             ui.Fade(false);
         }

@@ -32,6 +32,12 @@ namespace headsup
         NoArrowDraws,
         AmbiguousArrowDraws,
         ArrowDrawsDiffer,
+        NoPointerMapping,
+        AmbiguousPointerMapping,
+        PointerMappingDiffers,
+        NoPointerShow,
+        AmbiguousPointerShow,
+        PointerShowChanged,
     };
     const char* Describe(LocateProblem problem);
 
@@ -59,4 +65,32 @@ namespace headsup
     constexpr uint32_t kArrowArgumentBytes = 32;
 
     ArrowCalls LocateArrowCalls(const ImageSection& text);
+
+    // Where the game guesses its window's client area as GetWindowRect less two SM_CXFRAME across and two SM_CYFRAME
+    // and SM_CYCAPTION down (the borders zeroed only in window mode 3): when it reads a mouse message's position, when
+    // it moves Windows' pointer to its own, and when the pointer at its area's edge pans the camera. Each is a call to
+    // GetWindowRect through the import table and a load of GetSystemMetrics from it into a register, six bytes each.
+    struct WindowGuess
+    {
+        uint32_t windowRectCall = 0, metricsLoad = 0; // RVAs
+        uint8_t movImmediate = 0;                     // the opcode of mov reg, imm32 into the register metricsLoad fills
+    };
+    struct PointerMapping
+    {
+        LocateProblem problem = LocateProblem::None;
+        std::vector<WindowGuess> guesses;
+    };
+    PointerMapping LocatePointerMapping(const ImageSection& text);
+
+    // The game's mouse controller and its routine that shows or hides the pointer (a thiscall taking 1 to show and
+    // popping it), found through the game's own call to it on a mouse move. The controller is a global whose address
+    // the code holds; its byte at kPointerShownOffset is 1 while the pointer shows.
+    struct PointerShow
+    {
+        LocateProblem problem   = LocateProblem::None;
+        uint32_t controllerGlobal = 0; // the global's address in the running client, as the code holds it
+        uint32_t show             = 0; // RVA
+    };
+    constexpr uint32_t kPointerShownOffset = 0x4E;
+    PointerShow LocatePointerShow(const ImageSection& text);
 }

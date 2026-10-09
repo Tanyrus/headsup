@@ -2,6 +2,9 @@
 
 #include "argb.h"
 
+#include <algorithm>
+#include <iterator>
+
 
 namespace headsup
 {
@@ -28,5 +31,11 @@ namespace headsup
         targets.anchorY    = window.ankY * y;
         targets.subAnchorX = window.subAnkX * x;
         targets.subAnchorY = window.subAnkY * y;
+    }
+
+    bool ClickMessage(uint32_t message)
+    {
+        constexpr uint32_t kClicks[] = {0x201, 0x203, 0x204, 0x206, 0x207, 0x209, 0x20B, 0x20D}; // each button's down, double
+        return std::find(std::begin(kClicks), std::end(kClicks), message) != std::end(kClicks);
     }
 }

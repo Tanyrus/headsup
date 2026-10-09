@@ -48,3 +48,11 @@ TEST(the_games_picking_arrow_is_red_out_of_range_and_blue_in_range)
     CHECK(!PickedOutOfRange(0xE0808080).has_value());
     CHECK(!PickedOutOfRange(0).has_value()); // none drawn yet
 }
+
+TEST(the_game_pointer_is_synced_before_each_click)
+{
+    for (const uint32_t click : {0x201u, 0x203u, 0x204u, 0x206u, 0x207u, 0x209u, 0x20Bu, 0x20Du}) // down and double-click
+        CHECK(ClickMessage(click));
+    for (const uint32_t other : {0x200u, 0x202u, 0x205u, 0x208u, 0x20Au, 0x20Cu}) // a move, each button's up, the wheel
+        CHECK(!ClickMessage(other));
+}

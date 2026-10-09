@@ -37,6 +37,9 @@ namespace headsup
     void PlaceAnchors(CursorTargets& targets, const CursorWindow& window, float menuWidth, float menuHeight,
         float backBufferWidth, float backBufferHeight);
 
+    // A mouse button pressed or double-clicked: before the game takes it, its pointer is moved to where the click is.
+    bool ClickMessage(uint32_t message);
+
     struct CursorName
     {
         uint16_t index;

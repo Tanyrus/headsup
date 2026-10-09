@@ -85,4 +85,30 @@ namespace headsup
         uint32_t m_Operands[2]  = {}; // the game's
         uint32_t m_Patched[2]   = {}; // HeadsUp's
     };
+
+    // Puts right the game's guess of its window's client area (native_locate.h's PointerMapping): each guess's
+    // GetWindowRect call and GetSystemMetrics load go to HeadsUp, which answers with the client area and no borders
+    // while the fix is on, and as Windows would while it is off. It also brings back the pointer the game hid for
+    // typing when the mouse moves over an Ashita window, which keeps those moves from the game.
+    class PointerFix
+    {
+    public:
+        ~PointerFix() { Stop(); }
+        // Only at a render boundary. Returns why it could not start, or an empty string.
+        std::string Start();
+        // Puts the game's bytes back if they are still HeadsUp's. Returns why it could not, or an empty string.
+        std::string Stop();
+        bool Running() const { return !m_Patches.empty(); }
+        void Enable(bool on);
+        // On a mouse move an Ashita window took: shows the game's pointer through its own routine if it is hidden.
+        static void RevealUnderWindow();
+
+    private:
+        struct Patch
+        {
+            uint8_t* at;
+            uint8_t game[6], ours[6];
+        };
+        std::vector<Patch> m_Patches;
+    };
 }

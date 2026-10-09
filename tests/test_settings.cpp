@@ -79,6 +79,7 @@ replaceNpcNames=false
 replaceCursor=false
 cursorFeather=false
 chocoboPointer=true
+fixPointer=false
 showPlayerIcons=false
 centerNameAndIcons=false
 ownNameColor=true
@@ -187,6 +188,7 @@ look=fantasy
         s.fontBold          = true;
         s.replacePlayerNames = s.replaceNpcNames = s.replaceCursor = s.cursorFeather = false;
         s.chocoboPointer = true;
+        s.fixPointer     = false;
         s.showPlayerIcons = s.centerNameAndIcons = false;
         s.ownNameColor   = true;
         s.smoothness     = 12;

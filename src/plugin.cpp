@@ -20,6 +20,7 @@
 #include "codedump.h"
 #include "drawdump.h"
 #include "namedump.h"
+#include "pointerwatch.h"
 #include "stackdump.h"
 #endif
 
@@ -87,6 +88,24 @@ namespace
         IConfigurationManager* m_Config;
     };
 
+    // Set at Initialize and Present, and read by OnMouse, which Ashita calls on the game's thread before the game sees
+    // each message.
+    bool g_SyncClicks   = false;
+    HWND g_GameWindow   = nullptr;
+    IGuiManager* g_Gui  = nullptr;
+
+    BOOL __stdcall OnMouse(uint32_t message, WPARAM wParam, LPARAM lParam, bool blocked)
+    {
+        if (!g_SyncClicks) return FALSE;
+        const bool overWindow = g_Gui != nullptr && g_Gui->GetIO().WantCaptureMouse; // an Ashita window takes the mouse
+        // The game takes a click where its pointer last was, which is somewhere else after the mouse moved over another
+        // window: a mouse move to the click's place goes first.
+        if (!blocked && !overWindow && g_GameWindow != nullptr && headsup::ClickMessage(message))
+            SendMessageA(g_GameWindow, WM_MOUSEMOVE, LOWORD(wParam), lParam);
+        // The game hides its pointer for typing until it sees the mouse move, which it never does over an Ashita window.
+        if (message == WM_MOUSEMOVE && overWindow) headsup::PointerFix::RevealUnderWindow();
+        return FALSE;
+    }
 }
 
 class HeadsUp final : public IPlugin
@@ -104,6 +123,7 @@ class HeadsUp final : public IPlugin
     std::vector<HANDLE> m_LoadedFonts;
     headsup::NameHook m_NameHook;
     headsup::ArrowHook m_ArrowHook;
+    headsup::PointerFix m_PointerFix;
     bool m_HooksTried = false;
     headsup::ScreenBox m_GameNameBox;
     bool m_PointerFailed = false; // said once; tried again when the setting changes
@@ -120,6 +140,7 @@ class HeadsUp final : public IPlugin
 
 #ifdef HEADSUP_DEV
     headsup::DrawDump m_DrawDump;
+    headsup::PointerWatch m_PointerWatch;
 #endif
     bool m_Drawing      = false; // drawing nameplates: our own draws come back through the hooks
     bool m_DrewInScene  = false; // this frame
@@ -172,16 +193,22 @@ public:
                 m_LoadedFonts.push_back(handle);
         }
         LoadSettings();
+        g_Gui = core->GetGuiManager();
+        core->GetInputManager()->GetMouse()->AddCallback(kName, OnMouse);
         return true;
     }
 
     void Release(void) override
     {
+        m_AshitaCore->GetInputManager()->GetMouse()->RemoveCallback(kName);
+        g_SyncClicks = false;
+        g_Gui        = nullptr;
         for (HANDLE handle : m_LoadedFonts)
             RemoveFontMemResourceEx(handle);
         m_LoadedFonts.clear();
         if (const std::string failure = m_NameHook.Stop(); !failure.empty()) Print(failure + ".");
         if (const std::string failure = m_ArrowHook.Stop(); !failure.empty()) Print(failure + ".");
+        if (const std::string failure = m_PointerFix.Stop(); !failure.empty()) Print(failure + ".");
         m_Pointer.Stop();
         m_Nameplates.Release();
     }
@@ -223,6 +250,8 @@ public:
             Print(headsup::ArmNameDump(m_NameHook.Running()));
         else if (args[1] == "stackdump")
             Print(headsup::ArmStackDump());
+        else if (args[1] == "pointerwatch")
+            Print(args.size() > 2 && args[2] == "stop" ? m_PointerWatch.Stop() : m_PointerWatch.Start(OwnFolder(kLogsFolder), Now()));
 #endif
         else
         {
@@ -234,6 +263,7 @@ public:
             Print("/hu codedump: write the client's loaded image to logs/headsup");
             Print("/hu namedump: write every call into the game's name routine during one frame to logs/headsup");
             Print("/hu stackdump: write the stack at the character draws of one frame to logs/headsup");
+            Print("/hu pointerwatch [stop]: log every change in the mouse pointer and the game's own to logs/headsup until stopped");
 #endif
         }
         return true;
@@ -300,6 +330,7 @@ public:
         if (m_DrawDump.NextFrame(Now(), m_Names, m_NameHook, m_Tracker, m_Nameplates)) WriteDrawDump();
         if (headsup::NameDumpReady()) WriteNameDump();
         if (headsup::StackDumpReady()) WriteStackDump();
+        m_PointerWatch.Frame(m_AshitaCore, Now());
 #endif
         StartHooks();
         m_Outline.NewFrame();
@@ -326,6 +357,9 @@ public:
         UpdateTracker(now);
         UpdateCursorTargets();
         m_ArrowHook.Hide(m_Settings.enabled && m_Settings.replaceCursor);
+        m_PointerFix.Enable(m_Settings.enabled && m_Settings.fixPointer);
+        g_SyncClicks = m_Settings.enabled && m_Settings.fixPointer;
+        g_GameWindow = m_AshitaCore->GetProperties()->GetFinalFantasyHwnd();
         const headsup::MenuStatus status{
             .outlinedMobs     = m_Tracker.OutlinedCount(),
             .meshes           = m_Outline.MeshesLastFrame(),
@@ -508,6 +542,8 @@ private:
             Print("could not hook the game's names: " + failure + ".");
         if (const std::string failure = m_ArrowHook.Start(); !failure.empty())
             Print("could not hook the game's target arrows, so it draws its own and HeadsUp none: " + failure + ".");
+        if (const std::string failure = m_PointerFix.Start(); !failure.empty())
+            Print("could not fix the game's mouse pointer: " + failure + ".");
     }
 
 #ifdef HEADSUP_DEV

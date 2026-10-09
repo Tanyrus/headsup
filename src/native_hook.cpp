@@ -23,6 +23,8 @@ extern "C"
     uintptr_t g_HeadsUpArrowDraw = 0;
     void HeadsUpArrowGate();
     __attribute__((used)) uint32_t HeadsUpOnArrow(const uint32_t* arguments, uint32_t returnAddress);
+    BOOL __stdcall HeadsUpWindowRect(HWND window, RECT* rect);
+    int __stdcall HeadsUpSystemMetric(int index);
 }
 
 // Entered by a jump from the routine's hook, so esp is the routine's frame once the flags and registers saved here are
@@ -114,6 +116,13 @@ namespace headsup
         uint32_t g_PickedReturn = 0; // where the candidate's arrow call returns to
         bool g_HideArrows       = false;
         uint32_t g_PickedColor  = 0;
+        bool g_FixPointer       = false;
+        uintptr_t g_ControllerGlobal = 0; // where the game keeps its mouse controller
+        uintptr_t g_ShowPointer      = 0; // the controller's thiscall that shows (1) or hides (0) the pointer
+        using ShowPointerFn          = void(__attribute__((thiscall))*)(uintptr_t controller, int shown);
+
+        constexpr uint8_t kCallOpcode = 0xE8;
+        constexpr uint32_t kGuessBytes = 6; // a call through the import table, or a load from it into a register
 
         // Return addresses of the calls into the routine, as loaded; set before the hook goes in and fixed while it is.
         std::vector<uint32_t> g_CallerReturns;
@@ -312,6 +321,90 @@ namespace headsup
     uint32_t ArrowHook::PickedColor() const { return g_PickedColor; }
     void ArrowHook::ForgetPicked() { g_PickedColor = 0; }
 }
+
+namespace headsup
+{
+    std::string PointerFix::Start()
+    {
+        if (Running()) return "";
+        auto* base = reinterpret_cast<uint8_t*>(GetModuleHandleA(kGameModule));
+        if (base == nullptr) return std::string(kGameModule) + " is not loaded";
+        ImageSection text{};
+        if (!FindSection(base, kCodeSection, text)) return "the client's code could not be read";
+        const PointerMapping mapping = LocatePointerMapping(text);
+        if (mapping.problem != LocateProblem::None) return Describe(mapping.problem);
+        const PointerShow show = LocatePointerShow(text);
+        if (show.problem != LocateProblem::None) return Describe(show.problem);
+        const auto windowRect = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&HeadsUpWindowRect));
+        const auto metric     = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&HeadsUpSystemMetric));
+        std::vector<Patch> patches;
+        for (const WindowGuess& guess : mapping.guesses)
+        {
+            Patch call{base + guess.windowRectCall, {}, {}};
+            const uint32_t to = windowRect - static_cast<uint32_t>(reinterpret_cast<uintptr_t>(call.at) + kCallLength);
+            call.ours[0] = kCallOpcode;
+            std::memcpy(call.ours + 1, &to, sizeof(to));
+            call.ours[kGuessBytes - 1] = kNop;
+            Patch load{base + guess.metricsLoad, {}, {}};
+            load.ours[0] = guess.movImmediate;
+            std::memcpy(load.ours + 1, &metric, sizeof(metric));
+            load.ours[kGuessBytes - 1] = kNop;
+            patches.push_back(call);
+            patches.push_back(load);
+        }
+        for (size_t i = 0; i < patches.size(); ++i)
+        {
+            std::memcpy(patches[i].game, patches[i].at, kGuessBytes);
+            if (WriteCode(patches[i].at, patches[i].ours, kGuessBytes)) continue;
+            while (i-- > 0)
+                WriteCode(patches[i].at, patches[i].game, kGuessBytes);
+            return "the client's code could not be changed";
+        }
+        m_Patches          = std::move(patches);
+        g_ControllerGlobal = show.controllerGlobal;
+        g_ShowPointer      = reinterpret_cast<uintptr_t>(base) + show.show;
+        return "";
+    }
+
+    std::string PointerFix::Stop()
+    {
+        std::string failure;
+        for (const Patch& patch : m_Patches)
+        {
+            if (std::memcmp(patch.at, patch.ours, kGuessBytes) != 0)
+                failure = "the game's reading of the mouse was changed again after HeadsUp fixed it, so it was left as it is";
+            else if (!WriteCode(patch.at, patch.game, kGuessBytes))
+                failure = "the game's reading of the mouse could not be put back";
+        }
+        m_Patches.clear();
+        g_ControllerGlobal = g_ShowPointer = 0;
+        return failure;
+    }
+
+    void PointerFix::Enable(bool on) { g_FixPointer = on; }
+
+    void PointerFix::RevealUnderWindow()
+    {
+        if (!g_FixPointer || g_ControllerGlobal == 0 || g_ShowPointer == 0) return;
+        const uintptr_t controller = *reinterpret_cast<const uintptr_t*>(g_ControllerGlobal);
+        if (controller == 0 || *reinterpret_cast<const uint8_t*>(controller + kPointerShownOffset) != 0) return;
+        reinterpret_cast<ShowPointerFn>(g_ShowPointer)(controller, 1);
+    }
+}
+
+// In place of the game's GetWindowRect where it guesses its client area: the client area itself, in screen pixels.
+extern "C" BOOL __stdcall HeadsUpWindowRect(HWND window, RECT* rect)
+{
+    RECT client{};
+    if (!headsup::g_FixPointer || !GetClientRect(window, &client)) return GetWindowRect(window, rect);
+    POINT corners[2] = {{client.left, client.top}, {client.right, client.bottom}};
+    MapWindowPoints(window, nullptr, corners, 2);
+    *rect = RECT{corners[0].x, corners[0].y, corners[1].x, corners[1].y};
+    return TRUE;
+}
+
+// And in place of its GetSystemMetrics there, asked only for the borders and caption it then subtracts: none.
+extern "C" int __stdcall HeadsUpSystemMetric(int index) { return headsup::g_FixPointer ? 0 : GetSystemMetrics(index); }
 
 // On the game's stack, inside the target window's draw: nothing here may allocate, throw or call Ashita.
 extern "C" uint32_t HeadsUpOnArrow(const uint32_t* arguments, uint32_t returnAddress)
