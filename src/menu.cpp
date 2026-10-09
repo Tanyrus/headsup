@@ -79,34 +79,46 @@ namespace headsup
         constexpr ImVec2 kCellPadding   = ImVec2(12.0f, 0.0f);
         constexpr float kGrabMinSize    = 10.0f;
 
+        // XIUI's sidebar has a page per module; ours has one per thing that is drawn.
         enum Page : int
         {
+            kGlobalPage,
             kOutlinesPage,
-            kNameplatesPage,
+            kMobsPage,
+            kPlayersPage,
+            kNpcsPage,
+            kCursorPage,
             kDebugPage,
             kPageCount,
         };
-        const char* const kPageLabels[kPageCount] = {"Outlines", "Nameplates", "Debug"};
+        const char* const kPageLabels[kPageCount] = {"Global", "Outlines", "Mobs", "Players", "NPCs", "Cursor", "Debug"};
 
         // One bit each in Menu::m_Collapsed.
         enum Section : uint32_t
         {
-            kOutlineSection         = 1u << 0,
-            kMobsSection            = 1u << 1,
-            kMobColorsSection       = 1u << 2,
-            kNamesSection           = 1u << 3,
-            kTextSection            = 1u << 4,
-            kTextColorsSection      = 1u << 5,
-            kConColorsSection       = 1u << 6,
-            kDebugOutlinesSection   = 1u << 7,
-            kDebugNameplatesSection = 1u << 8,
-            kDebugFrameSection      = 1u << 9,
-            kPlayerIconsSection     = 1u << 10,
-            kMobInfoSection         = 1u << 11,
-            kHideSection            = 1u << 12,
-            kPlaceholdersSection    = 1u << 13,
-            kCursorSection          = 1u << 14,
-            kCursorColorsSection    = 1u << 15,
+            kTextSection            = 1u << 0,
+            kScaleSection           = 1u << 1,
+            kTextColorsSection      = 1u << 2,
+            kOutlineSection         = 1u << 3,
+            kMobsSection            = 1u << 4,
+            kMobColorsSection       = 1u << 5,
+            kMobDisplaySection      = 1u << 6,
+            kMobSizesSection        = 1u << 7,
+            kHideSection            = 1u << 8,
+            kPlaceholdersSection    = 1u << 9,
+            kConColorsSection       = 1u << 10,
+            kAccentColorsSection    = 1u << 11,
+            kPlayerDisplaySection   = 1u << 12,
+            kPlayerSizesSection     = 1u << 13,
+            kPlayerIconsSection     = 1u << 14,
+            kNpcDisplaySection      = 1u << 15,
+            kCursorSection          = 1u << 16,
+            kPointerSection         = 1u << 17,
+            kCursorColorsSection    = 1u << 18,
+            kDebugGeneralSection    = 1u << 19,
+            kDebugOutlinesSection   = 1u << 20,
+            kDebugNameplatesSection = 1u << 21,
+            kDebugFrameSection      = 1u << 22,
         };
 
         const char* const kCategoryLabels[kCategoryCount] = {"Aggressive", "Passive", "No data", "Aggressive NM",
@@ -382,27 +394,6 @@ namespace headsup
             }
         };
 
-        // The window's own title row, in place of ImGui's title bar so the ON/OFF chip can sit beside the name. Dragging
-        // any empty part of the window moves it.
-        void DrawTitle(Ui& ui, Settings& s, bool& open, double version)
-        {
-            ui.gui->AlignTextToFramePadding();
-            ui.Colored(kText, "HeadsUp");
-            ui.gui->SameLine();
-            char shown[16];
-            std::snprintf(shown, sizeof(shown), "v%g", version);
-            ui.Colored(kMuted, shown);
-            ui.gui->SameLine();
-            ui.Chip(s.enabled);
-            ui.Tip("Turns every outline and nameplate on or off, the same as /hu on and /hu off.");
-            ui.gui->SameLine();
-            const float size = ui.gui->GetFrameHeight();
-            ui.gui->SetCursorPosX(ui.gui->GetWindowWidth() - ui.style.WindowPadding.x - size);
-            if (ui.Button("x##close", ImVec2(size, size), kFlatButton)) open = false;
-            ui.Tip("Close. /hu opens it again.");
-            ui.gui->Spacing();
-        }
-
         void DrawSidebar(Ui& ui, int& page)
         {
             const ImVec2 spacing = ui.style.ItemSpacing;
@@ -423,7 +414,7 @@ namespace headsup
 
         void DrawTabs(Ui& ui, bool& colorsTab, bool hasColors)
         {
-            const char* const labels[2] = {"Settings", "Color Settings"};
+            const char* const labels[2] = {"settings", "color settings"};
             const int tabs              = hasColors ? 2 : 1;
             // No gap under the tabs: a row's gap is taken when its last item is placed.
             const float spacingY   = ui.style.ItemSpacing.y;
@@ -459,7 +450,7 @@ namespace headsup
                 ui.SliderFloat("Max distance", s.maxDistance, kMinOutlineDistance, kMaxOutlineDistance, "%.0f yalms", "%.0f",
                     "Mobs farther away, in yalms, get no outline. Nameplates are not limited.");
             }
-            if (ui.Section("Mobs to outline", kMobsSection, collapsed))
+            if (ui.Section("Mobs to Outline", kMobsSection, collapsed))
             {
                 for (const Category category : kCategoryOrder)
                 {
@@ -474,7 +465,7 @@ namespace headsup
         void DrawOutlineColors(Ui& ui, Settings& s, uint32_t& collapsed)
         {
             ui.Fade(!s.enabled);
-            if (ui.Section("Mob colors", kMobColorsSection, collapsed))
+            if (ui.Section("Mob Colors", kMobColorsSection, collapsed))
             {
                 for (const Category category : kCategoryOrder)
                 {
@@ -486,79 +477,99 @@ namespace headsup
             ui.Fade(false);
         }
 
-        void DrawNameplateSettings(Ui& ui, Settings& s, uint32_t& collapsed, const std::vector<std::string>& fonts)
+        void DrawGlobalSettings(Ui& ui, Settings& s, uint32_t& collapsed, const std::vector<std::string>& fonts)
         {
             const bool anyNames = ReplacesAnyName(s);
-            ui.Fade(!s.enabled);
-            if (ui.Section("Names", kNamesSection, collapsed))
-            {
-                ui.Check("Replace mob names", s.replaceMobNames,
-                    "Hides the game's mob names and draws them in your font, in the game's color.");
-                ui.Check("Replace player names", s.replacePlayerNames,
-                    "The same for players, you included. Levels and MobDB icons are for mobs only.");
-                ui.Check("Replace NPC names", s.replaceNpcNames, "The same for NPCs.");
-            }
-            if (ui.Section("Text", kTextSection, collapsed))
+            ui.Fade(!anyNames);
+            if (ui.Section("Text Settings", kTextSection, collapsed))
             {
                 ui.FontDropdown("Name font", s.fontName, fonts);
                 ui.gui->SameLine();
                 ui.Check("Bold##name", s.fontBold, "Bold names.");
-                ui.Fade(!anyNames);
-                ui.Fade(!s.enabled || !s.replaceMobNames);
-                ui.SliderInt("Mob name size", s.mobNameSize, kMinTextSize, kMaxTextSize, "%d px", "The height of mob names.");
-                ui.Fade(!s.enabled || !s.replacePlayerNames);
-                ui.SliderInt("Your name size", s.selfNameSize, kMinTextSize, kMaxTextSize, "%d px", "The height of your own name.");
-                ui.SliderInt("Player name size", s.playerNameSize, kMinTextSize, kMaxTextSize, "%d px",
-                    "The height of other players' names.");
-                ui.Fade(!s.enabled || !s.replaceNpcNames);
-                ui.SliderInt("NPC name size", s.npcNameSize, kMinTextSize, kMaxTextSize, "%d px", "The height of NPC names.");
-                ui.Fade(!anyNames);
-                ui.SliderInt("Raise names", s.nameRaise, kMinNameRaise, kMaxNameRaise, "%d px",
-                    "How far above the game's own spot the names HeadsUp draws sit, with everything above them.");
-                ui.Fade(!s.enabled || !s.replaceMobNames);
-                ui.Check("Glow around mob names", s.nameGlow,
-                    "A soft glow in the mob's outline color: red will attack, green won't, purple is a placeholder.");
-                ui.Fade(!s.enabled || !s.replaceMobNames || !s.nameGlow);
-                ui.SliderInt("Glow strength", s.glowStrength, kMinGlowStrength, kMaxGlowStrength, "%d%%",
-                    "How strong the glow around mob names is.");
-                ui.SliderInt("Glow size", s.glowSize, kMinGlowSize, kMaxGlowSize, "%d%%", "How far the glow spreads from the letters.");
-                ui.Fade(!s.enabled);
-                ui.Check("Scale with distance", s.scaleWithDistance,
-                    "Every size grows and shrinks with the game's own name size as the name comes closer or moves away.");
-                ui.Fade(!s.enabled || !s.scaleWithDistance);
-                ui.Check("Scale your name", s.scaleOwnName, "Off, your own name and everything above it stay one size.");
-                ui.Check("Scale other players' names", s.scalePlayerNames,
-                    "Off, other players' names and their icons stay one size at any distance.");
-            }
-            if (ui.Section("Level and icons", kMobInfoSection, collapsed))
-            {
-                ui.Check("Show level and con", s.showLabels,
-                    "Lv 20-23 EP-DC: the level range from the Phoenix data and how it cons to you. After you /check the "
-                    "mob, its exact level, until it respawns.");
                 ui.Fade(!s.enabled || !s.showLabels);
                 ui.FontDropdown("Level font", s.labelFontName, fonts);
                 ui.gui->SameLine();
                 ui.Check("Bold##level", s.labelFontBold, "A bold level line and placeholder timers.");
-                ui.SliderInt("Level and con size", s.labelSize, kMinTextSize, kMaxTextSize, "%d px", "The level line's height.");
-                ui.Check("Show ornament", s.showOrnament,
-                    "A thin line with a diamond between a mob's level line and its name, in its outline color.");
-                ui.Fade(!s.enabled || !s.showLabels || !s.showOrnament);
-                ui.SliderInt("Ornament width", s.ornamentWidth, kMinOrnamentWidth, kMaxOrnamentWidth, "%d px",
-                    "The line's length.");
-                ui.SliderInt("Ornament height", s.ornamentThickness, kMinOrnamentThickness, kMaxOrnamentThickness, "%d px",
-                    "The diamond's height.");
-                ui.Fade(!s.enabled);
+                ui.Fade(!anyNames);
+                ui.SliderInt("Raise names", s.nameRaise, kMinNameRaise, kMaxNameRaise, "%d px",
+                    "How far above the game's own spot the names HeadsUp draws sit, with everything above them.");
+            }
+            ui.Fade(!s.enabled);
+            if (ui.Section("Scale with Distance", kScaleSection, collapsed))
+            {
+                ui.Check("Scale with distance", s.scaleWithDistance,
+                    "Every size grows and shrinks with the game's own name size as the name comes closer or moves away. "
+                    "Your name, other players' names and the cursor each have their own switch too.");
+            }
+            ui.Fade(false);
+        }
+
+        void DrawGlobalColors(Ui& ui, Settings& s, uint32_t& collapsed)
+        {
+            const bool anyNames = ReplacesAnyName(s);
+            ui.Fade(!anyNames);
+            if (ui.Section("Text Colors", kTextColorsSection, collapsed))
+            {
+                ui.changed |= ui.gui->Checkbox("##ownNameColor", &s.ownNameColor);
+                ui.gui->SameLine();
+                ui.Fade(!anyNames || !s.ownNameColor);
+                ui.Swatch("Own name color", s.nameColor,
+                    "Off: names keep the game's color, which shows who claimed the mob. On: every name takes this color.");
+                ui.Fade(!anyNames);
+                ui.Swatch("Name shadow", s.textOutline, "The soft shadow under names, and the edge of the target cursor.");
+                ui.SliderInt("Name shadow strength", s.nameShadow, kMinShadowStrength, kMaxShadowStrength, "%d%%",
+                    "0% draws names with no shadow.");
+                ui.Fade(!s.enabled || !s.showLabels);
+                ui.Swatch("Level shadow", s.labelShadowColor, "The soft shadow under the level line and the placeholder timers.");
+                ui.SliderInt("Level shadow strength", s.labelShadow, kMinShadowStrength, kMaxShadowStrength, "%d%%",
+                    "0% draws the level line with no shadow.");
+            }
+            ui.Fade(false);
+        }
+
+        void DrawMobSettings(Ui& ui, Settings& s, uint32_t& collapsed)
+        {
+            ui.Fade(!s.enabled);
+            if (ui.Section("Display Options", kMobDisplaySection, collapsed))
+            {
+                ui.Check("Replace mob names", s.replaceMobNames,
+                    "Hides the game's mob names and draws them in your font, in the game's color.");
+                ui.Check("Show level and con", s.showLabels,
+                    "Lv 20-23 EP-DC: the level range from the Phoenix data and how it cons to you. After you /check the "
+                    "mob, its exact level, until it respawns.");
                 ui.Check("Show icons", s.showIcons,
                     "XIUI's MobDB icons: aggressive or passive, whether it links, and how it detects you.");
-                ui.Fade(!s.enabled || !s.showIcons);
-                ui.SliderInt("Icon size", s.iconSize, kMinTextSize, kMaxTextSize, "%d px", "Each MobDB icon's width and height.");
+                ui.Fade(!s.enabled || !s.showLabels);
+                ui.Check("Show ornament", s.showOrnament,
+                    "A thin line with a diamond between a mob's level line and its name, in its outline color.");
+                ui.Fade(!s.enabled || !s.replaceMobNames);
+                ui.Check("Glow around mob names", s.nameGlow,
+                    "A soft glow in the mob's outline color: red will attack, green won't, purple is a placeholder.");
                 ui.Fade(!s.enabled);
                 ui.Choice("Mob ID", s.mobId, kMobIdLabels, kMobIdFormatCount,
                     "The mob's ID on its level line: its last three hex digits (Lv 1-3 EM [006]), as players name NM "
                     "placeholders, or the whole ID in decimal and hex.");
             }
+            if (ui.Section("Sizes", kMobSizesSection, collapsed))
+            {
+                ui.Fade(!s.enabled || !s.replaceMobNames);
+                ui.SliderInt("Name size", s.mobNameSize, kMinTextSize, kMaxTextSize, "%d px", "The height of mob names.");
+                ui.Fade(!s.enabled || !s.showLabels);
+                ui.SliderInt("Level and con size", s.labelSize, kMinTextSize, kMaxTextSize, "%d px", "The level line's height.");
+                ui.Fade(!s.enabled || !s.showIcons);
+                ui.SliderInt("Icon size", s.iconSize, kMinTextSize, kMaxTextSize, "%d px", "Each MobDB icon's width and height.");
+                ui.Fade(!s.enabled || !s.showLabels || !s.showOrnament);
+                ui.SliderInt("Ornament width", s.ornamentWidth, kMinOrnamentWidth, kMaxOrnamentWidth, "%d px",
+                    "The line's length.");
+                ui.SliderInt("Ornament height", s.ornamentThickness, kMinOrnamentThickness, kMaxOrnamentThickness, "%d px",
+                    "The diamond's height.");
+                ui.Fade(!s.enabled || !s.replaceMobNames || !s.nameGlow);
+                ui.SliderInt("Glow strength", s.glowStrength, kMinGlowStrength, kMaxGlowStrength, "%d%%",
+                    "How strong the glow around mob names is.");
+                ui.SliderInt("Glow size", s.glowSize, kMinGlowSize, kMaxGlowSize, "%d%%", "How far the glow spreads from the letters.");
+            }
             ui.Fade(!s.enabled || (!s.showLabels && s.mobId == MobIdFormat::Off && !s.showIcons));
-            if (ui.Section("Hide level and icons", kHideSection, collapsed))
+            if (ui.Section("Hide Level and Icons", kHideSection, collapsed))
             {
                 ui.Check("On mobs your party claimed", s.hideClaimedByParty,
                     "Takes the level line and icons off a mob once you or your party has claimed it. Its name and the "
@@ -569,7 +580,7 @@ namespace headsup
                     "Takes the level line and icons off every mob while you are engaged.");
             }
             ui.Fade(!s.enabled);
-            if (ui.Section("NM placeholders", kPlaceholdersSection, collapsed))
+            if (ui.Section("NM Placeholders", kPlaceholdersSection, collapsed))
             {
                 ui.Fade(!s.enabled || s.mobId == MobIdFormat::Off);
                 ui.Check("Mark them [PH]", s.markPlaceholders,
@@ -584,81 +595,13 @@ namespace headsup
                 ui.Fade(!s.enabled || !s.phTimers);
                 ui.SliderInt("Timer size", s.timerSize, kMinTextSize, kMaxTextSize, "%d px", "The timer lines' height.");
             }
-            ui.Fade(!s.enabled || !s.replacePlayerNames);
-            if (ui.Section("Player icons", kPlayerIconsSection, collapsed))
-            {
-                ui.Check("Show player icons", s.showPlayerIcons,
-                    "Beside replaced player names: seeking party, bazaar, linkshell in its color, away, mentor, new "
-                    "adventurer, GM and level sync, in XIUI's HQ versions of the game's icons. Each can go left or right of "
-                    "the name, or be hidden.");
-                ui.Fade(!s.enabled || !s.replacePlayerNames || !s.showPlayerIcons);
-                ui.Check("Center name and icons", s.centerNameAndIcons,
-                    "Centers a player's name and the icons beside it together over them, as the game does. Off, the name "
-                    "alone is centered and the icons hang to its sides.");
-                ui.SliderInt("Player icon size", s.playerIconSize, kMinPlayerIconSize, kMaxPlayerIconSize, "%d%%",
-                    "The icons beside player names, as a share of the name's height, so they grow and shrink with it.");
-                for (int i = 0; i < kPlayerIconCount; ++i)
-                    ui.Choice(kPlayerIconLabels[i], s.playerIconSide[i], kIconSideLabels, kIconSideCount, kPlayerIconTips[i]);
-            }
-            ui.Fade(!s.enabled);
-            if (ui.Section("Cursor and pointer", kCursorSection, collapsed))
-            {
-                ui.Check("Replace target cursor", s.replaceCursor,
-                    "Hides the game's cursor over your target and draws HeadsUp's above its nameplate instead: one color for "
-                    "your target, one while you are locked on, and one for the sub-target cursor.");
-                ui.Fade(!s.enabled || !s.replaceCursor);
-                ui.Check("Phoenix feather cursor", s.cursorFeather, "Phoenix's feather icon instead of the arrow, in the same colors.");
-                ui.SliderInt("Cursor size", s.cursorSize, kMinTextSize, kMaxTextSize, "%d px", "The target cursor's height.");
-                ui.Check("Scale cursor with distance", s.scaleCursor,
-                    "The cursor grows and shrinks with the game's name size as its target comes closer or moves away, "
-                    "whatever the names do.");
-                ui.Fade(!s.enabled);
-                ui.Check("Chocobo mouse pointer", s.chocoboPointer,
-                    "PlayOnline's chocobo in place of the game's mouse pointer, over menus too. The camera arrows stay the "
-                    "game's.");
-            }
             ui.Fade(false);
         }
 
-        void DrawNameplateColors(Ui& ui, Settings& s, uint32_t& collapsed)
+        void DrawMobColors(Ui& ui, Settings& s, uint32_t& collapsed)
         {
-            ui.Fade(!s.enabled);
-            if (ui.Section("Text and icons", kTextColorsSection, collapsed))
-            {
-                const bool anyNames = ReplacesAnyName(s);
-                ui.Fade(!anyNames);
-                ui.changed |= ui.gui->Checkbox("##ownNameColor", &s.ownNameColor);
-                ui.gui->SameLine();
-                ui.Fade(!anyNames || !s.ownNameColor);
-                ui.Swatch("Own name color", s.nameColor,
-                    "Off: names keep the game's color, which shows who claimed the mob. On: every name takes this color.");
-                ui.Fade(!anyNames);
-                ui.Swatch("Name shadow", s.textOutline, "The soft shadow under names, and the edge of the target cursor.");
-                ui.SliderInt("Name shadow strength", s.nameShadow, kMinShadowStrength, kMaxShadowStrength, "%d%%",
-                    "0% draws names with no shadow.");
-                ui.Fade(!s.enabled || !s.showLabels);
-                ui.Swatch("Level shadow", s.labelShadowColor, "The soft shadow under the level line and the placeholder timers.");
-                ui.SliderInt("Level shadow strength", s.labelShadow, kMinShadowStrength, kMaxShadowStrength, "%d%%",
-                    "0% draws the level line with no shadow.");
-                ui.Fade(!s.enabled || !s.replaceMobNames || !s.nameGlow);
-                ui.changed |= ui.gui->Checkbox("##ownGlowColor", &s.ownGlowColor);
-                ui.gui->SameLine();
-                ui.Fade(!s.enabled || !s.replaceMobNames || !s.nameGlow || !s.ownGlowColor);
-                ui.Swatch("Own glow color", s.glowColor,
-                    "Off: a mob's name glows in its outline color, so the glow says whether it will attack. On: every glow "
-                    "takes this color.");
-                ui.Fade(!s.enabled || !s.showLabels || !s.showOrnament);
-                ui.changed |= ui.gui->Checkbox("##ownOrnamentColor", &s.ownOrnamentColor);
-                ui.gui->SameLine();
-                ui.Fade(!s.enabled || !s.showLabels || !s.showOrnament || !s.ownOrnamentColor);
-                ui.Swatch("Own ornament color", s.ornamentColor,
-                    "Off: the ornament takes the mob's outline color. On: every ornament takes this color.");
-                ui.Fade(!s.enabled);
-                ui.Fade(!s.enabled || !s.showIcons);
-                ui.Swatch("Icon tint", s.iconTint, "Multiplies the MobDB icons' colors. White keeps them as they are.");
-            }
             ui.Fade(!s.enabled || !s.showLabels);
-            if (ui.Section("Level and con", kConColorsSection, collapsed))
+            if (ui.Section("Level and Con", kConColorsSection, collapsed))
             {
                 ui.Colored(kMuted, "One color for each con.");
                 ui.Help("Easy Prey also covers Incredibly Easy Prey, and Very Tough covers Incredibly Tough. Unknown level "
@@ -675,8 +618,112 @@ namespace headsup
                     ui.gui->EndTable();
                 }
             }
+            ui.Fade(!s.enabled);
+            if (ui.Section("Glow, Ornament and Icons", kAccentColorsSection, collapsed))
+            {
+                ui.Fade(!s.enabled || !s.replaceMobNames || !s.nameGlow);
+                ui.changed |= ui.gui->Checkbox("##ownGlowColor", &s.ownGlowColor);
+                ui.gui->SameLine();
+                ui.Fade(!s.enabled || !s.replaceMobNames || !s.nameGlow || !s.ownGlowColor);
+                ui.Swatch("Own glow color", s.glowColor,
+                    "Off: a mob's name glows in its outline color, so the glow says whether it will attack. On: every glow "
+                    "takes this color.");
+                ui.Fade(!s.enabled || !s.showLabels || !s.showOrnament);
+                ui.changed |= ui.gui->Checkbox("##ownOrnamentColor", &s.ownOrnamentColor);
+                ui.gui->SameLine();
+                ui.Fade(!s.enabled || !s.showLabels || !s.showOrnament || !s.ownOrnamentColor);
+                ui.Swatch("Own ornament color", s.ornamentColor,
+                    "Off: the ornament takes the mob's outline color. On: every ornament takes this color.");
+                ui.Fade(!s.enabled || !s.showIcons);
+                ui.Swatch("Icon tint", s.iconTint, "Multiplies the MobDB icons' colors. White keeps them as they are.");
+            }
+            ui.Fade(false);
+        }
+
+        void DrawPlayerSettings(Ui& ui, Settings& s, uint32_t& collapsed)
+        {
+            ui.Fade(!s.enabled);
+            if (ui.Section("Display Options", kPlayerDisplaySection, collapsed))
+            {
+                ui.Check("Replace player names", s.replacePlayerNames,
+                    "Hides the game's player names, yours included, and draws them in your font, in the game's color.");
+                ui.Fade(!s.enabled || !s.replacePlayerNames);
+                ui.Check("Show player icons", s.showPlayerIcons,
+                    "Beside replaced player names: seeking party, bazaar, linkshell in its color, away, mentor, new "
+                    "adventurer, GM and level sync, in XIUI's HQ versions of the game's icons. Each can go left or right of "
+                    "the name, or be hidden.");
+                ui.Fade(!s.enabled || !s.replacePlayerNames || !s.showPlayerIcons);
+                ui.Check("Center name and icons", s.centerNameAndIcons,
+                    "Centers a player's name and the icons beside it together over them, as the game does. Off, the name "
+                    "alone is centered and the icons hang to its sides.");
+            }
+            ui.Fade(!s.enabled || !s.replacePlayerNames);
+            if (ui.Section("Sizes", kPlayerSizesSection, collapsed))
+            {
+                ui.SliderInt("Your name size", s.selfNameSize, kMinTextSize, kMaxTextSize, "%d px", "The height of your own name.");
+                ui.SliderInt("Player name size", s.playerNameSize, kMinTextSize, kMaxTextSize, "%d px",
+                    "The height of other players' names.");
+                ui.Fade(!s.enabled || !s.replacePlayerNames || !s.showPlayerIcons);
+                ui.SliderInt("Player icon size", s.playerIconSize, kMinPlayerIconSize, kMaxPlayerIconSize, "%d%%",
+                    "The icons beside player names, as a share of the name's height, so they grow and shrink with it.");
+                ui.Fade(!s.enabled || !s.replacePlayerNames || !s.scaleWithDistance);
+                ui.Check("Scale your name", s.scaleOwnName,
+                    "With Scale with distance on (Global page): off, your own name and everything above it stay one size.");
+                ui.Check("Scale other players' names", s.scalePlayerNames,
+                    "With Scale with distance on (Global page): off, other players' names and their icons stay one size at "
+                    "any distance.");
+            }
+            ui.Fade(!s.enabled || !s.replacePlayerNames || !s.showPlayerIcons);
+            if (ui.Section("Player Icons", kPlayerIconsSection, collapsed))
+            {
+                for (int i = 0; i < kPlayerIconCount; ++i)
+                    ui.Choice(kPlayerIconLabels[i], s.playerIconSide[i], kIconSideLabels, kIconSideCount, kPlayerIconTips[i]);
+            }
+            ui.Fade(false);
+        }
+
+        void DrawNpcSettings(Ui& ui, Settings& s, uint32_t& collapsed)
+        {
+            ui.Fade(!s.enabled);
+            if (ui.Section("Display Options", kNpcDisplaySection, collapsed))
+            {
+                ui.Check("Replace NPC names", s.replaceNpcNames,
+                    "Hides the game's NPC names and draws them in your font, in the game's color.");
+                ui.Fade(!s.enabled || !s.replaceNpcNames);
+                ui.SliderInt("NPC name size", s.npcNameSize, kMinTextSize, kMaxTextSize, "%d px", "The height of NPC names.");
+            }
+            ui.Fade(false);
+        }
+
+        void DrawCursorSettings(Ui& ui, Settings& s, uint32_t& collapsed)
+        {
+            ui.Fade(!s.enabled);
+            if (ui.Section("Target Cursor", kCursorSection, collapsed))
+            {
+                ui.Check("Replace target cursor", s.replaceCursor,
+                    "Hides the game's cursor over your target and draws HeadsUp's above its nameplate instead: one color for "
+                    "your target, one while you are locked on, and one for the sub-target cursor.");
+                ui.Fade(!s.enabled || !s.replaceCursor);
+                ui.Check("Phoenix feather cursor", s.cursorFeather, "Phoenix's feather icon instead of the arrow, in the same colors.");
+                ui.SliderInt("Cursor size", s.cursorSize, kMinTextSize, kMaxTextSize, "%d px", "The target cursor's height.");
+                ui.Check("Scale cursor with distance", s.scaleCursor,
+                    "The cursor grows and shrinks with the game's name size as its target comes closer or moves away, "
+                    "whatever the names do.");
+            }
+            ui.Fade(!s.enabled);
+            if (ui.Section("Mouse Pointer", kPointerSection, collapsed))
+            {
+                ui.Check("Chocobo mouse pointer", s.chocoboPointer,
+                    "PlayOnline's chocobo in place of the game's mouse pointer, over menus too. The camera arrows stay the "
+                    "game's.");
+            }
+            ui.Fade(false);
+        }
+
+        void DrawCursorColors(Ui& ui, Settings& s, uint32_t& collapsed)
+        {
             ui.Fade(!s.enabled || !s.replaceCursor);
-            if (ui.Section("Target cursor", kCursorColorsSection, collapsed))
+            if (ui.Section("Target Cursor", kCursorColorsSection, collapsed))
             {
                 ui.Swatch("Target cursor", s.cursorColor, "The cursor over your target.");
                 ui.Swatch("Locked-on cursor", s.lockedCursorColor, "The cursor over your target while you are locked on.");
@@ -702,9 +749,17 @@ namespace headsup
             ui.gui->EndTable();
         }
 
-        void DrawDebug(Ui& ui, const MenuStatus& status, uint32_t& collapsed, bool& requested)
+        void DrawDebug(Ui& ui, Settings& s, const MenuStatus& status, uint32_t& collapsed, bool& requested)
         {
             char outlined[32], meshes[32], shown[32], names[64], frame[48], level[32];
+            if (ui.Section("General", kDebugGeneralSection, collapsed))
+            {
+                ui.gui->AlignTextToFramePadding();
+                ui.gui->TextUnformatted("Outlines and nameplates");
+                ui.gui->SameLine();
+                ui.Chip(s.enabled);
+                ui.Help("Turns every outline and nameplate on or off, the same as /hu on and /hu off.");
+            }
             if (ui.Section("Outlines", kDebugOutlinesSection, collapsed))
             {
                 std::snprintf(outlined, sizeof(outlined), "%u", status.outlinedMobs);
@@ -768,10 +823,12 @@ namespace headsup
         ApplyPhoenixStyle(style);
         Ui ui{gui, style, style.Alpha};
 
+        // XIUI's title bar, its version in it; ### keeps the window the same one as the version changes.
+        char title[48];
+        std::snprintf(title, sizeof(title), "HeadsUp - v%g###HeadsUp", status.version);
         gui->SetNextWindowSize(ImVec2(kWindowWidth, kWindowHeight), ImGuiCond_Always);
-        if (gui->Begin("HeadsUp", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar))
+        if (gui->Begin(title, &open, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse))
         {
-            DrawTitle(ui, s, open, status.version);
             if (gui->BeginTable("##layout", 2, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_BordersInnerV))
             {
                 gui->TableSetupColumn("##pages", ImGuiTableColumnFlags_WidthFixed, kSidebarWidth, 0);
@@ -780,29 +837,41 @@ namespace headsup
                 gui->TableNextColumn();
                 DrawSidebar(ui, m_Page);
                 gui->TableNextColumn();
-                const bool hasColors = m_Page == kOutlinesPage || m_Page == kNameplatesPage;
+                const bool hasColors = m_Page == kGlobalPage || m_Page == kOutlinesPage || m_Page == kMobsPage || m_Page == kCursorPage;
                 if (!hasColors) m_ColorsTab = false;
                 DrawTabs(ui, m_ColorsTab, hasColors);
                 switch (m_Page)
                 {
+                case kGlobalPage:
+                    if (m_ColorsTab)
+                        DrawGlobalColors(ui, s, m_Collapsed);
+                    else
+                    {
+                        if (m_Fonts.empty()) m_Fonts = FontChoices(InstalledFontFamilies(), s.fontName);
+                        DrawGlobalSettings(ui, s, m_Collapsed, m_Fonts);
+                    }
+                    break;
                 case kOutlinesPage:
                     if (m_ColorsTab)
                         DrawOutlineColors(ui, s, m_Collapsed);
                     else
                         DrawOutlineSettings(ui, s, m_Collapsed, status);
                     break;
-                case kNameplatesPage:
+                case kMobsPage:
                     if (m_ColorsTab)
-                        DrawNameplateColors(ui, s, m_Collapsed);
+                        DrawMobColors(ui, s, m_Collapsed);
                     else
-                    {
-                        if (m_Fonts.empty()) m_Fonts = FontChoices(InstalledFontFamilies(), s.fontName);
-                        DrawNameplateSettings(ui, s, m_Collapsed, m_Fonts);
-                    }
+                        DrawMobSettings(ui, s, m_Collapsed);
                     break;
-                default:
-                    DrawDebug(ui, status, m_Collapsed, m_DebugRequested);
+                case kPlayersPage: DrawPlayerSettings(ui, s, m_Collapsed); break;
+                case kNpcsPage: DrawNpcSettings(ui, s, m_Collapsed); break;
+                case kCursorPage:
+                    if (m_ColorsTab)
+                        DrawCursorColors(ui, s, m_Collapsed);
+                    else
+                        DrawCursorSettings(ui, s, m_Collapsed);
                     break;
+                default: DrawDebug(ui, s, status, m_Collapsed, m_DebugRequested); break;
                 }
                 gui->EndTable();
             }
