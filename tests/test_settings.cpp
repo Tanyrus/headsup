@@ -144,6 +144,7 @@ iconLinkshell=hide
 iconBazaar=right
 iconSeekingParty=hide
 mobId=lastThree
+look=fantasy
 )";
 
     Settings SavedSettings()
@@ -207,6 +208,7 @@ mobId=lastThree
         for (const PlayerIcon icon : {PlayerIcon::Mentor, PlayerIcon::LevelSync, PlayerIcon::Linkshell, PlayerIcon::SeekingParty})
             s.playerIconSide[static_cast<int>(icon)] = IconSide::Hidden;
         s.mobId = MobIdFormat::LastThree;
+        s.look  = Look::Fantasy;
         return s;
     }
 

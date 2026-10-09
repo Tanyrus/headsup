@@ -6,7 +6,7 @@ using namespace headsup;
 TEST(utf8_becomes_utf16)
 {
     CHECK(Utf16("Lv 22") == std::wstring(L"Lv 22"));
-    CHECK(Utf16("\xC2\xB7") == std::wstring(L"\x00B7"));               // the middle dot separator
+    CHECK(Utf16("\xC2\xB7") == std::wstring(L"\x00B7"));               // a middle dot
     CHECK(Utf16("a\xE2\x82\xAC") == std::wstring(L"a\x20AC"));         // three bytes: the euro sign
     CHECK(Utf16("\xF0\x9F\x90\xA6") == std::wstring(L"\xD83D\xDC26")); // above U+FFFF: a surrogate pair
     CHECK(Utf16("") == std::wstring());

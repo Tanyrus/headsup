@@ -86,11 +86,11 @@ namespace headsup
                         MobIdText(a.serverId, placeholder, settings.mobId, settings.markPlaceholders));
                     info.mobIcons = IconsFor(mob);
                 }
+                const bool placeholderColor = placeholder && settings.show[CategoryIndex(Category::Placeholder)];
+                info.category = placeholderColor ? Category::Placeholder : Classify(mob, a.checked ? a.checked->level : 0, player);
                 if (settings.enabled && a.alive && a.distance <= settings.maxDistance)
                 {
-                    const bool placeholderColor = placeholder && settings.show[CategoryIndex(Category::Placeholder)];
-                    const int category = CategoryIndex(placeholderColor ? Category::Placeholder
-                                                                        : Classify(mob, a.checked ? a.checked->level : 0, player));
+                    const int category = CategoryIndex(info.category);
                     if (settings.show[category])
                     {
                         info.outline    = true;

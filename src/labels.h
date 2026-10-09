@@ -20,10 +20,15 @@ namespace headsup
     };
     constexpr int kLabelShadeCount = static_cast<int>(LabelShade::VeryTough) + 1;
 
+    // Between the level line's parts: "Lv 22-23 IT [106]".
+    constexpr const char* kLabelSeparator = " ";
+
     struct Label
     {
-        char text[48];
+        static constexpr size_t kNoMark = static_cast<size_t>(-1);
+        char text[72];
         LabelShade shade;
+        size_t markAt = kNoMark; // where the placeholder mark starts in text: it is drawn in the placeholder's color
     };
 
     // A mob's server ID holds its zone above its target index, the ID's last three hex digits.

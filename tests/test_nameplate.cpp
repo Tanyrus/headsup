@@ -327,3 +327,24 @@ TEST(the_cursor_bobs_up_from_its_place_and_back_again)
     CHECK(Near(lowest, -3.0f, 0.05f)); // 15% of 20 px, upward
     CHECK(Near(highest, 0.0f, 0.05f));
 }
+
+TEST(the_ornament_sits_between_the_level_line_and_the_name)
+{
+    // Game name centered at (1040, 205). Name 100x18, label 80x16, an ornament 108x7.
+    const ScreenBox plate = Box(1000.0f, 200.0f, 1080.0f, 210.0f);
+    LineSizes sizes;
+    sizes.nameWidth = 100.0f, sizes.nameHeight = 18.0f, sizes.labelWidth = 80.0f, sizes.labelHeight = 16.0f;
+    sizes.ornamentWidth = 108.0f, sizes.ornamentHeight = 7.0f;
+    const NameplateLayout l = LayoutNameplate(plate, sizes, true);
+    CHECK(Near(l.nameY, 196.0f));
+    CHECK(Near(l.ornamentY, 190.0f) && Near(l.ornamentX, 986.0f)); // centered, 2 px under the label
+    CHECK(Near(l.labelY, 172.0f));                                 // the label moved up to make room
+}
+
+TEST(no_ornament_leaves_the_label_where_it_was)
+{
+    const ScreenBox plate = Box(1000.0f, 200.0f, 1080.0f, 210.0f);
+    LineSizes sizes;
+    sizes.nameWidth = 100.0f, sizes.nameHeight = 18.0f, sizes.labelWidth = 80.0f, sizes.labelHeight = 16.0f;
+    CHECK(Near(LayoutNameplate(plate, sizes, true).labelY, 183.0f));
+}

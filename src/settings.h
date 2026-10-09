@@ -23,6 +23,12 @@ namespace headsup
     constexpr int kCategoryCount = static_cast<int>(Category::Placeholder) + 1;
     constexpr int CategoryIndex(Category category) { return static_cast<int>(category); }
 
+    enum class Look : uint8_t
+    {
+        Fantasy,
+    };
+    constexpr int kLookCount = static_cast<int>(Look::Fantasy) + 1;
+
     // Opaque: outline copies take alpha from the mob's texture, where it shapes hair and cloth cut-outs.
     struct Color
     {
@@ -64,6 +70,7 @@ namespace headsup
         bool markPlaceholders  = true;  // "[PH]" for a lottery placeholder's ID
         bool phTimers          = false; // above your name, a respawn timer for each placeholder you see die
         bool scaleWithDistance = true;  // sizes follow the game's name size
+        Look look              = Look::Fantasy; // which style the plates are drawn in
         std::string fontName   = kDefaultFont; // a font family installed in Windows
         bool fontBold          = false;
         int nameSize           = 15;    // pixels

@@ -1,6 +1,7 @@
 #include "labels.h"
 
 #include <cstdio>
+#include <cstring>
 
 namespace headsup
 {
@@ -26,7 +27,7 @@ namespace headsup
                 return text;
             case MobIdFormat::Full:
                 std::snprintf(text, sizeof(text), "[%u (0x%X)]%s%s", static_cast<unsigned>(serverId), static_cast<unsigned>(serverId),
-                    marked ? " " : "", marked ? kPlaceholderMark : "");
+                    marked ? kLabelSeparator : "", marked ? kPlaceholderMark : "");
                 return text;
         }
         return "";
@@ -34,9 +35,11 @@ namespace headsup
 
     Label LevelLine(const Label& level, bool showLevel, const std::string& id)
     {
-        const std::string text = std::string(showLevel ? level.text : "") + (showLevel && !id.empty() ? " " : "") + id;
+        const bool both        = showLevel && !id.empty();
+        const std::string text = std::string(showLevel ? level.text : "") + (both ? kLabelSeparator : "") + id;
         Label line             = level;
         std::snprintf(line.text, sizeof(line.text), "%s", text.c_str());
+        line.markAt = id.ends_with(kPlaceholderMark) ? text.size() - std::strlen(kPlaceholderMark) : Label::kNoMark;
         return line;
     }
 
@@ -52,13 +55,13 @@ namespace headsup
         label.shade = LabelShade::Unknown;
         if (checked != nullptr && checked->level > 0)
         {
-            std::snprintf(label.text, sizeof(label.text), "Lv %d %s", checked->level, Abbrev(checked->con));
+            std::snprintf(label.text, sizeof(label.text), "Lv %d%s%s", checked->level, kLabelSeparator, Abbrev(checked->con));
             label.shade = ShadeFor(checked->con);
             return label;
         }
         if (mob == nullptr || mob->maxLevel == 0)
         {
-            std::snprintf(label.text, sizeof(label.text), "Lv ? ??");
+            std::snprintf(label.text, sizeof(label.text), "Lv ?%s??", kLabelSeparator);
             return label;
         }
 
@@ -70,15 +73,15 @@ namespace headsup
             std::snprintf(levels, sizeof(levels), "%d-%d", low, high);
         if (playerLevel <= 0)
         {
-            std::snprintf(label.text, sizeof(label.text), "Lv %s ??", levels);
+            std::snprintf(label.text, sizeof(label.text), "Lv %s%s??", levels, kLabelSeparator);
             return label;
         }
         const Con easiest = Difficulty(playerLevel, low + mob->expLevelMod);
         const Con hardest = Difficulty(playerLevel, high + mob->expLevelMod);
         if (easiest == hardest)
-            std::snprintf(label.text, sizeof(label.text), "Lv %s %s", levels, Abbrev(hardest));
+            std::snprintf(label.text, sizeof(label.text), "Lv %s%s%s", levels, kLabelSeparator, Abbrev(hardest));
         else
-            std::snprintf(label.text, sizeof(label.text), "Lv %s %s-%s", levels, Abbrev(easiest), Abbrev(hardest));
+            std::snprintf(label.text, sizeof(label.text), "Lv %s%s%s-%s", levels, kLabelSeparator, Abbrev(easiest), Abbrev(hardest));
         label.shade = ShadeFor(hardest);
         return label;
     }

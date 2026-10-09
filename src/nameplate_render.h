@@ -4,6 +4,7 @@
 #include "game_cursor.h"
 #include "game_names.h"
 #include "icons.h"
+#include "look.h"
 #include "nameplate.h"
 #include "native_hook.h"
 #include "ph_timers.h"
@@ -56,6 +57,9 @@ namespace headsup
             bool bold = false;
             int height = 0;
             uint32_t color = 0, outline = 0;
+            uint32_t glow = 0;
+            size_t markAt = Label::kNoMark;
+            uint32_t markColor = 0;
             bool operator==(const TextureKey&) const = default;
         };
 
@@ -67,6 +71,7 @@ namespace headsup
             float height = 0.0f;
             float u = 0.0f, v = 0.0f; // the image's share of its power-of-two texture
             float tip = 0.5f;
+            float halo = 0.0f; // the shadow's or glow's margin, in texture pixels: it hangs outside the box the layout places
         };
 
         struct Plate
@@ -74,6 +79,7 @@ namespace headsup
             PlateTexture name;
             PlateTexture label;
             PlateTexture cursor;
+            PlateTexture ornament;
             int nameRaster   = 0;
             int labelRaster  = 0;
             int cursorRaster = 0;
@@ -95,7 +101,10 @@ namespace headsup
             uint32_t tint;
         };
 
-        bool Prepare(PlateTexture& t, const char* text, uint32_t color, int pixelHeight, const Settings& settings);
+        // A glow of 0 draws none. From markAt on, the text is drawn in markColor.
+        bool Prepare(PlateTexture& t, const char* text, uint32_t color, uint32_t glow, int pixelHeight, const Settings& settings,
+            size_t markAt = Label::kNoMark, uint32_t markColor = 0);
+        bool PrepareOrnament(PlateTexture& t, uint32_t color, int pixelHeight, const Settings& settings);
         bool PrepareCursor(PlateTexture& t, uint32_t color, int pixelHeight, const Settings& settings);
         bool Upload(PlateTexture& t, const Image& image, TextureKey key);
         IDirect3DTexture8* CreateTexture(const void* bgra, int width, int height, float& u, float& v);

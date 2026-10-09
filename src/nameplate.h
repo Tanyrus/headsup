@@ -63,6 +63,7 @@ namespace headsup
     {
         float nameWidth = 0.0f, nameHeight = 0.0f;
         float labelWidth = 0.0f, labelHeight = 0.0f;
+        float ornamentWidth = 0.0f, ornamentHeight = 0.0f;
         int mobIconCount = 0;
         float iconSize   = 0.0f;
         float cursorWidth  = 0.0f;
@@ -81,6 +82,7 @@ namespace headsup
         float centerX;
         float nameX, nameY;
         float labelX, labelY;
+        float ornamentX, ornamentY;
         float iconsX, iconsY, iconStep;
         float timersY, timerStep;
         CursorSpot cursor;

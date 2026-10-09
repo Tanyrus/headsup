@@ -101,6 +101,12 @@ namespace headsup
             l.nameY           = plate.CenterY() - sizes.nameHeight * 0.5f;
             bottom            = l.nameY + kNameOverlap;
         }
+        if (sizes.ornamentHeight > 0.0f)
+        {
+            l.ornamentX = centerX - sizes.ornamentWidth * 0.5f;
+            l.ornamentY = bottom - kLineGap - sizes.ornamentHeight;
+            bottom      = l.ornamentY - kLineGap;
+        }
         if (sizes.labelHeight > 0.0f)
         {
             l.labelX = centerX - sizes.labelWidth * 0.5f;

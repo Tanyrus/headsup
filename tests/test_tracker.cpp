@@ -314,10 +314,12 @@ TEST(every_mob_gets_nameplate_data_at_any_distance)
     CHECK(std::string(far->label.text) == "Lv 17-20 EP-EM");
     CHECK(far->mobIcons.count >= 1);
     CHECK(far->mobIcons.icons[0] == Icon::AggroNQ);
+    CHECK(far->category == Category::WillAttack); // its name still glows in the color it would be outlined in
     const ActorInfo* hidden = t.Find(0x3000);
     CHECK(!hidden->outline);
     CHECK(std::string(hidden->label.text) == "Lv 19-20 DC-EM");
     CHECK(hidden->mobIcons.icons[0] == Icon::PassiveNQ);
+    CHECK(hidden->category == Category::WontAttack);
     CHECK(t.Actors() == (std::vector<ActorPtr>{0x1000, 0x2000, 0x3000})); // in entity order
 }
 

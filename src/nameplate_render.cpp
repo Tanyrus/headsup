@@ -19,9 +19,15 @@ namespace headsup
             float u, v;
         };
         constexpr DWORD kQuadFvf          = D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1;
-        constexpr float kOutlinePerHeight = 0.1f; // outline width, per pixel of text or cursor height
+        constexpr float kOutlinePerHeight = 0.1f; // the cursor's outline width, per pixel of its height
         constexpr float kPixelCenter      = 0.5f; // Direct3D 8 samples pixel centers at half-pixel offsets
         constexpr float kPercent          = 100.0f;
+        // From the mockup's CSS: a 22 px name's shadows blur 2 and 3 px, 1 px lower, its glow 14 px, its ornament 130 x 9.
+        constexpr float kShadowPerHeight     = 0.12f; // the shadow's blur radius, per pixel of text height
+        constexpr float kShadowDropPerHeight = 0.05f;
+        constexpr float kGlowPerHeight       = 0.64f; // the glow's blur radius, per pixel of name height
+        constexpr float kOrnamentPerName     = 6.0f;  // the ornament's width, in name heights
+        constexpr float kOrnamentThickness   = 0.4f;  // its height, per pixel of name height
 
         uint32_t CursorColor(CursorKind kind, const Settings& settings)
         {
@@ -47,8 +53,11 @@ namespace headsup
             texture = nullptr;
         }
 
-        bool RasterizeText(const char* text, const char* family, int pixelHeight, bool bold, int margin, Coverage& out)
+        // markX is where the text from byte markAt on starts.
+        bool RasterizeText(const char* text, const char* family, int pixelHeight, bool bold, int margin, size_t markAt, Coverage& out,
+            int& markX)
         {
+            markX    = kNoMarkColumn;
             out      = Coverage{};
             HDC dc   = CreateCompatibleDC(nullptr);
             // A negative height asks for the character height, without the font's internal leading.
@@ -62,6 +71,13 @@ namespace headsup
                 const auto length       = static_cast<int>(wide.size());
                 SIZE size{};
                 GetTextExtentPoint32W(dc, wide.c_str(), length, &size);
+                if (markAt != Label::kNoMark)
+                {
+                    const std::wstring before = Utf16(std::string(text).substr(0, markAt));
+                    SIZE start{};
+                    GetTextExtentPoint32W(dc, before.c_str(), static_cast<int>(before.size()), &start);
+                    markX = margin + start.cx;
+                }
                 const int width  = size.cx + 2 * margin;
                 const int height = size.cy + 2 * margin;
                 BITMAPINFO info{};
@@ -137,18 +153,40 @@ namespace headsup
         return texture;
     }
 
-    bool NameplateRenderer::Prepare(PlateTexture& t, const char* text, uint32_t color, int pixelHeight, const Settings& settings)
+    bool NameplateRenderer::Prepare(PlateTexture& t, const char* text, uint32_t color, uint32_t glow, int pixelHeight,
+        const Settings& settings, size_t markAt, uint32_t markColor)
     {
-        TextureKey key{text, settings.fontName, settings.fontBold, pixelHeight, color, ToArgb(settings.textOutline)};
+        TextureKey key{text, settings.fontName, settings.fontBold, pixelHeight, color, ToArgb(settings.textOutline), glow, markAt, markColor};
         if (t.texture != nullptr && t.key == key) return true;
-        const int radius = OutlineRadius(pixelHeight);
+        const auto height    = static_cast<float>(pixelHeight);
+        const float shadow   = height * kShadowPerHeight;
+        const int drop       = static_cast<int>(std::lround(height * kShadowDropPerHeight));
+        const float glowBlur = glow != 0 ? height * kGlowPerHeight : 0.0f;
+        const int margin     = BlurMargin(std::max(glowBlur, shadow + static_cast<float>(drop)));
         Coverage coverage;
-        if (!RasterizeText(text, settings.fontName.c_str(), pixelHeight, settings.fontBold, radius, coverage))
+        int markX = kNoMarkColumn;
+        if (!RasterizeText(text, settings.fontName.c_str(), pixelHeight, settings.fontBold, margin, markAt, coverage, markX))
         {
             FailNames("GDI could not draw text in " + settings.fontName + " at " + std::to_string(pixelHeight) + " px");
             return false;
         }
-        return Upload(t, Outlined(coverage, radius, color, key.outline), std::move(key));
+        const Layers layers{shadow, drop, glowBlur, color, key.outline, glow, markX, markColor};
+        if (!Upload(t, Styled(coverage, layers), std::move(key))) return false;
+        t.halo = static_cast<float>(margin);
+        return true;
+    }
+
+    bool NameplateRenderer::PrepareOrnament(PlateTexture& t, uint32_t color, int pixelHeight, const Settings& settings)
+    {
+        TextureKey key{"", "", false, pixelHeight, color, ToArgb(settings.textOutline)};
+        if (t.texture != nullptr && t.key == key) return true;
+        const auto height   = static_cast<float>(pixelHeight);
+        const float shadow  = height * kShadowPerHeight;
+        const int width     = std::max(1, static_cast<int>(std::lround(height * kOrnamentPerName)));
+        const int thickness = std::max(1, static_cast<int>(std::lround(height * kOrnamentThickness)));
+        if (!Upload(t, Ornament(width, thickness, shadow, color, key.outline), std::move(key))) return false;
+        t.halo = static_cast<float>(BlurMargin(shadow));
+        return true;
     }
 
     bool NameplateRenderer::PrepareCursor(PlateTexture& t, uint32_t color, int pixelHeight, const Settings& settings)
@@ -244,8 +282,11 @@ namespace headsup
                 const uint32_t cursorColor = CursorColor(lines.cursor, settings);
                 const uint32_t nameColor = settings.ownNameColor ? ToArgb(settings.nameColor) : gameName.color;
                 const uint32_t labelColor = ToArgb(settings.labelColor[static_cast<int>(info->label.shade)]);
-                if ((lines.name && !Prepare(p.name, info->name, nameColor, p.nameRaster, settings)) ||
-                    (lines.label && !Prepare(p.label, info->label.text, labelColor, p.labelRaster, settings)) ||
+                const PlateStyle style    = StyleFor(*info, lines.label, settings);
+                if ((lines.name && !Prepare(p.name, info->name, nameColor, style.glow ? style.accent : 0u, p.nameRaster, settings)) ||
+                    (lines.label && !Prepare(p.label, info->label.text, labelColor, 0u, p.labelRaster, settings, info->label.markAt,
+                                        Lighter(ToArgb(settings.color[CategoryIndex(Category::Placeholder)])))) ||
+                    (style.ornament && !PrepareOrnament(p.ornament, style.accent, p.nameRaster, settings)) ||
                     (showCursor && !PrepareCursor(p.cursor, cursorColor, p.cursorRaster, settings)))
                     break;
                 const float nameFit   = nameShown / static_cast<float>(p.nameRaster);
@@ -261,20 +302,25 @@ namespace headsup
                 for (; timersReady < static_cast<int>(p.timers.size()); ++timersReady)
                 {
                     const TimerLine& line = selfTimers[timersReady];
-                    if (!Prepare(p.timers[timersReady], line.text.c_str(), line.up ? upColor : kWhite, p.timerRaster, settings)) break;
+                    if (!Prepare(p.timers[timersReady], line.text.c_str(), line.up ? upColor : kWhite, 0u, p.timerRaster, settings)) break;
                 }
                 const float playerIconSize = nameShown / toY * static_cast<float>(settings.playerIconSize) / kPercent;
 
                 LineSizes sizes;
                 if (lines.name)
                 {
-                    sizes.nameWidth  = p.name.width * nameFit / toX;
-                    sizes.nameHeight = p.name.height * nameFit / toY;
+                    sizes.nameWidth  = (p.name.width - 2.0f * p.name.halo) * nameFit / toX;
+                    sizes.nameHeight = (p.name.height - 2.0f * p.name.halo) * nameFit / toY;
+                }
+                if (style.ornament)
+                {
+                    sizes.ornamentWidth  = (p.ornament.width - 2.0f * p.ornament.halo) * nameFit / toX;
+                    sizes.ornamentHeight = (p.ornament.height - 2.0f * p.ornament.halo) * nameFit / toY;
                 }
                 if (lines.label)
                 {
-                    sizes.labelWidth  = p.label.width * labelFit / toX;
-                    sizes.labelHeight = p.label.height * labelFit / toY;
+                    sizes.labelWidth  = (p.label.width - 2.0f * p.label.halo) * labelFit / toX;
+                    sizes.labelHeight = (p.label.height - 2.0f * p.label.halo) * labelFit / toY;
                 }
                 sizes.mobIconCount = lines.mobIconCount;
                 sizes.iconSize     = iconSize;
@@ -290,7 +336,7 @@ namespace headsup
                 sizes.centerNameAndIcons = settings.centerNameAndIcons;
                 sizes.timerCount         = timersReady;
                 for (int i = 0; i < timersReady; ++i)
-                    sizes.timerHeight = std::max(sizes.timerHeight, p.timers[i].height * timerFit / toY);
+                    sizes.timerHeight = std::max(sizes.timerHeight, (p.timers[i].height - 2.0f * p.timers[i].halo) * timerFit / toY);
                 if (lines.name)
                 {
                     const float raise = static_cast<float>(settings.nameRaise) * scale;
@@ -299,12 +345,13 @@ namespace headsup
                 }
                 const NameplateLayout layout = LayoutNameplate(anchor, sizes, lines.name);
                 const float depth            = gameName.depth;
-                if (lines.name)
-                    addQuad(m_Quads, p.name.texture, layout.nameX, layout.nameY, p.name.width * nameFit, p.name.height * nameFit, p.name.u,
-                        p.name.v, depth, kWhite);
-                if (lines.label)
-                    addQuad(m_Quads, p.label.texture, layout.labelX, layout.labelY, p.label.width * labelFit, p.label.height * labelFit,
-                        p.label.u, p.label.v, depth, kWhite);
+                auto addText = [&](const PlateTexture& t, float x, float y, float fit) {
+                    addQuad(m_Quads, t.texture, x - t.halo * fit / toX, y - t.halo * fit / toY, t.width * fit, t.height * fit, t.u, t.v,
+                        depth, kWhite);
+                };
+                if (lines.name) addText(p.name, layout.nameX, layout.nameY, nameFit);
+                if (style.ornament) addText(p.ornament, layout.ornamentX, layout.ornamentY, nameFit);
+                if (lines.label) addText(p.label, layout.labelX, layout.labelY, labelFit);
                 int drawn = 0;
                 for (; drawn < lines.mobIconCount; ++drawn)
                 {
@@ -335,9 +382,8 @@ namespace headsup
                 for (int i = 0; i < sizes.timerCount; ++i)
                 {
                     const PlateTexture& t = p.timers[i];
-                    addQuad(m_Quads, t.texture, layout.centerX - t.width * timerFit / toX / 2.0f,
-                        layout.timersY + static_cast<float>(i) * layout.timerStep, t.width * timerFit, t.height * timerFit, t.u, t.v,
-                        depth, kWhite);
+                    addText(t, layout.centerX - (t.width - 2.0f * t.halo) * timerFit / toX / 2.0f,
+                        layout.timersY + static_cast<float>(i) * layout.timerStep, timerFit);
                 }
                 auto shownHeight = [&](bool shown, float pixels) { return shown ? static_cast<int>(std::lround(pixels / toY)) : 0; };
                 m_Shown.push_back(Shown{info->index, layout.nameX, layout.nameY, layout.labelX, layout.labelY, layout.iconsX,
@@ -388,6 +434,7 @@ namespace headsup
         ReleaseTexture(plate.name.texture);
         ReleaseTexture(plate.label.texture);
         ReleaseTexture(plate.cursor.texture);
+        ReleaseTexture(plate.ornament.texture);
         for (PlateTexture& timer : plate.timers)
             ReleaseTexture(timer.texture);
         plate.timers.clear();

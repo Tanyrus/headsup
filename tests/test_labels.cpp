@@ -104,11 +104,37 @@ TEST(unknown_player_level_shows_levels_without_a_con)
     CHECK(l.shade == LabelShade::Unknown);
 }
 
-TEST(the_longest_level_line_fits)
+TEST(a_level_line_separates_its_parts_with_spaces)
+{
+    const MobRecord* worm = FindMob(17191194, "Carrion Worm"); // Lv 4-5, Bigmouth Billy's placeholder
+    const Label level     = MakeLabel(worm, nullptr, 20);
+    CHECK(std::string(level.text) == "Lv 4-5 TW");
+    CHECK(Text(LevelLine(level, true, MobIdText(17191194, true, MobIdFormat::LastThree, true))) == "Lv 4-5 TW [PH]");
+    CHECK(Text(LevelLine(level, false, MobIdText(17191194, true, MobIdFormat::LastThree, true))) == "[PH]");
+    CHECK(Text(LevelLine(level, true, "")) == "Lv 4-5 TW");
+}
+
+TEST(the_longest_label_fits)
 {
     // Three-digit levels at both ends, two two-letter cons, a full ID and [PH]: at 99, a level 102 is Very Tough and 150
     // Incredibly Tough (era table rows +3 and +15).
     const MobRecord m = Mob(102, 150);
-    CHECK_EQ(Text(LevelLine(MakeLabel(&m, nullptr, 99), true, MobIdText(17190918, true, MobIdFormat::Full, true))),
-        "Lv 102-150 VT-IT [17190918 (0x1065006)] [PH]");
+    const std::string longest =
+        Text(LevelLine(MakeLabel(&m, nullptr, 99), true, MobIdText(17190918, true, MobIdFormat::Full, true)));
+    CHECK(longest == "Lv 102-150 VT-IT [17190918 (0x1065006)] [PH]");
+    CHECK(longest.size() < sizeof(Label::text));
+}
+
+TEST(a_level_line_knows_where_its_placeholder_mark_starts)
+{
+    const MobRecord m = Mob(17, 20);
+    const Label level = MakeLabel(&m, nullptr, 20);
+    // "Lv 17-20" is 8 bytes, each separating space 1 and "EP-EM" 5.
+    CHECK_EQ(LevelLine(level, true, MobIdText(17191194, true, MobIdFormat::LastThree, true)).markAt, size_t{15});
+    // Then "[17191194 (0x106511A)]", 22 bytes, and another space.
+    CHECK_EQ(LevelLine(level, true, MobIdText(17191194, true, MobIdFormat::Full, true)).markAt, size_t{38});
+    CHECK_EQ(LevelLine(level, false, MobIdText(17191194, true, MobIdFormat::LastThree, true)).markAt, size_t{0});
+    CHECK(LevelLine(level, true, MobIdText(17191194, true, MobIdFormat::LastThree, false)).markAt == Label::kNoMark);
+    CHECK(LevelLine(level, true, MobIdText(17191194, false, MobIdFormat::Full, true)).markAt == Label::kNoMark);
+    CHECK(level.markAt == Label::kNoMark);
 }

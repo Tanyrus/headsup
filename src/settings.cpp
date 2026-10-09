@@ -78,6 +78,8 @@ namespace headsup
             "placeholder"};
         constexpr const char* kMobIdKey                  = "mobId";
         const char* const kMobIdNames[kMobIdFormatCount] = {"off", "lastThree", "full"};
+        constexpr const char* kLookKey                   = "look";
+        const char* const kLookNames[kLookCount]         = {"fantasy"};
         const char* const kChannelKeys[3]               = {"R", "G", "B"};
         const char* const kIconSideNames[kIconSideCount] = {"left", "right", "hide"};
         const char* const kPlayerIconKeys[kPlayerIconCount] = {"iconGm", "iconMentor", "iconNewAdventurer", "iconLevelSync",
@@ -197,6 +199,9 @@ namespace headsup
         const std::string mobId = store.GetString(kMobIdKey, "");
         for (int f = 0; f < kMobIdFormatCount; ++f)
             if (mobId == kMobIdNames[f]) s.mobId = static_cast<MobIdFormat>(f);
+        const std::string look = store.GetString(kLookKey, "");
+        for (int l = 0; l < kLookCount; ++l)
+            if (look == kLookNames[l]) s.look = static_cast<Look>(l);
         if (store.GetFloat(kVersionKey, 0.0f) < kSettingsVersion && s.cursorColor == kOldCursorColor)
             s.cursorColor = Settings{}.cursorColor;
         return Clamp(s);
@@ -234,6 +239,7 @@ namespace headsup
         for (int i = 0; i < kPlayerIconCount; ++i)
             store.Set(kPlayerIconKeys[i], kIconSideNames[static_cast<int>(s.playerIconSide[i])]);
         store.Set(kMobIdKey, kMobIdNames[static_cast<int>(s.mobId)]);
+        store.Set(kLookKey, kLookNames[static_cast<int>(s.look)]);
         setFloat(kVersionKey, static_cast<float>(kSettingsVersion));
     }
 
