@@ -545,6 +545,9 @@ namespace headsup
                 ui.Fade(!s.enabled || !s.replaceMobNames);
                 ui.Check("Glow around mob names", s.nameGlow,
                     "A soft glow in the mob's outline color: red will attack, green won't, purple is a placeholder.");
+                ui.Fade(!s.enabled || !s.replaceMobNames || !s.nameGlow);
+                ui.Check("No glow on mobs you fight", s.glowOffWhenFighting,
+                    "Takes the glow off a mob once you or your party has claimed it, so the ones still to watch stand out.");
                 ui.Fade(!s.enabled);
                 ui.Choice("Mob ID", s.mobId, kMobIdLabels, kMobIdFormatCount,
                     "The mob's ID on its level line: its last three hex digits (Lv 1-3 EM [006]), as players name NM "

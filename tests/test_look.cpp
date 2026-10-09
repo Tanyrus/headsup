@@ -103,3 +103,17 @@ TEST(the_name_and_the_level_line_each_have_a_font_and_a_shadow)
     CHECK(NameLineStyle(s) == (LineStyle{"Georgia", true, ToArgb(s.textOutline), 0.5f}));
     CHECK(LevelLineStyle(s) == (LineStyle{"Cinzel", false, ToArgb(s.labelShadowColor), 1.5f}));
 }
+
+TEST(a_mob_you_or_your_party_fight_can_lose_its_glow)
+{
+    Settings s;
+    ActorInfo yours = Mob(Category::WillAttack);
+    yours.claimed = yours.claimedByParty = true;
+    ActorInfo theirs = Mob(Category::WillAttack);
+    theirs.claimed   = true; // someone outside your party's
+    CHECK(!StyleFor(yours, true, s).glow);
+    CHECK(StyleFor(yours, true, s).ornament); // only the glow goes
+    CHECK(StyleFor(theirs, true, s).glow);
+    s.glowOffWhenFighting = false;
+    CHECK(StyleFor(yours, true, s).glow);
+}

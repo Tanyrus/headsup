@@ -27,7 +27,7 @@ namespace headsup
             {"hideTooWeak", &Settings::hideTooWeak}, {"hideWhileEngaged", &Settings::hideWhileEngaged},
             {"markPlaceholders", &Settings::markPlaceholders}, {"phTimers", &Settings::phTimers},
             {"scaleWithDistance", &Settings::scaleWithDistance}, {"fontBold", &Settings::fontBold},
-            {"nameGlow", &Settings::nameGlow}, {"scaleOwnName", &Settings::scaleOwnName},
+            {"nameGlow", &Settings::nameGlow}, {"glowOffWhenFighting", &Settings::glowOffWhenFighting}, {"scaleOwnName", &Settings::scaleOwnName},
             {"scalePlayerNames", &Settings::scalePlayerNames}, {"showOrnament", &Settings::showOrnament},
             {"ownGlowColor", &Settings::ownGlowColor}, {"ownOrnamentColor", &Settings::ownOrnamentColor},
             {"replacePlayerNames", &Settings::replacePlayerNames}, {"replaceNpcNames", &Settings::replaceNpcNames},

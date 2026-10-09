@@ -82,6 +82,7 @@ namespace headsup
         std::string fontName   = kDefaultFont; // a font family installed in Windows
         bool fontBold          = false;
         bool nameGlow          = true;  // a mob's name glows in its outline color
+        bool glowOffWhenFighting = true; // but not once you or your party has claimed it
         int glowStrength       = 100;   // percent of the mockup's glow
         int glowSize           = 100;   // percent of the mockup's glow
         bool ownGlowColor      = false; // the glow in glowColor instead of the outline color

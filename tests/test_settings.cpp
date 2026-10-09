@@ -52,6 +52,7 @@ scaleWithDistance=false
 scaleCursor=true
 fontBold=true
 nameGlow=false
+glowOffWhenFighting=false
 scaleOwnName=false
 scalePlayerNames=false
 labelFontBold=false
@@ -201,6 +202,7 @@ look=fantasy
         s.playerIconSize = 120;
         s.glowStrength   = 150;
         s.nameGlow       = false;
+        s.glowOffWhenFighting = false;
         s.scaleOwnName = s.scalePlayerNames = false;
         s.labelFontBold    = false; // the name's is on: a dropped key would take it
         s.showOrnament     = false;

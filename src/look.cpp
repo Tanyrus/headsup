@@ -12,7 +12,7 @@ namespace headsup
         PlateStyle style;
         if (info.kind != EntityKind::Mob || !info.alive) return style;
         const uint32_t outline = ToArgb(settings.color[CategoryIndex(info.category)]);
-        style.glow          = settings.nameGlow;
+        style.glow          = settings.nameGlow && !(settings.glowOffWhenFighting && info.claimedByParty);
         style.glowColor     = settings.ownGlowColor ? ToArgb(settings.glowColor) : outline;
         style.glowStrength  = static_cast<float>(settings.glowStrength) / kPercent;
         style.glowSize      = static_cast<float>(settings.glowSize) / kPercent;
