@@ -1,6 +1,8 @@
+#include "pointer_keys.h"
 #include "settings.h"
 #include "test.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <map>
 #include <sstream>
@@ -36,7 +38,7 @@ namespace
 
     // A settings.ini as HeadsUp writes it, every value off its default so a renamed or dropped key shows. Saved files
     // carry these keys: a field may be renamed, its key never.
-    constexpr const char* kSavedFile = R"(settingsVersion=1.0000
+    constexpr const char* kSavedFile = R"(settingsVersion=2.0000
 enabled=false
 showLabels=false
 replaceMobNames=false
@@ -48,23 +50,52 @@ hideWhileEngaged=true
 markPlaceholders=false
 phTimers=true
 scaleWithDistance=false
+scaleCursor=true
 fontBold=true
+nameGlow=false
+glowOffWhenFighting=false
+scaleOwnName=false
+scalePlayerNames=false
+labelFontBold=false
+showOrnament=false
+ownGlowColor=true
+ownOrnamentColor=true
+labelFontName=Cinzel
+glowSize=150.0000
+ornamentWidth=120.0000
+ornamentThickness=9.0000
+nameShadow=50.0000
+labelShadow=150.0000
+glowColorR=0.1000
+glowColorG=0.2000
+glowColorB=0.3000
+ornamentColorR=0.4000
+ornamentColorG=0.5000
+ornamentColorB=0.6000
+labelShadowColorR=0.7000
+labelShadowColorG=0.8000
+labelShadowColorB=0.9000
 replacePlayerNames=false
 replaceNpcNames=false
 replaceCursor=false
 cursorFeather=false
 chocoboPointer=true
+fixPointer=false
 showPlayerIcons=false
 centerNameAndIcons=false
 ownNameColor=true
 smoothness=12.0000
-nameSize=12.0000
+mobNameSize=12.0000
+playerNameSize=13.0000
+selfNameSize=17.0000
+npcNameSize=16.0000
 labelSize=14.0000
 timerSize=17.0000
 iconSize=24.0000
 cursorSize=31.0000
 nameRaise=12.0000
 playerIconSize=120.0000
+glowStrength=150.0000
 thickness=6.5000
 maxDistance=25.0000
 cursorColorR=0.7700
@@ -143,6 +174,8 @@ iconLinkshell=hide
 iconBazaar=right
 iconSeekingParty=hide
 mobId=lastThree
+look=fantasy
+keepPointerKeys=11 1B 51
 )";
 
     Settings SavedSettings()
@@ -153,19 +186,41 @@ mobId=lastThree
         s.markPlaceholders  = false;
         s.phTimers          = true;
         s.scaleWithDistance = false;
+        s.scaleCursor       = true; // apart from the names': a dropped key would take theirs
         s.fontBold          = true;
         s.replacePlayerNames = s.replaceNpcNames = s.replaceCursor = s.cursorFeather = false;
         s.chocoboPointer = true;
+        s.fixPointer     = false;
         s.showPlayerIcons = s.centerNameAndIcons = false;
         s.ownNameColor   = true;
         s.smoothness     = 12;
-        s.nameSize       = 12;
+        s.mobNameSize    = 12;
+        s.playerNameSize = 13;
+        s.selfNameSize   = 17;
+        s.npcNameSize    = 16;
         s.labelSize      = 14;
         s.timerSize      = 17;
         s.iconSize       = 24;
         s.cursorSize     = 31;
         s.nameRaise      = 12;
         s.playerIconSize = 120;
+        s.glowStrength   = 150;
+        s.nameGlow       = false;
+        s.glowOffWhenFighting = false;
+        s.scaleOwnName = s.scalePlayerNames = false;
+        s.labelFontBold    = false; // the name's is on: a dropped key would take it
+        s.showOrnament     = false;
+        s.ownGlowColor     = true;
+        s.ownOrnamentColor = true;
+        s.labelFontName    = "Cinzel";
+        s.glowSize         = 150;
+        s.ornamentWidth    = 120;
+        s.ornamentThickness = 9;
+        s.nameShadow       = 50;
+        s.labelShadow      = 150;
+        s.glowColor        = Color{{0.1f, 0.2f, 0.3f}};
+        s.ornamentColor    = Color{{0.4f, 0.5f, 0.6f}};
+        s.labelShadowColor = Color{{0.7f, 0.8f, 0.9f}};
         s.thickness      = 6.5f;
         s.maxDistance    = 25.0f;
         s.cursorColor           = Color{{0.77f, 0.32f, 0.31f}};
@@ -206,6 +261,8 @@ mobId=lastThree
         for (const PlayerIcon icon : {PlayerIcon::Mentor, PlayerIcon::LevelSync, PlayerIcon::Linkshell, PlayerIcon::SeekingParty})
             s.playerIconSide[static_cast<int>(icon)] = IconSide::Hidden;
         s.mobId = MobIdFormat::LastThree;
+        s.look  = Look::Fantasy;
+        s.keepPointerKeys = {0x11, 0x1B, 0x51};
         return s;
     }
 
@@ -250,7 +307,7 @@ TEST(a_whole_number_too_large_for_an_int_is_clamped_like_any_other)
     store.values["labelSize"]  = "-1e10";
     store.values["cursorSize"] = "3e9";
     const Settings s = LoadSettings(store);
-    CHECK_EQ(s.nameSize, kMaxTextSize);
+    CHECK_EQ(s.mobNameSize, kMaxTextSize);
     CHECK_EQ(s.labelSize, kMinTextSize);
     CHECK_EQ(s.cursorSize, kMaxTextSize);
 }
@@ -266,15 +323,19 @@ TEST(a_font_name_windows_cannot_use_falls_back_to_the_default)
     CHECK(LoadSettings(store).fontName == std::string(kMaxFontName, 'x'));
 }
 
-TEST(the_font_list_is_the_installed_families_sorted_once_each)
+TEST(the_font_list_puts_the_bundled_fonts_first_then_the_installed_ones_sorted_once_each)
 {
-    // GDI lists a family once per character set, and vertical variants with an @.
-    const std::vector<std::string> choices =
-        FontChoices({"Verdana", "@MS Gothic", "arial", "Verdana", "Trebuchet MS", "MS Gothic", ""}, "Trebuchet MS");
-    CHECK((choices == std::vector<std::string>{"arial", "MS Gothic", "Trebuchet MS", "Verdana"}));
-    // The chosen font stays in the list when it is not installed, so the dropdown can show it.
-    const std::vector<std::string> missing = FontChoices({"Verdana"}, "Gill Sans");
-    CHECK((missing == std::vector<std::string>{"Gill Sans", "Verdana"}));
+    // GDI lists a family once per character set, vertical variants with an @, and a bundled font may be installed too.
+    const std::vector<std::string> choices = FontChoices({"Verdana", "arial", "Arial", "@Meiryo", "", "Cinzel"}, "Verdana");
+    const std::vector<std::string> expected{"Marcellus SC", "Cinzel", "Cormorant SC", "arial", "Verdana"};
+    CHECK(choices == expected);
+}
+
+TEST(a_font_that_is_not_installed_is_still_offered_so_it_can_be_kept)
+{
+    const std::vector<std::string> choices = FontChoices({"Verdana"}, "Papyrus");
+    CHECK(std::ranges::find(choices, "Papyrus") != choices.end());
+    CHECK(choices[0] == "Marcellus SC"); // the bundled ones still lead
 }
 
 TEST(clamp_bounds_every_field)
@@ -285,22 +346,32 @@ TEST(clamp_bounds_every_field)
     s.smoothness  = 99;
     s.maxDistance = 1000.0f;
     s.fontName    = "";
-    s.nameSize    = 100;
+    s.mobNameSize = s.playerNameSize = 100;
+    s.selfNameSize = s.npcNameSize = 0;
     s.labelSize   = 0;
     s.timerSize   = 0;
     s.iconSize    = 49;
     s.playerIconSize = 10;
+    s.glowStrength   = 1000;
+    s.glowSize       = 1000;
+    s.ornamentWidth  = 0;
+    s.ornamentThickness = 1000;
+    s.nameShadow     = -5;
+    s.labelShadow    = 1000;
+    s.labelFontName  = "";
     s.cursorSize  = 2;
     s.nameRaise   = 99;
     const Color wild{{2.0f, -1.0f, 0.5f}};
     s.nameColor = s.textOutline = s.iconTint = s.cursorColor = s.subCursorColor = s.lockedCursorColor = wild;
+    s.glowColor = s.ornamentColor = s.labelShadowColor = wild;
     for (Color& c : s.labelColor)
         c = wild;
     for (Color& c : s.color)
         c = wild;
     const Settings c = Clamp(s);
     const Color clamped{{1.0f, 0.0f, 0.5f}};
-    for (const Color& each : {c.nameColor, c.textOutline, c.iconTint, c.cursorColor, c.subCursorColor, c.lockedCursorColor})
+    for (const Color& each : {c.nameColor, c.textOutline, c.iconTint, c.cursorColor, c.subCursorColor, c.lockedCursorColor,
+             c.glowColor, c.ornamentColor, c.labelShadowColor})
         CHECK(each == clamped);
     for (const Color& each : c.labelColor)
         CHECK(each == clamped);
@@ -309,9 +380,17 @@ TEST(clamp_bounds_every_field)
     CHECK_EQ(c.thickness, kMinThickness);
     CHECK_EQ(c.smoothness, kMaxSmoothness);
     CHECK_EQ(c.playerIconSize, kMinPlayerIconSize);
+    CHECK_EQ(c.glowStrength, kMaxGlowStrength);
+    CHECK_EQ(c.glowSize, kMaxGlowSize);
+    CHECK_EQ(c.ornamentWidth, kMinOrnamentWidth);
+    CHECK_EQ(c.ornamentThickness, kMaxOrnamentThickness);
+    CHECK_EQ(c.nameShadow, kMinShadowStrength);
+    CHECK_EQ(c.labelShadow, kMaxShadowStrength);
+    CHECK(c.labelFontName == kDefaultFont);
     CHECK_EQ(c.maxDistance, kMaxOutlineDistance);
     CHECK(c.fontName == kDefaultFont);
-    CHECK_EQ(c.nameSize, kMaxTextSize);
+    CHECK(c.mobNameSize == kMaxTextSize && c.playerNameSize == kMaxTextSize);
+    CHECK(c.selfNameSize == kMinTextSize && c.npcNameSize == kMinTextSize);
     CHECK_EQ(c.labelSize, kMinTextSize);
     CHECK_EQ(c.timerSize, kMinTextSize);
     CHECK_EQ(c.iconSize, kMaxTextSize);
@@ -412,4 +491,74 @@ TEST(an_old_target_cursor_of_any_other_color_is_kept)
 {
     MapStore old = TargetCursor("0.7700", "0.3200", "0.3200");
     CHECK(LoadSettings(old).cursorColor == (Color{{0.77f, 0.32f, 0.32f}}));
+}
+
+TEST(a_file_from_before_the_level_line_had_its_own_font_and_shadow_keeps_the_names)
+{
+    MapStore old;
+    old.values = {{"fontName", "Georgia"}, {"fontBold", "true"}, {"textOutlineR", "0.2500"}, {"textOutlineG", "0.2400"},
+        {"textOutlineB", "0.5000"}};
+    const Settings s = LoadSettings(old);
+    CHECK(s.labelFontName == "Georgia" && s.labelFontBold);
+    CHECK(s.labelShadowColor == (Color{{0.25f, 0.24f, 0.5f}}));
+}
+
+TEST(a_file_from_before_each_kind_had_a_name_size_gives_all_of_them_its_one)
+{
+    MapStore old;
+    old.values = {{"nameSize", "20.0000"}};
+    const Settings s = LoadSettings(old);
+    CHECK(s.mobNameSize == 20 && s.playerNameSize == 20 && s.selfNameSize == 20 && s.npcNameSize == 20);
+}
+
+TEST(a_file_from_before_the_cursor_scaled_on_its_own_scales_it_like_the_names)
+{
+    MapStore old;
+    old.values = {{"scaleWithDistance", "false"}};
+    CHECK(!LoadSettings(old).scaleCursor);
+    old.values = {{"scaleWithDistance", "true"}};
+    CHECK(LoadSettings(old).scaleCursor);
+}
+
+TEST(an_old_install_on_the_old_default_font_takes_the_bundled_one_once)
+{
+    // Every setting is saved whenever one changes, so a file from before 0.6 holds Trebuchet MS as if chosen.
+    MapStore old;
+    old.values = {{"settingsVersion", "1.0000"}, {"fontName", "Trebuchet MS"}, {"labelFontName", "Trebuchet MS"}};
+    const Settings s = LoadSettings(old);
+    CHECK(s.fontName == kDefaultFont && s.labelFontName == kDefaultFont);
+    MapStore older; // from before settings had a version, or the level line its own font
+    older.values = {{"fontName", "Trebuchet MS"}};
+    CHECK(LoadSettings(older).labelFontName == kDefaultFont);
+}
+
+TEST(a_font_picked_before_or_since_is_kept)
+{
+    MapStore picked;
+    picked.values = {{"settingsVersion", "1.0000"}, {"fontName", "Georgia"}, {"labelFontName", "Cinzel"}};
+    CHECK(LoadSettings(picked).fontName == "Georgia" && LoadSettings(picked).labelFontName == "Cinzel");
+    MapStore since;
+    since.values = {{"settingsVersion", "2.0000"}, {"fontName", "Trebuchet MS"}};
+    CHECK(LoadSettings(since).fontName == "Trebuchet MS");
+}
+
+TEST(a_white_target_cursor_saved_after_it_turned_red_stays_white)
+{
+    MapStore chosen = TargetCursor("1.0000", "1.0000", "1.0000");
+    chosen.values["settingsVersion"] = "1.0000";
+    CHECK(LoadSettings(chosen).cursorColor == (Color{{1.0f, 1.0f, 1.0f}}));
+}
+
+TEST(the_keys_that_keep_the_pointer_are_real_keys_once_each_and_not_too_many)
+{
+    Settings s;
+    s.keepPointerKeys = {0xA2, 0x11, 0x00, 0x01, 0x51}; // left Ctrl is Ctrl; nothing and the left button are not keys
+    CHECK(Clamp(s).keepPointerKeys == (std::vector<uint8_t>{0x11, 0x51}));
+    s.keepPointerKeys.clear();
+    for (int vk = 0x30; vk < 0x30 + 40; ++vk)
+        s.keepPointerKeys.push_back(static_cast<uint8_t>(vk));
+    CHECK_EQ(Clamp(s).keepPointerKeys.size(), kMaxKeptKeys);
+    MapStore odd;
+    odd.values = {{"keepPointerKeys", "11 zz 1B 999"}};
+    CHECK(LoadSettings(odd).keepPointerKeys == (std::vector<uint8_t>{0x11, 0x1B}));
 }

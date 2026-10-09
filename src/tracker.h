@@ -63,6 +63,7 @@ namespace headsup
         uint32_t argb      = 0;     // the outline's D3DCOLOR
         uint16_t index     = 0;     // entity target index
         EntityKind kind    = EntityKind::Npc;
+        Category category  = Category::Unknown; // where a mob's outline color comes from, shown or not
         bool alive         = false;
         char name[32]      = {};
         Label label{};              // level and con text: every living mob

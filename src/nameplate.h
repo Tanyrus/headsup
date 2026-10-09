@@ -63,6 +63,7 @@ namespace headsup
     {
         float nameWidth = 0.0f, nameHeight = 0.0f;
         float labelWidth = 0.0f, labelHeight = 0.0f;
+        float ornamentWidth = 0.0f, ornamentHeight = 0.0f;
         int mobIconCount = 0;
         float iconSize   = 0.0f;
         float cursorWidth  = 0.0f;
@@ -81,6 +82,7 @@ namespace headsup
         float centerX;
         float nameX, nameY;
         float labelX, labelY;
+        float ornamentX, ornamentY;
         float iconsX, iconsY, iconStep;
         float timersY, timerStep;
         CursorSpot cursor;
@@ -92,6 +94,22 @@ namespace headsup
 
     // Not rounded, so sizes change as smoothly as the game's names.
     float DistanceScale(float letterHeight, float screenHeight);
+    // The game steps its name size, by 5% at a time far away; a plate eases toward each step. A plate with no size yet
+    // (0) takes the size at once.
+    float EaseScale(float shown, float target, double seconds);
+    // A frame's time for redrawing textures whose look changed, at a size step or a menu change; the rest keep their old
+    // texture a frame longer. One with nothing to show yet is always drawn.
+    constexpr double kRedrawBudgetMs = 3.0;
+    bool RedrawNow(bool drawn, double spentMs);
+    // Whether this plate's sizes follow the game's name size; self is your own.
+    bool ScalesWithDistance(const Settings& settings, EntityKind kind, bool self);
+    // Plates of a higher rank draw over every plate of a lower one: your target's, and over it the one you are picking.
+    constexpr int kPlainRank = 0, kTargetRank = 1, kPickedRank = 2;
+    int PlateRank(uint16_t index, const CursorTargets& targets);
+    // Within a rank, farther plates first, so nearer ones cover them.
+    bool DrawnBefore(int rankA, float depthA, int rankB, float depthB);
+    // The name size the menu sets for this kind of name; self is your own.
+    int NameSize(const Settings& settings, EntityKind kind, bool self);
     // Heights come in steps, and current (the height drawn now) is kept until the shown size falls a step below it or
     // rises a little above it, so text is redrawn only when its size really changes and never flickers between two.
     int RasterHeight(float pixels, int current);

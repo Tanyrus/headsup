@@ -23,7 +23,14 @@ namespace headsup
         bool hooked; // the game's name routine
         NameStats names;
         PlayerState player;
-        double version; // shown beside the title, so a tester's build can be told apart
+        double version; // shown in the title bar, so a tester's build can be told apart
+    };
+
+    // The "Add a key" button's wait for a key: those held when it was pressed do not count.
+    struct KeyCapture
+    {
+        bool on = false;
+        std::vector<uint8_t> held;
     };
 
     // The /headsup settings window. Uses only IGuiManager functions that are safe across the MinGW/MSVC ABI
@@ -41,8 +48,9 @@ namespace headsup
     private:
         bool m_DebugRequested = false;
         int m_Page           = 0;
-        bool m_ColorsTab     = false; // that page's "Color Settings" tab instead of "Settings"
+        bool m_ColorsTab     = false; // that page's "color settings" tab instead of "settings"
         uint32_t m_Collapsed = 0;     // one bit per collapsed section
-        std::vector<std::string> m_Fonts; // FontChoices, read when the Nameplates page's Settings tab first opens
+        std::vector<std::string> m_Fonts; // FontChoices, read when the Global page's settings tab first opens
+        KeyCapture m_KeyCapture;
     };
 }

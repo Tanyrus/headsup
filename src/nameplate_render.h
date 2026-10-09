@@ -4,6 +4,7 @@
 #include "game_cursor.h"
 #include "game_names.h"
 #include "icons.h"
+#include "look.h"
 #include "nameplate.h"
 #include "native_hook.h"
 #include "ph_timers.h"
@@ -49,13 +50,24 @@ namespace headsup
         std::string TakeIconFailure();
 
     private:
-        // A cursor's text is empty and its font names its shape.
+        // How a texture's text is drawn. A cursor's line font names its shape and its shadow color is its outline's.
+        struct TextLook
+        {
+            LineStyle line;
+            uint32_t color     = 0;
+            uint32_t glow      = 0; // 0 for none
+            float glowStrength = 0.0f, glowSize = 0.0f;
+            size_t markAt      = Label::kNoMark;
+            uint32_t markColor = 0;
+            bool operator==(const TextLook&) const = default;
+        };
+
+        // The ornament's and the cursor's text is empty; only the ornament has a width.
         struct TextureKey
         {
-            std::string text, font;
-            bool bold = false;
-            int height = 0;
-            uint32_t color = 0, outline = 0;
+            std::string text;
+            int height = 0, width = 0;
+            TextLook look;
             bool operator==(const TextureKey&) const = default;
         };
 
@@ -67,6 +79,7 @@ namespace headsup
             float height = 0.0f;
             float u = 0.0f, v = 0.0f; // the image's share of its power-of-two texture
             float tip = 0.5f;
+            float halo = 0.0f; // the shadow's or glow's margin, in texture pixels: it hangs outside the box the layout places
         };
 
         struct Plate
@@ -74,7 +87,11 @@ namespace headsup
             PlateTexture name;
             PlateTexture label;
             PlateTexture cursor;
+            PlateTexture ornament;
+            float scale      = 0.0f; // eased toward the game's name size
+            double scaleTime = 0.0;
             int nameRaster   = 0;
+            int ornamentRaster = 0;
             int labelRaster  = 0;
             int cursorRaster = 0;
             std::vector<PlateTexture> timers;
@@ -93,9 +110,12 @@ namespace headsup
             IDirect3DTexture8* texture;
             float x, y, width, height, u, v, depth;
             uint32_t tint;
+            int rank;
         };
 
-        bool Prepare(PlateTexture& t, const char* text, uint32_t color, int pixelHeight, const Settings& settings);
+        bool Prepare(PlateTexture& t, const char* text, const TextLook& look, int pixelHeight);
+        // The ornament's diamond has the shadow of shadowLine.
+        bool PrepareOrnament(PlateTexture& t, uint32_t color, int pixelHeight, int width, const LineStyle& shadowLine);
         bool PrepareCursor(PlateTexture& t, uint32_t color, int pixelHeight, const Settings& settings);
         bool Upload(PlateTexture& t, const Image& image, TextureKey key);
         IDirect3DTexture8* CreateTexture(const void* bgra, int width, int height, float& u, float& v);
@@ -110,6 +130,7 @@ namespace headsup
         std::vector<Shown> m_Shown;
         std::vector<CursorName> m_CursorNames;
         uint32_t m_Frame           = 0;
+        double m_RedrawMs          = 0.0; // spent this frame
         bool m_NamesFailed         = false;
         bool m_IconsFailed         = false;
         std::string m_NameFailure;

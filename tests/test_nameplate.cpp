@@ -327,3 +327,95 @@ TEST(the_cursor_bobs_up_from_its_place_and_back_again)
     CHECK(Near(lowest, -3.0f, 0.05f)); // 15% of 20 px, upward
     CHECK(Near(highest, 0.0f, 0.05f));
 }
+
+TEST(the_ornament_sits_between_the_level_line_and_the_name)
+{
+    // Game name centered at (1040, 205). Name 100x18, label 80x16, an ornament 108x7.
+    const ScreenBox plate = Box(1000.0f, 200.0f, 1080.0f, 210.0f);
+    LineSizes sizes;
+    sizes.nameWidth = 100.0f, sizes.nameHeight = 18.0f, sizes.labelWidth = 80.0f, sizes.labelHeight = 16.0f;
+    sizes.ornamentWidth = 108.0f, sizes.ornamentHeight = 7.0f;
+    const NameplateLayout l = LayoutNameplate(plate, sizes, true);
+    CHECK(Near(l.nameY, 196.0f));
+    CHECK(Near(l.ornamentY, 190.0f) && Near(l.ornamentX, 986.0f)); // centered, 2 px under the label
+    CHECK(Near(l.labelY, 172.0f));                                 // the label moved up to make room
+}
+
+TEST(no_ornament_leaves_the_label_where_it_was)
+{
+    const ScreenBox plate = Box(1000.0f, 200.0f, 1080.0f, 210.0f);
+    LineSizes sizes;
+    sizes.nameWidth = 100.0f, sizes.nameHeight = 18.0f, sizes.labelWidth = 80.0f, sizes.labelHeight = 16.0f;
+    CHECK(Near(LayoutNameplate(plate, sizes, true).labelY, 183.0f));
+}
+
+TEST(your_name_and_other_players_names_can_each_keep_one_size)
+{
+    Settings s;
+    CHECK(ScalesWithDistance(s, EntityKind::Player, true) && ScalesWithDistance(s, EntityKind::Player, false));
+    s.scaleOwnName = false;
+    CHECK(!ScalesWithDistance(s, EntityKind::Player, true));
+    CHECK(ScalesWithDistance(s, EntityKind::Player, false)); // everyone else still scales
+    s.scaleOwnName     = true;
+    s.scalePlayerNames = false;
+    CHECK(ScalesWithDistance(s, EntityKind::Player, true));
+    CHECK(!ScalesWithDistance(s, EntityKind::Player, false));
+    CHECK(ScalesWithDistance(s, EntityKind::Mob, false) && ScalesWithDistance(s, EntityKind::Npc, false));
+    s.scalePlayerNames  = true;
+    s.scaleWithDistance = false; // the main switch turns every name off
+    CHECK(!ScalesWithDistance(s, EntityKind::Player, true) && !ScalesWithDistance(s, EntityKind::Mob, false));
+}
+
+TEST(each_kind_of_name_has_its_own_size)
+{
+    Settings s;
+    s.mobNameSize    = 11;
+    s.playerNameSize = 12;
+    s.selfNameSize   = 13;
+    s.npcNameSize    = 14;
+    CHECK_EQ(NameSize(s, EntityKind::Mob, false), 11);
+    CHECK_EQ(NameSize(s, EntityKind::Player, false), 12);
+    CHECK_EQ(NameSize(s, EntityKind::Player, true), 13);
+    CHECK_EQ(NameSize(s, EntityKind::Npc, false), 14);
+}
+
+TEST(your_target_and_the_mob_you_are_picking_draw_over_every_other_plate)
+{
+    CursorTargets targets;
+    targets.target    = 0x220;
+    targets.subTarget = 0x221;
+    CHECK_EQ(PlateRank(0x222, targets), 0);
+    CHECK(PlateRank(0x220, targets) > PlateRank(0x222, targets));
+    CHECK(PlateRank(0x221, targets) > PlateRank(0x220, targets));
+    CHECK_EQ(PlateRank(0, CursorTargets{}), 0); // no target is not entity 0's
+    CHECK(DrawnBefore(0, 0.99f, 0, 0.98f));  // within a rank, farther plates first
+    CHECK(!DrawnBefore(0, 0.98f, 0, 0.99f));
+    CHECK(DrawnBefore(0, 0.90f, 1, 0.99f));  // the target last, though it is farther
+    CHECK(!DrawnBefore(1, 0.99f, 0, 0.90f));
+}
+
+TEST(a_plate_eases_toward_the_games_stepped_name_size)
+{
+    CHECK_EQ(EaseScale(0.0f, 1.4f, 0.016), 1.4f); // a new plate starts at the size
+    CHECK_EQ(EaseScale(1.0f, 1.2f, 0.0), 1.0f);
+    // Two thirds of the way (1 - 1/e) after one time constant of 0.15 s, all of it long after.
+    CHECK(std::fabs(EaseScale(1.0f, 1.2f, 0.15) - (1.0f + 0.2f * (1.0f - std::exp(-1.0f)))) < 1e-4f);
+    CHECK(std::fabs(EaseScale(1.0f, 1.2f, 5.0) - 1.2f) < 1e-4f);
+}
+
+TEST(a_frame_redraws_textures_until_its_budget_is_spent_but_always_draws_a_first_one)
+{
+    CHECK(RedrawNow(true, 0.0));
+    CHECK(!RedrawNow(true, kRedrawBudgetMs));
+    CHECK(RedrawNow(false, kRedrawBudgetMs * 10.0)); // a plate with nothing to show yet never waits
+}
+
+TEST(no_cursor_is_drawn_over_arrows_the_game_could_not_be_kept_from_drawing)
+{
+    const Settings s;
+    CursorTargets targets{1105, 0, false};
+    targets.gameArrowsShown = true;
+    CHECK(Lines(Mob(1105), s, {.targets = targets}).cursor == CursorKind::None);
+    targets.anchored = true;
+    CHECK(LoneCursors(targets, s, {}).empty());
+}

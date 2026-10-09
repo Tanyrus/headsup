@@ -1,8 +1,12 @@
 #include "settings.h"
 
 #include "argb.h"
+#include "fonts.h"
+#include "pointer_keys.h"
 
 #include <algorithm>
+#include <cstdlib>
+#include <sstream>
 #include <cctype>
 #include <climits>
 #include <cmath>
@@ -26,9 +30,12 @@ namespace headsup
             {"hideTooWeak", &Settings::hideTooWeak}, {"hideWhileEngaged", &Settings::hideWhileEngaged},
             {"markPlaceholders", &Settings::markPlaceholders}, {"phTimers", &Settings::phTimers},
             {"scaleWithDistance", &Settings::scaleWithDistance}, {"fontBold", &Settings::fontBold},
+            {"nameGlow", &Settings::nameGlow}, {"glowOffWhenFighting", &Settings::glowOffWhenFighting}, {"scaleOwnName", &Settings::scaleOwnName},
+            {"scalePlayerNames", &Settings::scalePlayerNames}, {"showOrnament", &Settings::showOrnament},
+            {"ownGlowColor", &Settings::ownGlowColor}, {"ownOrnamentColor", &Settings::ownOrnamentColor},
             {"replacePlayerNames", &Settings::replacePlayerNames}, {"replaceNpcNames", &Settings::replaceNpcNames},
             {"replaceCursor", &Settings::replaceCursor}, {"cursorFeather", &Settings::cursorFeather},
-            {"chocoboPointer", &Settings::chocoboPointer},
+            {"chocoboPointer", &Settings::chocoboPointer}, {"fixPointer", &Settings::fixPointer},
             {"showPlayerIcons", &Settings::showPlayerIcons}, {"centerNameAndIcons", &Settings::centerNameAndIcons},
             {"ownNameColor", &Settings::ownNameColor}};
 
@@ -39,13 +46,22 @@ namespace headsup
             int lo, hi;
         };
         constexpr IntKey kInts[] = {{"smoothness", &Settings::smoothness, kMinSmoothness, kMaxSmoothness},
-            {"nameSize", &Settings::nameSize, kMinTextSize, kMaxTextSize},
+            {"mobNameSize", &Settings::mobNameSize, kMinTextSize, kMaxTextSize},
+            {"playerNameSize", &Settings::playerNameSize, kMinTextSize, kMaxTextSize},
+            {"selfNameSize", &Settings::selfNameSize, kMinTextSize, kMaxTextSize},
+            {"npcNameSize", &Settings::npcNameSize, kMinTextSize, kMaxTextSize},
             {"labelSize", &Settings::labelSize, kMinTextSize, kMaxTextSize},
             {"timerSize", &Settings::timerSize, kMinTextSize, kMaxTextSize},
             {"iconSize", &Settings::iconSize, kMinTextSize, kMaxTextSize},
             {"cursorSize", &Settings::cursorSize, kMinTextSize, kMaxTextSize},
             {"nameRaise", &Settings::nameRaise, kMinNameRaise, kMaxNameRaise},
-            {"playerIconSize", &Settings::playerIconSize, kMinPlayerIconSize, kMaxPlayerIconSize}};
+            {"playerIconSize", &Settings::playerIconSize, kMinPlayerIconSize, kMaxPlayerIconSize},
+            {"glowStrength", &Settings::glowStrength, kMinGlowStrength, kMaxGlowStrength},
+            {"glowSize", &Settings::glowSize, kMinGlowSize, kMaxGlowSize},
+            {"ornamentWidth", &Settings::ornamentWidth, kMinOrnamentWidth, kMaxOrnamentWidth},
+            {"ornamentThickness", &Settings::ornamentThickness, kMinOrnamentThickness, kMaxOrnamentThickness},
+            {"nameShadow", &Settings::nameShadow, kMinShadowStrength, kMaxShadowStrength},
+            {"labelShadow", &Settings::labelShadow, kMinShadowStrength, kMaxShadowStrength}};
 
         struct FloatKey
         {
@@ -64,19 +80,36 @@ namespace headsup
         constexpr ColorKey kColors[] = {{"cursorColor", &Settings::cursorColor}, {"subCursorColor", &Settings::subCursorColor},
             {"outOfRangeCursorColor", &Settings::outOfRangeCursorColor},
             {"lockedCursorColor", &Settings::lockedCursorColor}, {"nameColor", &Settings::nameColor},
-            {"textOutline", &Settings::textOutline}, {"iconTint", &Settings::iconTint}};
+            {"textOutline", &Settings::textOutline}, {"iconTint", &Settings::iconTint}, {"glowColor", &Settings::glowColor},
+            {"ornamentColor", &Settings::ornamentColor}};
 
         constexpr const char* kFontKey = "fontName";
-        // Every setting is saved whenever one changes, so a file keeps the defaults of its day. 1: the target cursor's
-        // default became Phoenix's red, and a file from before holding the white it had never chose a color.
+        // Saved files from before the level line had its own font and shadow take the name's.
+        constexpr const char* kLabelFontKey        = "labelFontName";
+        constexpr const char* kLabelBoldKey        = "labelFontBold";
+        constexpr const char* kLabelShadowColorKey = "labelShadowColor";
+        // And from before each kind of name had its own size, one for all of them.
+        constexpr const char* kOneNameSizeKey = "nameSize";
+        // And from before the cursor scaled on its own, when it scaled with the names.
+        constexpr const char* kScaleCursorKey = "scaleCursor";
+        constexpr const char* kKeepPointerKey = "keepPointerKeys"; // hex virtual-key codes, a space apart
+        constexpr int kHex                    = 16;
+        // Every setting is saved whenever one changes, so a file keeps the defaults of its day, and each default that
+        // changed is put right once in files from before. 1: the target cursor's became Phoenix's red. 2: the font's
+        // became the bundled Marcellus SC.
         constexpr const char* kVersionKey = "settingsVersion";
-        constexpr int kSettingsVersion    = 1;
-        constexpr Color kOldCursorColor   = {{1.0f, 1.0f, 1.0f}};
+        constexpr int kRedCursorVersion    = 1;
+        constexpr int kBundledFontVersion  = 2;
+        constexpr int kSettingsVersion     = kBundledFontVersion;
+        constexpr Color kOldCursorColor    = {{1.0f, 1.0f, 1.0f}};
+        constexpr const char* kOldFont     = "Trebuchet MS";
         constexpr const char* kShowSuffix = "Show";
         const char* const kCategoryKeys[kCategoryCount] = {"willAttack", "wontAttack", "unknown", "nmWillAttack", "nmWontAttack",
             "placeholder"};
         constexpr const char* kMobIdKey                  = "mobId";
         const char* const kMobIdNames[kMobIdFormatCount] = {"off", "lastThree", "full"};
+        constexpr const char* kLookKey                   = "look";
+        const char* const kLookNames[kLookCount]         = {"fantasy"};
         const char* const kChannelKeys[3]               = {"R", "G", "B"};
         const char* const kIconSideNames[kIconSideCount] = {"left", "right", "hide"};
         const char* const kPlayerIconKeys[kPlayerIconCount] = {"iconGm", "iconMentor", "iconNewAdventurer", "iconLevelSync",
@@ -143,7 +176,11 @@ namespace headsup
         };
         std::sort(installed.begin(), installed.end(), [&](const std::string& a, const std::string& b) { return lower(a) < lower(b); });
         installed.erase(std::unique(installed.begin(), installed.end(), SameIgnoringCase), installed.end());
-        return installed;
+        std::vector<std::string> choices = BundledFamilies();
+        for (const std::string& name : installed)
+            if (std::none_of(choices.begin(), choices.end(), [&](const std::string& had) { return SameIgnoringCase(had, name); }))
+                choices.push_back(name);
+        return choices;
     }
 
     Settings Clamp(Settings s)
@@ -154,6 +191,16 @@ namespace headsup
         for (const IntKey& i : kInts)
             s.*i.field = std::clamp(s.*i.field, i.lo, i.hi);
         if (s.fontName.empty() || s.fontName.size() > kMaxFontName) s.fontName = d.fontName;
+        if (s.labelFontName.empty() || s.labelFontName.size() > kMaxFontName) s.labelFontName = d.labelFontName;
+        s.labelShadowColor = ClampColor(s.labelShadowColor, d.labelShadowColor);
+        std::vector<uint8_t> keys;
+        for (const uint8_t vk : s.keepPointerKeys)
+        {
+            const uint8_t key = NormalizeKey(vk);
+            if (key != 0 && !MouseButton(key) && std::ranges::find(keys, key) == keys.end() && keys.size() < kMaxKeptKeys)
+                keys.push_back(key);
+        }
+        s.keepPointerKeys = std::move(keys);
         for (const ColorKey& c : kColors)
             s.*c.field = ClampColor(s.*c.field, d.*c.field);
         for (int k = 0; k < kLabelShadeCount; ++k)
@@ -168,6 +215,7 @@ namespace headsup
         Settings s;
         for (const BoolKey& b : kBools)
             s.*b.field = store.GetBool(b.key, s.*b.field);
+        s.mobNameSize = s.playerNameSize = s.selfNameSize = s.npcNameSize = LoadInt(store, kOneNameSizeKey, s.mobNameSize);
         for (const IntKey& i : kInts)
             s.*i.field = LoadInt(store, i.key, s.*i.field);
         for (const FloatKey& f : kFloats)
@@ -175,6 +223,18 @@ namespace headsup
         for (const ColorKey& c : kColors)
             LoadColor(store, c.key, s.*c.field);
         s.fontName = store.GetString(kFontKey, kDefaultFont);
+        s.labelFontName    = store.GetString(kLabelFontKey, s.fontName.c_str());
+        s.labelFontBold    = store.GetBool(kLabelBoldKey, s.fontBold);
+        s.scaleCursor      = store.GetBool(kScaleCursorKey, s.scaleWithDistance);
+        std::istringstream keys(store.GetString(kKeepPointerKey, ""));
+        for (std::string key; keys >> key;)
+        {
+            char* end        = nullptr;
+            const long value = std::strtol(key.c_str(), &end, kHex);
+            if (*end == '\0' && value > 0 && value <= UINT8_MAX) s.keepPointerKeys.push_back(static_cast<uint8_t>(value));
+        }
+        s.labelShadowColor = s.textOutline;
+        LoadColor(store, kLabelShadowColorKey, s.labelShadowColor);
         for (int k = 0; k < kLabelShadeCount; ++k)
             LoadColor(store, kLabelShadeKeys[k], s.labelColor[k]);
         for (int c = 0; c < kCategoryCount; ++c)
@@ -192,8 +252,16 @@ namespace headsup
         const std::string mobId = store.GetString(kMobIdKey, "");
         for (int f = 0; f < kMobIdFormatCount; ++f)
             if (mobId == kMobIdNames[f]) s.mobId = static_cast<MobIdFormat>(f);
-        if (store.GetFloat(kVersionKey, 0.0f) < kSettingsVersion && s.cursorColor == kOldCursorColor)
-            s.cursorColor = Settings{}.cursorColor;
+        const std::string look = store.GetString(kLookKey, "");
+        for (int l = 0; l < kLookCount; ++l)
+            if (look == kLookNames[l]) s.look = static_cast<Look>(l);
+        const float saved = store.GetFloat(kVersionKey, 0.0f);
+        if (saved < kRedCursorVersion && s.cursorColor == kOldCursorColor) s.cursorColor = Settings{}.cursorColor;
+        if (saved < kBundledFontVersion)
+        {
+            if (s.fontName == kOldFont) s.fontName = kDefaultFont;
+            if (s.labelFontName == kOldFont) s.labelFontName = kDefaultFont;
+        }
         return Clamp(s);
     }
 
@@ -218,6 +286,18 @@ namespace headsup
         for (const ColorKey& c : kColors)
             setColor(c.key, s.*c.field);
         store.Set(kFontKey, s.fontName.c_str());
+        store.Set(kLabelFontKey, s.labelFontName.c_str());
+        setBool(kLabelBoldKey, s.labelFontBold);
+        setBool(kScaleCursorKey, s.scaleCursor);
+        std::string keys;
+        for (const uint8_t vk : s.keepPointerKeys)
+        {
+            char hex[4];
+            std::snprintf(hex, sizeof(hex), "%02X", vk);
+            keys += (keys.empty() ? "" : " ") + std::string(hex);
+        }
+        store.Set(kKeepPointerKey, keys.c_str());
+        setColor(kLabelShadowColorKey, s.labelShadowColor);
         for (int k = 0; k < kLabelShadeCount; ++k)
             setColor(kLabelShadeKeys[k], s.labelColor[k]);
         for (int c = 0; c < kCategoryCount; ++c)
@@ -229,6 +309,7 @@ namespace headsup
         for (int i = 0; i < kPlayerIconCount; ++i)
             store.Set(kPlayerIconKeys[i], kIconSideNames[static_cast<int>(s.playerIconSide[i])]);
         store.Set(kMobIdKey, kMobIdNames[static_cast<int>(s.mobId)]);
+        store.Set(kLookKey, kLookNames[static_cast<int>(s.look)]);
         setFloat(kVersionKey, static_cast<float>(kSettingsVersion));
     }
 

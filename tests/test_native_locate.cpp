@@ -173,3 +173,178 @@ TEST(a_routine_nobody_calls_is_refused)
     image.Put(0x17570C, {0x90});
     CHECK(Locate(image).problem == LocateProblem::NoCallers);
 }
+
+namespace
+{
+    // The end of the target window's draw (RVA 0x1511A0) in the same dump: the arrow over the target at (m_AnkX, m_AnkY)
+    // in gray E0808080, then while a sub-target is picked the arrow over the candidate at (m_SubAnkX, m_SubAnkY) in the
+    // range color, each through the shape draw at 0x120C80 (it ends in ret 20h).
+    constexpr uint32_t kTargetArrow = 0x15151C;
+    constexpr uint32_t kPickedArrow = 0x151564;
+    constexpr uint32_t kShapeDraw   = 0x120C80;
+
+    Image ArrowClient()
+    {
+        Image image;
+        image.Put(kTargetArrow, {0x66, 0x8B, 0x86, 0xBC, 0x00, 0x00, 0x00, 0x66, 0x85, 0xC0, 0x74, 0x32, 0x0F, 0xBF, 0x96, 0xBE,
+                                    0x00, 0x00, 0x00, 0x6A, 0x00, 0x6A, 0x00, 0x6A, 0x00, 0x33, 0xC9, 0x8A, 0x8E, 0xBA, 0x00, 0x00,
+                                    0x00, 0x68, 0x80, 0x80, 0x80, 0xE0, 0x0F, 0xBF, 0xC0, 0x8B, 0x4C, 0x8E, 0x78, 0x68, 0x00, 0x00,
+                                    0x80, 0x3F, 0x68, 0x00, 0x00, 0x80, 0x3F, 0x52, 0x50, 0xE8, 0x26, 0xF7, 0xFC, 0xFF});
+        image.Put(kPickedArrow, {0x0F, 0xBF, 0x96, 0xC2, 0x00, 0x00, 0x00, 0x0F, 0xBF, 0x86, 0xC0, 0x00, 0x00, 0x00, 0x6A, 0x00,
+                                    0x6A, 0x00, 0x6A, 0x00, 0x33, 0xC9, 0x8A, 0x8E, 0xBA, 0x00, 0x00, 0x00, 0x57, 0x68, 0x00, 0x00,
+                                    0x80, 0x3F, 0x68, 0x00, 0x00, 0x80, 0x3F, 0x8B, 0x4C, 0x8E, 0x78, 0x52, 0x50, 0xE8, 0xEA, 0xF6,
+                                    0xFC, 0xFF});
+        return image;
+    }
+}
+
+TEST(the_target_arrows_are_two_calls_into_one_shape_draw)
+{
+    const ArrowCalls calls = LocateArrowCalls(ArrowClient().Text());
+    CHECK(calls.problem == LocateProblem::None);
+    CHECK_EQ(calls.target, kTargetArrow + 0x39); // the E8 after its pushes
+    CHECK_EQ(calls.picked, kPickedArrow + 0x2D);
+    CHECK_EQ(calls.draw, kShapeDraw);
+}
+
+TEST(a_client_without_the_arrow_draws_is_left_alone)
+{
+    Image image = ArrowClient();
+    image.Put(kPickedArrow + 0x1C, {0x56}); // push esi in place of push edi: another color
+    CHECK(LocateArrowCalls(image.Text()).problem == LocateProblem::NoArrowDraws);
+    CHECK(LocateArrowCalls(Image{}.Text()).problem == LocateProblem::NoArrowDraws);
+}
+
+TEST(a_second_copy_of_an_arrow_draw_is_ambiguous)
+{
+    Image image = ArrowClient();
+    const uint8_t* from = image.At(kTargetArrow);
+    std::memcpy(image.At(0x100000), from, 0x3E);
+    CHECK(LocateArrowCalls(image.Text()).problem == LocateProblem::AmbiguousArrowDraws);
+}
+
+TEST(arrow_draws_into_different_functions_are_left_alone)
+{
+    Image image = ArrowClient();
+    image.Put32(kPickedArrow + 0x2E, 0xFFFCF6F0); // six bytes past the shape draw
+    CHECK(LocateArrowCalls(image.Text()).problem == LocateProblem::ArrowDrawsDiffer);
+}
+
+namespace
+{
+    // Where the same dump guesses the client area from GetWindowRect and the system's border sizes: reading a mouse
+    // message's position, moving Windows' pointer to the game's, and panning at the pointer area's edge. Each loads
+    // GetSystemMetrics into a different register.
+    constexpr uint32_t kMessageGuess = 0x002917, kWarpGuess = 0x1257E1, kEdgeGuess = 0x125C15;
+
+    Image PointerClient()
+    {
+        Image image;
+        image.Put(kMessageGuess, {0x8B, 0x48, 0x18, 0x51, 0xFF, 0x15, 0xE4, 0x93, 0x7E, 0x03, 0x8B, 0x2D, 0xA0, 0x93, 0x7E, 0x03,
+                                     0x6A, 0x20, 0xFF, 0xD5, 0x6A, 0x21});
+        image.Put(kWarpGuess, {0xD9, 0x5C, 0x24, 0x20, 0xFF, 0x15, 0xE4, 0x93, 0x7E, 0x03, 0x8B, 0x35, 0xA0, 0x93, 0x7E, 0x03, 0x6A,
+                                  0x20, 0xFF, 0xD6, 0x8B, 0xF8, 0x6A, 0x21});
+        image.Put(kEdgeGuess, {0x8B, 0x51, 0x18, 0x52, 0xFF, 0x15, 0xE4, 0x93, 0x7E, 0x03, 0x8B, 0x1D, 0xA0, 0x93, 0x7E, 0x03, 0x6A,
+                                  0x20, 0xFF, 0xD3, 0x6A, 0x21});
+        return image;
+    }
+}
+
+TEST(the_games_three_guesses_at_its_client_area_are_found)
+{
+    const PointerMapping mapping = LocatePointerMapping(PointerClient().Text());
+    CHECK(mapping.problem == LocateProblem::None);
+    CHECK_EQ(mapping.guesses.size(), size_t{3});
+    if (mapping.guesses.size() != 3) return;
+    CHECK(mapping.guesses[0].windowRectCall == kMessageGuess + 4 && mapping.guesses[0].metricsLoad == kMessageGuess + 10);
+    CHECK(mapping.guesses[1].windowRectCall == kWarpGuess + 4 && mapping.guesses[1].metricsLoad == kWarpGuess + 10);
+    CHECK(mapping.guesses[2].windowRectCall == kEdgeGuess + 4 && mapping.guesses[2].metricsLoad == kEdgeGuess + 10);
+    // mov ebp, imm32; mov esi, imm32; mov ebx, imm32: the registers they load GetSystemMetrics into
+    CHECK(mapping.guesses[0].movImmediate == 0xBD && mapping.guesses[1].movImmediate == 0xBE && mapping.guesses[2].movImmediate == 0xBB);
+}
+
+TEST(a_client_missing_a_guess_or_holding_two_is_left_alone)
+{
+    Image missing = PointerClient();
+    missing.Put(kEdgeGuess + 0x13, {0xD7}); // call edi
+    CHECK(LocatePointerMapping(missing.Text()).problem == LocateProblem::NoPointerMapping);
+    Image twice = PointerClient();
+    std::memcpy(twice.At(0x100000), twice.At(kMessageGuess), 0x16);
+    CHECK(LocatePointerMapping(twice.Text()).problem == LocateProblem::AmbiguousPointerMapping);
+}
+
+TEST(guesses_through_different_imports_are_left_alone)
+{
+    Image image = PointerClient();
+    image.Put32(kWarpGuess + 12, 0x037E93A4); // the import after GetSystemMetrics
+    CHECK(LocatePointerMapping(image.Text()).problem == LocateProblem::PointerMappingDiffers);
+}
+
+namespace
+{
+    // The same dump's mouse-move handling (0x2A6A): it moves the mouse controller's pointer (global at 0x039A1D4C),
+    // then calls the controller's routine at 0x1262F0 with 1, which shows the pointer and keeps that in its byte +0x4E.
+    constexpr uint32_t kMoveCall = 0x002A6A, kShowPointer = 0x1262F0;
+
+    Image ShowClient()
+    {
+        Image image;
+        image.Put(kMoveCall, {0x8D, 0x4C, 0x24, 0x14, 0x8D, 0x54, 0x24, 0x24, 0x51, 0x8B, 0x0D, 0x4C, 0x1D, 0x9A, 0x03, 0x53, 0x52, 0xE8,
+                                 0x50, 0x2B, 0x12, 0x00, 0x8B, 0x0D, 0x4C, 0x1D, 0x9A, 0x03, 0x6A, 0x01, 0xE8, 0x63, 0x38, 0x12, 0x00});
+        image.Put(kShowPointer, {0xA1, 0xF8, 0x6B, 0x91, 0x03, 0x56, 0x8B, 0xF1, 0x8B, 0x0D, 0x6C, 0x66, 0x91, 0x03, 0x85, 0xC0, 0x74,
+                                    0x3B, 0x53, 0x8B, 0x5C, 0x24, 0x0C, 0x85, 0xC9, 0x74, 0x0C, 0x53, 0xE8, 0x6F, 0x44, 0xEE, 0xFF, 0x8B,
+                                    0x0D, 0x6C, 0x66, 0x91, 0x03, 0x38, 0x5E, 0x4E});
+        return image;
+    }
+}
+
+TEST(the_games_show_pointer_routine_is_found_through_its_mouse_move)
+{
+    const PointerShow show = LocatePointerShow(ShowClient().Text());
+    CHECK(show.problem == LocateProblem::None);
+    CHECK_EQ(show.controllerGlobal, 0x039A1D4Cu);
+    CHECK_EQ(show.show, kShowPointer);
+}
+
+TEST(a_show_pointer_routine_that_keeps_its_state_elsewhere_is_left_alone)
+{
+    Image moved = ShowClient();
+    moved.Put(kShowPointer + 0x29, {0x4F}); // cmp bl,[esi+4Fh]
+    CHECK(LocatePointerShow(moved.Text()).problem == LocateProblem::PointerShowChanged);
+    CHECK(LocatePointerShow(Image{}.Text()).problem == LocateProblem::NoPointerShow);
+    Image other = ShowClient();
+    other.Put32(kMoveCall + 24, 0x039A1D50); // the show called on another object than the one moved
+    CHECK(LocatePointerShow(other.Text()).problem == LocateProblem::PointerShowChanged);
+}
+
+namespace
+{
+    // The end of the same dump's command check (0x124D5F): mouse use on (1) for a few commands, off (0) for the rest,
+    // each through the routine at 0x126F70 on the mouse controller.
+    constexpr uint32_t kMouseUseCalls = 0x124D5F, kMouseUse = 0x126F70;
+
+    Image KeyHideClient()
+    {
+        Image image;
+        image.Put(kMouseUseCalls, {0x8B, 0x0D, 0x4C, 0x1D, 0x9A, 0x03, 0x6A, 0x01, 0xE8, 0x04, 0x22, 0x00, 0x00, 0x8A, 0x44, 0x24, 0x14,
+                                      0x5F, 0x5E, 0x59, 0xC3, 0x8B, 0x0D, 0x4C, 0x1D, 0x9A, 0x03, 0x6A, 0x00, 0xE8, 0xEF, 0x21, 0x00,
+                                      0x00, 0x8A, 0x44, 0x24, 0x14, 0x5F, 0x5E, 0x59, 0xC3});
+        return image;
+    }
+}
+
+TEST(the_hide_after_a_keys_command_is_the_second_of_two_mouse_use_calls)
+{
+    const KeyHide hide = LocateKeyHide(KeyHideClient().Text());
+    CHECK(hide.problem == LocateProblem::None);
+    CHECK_EQ(hide.offCall, kMouseUseCalls + 0x1D);
+    CHECK_EQ(hide.mouseUse, kMouseUse);
+}
+
+TEST(mouse_use_calls_into_different_routines_are_left_alone)
+{
+    Image image = KeyHideClient();
+    image.Put32(kMouseUseCalls + 0x1E, 0x000021F5); // six bytes past the routine
+    CHECK(LocateKeyHide(image.Text()).problem == LocateProblem::KeyHideDiffers);
+    CHECK(LocateKeyHide(Image{}.Text()).problem == LocateProblem::NoKeyHide);
+}

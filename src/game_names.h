@@ -32,14 +32,9 @@ namespace headsup
         // all be HeadsUp's, leaving no letters to find them by.
         void UseScene(IDirect3DSurface8* target, IDirect3DSurface8* depth);
 
-        // The scene's camera, and the font of the names from the world text the game draws.
-        void OnDrawUP(D3DPRIMITIVETYPE type, UINT primCount, const void* vertices, UINT stride, const Tracker& tracker,
-            const Settings& settings);
-        bool IsGameCursorDraw(D3DPRIMITIVETYPE type, UINT primCount, const void* vertices, UINT stride, const Tracker& tracker,
-            const std::vector<CursorName>& names, bool picking, ITarget* target);
+        // The scene's camera, from the fixed-function draws characters own.
+        void OnDrawUP(const Tracker& tracker, const Settings& settings);
         // The game draws its arrow after our nameplates, so this is the frame before's.
-        bool PickOutOfRange() const { return m_PickOutOfRange; }
-        void ForgetPickRange() { m_PickOutOfRange = false; }
         void CountMesh(uint16_t index) { ++m_MeshDraws[index]; }
 
         // The game is about to copy its scene image, names included, to the back buffer: the last moment to draw into it.
@@ -52,7 +47,6 @@ namespace headsup
         float BackBufferHeight() const { return m_BackBufferHeight; }
         const Camera* SceneCamera() const { return m_HaveCamera ? &m_Camera : nullptr; }
 
-        uintptr_t FontTexture() const { return m_Font; }
         uint32_t MeshDraws(uint16_t index) const;
         uint32_t FramesSinceMesh(uint16_t index) const;
 
@@ -73,8 +67,6 @@ namespace headsup
         float m_BackBufferHeight   = 0.0f;
         uintptr_t m_BackBuffer     = 0;
 
-        TextureUse m_TextureUse;
-        uintptr_t m_Font = 0;
         std::unordered_map<uint16_t, uint32_t> m_MeshDraws;
         std::unordered_map<uint16_t, uint32_t> m_MeshDrawsLast;
         std::unordered_map<uint16_t, uint32_t> m_LastMeshFrame;
@@ -85,9 +77,6 @@ namespace headsup
 
         TargetScale m_Scene;
         uintptr_t m_SceneDepth   = 0;
-        TargetScale m_Ui;
-        uintptr_t m_ArrowTexture = 0;
-        bool m_PickOutOfRange    = false;
         Camera m_Camera{};
         bool m_HaveCamera = false;
     };

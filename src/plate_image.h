@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <vector>
 
 namespace headsup
@@ -24,8 +25,35 @@ namespace headsup
         std::vector<uint32_t> argb;
     };
 
-    // The coverage needs a margin of radius empty pixels for its outline to fit.
+    // How far a blur of this CSS radius reaches past what it blurs: the margin it needs.
+    int BlurMargin(float blur);
+
+    constexpr int kNoMarkColumn = std::numeric_limits<int>::max();
+
+    // Text as the look draws it, back to front: a glow (the letters blurred, at part strength), a dark shadow (the letters
+    // blurred, once in place and once dropped), then the letters. Blurs are CSS radii, twice the Gaussian's sigma; 0 is none.
+    struct Layers
+    {
+        float shadowBlur     = 0.0f;
+        int shadowDrop       = 0; // pixels down
+        float glowBlur       = 0.0f;
+        uint32_t color       = 0;
+        uint32_t shadowColor = 0;
+        uint32_t glowColor   = 0;
+        float glowStrength   = 1.0f; // times the mockup's glow, which is solid wherever it would pass full
+        float shadowStrength = 1.0f; // times the mockup's shadow, the same way
+        int markX            = kNoMarkColumn; // from this column on, the letters take markColor
+        uint32_t markColor   = 0;
+    };
+    // The coverage needs a margin of BlurMargin of the wider of the glow and the shadow with its drop.
+    Image Styled(const Coverage& coverage, const Layers& layers);
+    // A hard edge grown radius pixels around a shape, for the cursor: the coverage needs a margin of radius.
     Image Outlined(const Coverage& coverage, int radius, uint32_t color, uint32_t outlineColor);
+
+    // The ornament between the level line and the name, width by height inside a margin of BlurMargin(shadowBlur): a
+    // hairline across its middle that fades in from both ends and lightens toward its center, under a diamond as tall as
+    // the ornament, in the lighter color with a dark shadow.
+    Image Ornament(int width, int height, float shadowBlur, float shadowStrength, uint32_t color, uint32_t shadowColor);
 
     // A power of two, which every Direct3D 8 card accepts.
     int TextureSide(int pixels);

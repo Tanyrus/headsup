@@ -37,6 +37,10 @@ sound, scent, magic, job abilities, low HP) and its level and con, colored like 
 line shows its exact level for that spawn. With mob IDs turned on, a placeholder shows `[PH]` on its level line, and
 an optional timer above your name counts down to the respawn of each placeholder you see die.
 
+Names are drawn in a bundled serif font, Marcellus SC by default, with Cinzel and Cormorant SC also included and every
+font installed in Windows available too. A monster's name glows in its border color, with a small ornament between the
+name and its level line, so a glance tells you whether it will attack.
+
 ![A Goblin Leecher's red outline and nameplate](resources/nameplate_and_outline.png)
 
 Players get XIUI's HQ status icons beside their names: seeking party, bazaar, linkshell in its color, away, mentor,

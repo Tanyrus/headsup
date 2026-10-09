@@ -3,31 +3,11 @@
 #include "argb.h"
 
 #include <algorithm>
-#include <cmath>
+#include <iterator>
+
 
 namespace headsup
 {
-    namespace
-    {
-        // Back-buffer pixels: the game's cursor is about 27x43 on 1440p.
-        constexpr float kMinCursorSide  = 4.0f;
-        constexpr float kMaxCursorSide  = 128.0f;
-        constexpr float kCursorReach    = 0.5f;
-        constexpr float kAnchorSlack    = 2.0f;  // UI pixels
-        constexpr float kMinArrowHeight = 16.0f; // UI pixels: the arrows are 32 tall, the window's letters at most 12
-
-        bool CursorSized(const ScreenBox& quad)
-        {
-            const float w = quad.Width(), h = quad.Height();
-            return quad.valid && w >= kMinCursorSide && h >= kMinCursorSide && w <= kMaxCursorSide && h <= kMaxCursorSide;
-        }
-
-        bool InArrowTexture(const CursorQuad& quad, uintptr_t arrowTexture)
-        {
-            return arrowTexture != 0 && quad.texture == arrowTexture && LooksLikeTargetArrow(quad.ui);
-        }
-    }
-
     std::optional<bool> PickedOutOfRange(uint32_t argb)
     {
         const uint8_t red = Channel(argb, kRedShift), blue = Channel(argb, kBlueShift);
@@ -53,62 +33,9 @@ namespace headsup
         targets.subAnchorY = window.subAnkY * y;
     }
 
-    std::vector<CursorAnchor> GameCursorAnchors(const std::vector<CursorName>& names, const CursorWindow& window, bool picking)
+    bool ClickMessage(uint32_t message)
     {
-        std::vector<CursorAnchor> anchors;
-        for (const CursorName& n : names)
-        {
-            anchors.push_back({n.index, window.ankX, window.ankY});
-            if (picking) anchors.push_back({n.index, window.subAnkX, window.subAnkY});
-        }
-        return anchors;
-    }
-
-    bool AtCursorAnchor(const ScreenBox& quad, float anchorX, float anchorY)
-    {
-        return quad.valid && std::fabs(quad.CenterX() - anchorX) <= kAnchorSlack && quad.maxY <= anchorY + kAnchorSlack &&
-               quad.maxY >= anchorY - quad.Height();
-    }
-
-    bool LooksLikeTargetArrow(const ScreenBox& quad) { return quad.valid && quad.Height() > quad.Width(); }
-
-    bool IsGameCursor(const ScreenBox& quad, const ScreenBox& name)
-    {
-        if (!name.valid || !CursorSized(quad)) return false;
-        if (std::fabs(quad.CenterX() - name.CenterX()) > quad.Width() * 0.5f) return false;
-        return quad.maxY <= name.maxY && quad.maxY >= name.minY - quad.Height() * kCursorReach;
-    }
-
-    bool MayBeGameCursor(const CursorQuad& quad, uintptr_t arrowTexture, const std::vector<CursorAnchor>& anchors,
-        const std::vector<CursorName>& names)
-    {
-        if (names.empty()) return false;
-        return InArrowTexture(quad, arrowTexture) ||
-               std::any_of(anchors.begin(), anchors.end(), [&](const CursorAnchor& a) { return AtCursorAnchor(quad.ui, a.x, a.y); }) ||
-               std::any_of(names.begin(), names.end(), [&](const CursorName& n) { return IsGameCursor(quad.screen, n.name); });
-    }
-
-    CursorVerdict JudgeGameCursor(const CursorQuad& quad, uintptr_t arrowTexture, uintptr_t fontTexture,
-        const std::vector<CursorAnchor>& anchors, const std::vector<CursorName>& names, std::optional<uint16_t> owner)
-    {
-        CursorVerdict verdict;
-        if (names.empty()) return verdict;
-        if (InArrowTexture(quad, arrowTexture))
-        {
-            verdict.block = true;
-            return verdict;
-        }
-        const bool anchored =
-            std::any_of(anchors.begin(), anchors.end(), [&](const CursorAnchor& a) { return AtCursorAnchor(quad.ui, a.x, a.y); });
-        const bool credited =
-            owner.has_value() &&
-            (std::any_of(anchors.begin(), anchors.end(),
-                 [&](const CursorAnchor& a) { return a.index == *owner && AtCursorAnchor(quad.ui, a.x, a.y); }) ||
-                std::any_of(names.begin(), names.end(),
-                    [&](const CursorName& n) { return n.index == *owner && IsGameCursor(quad.screen, n.name); }));
-        verdict.block      = anchored || credited;
-        verdict.learnArrow = credited && quad.texture != 0 && quad.texture != fontTexture && LooksLikeTargetArrow(quad.ui) &&
-                             quad.ui.Height() >= kMinArrowHeight && CursorSized(quad.screen);
-        return verdict;
+        constexpr uint32_t kClicks[] = {0x201, 0x203, 0x204, 0x206, 0x207, 0x209, 0x20B, 0x20D}; // each button's down, double
+        return std::find(std::begin(kClicks), std::end(kClicks), message) != std::end(kClicks);
     }
 }

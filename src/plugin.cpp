@@ -3,6 +3,7 @@
 #include "check.h"
 #include "commands.h"
 #include "d3d_util.h"
+#include "fonts.h"
 #include "game_cursor.h"
 #include "game_names.h"
 #include "menu.h"
@@ -19,6 +20,7 @@
 #include "codedump.h"
 #include "drawdump.h"
 #include "namedump.h"
+#include "pointerwatch.h"
 #include "stackdump.h"
 #endif
 
@@ -37,7 +39,7 @@ namespace
     constexpr const char* kName              = "headsup";
     // Ashita takes a plugin's version as one number, so it holds the release tag's major.minor; the release workflow
     // checks the two agree.
-    constexpr double kVersion                = 0.55;
+    constexpr double kVersion                = 0.6;
     constexpr const char* kConfigAlias       = "headsup";
     constexpr const char* kConfigFolder      = "config";
     constexpr const char* kLogsFolder        = "logs";
@@ -86,6 +88,24 @@ namespace
         IConfigurationManager* m_Config;
     };
 
+    // Set at Initialize and Present, and read by OnMouse, which Ashita calls on the game's thread before the game sees
+    // each message.
+    bool g_SyncClicks   = false;
+    HWND g_GameWindow   = nullptr;
+    IGuiManager* g_Gui  = nullptr;
+
+    BOOL __stdcall OnMouse(uint32_t message, WPARAM wParam, LPARAM lParam, bool blocked)
+    {
+        if (!g_SyncClicks) return FALSE;
+        const bool overWindow = g_Gui != nullptr && g_Gui->GetIO().WantCaptureMouse; // an Ashita window takes the mouse
+        // The game takes a click where its pointer last was, which is somewhere else after the mouse moved over another
+        // window: a mouse move to the click's place goes first.
+        if (!blocked && !overWindow && g_GameWindow != nullptr && headsup::ClickMessage(message))
+            SendMessageA(g_GameWindow, WM_MOUSEMOVE, LOWORD(wParam), lParam);
+        // The game hides its pointer for typing until it sees the mouse move, which it never does over an Ashita window.
+        if (message == WM_MOUSEMOVE && overWindow) headsup::PointerFix::RevealUnderWindow();
+        return FALSE;
+    }
 }
 
 class HeadsUp final : public IPlugin
@@ -100,8 +120,11 @@ class HeadsUp final : public IPlugin
     headsup::GameNames m_Names;
     headsup::NameplateRenderer m_Nameplates;
     headsup::PointerSwap m_Pointer;
+    std::vector<HANDLE> m_LoadedFonts;
     headsup::NameHook m_NameHook;
-    bool m_NameHookTried = false;
+    headsup::ArrowHook m_ArrowHook;
+    headsup::PointerFix m_PointerFix;
+    bool m_HooksTried = false;
     headsup::ScreenBox m_GameNameBox;
     bool m_PointerFailed = false; // said once; tried again when the setting changes
     headsup::Menu m_Menu;
@@ -117,6 +140,7 @@ class HeadsUp final : public IPlugin
 
 #ifdef HEADSUP_DEV
     headsup::DrawDump m_DrawDump;
+    headsup::PointerWatch m_PointerWatch;
 #endif
     bool m_Drawing      = false; // drawing nameplates: our own draws come back through the hooks
     bool m_DrewInScene  = false; // this frame
@@ -124,7 +148,6 @@ class HeadsUp final : public IPlugin
     bool m_RestoreWarned = false; // said once that Direct3D did not put the game's states back
     IDirect3DDevice8* m_Device = nullptr;
     headsup::CursorTargets m_CursorTargets;
-    bool m_Picking      = false;
     float m_MenuWidth   = 0.0f;
     float m_MenuHeight  = 0.0f;
     int m_CaptureLeft   = 0;
@@ -159,13 +182,33 @@ public:
         IConfigurationManager* config = core->GetConfigurationManager();
         m_MenuWidth                   = config->GetFloat(kBootConfig, kRegistry, kMenuWidth, 0.0f);
         m_MenuHeight                  = config->GetFloat(kBootConfig, kRegistry, kMenuHeight, 0.0f);
+        size_t fonts = 0;
+        for (const headsup::BundledFont* font = headsup::BundledFonts(fonts); fonts-- > 0; ++font)
+        {
+            DWORD installed = 0;
+            // Loaded for this process only: nothing is written to the system's fonts.
+            if (HANDLE handle = AddFontMemResourceEx(const_cast<unsigned char*>(font->data), static_cast<DWORD>(font->bytes), nullptr,
+                    &installed);
+                handle != nullptr)
+                m_LoadedFonts.push_back(handle);
+        }
         LoadSettings();
+        g_Gui = core->GetGuiManager();
+        core->GetInputManager()->GetMouse()->AddCallback(kName, OnMouse);
         return true;
     }
 
     void Release(void) override
     {
+        m_AshitaCore->GetInputManager()->GetMouse()->RemoveCallback(kName);
+        g_SyncClicks = false;
+        g_Gui        = nullptr;
+        for (HANDLE handle : m_LoadedFonts)
+            RemoveFontMemResourceEx(handle);
+        m_LoadedFonts.clear();
         if (const std::string failure = m_NameHook.Stop(); !failure.empty()) Print(failure + ".");
+        if (const std::string failure = m_ArrowHook.Stop(); !failure.empty()) Print(failure + ".");
+        if (const std::string failure = m_PointerFix.Stop(); !failure.empty()) Print(failure + ".");
         m_Pointer.Stop();
         m_Nameplates.Release();
     }
@@ -207,6 +250,8 @@ public:
             Print(headsup::ArmNameDump(m_NameHook.Running()));
         else if (args[1] == "stackdump")
             Print(headsup::ArmStackDump());
+        else if (args[1] == "pointerwatch")
+            Print(args.size() > 2 && args[2] == "stop" ? m_PointerWatch.Stop() : m_PointerWatch.Start(OwnFolder(kLogsFolder), Now()));
 #endif
         else
         {
@@ -218,6 +263,7 @@ public:
             Print("/hu codedump: write the client's loaded image to logs/headsup");
             Print("/hu namedump: write every call into the game's name routine during one frame to logs/headsup");
             Print("/hu stackdump: write the stack at the character draws of one frame to logs/headsup");
+            Print("/hu pointerwatch [stop]: log every change in the mouse pointer and the game's own to logs/headsup until stopped");
 #endif
         }
         return true;
@@ -284,8 +330,9 @@ public:
         if (m_DrawDump.NextFrame(Now(), m_Names, m_NameHook, m_Tracker, m_Nameplates)) WriteDrawDump();
         if (headsup::NameDumpReady()) WriteNameDump();
         if (headsup::StackDumpReady()) WriteStackDump();
+        m_PointerWatch.Frame(m_AshitaCore, Now());
 #endif
-        StartNameHook();
+        StartHooks();
         m_Outline.NewFrame();
         m_Names.NewFrame();
         if (m_Outline.TakeStencilWarning())
@@ -309,6 +356,11 @@ public:
         const double now       = Now();
         UpdateTracker(now);
         UpdateCursorTargets();
+        m_ArrowHook.Hide(m_Settings.enabled && m_Settings.replaceCursor);
+        m_PointerFix.Enable(m_Settings.enabled && m_Settings.fixPointer);
+        m_PointerFix.KeepPointerFor(m_Settings.enabled ? m_Settings.keepPointerKeys : std::vector<uint8_t>{});
+        g_SyncClicks = m_Settings.enabled && m_Settings.fixPointer;
+        g_GameWindow = m_AshitaCore->GetProperties()->GetFinalFantasyHwnd();
         const headsup::MenuStatus status{
             .outlinedMobs     = m_Tracker.OutlinedCount(),
             .meshes           = m_Outline.MeshesLastFrame(),
@@ -379,10 +431,8 @@ public:
         if (Ours()) return false;
         RecordDraw('U', type, primCount, vertices, stride, 0u, headsup::VertexCount(type, primCount));
         DrawNameplatesBeforeSceneCopy();
-        m_Names.OnDrawUP(type, primCount, vertices, stride, m_Tracker, m_Settings);
-        const bool blocked = BlocksGameCursor(type, primCount, vertices, stride);
-        if (blocked) MarkHidden();
-        return blocked;
+        m_Names.OnDrawUP(m_Tracker, m_Settings);
+        return false;
     }
 
     bool Direct3DDrawIndexedPrimitiveUP(D3DPRIMITIVETYPE type, UINT minIndex, UINT numVertices, UINT primCount,
@@ -399,13 +449,6 @@ public:
 private:
     // HeadsUp's own draws, which come back through the hooks.
     bool Ours() const { return m_Drawing || m_Outline.Drawing(); }
-
-    bool BlocksGameCursor(D3DPRIMITIVETYPE type, UINT primCount, const void* vertices, UINT stride)
-    {
-        return m_Settings.enabled && m_Settings.replaceCursor &&
-               m_Names.IsGameCursorDraw(type, primCount, vertices, stride, m_Tracker, m_Nameplates.CursorNames(), m_Picking,
-                   m_AshitaCore->GetMemoryManager()->GetTarget());
-    }
 
     // Only developer builds (dev/) record draws, for /hu drawdump.
     void RecordDraw([[maybe_unused]] char hook, [[maybe_unused]] D3DPRIMITIVETYPE type, [[maybe_unused]] UINT count,
@@ -492,12 +535,16 @@ private:
         return owners;
     }
 
-    // At Present, a render boundary: the game is not inside its name routine.
-    void StartNameHook()
+    // At Present, a render boundary: the game is not inside its name routine or its target window's draw.
+    void StartHooks()
     {
-        if (std::exchange(m_NameHookTried, true)) return;
+        if (std::exchange(m_HooksTried, true)) return;
         if (const std::string failure = m_NameHook.Start(); !failure.empty())
             Print("could not hook the game's names: " + failure + ".");
+        if (const std::string failure = m_ArrowHook.Start(); !failure.empty())
+            Print("could not hook the game's target arrows, so it draws its own and HeadsUp none: " + failure + ".");
+        if (const std::string failure = m_PointerFix.Start(); !failure.empty())
+            Print("could not fix the game's mouse pointer: " + failure + ".");
     }
 
 #ifdef HEADSUP_DEV
@@ -651,11 +698,12 @@ private:
     void UpdateCursorTargets()
     {
         ITarget* target = m_AshitaCore->GetMemoryManager()->GetTarget();
-        m_Picking       = target->GetIsSubTargetActive() != 0;
-        m_CursorTargets = headsup::TargetsFromSlots(m_Picking, target->GetTargetIndex(0), target->GetTargetIndex(1),
+        const bool picking = target->GetIsSubTargetActive() != 0;
+        m_CursorTargets    = headsup::TargetsFromSlots(picking, target->GetTargetIndex(0), target->GetTargetIndex(1),
             (target->GetLockedOnFlags() & kLockedOn) != 0, m_AshitaCore->GetMemoryManager()->GetEntity()->GetEntityMapSize());
-        if (!m_Picking) m_Names.ForgetPickRange();
-        m_CursorTargets.outOfRange = m_Picking && m_Names.PickOutOfRange();
+        if (!picking) m_ArrowHook.ForgetPicked();
+        m_CursorTargets.outOfRange      = picking && headsup::PickedOutOfRange(m_ArrowHook.PickedColor()).value_or(false);
+        m_CursorTargets.gameArrowsShown = !m_ArrowHook.Running();
         if (const Ashita::FFXI::targetwindow_t* window = target->GetRawStructureWindow())
             headsup::PlaceAnchors(m_CursorTargets,
                 headsup::CursorWindow{static_cast<float>(window->m_AnkX), static_cast<float>(window->m_AnkY),

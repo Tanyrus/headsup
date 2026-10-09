@@ -19,6 +19,7 @@ namespace headsup
         constexpr float kRasterSmallest   = 6.0f;   // pixels
         constexpr float kRasterStep       = 1.25f;
         constexpr float kRasterOverscale  = 1.05f;  // text is scaled up this much before it is redrawn larger
+        constexpr double kScaleEase       = 0.15;   // seconds: two thirds of the way to a new size in this time
 
         float RowWidth(int count, float size)
         {
@@ -27,7 +28,7 @@ namespace headsup
 
         CursorKind CursorFor(uint16_t index, const Settings& settings, const CursorTargets& targets)
         {
-            if (!settings.replaceCursor || index == 0) return CursorKind::None;
+            if (!settings.replaceCursor || targets.gameArrowsShown || index == 0) return CursorKind::None;
             if (index == targets.subTarget) return targets.outOfRange ? CursorKind::OutOfRange : CursorKind::SubTarget;
             if (index == targets.target) return targets.locked ? CursorKind::Locked : CursorKind::Target;
             return CursorKind::None;
@@ -101,6 +102,12 @@ namespace headsup
             l.nameY           = plate.CenterY() - sizes.nameHeight * 0.5f;
             bottom            = l.nameY + kNameOverlap;
         }
+        if (sizes.ornamentHeight > 0.0f)
+        {
+            l.ornamentX = centerX - sizes.ornamentWidth * 0.5f;
+            l.ornamentY = bottom - kLineGap - sizes.ornamentHeight;
+            bottom      = l.ornamentY - kLineGap;
+        }
         if (sizes.labelHeight > 0.0f)
         {
             l.labelX = centerX - sizes.labelWidth * 0.5f;
@@ -132,6 +139,48 @@ namespace headsup
     {
         const float factor = screenHeight > 0.0f ? letterHeight / (screenHeight / kLettersPerScreen) : 1.0f;
         return std::isfinite(factor) ? std::clamp(factor, kMinScale, kMaxScale) : 1.0f;
+    }
+
+    float EaseScale(float shown, float target, double seconds)
+    {
+        if (shown <= 0.0f) return target;
+        return shown + (target - shown) * static_cast<float>(1.0 - std::exp(-std::max(0.0, seconds) / kScaleEase));
+    }
+
+    bool RedrawNow(bool drawn, double spentMs)
+    {
+        return !drawn || spentMs < kRedrawBudgetMs;
+    }
+
+    bool ScalesWithDistance(const Settings& settings, EntityKind kind, bool self)
+    {
+        if (!settings.scaleWithDistance) return false;
+        if (self) return settings.scaleOwnName;
+        return kind != EntityKind::Player || settings.scalePlayerNames;
+    }
+
+    int PlateRank(uint16_t index, const CursorTargets& targets)
+    {
+        if (index == 0) return kPlainRank;
+        if (index == targets.subTarget) return kPickedRank;
+        return index == targets.target ? kTargetRank : kPlainRank;
+    }
+
+    bool DrawnBefore(int rankA, float depthA, int rankB, float depthB)
+    {
+        return rankA != rankB ? rankA < rankB : depthA > depthB;
+    }
+
+    int NameSize(const Settings& settings, EntityKind kind, bool self)
+    {
+        if (self) return settings.selfNameSize;
+        switch (kind)
+        {
+            case EntityKind::Mob: return settings.mobNameSize;
+            case EntityKind::Player: return settings.playerNameSize;
+            case EntityKind::Npc: return settings.npcNameSize;
+        }
+        return settings.mobNameSize;
     }
 
     int RasterHeight(float pixels, int current)
