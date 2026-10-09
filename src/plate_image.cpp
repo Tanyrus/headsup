@@ -65,15 +65,29 @@ namespace headsup
                 sum += kernel[static_cast<size_t>(i + taps)] = std::exp(-0.5f * static_cast<float>(i * i) / (sigma * sigma));
             for (float& k : kernel)
                 k /= sum;
+            // Uncovered pixels only ever add zero, so each sum runs over the covered span alone, in the same order: the
+            // glow's margins are most of its image.
             std::vector<float> across(c.alpha.size(), 0.0f), plane(c.alpha.size(), 0.0f);
+            int top = c.height, bottom = -1, left = c.width, right = -1;
             for (int y = 0; y < c.height; ++y)
+            {
+                int first = c.width, last = -1;
                 for (int x = 0; x < c.width; ++x)
-                    for (int i = std::max(-taps, -x); i <= std::min(taps, c.width - 1 - x); ++i)
+                {
+                    if (c.alpha[static_cast<size_t>(y * c.width + x)] == 0) continue;
+                    first = std::min(first, x);
+                    last  = x;
+                }
+                if (last < 0) continue;
+                top = std::min(top, y), bottom = y, left = std::min(left, first), right = std::max(right, last);
+                for (int x = std::max(0, first - taps); x <= std::min(c.width - 1, last + taps); ++x)
+                    for (int i = std::max(-taps, first - x); i <= std::min(taps, last - x); ++i)
                         across[static_cast<size_t>(y * c.width + x)] +=
                             Cover(c, static_cast<size_t>(y * c.width + x + i)) * kernel[static_cast<size_t>(i + taps)];
-            for (int y = 0; y < c.height; ++y)
-                for (int x = 0; x < c.width; ++x)
-                    for (int i = std::max(-taps, -y); i <= std::min(taps, c.height - 1 - y); ++i)
+            }
+            for (int y = std::max(0, top - taps); y <= std::min(c.height - 1, bottom + taps); ++y)
+                for (int x = std::max(0, left - taps); x <= std::min(c.width - 1, right + taps); ++x)
+                    for (int i = std::max(-taps, top - y); i <= std::min(taps, bottom - y); ++i)
                         plane[static_cast<size_t>(y * c.width + x)] +=
                             across[static_cast<size_t>((y + i) * c.width + x)] * kernel[static_cast<size_t>(i + taps)];
             return plane;

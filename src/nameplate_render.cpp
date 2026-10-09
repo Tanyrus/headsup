@@ -178,6 +178,13 @@ namespace headsup
         TextureKey key{text, pixelHeight, 0, look};
         if (t.texture != nullptr && t.key == key) return true;
         if (!RedrawNow(t.texture != nullptr, m_RedrawMs)) return true;
+        // A name new in a busy frame is drawn at once without its glow, which costs the most: a later frame adds it.
+        if (t.texture == nullptr && look.glow != 0 && !RedrawNow(true, m_RedrawMs))
+        {
+            TextLook plain = look;
+            plain.glow     = 0;
+            return Prepare(t, text, plain, pixelHeight);
+        }
         const Stopwatch stopwatch(m_RedrawMs);
         const auto height    = static_cast<float>(pixelHeight);
         const float shadow   = height * kShadowPerHeight;

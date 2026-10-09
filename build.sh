@@ -35,8 +35,9 @@ abi_check() { python3 "$ROOT/tools/abi_check.py" "$DEV_DIR"; }
 
 plugin() {
     mkdir -p "$OUT"
-    # The SDK's Registry.h passes an int* where Windows wants an LPDWORD, which only -fpermissive accepts.
-    i686-w64-mingw32-g++ -std=c++20 -O2 -shared \
+    # The SDK's Registry.h passes an int* where Windows wants an LPDWORD, which only -fpermissive accepts. x87 math made
+    # the glow's blur five to eight times slower than SSE2; the game and Ashita call in with the stack only 4-byte aligned.
+    i686-w64-mingw32-g++ -std=c++20 -O2 -msse2 -mfpmath=sse -mincoming-stack-boundary=2 -shared \
         -isystem "$ROOT/shim" -isystem "$ROOT/third_party/ashita-sdk" -I"$ROOT/src" "${DEV_FLAGS[@]}" \
         -Wall -Wextra -Werror -fpermissive \
         -static -static-libgcc -static-libstdc++ -Wl,--kill-at \

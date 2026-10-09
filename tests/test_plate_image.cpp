@@ -135,6 +135,14 @@ TEST(the_glow_is_the_letters_blurred_at_part_strength)
     CHECK((Pixel(image, 15, mid) & 0x00FFFFFFu) == 0x0000FF00u);                   // in the glow's color
 }
 
+TEST(the_glow_is_the_same_either_side_of_the_letters)
+{
+    const Image image = Styled(Block(40, 16), Layers{0.0f, 0, 8.0f, 0xFFFFFFFFu, 0xFF000000u, 0xFF00FF00u});
+    for (const int out : {1, 4, 9})
+        CHECK_EQ(Pixel(image, 16 - out, 36), Pixel(image, 55 + out, 36)); // the block spans columns 16 to 55
+    CHECK_EQ(Pixel(image, 36, 15), Pixel(image, 36, 56));
+}
+
 TEST(a_stronger_glow_is_denser_up_to_solid)
 {
     Layers layers{0.0f, 0, 8.0f, 0xFFFFFFFFu, 0xFF000000u, 0xFF00FF00u};
