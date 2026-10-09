@@ -358,6 +358,7 @@ public:
         UpdateCursorTargets();
         m_ArrowHook.Hide(m_Settings.enabled && m_Settings.replaceCursor);
         m_PointerFix.Enable(m_Settings.enabled && m_Settings.fixPointer);
+        m_PointerFix.KeepPointerFor(m_Settings.enabled ? m_Settings.keepPointerKeys : std::vector<uint8_t>{});
         g_SyncClicks = m_Settings.enabled && m_Settings.fixPointer;
         g_GameWindow = m_AshitaCore->GetProperties()->GetFinalFantasyHwnd();
         const headsup::MenuStatus status{

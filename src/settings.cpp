@@ -2,8 +2,11 @@
 
 #include "argb.h"
 #include "fonts.h"
+#include "pointer_keys.h"
 
 #include <algorithm>
+#include <cstdlib>
+#include <sstream>
 #include <cctype>
 #include <climits>
 #include <cmath>
@@ -89,6 +92,8 @@ namespace headsup
         constexpr const char* kOneNameSizeKey = "nameSize";
         // And from before the cursor scaled on its own, when it scaled with the names.
         constexpr const char* kScaleCursorKey = "scaleCursor";
+        constexpr const char* kKeepPointerKey = "keepPointerKeys"; // hex virtual-key codes, a space apart
+        constexpr int kHex                    = 16;
         // Every setting is saved whenever one changes, so a file keeps the defaults of its day, and each default that
         // changed is put right once in files from before. 1: the target cursor's became Phoenix's red. 2: the font's
         // became the bundled Marcellus SC.
@@ -188,6 +193,14 @@ namespace headsup
         if (s.fontName.empty() || s.fontName.size() > kMaxFontName) s.fontName = d.fontName;
         if (s.labelFontName.empty() || s.labelFontName.size() > kMaxFontName) s.labelFontName = d.labelFontName;
         s.labelShadowColor = ClampColor(s.labelShadowColor, d.labelShadowColor);
+        std::vector<uint8_t> keys;
+        for (const uint8_t vk : s.keepPointerKeys)
+        {
+            const uint8_t key = NormalizeKey(vk);
+            if (key != 0 && !MouseButton(key) && std::ranges::find(keys, key) == keys.end() && keys.size() < kMaxKeptKeys)
+                keys.push_back(key);
+        }
+        s.keepPointerKeys = std::move(keys);
         for (const ColorKey& c : kColors)
             s.*c.field = ClampColor(s.*c.field, d.*c.field);
         for (int k = 0; k < kLabelShadeCount; ++k)
@@ -213,6 +226,13 @@ namespace headsup
         s.labelFontName    = store.GetString(kLabelFontKey, s.fontName.c_str());
         s.labelFontBold    = store.GetBool(kLabelBoldKey, s.fontBold);
         s.scaleCursor      = store.GetBool(kScaleCursorKey, s.scaleWithDistance);
+        std::istringstream keys(store.GetString(kKeepPointerKey, ""));
+        for (std::string key; keys >> key;)
+        {
+            char* end        = nullptr;
+            const long value = std::strtol(key.c_str(), &end, kHex);
+            if (*end == '\0' && value > 0 && value <= UINT8_MAX) s.keepPointerKeys.push_back(static_cast<uint8_t>(value));
+        }
         s.labelShadowColor = s.textOutline;
         LoadColor(store, kLabelShadowColorKey, s.labelShadowColor);
         for (int k = 0; k < kLabelShadeCount; ++k)
@@ -269,6 +289,14 @@ namespace headsup
         store.Set(kLabelFontKey, s.labelFontName.c_str());
         setBool(kLabelBoldKey, s.labelFontBold);
         setBool(kScaleCursorKey, s.scaleCursor);
+        std::string keys;
+        for (const uint8_t vk : s.keepPointerKeys)
+        {
+            char hex[4];
+            std::snprintf(hex, sizeof(hex), "%02X", vk);
+            keys += (keys.empty() ? "" : " ") + std::string(hex);
+        }
+        store.Set(kKeepPointerKey, keys.c_str());
         setColor(kLabelShadowColorKey, s.labelShadowColor);
         for (int k = 0; k < kLabelShadeCount; ++k)
             setColor(kLabelShadeKeys[k], s.labelColor[k]);

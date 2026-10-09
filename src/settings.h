@@ -79,6 +79,7 @@ namespace headsup
         bool scalePlayerNames  = true;  // other players' plates too
         bool scaleCursor       = true;  // the target cursor's size follows the game's name size, apart from the names
         Look look              = Look::Fantasy; // which style the plates are drawn in
+        std::vector<uint8_t> keepPointerKeys; // keys that set off a command without hiding the game's pointer
         std::string fontName   = kDefaultFont; // a font family installed in Windows
         bool fontBold          = false;
         bool nameGlow          = true;  // a mob's name glows in its outline color

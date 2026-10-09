@@ -52,6 +52,11 @@ namespace headsup
         constexpr int16_t kMoveShow[] = {0x8D, 0x4C, 0x24, 0x14, 0x8D, 0x54, 0x24, 0x24, 0x51, 0x8B, 0x0D, -1, -1, -1, -1, 0x53, 0x52,
             0xE8, -1, -1, -1, -1, 0x8B, 0x0D, -1, -1, -1, -1, 0x6A, 0x01, 0xE8, -1, -1, -1, -1};
         constexpr uint32_t kMoveController = 11, kShowController = 24, kShowCall = 30;
+        // The command check's end: mov ecx,[controller]; push 1 (then 0); call mouse use; mov al,[esp+14h]; pop edi; pop
+        // esi; pop ecx; ret. The on call is 8 bytes in, the off call 29.
+        constexpr int16_t kMouseUseCalls[] = {0x8B, 0x0D, -1, -1, -1, -1, 0x6A, 0x01, 0xE8, -1, -1, -1, -1, 0x8A, 0x44, 0x24, 0x14, 0x5F,
+            0x5E, 0x59, 0xC3, 0x8B, 0x0D, -1, -1, -1, -1, 0x6A, 0x00, 0xE8, -1, -1, -1, -1, 0x8A, 0x44, 0x24, 0x14, 0x5F, 0x5E, 0x59, 0xC3};
+        constexpr uint32_t kMouseOnCall = 8, kMouseOffCall = 29;
         // The show routine as far as its test of the shown byte: cmp [esi+4Eh], bl. Its globals are wild.
         constexpr int16_t kShowRoutine[] = {0xA1, -1, -1, -1, -1, 0x56, 0x8B, 0xF1, 0x8B, 0x0D, -1, -1, -1, -1, 0x85, 0xC0, 0x74, 0x3B,
             0x53, 0x8B, 0x5C, 0x24, 0x0C, 0x85, 0xC9, 0x74, 0x0C, 0x53, 0xE8, -1, -1, -1, -1, 0x8B, 0x0D, -1, -1, -1, -1, 0x38, 0x5E,
@@ -161,6 +166,9 @@ namespace headsup
         case LocateProblem::NoPointerShow: return "the game's showing of its pointer was not found";
         case LocateProblem::AmbiguousPointerShow: return "the game's showing of its pointer was found more than once";
         case LocateProblem::PointerShowChanged: return "the game's showing of its pointer is not as expected";
+        case LocateProblem::NoKeyHide: return "where the game hides its pointer for a key was not found";
+        case LocateProblem::AmbiguousKeyHide: return "where the game hides its pointer for a key was found more than once";
+        case LocateProblem::KeyHideDiffers: return "the game hides its pointer for a key through an unexpected function";
         }
         return "unknown problem";
     }
@@ -261,5 +269,15 @@ namespace headsup
                 .empty())
             return PointerShow{LocateProblem::PointerShowChanged};
         return PointerShow{LocateProblem::None, controller, show};
+    }
+
+    KeyHide LocateKeyHide(const ImageSection& text)
+    {
+        const std::vector<uint32_t> found = Find(kMouseUseCalls, sizeof(kMouseUseCalls) / sizeof(int16_t), text);
+        if (found.empty()) return KeyHide{LocateProblem::NoKeyHide};
+        if (found.size() > 1) return KeyHide{LocateProblem::AmbiguousKeyHide};
+        const uint32_t on = text.rva + found.front() + kMouseOnCall, off = text.rva + found.front() + kMouseOffCall;
+        if (CallTarget(on, text) != CallTarget(off, text)) return KeyHide{LocateProblem::KeyHideDiffers};
+        return KeyHide{LocateProblem::None, off, CallTarget(off, text)};
     }
 }

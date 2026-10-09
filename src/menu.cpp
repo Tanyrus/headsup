@@ -1,9 +1,11 @@
 #include "menu.h"
 
 #include "Ashita.h"
+#include "pointer_keys.h"
 
 #include <cfloat>
 #include <cstdio>
+#include <algorithm>
 #include <initializer_list>
 #include <utility>
 
@@ -65,6 +67,7 @@ namespace headsup
         constexpr float kChipWidth     = 52.0f;
         constexpr float kChoiceColumn  = 200.0f; // where a choice's buttons start in its row
         constexpr float kChoiceWidth   = 64.0f;
+        constexpr float kKeyNameWidth  = 110.0f; // where a kept key's Remove button starts
         constexpr float kOffAlpha      = 0.45f;  // settings of a feature that is off are drawn this faint
         // One size for every page, the tallest included; a longer page scrolls.
         constexpr float kWindowWidth   = 700.0f;
@@ -698,7 +701,51 @@ namespace headsup
             ui.Fade(false);
         }
 
-        void DrawCursorSettings(Ui& ui, Settings& s, uint32_t& collapsed)
+        bool KeyDown(uint8_t vk) { return (GetAsyncKeyState(vk) & 0x8000) != 0; }
+
+        // The keys that keep the game's pointer, each with a Remove button, and an Add button that takes the next key
+        // pressed that was not already held.
+        void DrawKeptKeys(Ui& ui, Settings& s, KeyCapture& capture)
+        {
+            ui.gui->AlignTextToFramePadding();
+            ui.gui->TextUnformatted("Keep the pointer when pressing");
+            ui.Help("FFXI hides its pointer whenever a key sets off one of its commands, such as Esc, or Ctrl and Alt for the "
+                    "macro bars. While only keys on this list are held, the pointer stays.");
+            for (size_t i = 0; i < s.keepPointerKeys.size(); ++i)
+            {
+                char remove[32];
+                std::snprintf(remove, sizeof(remove), "Remove##key%zu", i);
+                ui.gui->AlignTextToFramePadding();
+                ui.gui->TextUnformatted(KeyName(s.keepPointerKeys[i]).c_str());
+                ui.gui->SameLine(kKeyNameWidth, -1.0f);
+                if (ui.Button(remove, ImVec2(0.0f, 0.0f), kControlButton))
+                {
+                    s.keepPointerKeys.erase(s.keepPointerKeys.begin() + static_cast<std::ptrdiff_t>(i));
+                    ui.changed = true;
+                    break;
+                }
+            }
+            if (!capture.on)
+            {
+                if (s.keepPointerKeys.size() < kMaxKeptKeys && ui.Button("Add a key", ImVec2(0.0f, 0.0f), kControlButton))
+                    capture = KeyCapture{true, HeldKeys(KeyDown)};
+                return;
+            }
+            ui.gui->AlignTextToFramePadding();
+            ui.Colored(kMuted, "Press a key...");
+            ui.gui->SameLine();
+            if (ui.Button("Cancel##key", ImVec2(0.0f, 0.0f), kControlButton)) capture.on = false;
+            for (const uint8_t key : HeldKeys(KeyDown))
+            {
+                if (std::ranges::find(capture.held, key) != capture.held.end()) continue;
+                if (std::ranges::find(s.keepPointerKeys, key) == s.keepPointerKeys.end()) s.keepPointerKeys.push_back(key);
+                ui.changed = true;
+                capture.on = false;
+                break;
+            }
+        }
+
+        void DrawCursorSettings(Ui& ui, Settings& s, uint32_t& collapsed, KeyCapture& capture)
         {
             ui.Fade(!s.enabled);
             if (ui.Section("Target Cursor", kCursorSection, collapsed))
@@ -725,6 +772,7 @@ namespace headsup
                     "it hides while you type stays hidden over Ashita's windows, this one included. This makes it read the "
                     "mouse in its true window area, move its pointer to each click first, and show the pointer again when "
                     "the mouse moves over those windows.");
+                DrawKeptKeys(ui, s, capture);
             }
             ui.Fade(false);
         }
@@ -878,7 +926,7 @@ namespace headsup
                     if (m_ColorsTab)
                         DrawCursorColors(ui, s, m_Collapsed);
                     else
-                        DrawCursorSettings(ui, s, m_Collapsed);
+                        DrawCursorSettings(ui, s, m_Collapsed, m_KeyCapture);
                     break;
                 default: DrawDebug(ui, s, status, m_Collapsed, m_DebugRequested); break;
                 }

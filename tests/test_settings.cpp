@@ -1,3 +1,4 @@
+#include "pointer_keys.h"
 #include "settings.h"
 #include "test.h"
 
@@ -174,6 +175,7 @@ iconBazaar=right
 iconSeekingParty=hide
 mobId=lastThree
 look=fantasy
+keepPointerKeys=11 1B 51
 )";
 
     Settings SavedSettings()
@@ -260,6 +262,7 @@ look=fantasy
             s.playerIconSide[static_cast<int>(icon)] = IconSide::Hidden;
         s.mobId = MobIdFormat::LastThree;
         s.look  = Look::Fantasy;
+        s.keepPointerKeys = {0x11, 0x1B, 0x51};
         return s;
     }
 
@@ -544,4 +547,18 @@ TEST(a_white_target_cursor_saved_after_it_turned_red_stays_white)
     MapStore chosen = TargetCursor("1.0000", "1.0000", "1.0000");
     chosen.values["settingsVersion"] = "1.0000";
     CHECK(LoadSettings(chosen).cursorColor == (Color{{1.0f, 1.0f, 1.0f}}));
+}
+
+TEST(the_keys_that_keep_the_pointer_are_real_keys_once_each_and_not_too_many)
+{
+    Settings s;
+    s.keepPointerKeys = {0xA2, 0x11, 0x00, 0x01, 0x51}; // left Ctrl is Ctrl; nothing and the left button are not keys
+    CHECK(Clamp(s).keepPointerKeys == (std::vector<uint8_t>{0x11, 0x51}));
+    s.keepPointerKeys.clear();
+    for (int vk = 0x30; vk < 0x30 + 40; ++vk)
+        s.keepPointerKeys.push_back(static_cast<uint8_t>(vk));
+    CHECK_EQ(Clamp(s).keepPointerKeys.size(), kMaxKeptKeys);
+    MapStore odd;
+    odd.values = {{"keepPointerKeys", "11 zz 1B 999"}};
+    CHECK(LoadSettings(odd).keepPointerKeys == (std::vector<uint8_t>{0x11, 0x1B}));
 }

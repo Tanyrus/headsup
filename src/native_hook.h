@@ -102,12 +102,16 @@ namespace headsup
         void Enable(bool on);
         // On a mouse move an Ashita window took: shows the game's pointer through its own routine if it is hidden.
         static void RevealUnderWindow();
+        // Keys that set off a game command without hiding its pointer (native_locate.h's KeyHide); none keeps the game's
+        // behavior.
+        void KeepPointerFor(const std::vector<uint8_t>& keys);
 
     private:
         struct Patch
         {
             uint8_t* at;
             uint8_t game[6], ours[6];
+            uint32_t bytes;
         };
         std::vector<Patch> m_Patches;
     };

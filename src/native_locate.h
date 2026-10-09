@@ -38,6 +38,9 @@ namespace headsup
         NoPointerShow,
         AmbiguousPointerShow,
         PointerShowChanged,
+        NoKeyHide,
+        AmbiguousKeyHide,
+        KeyHideDiffers,
     };
     const char* Describe(LocateProblem problem);
 
@@ -93,4 +96,13 @@ namespace headsup
     };
     constexpr uint32_t kPointerShownOffset = 0x4E;
     PointerShow LocatePointerShow(const ImageSection& text);
+
+    // The game's command check ends by turning mouse use on (1) for a few mouse commands and off (0) for the rest, which
+    // hides the pointer whenever a key sets off a command: two thiscalls into one routine on the mouse controller.
+    struct KeyHide
+    {
+        LocateProblem problem = LocateProblem::None;
+        uint32_t offCall = 0, mouseUse = 0; // RVAs: the five-byte call with 0, and the routine
+    };
+    KeyHide LocateKeyHide(const ImageSection& text);
 }

@@ -3,6 +3,7 @@
 #include "Ashita.h"
 #include "name_frame.h"
 #include "native_locate.h"
+#include "pointer_keys.h"
 #include "tracker.h"
 
 #ifdef HEADSUP_DEV
@@ -120,6 +121,17 @@ namespace headsup
         uintptr_t g_ControllerGlobal = 0; // where the game keeps its mouse controller
         uintptr_t g_ShowPointer      = 0; // the controller's thiscall that shows (1) or hides (0) the pointer
         using ShowPointerFn          = void(__attribute__((thiscall))*)(uintptr_t controller, int shown);
+        uintptr_t g_MouseUse         = 0; // the controller's thiscall that turns mouse use on (1) or off (0)
+        using MouseUseFn             = void(__attribute__((thiscall))*)(uintptr_t controller, int on);
+        std::vector<uint8_t> g_KeepKeys;
+
+        // In place of the game's call that turns mouse use off after a key set off a command.
+        __attribute__((thiscall)) void MouseOffUnlessKept(uintptr_t controller, int on)
+        {
+            const auto down = [](uint8_t vk) { return (GetAsyncKeyState(vk) & 0x8000) != 0; };
+            if (on == 0 && !g_KeepKeys.empty() && KeepsPointer(HeldKeys(down), g_KeepKeys)) return;
+            reinterpret_cast<MouseUseFn>(g_MouseUse)(controller, on);
+        }
 
         constexpr uint8_t kCallOpcode = 0xE8;
         constexpr uint32_t kGuessBytes = 6; // a call through the import table, or a load from it into a register
@@ -335,34 +347,43 @@ namespace headsup
         if (mapping.problem != LocateProblem::None) return Describe(mapping.problem);
         const PointerShow show = LocatePointerShow(text);
         if (show.problem != LocateProblem::None) return Describe(show.problem);
+        const KeyHide keyHide = LocateKeyHide(text);
+        if (keyHide.problem != LocateProblem::None) return Describe(keyHide.problem);
         const auto windowRect = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&HeadsUpWindowRect));
         const auto metric     = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&HeadsUpSystemMetric));
         std::vector<Patch> patches;
         for (const WindowGuess& guess : mapping.guesses)
         {
-            Patch call{base + guess.windowRectCall, {}, {}};
+            Patch call{base + guess.windowRectCall, {}, {}, kGuessBytes};
             const uint32_t to = windowRect - static_cast<uint32_t>(reinterpret_cast<uintptr_t>(call.at) + kCallLength);
             call.ours[0] = kCallOpcode;
             std::memcpy(call.ours + 1, &to, sizeof(to));
             call.ours[kGuessBytes - 1] = kNop;
-            Patch load{base + guess.metricsLoad, {}, {}};
+            Patch load{base + guess.metricsLoad, {}, {}, kGuessBytes};
             load.ours[0] = guess.movImmediate;
             std::memcpy(load.ours + 1, &metric, sizeof(metric));
             load.ours[kGuessBytes - 1] = kNop;
             patches.push_back(call);
             patches.push_back(load);
         }
+        Patch mouseOff{base + keyHide.offCall, {}, {}, kCallLength};
+        const uint32_t to = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&MouseOffUnlessKept)) -
+                            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(mouseOff.at) + kCallLength);
+        mouseOff.ours[0] = kCallOpcode;
+        std::memcpy(mouseOff.ours + 1, &to, sizeof(to));
+        patches.push_back(mouseOff);
         for (size_t i = 0; i < patches.size(); ++i)
         {
-            std::memcpy(patches[i].game, patches[i].at, kGuessBytes);
-            if (WriteCode(patches[i].at, patches[i].ours, kGuessBytes)) continue;
+            std::memcpy(patches[i].game, patches[i].at, patches[i].bytes);
+            if (WriteCode(patches[i].at, patches[i].ours, patches[i].bytes)) continue;
             while (i-- > 0)
-                WriteCode(patches[i].at, patches[i].game, kGuessBytes);
+                WriteCode(patches[i].at, patches[i].game, patches[i].bytes);
             return "the client's code could not be changed";
         }
         m_Patches          = std::move(patches);
         g_ControllerGlobal = show.controllerGlobal;
         g_ShowPointer      = reinterpret_cast<uintptr_t>(base) + show.show;
+        g_MouseUse         = reinterpret_cast<uintptr_t>(base) + keyHide.mouseUse;
         return "";
     }
 
@@ -371,9 +392,9 @@ namespace headsup
         std::string failure;
         for (const Patch& patch : m_Patches)
         {
-            if (std::memcmp(patch.at, patch.ours, kGuessBytes) != 0)
+            if (std::memcmp(patch.at, patch.ours, patch.bytes) != 0)
                 failure = "the game's reading of the mouse was changed again after HeadsUp fixed it, so it was left as it is";
-            else if (!WriteCode(patch.at, patch.game, kGuessBytes))
+            else if (!WriteCode(patch.at, patch.game, patch.bytes))
                 failure = "the game's reading of the mouse could not be put back";
         }
         m_Patches.clear();
@@ -382,6 +403,11 @@ namespace headsup
     }
 
     void PointerFix::Enable(bool on) { g_FixPointer = on; }
+
+    void PointerFix::KeepPointerFor(const std::vector<uint8_t>& keys)
+    {
+        if (keys != g_KeepKeys) g_KeepKeys = keys;
+    }
 
     void PointerFix::RevealUnderWindow()
     {

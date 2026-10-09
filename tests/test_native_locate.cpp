@@ -316,3 +316,35 @@ TEST(a_show_pointer_routine_that_keeps_its_state_elsewhere_is_left_alone)
     other.Put32(kMoveCall + 24, 0x039A1D50); // the show called on another object than the one moved
     CHECK(LocatePointerShow(other.Text()).problem == LocateProblem::PointerShowChanged);
 }
+
+namespace
+{
+    // The end of the same dump's command check (0x124D5F): mouse use on (1) for a few commands, off (0) for the rest,
+    // each through the routine at 0x126F70 on the mouse controller.
+    constexpr uint32_t kMouseUseCalls = 0x124D5F, kMouseUse = 0x126F70;
+
+    Image KeyHideClient()
+    {
+        Image image;
+        image.Put(kMouseUseCalls, {0x8B, 0x0D, 0x4C, 0x1D, 0x9A, 0x03, 0x6A, 0x01, 0xE8, 0x04, 0x22, 0x00, 0x00, 0x8A, 0x44, 0x24, 0x14,
+                                      0x5F, 0x5E, 0x59, 0xC3, 0x8B, 0x0D, 0x4C, 0x1D, 0x9A, 0x03, 0x6A, 0x00, 0xE8, 0xEF, 0x21, 0x00,
+                                      0x00, 0x8A, 0x44, 0x24, 0x14, 0x5F, 0x5E, 0x59, 0xC3});
+        return image;
+    }
+}
+
+TEST(the_hide_after_a_keys_command_is_the_second_of_two_mouse_use_calls)
+{
+    const KeyHide hide = LocateKeyHide(KeyHideClient().Text());
+    CHECK(hide.problem == LocateProblem::None);
+    CHECK_EQ(hide.offCall, kMouseUseCalls + 0x1D);
+    CHECK_EQ(hide.mouseUse, kMouseUse);
+}
+
+TEST(mouse_use_calls_into_different_routines_are_left_alone)
+{
+    Image image = KeyHideClient();
+    image.Put32(kMouseUseCalls + 0x1E, 0x000021F5); // six bytes past the routine
+    CHECK(LocateKeyHide(image.Text()).problem == LocateProblem::KeyHideDiffers);
+    CHECK(LocateKeyHide(Image{}.Text()).problem == LocateProblem::NoKeyHide);
+}
