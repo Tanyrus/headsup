@@ -1,6 +1,7 @@
 #include "settings.h"
 #include "test.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <map>
 #include <sstream>
@@ -266,15 +267,19 @@ TEST(a_font_name_windows_cannot_use_falls_back_to_the_default)
     CHECK(LoadSettings(store).fontName == std::string(kMaxFontName, 'x'));
 }
 
-TEST(the_font_list_is_the_installed_families_sorted_once_each)
+TEST(the_font_list_puts_the_bundled_fonts_first_then_the_installed_ones_sorted_once_each)
 {
-    // GDI lists a family once per character set, and vertical variants with an @.
-    const std::vector<std::string> choices =
-        FontChoices({"Verdana", "@MS Gothic", "arial", "Verdana", "Trebuchet MS", "MS Gothic", ""}, "Trebuchet MS");
-    CHECK((choices == std::vector<std::string>{"arial", "MS Gothic", "Trebuchet MS", "Verdana"}));
-    // The chosen font stays in the list when it is not installed, so the dropdown can show it.
-    const std::vector<std::string> missing = FontChoices({"Verdana"}, "Gill Sans");
-    CHECK((missing == std::vector<std::string>{"Gill Sans", "Verdana"}));
+    // GDI lists a family once per character set, vertical variants with an @, and a bundled font may be installed too.
+    const std::vector<std::string> choices = FontChoices({"Verdana", "arial", "Arial", "@Meiryo", "", "Cinzel"}, "Verdana");
+    const std::vector<std::string> expected{"Marcellus SC", "Cinzel", "Cormorant SC", "arial", "Verdana"};
+    CHECK(choices == expected);
+}
+
+TEST(a_font_that_is_not_installed_is_still_offered_so_it_can_be_kept)
+{
+    const std::vector<std::string> choices = FontChoices({"Verdana"}, "Papyrus");
+    CHECK(std::ranges::find(choices, "Papyrus") != choices.end());
+    CHECK(choices[0] == "Marcellus SC"); // the bundled ones still lead
 }
 
 TEST(clamp_bounds_every_field)

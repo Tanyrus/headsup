@@ -1,6 +1,7 @@
 #include "settings.h"
 
 #include "argb.h"
+#include "fonts.h"
 
 #include <algorithm>
 #include <cctype>
@@ -143,7 +144,11 @@ namespace headsup
         };
         std::sort(installed.begin(), installed.end(), [&](const std::string& a, const std::string& b) { return lower(a) < lower(b); });
         installed.erase(std::unique(installed.begin(), installed.end(), SameIgnoringCase), installed.end());
-        return installed;
+        std::vector<std::string> choices = BundledFamilies();
+        for (const std::string& name : installed)
+            if (std::none_of(choices.begin(), choices.end(), [&](const std::string& had) { return SameIgnoringCase(had, name); }))
+                choices.push_back(name);
+        return choices;
     }
 
     Settings Clamp(Settings s)

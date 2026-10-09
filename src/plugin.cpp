@@ -3,6 +3,7 @@
 #include "check.h"
 #include "commands.h"
 #include "d3d_util.h"
+#include "fonts.h"
 #include "game_cursor.h"
 #include "game_names.h"
 #include "menu.h"
@@ -100,6 +101,7 @@ class HeadsUp final : public IPlugin
     headsup::GameNames m_Names;
     headsup::NameplateRenderer m_Nameplates;
     headsup::PointerSwap m_Pointer;
+    std::vector<HANDLE> m_LoadedFonts;
     headsup::NameHook m_NameHook;
     bool m_NameHookTried = false;
     headsup::ScreenBox m_GameNameBox;
@@ -159,12 +161,25 @@ public:
         IConfigurationManager* config = core->GetConfigurationManager();
         m_MenuWidth                   = config->GetFloat(kBootConfig, kRegistry, kMenuWidth, 0.0f);
         m_MenuHeight                  = config->GetFloat(kBootConfig, kRegistry, kMenuHeight, 0.0f);
+        size_t fonts = 0;
+        for (const headsup::BundledFont* font = headsup::BundledFonts(fonts); fonts-- > 0; ++font)
+        {
+            DWORD installed = 0;
+            // Loaded for this process only: nothing is written to the system's fonts.
+            if (HANDLE handle = AddFontMemResourceEx(const_cast<unsigned char*>(font->data), static_cast<DWORD>(font->bytes), nullptr,
+                    &installed);
+                handle != nullptr)
+                m_LoadedFonts.push_back(handle);
+        }
         LoadSettings();
         return true;
     }
 
     void Release(void) override
     {
+        for (HANDLE handle : m_LoadedFonts)
+            RemoveFontMemResourceEx(handle);
+        m_LoadedFonts.clear();
         if (const std::string failure = m_NameHook.Stop(); !failure.empty()) Print(failure + ".");
         m_Pointer.Stop();
         m_Nameplates.Release();

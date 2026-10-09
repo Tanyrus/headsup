@@ -44,7 +44,7 @@ namespace headsup
     constexpr int kMinTextSize = 8, kMaxTextSize = 48;   // pixels: name, label, icon and cursor sizes
     constexpr int kMinNameRaise = 0, kMaxNameRaise = 40; // pixels
     constexpr int kMinPlayerIconSize = 50, kMaxPlayerIconSize = 150; // percent of the name's letter height
-    constexpr const char* kDefaultFont = "Trebuchet MS";
+    constexpr const char* kDefaultFont = "Marcellus SC";
     constexpr size_t kMaxFontName      = 31; // a Windows font name's longest, without its terminator
 
     struct Settings

@@ -1,6 +1,7 @@
 #include "nameplate_render.h"
 
 #include "argb.h"
+#include "utf16.h"
 
 #include <algorithm>
 #include <cmath>
@@ -51,15 +52,16 @@ namespace headsup
             out      = Coverage{};
             HDC dc   = CreateCompatibleDC(nullptr);
             // A negative height asks for the character height, without the font's internal leading.
-            HFONT font = CreateFontA(-pixelHeight, 0, 0, 0, bold ? FW_BOLD : FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
-                OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_DONTCARE, family);
+            HFONT font = CreateFontW(-pixelHeight, 0, 0, 0, bold ? FW_BOLD : FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+                OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_DONTCARE, Utf16(family).c_str());
             bool drawn = false;
             if (dc != nullptr && font != nullptr)
             {
                 const HGDIOBJ oldFont = SelectObject(dc, font);
-                const int length      = static_cast<int>(std::strlen(text));
+                const std::wstring wide = Utf16(text);
+                const auto length       = static_cast<int>(wide.size());
                 SIZE size{};
-                GetTextExtentPoint32A(dc, text, length, &size);
+                GetTextExtentPoint32W(dc, wide.c_str(), length, &size);
                 const int width  = size.cx + 2 * margin;
                 const int height = size.cy + 2 * margin;
                 BITMAPINFO info{};
@@ -78,7 +80,7 @@ namespace headsup
                     std::memset(bits, 0, pixels * kBytesPerPixel);
                     SetBkMode(dc, TRANSPARENT);
                     SetTextColor(dc, RGB(255, 255, 255));
-                    TextOutA(dc, margin, margin, text, length);
+                    TextOutW(dc, margin, margin, wide.c_str(), length);
                     GdiFlush();
                     const auto* bgrx = static_cast<const uint8_t*>(bits);
                     out.width        = width;
