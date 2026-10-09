@@ -409,3 +409,13 @@ TEST(a_frame_redraws_textures_until_its_budget_is_spent_but_always_draws_a_first
     CHECK(!RedrawNow(true, kRedrawBudgetMs));
     CHECK(RedrawNow(false, kRedrawBudgetMs * 10.0)); // a plate with nothing to show yet never waits
 }
+
+TEST(no_cursor_is_drawn_over_arrows_the_game_could_not_be_kept_from_drawing)
+{
+    const Settings s;
+    CursorTargets targets{1105, 0, false};
+    targets.gameArrowsShown = true;
+    CHECK(Lines(Mob(1105), s, {.targets = targets}).cursor == CursorKind::None);
+    targets.anchored = true;
+    CHECK(LoneCursors(targets, s, {}).empty());
+}

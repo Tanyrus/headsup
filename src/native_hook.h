@@ -60,4 +60,29 @@ namespace headsup
         uint8_t m_Patch[sizeof(kNameHookBytes)] = {};
         uint32_t m_ModuleBase = 0;
     };
+
+    // Sends the game's two target arrows through HeadsUp: the calls that draw them (native_locate.h) go to a gate that
+    // notes the arrow's color, then lets the game draw it or skips it while HeadsUp draws its own cursor instead.
+    class ArrowHook
+    {
+    public:
+        ~ArrowHook() { Stop(); }
+        // Only at a render boundary, where the game cannot be inside the target window's draw. Returns why it could
+        // not start, or an empty string.
+        std::string Start();
+        // Puts the game's calls back if they are still HeadsUp's. Returns why it could not, or an empty string.
+        std::string Stop();
+        bool Running() const { return m_Calls[0] != nullptr; }
+
+        // Whether the game's arrows are skipped from now on.
+        void Hide(bool hide);
+        // The color of the arrow the game last drew over a candidate being picked, or 0 since forgotten.
+        uint32_t PickedColor() const;
+        void ForgetPicked();
+
+    private:
+        uint8_t* m_Calls[2]     = {}; // the target's and the candidate's
+        uint32_t m_Operands[2]  = {}; // the game's
+        uint32_t m_Patched[2]   = {}; // HeadsUp's
+    };
 }

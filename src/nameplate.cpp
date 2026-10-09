@@ -28,7 +28,7 @@ namespace headsup
 
         CursorKind CursorFor(uint16_t index, const Settings& settings, const CursorTargets& targets)
         {
-            if (!settings.replaceCursor || index == 0) return CursorKind::None;
+            if (!settings.replaceCursor || targets.gameArrowsShown || index == 0) return CursorKind::None;
             if (index == targets.subTarget) return targets.outOfRange ? CursorKind::OutOfRange : CursorKind::SubTarget;
             if (index == targets.target) return targets.locked ? CursorKind::Locked : CursorKind::Target;
             return CursorKind::None;

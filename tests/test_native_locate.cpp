@@ -173,3 +173,59 @@ TEST(a_routine_nobody_calls_is_refused)
     image.Put(0x17570C, {0x90});
     CHECK(Locate(image).problem == LocateProblem::NoCallers);
 }
+
+namespace
+{
+    // The end of the target window's draw (RVA 0x1511A0) in the same dump: the arrow over the target at (m_AnkX, m_AnkY)
+    // in gray E0808080, then while a sub-target is picked the arrow over the candidate at (m_SubAnkX, m_SubAnkY) in the
+    // range color, each through the shape draw at 0x120C80 (it ends in ret 20h).
+    constexpr uint32_t kTargetArrow = 0x15151C;
+    constexpr uint32_t kPickedArrow = 0x151564;
+    constexpr uint32_t kShapeDraw   = 0x120C80;
+
+    Image ArrowClient()
+    {
+        Image image;
+        image.Put(kTargetArrow, {0x66, 0x8B, 0x86, 0xBC, 0x00, 0x00, 0x00, 0x66, 0x85, 0xC0, 0x74, 0x32, 0x0F, 0xBF, 0x96, 0xBE,
+                                    0x00, 0x00, 0x00, 0x6A, 0x00, 0x6A, 0x00, 0x6A, 0x00, 0x33, 0xC9, 0x8A, 0x8E, 0xBA, 0x00, 0x00,
+                                    0x00, 0x68, 0x80, 0x80, 0x80, 0xE0, 0x0F, 0xBF, 0xC0, 0x8B, 0x4C, 0x8E, 0x78, 0x68, 0x00, 0x00,
+                                    0x80, 0x3F, 0x68, 0x00, 0x00, 0x80, 0x3F, 0x52, 0x50, 0xE8, 0x26, 0xF7, 0xFC, 0xFF});
+        image.Put(kPickedArrow, {0x0F, 0xBF, 0x96, 0xC2, 0x00, 0x00, 0x00, 0x0F, 0xBF, 0x86, 0xC0, 0x00, 0x00, 0x00, 0x6A, 0x00,
+                                    0x6A, 0x00, 0x6A, 0x00, 0x33, 0xC9, 0x8A, 0x8E, 0xBA, 0x00, 0x00, 0x00, 0x57, 0x68, 0x00, 0x00,
+                                    0x80, 0x3F, 0x68, 0x00, 0x00, 0x80, 0x3F, 0x8B, 0x4C, 0x8E, 0x78, 0x52, 0x50, 0xE8, 0xEA, 0xF6,
+                                    0xFC, 0xFF});
+        return image;
+    }
+}
+
+TEST(the_target_arrows_are_two_calls_into_one_shape_draw)
+{
+    const ArrowCalls calls = LocateArrowCalls(ArrowClient().Text());
+    CHECK(calls.problem == LocateProblem::None);
+    CHECK_EQ(calls.target, kTargetArrow + 0x39); // the E8 after its pushes
+    CHECK_EQ(calls.picked, kPickedArrow + 0x2D);
+    CHECK_EQ(calls.draw, kShapeDraw);
+}
+
+TEST(a_client_without_the_arrow_draws_is_left_alone)
+{
+    Image image = ArrowClient();
+    image.Put(kPickedArrow + 0x1C, {0x56}); // push esi in place of push edi: another color
+    CHECK(LocateArrowCalls(image.Text()).problem == LocateProblem::NoArrowDraws);
+    CHECK(LocateArrowCalls(Image{}.Text()).problem == LocateProblem::NoArrowDraws);
+}
+
+TEST(a_second_copy_of_an_arrow_draw_is_ambiguous)
+{
+    Image image = ArrowClient();
+    const uint8_t* from = image.At(kTargetArrow);
+    std::memcpy(image.At(0x100000), from, 0x3E);
+    CHECK(LocateArrowCalls(image.Text()).problem == LocateProblem::AmbiguousArrowDraws);
+}
+
+TEST(arrow_draws_into_different_functions_are_left_alone)
+{
+    Image image = ArrowClient();
+    image.Put32(kPickedArrow + 0x2E, 0xFFFCF6F0); // six bytes past the shape draw
+    CHECK(LocateArrowCalls(image.Text()).problem == LocateProblem::ArrowDrawsDiffer);
+}

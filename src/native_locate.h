@@ -29,6 +29,9 @@ namespace headsup
         UnexpectedExit,
         NoCallers,
         NoEntityCaller,
+        NoArrowDraws,
+        AmbiguousArrowDraws,
+        ArrowDrawsDiffer,
     };
     const char* Describe(LocateProblem problem);
 
@@ -44,4 +47,16 @@ namespace headsup
     // Found by the two icon tables it reads (from .rdata, which is in the file) rather than by its own bytes, so it
     // does not depend on where the client was loaded or on a committed copy of the game's code.
     NameRoutine LocateNameRoutine(uint32_t moduleBase, const ImageSection& text, const ImageSection& rdata);
+
+    // RVAs of the calls at the end of the target window's draw that draw its arrows, each a five-byte call: over the
+    // target at (m_AnkX, m_AnkY), and over the candidate while a sub-target is picked at (m_SubAnkX, m_SubAnkY). Both go
+    // to one shape draw, a thiscall that takes x, y, scale x, scale y, color and three zeros and pops them.
+    struct ArrowCalls
+    {
+        LocateProblem problem = LocateProblem::None;
+        uint32_t target = 0, picked = 0, draw = 0;
+    };
+    constexpr uint32_t kArrowArgumentBytes = 32;
+
+    ArrowCalls LocateArrowCalls(const ImageSection& text);
 }

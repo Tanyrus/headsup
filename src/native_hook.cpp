@@ -20,6 +20,9 @@ extern "C"
     uintptr_t g_HeadsUpNameExit   = 0;
     void HeadsUpNameGate();
     __attribute__((used)) uint32_t HeadsUpOnName(uint32_t frame);
+    uintptr_t g_HeadsUpArrowDraw = 0;
+    void HeadsUpArrowGate();
+    __attribute__((used)) uint32_t HeadsUpOnArrow(const uint32_t* arguments, uint32_t returnAddress);
 }
 
 // Entered by a jump from the routine's hook, so esp is the routine's frame once the flags and registers saved here are
@@ -65,6 +68,30 @@ _HeadsUpNameGate:
     .att_syntax prefix
 )");
 
+// Called in place of the shape draw, a thiscall: ecx is the arrow's shape and the stack holds the return address, then
+// the eight arguments. A call boundary, so the x87 stack is empty. On 0 it jumps on to the shape draw with all of that
+// as it was; otherwise it returns and pops the arguments as the shape draw would (kArrowArgumentBytes).
+asm(R"(
+    .text
+    .p2align 4
+    .globl _HeadsUpArrowGate
+_HeadsUpArrowGate:
+    .intel_syntax noprefix
+    push ecx
+    lea eax, [esp + 8]
+    push dword ptr [esp + 4]
+    push eax
+    call _HeadsUpOnArrow
+    add esp, 8
+    pop ecx
+    test eax, eax
+    jnz .LHeadsUpArrowSkip
+    jmp dword ptr [_g_HeadsUpArrowDraw]
+.LHeadsUpArrowSkip:
+    ret 32
+    .att_syntax prefix
+)");
+
 namespace headsup
 {
     namespace
@@ -79,6 +106,14 @@ namespace headsup
             PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
 
         static_assert(sizeof(kNameHookBytes) == kJumpLength + 1, "the hook is a jump and one nop");
+        static_assert(kArrowArgumentBytes == 32, "the arrow gate's ret 32");
+        constexpr uint32_t kCallLength        = 5;
+        constexpr uint32_t kArrowColorArgument = 4; // x, y, scale x, scale y, then the color
+
+        // Written at Present and read by OnArrow, both on the render thread, so never at once.
+        uint32_t g_PickedReturn = 0; // where the candidate's arrow call returns to
+        bool g_HideArrows       = false;
+        uint32_t g_PickedColor  = 0;
 
         // Return addresses of the calls into the routine, as loaded; set before the hook goes in and fixed while it is.
         std::vector<uint32_t> g_CallerReturns;
@@ -223,6 +258,67 @@ namespace headsup
         if (!WriteCode(site, kNameHookBytes, sizeof(kNameHookBytes))) return "the game's name routine could not be put back";
         return "";
     }
+}
+
+namespace headsup
+{
+    std::string ArrowHook::Start()
+    {
+        if (Running()) return "";
+        auto* base = reinterpret_cast<uint8_t*>(GetModuleHandleA(kGameModule));
+        if (base == nullptr) return std::string(kGameModule) + " is not loaded";
+        ImageSection text{};
+        if (!FindSection(base, kCodeSection, text)) return "the client's code could not be read";
+        const ArrowCalls calls = LocateArrowCalls(text);
+        if (calls.problem != LocateProblem::None) return Describe(calls.problem);
+        const auto moduleBase   = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(base));
+        const auto gate         = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&HeadsUpArrowGate));
+        const uint32_t sites[2] = {calls.target, calls.picked};
+        uint8_t* operands[2]    = {base + calls.target + 1, base + calls.picked + 1};
+        for (int i = 0; i < 2; ++i)
+        {
+            std::memcpy(&m_Operands[i], operands[i], sizeof(uint32_t));
+            m_Patched[i] = gate - (moduleBase + sites[i] + kCallLength);
+        }
+        g_HeadsUpArrowDraw = moduleBase + calls.draw;
+        g_PickedReturn     = moduleBase + calls.picked + kCallLength;
+        for (int i = 0; i < 2; ++i)
+        {
+            if (WriteCode(operands[i], reinterpret_cast<const uint8_t*>(&m_Patched[i]), sizeof(uint32_t))) continue;
+            if (i > 0) WriteCode(operands[0], reinterpret_cast<const uint8_t*>(&m_Operands[0]), sizeof(uint32_t));
+            return "the client's code could not be changed";
+        }
+        m_Calls[0] = operands[0];
+        m_Calls[1] = operands[1];
+        return "";
+    }
+
+    std::string ArrowHook::Stop()
+    {
+        if (!Running()) return "";
+        std::string failure;
+        for (int i = 0; i < 2; ++i)
+        {
+            uint8_t* operand = std::exchange(m_Calls[i], nullptr);
+            if (std::memcmp(operand, &m_Patched[i], sizeof(uint32_t)) != 0)
+                failure = "the game's target arrows were changed again after HeadsUp hooked them, so they were left as they are";
+            else if (!WriteCode(operand, reinterpret_cast<const uint8_t*>(&m_Operands[i]), sizeof(uint32_t)))
+                failure = "the game's target arrows could not be put back";
+        }
+        return failure;
+    }
+
+    void ArrowHook::Hide(bool hide) { g_HideArrows = hide; }
+    uint32_t ArrowHook::PickedColor() const { return g_PickedColor; }
+    void ArrowHook::ForgetPicked() { g_PickedColor = 0; }
+}
+
+// On the game's stack, inside the target window's draw: nothing here may allocate, throw or call Ashita.
+extern "C" uint32_t HeadsUpOnArrow(const uint32_t* arguments, uint32_t returnAddress)
+{
+    using namespace headsup;
+    if (returnAddress == g_PickedReturn) g_PickedColor = arguments[kArrowColorArgument];
+    return g_HideArrows ? 1 : 0;
 }
 
 // On the game's stack, inside its name routine: nothing here may allocate, throw or call Ashita.
