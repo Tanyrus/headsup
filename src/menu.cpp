@@ -609,6 +609,9 @@ namespace headsup
                 ui.Fade(!s.enabled || !s.replaceCursor);
                 ui.Check("Phoenix feather cursor", s.cursorFeather, "Phoenix's feather icon instead of the arrow, in the same colors.");
                 ui.SliderInt("Cursor size", s.cursorSize, kMinTextSize, kMaxTextSize, "%d px", "The target cursor's height.");
+                ui.Check("Scale cursor with distance", s.scaleCursor,
+                    "The cursor grows and shrinks with the game's name size as its target comes closer or moves away, "
+                    "whatever the names do.");
                 ui.Fade(!s.enabled);
                 ui.Check("Chocobo mouse pointer", s.chocoboPointer,
                     "PlayOnline's chocobo in place of the game's mouse pointer, over menus too. The camera arrows stay the "

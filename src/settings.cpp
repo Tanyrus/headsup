@@ -87,6 +87,8 @@ namespace headsup
         constexpr const char* kLabelShadowColorKey = "labelShadowColor";
         // And from before each kind of name had its own size, one for all of them.
         constexpr const char* kOneNameSizeKey = "nameSize";
+        // And from before the cursor scaled on its own, when it scaled with the names.
+        constexpr const char* kScaleCursorKey = "scaleCursor";
         // Every setting is saved whenever one changes, so a file keeps the defaults of its day. 1: the target cursor's
         // default became Phoenix's red, and a file from before holding the white it had never chose a color.
         constexpr const char* kVersionKey = "settingsVersion";
@@ -206,6 +208,7 @@ namespace headsup
         s.fontName = store.GetString(kFontKey, kDefaultFont);
         s.labelFontName    = store.GetString(kLabelFontKey, s.fontName.c_str());
         s.labelFontBold    = store.GetBool(kLabelBoldKey, s.fontBold);
+        s.scaleCursor      = store.GetBool(kScaleCursorKey, s.scaleWithDistance);
         s.labelShadowColor = s.textOutline;
         LoadColor(store, kLabelShadowColorKey, s.labelShadowColor);
         for (int k = 0; k < kLabelShadeCount; ++k)
@@ -256,6 +259,7 @@ namespace headsup
         store.Set(kFontKey, s.fontName.c_str());
         store.Set(kLabelFontKey, s.labelFontName.c_str());
         setBool(kLabelBoldKey, s.labelFontBold);
+        setBool(kScaleCursorKey, s.scaleCursor);
         setColor(kLabelShadowColorKey, s.labelShadowColor);
         for (int k = 0; k < kLabelShadeCount; ++k)
             setColor(kLabelShadeKeys[k], s.labelColor[k]);

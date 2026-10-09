@@ -94,6 +94,13 @@ namespace headsup
 
     // Not rounded, so sizes change as smoothly as the game's names.
     float DistanceScale(float letterHeight, float screenHeight);
+    // The game steps its name size, by 5% at a time far away; a plate eases toward each step. A plate with no size yet
+    // (0) takes the size at once.
+    float EaseScale(float shown, float target, double seconds);
+    // A frame's time for redrawing textures whose look changed, at a size step or a menu change; the rest keep their old
+    // texture a frame longer. One with nothing to show yet is always drawn.
+    constexpr double kRedrawBudgetMs = 3.0;
+    bool RedrawNow(bool drawn, double spentMs);
     // Whether this plate's sizes follow the game's name size; self is your own.
     bool ScalesWithDistance(const Settings& settings, EntityKind kind, bool self);
     // Plates of a higher rank draw over every plate of a lower one: your target's, and over it the one you are picking.

@@ -49,6 +49,7 @@ hideWhileEngaged=true
 markPlaceholders=false
 phTimers=true
 scaleWithDistance=false
+scaleCursor=true
 fontBold=true
 nameGlow=false
 scaleOwnName=false
@@ -181,6 +182,7 @@ look=fantasy
         s.markPlaceholders  = false;
         s.phTimers          = true;
         s.scaleWithDistance = false;
+        s.scaleCursor       = true; // apart from the names': a dropped key would take theirs
         s.fontBold          = true;
         s.replacePlayerNames = s.replaceNpcNames = s.replaceCursor = s.cursorFeather = false;
         s.chocoboPointer = true;
@@ -500,4 +502,13 @@ TEST(a_file_from_before_each_kind_had_a_name_size_gives_all_of_them_its_one)
     old.values = {{"nameSize", "20.0000"}};
     const Settings s = LoadSettings(old);
     CHECK(s.mobNameSize == 20 && s.playerNameSize == 20 && s.selfNameSize == 20 && s.npcNameSize == 20);
+}
+
+TEST(a_file_from_before_the_cursor_scaled_on_its_own_scales_it_like_the_names)
+{
+    MapStore old;
+    old.values = {{"scaleWithDistance", "false"}};
+    CHECK(!LoadSettings(old).scaleCursor);
+    old.values = {{"scaleWithDistance", "true"}};
+    CHECK(LoadSettings(old).scaleCursor);
 }

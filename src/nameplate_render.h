@@ -88,6 +88,8 @@ namespace headsup
             PlateTexture label;
             PlateTexture cursor;
             PlateTexture ornament;
+            float scale      = 0.0f; // eased toward the game's name size
+            double scaleTime = 0.0;
             int nameRaster   = 0;
             int ornamentRaster = 0;
             int labelRaster  = 0;
@@ -128,6 +130,7 @@ namespace headsup
         std::vector<Shown> m_Shown;
         std::vector<CursorName> m_CursorNames;
         uint32_t m_Frame           = 0;
+        double m_RedrawMs          = 0.0; // spent this frame
         bool m_NamesFailed         = false;
         bool m_IconsFailed         = false;
         std::string m_NameFailure;

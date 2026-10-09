@@ -393,3 +393,19 @@ TEST(your_target_and_the_mob_you_are_picking_draw_over_every_other_plate)
     CHECK(DrawnBefore(0, 0.90f, 1, 0.99f));  // the target last, though it is farther
     CHECK(!DrawnBefore(1, 0.99f, 0, 0.90f));
 }
+
+TEST(a_plate_eases_toward_the_games_stepped_name_size)
+{
+    CHECK_EQ(EaseScale(0.0f, 1.4f, 0.016), 1.4f); // a new plate starts at the size
+    CHECK_EQ(EaseScale(1.0f, 1.2f, 0.0), 1.0f);
+    // Two thirds of the way (1 - 1/e) after one time constant of 0.15 s, all of it long after.
+    CHECK(std::fabs(EaseScale(1.0f, 1.2f, 0.15) - (1.0f + 0.2f * (1.0f - std::exp(-1.0f)))) < 1e-4f);
+    CHECK(std::fabs(EaseScale(1.0f, 1.2f, 5.0) - 1.2f) < 1e-4f);
+}
+
+TEST(a_frame_redraws_textures_until_its_budget_is_spent_but_always_draws_a_first_one)
+{
+    CHECK(RedrawNow(true, 0.0));
+    CHECK(!RedrawNow(true, kRedrawBudgetMs));
+    CHECK(RedrawNow(false, kRedrawBudgetMs * 10.0)); // a plate with nothing to show yet never waits
+}

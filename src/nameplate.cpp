@@ -19,6 +19,7 @@ namespace headsup
         constexpr float kRasterSmallest   = 6.0f;   // pixels
         constexpr float kRasterStep       = 1.25f;
         constexpr float kRasterOverscale  = 1.05f;  // text is scaled up this much before it is redrawn larger
+        constexpr double kScaleEase       = 0.15;   // seconds: two thirds of the way to a new size in this time
 
         float RowWidth(int count, float size)
         {
@@ -138,6 +139,17 @@ namespace headsup
     {
         const float factor = screenHeight > 0.0f ? letterHeight / (screenHeight / kLettersPerScreen) : 1.0f;
         return std::isfinite(factor) ? std::clamp(factor, kMinScale, kMaxScale) : 1.0f;
+    }
+
+    float EaseScale(float shown, float target, double seconds)
+    {
+        if (shown <= 0.0f) return target;
+        return shown + (target - shown) * static_cast<float>(1.0 - std::exp(-std::max(0.0, seconds) / kScaleEase));
+    }
+
+    bool RedrawNow(bool drawn, double spentMs)
+    {
+        return !drawn || spentMs < kRedrawBudgetMs;
     }
 
     bool ScalesWithDistance(const Settings& settings, EntityKind kind, bool self)

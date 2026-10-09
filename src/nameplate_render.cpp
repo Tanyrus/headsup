@@ -4,6 +4,7 @@
 #include "utf16.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <utility>
@@ -34,6 +35,26 @@ namespace headsup
                           : kind == CursorKind::OutOfRange ? settings.outOfRangeCursorColor
                           : kind == CursorKind::Locked     ? settings.lockedCursorColor
                                                            : settings.cursorColor);
+        }
+
+        // Adds the time from its making to its end to spent.
+        class Stopwatch
+        {
+        public:
+            explicit Stopwatch(double& spentMs) : m_Spent(spentMs), m_Start(std::chrono::steady_clock::now()) {}
+            ~Stopwatch() { m_Spent += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - m_Start).count(); }
+            Stopwatch(const Stopwatch&)            = delete;
+            Stopwatch& operator=(const Stopwatch&) = delete;
+
+        private:
+            double& m_Spent;
+            std::chrono::steady_clock::time_point m_Start;
+        };
+
+        // A texture is scaled from the height it was drawn at, which lags a size step while it waits to be redrawn.
+        float FitOf(float shown, int drawnHeight)
+        {
+            return drawnHeight > 0 ? shown / static_cast<float>(drawnHeight) : 0.0f;
         }
 
         int ExactHeight(float shown)
@@ -156,6 +177,8 @@ namespace headsup
     {
         TextureKey key{text, pixelHeight, 0, look};
         if (t.texture != nullptr && t.key == key) return true;
+        if (!RedrawNow(t.texture != nullptr, m_RedrawMs)) return true;
+        const Stopwatch stopwatch(m_RedrawMs);
         const auto height    = static_cast<float>(pixelHeight);
         const float shadow   = height * kShadowPerHeight;
         const int drop       = static_cast<int>(std::lround(height * kShadowDropPerHeight));
@@ -179,6 +202,8 @@ namespace headsup
     {
         TextureKey key{"", pixelHeight, width, TextLook{shadowLine, color}};
         if (t.texture != nullptr && t.key == key) return true;
+        if (!RedrawNow(t.texture != nullptr, m_RedrawMs)) return true;
+        const Stopwatch stopwatch(m_RedrawMs);
         const float shadow = static_cast<float>(pixelHeight) * kOrnamentShadowPerHeight;
         if (!Upload(t, Ornament(width, pixelHeight, shadow, shadowLine.shadowStrength, color, shadowLine.shadowColor), std::move(key)))
             return false;
@@ -191,6 +216,8 @@ namespace headsup
         const LineStyle shape{settings.cursorFeather ? "feather" : "arrow", false, ToArgb(settings.textOutline)};
         TextureKey key{"", pixelHeight, 0, TextLook{shape, color}};
         if (t.texture != nullptr && t.key == key) return true;
+        if (!RedrawNow(t.texture != nullptr, m_RedrawMs)) return true;
+        const Stopwatch stopwatch(m_RedrawMs);
         const int radius        = OutlineRadius(pixelHeight);
         const Shape& outline    = settings.cursorFeather ? FeatherShape() : ArrowShape();
         const Coverage coverage = ShapeCoverage(outline, pixelHeight, radius);
@@ -232,6 +259,7 @@ namespace headsup
         float toY, const CursorTargets& targets, double now, uint16_t selfIndex, const std::vector<TimerLine>& selfTimers)
     {
         ++m_Frame;
+        m_RedrawMs = 0.0;
         m_Shown.clear();
         m_Quads.clear();
         m_CursorNames.clear();
@@ -268,18 +296,20 @@ namespace headsup
 
                 const bool self         = info->index == selfIndex;
                 const bool scales       = ScalesWithDistance(settings, info->kind, self);
-                const float scale       = scales ? DistanceScale(gameName.box.Height(), screenHeight) : 1.0f;
+                p.scale                 = EaseScale(p.scale, DistanceScale(gameName.box.Height(), screenHeight), now - p.scaleTime);
+                p.scaleTime             = now;
+                const float scale       = scales ? p.scale : 1.0f;
                 const float nameShown   = static_cast<float>(NameSize(settings, info->kind, self)) * scale * toY;
                 const float labelShown  = static_cast<float>(settings.labelSize) * scale * toY;
                 const float timerShown  = static_cast<float>(settings.timerSize) * scale * toY;
                 const float iconSize    = static_cast<float>(settings.iconSize) * scale;
-                const float cursorShown = static_cast<float>(settings.cursorSize) * scale * toY;
+                const float cursorShown = static_cast<float>(settings.cursorSize) * (settings.scaleCursor ? p.scale : 1.0f) * toY;
                 auto raster             = [&](float shown, int current) {
                     return scales ? RasterHeight(shown, current) : ExactHeight(shown);
                 };
                 p.nameRaster   = raster(nameShown, p.nameRaster);
                 p.labelRaster  = raster(labelShown, p.labelRaster);
-                p.cursorRaster = raster(cursorShown, p.cursorRaster);
+                p.cursorRaster = settings.scaleCursor ? RasterHeight(cursorShown, p.cursorRaster) : ExactHeight(cursorShown);
                 const float ornamentShown = static_cast<float>(settings.ornamentThickness) * scale * toY;
                 p.ornamentRaster          = raster(ornamentShown, p.ornamentRaster);
                 const int ornamentWidth   = std::max(1, static_cast<int>(std::lround(static_cast<float>(p.ornamentRaster) *
@@ -306,15 +336,14 @@ namespace headsup
                     (style.ornament && !PrepareOrnament(p.ornament, style.ornamentColor, p.ornamentRaster, ornamentWidth, nameLine)) ||
                     (showCursor && !PrepareCursor(p.cursor, cursorColor, p.cursorRaster, settings)))
                     break;
-                const float nameFit   = nameShown / static_cast<float>(p.nameRaster);
-                const float labelFit  = labelShown / static_cast<float>(p.labelRaster);
-                const float cursorFit = cursorShown / static_cast<float>(p.cursorRaster);
-                const float ornamentFit = ornamentShown / static_cast<float>(p.ornamentRaster);
+                const float nameFit     = FitOf(nameShown, p.name.key.height);
+                const float labelFit    = FitOf(labelShown, p.label.key.height);
+                const float cursorFit   = FitOf(cursorShown, p.cursor.key.height);
+                const float ornamentFit = FitOf(ornamentShown, p.ornament.key.height);
                 for (size_t i = timersHere ? selfTimers.size() : 0; i < p.timers.size(); ++i)
                     ReleaseTexture(p.timers[i].texture);
                 p.timers.resize(timersHere ? selfTimers.size() : 0);
                 p.timerRaster          = timersHere ? raster(timerShown, p.timerRaster) : 0;
-                const float timerFit   = timersHere ? timerShown / static_cast<float>(p.timerRaster) : 0.0f;
                 const uint32_t upColor = ToArgb(settings.color[CategoryIndex(Category::Placeholder)]);
                 int timersReady        = 0;
                 for (; timersReady < static_cast<int>(p.timers.size()); ++timersReady)
@@ -355,7 +384,8 @@ namespace headsup
                 sizes.centerNameAndIcons = settings.centerNameAndIcons;
                 sizes.timerCount         = timersReady;
                 for (int i = 0; i < timersReady; ++i)
-                    sizes.timerHeight = std::max(sizes.timerHeight, (p.timers[i].height - 2.0f * p.timers[i].halo) * timerFit / toY);
+                    sizes.timerHeight = std::max(sizes.timerHeight,
+                        (p.timers[i].height - 2.0f * p.timers[i].halo) * FitOf(timerShown, p.timers[i].key.height) / toY);
                 if (lines.name)
                 {
                     const float raise = static_cast<float>(settings.nameRaise) * scale;
@@ -401,6 +431,7 @@ namespace headsup
                 for (int i = 0; i < sizes.timerCount; ++i)
                 {
                     const PlateTexture& t = p.timers[i];
+                    const float timerFit  = FitOf(timerShown, t.key.height);
                     addText(t, layout.centerX - (t.width - 2.0f * t.halo) * timerFit / toX / 2.0f,
                         layout.timersY + static_cast<float>(i) * layout.timerStep, timerFit);
                 }
@@ -424,7 +455,7 @@ namespace headsup
                 const float cursorShown = static_cast<float>(settings.cursorSize) * toY;
                 p.cursorRaster          = ExactHeight(cursorShown);
                 if (!PrepareCursor(p.cursor, CursorColor(lone.kind, settings), p.cursorRaster, settings)) break;
-                const float fit     = cursorShown / static_cast<float>(p.cursorRaster);
+                const float fit     = FitOf(cursorShown, p.cursor.key.height);
                 const float height  = p.cursor.height * fit / toY;
                 const CursorSpot at = CursorAtAnchor(lone.x, lone.y, p.cursor.width * fit / toX, height, p.cursor.tip);
                 addQuad(cursorQuads, p.cursor.texture, at.x, at.y + CursorBob(now, height), p.cursor.width * fit,

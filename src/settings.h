@@ -77,6 +77,7 @@ namespace headsup
         bool scaleWithDistance = true;  // sizes follow the game's name size
         bool scaleOwnName      = true;  // your own plate too
         bool scalePlayerNames  = true;  // other players' plates too
+        bool scaleCursor       = true;  // the target cursor's size follows the game's name size, apart from the names
         Look look              = Look::Fantasy; // which style the plates are drawn in
         std::string fontName   = kDefaultFont; // a font family installed in Windows
         bool fontBold          = false;
