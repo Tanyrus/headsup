@@ -96,6 +96,11 @@ namespace headsup
     float DistanceScale(float letterHeight, float screenHeight);
     // Whether this plate's sizes follow the game's name size; self is your own.
     bool ScalesWithDistance(const Settings& settings, EntityKind kind, bool self);
+    // Plates of a higher rank draw over every plate of a lower one: your target's, and over it the one you are picking.
+    constexpr int kPlainRank = 0, kTargetRank = 1, kPickedRank = 2;
+    int PlateRank(uint16_t index, const CursorTargets& targets);
+    // Within a rank, farther plates first, so nearer ones cover them.
+    bool DrawnBefore(int rankA, float depthA, int rankB, float depthB);
     // The name size the menu sets for this kind of name; self is your own.
     int NameSize(const Settings& settings, EntityKind kind, bool self);
     // Heights come in steps, and current (the height drawn now) is kept until the shown size falls a step below it or

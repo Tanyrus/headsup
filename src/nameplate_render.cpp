@@ -240,10 +240,11 @@ namespace headsup
         const float screenHeight = names.BackBufferHeight();
         // Cursors are drawn after every nameplate, so another name never covers one.
         std::vector<Quad> cursorQuads;
+        int rank     = kPlainRank; // of the plate whose quads are being added
         auto addQuad = [&](std::vector<Quad>& into, IDirect3DTexture8* texture, float x, float y, float width, float height, float u,
                            float v, float depth, uint32_t tint) {
             // Whole pixels in the target keep the text as sharp as it was drawn.
-            into.push_back(Quad{texture, std::round(x * toX), std::round(y * toY), width, height, u, v, depth, tint});
+            into.push_back(Quad{texture, std::round(x * toX), std::round(y * toY), width, height, u, v, depth, tint, rank});
         };
         if (NameplatesOn(settings) && !m_NamesFailed && m_Device != nullptr)
         {
@@ -262,6 +263,7 @@ namespace headsup
                 const bool timersHere = info->index == selfIndex && !selfTimers.empty();
                 if (!lines.Any() && !timersHere) continue;
                 Plate& p = m_Plates[info->index];
+                rank     = PlateRank(info->index, targets);
                 p.frame  = m_Frame;
 
                 const bool self         = info->index == selfIndex;
@@ -431,7 +433,8 @@ namespace headsup
             }
         }
 
-        std::stable_sort(m_Quads.begin(), m_Quads.end(), [](const Quad& a, const Quad& b) { return a.depth > b.depth; });
+        std::stable_sort(m_Quads.begin(), m_Quads.end(),
+            [](const Quad& a, const Quad& b) { return DrawnBefore(a.rank, a.depth, b.rank, b.depth); });
         m_Quads.insert(m_Quads.end(), cursorQuads.begin(), cursorQuads.end());
 
         for (auto it = m_Plates.begin(); it != m_Plates.end();)

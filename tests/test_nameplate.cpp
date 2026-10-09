@@ -378,3 +378,18 @@ TEST(each_kind_of_name_has_its_own_size)
     CHECK_EQ(NameSize(s, EntityKind::Player, true), 13);
     CHECK_EQ(NameSize(s, EntityKind::Npc, false), 14);
 }
+
+TEST(your_target_and_the_mob_you_are_picking_draw_over_every_other_plate)
+{
+    CursorTargets targets;
+    targets.target    = 0x220;
+    targets.subTarget = 0x221;
+    CHECK_EQ(PlateRank(0x222, targets), 0);
+    CHECK(PlateRank(0x220, targets) > PlateRank(0x222, targets));
+    CHECK(PlateRank(0x221, targets) > PlateRank(0x220, targets));
+    CHECK_EQ(PlateRank(0, CursorTargets{}), 0); // no target is not entity 0's
+    CHECK(DrawnBefore(0, 0.99f, 0, 0.98f));  // within a rank, farther plates first
+    CHECK(!DrawnBefore(0, 0.98f, 0, 0.99f));
+    CHECK(DrawnBefore(0, 0.90f, 1, 0.99f));  // the target last, though it is farther
+    CHECK(!DrawnBefore(1, 0.99f, 0, 0.90f));
+}

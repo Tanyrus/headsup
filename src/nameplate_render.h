@@ -108,6 +108,7 @@ namespace headsup
             IDirect3DTexture8* texture;
             float x, y, width, height, u, v, depth;
             uint32_t tint;
+            int rank;
         };
 
         bool Prepare(PlateTexture& t, const char* text, const TextLook& look, int pixelHeight);

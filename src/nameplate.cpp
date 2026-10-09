@@ -147,6 +147,18 @@ namespace headsup
         return kind != EntityKind::Player || settings.scalePlayerNames;
     }
 
+    int PlateRank(uint16_t index, const CursorTargets& targets)
+    {
+        if (index == 0) return kPlainRank;
+        if (index == targets.subTarget) return kPickedRank;
+        return index == targets.target ? kTargetRank : kPlainRank;
+    }
+
+    bool DrawnBefore(int rankA, float depthA, int rankB, float depthB)
+    {
+        return rankA != rankB ? rankA < rankB : depthA > depthB;
+    }
+
     int NameSize(const Settings& settings, EntityKind kind, bool self)
     {
         if (self) return settings.selfNameSize;
