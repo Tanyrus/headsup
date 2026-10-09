@@ -89,11 +89,15 @@ namespace headsup
         constexpr const char* kOneNameSizeKey = "nameSize";
         // And from before the cursor scaled on its own, when it scaled with the names.
         constexpr const char* kScaleCursorKey = "scaleCursor";
-        // Every setting is saved whenever one changes, so a file keeps the defaults of its day. 1: the target cursor's
-        // default became Phoenix's red, and a file from before holding the white it had never chose a color.
+        // Every setting is saved whenever one changes, so a file keeps the defaults of its day, and each default that
+        // changed is put right once in files from before. 1: the target cursor's became Phoenix's red. 2: the font's
+        // became the bundled Marcellus SC.
         constexpr const char* kVersionKey = "settingsVersion";
-        constexpr int kSettingsVersion    = 1;
-        constexpr Color kOldCursorColor   = {{1.0f, 1.0f, 1.0f}};
+        constexpr int kRedCursorVersion    = 1;
+        constexpr int kBundledFontVersion  = 2;
+        constexpr int kSettingsVersion     = kBundledFontVersion;
+        constexpr Color kOldCursorColor    = {{1.0f, 1.0f, 1.0f}};
+        constexpr const char* kOldFont     = "Trebuchet MS";
         constexpr const char* kShowSuffix = "Show";
         const char* const kCategoryKeys[kCategoryCount] = {"willAttack", "wontAttack", "unknown", "nmWillAttack", "nmWontAttack",
             "placeholder"};
@@ -231,8 +235,13 @@ namespace headsup
         const std::string look = store.GetString(kLookKey, "");
         for (int l = 0; l < kLookCount; ++l)
             if (look == kLookNames[l]) s.look = static_cast<Look>(l);
-        if (store.GetFloat(kVersionKey, 0.0f) < kSettingsVersion && s.cursorColor == kOldCursorColor)
-            s.cursorColor = Settings{}.cursorColor;
+        const float saved = store.GetFloat(kVersionKey, 0.0f);
+        if (saved < kRedCursorVersion && s.cursorColor == kOldCursorColor) s.cursorColor = Settings{}.cursorColor;
+        if (saved < kBundledFontVersion)
+        {
+            if (s.fontName == kOldFont) s.fontName = kDefaultFont;
+            if (s.labelFontName == kOldFont) s.labelFontName = kDefaultFont;
+        }
         return Clamp(s);
     }
 

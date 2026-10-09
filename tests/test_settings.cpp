@@ -37,7 +37,7 @@ namespace
 
     // A settings.ini as HeadsUp writes it, every value off its default so a renamed or dropped key shows. Saved files
     // carry these keys: a field may be renamed, its key never.
-    constexpr const char* kSavedFile = R"(settingsVersion=1.0000
+    constexpr const char* kSavedFile = R"(settingsVersion=2.0000
 enabled=false
 showLabels=false
 replaceMobNames=false
@@ -491,10 +491,10 @@ TEST(an_old_target_cursor_of_any_other_color_is_kept)
 TEST(a_file_from_before_the_level_line_had_its_own_font_and_shadow_keeps_the_names)
 {
     MapStore old;
-    old.values = {{"fontName", "Trebuchet MS"}, {"fontBold", "true"}, {"textOutlineR", "0.2500"}, {"textOutlineG", "0.2400"},
+    old.values = {{"fontName", "Georgia"}, {"fontBold", "true"}, {"textOutlineR", "0.2500"}, {"textOutlineG", "0.2400"},
         {"textOutlineB", "0.5000"}};
     const Settings s = LoadSettings(old);
-    CHECK(s.labelFontName == "Trebuchet MS" && s.labelFontBold);
+    CHECK(s.labelFontName == "Georgia" && s.labelFontBold);
     CHECK(s.labelShadowColor == (Color{{0.25f, 0.24f, 0.5f}}));
 }
 
@@ -513,4 +513,33 @@ TEST(a_file_from_before_the_cursor_scaled_on_its_own_scales_it_like_the_names)
     CHECK(!LoadSettings(old).scaleCursor);
     old.values = {{"scaleWithDistance", "true"}};
     CHECK(LoadSettings(old).scaleCursor);
+}
+
+TEST(an_old_install_on_the_old_default_font_takes_the_bundled_one_once)
+{
+    // Every setting is saved whenever one changes, so a file from before 0.6 holds Trebuchet MS as if chosen.
+    MapStore old;
+    old.values = {{"settingsVersion", "1.0000"}, {"fontName", "Trebuchet MS"}, {"labelFontName", "Trebuchet MS"}};
+    const Settings s = LoadSettings(old);
+    CHECK(s.fontName == kDefaultFont && s.labelFontName == kDefaultFont);
+    MapStore older; // from before settings had a version, or the level line its own font
+    older.values = {{"fontName", "Trebuchet MS"}};
+    CHECK(LoadSettings(older).labelFontName == kDefaultFont);
+}
+
+TEST(a_font_picked_before_or_since_is_kept)
+{
+    MapStore picked;
+    picked.values = {{"settingsVersion", "1.0000"}, {"fontName", "Georgia"}, {"labelFontName", "Cinzel"}};
+    CHECK(LoadSettings(picked).fontName == "Georgia" && LoadSettings(picked).labelFontName == "Cinzel");
+    MapStore since;
+    since.values = {{"settingsVersion", "2.0000"}, {"fontName", "Trebuchet MS"}};
+    CHECK(LoadSettings(since).fontName == "Trebuchet MS");
+}
+
+TEST(a_white_target_cursor_saved_after_it_turned_red_stays_white)
+{
+    MapStore chosen = TargetCursor("1.0000", "1.0000", "1.0000");
+    chosen.values["settingsVersion"] = "1.0000";
+    CHECK(LoadSettings(chosen).cursorColor == (Color{{1.0f, 1.0f, 1.0f}}));
 }
