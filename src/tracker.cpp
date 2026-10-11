@@ -61,6 +61,7 @@ namespace headsup
             .elementResistRank = settings.elementResistRank, .maxElements = settings.maxElements};
         std::ranges::copy(settings.statusBadges, badges.status);
         m_Actors.clear();
+        m_Actors.reserve(actors.size());
         m_Player   = player;
         m_Min      = UINT32_MAX;
         m_Max      = 0;
@@ -69,8 +70,12 @@ namespace headsup
         for (const ActorInput& a : actors)
         {
             if (a.actor == 0) continue;
-            ActorInfo info;
+            // Filled where it is kept: an ActorInfo is half a kilobyte, and Update runs for every actor every frame.
+            const auto [entry, added] = m_Actors.try_emplace(a.actor);
+            ActorInfo& info           = entry->second;
+            if (!added) info = ActorInfo{}; // listed twice: the later entry alone counts
             info.index       = a.index;
+            info.serverId    = a.serverId;
             info.kind        = a.kind;
             info.alive       = a.alive;
             info.pose        = a.pose;
@@ -82,9 +87,11 @@ namespace headsup
             {
                 const MobRecord* mob   = FindMob(a.serverId, a.name);
                 const bool placeholder = mob != nullptr && mob->placeholderOf != 0;
+                info.mob               = mob;
                 if (a.alive)
                 {
                     const Label level = MakeLabel(mob, a.checked, player.level);
+                    info.level        = level;
                     info.tooWeak      = level.shade == LabelShade::TooWeak;
                     info.label        = LevelLine(level, settings.showLabels,
                         MobIdText(a.serverId, placeholder, settings.mobId, settings.markPlaceholders));
@@ -111,7 +118,6 @@ namespace headsup
                 info.linkshellArgb = a.status->linkshellArgb;
             }
             m_Order.push_back(a.actor);
-            m_Actors[a.actor] = info;
             m_Min = std::min(m_Min, a.actor);
             m_Max = std::max(m_Max, a.actor);
         }
@@ -122,6 +128,14 @@ namespace headsup
         if (actor < m_Min || actor > m_Max) return nullptr; // cheap reject for the stack scan
         const auto it = m_Actors.find(actor);
         return it == m_Actors.end() ? nullptr : &it->second;
+    }
+
+    const ActorInfo* Tracker::FindIndex(uint16_t index) const
+    {
+        if (index == 0) return nullptr;
+        for (const auto& [actor, info] : m_Actors)
+            if (info.index == index) return &info;
+        return nullptr;
     }
 
     const ActorInfo* FindOwner(const uint32_t* begin, const uint32_t* end, const Tracker& tracker)

@@ -2,6 +2,7 @@
 #include "test.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 
 using namespace headsup;
@@ -40,4 +41,15 @@ TEST(everything_can_be_taken_at_once)
     cache.Use({"b", 1}, 1) = 2;
     CHECK(cache.TakeAll() == (std::vector<int>{1, 2}));
     CHECK_EQ(cache.Size(), 0u);
+}
+
+TEST(a_view_of_a_key_finds_its_entry_and_a_new_one_keeps_its_own_copy)
+{
+    FrameCache<std::string, int> cache;
+    std::string name = "Bloodtear Baldurf";
+    cache.Use(std::string_view(name), 1) = 7;
+    name = "Andhrimnir";
+    CHECK_EQ(cache.Use(std::string_view("Bloodtear Baldurf"), 2), 7);
+    CHECK_EQ(cache.Use(std::string("Bloodtear Baldurf"), 3), 7);
+    CHECK_EQ(cache.Size(), 1u);
 }

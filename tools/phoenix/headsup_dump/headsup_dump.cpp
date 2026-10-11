@@ -5,14 +5,15 @@
  * zones have spawned their mobs, it spawns the rest, so every mob runs its
  * spawn script, and watches them all live a while, noting any it sees
  * attacking, then writes every loaded mob, with its immunities, damage
- * taken and resistance ranks, and the /check and aggro rules the server
- * loaded to $HEADSUP_DUMP_PATH as JSON and exits.
+ * taken, resistance ranks and loot, and the /check and aggro rules the
+ * server loaded to $HEADSUP_DUMP_PATH as JSON and exits.
  ************************************************************************/
 
 #include "common/lua.h"
 #include "map/ai/ai_container.h"
 #include "map/entities/mob_entity.h"
 #include "map/utils/charutils.h"
+#include "map/utils/itemutils.h"
 #include "map/utils/moduleutils.h"
 #include "map/utils/zoneutils.h"
 #include "map/zone.h"
@@ -131,6 +132,38 @@ namespace
         std::fputs("]", out);
     }
 
+    // One loot entry as [DROP_TYPE, item ID, rate, fixed rate].
+    void WriteDropItem(FILE* out, const DropItem_t& item, bool first)
+    {
+        std::fprintf(out, "%s[%u,%u,%u,%s]", first ? "" : ",", static_cast<unsigned>(item.DropType),
+            static_cast<unsigned>(item.ItemID), static_cast<unsigned>(item.DropRate), item.hasFixedRate ? "true" : "false");
+    }
+
+    // Each drop list as the server holds it: its ungrouped entries (drops, steals and despoils), then its groups, each
+    // with its rate and the entries one roll of the group picks among.
+    void WriteDropLists(FILE* out, const std::vector<const DropList_t*>& lists)
+    {
+        std::fputs("\"dropLists\":[", out);
+        for (size_t i = 0; i < lists.size(); ++i)
+        {
+            std::fputs(i ? ",\n{\"items\":[" : "\n{\"items\":[", out);
+            for (size_t j = 0; j < lists[i]->Items.size(); ++j)
+                WriteDropItem(out, lists[i]->Items[j], j == 0);
+            std::fputs("],\"groups\":[", out);
+            for (size_t j = 0; j < lists[i]->Groups.size(); ++j)
+            {
+                const DropGroup_t& group = lists[i]->Groups[j];
+                std::fprintf(out, "%s{\"rate\":%u,\"fixed\":%s,\"items\":[", j ? "," : "",
+                    static_cast<unsigned>(group.GroupRate), group.hasFixedRate ? "true" : "false");
+                for (size_t k = 0; k < group.Items.size(); ++k)
+                    WriteDropItem(out, group.Items[k], k == 0);
+                std::fputs("]}", out);
+            }
+            std::fputs("]}", out);
+        }
+        std::fputs("\n]", out);
+    }
+
     // isSitting reads only the entity's animation: try each on one mob, then give it its own back.
     void WriteSittingAnimations(FILE* out, CMobEntity* PMob)
     {
@@ -247,6 +280,9 @@ class HeadsUpDumpModule : public CPPModule
         const std::unordered_map<uint32, uint32> nmOf = Placeholders();
         size_t count       = 0;
         CMobEntity* anyMob = nullptr;
+        // Every mob of one template shares its drop list, so each list is written once and the mobs give its index.
+        std::vector<const DropList_t*> dropLists;
+        std::unordered_map<const DropList_t*, size_t> dropListIndex;
         std::fputs("{\"mobs\":[\n", out);
         zoneutils::ForEachZone([&](CZone* PZone) {
             PZone->ForEachMob([&](CMobEntity* PMob) {
@@ -265,6 +301,15 @@ class HeadsUpDumpModule : public CPPModule
                     static_cast<int>(PMob->getMod(xi::Mod::EXP_LVL_MOD)), follows ? "true" : "false",
                     nmOf.contains(PMob->id) ? nmOf.at(PMob->id) : 0u);
                 std::fprintf(out, ",\"immunity\":%u", static_cast<unsigned>(PMob->m_Immunity));
+                // The list the server rolls at death and reads for Steal: the template's, else the numbered SQL list a
+                // script gave it (an empty one when none did).
+                const DropList_t* drops = PMob->dropList();
+                if (drops != nullptr && (!drops->Items.empty() || !drops->Groups.empty()))
+                {
+                    const auto [entry, added] = dropListIndex.try_emplace(drops, dropLists.size());
+                    if (added) dropLists.push_back(drops);
+                    std::fprintf(out, ",\"dropList\":%zu", entry->second);
+                }
                 WriteMods(out, "sdt", PMob, kSdtMods);
                 WriteMods(out, "elementRanks", PMob, kElementRankMods);
                 WriteMods(out, "statusRanks", PMob, kStatusRankMods);
@@ -282,6 +327,8 @@ class HeadsUpDumpModule : public CPPModule
             std::_Exit(1);
         }
         std::fputs("\n],\n", out);
+        WriteDropLists(out, dropLists);
+        std::fputs(",\n", out);
         WriteRules(out, anyMob);
         std::fputs("}\n", out);
         if (std::ferror(out) != 0 || std::fclose(out) != 0)
@@ -289,7 +336,8 @@ class HeadsUpDumpModule : public CPPModule
             ShowError("headsup_dump: writing %s failed: %s; the file is incomplete", path, std::strerror(errno));
             std::_Exit(1);
         }
-        ShowInfo("headsup_dump: wrote %zu mobs (%zu lottery placeholders) and the rules to %s", count, nmOf.size(), path);
+        ShowInfo("headsup_dump: wrote %zu mobs (%zu lottery placeholders, %zu drop lists) and the rules to %s", count,
+            nmOf.size(), dropLists.size(), path);
         std::_Exit(0);
     }
 };

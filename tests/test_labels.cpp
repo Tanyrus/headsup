@@ -9,7 +9,8 @@ namespace
 {
     MobRecord Mob(uint8_t minLevel, uint8_t maxLevel, int16_t levelMod = 0)
     {
-        return MobRecord{17199648, "Goblin Bounty Hunter", minLevel, maxLevel, kMobAggressive, 300, 0, levelMod, 0, 0};
+        return MobRecord{
+            17199648, "Goblin Bounty Hunter", minLevel, maxLevel, kMobAggressive, 300, 0, levelMod, 0, 0, 0};
     }
 
     std::string Text(const Label& l)

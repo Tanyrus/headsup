@@ -1,6 +1,7 @@
 #include "game_cursor.h"
 
 #include "argb.h"
+#include "mouse_messages.h"
 
 #include <algorithm>
 #include <iterator>
@@ -35,7 +36,8 @@ namespace headsup
 
     bool ClickMessage(uint32_t message)
     {
-        constexpr uint32_t kClicks[] = {0x201, 0x203, 0x204, 0x206, 0x207, 0x209, 0x20B, 0x20D}; // each button's down, double
+        constexpr uint32_t kClicks[] = {kLeftDown, kLeftDouble, kRightDown, kRightDouble, kMiddleDown, kMiddleDouble,
+            kXButtonDown, kXButtonDouble};
         return std::find(std::begin(kClicks), std::end(kClicks), message) != std::end(kClicks);
     }
 }

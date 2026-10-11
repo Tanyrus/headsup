@@ -4,7 +4,10 @@
 
 namespace headsup
 {
-    constexpr uint32_t kWhite = 0xFFFFFFFF;
+    constexpr uint32_t kWhite     = 0xFFFFFFFF;
+    constexpr uint32_t kBlack     = 0xFF000000;
+    constexpr uint32_t kAlphaMask = 0xFF000000; // a D3DCOLOR's alpha byte
+    constexpr uint32_t kBarGreen  = 0xFF6FE36F; // the bar's one green: wind, Windurst, a weapon skill's TP
     constexpr int kRedShift = 16, kGreenShift = 8, kBlueShift = 0, kAlphaShift = 24; // in a D3DCOLOR (A8R8G8B8)
 
     constexpr uint32_t Argb(uint8_t a, uint8_t r, uint8_t g, uint8_t b)
@@ -13,6 +16,7 @@ namespace headsup
     }
 
     constexpr uint32_t Opaque(uint8_t r, uint8_t g, uint8_t b) { return Argb(0xFF, r, g, b); }
+    constexpr uint32_t Opaque(uint32_t argb) { return argb | kAlphaMask; }
 
     constexpr uint8_t Channel(uint32_t argb, int shift) { return static_cast<uint8_t>(argb >> shift); }
 

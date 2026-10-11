@@ -12,7 +12,7 @@ namespace
 {
     MobRecord Mob(uint8_t flags, uint16_t detects)
     {
-        return MobRecord{17199648, "Goblin Bounty Hunter", 17, 20, flags, 300, detects, 0, 0, 0};
+        return MobRecord{17199648, "Goblin Bounty Hunter", 17, 20, flags, 300, detects, 0, 0, 0, 0};
     }
 
     std::vector<Icon> List(const IconSet& set)
@@ -65,6 +65,23 @@ TEST(true_detection_replaces_sight)
     CHECK(List(IconsFor(&sight)) == (std::vector<Icon>{Icon::PassiveNQ, Icon::TrueSight}));
     const MobRecord sound = Mob(kMobTrueDetection, kDetectHearing); // true sound: the TrueSight icon and Sound
     CHECK(List(IconsFor(&sound)) == (std::vector<Icon>{Icon::PassiveNQ, Icon::TrueSight, Icon::Sound}));
+}
+
+TEST(every_icon_a_mobs_row_can_hold_has_a_popup_tag)
+{
+    const uint16_t detections[] = {
+        kDetectSight, kDetectHearing, kDetectLowHp, kDetectMagic, kDetectAbility, kDetectScent};
+    for (int flags = 0; flags < 256; ++flags)
+        for (int subset = 0; subset < 1 << std::size(detections); ++subset)
+        {
+            uint16_t detects = 0;
+            for (size_t bit = 0; bit < std::size(detections); ++bit)
+                if (subset & (1 << bit)) detects |= detections[bit];
+            const MobRecord mob = Mob(static_cast<uint8_t>(flags), detects);
+            const IconSet icons = IconsFor(&mob);
+            for (int i = 0; i < icons.count; ++i)
+                CHECK(std::string(IconTag(icons.icons[i])) != "");
+        }
 }
 
 TEST(every_icon_fills_a_square_so_all_show_the_same_size)

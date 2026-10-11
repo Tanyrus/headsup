@@ -108,4 +108,17 @@ TEST(a_countdown_reads_minutes_and_seconds_or_hours)
     CHECK(Countdown(7.0) == "0:07");
     CHECK(Countdown(0.2) == "0:01"); // never 0:00 before it is due
     CHECK(Countdown(3909.0) == "1:05:09");
+    CHECK(Countdown(299.0) == "4:59" && Countdown(2160.0) == "36:00" && Countdown(36720.0) == "10:12:00");
+}
+
+TEST(a_placeholders_seconds_left_count_down_to_zero)
+{
+    PhTimers timers;
+    const PhSighting dead{0x1001ABC, 300, "Some NM", false, true};
+    timers.Update(100.0, {PhSighting{0x1001ABC, 300, "Some NM", true, true}});
+    timers.Update(110.0, {dead});
+    CHECK(!timers.SecondsLeft(0x1001DEF, 110.0).has_value());
+    CHECK(timers.SecondsLeft(0x1001ABC, 110.0).has_value());
+    CHECK_EQ(*timers.SecondsLeft(0x1001ABC, 110.0), kDeathToDespawnSeconds + 300.0);
+    CHECK_EQ(*timers.SecondsLeft(0x1001ABC, 110.0 + kDeathToDespawnSeconds + 400.0), 0.0);
 }

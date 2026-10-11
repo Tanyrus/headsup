@@ -21,6 +21,9 @@ namespace headsup
     // In XIUI's order. The aggro icon is the mob's nature (whether it aggros at all), not whether it would attack this
     // player.
     IconSet IconsFor(const MobRecord* mob);
+    // The word a popup's tag says for an icon IconsFor gives: "Aggressive" for either aggro icon, "True sight"; empty
+    // for any other icon.
+    const char* IconTag(Icon icon);
 
     enum class BadgeKind : uint8_t
     {
@@ -75,10 +78,23 @@ namespace headsup
     // element's rank counts only when its SDT shows nothing; a status the mob is immune to shows no rank. Light and dark
     // sleep share one Sleep badge when theirs are the same.
     InfoIconSet InfoIconsFor(const MobResistances* mob, const BadgeRules& rules);
+    // A change in damage taken as the badges spell it: "+25%", "-50%", "0%".
+    std::string PercentText(int percent);
     // A rank as the wikis' percent, -3 as "+50%" (150%) and 4 as "-50%", or as the rank itself.
     std::string RankText(int rank, bool ranks);
-    // "+25%", "-50%", a rank as RankText gives it, or "×" for an immunity.
+    // The mark of an immunity: a times sign.
+    constexpr const char* kTimesSign = "\xC3\x97";
+    // "+25%", "-50%", a rank as RankText gives it, or kTimesSign for an immunity.
     std::string BadgeText(const InfoIcon& icon, bool ranks);
+
+    constexpr int kFirstElementSdt = static_cast<int>(Sdt::Fire);
+    // A damage type's or element's icon, by its place in Sdt.
+    Icon SdtIcon(int sdt);
+    // Damage taken as the percent a badge shows: an sdt of 2500 is +25%.
+    int SdtPercent(int16_t sdt);
+    // A status's icon and MobImmunity bit, by its place in StatusRank.
+    Icon StatusIcon(int status);
+    uint32_t StatusImmunity(int status);
 
     // An icon's pixels, rows top to bottom, each B, G, R, A as D3DFMT_A8R8G8B8 keeps it in memory.
     struct IconBitmap

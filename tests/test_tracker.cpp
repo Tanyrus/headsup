@@ -93,7 +93,7 @@ TEST(a_mob_attacks_as_phoenixs_aggro_check_decides)
              Row{"a Too Weak notorious monster", kMobAggressive | kMobNotorious, 50, 55, 0, 0, kLevel75, Category::NmWontAttack},
          })
     {
-        const MobRecord mob{kBountyHunter, "Test Mob", r.minLevel, r.maxLevel, r.flags, 300, 0, r.levelMod, 0, 0};
+        const MobRecord mob{kBountyHunter, "Test Mob", r.minLevel, r.maxLevel, r.flags, 300, 0, r.levelMod, 0, 0, 0};
         auto outcome = [&](Category c) { return std::string(r.why) + ": " + std::to_string(CategoryIndex(c)); };
         CHECK_EQ(outcome(Classify(&mob, r.checkedLevel, r.player)), outcome(r.expected));
     }
@@ -335,6 +335,16 @@ TEST(dead_mobs_keep_only_their_name)
     CHECK_EQ(dead->mobIcons.count, 0);
 }
 
+// The target's popup reads a dead mob's record; only its level and icons go.
+TEST(a_dead_mob_keeps_its_record_for_the_popup)
+{
+    Tracker t;
+    t.Update({BountyHunter(0x2000, 10.0f, false)}, kLevel20, Settings{});
+    const ActorInfo* dead = t.Find(0x2000);
+    CHECK(dead->mob != nullptr && dead->mob->id == kBountyHunter);
+    CHECK(dead->level.text[0] == '\0');
+}
+
 TEST(squared_distance_becomes_yalms_and_keeps_nan)
 {
     // Ashita reports squared distances. A NaN must stay NaN so no distance limit passes it; std::max(0, NaN) is 0.
@@ -366,8 +376,13 @@ TEST(a_mob_your_party_claimed_is_marked)
 
 TEST(a_mob_carries_what_it_is_weak_to_resists_and_is_immune_to)
 {
+    auto badges = [] {
+        Settings s;
+        s.showDamageIcons = s.showStatusRankIcons = s.showImmunityIcons = true;
+        return s;
+    };
     Tracker t;
-    Settings s;
+    Settings s = badges();
     t.Update({BountyHunter(0x2000)}, kLevel20, s);
     const MobRecord* record = FindMob(kBountyHunter, "Goblin Bounty Hunter");
     CHECK(record != nullptr);
@@ -383,17 +398,39 @@ TEST(a_mob_carries_what_it_is_weak_to_resists_and_is_immune_to)
     };
     s.elementWeakRank = -3;
     CHECK(shown(s) == (std::vector<InfoIcon>{{Icon::Light, BadgeKind::WeakRank, -3}}));
-    s             = Settings{};
+    s             = badges();
     s.maxElements = 2;
     CHECK(shown(s) == (std::vector<InfoIcon>{{Icon::Light, BadgeKind::WeakRank, -3}, {Icon::Fire, BadgeKind::WeakRank, -2}}));
     s.statusBadges[static_cast<int>(StatusRank::Gravity)].weakRank = -2;
     CHECK(shown(s).back() == (InfoIcon{Icon::Gravity, BadgeKind::StatusWeak, -2}));
     s.statusBadges[static_cast<int>(StatusRank::Gravity)].show = false;
     CHECK_EQ(shown(s).size(), 2u);
-    s = Settings{};
+    s = badges();
     s.showDamageIcons = s.showStatusRankIcons = s.showImmunityIcons = false;
     t.Update({BountyHunter(0x2000)}, kLevel20, s);
     CHECK_EQ(t.Find(0x2000)->infoIcons.count, 0);
-    t.Update({BountyHunter(0x2000, 10.0f, false)}, kLevel20, Settings{});
+    t.Update({BountyHunter(0x2000, 10.0f, false)}, kLevel20, badges());
     CHECK_EQ(t.Find(0x2000)->infoIcons.count, 0); // dead
+}
+
+TEST(a_mob_carries_its_server_id_record_and_level_line_and_is_found_by_target_index)
+{
+    Tracker t;
+    t.Update({BountyHunter(0x2000)}, kLevel20, Settings{});
+    const ActorInfo* info = t.FindIndex(BountyHunter(0x2000).index);
+    CHECK(info != nullptr && info == t.Find(0x2000));
+    CHECK_EQ(info->serverId, kBountyHunter);
+    CHECK(info->mob != nullptr && info->mob->id == kBountyHunter);
+    CHECK(std::string(info->level.text).rfind("Lv ", 0) == 0);
+    CHECK(t.FindIndex(0) == nullptr);
+}
+
+TEST(an_actor_listed_twice_keeps_only_what_its_later_entry_says)
+{
+    Tracker t;
+    t.Update({BountyHunter(0x2000), Npc(0x2000)}, kLevel20, EveryCategory());
+    const ActorInfo* info = t.Find(0x2000);
+    CHECK(info != nullptr && info->kind == EntityKind::Npc && std::string(info->name) == "Home Point #1");
+    CHECK(!info->outline && info->mob == nullptr && info->label.text[0] == '\0' && info->mobIcons.count == 0);
+    CHECK(t.FindIndex(BountyHunter(0x2000).index) == nullptr);
 }

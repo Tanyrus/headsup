@@ -18,7 +18,6 @@ namespace headsup
         constexpr int kNeutralPercent                       = 100;
         constexpr Icon kSdtIcons[kSdtCount] = {Icon::Slashing, Icon::Piercing, Icon::Impact, Icon::H2H, Icon::Fire, Icon::Ice,
             Icon::Wind, Icon::Earth, Icon::Lightning, Icon::Water, Icon::Light, Icon::Dark};
-        constexpr int kFirstElementSdt = static_cast<int>(Sdt::Fire);
         struct Status
         {
             Icon icon;
@@ -108,6 +107,26 @@ namespace headsup
         return set;
     }
 
+    const char* IconTag(Icon icon)
+    {
+        switch (icon)
+        {
+        case Icon::AggroNQ:
+        case Icon::AggroHQ: return "Aggressive";
+        case Icon::PassiveNQ:
+        case Icon::PassiveHQ: return "Passive";
+        case Icon::Link: return "Links";
+        case Icon::Sight: return "Sight";
+        case Icon::TrueSight: return "True sight";
+        case Icon::Sound: return "Sound";
+        case Icon::Scent: return "Scent";
+        case Icon::Magic: return "Magic";
+        case Icon::Ability: return "Job abilities";
+        case Icon::Blood: return "Low HP";
+        default: return "";
+        }
+    }
+
     InfoIconSet InfoIconsFor(const MobResistances* mob, const BadgeRules& rules)
     {
         InfoIconSet set;
@@ -117,7 +136,7 @@ namespace headsup
         {
             for (int i = 0; i < kSdtCount; ++i)
             {
-                const int percent = static_cast<int>(std::lround(mob->sdt[i] / kSdtPerPercent));
+                const int percent = SdtPercent(mob->sdt[i]);
                 if (percent > 0) weak.push_back({kSdtIcons[i], BadgeKind::Weak, percent});
                 if (percent < 0) resist.push_back({kSdtIcons[i], BadgeKind::Resist, -percent});
                 if (i < kFirstElementSdt || percent != 0) continue;
@@ -164,20 +183,20 @@ namespace headsup
         return set;
     }
 
+    std::string PercentText(int percent) { return (percent > 0 ? "+" : "") + std::to_string(percent) + "%"; }
+
     std::string RankText(int rank, bool ranks)
     {
-        if (ranks) return std::to_string(rank);
-        const int change = RankPercent(rank) - kNeutralPercent;
-        return (change > 0 ? "+" : "") + std::to_string(change) + "%";
+        return ranks ? std::to_string(rank) : PercentText(RankPercent(rank) - kNeutralPercent);
     }
 
     std::string BadgeText(const InfoIcon& icon, bool ranks)
     {
         switch (icon.badge)
         {
-        case BadgeKind::Weak: return "+" + std::to_string(icon.value) + "%";
-        case BadgeKind::Resist: return "-" + std::to_string(icon.value) + "%";
-        case BadgeKind::Immune: return "\xC3\x97"; // the times sign
+        case BadgeKind::Weak: return PercentText(icon.value);
+        case BadgeKind::Resist: return PercentText(-icon.value);
+        case BadgeKind::Immune: return kTimesSign;
         case BadgeKind::WeakRank:
         case BadgeKind::ResistRank:
         case BadgeKind::StatusWeak:
@@ -185,6 +204,14 @@ namespace headsup
         }
         return RankText(icon.value, ranks);
     }
+
+    Icon SdtIcon(int sdt) { return kSdtIcons[sdt]; }
+
+    int SdtPercent(int16_t sdt) { return static_cast<int>(std::lround(sdt / kSdtPerPercent)); }
+
+    Icon StatusIcon(int status) { return kRankStatuses[status].icon; }
+
+    uint32_t StatusImmunity(int status) { return kRankStatuses[status].immunity; }
 
     const IconBitmap& IconImage(Icon icon)
     {

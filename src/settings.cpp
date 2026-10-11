@@ -11,6 +11,7 @@
 #include <climits>
 #include <cmath>
 #include <cstdio>
+#include <iterator>
 #include <string>
 
 namespace headsup
@@ -39,7 +40,9 @@ namespace headsup
             {"showPlayerIcons", &Settings::showPlayerIcons}, {"centerNameAndIcons", &Settings::centerNameAndIcons},
             {"ownNameColor", &Settings::ownNameColor}, {"showDamageIcons", &Settings::showDamageIcons},
             {"showStatusRankIcons", &Settings::showStatusRankIcons}, {"showImmunityIcons", &Settings::showImmunityIcons},
-            {"showRanks", &Settings::showRanks}};
+            {"showRanks", &Settings::showRanks}, {"showBar", &Settings::showBar},
+            {"hideHelpBar", &Settings::hideHelpBar}, {"hideNetstat", &Settings::hideNetstat},
+            {"clockSeconds", &Settings::clockSeconds}, {"serverSeconds", &Settings::serverSeconds}};
 
         struct IntKey
         {
@@ -66,7 +69,10 @@ namespace headsup
             {"labelShadow", &Settings::labelShadow, kMinShadowStrength, kMaxShadowStrength},
             {"elementWeakRank", &Settings::elementWeakRank, kNoWeakRank, kMaxWeakRank},
             {"elementResistRank", &Settings::elementResistRank, kMinResistRank, kNoResistRank},
-            {"maxElements", &Settings::maxElements, 0, kElementCount}};
+            {"maxElements", &Settings::maxElements, 0, kElementCount},
+            {"barHeight", &Settings::barHeight, kMinBarHeight, kMaxBarHeight},
+            {"barTextSize", &Settings::barTextSize, kAutoBarTextSize, kMaxBarTextSize},
+            {"popupTextSize", &Settings::popupTextSize, kAutoPopupTextSize, kMaxBarTextSize}};
 
         struct FloatKey
         {
@@ -92,6 +98,8 @@ namespace headsup
 
         constexpr const char* kFontKey = "fontName";
         constexpr const char* kBadgeFontKey = "badgeFontName";
+        constexpr const char* kBarTitleFontKey = "barTitleFont";
+        constexpr const char* kBarTextFontKey  = "barTextFont";
         // Saved files from before the level line had its own font and shadow take the name's.
         constexpr const char* kLabelFontKey        = "labelFontName";
         constexpr const char* kLabelBoldKey        = "labelFontBold";
@@ -101,6 +109,14 @@ namespace headsup
         // And from before the cursor scaled on its own, when it scaled with the names.
         constexpr const char* kScaleCursorKey = "scaleCursor";
         constexpr const char* kKeepPointerKey = "keepPointerKeys"; // hex virtual-key codes, a space apart
+        constexpr const char* kMovedWindowsKey = "movedWindows";   // short window names, a space apart
+        constexpr const char* kWindowOffsetsKey = "windowOffsets"; // "equip:10,-20 statcom:0,40"
+        constexpr const char* kWindowGroupsKey  = "windowGroups";  // "Equipment:20,-10,1:equip+inventor|..."
+        constexpr const char* kAllUnderBarKey   = "allUnderBar";
+        constexpr const char* kMoveGameHelpKey  = "moveGameHelp";
+        constexpr const char* kHelpBarXKey = "helpBarX";
+        constexpr const char* kHelpBarBackgroundKey = "helpBarBackground";
+        constexpr const char* kHelpBarYKey = "helpBarY";
         constexpr int kHex                    = 16;
         // Every setting is saved whenever one changes, so a file keeps the defaults of its day, and each default that
         // changed is put right once in files from before. 1: the target cursor's became Phoenix's red. 2: the font's
@@ -118,6 +134,33 @@ namespace headsup
         const char* const kMobIdNames[kMobIdFormatCount] = {"off", "lastThree", "full"};
         constexpr const char* kLookKey                   = "look";
         const char* const kLookNames[kLookCount]         = {"fantasy"};
+        constexpr const char* kBarThemeKey = "barTheme";
+        const char* const kBarThemeNames[kBarThemeCount] = {"phoenixGold", "umbraDark", "phoenixRedOrnate",
+            "phoenixRedPills"};
+        constexpr const char* kBarCurrencyKey = "barCurrency";
+        constexpr const char* kClockZoneKey   = "serverClockZone";
+        constexpr const char* kTargetDetailsKey = "barTargetDetails";
+        constexpr const char* kMenuFontKey      = "menuFont";
+        constexpr const char* kMenuScaleKey     = "menuScale";
+        constexpr const char* kSecondLineSuffix = "Line2";
+        constexpr const char* kIconsSuffix      = "Icons";
+        constexpr const char* kExpBarKey        = "expBar";
+        const char* const kExpBarNames[kExpBarPlaceCount] = {"under", "beside", "off"};
+        constexpr const char* kJobNamesKey  = "jobNames";
+        constexpr const char* kSubtitleKey  = "barSubtitle";
+        const char* const kSubtitleNames[kSubtitlePlaceCount] = {"hide", "before", "after"};
+        constexpr const char* kClock24Key   = "clock24";
+        constexpr const char* kLatencyKey   = "barLatency";
+        const char* const kClockZoneNames[kClockZoneCount] = {"japan", "utc", "usEastern", "usCentral", "usMountain",
+            "usArizona", "usPacific", "usAlaska", "usHawaii", "ukIreland", "centralEurope", "easternEurope",
+            "australiaEastern"};
+        constexpr const char* kBarSeparatorsKey                    = "barSeparators";
+        const char* const kBarSeparatorsNames[kBarSeparatorsCount] = {"theme", "diamonds", "none"};
+        const char* const kBarWidgetKeys[] = {"barZone", "barWeather", "barVanaTime", "barTarget", "barGil", "barBags",
+            "barEarthTime", "barGameHelp", "barServerTime", "barFps", "barJob", "barConnection", "barParty", "barConquest", "barSignet", "barDistance"};
+        static_assert(std::size(kBarWidgetKeys) == kBarWidgetCount);
+        const char* const kBarSectionKeys[] = {"barLeft", "barCenter", "barRight"};
+        static_assert(std::size(kBarSectionKeys) == kBarSectionCount);
         const char* const kChannelKeys[3]               = {"R", "G", "B"};
         const char* const kIconSideNames[kIconSideCount] = {"left", "right", "hide"};
         constexpr const char* kDetectionSideKey          = "detectionIconSide";
@@ -179,6 +222,42 @@ namespace headsup
                                 s.replacePlayerNames || s.replaceNpcNames || s.replaceCursor || s.phTimers);
     }
 
+    void UseHeadsUpWindowDefaults(Settings& s)
+    {
+        s.allUnderBar   = true;
+        s.moveGameHelp  = true;
+        s.movedWindows  = DefaultMovedWindows();
+        s.windowOffsets = {};
+        s.windowGroups  = DefaultWindowGroups();
+    }
+
+    void UseGameWindowDefaults(Settings& s)
+    {
+        s.allUnderBar   = false;
+        s.moveGameHelp  = false;
+        s.movedWindows  = {};
+        s.windowOffsets = {};
+        s.windowGroups  = {};
+    }
+
+    void UseHelpTextDefaults(Settings& s)
+    {
+        UseHeadsUpWindowDefaults(s);
+        s.moveGameHelp = false;
+        s.hideHelpBar  = true;
+        s.barWidgets[static_cast<int>(BarWidget::GameHelp)] = true;
+    }
+
+    bool BarOn(const Settings& s)
+    {
+        return s.enabled && s.showBar;
+    }
+
+    bool BarRuns(const Settings& s, uint8_t loginStatus)
+    {
+        return BarOn(s) && loginStatus == kLoginInGame;
+    }
+
     std::vector<std::string> FontChoices(std::vector<std::string> installed, const std::string& current)
     {
         installed.push_back(current);
@@ -210,6 +289,8 @@ namespace headsup
         if (s.fontName.empty() || s.fontName.size() > kMaxFontName) s.fontName = d.fontName;
         if (s.labelFontName.empty() || s.labelFontName.size() > kMaxFontName) s.labelFontName = d.labelFontName;
         if (s.badgeFontName.empty() || s.badgeFontName.size() > kMaxFontName) s.badgeFontName = d.badgeFontName;
+        if (s.barTitleFont.size() > kMaxFontName) s.barTitleFont = d.barTitleFont;
+        if (s.barTextFont.size() > kMaxFontName) s.barTextFont = d.barTextFont;
         s.labelShadowColor = ClampColor(s.labelShadowColor, d.labelShadowColor);
         std::vector<uint8_t> keys;
         for (const uint8_t vk : s.keepPointerKeys)
@@ -219,6 +300,11 @@ namespace headsup
                 keys.push_back(key);
         }
         s.keepPointerKeys = std::move(keys);
+        s.movedWindows    = MovedWindowsFrom(MovedWindowNames(s.movedWindows));
+        s.windowOffsets   = WindowOffsetsFrom(WindowOffsetText(s.windowOffsets));
+        s.windowGroups    = WindowGroupsFrom(WindowGroupsText(s.windowGroups));
+        s.helpBarX        = std::clamp(s.helpBarX, -kMaxHelpBarOffset, kMaxHelpBarOffset);
+        s.helpBarY        = std::clamp(s.helpBarY, -kMaxHelpBarOffset, kMaxHelpBarOffset);
         for (const ColorKey& c : kColors)
             s.*c.field = ClampColor(s.*c.field, d.*c.field);
         for (int k = 0; k < kLabelShadeCount; ++k)
@@ -227,6 +313,14 @@ namespace headsup
             s.color[c] = ClampColor(s.color[c], d.color[c]);
         if (s.detectionIconSide == IconSide::Hidden) s.detectionIconSide = d.detectionIconSide;
         if (s.badgeSide == IconSide::Hidden) s.badgeSide = d.badgeSide;
+        if (static_cast<int>(s.barTheme) >= kBarThemeCount) s.barTheme = d.barTheme;
+        if (s.barCurrency < 0 || s.barCurrency >= kCurrencyCount) s.barCurrency = d.barCurrency;
+        if (static_cast<int>(s.serverClockZone) >= kClockZoneCount) s.serverClockZone = d.serverClockZone;
+        if (static_cast<int>(s.expBar) >= kExpBarPlaceCount) s.expBar = d.expBar;
+        if (static_cast<int>(s.barSubtitle) >= kSubtitlePlaceCount) s.barSubtitle = d.barSubtitle;
+        if (MenuFontNamed(s.menuFont) == nullptr) s.menuFont = d.menuFont;
+        s.menuScale = std::clamp(s.menuScale, kMinMenuScale, kMaxMenuScale);
+        if (static_cast<int>(s.barSeparators) >= kBarSeparatorsCount) s.barSeparators = d.barSeparators;
         for (StatusBadgeRule& status : s.statusBadges)
         {
             status.weakRank   = std::clamp(status.weakRank, kNoWeakRank, kMaxWeakRank);
@@ -250,6 +344,8 @@ namespace headsup
         s.fontName = store.GetString(kFontKey, kDefaultFont);
         s.labelFontName    = store.GetString(kLabelFontKey, s.fontName.c_str());
         s.badgeFontName    = store.GetString(kBadgeFontKey, kBadgeFont);
+        s.barTitleFont     = store.GetString(kBarTitleFontKey, "");
+        s.barTextFont      = store.GetString(kBarTextFontKey, "");
         s.labelFontBold    = store.GetBool(kLabelBoldKey, s.fontBold);
         s.scaleCursor      = store.GetBool(kScaleCursorKey, s.scaleWithDistance);
         std::istringstream keys(store.GetString(kKeepPointerKey, ""));
@@ -297,6 +393,48 @@ namespace headsup
         const std::string look = store.GetString(kLookKey, "");
         for (int l = 0; l < kLookCount; ++l)
             if (look == kLookNames[l]) s.look = static_cast<Look>(l);
+        const std::string theme = store.GetString(kBarThemeKey, "");
+        for (int t = 0; t < kBarThemeCount; ++t)
+            if (theme == kBarThemeNames[t]) s.barTheme = static_cast<BarTheme>(t);
+        if (const std::optional<int> currency = CurrencyOfKey(store.GetString(kBarCurrencyKey, "")))
+            s.barCurrency = *currency;
+        s.barTargetDetails = store.GetBool(kTargetDetailsKey, s.barTargetDetails);
+        s.menuFont         = store.GetString(kMenuFontKey, s.menuFont.c_str());
+        s.menuScale        = LoadInt(store, kMenuScaleKey, s.menuScale);
+        const std::string clockZone = store.GetString(kClockZoneKey, "");
+        for (int z = 0; z < kClockZoneCount; ++z)
+            if (clockZone == kClockZoneNames[z]) s.serverClockZone = static_cast<ClockZone>(z);
+        const std::string separators = store.GetString(kBarSeparatorsKey, "");
+        for (int t = 0; t < kBarSeparatorsCount; ++t)
+            if (separators == kBarSeparatorsNames[t]) s.barSeparators = static_cast<BarSeparators>(t);
+        for (int w = 0; w < kBarWidgetCount; ++w)
+        {
+            const std::string key = kBarWidgetKeys[w];
+            s.barWidgets[w]       = store.GetBool(key.c_str(), s.barWidgets[w]);
+            s.barSecondLine[w]    = store.GetBool((key + kSecondLineSuffix).c_str(), s.barSecondLine[w]);
+            s.barIcons[w]         = store.GetBool((key + kIconsSuffix).c_str(), s.barIcons[w]);
+        }
+        const std::string expBar = store.GetString(kExpBarKey, "");
+        for (int e = 0; e < kExpBarPlaceCount; ++e)
+            if (expBar == kExpBarNames[e]) s.expBar = static_cast<ExpBarPlace>(e);
+        s.jobNames   = store.GetBool(kJobNamesKey, s.jobNames);
+        const std::string subtitle = store.GetString(kSubtitleKey, "");
+        for (int i = 0; i < kSubtitlePlaceCount; ++i)
+            if (subtitle == kSubtitleNames[i]) s.barSubtitle = static_cast<SubtitlePlace>(i);
+        s.clock24    = store.GetBool(kClock24Key, s.clock24);
+        s.barLatency = store.GetBool(kLatencyKey, s.barLatency);
+        std::array<std::string, kBarSectionCount> sections;
+        for (int i = 0; i < kBarSectionCount; ++i)
+            sections[i] = store.GetString(kBarSectionKeys[i], "");
+        s.barSections = PlacementFrom(sections);
+        s.movedWindows = MovedWindowsFrom(store.GetString(kMovedWindowsKey, MovedWindowNames(s.movedWindows).c_str()));
+        s.windowOffsets = WindowOffsetsFrom(store.GetString(kWindowOffsetsKey, ""));
+        s.windowGroups  = WindowGroupsFrom(store.GetString(kWindowGroupsKey, ""));
+        s.allUnderBar   = store.GetBool(kAllUnderBarKey, s.allUnderBar);
+        s.moveGameHelp  = store.GetBool(kMoveGameHelpKey, s.moveGameHelp);
+        s.helpBarX      = LoadInt(store, kHelpBarXKey, s.helpBarX);
+        s.helpBarBackground = store.GetBool(kHelpBarBackgroundKey, s.helpBarBackground);
+        s.helpBarY      = LoadInt(store, kHelpBarYKey, s.helpBarY);
         const float saved = store.GetFloat(kVersionKey, 0.0f);
         if (saved < kRedCursorVersion && s.cursorColor == kOldCursorColor) s.cursorColor = Settings{}.cursorColor;
         if (saved < kBundledFontVersion)
@@ -330,6 +468,8 @@ namespace headsup
         store.Set(kFontKey, s.fontName.c_str());
         store.Set(kLabelFontKey, s.labelFontName.c_str());
         store.Set(kBadgeFontKey, s.badgeFontName.c_str());
+        store.Set(kBarTitleFontKey, s.barTitleFont.c_str());
+        store.Set(kBarTextFontKey, s.barTextFont.c_str());
         setBool(kLabelBoldKey, s.labelFontBold);
         setBool(kScaleCursorKey, s.scaleCursor);
         std::string keys;
@@ -362,6 +502,35 @@ namespace headsup
         }
         store.Set(kMobIdKey, kMobIdNames[static_cast<int>(s.mobId)]);
         store.Set(kLookKey, kLookNames[static_cast<int>(s.look)]);
+        store.Set(kBarThemeKey, kBarThemeNames[static_cast<int>(s.barTheme)]);
+        store.Set(kBarSeparatorsKey, kBarSeparatorsNames[static_cast<int>(s.barSeparators)]);
+        store.Set(kBarCurrencyKey, kCurrencyTable[s.barCurrency].key);
+        store.Set(kClockZoneKey, kClockZoneNames[static_cast<int>(s.serverClockZone)]);
+        setBool(kTargetDetailsKey, s.barTargetDetails);
+        store.Set(kMenuFontKey, s.menuFont.c_str());
+        setFloat(kMenuScaleKey, static_cast<float>(s.menuScale));
+        for (int w = 0; w < kBarWidgetCount; ++w)
+        {
+            const std::string key = kBarWidgetKeys[w];
+            setBool(key, s.barWidgets[w]);
+            setBool(key + kSecondLineSuffix, s.barSecondLine[w]);
+            setBool(key + kIconsSuffix, s.barIcons[w]);
+        }
+        store.Set(kExpBarKey, kExpBarNames[static_cast<int>(s.expBar)]);
+        setBool(kJobNamesKey, s.jobNames);
+        store.Set(kSubtitleKey, kSubtitleNames[static_cast<int>(s.barSubtitle)]);
+        setBool(kClock24Key, s.clock24);
+        setBool(kLatencyKey, s.barLatency);
+        for (int i = 0; i < kBarSectionCount; ++i)
+            store.Set(kBarSectionKeys[i], PlacementNames(s.barSections[i]).c_str());
+        store.Set(kMovedWindowsKey, MovedWindowNames(s.movedWindows).c_str());
+        store.Set(kWindowOffsetsKey, WindowOffsetText(s.windowOffsets).c_str());
+        store.Set(kWindowGroupsKey, WindowGroupsText(s.windowGroups).c_str());
+        setBool(kAllUnderBarKey, s.allUnderBar);
+        setBool(kMoveGameHelpKey, s.moveGameHelp);
+        setFloat(kHelpBarXKey, static_cast<float>(s.helpBarX));
+        setBool(kHelpBarBackgroundKey, s.helpBarBackground);
+        setFloat(kHelpBarYKey, static_cast<float>(s.helpBarY));
         setFloat(kVersionKey, static_cast<float>(kSettingsVersion));
     }
 

@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Regenerate data/phoenix_mobs.tsv and data/phoenix_rules.json from Phoenix's own map server; data/ is only written when
-# validation passes. It clones Phoenix at PHOENIX_COMMIT with its patches and mesh submodules (not the staff-only
+# Regenerate data/phoenix_mobs.tsv, data/phoenix_drops.tsv and data/phoenix_rules.json from Phoenix's own map server,
+# and data/phoenix_zones.tsv, data/phoenix_weather.tsv and data/phoenix_titles.tsv from its checkout; data/ is only written
+# when all of them pass. It clones Phoenix at PHOENIX_COMMIT with its patches and mesh submodules (not the staff-only
 # phoenix_ac), builds the map server with the headsup_dump module, loads Phoenix's database into a private MariaDB, runs
 # the server until the module has dumped every loaded mob and the /check and aggro rules HEADSUP_PHOENIX_DUMPS times,
-# then merges every dump kept for this commit and validates it.
+# then merges every dump kept for this commit and validates it. zones.py reads the zones, regions and weather calendars,
+# and titles.py the title names, from the checkout's sources alone.
 # A mob counts as aggressive if any run saw it attack: some change aggression while the server runs.
 #
 #   HEADSUP_PHOENIX_DIR        work folder, default ~/.cache/headsup-phoenix (about 6 GB; never under /tmp)
@@ -156,8 +158,16 @@ done
 rm -rf "$STAGE"
 python3 "$ROOT/tools/phoenix/compact.py" "$SNAPSHOTS"/*.json "$STAGE" "$COMMIT" ||
     fail "compact; data/ left unchanged"
-python3 "$ROOT/tools/phoenix/validate.py" "$STAGE/phoenix_mobs.tsv" "$STAGE/phoenix_rules.json" ||
-    fail "validation; data/ left unchanged"
+python3 "$ROOT/tools/phoenix/zones.py" "$SERVER" "$STAGE" ||
+    fail "zones; data/ left unchanged"
+python3 "$ROOT/tools/gen_zones.py" --check "$STAGE" ||
+    fail "zone data the plugin cannot hold; data/ left unchanged"
+python3 "$ROOT/tools/phoenix/titles.py" "$SERVER" "$STAGE" ||
+    fail "titles; data/ left unchanged"
+python3 "$ROOT/tools/phoenix/validate.py" "$STAGE/phoenix_mobs.tsv" "$STAGE/phoenix_rules.json" \
+    "$STAGE/phoenix_drops.tsv" || fail "validation; data/ left unchanged"
 mkdir -p "$ROOT/data"
-cp "$STAGE/phoenix_mobs.tsv" "$STAGE/phoenix_mobs.meta" "$STAGE/phoenix_rules.json" "$ROOT/data/"
-log "data/phoenix_mobs.tsv, data/phoenix_mobs.meta and data/phoenix_rules.json updated"
+cp "$STAGE/phoenix_mobs.tsv" "$STAGE/phoenix_mobs.meta" "$STAGE/phoenix_drops.tsv" "$STAGE/phoenix_rules.json" \
+    "$STAGE/phoenix_zones.tsv" "$STAGE/phoenix_weather.tsv" "$STAGE/phoenix_titles.tsv" "$ROOT/data/"
+log "data/phoenix_mobs.tsv, .meta, phoenix_drops.tsv, phoenix_rules.json, phoenix_zones.tsv, phoenix_weather.tsv and" \
+    "phoenix_titles.tsv updated"

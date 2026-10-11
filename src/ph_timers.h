@@ -39,6 +39,8 @@ namespace headsup
     public:
         void Update(double now, const std::vector<PhSighting>& placeholders);
         std::vector<TimerLine> Lines(uint16_t zone, double now) const;
+        // Seconds until this placeholder is due back, 0 once it is; nullopt when no timer runs for it.
+        std::optional<double> SecondsLeft(uint32_t serverId, double now) const;
 
     private:
         struct Timer

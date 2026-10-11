@@ -62,6 +62,9 @@ namespace headsup
         uint8_t stencilRef = 0;     // 1 to kMaxStencilRef when outlined
         uint32_t argb      = 0;     // the outline's D3DCOLOR
         uint16_t index     = 0;     // entity target index
+        uint32_t serverId    = 0;       // the mob data key
+        const MobRecord* mob = nullptr; // a mob's Phoenix record, when it has one
+        Label level{};                  // a living mob's level and con, as the level line shows them before its ID
         EntityKind kind    = EntityKind::Npc;
         Category category  = Category::Unknown; // where a mob's outline color comes from, shown or not
         bool alive         = false;
@@ -92,6 +95,8 @@ namespace headsup
     public:
         void Update(const std::vector<ActorInput>& actors, const PlayerState& player, const Settings& settings);
         const ActorInfo* Find(ActorPtr actor) const;
+        // The actor with this entity target index; null for 0 or when none has it.
+        const ActorInfo* FindIndex(uint16_t index) const;
         uint32_t OutlinedCount() const { return m_Outlined; }
         const PlayerState& Player() const { return m_Player; }
         // In entity order.

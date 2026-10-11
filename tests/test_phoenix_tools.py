@@ -1,3 +1,5 @@
+import contextlib
+import io
 import json
 import pathlib
 import tempfile
@@ -13,11 +15,11 @@ MOBS = [
      'aggro': True, 'alwaysAggro': 0, 'noAggro': 0, 'type': 0,
      'link': True, 'detects': 0x001 | 0x002, 'trueDetection': False, 'expLevelMod': 0, 'follows': False,
      'placeholderOf': 17199700, 'immunity': 0x1000 | 0x10, 'sdt': [0, 2500] + [0] * 10,
-     'elementRanks': [-2] * 6 + [-3, 0], 'statusRanks': [0] * 10},
+     'elementRanks': [-2] * 6 + [-3, 0], 'statusRanks': [0] * 10, 'dropList': 1},
     {'id': 17199105, 'zone': 103, 'name': 'Stag_Crab', 'minLevel': 15, 'maxLevel': 17, 'respawn': 0,
      'aggro': True, 'alwaysAggro': 1, 'noAggro': 0, 'type': 0x04,
      'link': False, 'detects': 0x002, 'trueDetection': False, 'expLevelMod': 0, 'follows': False, 'placeholderOf': 0,
-     'immunity': 0, 'sdt': [0] * 12, 'elementRanks': [0] * 8, 'statusRanks': [0] * 10},
+     'immunity': 0, 'sdt': [0] * 12, 'elementRanks': [0] * 8, 'statusRanks': [0] * 10, 'dropList': 0},
     {'id': 17272838, 'zone': 121, 'name': 'Guardian_Treant', 'minLevel': 32, 'maxLevel': 32, 'respawn': 960,
      'aggro': False, 'alwaysAggro': 0, 'noAggro': 1, 'type': 0x02 | 0x10,
      'link': False, 'detects': 0x100, 'trueDetection': True, 'expLevelMod': -2, 'follows': True, 'placeholderOf': 0,
@@ -25,6 +27,18 @@ MOBS = [
 ]
 
 # As the dump module writes them: differences out past the table, which GetBaseExp clamps to, and cons as numbers.
+# As the dump module writes them: [DROP_TYPE, item, rate, fixed], 0 normal, 1 grouped, 2 steal, 4 despoil.
+DROP_LISTS = [
+    {'items': [[0, 768, 150, False], [2, 17296, 0, False], [4, 640, 0, False]], 'groups': []},
+    {'items': [[0, 12552, 50, False]],
+     'groups': [{'rate': 100, 'fixed': False, 'items': [[1, 4495, 600, False], [1, 0, 400, False]]}]},
+]
+DROPS_ROWS = [['list', 'kind', 'group', 'groupRate', 'item', 'rate'],
+              ['1', 'drop', '0', '0', '768', '150'], ['1', 'steal', '0', '0', '17296', '0'],
+              ['1', 'despoil', '0', '0', '640', '0'],
+              ['2', 'drop', '0', '0', '12552', '50'], ['2', 'drop', '1', '100', '4495', '600'],
+              ['2', 'drop', '1', '100', '0', '400']]
+
 RULES = {'firstDifference': -3,
          'baseExp': [[0] * 20, [0] * 20, [50] * 20, [100] * 20, [120] * 20, [120] * 20, [120] * 20],
          'difficulty': [{'minExp': 120, 'con': 5}, {'minExp': 100, 'con': 4}],
@@ -33,11 +47,11 @@ RULES = {'firstDifference': -3,
 
 
 ZERO_LISTS = ['0', ','.join(['0'] * 12), ','.join(['0'] * 8), ','.join(['0'] * 10)]
-ZEROS_RECORD = {'immunity': 0, 'sdt': [0] * 12, 'elementRanks': [0] * 8, 'statusRanks': [0] * 10}
+ZEROS_RECORD = {'immunity': 0, 'sdt': [0] * 12, 'elementRanks': [0] * 8, 'statusRanks': [0] * 10, 'drops': 0}
 
 
-def dump(mobs, rules=RULES):
-    return {'mobs': mobs, 'rules': rules}
+def dump(mobs, rules=RULES, drop_lists=DROP_LISTS):
+    return {'mobs': mobs, 'dropLists': drop_lists, 'rules': rules}
 
 
 def run_compact(tmp, *dumps):
@@ -49,21 +63,23 @@ def run_compact(tmp, *dumps):
     compact.compact(paths, tmp, 'abc123')
     out = pathlib.Path(tmp)
     rows = [line.split('\t') for line in (out / 'phoenix_mobs.tsv').read_text().splitlines()]
-    return rows, (out / 'phoenix_mobs.meta').read_text(), json.loads((out / 'phoenix_rules.json').read_text())
+    drops = [line.split('\t') for line in (out / 'phoenix_drops.tsv').read_text().splitlines()]
+    return rows, (out / 'phoenix_mobs.meta').read_text(), json.loads((out / 'phoenix_rules.json').read_text()), drops
 
 
 class Compact(unittest.TestCase):
     def setUp(self):
         with tempfile.TemporaryDirectory() as tmp:
-            self.rows, self.meta, self.rules = run_compact(tmp, dump(MOBS))
+            self.rows, self.meta, self.rules, self.drops = run_compact(tmp, dump(MOBS))
 
     def test_rows_are_sorted_by_id_with_display_names(self):
         self.assertEqual(self.rows[0], ['id', 'zone', 'name', 'minLevel', 'maxLevel', 'flags', 'respawn', 'detects',
-                                        'expLevelMod', 'placeholderOf', 'immunity', 'sdt', 'elementRanks', 'statusRanks'])
+                                        'expLevelMod', 'placeholderOf', 'immunity', 'sdt', 'elementRanks', 'statusRanks',
+                                        'drops'])
         self.assertEqual([row[0] for row in self.rows[1:]], ['17199105', '17199648', '17272838'])
         self.assertEqual(self.rows[2], ['17199648', '103', 'Goblin Bounty Hunter', '17', '20', '33', '300', '3', '0',
                                         '17199700', '4112', '0,2500,0,0,0,0,0,0,0,0,0,0', '-2,-2,-2,-2,-2,-2,-3,0',
-                                        '0,0,0,0,0,0,0,0,0,0'])
+                                        '0,0,0,0,0,0,0,0,0,0', '2'])
 
     def test_flags_respawn_detection_and_the_level_mod(self):
         self.assertEqual(self.rows[1][5:10], [str(1 | 2), '0', '2', '0', '0'])  # aggro + always aggro (fished ignored)
@@ -74,6 +90,18 @@ class Compact(unittest.TestCase):
         self.assertIn('phoenix_commit\tabc123\n', self.meta)
         self.assertIn('mobs\t3\n', self.meta)
         self.assertIn('zones\t2\n', self.meta)
+        self.assertIn('dropLists\t2\n', self.meta)
+
+    def test_each_list_is_numbered_by_its_first_mob_and_a_mob_without_loot_has_0(self):
+        # The crab, first by ID, has the dump's list 0 and the goblin its list 1; the treant has none.
+        self.assertEqual([row[-1] for row in self.rows[1:]], ['1', '2', '0'])
+        self.assertEqual(self.drops, DROPS_ROWS)
+
+    def test_equal_lists_are_written_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            rows, _, _, drops = run_compact(tmp, dump([mob(), mob(id=16797855, dropList=1)], drop_lists=DROP_LISTS[:1] * 2))
+        self.assertEqual([row[-1] for row in rows[1:]], ['1', '1'])
+        self.assertEqual(drops, DROPS_ROWS[:4])
 
     def test_the_table_keeps_one_of_each_clamped_end_row(self):
         self.assertEqual(self.rules['firstDifference'], -2)
@@ -101,7 +129,7 @@ def mob(**fields):
     base = {'id': 16797854, 'zone': 5, 'name': 'Ice_Elemental', 'minLevel': 76, 'maxLevel': 77, 'respawn': 300,
             'aggro': False, 'alwaysAggro': 0, 'noAggro': 0, 'type': 0, 'link': False, 'detects': 0x020,
             'trueDetection': False, 'expLevelMod': 0, 'follows': False, 'placeholderOf': 0, 'immunity': 0,
-            'sdt': [0] * 12, 'elementRanks': [0] * 8, 'statusRanks': [0] * 10}
+            'sdt': [0] * 12, 'elementRanks': [0] * 8, 'statusRanks': [0] * 10, 'dropList': 0}
     base.update(fields)
     return base
 
@@ -110,8 +138,11 @@ class MergeSnapshots(unittest.TestCase):
     """Some mobs change aggro at runtime (elementals, Ghrah forms); a mob counts as attacking if any run saw it attack."""
 
     def compact_rows(self, *mob_lists):
-        with tempfile.TemporaryDirectory() as tmp:
-            rows, meta, _ = run_compact(tmp, *(dump(mobs) for mobs in mob_lists))
+        """The rows and meta, with phoenix_drops.tsv's rows in self.drops and what compact wrote to stderr in
+        self.stderr."""
+        with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stderr(io.StringIO()) as err:
+            rows, meta, _, self.drops = run_compact(tmp, *(dump(mobs) for mobs in mob_lists))
+        self.stderr = err.getvalue()
         return rows[1:], meta
 
     def test_attacking_in_any_snapshot_counts(self):
@@ -144,10 +175,31 @@ class MergeSnapshots(unittest.TestCase):
         first = mob(minLevel=76, maxLevel=77, link=True, detects=0x002, expLevelMod=-2, placeholderOf=16797860,
                     immunity=0x800, statusRanks=[0] * 5 + [6] + [0] * 4)
         later = mob(zone=6, name='Label_Only', minLevel=75, maxLevel=78, respawn=999, type=0x02, detects=0x101,
-                    trueDetection=True, follows=True, immunity=0x2)
+                    trueDetection=True, follows=True, immunity=0x2, dropList=1)
         rows, _ = self.compact_rows([first], [later])
         self.assertEqual(rows[0], ['16797854', '5', 'Ice Elemental', '75', '78', '32', '300', '2', '-2', '16797860',
-                                   '2048', ','.join(['0'] * 12), ','.join(['0'] * 8), '0,0,0,0,0,6,0,0,0,0'])
+                                   '2048', ','.join(['0'] * 12), ','.join(['0'] * 8), '0,0,0,0,0,6,0,0,0,0', '1'])
+        self.assertEqual(self.drops, DROPS_ROWS[:4])
+
+    def test_a_drop_list_that_differs_in_a_later_snapshot_is_named(self):
+        self.compact_rows([mob(), mob(id=16797855)], [mob(dropList=1), mob(id=16797855)])
+        self.assertIn('1 mobs have another drop list in a later dump, kept the first: 16797854', self.stderr)
+
+    def test_lists_are_compared_by_their_entries_not_their_dump_index(self):
+        with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stderr(io.StringIO()) as err:
+            run_compact(tmp, dump([mob()]), dump([mob(dropList=1)], drop_lists=DROP_LISTS[::-1]))
+        self.assertEqual(err.getvalue(), '')
+
+    def test_a_mob_without_loot_has_no_list(self):
+        lootless = {field: value for field, value in mob(id=16797855).items() if field != 'dropList'}
+        rows, _ = self.compact_rows([mob(), lootless])
+        self.assertEqual([r[-1] for r in rows], ['1', '0'])
+        self.assertEqual(self.drops, DROPS_ROWS[:4])
+
+    def test_a_group_keeps_its_rate_and_its_members_weights(self):
+        rows, _ = self.compact_rows([mob(dropList=1)])
+        self.assertEqual(rows[0][-1], '1')
+        self.assertEqual(self.drops[1:], [['1'] + row[1:] for row in DROPS_ROWS[4:]])
 
     def test_mobs_from_any_snapshot_are_kept_and_counted(self):
         rows, meta = self.compact_rows([mob()], [mob(), mob(id=16797855)])
@@ -179,6 +231,27 @@ class Rules(unittest.TestCase):
     def test_a_dump_without_mobs_or_rules_names_its_file(self):
         self.assertCompactFails('run-0.json: not a dump this compact.py reads', {'rules': RULES})
         self.assertCompactFails('run-0.json: not a dump this compact.py reads', [mob()])
+
+    def test_drop_lists_the_tsv_cannot_say_are_an_error(self):
+        def lists(items=(), groups=()):
+            return [{'items': list(items), 'groups': list(groups)}]
+        for drop_lists, message in (
+                (lists([[1, 768, 150, False]]), 'drop list 0: drop type 1 outside a group'),
+                (lists([[3, 768, 150, False]]), 'drop list 0: drop type 3 outside a group'),
+                (lists(groups=[{'rate': 100, 'fixed': False, 'items': [[0, 768, 1, False]]}]), 'drop type 0 inside a group'),
+                (lists([[0, 768, 150, True]]), 'item 768 has a fixed rate'),
+                (lists(groups=[{'rate': 100, 'fixed': True, 'items': [[1, 768, 1, False]]}]), 'group 1 has a fixed rate'),
+                (lists([[0, 768, 150]]), 'is not a drop list entry'),
+                (lists([[0, 768, 1001, False]]), "a drop's rate must be at most 1000")):
+            with self.subTest(message=message):
+                self.assertCompactFails(message, dump([mob()], drop_lists=drop_lists))
+
+    def test_a_mob_past_the_dumped_lists_is_an_error(self):
+        self.assertCompactFails('run-0.json: mob 16797854 has drop list 2, past the 2 dumped', dump([mob(dropList=2)]))
+        self.assertCompactFails("has drop list '0', past the 2 dumped", dump([mob(dropList='0')]))
+
+    def test_a_dump_without_drop_lists_names_its_file(self):
+        self.assertCompactFails('run-0.json: not a dump this compact.py reads', {'mobs': [mob()], 'rules': RULES})
 
     def test_a_mob_without_a_field_names_its_file(self):
         broken = mob()
@@ -212,10 +285,10 @@ class CompactRejects(unittest.TestCase):
         self.assertIn('run-1.json: not a complete dump', str(caught.exception))
 
 
-def record(mob_id, zone, name, lo, hi, flags, respawn, detects, level_mod=0, placeholder_of=0, immunity=0):
+def record(mob_id, zone, name, lo, hi, flags, respawn, detects, level_mod=0, placeholder_of=0, immunity=0, drops=0):
     return mob_id, dict({'id': mob_id, 'zone': zone, 'name': name, 'minLevel': lo, 'maxLevel': hi, 'flags': flags,
                          'respawn': respawn, 'detects': detects, 'expLevelMod': level_mod, 'placeholderOf': placeholder_of},
-                        **dict(ZEROS_RECORD, immunity=immunity))
+                        **dict(ZEROS_RECORD, immunity=immunity, drops=drops))
 
 
 class Validate(unittest.TestCase):
@@ -286,9 +359,57 @@ class Validate(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = pathlib.Path(tmp) / 'mobs.tsv'
             path.write_text('id\tzone\tname\tminLevel\tmaxLevel\tflags\trespawn\tdetects\texpLevelMod\tplaceholderOf'
-                            '\timmunity\tsdt\telementRanks\tstatusRanks\n'
-                            '17191194\t101\tCarrion Worm\t4\t5\t0\t180\t2\t0\t17191196\t' + '\t'.join(ZERO_LISTS) + '\n')
+                            '\timmunity\tsdt\telementRanks\tstatusRanks\tdrops\n'
+                            '17191194\t101\tCarrion Worm\t4\t5\t0\t180\t2\t0\t17191196\t' + '\t'.join(ZERO_LISTS) +
+                            '\t0\n')
             self.assertEqual(validate.load(path), dict([record(17191194, 101, 'Carrion Worm', 4, 5, 0, 180, 2, 0, 17191196)]))
+
+
+def entry(kind, item, rate, group=0, group_rate=0, list_number=1):
+    return {'list': list_number, 'kind': kind, 'group': group, 'groupRate': group_rate, 'item': item, 'rate': rate}
+
+
+class ValidateDrops(unittest.TestCase):
+    BILLY = [entry('drop', validate.IRON_ORE, 240), entry('drop', validate.MYTHRIL_ORE, 240),
+             entry('drop', 1, 10), entry('steal', validate.GOLD_ORE, 0)]
+    BAT = [entry('drop', 922, 150, list_number=2)]
+    WORM = [entry('drop', 768, 150, list_number=3), entry('despoil', 640, 0, list_number=3),
+            entry('drop', 4495, 600, 1, 100, 3), entry('drop', 0, 400, 1, 100, 3)]
+    RECORDS = dict([record(17191196, 100, 'Bigmouth Billy', 9, 9, 8, 0, 2, drops=1),
+                    record(17211463, 106, 'Fledermaus', 3, 4, 0, 180, 2, drops=2),
+                    record(17191194, 101, 'Carrion Worm', 4, 5, 0, 180, 2, drops=3),
+                    record(17191195, 101, 'Carrion Worm', 4, 5, 0, 180, 2)])
+
+    def check(self, records, lists, **limits):
+        return validate.check_drops(records, lists, **dict(dict(min_looting=3, min_lists=3, min_of_a_kind=1), **limits))
+
+    def test_known_lists_pass(self):
+        self.assertEqual(self.check(self.RECORDS, [self.BILLY, self.BAT, self.WORM]), [])
+
+    def test_too_few_lists_or_kinds_fail(self):
+        self.assertEqual(self.check(self.RECORDS, [self.BILLY, self.BAT, self.WORM], min_looting=4, min_lists=4,
+                                    min_of_a_kind=2), [
+            'only 3 mobs with loot (expected at least 4)', 'only 3 drop lists (expected at least 4)',
+            'only 1 drop lists with steal entries (expected at least 2)',
+            'only 1 drop lists with despoil entries (expected at least 2)',
+            'only 1 drop lists with groups (expected at least 2)'])
+
+    def test_a_list_no_mob_has_fails(self):
+        self.assertEqual(self.check(self.RECORDS, [self.BILLY, self.BAT, self.WORM, self.BAT]),
+                         ['1 drop lists no mob has, the first 4'])
+
+    def test_bigmouth_billy_must_drop_ore_and_have_gold_to_steal(self):
+        self.assertEqual(self.check(self.RECORDS, [self.BILLY[:2], self.BAT, self.WORM]), [
+            'only 0 drop lists with steal entries (expected at least 1)',
+            f'17191196: its drop list has no [(\'steal\', 0, 0, {validate.GOLD_ORE}, 0)]'])
+        records = dict(self.RECORDS)
+        records.update([record(17191196, 100, 'Bigmouth Billy', 9, 9, 8, 0, 2)])
+        self.assertEqual(len(self.check(records, [self.BILLY, self.BAT, self.WORM], min_looting=0)), 2)  # + list 1 unused
+
+    def test_the_bats_fiend_blood_must_be_gone(self):
+        bat = self.BAT + [entry('drop', validate.FIEND_BLOOD, 10, list_number=2)]
+        self.assertEqual(self.check(self.RECORDS, [self.BILLY, bat, self.WORM]),
+                         [f'Fledermaus (zone 106): still drops one of [{validate.FIEND_BLOOD}], which a module removes'])
 
 
 class ValidateRules(unittest.TestCase):

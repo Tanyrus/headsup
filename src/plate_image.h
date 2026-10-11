@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <vector>
 
 namespace headsup
@@ -17,6 +18,26 @@ namespace headsup
         std::vector<uint8_t> alpha;
     };
 
+    constexpr uint8_t kInkCoverage = 64; // a quarter: the least a pixel of a glyph is covered to count as its ink
+
+    // The rows and columns of a coverage holding ink, right and bottom exclusive.
+    struct InkBox
+    {
+        int left = 0, top = 0, right = 0, bottom = 0;
+        bool Empty() const { return right <= left || bottom <= top; }
+    };
+    // The box around every pixel covered at least threshold; empty when there is none.
+    InkBox FindInk(const Coverage& coverage, uint8_t threshold);
+
+    // Where a font's ink sits in the line GDI draws it in, in rows from the line's top: the top of its tallest
+    // capitals and figures, its baseline, and the bottom of its descenders.
+    struct LineInk
+    {
+        float top = 0.0f, baseline = 0.0f, bottom = 0.0f;
+    };
+    // A line's ink from the ink of glyphs drawn in it and of an H: nothing when either drew none.
+    std::optional<LineInk> LineInkOf(const InkBox& glyphs, const InkBox& capital);
+
     // D3DCOLOR (ARGB), rows top to bottom, not premultiplied.
     struct Image
     {
@@ -27,6 +48,9 @@ namespace headsup
 
     // How far a blur of this CSS radius reaches past what it blurs: the margin it needs.
     int BlurMargin(float blur);
+
+    // A text's soft shadow: its blur radius per pixel of the text's height, from the mockup's 22 px name.
+    constexpr float kShadowPerHeight = 0.12f;
 
     constexpr int kNoMarkColumn = std::numeric_limits<int>::max();
 
@@ -55,8 +79,59 @@ namespace headsup
     // the ornament, in the lighter color with a dark shadow.
     Image Ornament(int width, int height, float shadowBlur, float shadowStrength, uint32_t color, uint32_t shadowColor);
 
+    // The bar's background as one column of pixels, stretched across the screen: a vertical gradient through top,
+    // middle (55% down) and bottom over height rows, whose last row is bottomLine; then one row of underLine (none when
+    // 0), then below fading to clear over belowRows rows.
+    Image StripColumn(int height, int belowRows, uint32_t top, uint32_t middle, uint32_t bottom, uint32_t bottomLine,
+        uint32_t underLine, uint32_t below);
+
+    struct BoxStyle
+    {
+        float radius     = 0.0f;
+        uint32_t top     = 0, bottom = 0; // the fill, top to bottom
+        uint32_t border  = 0;             // 1 px along the inside of the edge; 0 for none
+        uint32_t outer   = 0;             // a second 1 px border outerGap pixels outside the box; 0 for none
+        int outerGap     = 0;
+    };
+    // How far past the box its outer border reaches: its gap and its own pixel, or nothing without one.
+    int OuterPad(const BoxStyle& style);
+    // A rounded box width by height, antialiased. With an outer border the image is OuterPad larger on every side.
+    Image Box(int width, int height, const BoxStyle& style);
+    // A box to draw in three: past its corners every column of a row is alike, so it is its left columns, one middle
+    // column stretched across the rest, and its right columns. The image holds the middle column twice, so filtering
+    // between the two blends it with nothing else.
+    constexpr int kSliceMiddleColumns = 2;
+    struct SlicedBox
+    {
+        Image image;             // the left columns, the middle column twice, the right columns
+        int width = 0;           // Box's image's
+        int left = 0, right = 0; // columns; left is width and right 0 when the box has no middle and image is all of it
+    };
+    SlicedBox SliceBox(int width, int height, const BoxStyle& style);
+    // A part of a sliced box as drawn: width pixels from x in the box, the texture's columns from u0 to u1 stretched
+    // across them.
+    struct SliceSpan
+    {
+        int x = 0, width = 0;
+        float u0 = 0.0f, u1 = 0.0f;
+    };
+    // How a box whose image takes u of its texture's width is drawn: its whole image, or its left columns, its first
+    // middle column's center stretched across the middle, and its right columns.
+    std::vector<SliceSpan> SliceSpans(const SlicedBox& box, float u);
+    // A diamond size pixels tall and wide.
+    Image Diamond(int size, uint32_t color);
+    // Gil's coin: a disc size pixels across with a 1 px rim at 60% of its color's brightness.
+    Image Coin(int size, uint32_t color);
+    // A 1 px line width long, color at the left fading to clear at the right: an ornate popup's heading rule.
+    Image FadingRule(int width, uint32_t color);
+
+    // A size in whole pixels, at least one: what text and images are drawn at.
+    int WholePixels(float size);
     // A power of two, which every Direct3D 8 card accepts.
     int TextureSide(int pixels);
+    // Puts a width by height image of D3DCOLORs in the top-left corner of a sideX by sideY texture whose rows start
+    // pitch bytes apart, and clears the rest, so filtering at the image's edge blends with nothing.
+    void CopyToCorner(const void* image, int width, int height, void* rows, int pitch, int sideX, int sideY);
 
     // A point of a closed outline in the unit box, x to the right and y down.
     struct ShapePoint

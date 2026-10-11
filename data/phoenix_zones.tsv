@@ -1,0 +1,301 @@
+id	name	region	calendar
+0	unknown	255	0
+1	Phanauet Channel	2	1
+2	Carpenters' Landing	2	1
+3	Manaclipper	6	2
+4	Bibiki Bay	6	2
+5	Uleguerand Range	9	3
+6	Bearclaw Pinnacle	9	3
+7	Attohwa Chasm	7	4
+8	Boneyard Gully	7	4
+9	Pso'Xja	8	5
+10	The Shrouded Maw	8	5
+11	Oldton Movalpolos	17	6
+12	Newton Movalpolos	17	6
+13	Mine Shaft #2716	17	6
+14	Hall of Transference	25	0
+15	Abyssea - Konschtat	41	0
+16	Promyvion - Holla	25	0
+17	Spire of Holla	25	0
+18	Promyvion - Dem	25	0
+19	Spire of Dem	25	0
+20	Promyvion - Mea	25	0
+21	Spire of Mea	25	0
+22	Promyvion - Vahzl	25	0
+23	Spire of Vahzl	25	0
+24	Lufaise Meadows	18	7
+25	Misareaux Coast	18	7
+26	Tavnazian Safehold	24	8
+27	Phomiuna Aqueducts	18	1
+28	Sacrarium	18	7
+29	Riverne - Site #B01	18	9
+30	Riverne - Site #A01	18	9
+31	Monarch Linn	18	7
+32	Sealion's Den	18	7
+33	Al'Taieu	26	10
+34	Grand Palace of Hu'Xzoi	26	10
+35	The Garden of Ru'Hmet	26	10
+36	Empyreal Paradox	26	10
+37	Temenos	27	11
+38	Apollyon	27	12
+39	Dynamis - Valkurm	23	12
+40	Dynamis - Buburimu	23	12
+41	Dynamis - Qufim	23	12
+42	Dynamis - Tavnazia	23	12
+43	Diorama Abdhaljs-Ghelsba	43	0
+44	Abdhaljs Isle-Purgonorgo	43	0
+45	Abyssea - Tahrongi	41	0
+46	Open sea route to Al Zahbi	255	13
+47	Open sea route to Mhaura	255	13
+48	Al Zahbi	28	14
+49	none	255	0
+50	Aht Urhgan Whitegate	28	14
+51	Wajaom Woodlands	29	15
+52	Bhaflau Thickets	28	15
+53	Nashmau	31	14
+54	Arrapago Reef	31	16
+55	Ilrusi Atoll	31	16
+56	Periqia	31	17
+57	Talacca Cove	31	16
+58	Silver Sea route to Nashmau	255	18
+59	Silver Sea route to Al Zahbi	255	18
+60	The Ashu Talif	31	12
+61	Mount Zhayolm	30	19
+62	Halvung	30	19
+63	Lebros Cavern	30	19
+64	Navukgo Execution Chamber	30	19
+65	Mamook	29	15
+66	Mamool Ja Training Grounds	29	15
+67	Jade Sepulcher	29	15
+68	Aydeewa Subterrane	29	15
+69	Leujaoam Sanctum	31	17
+70	Chocobo Circuit	255	0
+71	The Colosseum	28	14
+72	Alzadaal Undersea Ruins	32	20
+73	Zhayolm Remnants	32	0
+74	Arrapago Remnants	32	0
+75	Bhaflau Remnants	32	0
+76	Silver Sea Remnants	32	0
+77	Nyzul Isle	32	21
+78	Hazhalm Testing Grounds	31	12
+79	Caedarva Mire	31	17
+80	Southern San d'Oria [S]	33	22
+81	East Ronfaure [S]	33	22
+82	Jugner Forest [S]	34	23
+83	Vunkerl Inlet [S]	36	23
+84	Batallia Downs [S]	34	24
+85	La Vaule [S]	34	25
+86	Everbloom Hollow	34	22
+87	Bastok Markets [S]	35	26
+88	North Gustaberg [S]	35	26
+89	Grauberg [S]	35	27
+90	Pashhow Marshlands [S]	36	28
+91	Rolanberry Fields [S]	36	29
+92	Beadeaux [S]	36	28
+93	Ruhotz Silvermines	35	26
+94	Windurst Waters [S]	37	30
+95	West Sarutabaruta [S]	37	30
+96	Fort Karugo-Narugo [S]	37	31
+97	Meriphataud Mountains [S]	38	32
+98	Sauromugue Champaign [S]	38	33
+99	Castle Oztroja [S]	38	32
+100	West Ronfaure	0	8
+101	East Ronfaure	0	8
+102	La Theine Plateau	1	34
+103	Valkurm Dunes	1	35
+104	Jugner Forest	2	1
+105	Batallia Downs	2	36
+106	North Gustaberg	3	37
+107	South Gustaberg	3	37
+108	Konschtat Highlands	1	6
+109	Pashhow Marshlands	4	38
+110	Rolanberry Fields	4	39
+111	Beaucedine Glacier	8	5
+112	Xarcabard	9	40
+113	Cape Teriggan	13	41
+114	Eastern Altepa Desert	12	42
+115	West Sarutabaruta	5	43
+116	East Sarutabaruta	5	43
+117	Tahrongi Canyon	6	4
+118	Buburimu Peninsula	6	44
+119	Meriphataud Mountains	7	45
+120	Sauromugue Champaign	7	46
+121	The Sanctuary of Zi'Tah	11	47
+122	Ro'Maeve	11	47
+123	Yuhtunga Jungle	14	48
+124	Yhoator Jungle	15	48
+125	Western Altepa Desert	12	42
+126	Qufim Island	10	49
+127	Behemoth's Dominion	10	49
+128	Valley of Sorrows	13	41
+129	Ghoyu's Reverie	37	30
+130	Ru'Aun Gardens	16	50
+131	Mordion Gaol	255	0
+132	Abyssea - La Theine	41	0
+133	Outer Ra'Kaznar [U2]	255	0
+134	Dynamis - Beaucedine	23	12
+135	Dynamis - Xarcabard	23	12
+136	Beaucedine Glacier [S]	39	5
+137	Xarcabard [S]	40	40
+138	Castle Zvahl Baileys [S]	40	51
+139	Horlais Peak	0	8
+140	Ghelsba Outpost	0	8
+141	Fort Ghelsba	0	8
+142	Yughott Grotto	0	8
+143	Palborough Mines	3	37
+144	Waughroon Shrine	3	37
+145	Giddeus	5	43
+146	Balga's Dais	5	43
+147	Beadeaux	4	38
+148	Qulun Dome	4	38
+149	Davoi	2	1
+150	Monastic Cavern	2	1
+151	Castle Oztroja	7	45
+152	Altar Room	7	45
+153	The Boyahda Tree	11	47
+154	Dragon's Aery	11	47
+155	Castle Zvahl Keep [S]	40	51
+156	Throne Room [S]	40	12
+157	Middle Delkfutt's Tower	10	49
+158	Upper Delkfutt's Tower	10	49
+159	Temple of Uggalepih	15	48
+160	Den of Rancor	15	48
+161	Castle Zvahl Baileys	9	51
+162	Castle Zvahl Keep	9	51
+163	Sacrificial Chamber	15	48
+164	Garlaige Citadel [S]	38	33
+165	Throne Room	9	51
+166	Ranguemont Pass	8	52
+167	Bostaunieux Oubliette	0	8
+168	Chamber of Oracles	12	42
+169	Toraimarai Canal	5	43
+170	Full Moon Fountain	5	43
+171	Crawlers' Nest [S]	36	29
+172	Zeruhn Mines	3	37
+173	Korroloka Tunnel	3	53
+174	Kuftal Tunnel	13	41
+175	The Eldieme Necropolis [S]	34	24
+176	Sea Serpent Grotto	14	47
+177	Ve'Lugannon Palace	16	50
+178	The Shrine of Ru'Avitau	16	50
+179	Stellar Fulcrum	10	49
+180	La'Loff Amphitheater	16	50
+181	The Celestial Nexus	16	50
+182	Walk of Echoes	42	12
+183	Maquette Abdhaljs-Legion A	43	0
+184	Lower Delkfutt's Tower	10	49
+185	Dynamis - San d'Oria	23	12
+186	Dynamis - Bastok	23	12
+187	Dynamis - Windurst	23	12
+188	Dynamis - Jeuno	23	12
+189	Outer Ra'Kaznar [U3]	255	0
+190	King Ranperre's Tomb	0	8
+191	Dangruf Wadi	3	37
+192	Inner Horutoto Ruins	5	43
+193	Ordelle's Caves	1	34
+194	Outer Horutoto Ruins	5	43
+195	The Eldieme Necropolis	2	36
+196	Gusgen Mines	1	6
+197	Crawlers' Nest	4	39
+198	Maze of Shakhrami	6	4
+199	Residential Area 199	255	0
+200	Garlaige Citadel	7	46
+201	Cloister of Gales	13	54
+202	Cloister of Storms	11	55
+203	Cloister of Frost	8	56
+204	Fei'Yin	8	5
+205	Ifrit's Cauldron	15	48
+206	Qu'Bia Arena	8	5
+207	Cloister of Flames	15	57
+208	Quicksand Caves	12	42
+209	Cloister of Tremors	12	58
+210	GM Home	255	0
+211	Cloister of Tides	15	20
+212	Gustav Tunnel	13	41
+213	Labyrinth of Onzozo	6	44
+214	Residential Area 214	255	0
+215	Abyssea - Attohwa	41	0
+216	Abyssea - Misareaux	41	0
+217	Abyssea - Vunkerl	41	0
+218	Abyssea - Altepa	41	0
+219	Residential Area 219	255	0
+220	Ship bound for Selbina	255	53
+221	Ship bound for Mhaura	255	53
+222	Provenance	255	0
+223	San d'Oria-Jeuno Airship	255	0
+224	Bastok-Jeuno Airship	255	0
+225	Windurst-Jeuno Airship	255	0
+226	Kazham-Jeuno Airship	255	0
+227	Ship bound for Selbina	255	53
+228	Ship bound for Mhaura	255	53
+229	Throne Room [V]	255	0
+230	Southern San d'Oria	19	8
+231	Northern San d'Oria	19	8
+232	Port San d'Oria	19	8
+233	Chateau d'Oraguille	19	8
+234	Bastok Mines	20	37
+235	Bastok Markets	20	37
+236	Port Bastok	20	37
+237	Metalworks	20	37
+238	Windurst Waters	21	43
+239	Windurst Walls	21	43
+240	Port Windurst	21	43
+241	Windurst Woods	21	43
+242	Heavens Tower	21	43
+243	Ru'Lude Gardens	22	59
+244	Upper Jeuno	22	59
+245	Lower Jeuno	22	59
+246	Port Jeuno	22	59
+247	Rabao	12	42
+248	Selbina	1	30
+249	Mhaura	6	30
+250	Kazham	14	30
+251	Hall of the Gods	11	0
+252	Norg	14	53
+253	Abyssea - Uleguerand	41	0
+254	Abyssea - Grauberg	41	0
+255	Abyssea - Empyreal Paradox	41	0
+256	Western Adoulin	44	0
+257	Eastern Adoulin	44	0
+258	Rala Waterways	44	0
+259	Rala Waterways U	44	0
+260	Yahse Hunting Grounds	45	0
+261	Ceizak Battlegrounds	45	0
+262	Foret de Hennetiel	45	0
+263	Yorcia Weald	255	0
+264	Yorcia Weald U	255	0
+265	Morimar Basalt Fields	45	0
+266	Marjami Ravine	255	0
+267	Kamihr Drifts	255	0
+268	Sih Gates	45	0
+269	Moh Gates	45	0
+270	Cirdas Caverns	45	0
+271	Cirdas Caverns U	45	0
+272	Dho Gates	255	0
+273	Woh Gates	255	0
+274	Outer Ra'Kaznar	255	0
+275	Outer Ra'Kaznar [U1]	255	0
+276	Ra'Kaznar Inner Court	255	0
+277	Ra'Kaznar Turris	255	0
+278	Gwora-Corridor	255	0
+279	Walk of Echoes [P2]	255	0
+280	Mog Garden	255	0
+281	Leafallia	255	0
+282	Mount Kamihr	255	0
+283	Silver Knife	255	0
+284	Celennia Memorial Library	255	0
+285	Feretory	255	0
+286	286	255	0
+287	Maquette Abdhaljs-Legion B	43	0
+288	Escha - Zi'Tah	255	0
+289	Escha - Ru'Aun	255	0
+290	Desuetia Empyreal Paradox	255	0
+291	Reisenjima	255	0
+292	Reisenjima Henge	255	0
+293	Reisenjima Sanctorium	255	0
+294	Dynamis - San d'Oria [D]	255	12
+295	Dynamis - Bastok [D]	255	12
+296	Dynamis - Windurst [D]	255	12
+297	Dynamis - Jeuno [D]	255	12
+298	Walk of Echoes [P1]	255	12
+299	Gwora-Throne Room	255	0

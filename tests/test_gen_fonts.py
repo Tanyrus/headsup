@@ -17,9 +17,18 @@ class Generate(unittest.TestCase):
         self.assertIn('const unsigned char kFontCormorantSC[] = {', text)
         self.assertIn('const unsigned char kFontBarlowCondensed[] = {', text)
         table = text[text.index('const BundledFont kBundledFonts[]'):]
-        self.assertLess(table.index('"Marcellus SC"'), table.index('"Cinzel"'))
-        self.assertLess(table.index('"Cinzel"'), table.index('"Cormorant SC"'))
-        self.assertLess(table.index('"Cormorant SC"'), table.index('"Barlow Condensed"'))
+        self.assertLess(table.index('{kMarcellusSC, kFontMarcellusSC, '), table.index('{kCinzel, kFontCinzel, '))
+        self.assertLess(table.index('{kCinzel, '), table.index('{kCormorantSC, kFontCormorantSC, '))
+        self.assertLess(table.index('{kCormorantSC, '), table.index('{kBarlowCondensed, kFontBarlowCondensed, '))
+
+    def test_each_family_is_named_once_for_the_code_that_asks_gdi_for_it(self):
+        families = gen_fonts.generate_families()
+        self.assertIn('namespace headsup\n{\n', families)
+        self.assertIn('    constexpr const char* kMarcellusSC = "Marcellus SC";\n', families)
+        self.assertIn('    constexpr const char* kCinzel = "Cinzel";\n', families)
+        self.assertIn('    constexpr const char* kCormorantSC = "Cormorant SC";\n', families)
+        self.assertIn('    constexpr const char* kBarlowCondensed = "Barlow Condensed";\n', families)
+        self.assertNotIn('"Marcellus SC"', gen_fonts.generate(self.fonts))
 
     def test_the_embedded_bytes_are_the_font_file(self):
         text = gen_fonts.generate(self.fonts)

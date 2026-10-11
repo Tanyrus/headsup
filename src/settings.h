@@ -1,9 +1,17 @@
 #pragma once
 
 #include "argb.h"
+#include "bar_placement.h"
+#include "bar_server_time.h"
+#include "bar_types.h"
+#include "currencies.h"
+#include "fonts.h"
 #include "labels.h"
+#include "menu_fonts.h"
+#include "native_locate.h"
 #include "player_status.h"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -55,9 +63,20 @@ namespace headsup
     constexpr int kMinShadowStrength = 0, kMaxShadowStrength = 200;  // percent of the mockup's shadow
     constexpr int kMinOrnamentWidth = 20, kMaxOrnamentWidth = 300;   // pixels
     constexpr int kMinOrnamentThickness = 3, kMaxOrnamentThickness = 24; // pixels
-    constexpr const char* kDefaultFont = "Marcellus SC";
-    constexpr const char* kBadgeFont   = "Barlow Condensed"; // bundled: plain enough to read a few pixels tall
+    constexpr const char* kDefaultFont = kMarcellusSC;
+    constexpr const char* kBadgeFont   = kBarlowCondensed; // plain enough to read a few pixels tall
     constexpr size_t kMaxFontName      = 31; // a Windows font name's longest, without its terminator
+
+    constexpr std::array<bool, kBarWidgetCount> AllOn()
+    {
+        std::array<bool, kBarWidgetCount> on{};
+        on.fill(true);
+        return on;
+    }
+
+    constexpr int kMinMenuScale = 70, kMaxMenuScale = 160; // percent
+
+    constexpr int kMaxHelpBarOffset = 4000; // pixels either way
 
     struct Settings
     {
@@ -68,9 +87,9 @@ namespace headsup
         bool showLabels    = true;  // level and con above every mob's name
         bool replaceMobNames   = true;
         bool showIcons         = true;  // the MobDB icon row
-        bool showDamageIcons     = true;  // the badge group: weaknesses and resistances to damage types and elements
-        bool showStatusRankIcons = true;  // statuses weak or resisted by rank, by statusBadges
-        bool showImmunityIcons   = true;
+        bool showDamageIcons     = false; // the badge group, off since the top bar's popup shows the same: weaknesses
+        bool showStatusRankIcons = false; // and resistances to damage types and elements; statuses by statusBadges
+        bool showImmunityIcons   = false;
         // Each group's side of the plate's center; a side both share has the detection icons nearest the center.
         IconSide detectionIconSide = IconSide::Left;
         IconSide badgeSide         = IconSide::Right;
@@ -81,6 +100,40 @@ namespace headsup
         StatusBadgeRule statusBadges[kStatusRankCount] = {}; // by StatusRank
         bool showRanks = false; // rank badges as ranks rather than the wikis' percents
         std::string badgeFontName = kBadgeFont;
+        bool showBar       = true;
+        BarTheme barTheme  = BarTheme::PhoenixGold;
+        BarSeparators barSeparators = BarSeparators::Theme;
+        int barHeight      = 45; // pixels: the least at which titles are 13 px over 11 px detail lines
+        int barTextSize    = kAutoBarTextSize; // the bar's title size, or Auto
+        std::string barTitleFont; // widget titles and popup headings; empty for the theme's
+        std::string barTextFont;  // details, figures and popup text; empty for the theme's
+        int popupTextSize  = kAutoPopupTextSize; // the popups' text size, or Auto
+        std::array<bool, kBarWidgetCount> barWidgets = kBarWidgetDefaults; // by BarWidget
+        int barCurrency = kGilCurrency; // the Gil widget's, by kCurrencyTable
+        ClockZone serverClockZone = ClockZone::Japan; // the Server time widget's clock
+        std::vector<WindowOffset> windowOffsets; // each game window's move from where the game puts it
+        std::vector<WindowGroup> windowGroups;   // windows moved together
+        bool allUnderBar  = false; // every game window opening in the screen's upper half goes under the bar
+        bool moveGameHelp = false; // the game's own help bar goes under the top bar, and the windows under it
+        int helpBarX = 0, helpBarY = 0;          // back-buffer pixels from the help bar's place under the top bar
+        bool helpBarBackground = true;           // off, the help text alone
+        std::string menuFont = kDefaultMenuFont; // the settings window's text, by its kMenuFonts name
+        int menuScale        = 100;              // percent: the settings window's text and everything sized by it
+        bool barTargetDetails = false; // a mob's icons after its name and its weaknesses after its level
+        std::array<bool, kBarWidgetCount> barSecondLine = AllOn(); // by BarWidget: its second line
+        std::array<bool, kBarWidgetCount> barIcons      = AllOn(); // by BarWidget: its icons and gil's coin
+        ExpBarPlace expBar = ExpBarPlace::Under;
+        SubtitlePlace barSubtitle = SubtitlePlace::After; // a widget's second line on a bar too short for two
+        bool jobNames      = true;
+        bool clock24       = true; // the Clock and Server time widgets
+        bool clockSeconds  = false; // the Clock widget's seconds
+        bool serverSeconds = false; // and Server time's
+        bool barLatency    = false; // the Connection widget's round trip after its rates
+        BarPlacement barSections = DefaultPlacement(); // where each widget sits, by BarSection
+        bool hideHelpBar = false; // skip the game's own help bar across the top of the screen
+        bool hideNetstat = false; // and its connection readout (S, R and %) at the top right
+        // The game's windows moved out from under Game help's bar, by short name (native_locate.h's ShortName).
+        std::vector<std::string> movedWindows = DefaultMovedWindows();
         bool hideClaimedByParty = false; // no level line or icons on a mob claimed by you or your party
         bool hideClaimed       = false; // nor on one anyone has claimed
         bool hideTooWeak       = false; // nor on one that cons Too Weak
@@ -165,6 +218,18 @@ namespace headsup
     };
 
     bool NameplatesOn(const Settings& s);
+    // How game windows move: HeadsUp's way, every window under the bar in the groups the game opens them in, or the
+    // game's, where it puts them. Each clears the windows' own offsets.
+    void UseHeadsUpWindowDefaults(Settings& s);
+    void UseGameWindowDefaults(Settings& s);
+    // HeadsUp's help text in place of the game's help bar, which is hidden, and every window under it as the HeadsUp
+    // defaults have them.
+    void UseHelpTextDefaults(Settings& s);
+    bool BarOn(const Settings& s);
+    // IPlayer::GetLoginStatus() once the character is in the world; 0 and 1 are the title screen and character select.
+    inline constexpr uint8_t kLoginInGame = 2;
+    // The bar's settings are on and the character is in game.
+    bool BarRuns(const Settings& s, uint8_t loginStatus);
     bool ReplacesAnyName(const Settings& s);
 
     // The fonts to offer: the installed families (as GDI lists them, once per character set and with vertical variants
