@@ -25,11 +25,14 @@ namespace headsup
         float x, y, z;
     };
     WorldPoint FromEntityPosition(float x, float y, float z);
+    // Yalms between two points.
+    float Distance(const WorldPoint& a, const WorldPoint& b);
 
     struct Camera
     {
         float viewProjection[4][4];
         float screenHeight;
+        WorldPoint eye; // where the camera is
     };
     Camera MakeCamera(const float view[16], const float projection[16], float screenHeight);
 

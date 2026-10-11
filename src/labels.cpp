@@ -25,6 +25,10 @@ namespace headsup
                 if (marked) return kPlaceholderMark;
                 std::snprintf(text, sizeof(text), "[%03X]", static_cast<unsigned>(serverId & kTargetIndexBits));
                 return text;
+            case MobIdFormat::Decimal:
+                std::snprintf(text, sizeof(text), "[%u]%s%s", static_cast<unsigned>(serverId), marked ? kLabelSeparator : "",
+                    marked ? kPlaceholderMark : "");
+                return text;
             case MobIdFormat::Full:
                 std::snprintf(text, sizeof(text), "[%u (0x%X)]%s%s", static_cast<unsigned>(serverId), static_cast<unsigned>(serverId),
                     marked ? kLabelSeparator : "", marked ? kPlaceholderMark : "");

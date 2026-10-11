@@ -19,8 +19,12 @@ SDK = ROOT / 'third_party' / 'ashita-sdk'
 SOURCE = ROOT / 'src'
 CALLED_INTERFACES = ['IAshitaCore', 'IMemoryManager', 'IEntity', 'IParty', 'IPlayer', 'IChatManager',
                      'IConfigurationManager', 'IGuiManager', 'ITarget', 'IProperties',
-                     'IInputManager', 'IMouse']
+                     'IInputManager', 'IMouse', 'IInventory',
+                     'IPacketManager', 'IResourceManager']
 NOT_CALLED = {'ILogManager'}  # handed to the plugin, never called
+# Calls are matched by name alone: these share a name with a call on another interface and are never made on this one.
+# The plugin's ->GetString calls are IConfigurationManager's; it reads only GetItemById from IResourceManager.
+NAME_ONLY_ELSEWHERE = {('IResourceManager', 'GetString')}
 INTERFACE = re.compile(r'^(?:struct|interface)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{(.*?)^\};', re.M | re.S)
 DECL = re.compile(r'virtual\s+[^;]*?\b([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)\s*(?:const)?\s*=\s*0\s*;')
 CALL = re.compile(r'->\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(')
@@ -127,6 +131,8 @@ def main() -> int:
         for name in returns.get(iface, ()):
             bad.setdefault(name, 'returns a struct by value')
         for call in sorted(calls & {n for n, _ in found[iface]}):
+            if (iface, call) in NAME_ONLY_ELSEWHERE:
+                continue
             checked += 1
             if call in bad:
                 problems.append(f'{iface}::{call} ({bad[call]})')

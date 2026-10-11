@@ -39,7 +39,8 @@ namespace headsup
     {
         Off,
         LastThree, // the target index, as players name placeholders: "[006]"
-        Full,
+        Decimal,   // the whole ID in decimal, as databases list it: "[17190918]"
+        Full,      // the whole ID in decimal and hex
     };
     constexpr int kMobIdFormatCount = static_cast<int>(MobIdFormat::Full) + 1;
 

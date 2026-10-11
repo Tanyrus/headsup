@@ -1,6 +1,9 @@
 #include "icons.h"
 #include "test.h"
 
+#include <algorithm>
+#include <iterator>
+#include <string>
 #include <vector>
 
 using namespace headsup;
@@ -9,7 +12,7 @@ namespace
 {
     MobRecord Mob(uint8_t flags, uint16_t detects)
     {
-        return MobRecord{17199648, "Goblin Bounty Hunter", 17, 20, flags, 300, detects, 0, 0};
+        return MobRecord{17199648, "Goblin Bounty Hunter", 17, 20, flags, 300, detects, 0, 0, 0, 0};
     }
 
     std::vector<Icon> List(const IconSet& set)
@@ -64,6 +67,23 @@ TEST(true_detection_replaces_sight)
     CHECK(List(IconsFor(&sound)) == (std::vector<Icon>{Icon::PassiveNQ, Icon::TrueSight, Icon::Sound}));
 }
 
+TEST(every_icon_a_mobs_row_can_hold_has_a_popup_tag)
+{
+    const uint16_t detections[] = {
+        kDetectSight, kDetectHearing, kDetectLowHp, kDetectMagic, kDetectAbility, kDetectScent};
+    for (int flags = 0; flags < 256; ++flags)
+        for (int subset = 0; subset < 1 << std::size(detections); ++subset)
+        {
+            uint16_t detects = 0;
+            for (size_t bit = 0; bit < std::size(detections); ++bit)
+                if (subset & (1 << bit)) detects |= detections[bit];
+            const MobRecord mob = Mob(static_cast<uint8_t>(flags), detects);
+            const IconSet icons = IconsFor(&mob);
+            for (int i = 0; i < icons.count; ++i)
+                CHECK(std::string(IconTag(icons.icons[i])) != "");
+        }
+}
+
 TEST(every_icon_fills_a_square_so_all_show_the_same_size)
 {
     // gen_icons.py cuts each image to its visible pixels: XIUI's player icons carry margins of 3 to 8 px of their 64.
@@ -83,4 +103,270 @@ TEST(every_icon_fills_a_square_so_all_show_the_same_size)
         }
         CHECK((left && right) || (top && bottom));
     }
+}
+
+namespace
+{
+    MobResistances Neutral() { return MobResistances{}; }
+
+    // Only the clearest weaknesses and resistances, so each test sees just what it sets up. Statuses keep their defaults:
+    // no weaknesses, resistances from rank 4.
+    constexpr BadgeRules kStrict{.elementWeakRank = -3, .elementResistRank = 4};
+
+    BadgeRules Statuses(int weakRank, int resistRank)
+    {
+        BadgeRules rules = kStrict;
+        for (StatusBadgeRule& status : rules.status)
+            status = StatusBadgeRule{true, weakRank, resistRank};
+        return rules;
+    }
+
+    std::vector<InfoIcon> Info(const MobResistances& r, const BadgeRules& rules = kStrict)
+    {
+        const InfoIconSet set = InfoIconsFor(&r, rules);
+        return std::vector<InfoIcon>(set.icons, set.icons + set.count);
+    }
+
+    BadgeRules Without(bool BadgeRules::*part)
+    {
+        BadgeRules rules = kStrict;
+        rules.*part      = false;
+        return rules;
+    }
+
+    int16_t& SdtOf(MobResistances& r, Sdt type) { return r.sdt[static_cast<int>(type)]; }
+    int8_t& ElementRankOf(MobResistances& r, Element e) { return r.elementRanks[static_cast<int>(e)]; }
+    int8_t& RankOf(MobResistances& r, StatusRank s) { return r.statusRanks[static_cast<int>(s)]; }
+}
+
+TEST(no_data_or_neutral_data_shows_no_badges)
+{
+    CHECK_EQ(InfoIconsFor(nullptr, BadgeRules{}).count, 0);
+    CHECK(Info(Neutral()).empty());
+    BadgeRules all        = Statuses(-1, 1);
+    all.elementWeakRank   = -1;
+    all.elementResistRank = 1;
+    CHECK(Info(Neutral(), all).empty()); // rank 0 is neutral
+}
+
+TEST(damage_weaknesses_come_first_largest_first_then_resistances_strongest_first)
+{
+    MobResistances r = Neutral();
+    SdtOf(r, Sdt::Piercing) = 2500;
+    SdtOf(r, Sdt::Impact)   = 5000;
+    SdtOf(r, Sdt::Slashing) = -2500;
+    SdtOf(r, Sdt::H2H)      = -10000;
+    SdtOf(r, Sdt::Fire)     = 49; // rounds to 0%: nothing
+    CHECK(Info(r) == (std::vector<InfoIcon>{{Icon::Impact, BadgeKind::Weak, 50}, {Icon::Piercing, BadgeKind::Weak, 25},
+                         {Icon::H2H, BadgeKind::Resist, 100}, {Icon::Slashing, BadgeKind::Resist, 25}}));
+}
+
+TEST(elements_show_by_rank_when_weak_or_resisted)
+{
+    MobResistances r = Neutral();
+    for (int8_t& rank : r.elementRanks)
+        rank = -2; // the common rank: nothing
+    ElementRankOf(r, Element::Light) = -3;
+    ElementRankOf(r, Element::Fire)  = -3;
+    ElementRankOf(r, Element::Dark)  = 6;
+    ElementRankOf(r, Element::Ice)   = 11;
+    ElementRankOf(r, Element::Water) = 3;
+    SdtOf(r, Sdt::Slashing)          = -2500;
+    CHECK(Info(r) == (std::vector<InfoIcon>{{Icon::Fire, BadgeKind::WeakRank, -3}, {Icon::Light, BadgeKind::WeakRank, -3},
+                         {Icon::Slashing, BadgeKind::Resist, 25}, {Icon::Ice, BadgeKind::ResistRank, 11},
+                         {Icon::Dark, BadgeKind::ResistRank, 6}}));
+}
+
+TEST(by_default_every_element_weakness_shows_weakest_first)
+{
+    MobResistances r = Neutral();
+    const int8_t vulture[kElementCount] = {-2, -3, 0, 0, -2, -2, -2, -2}; // fire, ice, wind, earth, lightning, water, light, dark
+    std::copy(std::begin(vulture), std::end(vulture), r.elementRanks);
+    ElementRankOf(r, Element::Dark) = 4;
+    CHECK(Info(r, BadgeRules{}) == (std::vector<InfoIcon>{{Icon::Ice, BadgeKind::WeakRank, -3}, {Icon::Fire, BadgeKind::WeakRank, -2},
+                                      {Icon::Lightning, BadgeKind::WeakRank, -2}, {Icon::Water, BadgeKind::WeakRank, -2},
+                                      {Icon::Light, BadgeKind::WeakRank, -2}, {Icon::Dark, BadgeKind::ResistRank, 4}}));
+}
+
+TEST(the_element_cutoffs_choose_how_weak_or_resistant_shows)
+{
+    MobResistances r                = Neutral();
+    ElementRankOf(r, Element::Fire) = -1;
+    ElementRankOf(r, Element::Ice)  = 1;
+    ElementRankOf(r, Element::Wind) = 3;
+    CHECK(Info(r, {.elementWeakRank = -1, .elementResistRank = 1}) ==
+          (std::vector<InfoIcon>{{Icon::Fire, BadgeKind::WeakRank, -1}, {Icon::Wind, BadgeKind::ResistRank, 3},
+              {Icon::Ice, BadgeKind::ResistRank, 1}}));
+    CHECK(Info(r, {.elementWeakRank = -2, .elementResistRank = 3}) == (std::vector<InfoIcon>{{Icon::Wind, BadgeKind::ResistRank, 3}}));
+}
+
+TEST(an_elements_sdt_wins_over_its_rank)
+{
+    MobResistances r = Neutral();
+    SdtOf(r, Sdt::Fire)             = 2500;
+    ElementRankOf(r, Element::Fire) = 6;
+    CHECK(Info(r) == (std::vector<InfoIcon>{{Icon::Fire, BadgeKind::Weak, 25}}));
+}
+
+TEST(status_ranks_from_4_up_highest_first_and_none_for_an_immunity)
+{
+    MobResistances r = Neutral();
+    RankOf(r, StatusRank::Paralyze) = 4;
+    RankOf(r, StatusRank::Gravity)  = 9;
+    RankOf(r, StatusRank::Bind)     = 3; // below 4: nothing
+    RankOf(r, StatusRank::Silence)  = 11;
+    r.immunity                      = kImmuneSilence;
+    CHECK(Info(r) == (std::vector<InfoIcon>{{Icon::Gravity, BadgeKind::StatusRank, 9}, {Icon::Paralyze, BadgeKind::StatusRank, 4},
+                         {Icon::Silence, BadgeKind::Immune, 0}}));
+}
+
+TEST(light_and_dark_sleep_merge_into_one_sleep_when_they_agree)
+{
+    MobResistances r = Neutral();
+    RankOf(r, StatusRank::LightSleep) = 6;
+    RankOf(r, StatusRank::DarkSleep)  = 6;
+    CHECK(Info(r) == (std::vector<InfoIcon>{{Icon::Sleep, BadgeKind::StatusRank, 6}}));
+    RankOf(r, StatusRank::DarkSleep) = 5;
+    CHECK(Info(r) == (std::vector<InfoIcon>{{Icon::LightSleep, BadgeKind::StatusRank, 6}, {Icon::DarkSleep, BadgeKind::StatusRank, 5}}));
+    RankOf(r, StatusRank::DarkSleep) = 6;
+    r.immunity                       = kImmuneLightSleep; // immune to one: the other keeps its own rank
+    CHECK(Info(r) == (std::vector<InfoIcon>{{Icon::DarkSleep, BadgeKind::StatusRank, 6}, {Icon::LightSleep, BadgeKind::Immune, 0}}));
+    r.immunity = kImmuneLightSleep | kImmuneDarkSleep;
+    CHECK(Info(r) == (std::vector<InfoIcon>{{Icon::Sleep, BadgeKind::Immune, 0}}));
+}
+
+TEST(status_weaknesses_show_when_turned_on_weakest_first_before_the_resistances)
+{
+    MobResistances r                = Neutral();
+    RankOf(r, StatusRank::Paralyze) = -3;
+    RankOf(r, StatusRank::Bind)     = -3;
+    RankOf(r, StatusRank::Poison)   = -2;
+    RankOf(r, StatusRank::Blind)    = -1;
+    RankOf(r, StatusRank::Gravity)  = 6;
+    RankOf(r, StatusRank::Silence)  = -3;
+    r.immunity                      = kImmuneSilence; // immune: no rank
+    CHECK(Info(r) == (std::vector<InfoIcon>{{Icon::Gravity, BadgeKind::StatusRank, 6}, {Icon::Silence, BadgeKind::Immune, 0}}));
+    CHECK(Info(r, Statuses(-2, 4)) ==
+          (std::vector<InfoIcon>{{Icon::Paralyze, BadgeKind::StatusWeak, -3}, {Icon::Bind, BadgeKind::StatusWeak, -3},
+              {Icon::Poison, BadgeKind::StatusWeak, -2}, {Icon::Gravity, BadgeKind::StatusRank, 6}, {Icon::Silence, BadgeKind::Immune, 0}}));
+    CHECK(Info(r, Statuses(-3, 7)) ==
+          (std::vector<InfoIcon>{{Icon::Paralyze, BadgeKind::StatusWeak, -3}, {Icon::Bind, BadgeKind::StatusWeak, -3},
+              {Icon::Silence, BadgeKind::Immune, 0}}));
+}
+
+TEST(sleeps_that_agree_on_a_weakness_merge_too)
+{
+    MobResistances r                  = Neutral();
+    RankOf(r, StatusRank::LightSleep) = -2;
+    RankOf(r, StatusRank::DarkSleep)  = -2;
+    CHECK(Info(r, Statuses(-1, 4)) == (std::vector<InfoIcon>{{Icon::Sleep, BadgeKind::StatusWeak, -2}}));
+    BadgeRules rules = Statuses(-1, 4);
+    rules.status[static_cast<int>(StatusRank::DarkSleep)].weakRank = -3; // dark sleep's cutoff leaves only light sleep
+    CHECK(Info(r, rules) == (std::vector<InfoIcon>{{Icon::LightSleep, BadgeKind::StatusWeak, -2}}));
+}
+
+TEST(each_status_has_its_own_switch_and_cutoffs)
+{
+    MobResistances r                = Neutral();
+    RankOf(r, StatusRank::Paralyze) = 5;
+    RankOf(r, StatusRank::Bind)     = 5;
+    RankOf(r, StatusRank::Silence)  = -2;
+    RankOf(r, StatusRank::Stun)     = 5;
+    BadgeRules rules                                            = kStrict;
+    rules.status[static_cast<int>(StatusRank::Bind)].show       = false;
+    rules.status[static_cast<int>(StatusRank::Silence)].weakRank = -2;
+    rules.status[static_cast<int>(StatusRank::Stun)].resistRank = 6;
+    CHECK(Info(r, rules) == (std::vector<InfoIcon>{{Icon::Silence, BadgeKind::StatusWeak, -2}, {Icon::Paralyze, BadgeKind::StatusRank, 5}}));
+}
+
+TEST(either_cutoff_can_be_off)
+{
+    MobResistances r                = Neutral();
+    ElementRankOf(r, Element::Fire) = -3;
+    ElementRankOf(r, Element::Ice)  = 11;
+    CHECK(Info(r, {.elementWeakRank = kNoWeakRank}) == (std::vector<InfoIcon>{{Icon::Ice, BadgeKind::ResistRank, 11}}));
+    CHECK(Info(r, {.elementResistRank = kNoResistRank}) == (std::vector<InfoIcon>{{Icon::Fire, BadgeKind::WeakRank, -3}}));
+    MobResistances s                = Neutral();
+    RankOf(s, StatusRank::Paralyze) = 11;
+    RankOf(s, StatusRank::Bind)     = -3;
+    CHECK(Info(s, Statuses(-1, kNoResistRank)) == (std::vector<InfoIcon>{{Icon::Bind, BadgeKind::StatusWeak, -3}}));
+    CHECK(Info(s, Statuses(kNoWeakRank, 1)) == (std::vector<InfoIcon>{{Icon::Paralyze, BadgeKind::StatusRank, 11}}));
+}
+
+TEST(the_element_limit_keeps_the_biggest_differences_and_weaknesses_win_ties)
+{
+    MobResistances r                     = Neutral();
+    ElementRankOf(r, Element::Fire)      = -2; // +30%
+    ElementRankOf(r, Element::Ice)       = 4;  // -50%
+    ElementRankOf(r, Element::Wind)      = -3; // +50%
+    ElementRankOf(r, Element::Earth)     = -1; // +15%
+    ElementRankOf(r, Element::Lightning) = 11; // -95%
+    const auto limit = [](int most) { return BadgeRules{.elementWeakRank = -1, .elementResistRank = 1, .maxElements = most}; };
+    CHECK(Info(r, limit(2)) == (std::vector<InfoIcon>{{Icon::Wind, BadgeKind::WeakRank, -3}, {Icon::Lightning, BadgeKind::ResistRank, 11}}));
+    CHECK(Info(r, limit(4)) == (std::vector<InfoIcon>{{Icon::Wind, BadgeKind::WeakRank, -3}, {Icon::Fire, BadgeKind::WeakRank, -2},
+                                   {Icon::Lightning, BadgeKind::ResistRank, 11}, {Icon::Ice, BadgeKind::ResistRank, 4}}));
+    CHECK(Info(r, limit(0)).empty());
+    CHECK_EQ(Info(r, limit(kElementCount)).size(), 5u);
+}
+
+TEST(immunities_in_mobdbs_order_and_the_ones_without_icons_left_out)
+{
+    MobResistances r = Neutral();
+    r.immunity = kImmunePetrify | kImmuneGravity | kImmuneElegy | kImmuneStun | kImmuneTerror | kImmuneAddle | kImmuneCurse;
+    CHECK(Info(r) == (std::vector<InfoIcon>{{Icon::Gravity, BadgeKind::Immune, 0}, {Icon::Stun, BadgeKind::Immune, 0},
+                         {Icon::Elegy, BadgeKind::Immune, 0}, {Icon::Petrify, BadgeKind::Immune, 0}}));
+}
+
+TEST(each_switch_turns_its_part_off)
+{
+    MobResistances r = Neutral();
+    SdtOf(r, Sdt::Piercing)         = 2500;
+    RankOf(r, StatusRank::Paralyze) = 6;
+    r.immunity                      = kImmuneBind;
+    CHECK(Info(r, Without(&BadgeRules::damage)) == (std::vector<InfoIcon>{{Icon::Paralyze, BadgeKind::StatusRank, 6}, {Icon::Bind, BadgeKind::Immune, 0}}));
+    CHECK(Info(r, Without(&BadgeRules::statusRanks)) == (std::vector<InfoIcon>{{Icon::Piercing, BadgeKind::Weak, 25}, {Icon::Bind, BadgeKind::Immune, 0}}));
+    CHECK(Info(r, Without(&BadgeRules::immunities)) == (std::vector<InfoIcon>{{Icon::Piercing, BadgeKind::Weak, 25}, {Icon::Paralyze, BadgeKind::StatusRank, 6}}));
+}
+
+TEST(a_mob_with_everything_fits_the_set)
+{
+    MobResistances r = Neutral();
+    for (int16_t& sdt : r.sdt)
+        sdt = 2500;
+    r.immunity = 0xFFFFFFFFu;
+    const std::vector<InfoIcon> all = Info(r);
+    CHECK_EQ(all.size(), 12u + 12u); // 12 damage types; Sleep and the 11 other immunities with icons
+    CHECK(all.size() <= static_cast<size_t>(kMaxInfoIcons));
+}
+
+TEST(badges_read_as_percents_like_mobdbs)
+{
+    CHECK(BadgeText({Icon::Piercing, BadgeKind::Weak, 25}, false) == "+25%");
+    CHECK(BadgeText({Icon::Slashing, BadgeKind::Resist, 50}, false) == "-50%");
+    CHECK(BadgeText({Icon::Light, BadgeKind::WeakRank, -3}, false) == "+50%"); // rank -3: the wikis' 150%
+    CHECK(BadgeText({Icon::Fire, BadgeKind::WeakRank, -1}, false) == "+15%");
+    CHECK(BadgeText({Icon::Dark, BadgeKind::ResistRank, 4}, false) == "-50%");
+    CHECK(BadgeText({Icon::Paralyze, BadgeKind::StatusWeak, -2}, false) == "+30%");
+    CHECK(BadgeText({Icon::Sleep, BadgeKind::StatusRank, 11}, false) == "-95%");
+    CHECK(BadgeText({Icon::Bind, BadgeKind::Immune, 0}, false) == "\xC3\x97");
+}
+
+TEST(rank_badges_can_read_as_ranks_instead)
+{
+    CHECK(BadgeText({Icon::Piercing, BadgeKind::Weak, 25}, true) == "+25%"); // a damage percent stays one
+    CHECK(BadgeText({Icon::Light, BadgeKind::WeakRank, -3}, true) == "-3");
+    CHECK(BadgeText({Icon::Dark, BadgeKind::ResistRank, 6}, true) == "6");
+    CHECK(BadgeText({Icon::Paralyze, BadgeKind::StatusWeak, -2}, true) == "-2");
+    CHECK(BadgeText({Icon::Sleep, BadgeKind::StatusRank, 11}, true) == "11");
+    CHECK(BadgeText({Icon::Bind, BadgeKind::Immune, 0}, true) == "\xC3\x97");
+}
+
+TEST(every_rank_reads_as_the_wikis_percent_and_ranks_past_the_ends_as_the_ends)
+{
+    const char* const expected[] = {"+50%", "+30%", "+15%", "0%", "-15%", "-30%", "-40%", "-50%", "-60%", "-70%", "-75%", "-80%",
+        "-85%", "-90%", "-95%"};
+    for (int rank = kMinRank; rank <= kMaxRank; ++rank)
+        CHECK(RankText(rank, false) == expected[rank - kMinRank]);
+    CHECK(RankText(kMinRank - 1, false) == "+50%" && RankText(kMaxRank + 1, false) == "-95%"); // Phoenix clamps them so
+    CHECK(RankText(-2, true) == "-2" && RankText(12, true) == "12");
 }

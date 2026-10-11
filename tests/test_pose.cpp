@@ -109,3 +109,15 @@ TEST(a_name_that_cannot_be_projected_stays_put)
     float row = 0.0f;
     CHECK(!RowAtHeight(TownCamera(), behind, 0.0f, row));
 }
+
+TEST(a_camera_knows_where_it_is)
+{
+    // A view of a camera at (10, -5, 20), turned a quarter about the height axis: its last row is the eye, turned
+    // and negated.
+    const float view[16] = {0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, -20.0f, 5.0f, 10.0f, 1.0f};
+    const Camera camera  = MakeCamera(view, kProjection, 1440.0f);
+    CHECK(test::Near(camera.eye.x, 10.0f, 1e-4f) && test::Near(camera.eye.y, -5.0f, 1e-4f) &&
+          test::Near(camera.eye.z, 20.0f, 1e-4f));
+    CHECK(test::Near(Distance(camera.eye, WorldPoint{10.0f, -5.0f, 17.0f}), 3.0f, 1e-4f));
+    CHECK(test::Near(Distance(WorldPoint{0.0f, 0.0f, 0.0f}, WorldPoint{3.0f, 4.0f, 12.0f}), 13.0f, 1e-4f));
+}

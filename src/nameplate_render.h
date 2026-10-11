@@ -1,8 +1,10 @@
 #pragma once
 
 #include "Ashita.h"
+#include "frame_cache.h"
 #include "game_cursor.h"
 #include "game_names.h"
+#include "gpu.h"
 #include "icons.h"
 #include "look.h"
 #include "nameplate.h"
@@ -45,7 +47,7 @@ namespace headsup
         // The game's cursor is blocked over these.
         const std::vector<CursorName>& CursorNames() const { return m_CursorNames; }
         bool NamesFailed() const { return m_NamesFailed; }
-        bool IconsFailed() const { return m_IconsFailed; }
+        bool IconsFailed() const { return m_Icons.Failed(); }
         std::string TakeNameFailure();
         std::string TakeIconFailure();
 
@@ -90,26 +92,30 @@ namespace headsup
             PlateTexture ornament;
             float scale      = 0.0f; // eased toward the game's name size
             double scaleTime = 0.0;
+            float rise       = 0.0f; // screen pixels above its own place, eased toward clear of the plates under it
+            double riseTime  = 0.0;
             int nameRaster   = 0;
             int ornamentRaster = 0;
             int labelRaster  = 0;
             int cursorRaster = 0;
             std::vector<PlateTexture> timers;
             int timerRaster  = 0;
+            int badgeRaster  = 0; // the badge group's text height; the badges themselves are shared (m_Badges)
             uint32_t frame   = 0;
         };
 
-        struct IconTexture
+        // A badge's texture is shared by every plate showing the same text in the same color and size.
+        struct BadgeKey
         {
-            IDirect3DTexture8* texture = nullptr;
-            float u = 0.0f, v = 0.0f;
+            std::string text;
+            uint32_t color = 0;
+            int height     = 0;
+            auto operator<=>(const BadgeKey&) const = default;
         };
 
         struct Quad
         {
-            IDirect3DTexture8* texture;
-            float x, y, width, height, u, v, depth;
-            uint32_t tint;
+            GpuQuad gpu;
             int rank;
         };
 
@@ -118,22 +124,20 @@ namespace headsup
         bool PrepareOrnament(PlateTexture& t, uint32_t color, int pixelHeight, int width, const LineStyle& shadowLine);
         bool PrepareCursor(PlateTexture& t, uint32_t color, int pixelHeight, const Settings& settings);
         bool Upload(PlateTexture& t, const Image& image, TextureKey key);
-        IDirect3DTexture8* CreateTexture(const void* bgra, int width, int height, float& u, float& v);
-        const IconTexture* IconTextureFor(Icon icon);
         void FailNames(std::string what);
         static void ReleasePlate(Plate& plate);
 
         IDirect3DDevice8* m_Device = nullptr;
+        GdiText m_Gdi;
         std::unordered_map<uint16_t, Plate> m_Plates;
-        IconTexture m_IconTextures[kIconCount] = {};
+        FrameCache<BadgeKey, PlateTexture> m_Badges;
+        IconTextures m_Icons;
         std::vector<Quad> m_Quads;
         std::vector<Shown> m_Shown;
         std::vector<CursorName> m_CursorNames;
         uint32_t m_Frame           = 0;
         double m_RedrawMs          = 0.0; // spent this frame
         bool m_NamesFailed         = false;
-        bool m_IconsFailed         = false;
         std::string m_NameFailure;
-        std::string m_IconFailure;
     };
 }

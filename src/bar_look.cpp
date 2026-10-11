@@ -1,0 +1,134 @@
+#include "bar_look.h"
+
+#include "argb.h"
+
+#include <algorithm>
+#include <cmath>
+#include <set>
+#include <string>
+
+namespace headsup
+{
+    namespace
+    {
+        constexpr uint32_t kNeutralColor = 0xFF8D8D8D;
+        constexpr float kTitleScale      = 1.35f; // a popup title, in popupText
+        constexpr float kCoinScale       = 0.75f; // gil's coin, in icons
+        constexpr float kFrameRadius     = 3.0f;  // the ornate target frame and hover tint
+        constexpr int kLitTarget         = 2;     // a hovered ornate target's tint, in hover tints' alpha
+        // The pills' section headings' letter-spacing, in their size: the approved mockup's 1.2 px at 10.5 px.
+        constexpr float kHeadingTracking = 1.2f / 10.5f;
+
+        const char* Interned(const std::string& name)
+        {
+            static std::set<std::string> names; // a set's names never move
+            return names.insert(name).first->c_str();
+        }
+
+        uint32_t AlphaTimes(uint32_t argb, int times)
+        {
+            const int alpha = std::min(0xFF, Channel(argb, kAlphaShift) * times);
+            return (argb & ~kAlphaMask) | static_cast<uint32_t>(alpha) << kAlphaShift;
+        }
+    }
+
+    uint32_t BarLook::BarColor(const Span& span) const
+    {
+        return span.tone == Tone::Normal ? palette.title : PopupColor(span);
+    }
+
+    uint32_t BarLook::PopupColor(const Span& span) const
+    {
+        switch (span.tone)
+        {
+        case Tone::Normal: return palette.text;
+        case Tone::Dim: return palette.subtitle;
+        case Tone::Heading: return palette.heading;
+        case Tone::Tag: return palette.tagText;
+        case Tone::Neutral: return kNeutralColor;
+        case Tone::Weak: return ToArgb(settings.weakBadgeColor);
+        case Tone::Resist: return ToArgb(settings.resistBadgeColor);
+        case Tone::Immune: return ToArgb(settings.immuneBadgeColor);
+        case Tone::Own: return span.argb;
+        }
+        return palette.text;
+    }
+
+    const char* BarTitleFont(const Settings& settings, BarShape shape)
+    {
+        return settings.barTitleFont.empty() ? TitleFont(shape) : Interned(settings.barTitleFont);
+    }
+
+    const char* BarTextFont(const Settings& settings)
+    {
+        return settings.barTextFont.empty() ? kDetailFont : Interned(settings.barTextFont);
+    }
+
+    TextFace BarLook::TitleFace() const { return TextFace{titleFont, static_cast<float>(lines.title)}; }
+
+    TextFace BarLook::TitleFace(const WidgetContent& content) const
+    {
+        return content.figures ? TextFace{detailFont, static_cast<float>(lines.title)} : TitleFace();
+    }
+
+    TextFace BarLook::DetailFace() const { return TextFace{detailFont, static_cast<float>(lines.detail)}; }
+
+    TextFace BarLook::FaceOf(PopupFont font) const
+    {
+        switch (font)
+        {
+        case PopupFont::Title: return TextFace{titleFont, metrics.popupText * kTitleScale};
+        case PopupFont::Heading:
+        {
+            const auto pixels  = static_cast<float>(WholePixels(metrics.heading));
+            const int tracking = ornate ? 0 : static_cast<int>(std::lround(pixels * kHeadingTracking));
+            return TextFace{titleFont, metrics.heading, tracking};
+        }
+        case PopupFont::Pin: return TextFace{titleFont, metrics.heading};
+        case PopupFont::Text: break;
+        }
+        return TextFace{detailFont, metrics.popupText};
+    }
+
+    float BarLook::Leading(const WidgetContent& content) const
+    {
+        return static_cast<float>(content.icons.size()) * (metrics.icon + metrics.gap) +
+               (content.coin ? static_cast<float>(CoinPixels(metrics)) + metrics.gap : 0.0f);
+    }
+
+    std::optional<WidgetBox> BarLook::BoxOf(const PlacedWidget& placed, bool lit) const
+    {
+        const BarRect& r    = placed.rect;
+        const bool isTarget = placed.widget == BarWidget::Target;
+        if (ornate)
+        {
+            // The target's frame and the hover tint take the pill row, clear of the strip's edges.
+            if (!isTarget && !lit) return std::nullopt;
+            // The target's frame always has the tint, so a hovered one has more of it.
+            const uint32_t fill = isTarget && lit ? AlphaTimes(palette.highlight, kLitTarget) : palette.highlight;
+            const BoxStyle style{
+                .radius = kFrameRadius, .top = fill, .bottom = fill, .border = isTarget ? palette.accent : 0u};
+            if (isTarget) return WidgetBox{BarRect{r.x, row.y, r.width, row.height}, style};
+            // Neighbours meet at a divider's diamond, drawn from a whole pixel and centered on their shared edge: the
+            // tint's edges, whole pixels too, stay clear of it.
+            const float inset = DiamondClearance(metrics);
+            const float left = std::round(r.x + inset), right = std::round(r.x + r.width - inset);
+            return WidgetBox{BarRect{left, row.y, right - left, row.height}, style};
+        }
+        const bool flat = placed.widget == BarWidget::Zone || placed.widget == BarWidget::EarthTime;
+        if (flat && !lit) return std::nullopt;
+        const uint32_t fill = lit ? palette.highlight : palette.pill;
+        return WidgetBox{r, BoxStyle{.radius = metrics.pillRadius, .top = fill, .bottom = fill,
+                                .border = isTarget || lit ? palette.accent : palette.pillBorder}};
+    }
+
+    int CoinPixels(const BarMetrics& metrics) { return WholePixels(metrics.icon * kCoinScale); }
+
+    std::optional<BarPoint> CenteredInk(const BarRect& box, const InkBox& ink, float margin)
+    {
+        if (ink.Empty()) return std::nullopt;
+        const float inkX = static_cast<float>(ink.left + ink.right) / 2.0f - margin;
+        const float inkY = static_cast<float>(ink.top + ink.bottom) / 2.0f - margin;
+        return BarPoint{box.x + box.width / 2.0f - inkX, box.y + box.height / 2.0f - inkY};
+    }
+}

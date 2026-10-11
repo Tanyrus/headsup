@@ -56,6 +56,12 @@ namespace headsup
 
     WorldPoint FromEntityPosition(float x, float y, float z) { return WorldPoint{x, z, y}; }
 
+    float Distance(const WorldPoint& a, const WorldPoint& b)
+    {
+        const float x = a.x - b.x, y = a.y - b.y, z = a.z - b.z;
+        return std::sqrt(x * x + y * y + z * z);
+    }
+
     Camera MakeCamera(const float view[16], const float projection[16], float screenHeight)
     {
         Camera camera{};
@@ -64,6 +70,11 @@ namespace headsup
                 for (int k = 0; k < 4; ++k)
                     camera.viewProjection[row][col] += view[row * 4 + k] * projection[k * 4 + col];
         camera.screenHeight = screenHeight;
+        // A view matrix's last row is the eye, turned by its rotation and negated: turned back, it is the eye.
+        const auto eye = [&](int axis) {
+            return -(view[12] * view[axis * 4] + view[13] * view[axis * 4 + 1] + view[14] * view[axis * 4 + 2]);
+        };
+        camera.eye = WorldPoint{eye(0), eye(1), eye(2)};
         return camera;
     }
 

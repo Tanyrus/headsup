@@ -171,6 +171,14 @@ class GenIcons(unittest.TestCase):
         self.assertIn('        Ability, // job abilities and weapon skills', ids)
         self.assertIn(f'constexpr int kIconCount = {len(names)};', ids)
 
+    def test_mobdbs_damage_and_status_icons_come_after_the_player_icons(self):
+        names = [name for name, _, _ in gen.ICONS]
+        self.assertEqual(names[names.index('LevelSync') + 1:], [
+            'Slashing', 'Piercing', 'Impact', 'H2H', 'Fire', 'Ice', 'Wind', 'Earth', 'Lightning', 'Water', 'Light', 'Dark',
+            'Sleep', 'LightSleep', 'DarkSleep', 'Gravity', 'Bind', 'Stun', 'Silence', 'Paralyze', 'Blind', 'Slow', 'Poison',
+            'Elegy', 'Requiem', 'Petrify'])
+        self.assertIn(('Sleep', 'mobdb-icons/ImmuneSleep.png', 'light and dark sleep'), gen.ICONS)
+
     def test_a_missing_or_unreadable_icon_fails(self):
         (self.dir / 'mobdb-icons' / 'Link.png').write_bytes(b'GIF89a')
         with self.assertRaises(gen.IconError):

@@ -1,11 +1,17 @@
 #pragma once
 
+#include "code_patch.h"
 #include "name_frame.h"
 #include "native_locate.h"
+#include "strip_text.h"
+#include "weather.h"
 
+#include <array>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 struct IDirect3DDevice8;
@@ -40,7 +46,7 @@ namespace headsup
         std::string Start();
         // Puts the game's bytes back if they are still HeadsUp's. Returns why it could not, or an empty string.
         std::string Stop();
-        bool Running() const { return m_Site != nullptr; }
+        bool Running() const { return m_Patch.at != nullptr; }
 
         uint32_t ModuleBase() const { return m_ModuleBase; }
         std::span<const uint32_t> CallerReturns() const;
@@ -56,8 +62,7 @@ namespace headsup
         IDirect3DSurface8* SceneDepth() const;
 
     private:
-        uint8_t* m_Site       = nullptr;
-        uint8_t m_Patch[sizeof(kNameHookBytes)] = {};
+        CodePatch m_Patch;
         uint32_t m_ModuleBase = 0;
     };
 
@@ -72,7 +77,7 @@ namespace headsup
         std::string Start();
         // Puts the game's calls back if they are still HeadsUp's. Returns why it could not, or an empty string.
         std::string Stop();
-        bool Running() const { return m_Calls[0] != nullptr; }
+        bool Running() const { return m_Calls[0].at != nullptr; }
 
         // Whether the game's arrows are skipped from now on.
         void Hide(bool hide);
@@ -81,9 +86,43 @@ namespace headsup
         void ForgetPicked();
 
     private:
-        uint8_t* m_Calls[2]     = {}; // the target's and the candidate's
-        uint32_t m_Operands[2]  = {}; // the game's
-        uint32_t m_Patched[2]   = {}; // HeadsUp's
+        std::array<CodePatch, 2> m_Calls; // the target's and the candidate's
+    };
+
+    // Skips the game's help bar and connection readout while asked: the draw loop's call to the menu window draw
+    // (native_locate.h) goes to HeadsUp, which passes every window but those hidden on to the game.
+    class WindowHook
+    {
+    public:
+        ~WindowHook() { Stop(); }
+        // Only at a render boundary. Returns why it could not start, or an empty string.
+        std::string Start();
+        // Puts the game's call back if it is still HeadsUp's. Returns why it could not, or an empty string.
+        std::string Stop();
+        bool Running() const { return m_Call.at != nullptr; }
+        // Which of the game's windows are skipped from now on.
+        void Hide(HiddenWindows hidden);
+        // Once a frame, before the game draws its windows: Stop puts back those that drew in the last two.
+        void NewFrame();
+        // While band is set, the windows Move names go down as they draw, all by the shift from the game's strip to
+        // under band's bottom (WindowShift, WindowPlacements), those Offset names move by their offsets, and every
+        // window that opens is noted.
+        void MoveFrom(std::optional<HelpBand> band);
+        // Each window's offset from where the game puts it.
+        void Offset(const std::vector<WindowOffset>& offsets);
+        // Which windows are moved, by short name (ShortName); those no window could have are left out.
+        void Move(const std::vector<std::string>& windows);
+        // The windows that drew since the last call, by short name, sorted: those open now.
+        std::vector<std::string> TakeOpen();
+        // The windows noted since HeadsUp loaded, by short name, in the order they came.
+        std::vector<std::string> SeenWindows() const;
+        size_t SeenCount() const;
+        // Why windows cannot be moved, once, after a Start that could not find the game's move.
+        std::string TakeMoveProblem() { return std::exchange(m_MoveProblem, std::string()); }
+
+    private:
+        CodePatch m_Call;
+        std::string m_MoveProblem;
     };
 
     // Puts right the game's guess of its window's client area (native_locate.h's PointerMapping): each guess's
@@ -107,12 +146,59 @@ namespace headsup
         void KeepPointerFor(const std::vector<uint8_t>& keys);
 
     private:
-        struct Patch
-        {
-            uint8_t* at;
-            uint8_t game[6], ours[6];
-            uint32_t bytes;
-        };
-        std::vector<Patch> m_Patches;
+        std::vector<CodePatch> m_Patches;
+    };
+
+    // One strip window's text object as read, or why not.
+    struct StripRead
+    {
+        uint32_t owner = 0;
+        uint32_t at    = 0;          // the text object's address, once read
+        std::vector<uint8_t> object; // kStripObjectBytes, empty when it could not be read
+        std::string why;             // empty when read
+    };
+
+    // The game's top-strip text (native_locate.h's LocateStripText), read on the game's thread at Present.
+    class StripTextReader
+    {
+    public:
+        // Finds the slots and offsets: "" when found, else why not.
+        std::string Find();
+        // Each check fails closed: no slot, a 0 owner (the title screen, character select, a teardown), an owner
+        // whose window record does not name the window, or memory that cannot be read. Every check, every call.
+        StripRead Read(StripWindow window) const;
+        // Each frame: the window's text object into into, false when hidden. Memory is checked only where the chain
+        // to it changed (StripWindowReader).
+        bool Read(StripWindow window, StripObject& into);
+
+    private:
+        StripSites m_Sites;
+        std::array<StripWindowReader, 2> m_Readers; // by StripWindow
+    };
+    // The client's connection counters (LocateNetStats), read on the game's thread.
+    // The zone's weather as the client keeps it, found once.
+    class WeatherReader
+    {
+    public:
+        // "" when found, else why not.
+        std::string Find();
+        // Nothing before Find succeeded or when what is there is no weather's id.
+        std::optional<Weather> Read() const;
+
+    private:
+        uint32_t m_Global = 0;
+    };
+
+    class NetStatsReader
+    {
+    public:
+        // Finds where the client keeps them: "" when found, else why not.
+        std::string Find();
+        // Nothing before Find succeeded, while the client has no session (the title screen), or when what is there
+        // cannot be read or cannot be the counters.
+        std::optional<NetCounters> Read() const;
+
+    private:
+        uint32_t m_Global = 0;
     };
 }

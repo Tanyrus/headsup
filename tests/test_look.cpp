@@ -101,6 +101,11 @@ TEST(the_name_and_the_level_line_each_have_a_font_and_a_shadow)
     s.labelShadowColor = Color{{0.0f, 0.0f, 0.5f}};
     s.labelShadow      = 150;
     CHECK(NameLineStyle(s) == (LineStyle{"Georgia", true, ToArgb(s.textOutline), 0.5f}));
+    s.playerFontName = "Verdana";
+    s.npcFontName    = "Tahoma";
+    s.npcFontBold    = true;
+    CHECK(NameLineStyle(s, EntityKind::Player) == (LineStyle{"Verdana", false, ToArgb(s.textOutline), 0.5f}));
+    CHECK(NameLineStyle(s, EntityKind::Npc) == (LineStyle{"Tahoma", true, ToArgb(s.textOutline), 0.5f}));
     CHECK(LevelLineStyle(s) == (LineStyle{"Cinzel", false, ToArgb(s.labelShadowColor), 1.5f}));
 }
 
@@ -116,4 +121,29 @@ TEST(a_mob_you_or_your_party_fight_can_lose_its_glow)
     CHECK(StyleFor(theirs, true, s).glow);
     s.glowOffWhenFighting = false;
     CHECK(StyleFor(yours, true, s).glow);
+}
+
+TEST(each_kind_of_badge_takes_its_color)
+{
+    Settings s;
+    s.weakBadgeColor   = ColorFromRgb(0x112233);
+    s.resistBadgeColor = ColorFromRgb(0x445566);
+    s.rankBadgeColor   = ColorFromRgb(0x778899);
+    s.immuneBadgeColor = ColorFromRgb(0xAABBCC);
+    CHECK_EQ(BadgeColor(BadgeKind::Weak, s), 0xFF112233u);
+    CHECK_EQ(BadgeColor(BadgeKind::WeakRank, s), 0xFF112233u);
+    CHECK_EQ(BadgeColor(BadgeKind::Resist, s), 0xFF445566u);
+    CHECK_EQ(BadgeColor(BadgeKind::ResistRank, s), 0xFF445566u);
+    CHECK_EQ(BadgeColor(BadgeKind::StatusWeak, s), 0xFF112233u);
+    CHECK_EQ(BadgeColor(BadgeKind::StatusRank, s), 0xFF778899u);
+    CHECK_EQ(BadgeColor(BadgeKind::Immune, s), 0xFFAABBCCu);
+}
+
+TEST(badges_are_bold_in_their_own_font_with_a_crisp_edge_in_the_level_lines_shadow_color)
+{
+    Settings s;
+    s.badgeFontName    = "Tahoma";
+    s.labelShadowColor = Color{{0.0f, 0.0f, 0.5f}};
+    CHECK(BadgeLineStyle(s) == (LineStyle{"Tahoma", true, ToArgb(s.labelShadowColor), 0.0f, true}));
+    CHECK(!LevelLineStyle(s).outline && !NameLineStyle(s).outline);
 }

@@ -21,15 +21,37 @@ namespace headsup
         return style;
     }
 
-    LineStyle NameLineStyle(const Settings& settings)
+    LineStyle NameLineStyle(const Settings& settings, EntityKind kind)
     {
-        return LineStyle{settings.fontName, settings.fontBold, ToArgb(settings.textOutline),
-            static_cast<float>(settings.nameShadow) / kPercent};
+        const bool player = kind == EntityKind::Player, npc = kind == EntityKind::Npc;
+        const std::string& font = player ? settings.playerFontName : npc ? settings.npcFontName : settings.fontName;
+        const bool bold         = player ? settings.playerFontBold : npc ? settings.npcFontBold : settings.fontBold;
+        return LineStyle{font, bold, ToArgb(settings.textOutline), static_cast<float>(settings.nameShadow) / kPercent};
     }
 
     LineStyle LevelLineStyle(const Settings& settings)
     {
         return LineStyle{settings.labelFontName, settings.labelFontBold, ToArgb(settings.labelShadowColor),
             static_cast<float>(settings.labelShadow) / kPercent};
+    }
+
+    LineStyle BadgeLineStyle(const Settings& settings)
+    {
+        return LineStyle{settings.badgeFontName, true, ToArgb(settings.labelShadowColor), 0.0f, true};
+    }
+
+    uint32_t BadgeColor(BadgeKind kind, const Settings& settings)
+    {
+        switch (kind)
+        {
+        case BadgeKind::Weak:
+        case BadgeKind::WeakRank:
+        case BadgeKind::StatusWeak: return ToArgb(settings.weakBadgeColor);
+        case BadgeKind::Resist:
+        case BadgeKind::ResistRank: return ToArgb(settings.resistBadgeColor);
+        case BadgeKind::StatusRank: return ToArgb(settings.rankBadgeColor);
+        case BadgeKind::Immune: break;
+        }
+        return ToArgb(settings.immuneBadgeColor);
     }
 }

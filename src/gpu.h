@@ -1,0 +1,100 @@
+#pragma once
+
+#include "Ashita.h"
+#include "frame_cache.h"
+#include "icons.h"
+#include "plate_image.h"
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <tuple>
+
+namespace headsup
+{
+    // One textured, tinted rectangle in render-target pixels. The texture's columns from u0 to u1 and its rows from the
+    // top to v are stretched across it.
+    struct GpuQuad
+    {
+        IDirect3DTexture8* texture;
+        float x, y, width, height, u0, u1, v, depth;
+        uint32_t tint;
+    };
+
+    // An A8R8G8B8 managed texture holding the image in its top-left corner, padded to powers of two; u and v are the
+    // image's share of it. Null when Direct3D refuses.
+    IDirect3DTexture8* CreateTexture(IDirect3DDevice8* device, const void* bgra, int width, int height, float& u,
+        float& v);
+    void ReleaseTexture(IDirect3DTexture8*& texture);
+
+    // Text drawn and measured with GDI, through one memory device context and the fonts it has made: the context until
+    // Release, each font until Sweep finds it idle.
+    class GdiText
+    {
+    public:
+        // Text in a font family, white on clear, tracking pixels after each character and margin pixels around it;
+        // false when GDI could not draw or measure it. markX is where the text from byte markAt on starts, or
+        // kNoMarkColumn when markAt is Label::kNoMark.
+        bool Rasterize(const char* text, const char* family, int pixelHeight, bool bold, int tracking, int margin,
+            size_t markAt, Coverage& out, int& markX);
+        // How wide Rasterize draws the text in the family's regular weight, set solid, in pixels, without drawing it;
+        // 0 when GDI cannot measure it.
+        float Measure(const char* text, const char* family, int pixelHeight);
+        // Where the font's ink sits in the line Rasterize draws (without its margin): the top and bottom of the ink of
+        // glyphs, and the bottom of an H's. Drawn once for each family, size and glyphs, then kept, past Release too.
+        LineInk FontInk(const char* family, int pixelHeight, const char* glyphs);
+        // Once a frame: deletes the fonts no text has used for kIdleFrames frames, as a player who tries fonts and
+        // sizes would otherwise keep every one.
+        void Sweep();
+        void Release();
+
+    private:
+        // The device context with the font selected and tracking pixels after each character, or null when GDI made
+        // neither.
+        HDC WithFont(std::string_view family, int pixelHeight, bool bold, int tracking);
+
+        HDC m_Context = nullptr;
+        FrameCache<std::tuple<std::string, int, bool>, HFONT> m_Fonts;
+        std::map<std::tuple<std::string, int, std::string>, LineInk, std::less<>> m_Inks;
+        uint32_t m_Frame = 0;
+    };
+
+    // An icon's texture, the icon in its top-left corner.
+    struct IconTexture
+    {
+        IDirect3DTexture8* texture = nullptr;
+        float width = 0.0f, height = 0.0f, u = 0.0f, v = 0.0f;
+    };
+
+    // The icons' textures, each made the first time it is asked for. Once Direct3D refuses one, no more are made.
+    class IconTextures
+    {
+    public:
+        // Null once Direct3D could not make one.
+        const IconTexture* For(IDirect3DDevice8* device, Icon icon);
+        bool Failed() const { return m_Failed; }
+        // Which icon Direct3D could not make, once.
+        std::string TakeFailure();
+        void Release();
+
+    private:
+        std::array<IconTexture, kIconCount> m_Textures{};
+        bool m_Failed = false;
+        std::string m_Failure;
+    };
+
+    // Sets every state the quads need; DrawQuad after it, then SetTexture(0, nullptr) when done.
+    void SetQuadStates(IDirect3DDevice8* device, bool depthTest);
+    void DrawQuad(IDirect3DDevice8* device, const GpuQuad& quad, bool depthTest);
+    // A state block of the states SetQuadStates sets, recorded from it: the vertex shader and the render and texture
+    // stage states. CaptureStateBlock before the quads and ApplyStateBlock after them put back the game's values of
+    // those. It leaves out texture 0 and stream 0 (which DrawPrimitiveUP clears): a block keeps what it captured
+    // alive until the next capture, and a default-pool texture or buffer kept alive makes the game's Reset fail.
+    // Nothing when Direct3D refuses.
+    std::optional<DWORD> RecordQuadStates(IDirect3DDevice8* device);
+}

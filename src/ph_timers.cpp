@@ -57,6 +57,13 @@ namespace headsup
         return lines;
     }
 
+    std::optional<double> PhTimers::SecondsLeft(uint32_t serverId, double now) const
+    {
+        const auto it = m_Timers.find(serverId);
+        if (it == m_Timers.end()) return std::nullopt;
+        return std::max(0.0, it->second.dueAt - now);
+    }
+
     std::string Countdown(double seconds)
     {
         const int total = static_cast<int>(std::ceil(seconds));

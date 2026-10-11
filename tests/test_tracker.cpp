@@ -1,6 +1,7 @@
 #include "test.h"
 #include "tracker.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include <iterator>
@@ -92,7 +93,7 @@ TEST(a_mob_attacks_as_phoenixs_aggro_check_decides)
              Row{"a Too Weak notorious monster", kMobAggressive | kMobNotorious, 50, 55, 0, 0, kLevel75, Category::NmWontAttack},
          })
     {
-        const MobRecord mob{kBountyHunter, "Test Mob", r.minLevel, r.maxLevel, r.flags, 300, 0, r.levelMod, 0};
+        const MobRecord mob{kBountyHunter, "Test Mob", r.minLevel, r.maxLevel, r.flags, 300, 0, r.levelMod, 0, 0, 0};
         auto outcome = [&](Category c) { return std::string(r.why) + ": " + std::to_string(CategoryIndex(c)); };
         CHECK_EQ(outcome(Classify(&mob, r.checkedLevel, r.player)), outcome(r.expected));
     }
@@ -151,6 +152,18 @@ TEST(owner_is_the_first_tracked_pointer_of_any_kind)
     CHECK(FindOwner(std::begin(mobDraw), std::end(mobDraw), t) == t.Find(0x2000));
     const uint32_t noActor[] = {0x5, 0x6};
     CHECK(FindOwner(std::begin(noActor), std::end(noActor), t) == nullptr);
+}
+
+TEST(owner_is_looked_for_past_the_games_draw_call_not_in_other_plugins_leftovers)
+{
+    Tracker t;
+    t.Update({Player(0x1000), BountyHunter(0x2000)}, kLevel20, Settings{});
+    constexpr uint32_t kCodeBegin = 0x400000, kCodeEnd = 0x500000;
+    // A plugin that ran first left the target (the mob) under the game's return address, 0x401234.
+    const uint32_t playerDraw[] = {0x5, 0x2000, 0x401234, 0x1000};
+    CHECK(FindOwnerAboveCaller(std::begin(playerDraw), std::end(playerDraw), t, kCodeBegin, kCodeEnd) == t.Find(0x1000));
+    const uint32_t noReturn[] = {0x5, 0x2000, 0x1000}; // no game address: the plain scan
+    CHECK(FindOwnerAboveCaller(std::begin(noReturn), std::end(noReturn), t, kCodeBegin, kCodeEnd) == t.Find(0x2000));
 }
 
 TEST(spawn_flags_give_the_kind)
@@ -228,6 +241,24 @@ TEST(a_mobs_level_line_carries_its_id_or_ph_and_a_placeholder_glows_purple)
     t.Update({Mob(0x2000, kCarrionWorm, "Carrion Worm"), Mob(0x4000, kPoisonFunguar, "Poison Funguar")}, kLevel20, s);
     CHECK(!t.Find(0x2000)->outline); // colored like any mob: passive, so not outlined
     CHECK(t.Find(0x4000)->outline && t.Find(0x4000)->argb == ToArgb(s.color[CategoryIndex(Category::WillAttack)]));
+}
+
+TEST(a_claimed_mob_takes_its_claims_color_while_that_is_on)
+{
+    Tracker t;
+    Settings s;
+    ActorInput ours   = Mob(0x2000, kBountyHunter, "Goblin Bounty Hunter");
+    ours.claimed      = true;
+    ours.claimedByParty = true;
+    ActorInput theirs = Mob(0x3000, kBountyHunter, "Goblin Bounty Hunter");
+    theirs.claimed    = true;
+    t.Update({ours, theirs}, kLevel20, s);
+    CHECK(t.Find(0x2000)->category == Category::WillAttack && t.Find(0x3000)->category == Category::WillAttack);
+    s.show[CategoryIndex(Category::PartyClaim)] = true;
+    s.show[CategoryIndex(Category::OtherClaim)] = true;
+    t.Update({ours, theirs}, kLevel20, s);
+    CHECK(t.Find(0x2000)->outline && t.Find(0x2000)->argb == ToArgb(s.color[CategoryIndex(Category::PartyClaim)]));
+    CHECK(t.Find(0x3000)->outline && t.Find(0x3000)->argb == ToArgb(s.color[CategoryIndex(Category::OtherClaim)]));
 }
 
 TEST(a_name_that_does_not_match_the_data_is_unknown)
@@ -334,6 +365,16 @@ TEST(dead_mobs_keep_only_their_name)
     CHECK_EQ(dead->mobIcons.count, 0);
 }
 
+// The target's popup reads a dead mob's record; only its level and icons go.
+TEST(a_dead_mob_keeps_its_record_for_the_popup)
+{
+    Tracker t;
+    t.Update({BountyHunter(0x2000, 10.0f, false)}, kLevel20, Settings{});
+    const ActorInfo* dead = t.Find(0x2000);
+    CHECK(dead->mob != nullptr && dead->mob->id == kBountyHunter);
+    CHECK(dead->level.text[0] == '\0');
+}
+
 TEST(squared_distance_becomes_yalms_and_keeps_nan)
 {
     // Ashita reports squared distances. A NaN must stay NaN so no distance limit passes it; std::max(0, NaN) is 0.
@@ -361,4 +402,65 @@ TEST(a_mob_your_party_claimed_is_marked)
     t.Update({Player(0x1000), ours, Mob(0x3000, kSnipper, "Snipper")}, kLevel20, Settings{});
     CHECK(t.Find(0x2000)->claimedByParty);
     CHECK(!t.Find(0x3000)->claimedByParty);
+}
+
+TEST(a_mob_carries_what_it_is_weak_to_resists_and_is_immune_to)
+{
+    auto badges = [] {
+        Settings s;
+        s.showDamageIcons = s.showStatusRankIcons = s.showImmunityIcons = true;
+        return s;
+    };
+    Tracker t;
+    Settings s = badges();
+    t.Update({BountyHunter(0x2000)}, kLevel20, s);
+    const MobRecord* record = FindMob(kBountyHunter, "Goblin Bounty Hunter");
+    CHECK(record != nullptr);
+    const InfoIconSet expected = InfoIconsFor(&ResistancesOf(*record), BadgeRules{});
+    const ActorInfo* info      = t.Find(0x2000);
+    CHECK(expected.count > 0 && info->infoIcons.count == expected.count); // goblins are weak to light
+    CHECK(std::equal(expected.icons, expected.icons + expected.count, info->infoIcons.icons));
+    // Its ranks: light -3, the other elements but dark -2; dark sleep -3, gravity -2.
+    auto shown = [&](const Settings& with) {
+        t.Update({BountyHunter(0x2000)}, kLevel20, with);
+        const InfoIconSet& set = t.Find(0x2000)->infoIcons;
+        return std::vector<InfoIcon>(set.icons, set.icons + set.count);
+    };
+    s.elementWeakRank = -3;
+    CHECK(shown(s) == (std::vector<InfoIcon>{{Icon::Light, BadgeKind::WeakRank, -3}}));
+    s             = badges();
+    s.maxElements = 2;
+    CHECK(shown(s) == (std::vector<InfoIcon>{{Icon::Light, BadgeKind::WeakRank, -3}, {Icon::Fire, BadgeKind::WeakRank, -2}}));
+    s.statusBadges[static_cast<int>(StatusRank::Gravity)].weakRank = -2;
+    CHECK(shown(s).back() == (InfoIcon{Icon::Gravity, BadgeKind::StatusWeak, -2}));
+    s.statusBadges[static_cast<int>(StatusRank::Gravity)].show = false;
+    CHECK_EQ(shown(s).size(), 2u);
+    s = badges();
+    s.showDamageIcons = s.showStatusRankIcons = s.showImmunityIcons = false;
+    t.Update({BountyHunter(0x2000)}, kLevel20, s);
+    CHECK_EQ(t.Find(0x2000)->infoIcons.count, 0);
+    t.Update({BountyHunter(0x2000, 10.0f, false)}, kLevel20, badges());
+    CHECK_EQ(t.Find(0x2000)->infoIcons.count, 0); // dead
+}
+
+TEST(a_mob_carries_its_server_id_record_and_level_line_and_is_found_by_target_index)
+{
+    Tracker t;
+    t.Update({BountyHunter(0x2000)}, kLevel20, Settings{});
+    const ActorInfo* info = t.FindIndex(BountyHunter(0x2000).index);
+    CHECK(info != nullptr && info == t.Find(0x2000));
+    CHECK_EQ(info->serverId, kBountyHunter);
+    CHECK(info->mob != nullptr && info->mob->id == kBountyHunter);
+    CHECK(std::string(info->level.text).rfind("Lv ", 0) == 0);
+    CHECK(t.FindIndex(0) == nullptr);
+}
+
+TEST(an_actor_listed_twice_keeps_only_what_its_later_entry_says)
+{
+    Tracker t;
+    t.Update({BountyHunter(0x2000), Npc(0x2000)}, kLevel20, EveryCategory());
+    const ActorInfo* info = t.Find(0x2000);
+    CHECK(info != nullptr && info->kind == EntityKind::Npc && std::string(info->name) == "Home Point #1");
+    CHECK(!info->outline && info->mob == nullptr && info->label.text[0] == '\0' && info->mobIcons.count == 0);
+    CHECK(t.FindIndex(BountyHunter(0x2000).index) == nullptr);
 }

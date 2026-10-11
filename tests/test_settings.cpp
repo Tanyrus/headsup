@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <iterator>
 #include <map>
 #include <sstream>
 #include <string>
@@ -119,6 +120,58 @@ textOutlineB=0.5000
 iconTintR=0.7500
 iconTintG=0.5000
 iconTintB=0.9000
+showDamageIcons=true
+showStatusRankIcons=true
+showImmunityIcons=true
+detectionIconSide=right
+badgeSide=left
+elementWeakRank=-3.0000
+elementResistRank=6.0000
+maxElements=3.0000
+showRanks=true
+badgeFontName=Tahoma
+paralyzeBadge=false
+paralyzeWeakRank=-1.0000
+paralyzeResistRank=1.0000
+bindBadge=false
+bindWeakRank=-2.0000
+bindResistRank=2.0000
+silenceBadge=false
+silenceWeakRank=-3.0000
+silenceResistRank=3.0000
+slowBadge=false
+slowWeakRank=-1.0000
+slowResistRank=5.0000
+poisonBadge=false
+poisonWeakRank=-2.0000
+poisonResistRank=6.0000
+lightSleepBadge=false
+lightSleepWeakRank=-3.0000
+lightSleepResistRank=7.0000
+darkSleepBadge=false
+darkSleepWeakRank=-1.0000
+darkSleepResistRank=8.0000
+blindBadge=false
+blindWeakRank=-2.0000
+blindResistRank=9.0000
+stunBadge=false
+stunWeakRank=-3.0000
+stunResistRank=10.0000
+gravityBadge=false
+gravityWeakRank=-1.0000
+gravityResistRank=12.0000
+weakBadgeColorR=0.1000
+weakBadgeColorG=0.2000
+weakBadgeColorB=0.3000
+resistBadgeColorR=0.4000
+resistBadgeColorG=0.5000
+resistBadgeColorB=0.6000
+rankBadgeColorR=0.7000
+rankBadgeColorG=0.8000
+rankBadgeColorB=0.9000
+immuneBadgeColorR=0.9000
+immuneBadgeColorG=0.1000
+immuneBadgeColorB=0.2000
 fontName=Georgia
 labelUnknownR=0.1000
 labelUnknownG=0.1100
@@ -165,6 +218,14 @@ placeholderShow=false
 placeholderR=0.6300
 placeholderG=0.6400
 placeholderB=0.6500
+partyClaimShow=true
+partyClaimR=0.7300
+partyClaimG=0.7400
+partyClaimB=0.7500
+otherClaimShow=true
+otherClaimR=0.8300
+otherClaimG=0.8400
+otherClaimB=0.8500
 iconGm=right
 iconMentor=hide
 iconNewAdventurer=right
@@ -173,9 +234,108 @@ iconAway=right
 iconLinkshell=hide
 iconBazaar=right
 iconSeekingParty=hide
+iconGmShare=false
+iconMentorShare=false
+iconNewAdventurerShare=false
+iconLevelSyncShare=false
+iconAwayShare=false
+iconLinkshellShare=false
+iconBazaarShare=true
+iconSeekingPartyShare=false
+playerIconOrder=iconSeekingParty iconGm iconMentor iconNewAdventurer iconLevelSync iconAway iconLinkshell iconBazaar
+playerIconMax=4.0000
 mobId=lastThree
 look=fantasy
 keepPointerKeys=11 1B 51
+showBar=false
+barTheme=umbraDark
+barSeparators=none
+barCurrency=allied_notes
+serverClockZone=usPacific
+barTargetDetails=true
+menuFont=Tahoma
+menuScale=125.0000
+barHeight=48.0000
+barTextSize=16.0000
+popupTextSize=20.0000
+barZone=false
+barWeather=false
+barVanaTime=false
+barTarget=false
+barGil=false
+barBags=false
+barEarthTime=false
+barGameHelp=false
+barServerTime=true
+barFps=false
+barJob=false
+barConnection=false
+barParty=true
+barConquest=true
+barSignet=true
+barDistance=false
+barZoneLine2=true
+barZoneIcons=true
+barWeatherLine2=true
+barWeatherIcons=true
+barVanaTimeLine2=true
+barVanaTimeIcons=true
+barTargetLine2=false
+barTargetIcons=true
+barGilLine2=true
+barGilIcons=false
+barBagsLine2=true
+barBagsIcons=true
+barEarthTimeLine2=true
+barEarthTimeIcons=true
+barGameHelpLine2=true
+barGameHelpIcons=true
+barServerTimeLine2=true
+barServerTimeIcons=true
+barFpsLine2=true
+barFpsIcons=true
+barJobLine2=true
+barJobIcons=true
+barConnectionLine2=true
+barConnectionIcons=true
+barPartyLine2=true
+barPartyIcons=true
+barConquestLine2=true
+barConquestIcons=true
+barSignetLine2=true
+barSignetIcons=true
+barDistanceLine2=true
+barDistanceIcons=true
+expBar=beside
+jobNames=false
+clock24=false
+stackNames=true
+barTitleFont=Cinzel
+barTextFont=
+barSubtitle=before
+playerFontName=Verdana
+playerFontBold=false
+npcFontName=Cinzel
+npcFontBold=true
+mobIconPlace=inline
+cursorOutline=60.0000
+untargetedOpacity=40.0000
+clockSeconds=true
+serverSeconds=true
+barLatency=true
+barLeft=zone weather vanaTime job party conquest signet serverTime distance
+barCenter=
+barRight=target gil bags connection fps earthTime
+hideHelpBar=true
+hideNetstat=true
+movedWindows=equip levmerit
+windowOffsets=equip:10,-20
+windowGroups=Bags:0,30,1:inventor+iteminfo
+allUnderBar=true
+moveGameHelp=true
+helpBarBackground=false
+helpBarX=12.0000
+helpBarY=8.0000
 )";
 
     Settings SavedSettings()
@@ -251,7 +411,9 @@ keepPointerKeys=11 1B 51
                  Outline{Category::WontAttack, true, {{0.23f, 0.24f, 0.25f}}}, Outline{Category::Unknown, true, {{0.33f, 0.34f, 0.35f}}},
                  Outline{Category::NmWillAttack, false, {{0.43f, 0.44f, 0.45f}}},
                  Outline{Category::NmWontAttack, false, {{0.53f, 0.54f, 0.55f}}},
-                 Outline{Category::Placeholder, false, {{0.63f, 0.64f, 0.65f}}}})
+                 Outline{Category::Placeholder, false, {{0.63f, 0.64f, 0.65f}}},
+                 Outline{Category::PartyClaim, true, {{0.73f, 0.74f, 0.75f}}},
+                 Outline{Category::OtherClaim, true, {{0.83f, 0.84f, 0.85f}}}})
         {
             s.show[CategoryIndex(o.category)]  = o.show;
             s.color[CategoryIndex(o.category)] = o.color;
@@ -263,6 +425,71 @@ keepPointerKeys=11 1B 51
         s.mobId = MobIdFormat::LastThree;
         s.look  = Look::Fantasy;
         s.keepPointerKeys = {0x11, 0x1B, 0x51};
+        s.showDamageIcons     = true;
+        s.showStatusRankIcons = true;
+        s.showImmunityIcons   = true;
+        s.detectionIconSide   = IconSide::Right;
+        s.badgeSide           = IconSide::Left;
+        s.elementWeakRank     = -3;
+        s.elementResistRank   = 6;
+        s.maxElements         = 3;
+        s.showRanks           = true;
+        s.badgeFontName       = "Tahoma";
+        s.showBar      = false;
+        s.barTheme     = BarTheme::UmbraDark;
+        s.barSeparators = BarSeparators::None;
+        s.barCurrency   = *CurrencyOfKey("allied_notes");
+        s.serverClockZone = ClockZone::UsPacific;
+        s.barTargetDetails = true;
+        s.menuFont         = "Tahoma";
+        s.menuScale        = 125;
+        s.windowOffsets    = {WindowOffset{"equip", 10, -20}};
+        s.windowGroups     = {WindowGroup{"Bags", 0, 30, true, {"inventor", "iteminfo"}}};
+        s.allUnderBar      = true;
+        s.moveGameHelp     = true;
+        s.helpBarBackground = false;
+        s.helpBarX         = 12;
+        s.helpBarY         = 8;
+        s.barSecondLine[static_cast<int>(BarWidget::Target)] = false;
+        s.barIcons[static_cast<int>(BarWidget::Gil)]         = false;
+        s.expBar     = ExpBarPlace::Beside;
+        s.jobNames   = false;
+        s.clock24    = false;
+        s.stackNames = true;
+        s.barTitleFont = "Cinzel";
+        s.barSubtitle = SubtitlePlace::Before;
+        s.playerIconOrder = {PlayerIcon::SeekingParty, PlayerIcon::Gm, PlayerIcon::Mentor, PlayerIcon::NewAdventurer,
+            PlayerIcon::LevelSync, PlayerIcon::Away, PlayerIcon::Linkshell, PlayerIcon::Bazaar};
+        s.playerIconShare[static_cast<int>(PlayerIcon::Bazaar)] = true;
+        s.playerIconMax = 4;
+        s.playerFontName = "Verdana";
+        s.playerFontBold = false;
+        s.npcFontName    = "Cinzel";
+        s.npcFontBold    = true;
+        s.mobIconPlace = IconPlace::Inline;
+        s.cursorOutline = 60;
+        s.untargetedOpacity = 40;
+        s.clockSeconds  = true;
+        s.serverSeconds = true;
+        s.barLatency = true;
+        s.barHeight    = 48;
+        s.barTextSize   = 16;
+        s.popupTextSize = 20;
+        s.hideHelpBar  = true;
+        s.hideNetstat  = true;
+        s.movedWindows = {"equip", "levmerit"};
+        for (int w = 0; w < kBarWidgetCount; ++w)
+            s.barWidgets[w] = !kBarWidgetDefaults[w];
+        s.barSections = DefaultPlacement();
+        MoveWidget(s.barSections, BarSection::Center, 0, BarSection::Right, 0); // the target first on the right
+        const int weak[kStatusRankCount]   = {-1, -2, -3, -1, -2, -3, -1, -2, -3, -1};
+        const int resist[kStatusRankCount] = {1, 2, 3, 5, 6, 7, 8, 9, 10, 12};
+        for (int i = 0; i < kStatusRankCount; ++i)
+            s.statusBadges[i] = StatusBadgeRule{false, weak[i], resist[i]};
+        s.weakBadgeColor      = Color{{0.1f, 0.2f, 0.3f}};
+        s.resistBadgeColor    = Color{{0.4f, 0.5f, 0.6f}};
+        s.rankBadgeColor      = Color{{0.7f, 0.8f, 0.9f}};
+        s.immuneBadgeColor    = Color{{0.9f, 0.1f, 0.2f}};
         return s;
     }
 
@@ -275,6 +502,14 @@ keepPointerKeys=11 1B 51
                 store.values[line.substr(0, equals)] = line.substr(equals + 1);
         return store;
     }
+}
+
+TEST(players_and_npcs_take_the_mob_name_font_from_a_file_saved_before_they_had_their_own)
+{
+    MapStore old;
+    old.values = {{"settingsVersion", "2.0000"}, {"fontName", "Georgia"}, {"fontBold", "true"}};
+    const Settings s = LoadSettings(old);
+    CHECK(s.playerFontName == "Georgia" && s.npcFontName == "Georgia" && s.playerFontBold && s.npcFontBold);
 }
 
 TEST(a_saved_file_loads_every_setting_and_saves_back_the_same)
@@ -291,6 +526,15 @@ TEST(a_player_icon_side_that_is_not_a_side_keeps_its_default)
     MapStore store;
     store.values["iconGm"] = "middle";
     CHECK(LoadSettings(store).playerIconSide[static_cast<int>(PlayerIcon::Gm)] == IconSide::Left);
+}
+
+TEST(a_group_side_that_is_not_left_or_right_keeps_its_default)
+{
+    MapStore store;
+    store.values["detectionIconSide"] = "hide";
+    store.values["badgeSide"]         = "middle";
+    const Settings s                  = LoadSettings(store);
+    CHECK(s.detectionIconSide == IconSide::Left && s.badgeSide == IconSide::Right);
 }
 
 TEST(empty_store_gives_defaults)
@@ -327,7 +571,7 @@ TEST(the_font_list_puts_the_bundled_fonts_first_then_the_installed_ones_sorted_o
 {
     // GDI lists a family once per character set, vertical variants with an @, and a bundled font may be installed too.
     const std::vector<std::string> choices = FontChoices({"Verdana", "arial", "Arial", "@Meiryo", "", "Cinzel"}, "Verdana");
-    const std::vector<std::string> expected{"Marcellus SC", "Cinzel", "Cormorant SC", "arial", "Verdana"};
+    const std::vector<std::string> expected{"Marcellus SC", "Cinzel", "Cormorant SC", "Barlow Condensed", "arial", "Verdana"};
     CHECK(choices == expected);
 }
 
@@ -361,6 +605,16 @@ TEST(clamp_bounds_every_field)
     s.labelFontName  = "";
     s.cursorSize  = 2;
     s.nameRaise   = 99;
+    s.elementWeakRank   = 5;
+    s.elementResistRank = -9;
+    s.maxElements       = 99;
+    s.statusBadges[2]   = StatusBadgeRule{true, 3, 40};
+    s.statusBadges[7]   = StatusBadgeRule{true, -40, -3};
+    s.detectionIconSide = s.badgeSide = IconSide::Hidden;
+    s.badgeFontName     = "";
+    s.barHeight         = 200;
+    s.barTheme          = static_cast<BarTheme>(9);
+    s.barCurrency       = kCurrencyCount;
     const Color wild{{2.0f, -1.0f, 0.5f}};
     s.nameColor = s.textOutline = s.iconTint = s.cursorColor = s.subCursorColor = s.lockedCursorColor = wild;
     s.glowColor = s.ornamentColor = s.labelShadowColor = wild;
@@ -396,6 +650,13 @@ TEST(clamp_bounds_every_field)
     CHECK_EQ(c.iconSize, kMaxTextSize);
     CHECK_EQ(c.cursorSize, kMinTextSize);
     CHECK_EQ(c.nameRaise, kMaxNameRaise);
+    CHECK(c.elementWeakRank == -1 && c.elementResistRank == 1 && c.maxElements == kElementCount);
+    CHECK(c.statusBadges[2] == (StatusBadgeRule{true, -1, kNoResistRank}));
+    CHECK(c.statusBadges[7] == (StatusBadgeRule{true, kNoWeakRank, 1}));
+    CHECK(c.detectionIconSide == IconSide::Left && c.badgeSide == IconSide::Right); // a group cannot hide
+    CHECK(c.badgeFontName == kBadgeFont);
+    CHECK_EQ(c.barHeight, kMaxBarHeight);
+    CHECK(c.barTheme == BarTheme::PhoenixGold && c.barCurrency == kGilCurrency);
 }
 
 TEST(non_finite_values_fall_back_to_defaults)
@@ -436,13 +697,15 @@ TEST(nameplates_need_the_master_switch_and_a_part)
     Settings none;
     none.showLabels = none.showIcons = false;
     none.replaceMobNames = none.replacePlayerNames = none.replaceNpcNames = none.replaceCursor = false;
+    none.showDamageIcons = none.showStatusRankIcons = none.showImmunityIcons = false;
     CHECK(!NameplatesOn(none));
     auto onlyWithTheSwitch = [](Settings s) {
         CHECK(NameplatesOn(s));
         s.enabled = false;
         CHECK(!NameplatesOn(s));
     };
-    for (bool Settings::*part : {&Settings::showLabels, &Settings::showIcons, &Settings::replaceMobNames,
+    for (bool Settings::*part : {&Settings::showLabels, &Settings::showIcons, &Settings::showDamageIcons,
+             &Settings::showStatusRankIcons, &Settings::showImmunityIcons, &Settings::replaceMobNames,
              &Settings::replacePlayerNames, &Settings::replaceNpcNames, &Settings::replaceCursor, &Settings::phTimers})
     {
         Settings s = none;
@@ -561,4 +824,165 @@ TEST(the_keys_that_keep_the_pointer_are_real_keys_once_each_and_not_too_many)
     MapStore odd;
     odd.values = {{"keepPointerKeys", "11 zz 1B 999"}};
     CHECK(LoadSettings(odd).keepPointerKeys == (std::vector<uint8_t>{0x11, 0x1B}));
+}
+
+TEST(a_file_from_before_the_badge_group_takes_its_defaults)
+{
+    MapStore old;
+    old.values = {{"showIcons", "true"}};
+    const Settings s = LoadSettings(old);
+    CHECK(!s.showDamageIcons && !s.showStatusRankIcons && !s.showImmunityIcons); // the top bar's popup shows them
+    CHECK(s.detectionIconSide == IconSide::Left && s.badgeSide == IconSide::Right);
+    CHECK(s.elementWeakRank == -1 && s.elementResistRank == 4 && s.maxElements == kElementCount && !s.showRanks);
+    CHECK(s.badgeFontName == kBadgeFont);
+    for (const StatusBadgeRule& status : s.statusBadges)
+        CHECK(status == (StatusBadgeRule{true, kNoWeakRank, 4}));
+    CHECK(s.weakBadgeColor == Settings{}.weakBadgeColor && s.immuneBadgeColor == Settings{}.immuneBadgeColor);
+}
+
+TEST(a_file_from_before_windows_moved_moves_the_equipment_group_and_an_empty_list_moves_none)
+{
+    MapStore old;
+    CHECK(LoadSettings(old).movedWindows == DefaultMovedWindows());
+    MapStore none;
+    none.values["movedWindows"] = "";
+    CHECK(LoadSettings(none).movedWindows.empty());
+}
+
+TEST(a_theme_that_is_not_one_keeps_the_default_and_old_files_get_the_bar)
+{
+    MapStore store;
+    store.values["barTheme"]    = "purple";
+    store.values["barCurrency"] = "dollars";
+    const Settings s         = LoadSettings(store);
+    CHECK(s.barTheme == BarTheme::PhoenixGold && s.barCurrency == kGilCurrency);
+    CHECK(s.showBar);
+    for (int w = 0; w < kBarWidgetCount; ++w) // a widget added to BarWidget takes its default from kBarWidgetDefaults
+        CHECK(s.barWidgets[w] == kBarWidgetDefaults[w]);
+}
+
+TEST(each_theme_and_bar_widget_has_its_own_key)
+{
+    struct Named
+    {
+        const char* name;
+        BarTheme theme;
+    };
+    for (const Named& t : {Named{"phoenixGold", BarTheme::PhoenixGold}, Named{"umbraDark", BarTheme::UmbraDark},
+             Named{"phoenixRedOrnate", BarTheme::PhoenixRedOrnate},
+             Named{"phoenixRedPills", BarTheme::PhoenixRedPills}})
+    {
+        MapStore store;
+        store.values["barTheme"] = t.name;
+        CHECK(LoadSettings(store).barTheme == t.theme);
+        MapStore saved;
+        SaveSettings(LoadSettings(store), saved);
+        CHECK(saved.values["barTheme"] == t.name);
+    }
+    const char* const widgetKeys[] = {"barZone", "barWeather", "barVanaTime", "barTarget", "barGil", "barBags",
+        "barEarthTime", "barGameHelp", "barServerTime", "barFps", "barJob", "barConnection", "barParty", "barConquest", "barSignet", "barDistance"}; // in BarWidget's order
+    static_assert(std::size(widgetKeys) == kBarWidgetCount);
+    for (int w = 0; w < kBarWidgetCount; ++w)
+    {
+        MapStore store;
+        store.values[widgetKeys[w]] = kBarWidgetDefaults[w] ? "false" : "true";
+        const Settings s = LoadSettings(store);
+        for (int other = 0; other < kBarWidgetCount; ++other)
+            CHECK(s.barWidgets[other] == (kBarWidgetDefaults[other] != (other == w)));
+    }
+}
+
+TEST(the_bar_height_is_clamped_at_both_ends)
+{
+    Settings s;
+    s.barHeight = 0;
+    CHECK_EQ(Clamp(s).barHeight, kMinBarHeight);
+    s.barHeight = kMaxBarHeight + 1;
+    CHECK_EQ(Clamp(s).barHeight, kMaxBarHeight);
+}
+
+TEST(the_bar_needs_the_master_switch_and_its_own)
+{
+    Settings s;
+    CHECK(BarOn(s));
+    s.showBar = false;
+    CHECK(!BarOn(s));
+    s.showBar = true;
+    s.enabled = false;
+    CHECK(!BarOn(s));
+}
+
+TEST(the_bar_runs_only_with_a_character_in_game)
+{
+    Settings s;
+    CHECK(BarRuns(s, kLoginInGame));
+    for (const uint8_t status : {uint8_t{0}, uint8_t{1}, uint8_t{3}, uint8_t{255}})
+        CHECK(!BarRuns(s, status));
+    s.showBar = false;
+    CHECK(!BarRuns(s, kLoginInGame));
+    s.showBar = true;
+    s.enabled = false;
+    CHECK(!BarRuns(s, kLoginInGame));
+}
+
+TEST(the_bar_sections_load_by_name_and_keep_every_widget)
+{
+    MapStore store;
+    store.values["barLeft"]   = "target zone";
+    store.values["barCenter"] = "";
+    const Settings s          = LoadSettings(store);
+    const auto& left          = s.barSections[static_cast<int>(BarSection::Left)];
+    CHECK(left.size() >= 2 && left[0] == BarWidget::Target && left[1] == BarWidget::Zone);
+    CHECK(s.barSections[static_cast<int>(BarSection::Center)].empty()); // the target is placed already
+    MapStore saved;
+    SaveSettings(s, saved);
+    CHECK(saved.values["barCenter"].empty() && saved.values["barLeft"].rfind("target zone", 0) == 0);
+}
+
+TEST(separators_that_are_not_a_choice_keep_the_themes)
+{
+    MapStore store;
+    store.values["barSeparators"] = "stars";
+    CHECK(LoadSettings(store).barSeparators == BarSeparators::Theme);
+}
+
+TEST(text_sizes_start_at_auto_and_clamp_to_their_range)
+{
+    CHECK(Settings{}.barTextSize == kAutoBarTextSize && Settings{}.popupTextSize == kAutoPopupTextSize);
+    MapStore store;
+    store.values["barTextSize"]   = "3";
+    store.values["popupTextSize"] = "90";
+    const Settings s = LoadSettings(store);
+    CHECK(s.barTextSize == kAutoBarTextSize && s.popupTextSize == kMaxBarTextSize);
+    // A 9 px popup puts its icons 2 px from their numbers, which reads as touching: set popup sizes start at 10.
+    store.values["popupTextSize"] = "3";
+    CHECK_EQ(LoadSettings(store).popupTextSize, kAutoPopupTextSize);
+    store.values["popupTextSize"] = "10";
+    CHECK_EQ(LoadSettings(store).popupTextSize, 10);
+    CHECK_EQ(kAutoPopupTextSize + 1, 10);
+}
+
+TEST(a_menu_font_the_list_lacks_or_a_size_past_its_ends_keeps_the_defaults)
+{
+    MapStore store;
+    store.values["menuFont"]  = "Comic Sans";
+    store.values["menuScale"] = "400";
+    const Settings s          = LoadSettings(store);
+    CHECK(s.menuFont == kDefaultMenuFont && s.menuScale == kMaxMenuScale);
+    CHECK(MenuFontNamed("Segoe UI") != nullptr && MenuFontNamed("Barlow Condensed")->file == nullptr);
+}
+
+TEST(the_window_defaults_set_every_window_under_the_bar_or_leave_them_all_to_the_game)
+{
+    Settings s;
+    s.windowOffsets = {WindowOffset{"equip", 10, -20}};
+    UseHeadsUpWindowDefaults(s);
+    CHECK(s.allUnderBar && s.moveGameHelp && s.windowOffsets.empty() && s.windowGroups == DefaultWindowGroups());
+    CHECK(s.movedWindows == DefaultMovedWindows());
+    UseGameWindowDefaults(s);
+    CHECK(!s.allUnderBar && !s.moveGameHelp && s.movedWindows.empty() && s.windowGroups.empty());
+    s.hideHelpBar = false;
+    s.barWidgets[static_cast<int>(BarWidget::GameHelp)] = false;
+    UseHelpTextDefaults(s);
+    CHECK(s.allUnderBar && !s.moveGameHelp && s.hideHelpBar && s.barWidgets[static_cast<int>(BarWidget::GameHelp)]);
 }

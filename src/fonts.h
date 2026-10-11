@@ -1,5 +1,7 @@
 #pragma once
 
+#include "generated/font_families.h"
+
 #include <cstddef>
 #include <string>
 #include <vector>

@@ -154,13 +154,30 @@ namespace headsup
         const bool has[kPlayerIconCount] = {status.gm, status.mentor, status.newAdventurer, status.levelSync, status.away,
             status.linkshell, status.bazaar, status.seekingParty};
         PlayerIconRows rows;
-        for (int i = 0; i < kPlayerIconCount; ++i)
+        int shown          = 0;
+        bool slotOpen      = false; // a slot is started, for the icons after it to share
+        bool slotFilled    = false;
+        IconSide slotSide  = IconSide::Left;
+        for (const PlayerIcon icon : settings.playerIconOrder)
         {
-            const IconSide side = settings.playerIconSide[i];
-            if (!has[i] || side == IconSide::Hidden) continue;
+            const int i = static_cast<int>(icon);
+            if (icon == PlayerIcon::Gm) continue;
+            const IconSide own = settings.playerIconSide[i];
+            const bool joins   = settings.playerIconShare[i] && slotOpen;
+            if (!joins)
+            {
+                slotOpen   = true;
+                slotFilled = false;
+                slotSide   = own;
+            }
+            if (!has[i] || own == IconSide::Hidden || slotFilled || shown >= settings.playerIconMax) continue;
+            const IconSide side    = slotSide != IconSide::Hidden ? slotSide : own;
             IconSet& row           = side == IconSide::Right ? rows.right : rows.left;
             row.icons[row.count++] = kPlayerIconImages[i];
+            slotFilled             = true;
+            ++shown;
         }
+        if (has[static_cast<int>(PlayerIcon::Gm)]) rows.left.icons[rows.left.count++] = Icon::Gm;
         return rows;
     }
 }

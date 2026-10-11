@@ -62,12 +62,16 @@ namespace headsup
         uint8_t stencilRef = 0;     // 1 to kMaxStencilRef when outlined
         uint32_t argb      = 0;     // the outline's D3DCOLOR
         uint16_t index     = 0;     // entity target index
+        uint32_t serverId    = 0;       // the mob data key
+        const MobRecord* mob = nullptr; // a mob's Phoenix record, when it has one
+        Label level{};                  // a living mob's level and con, as the level line shows them before its ID
         EntityKind kind    = EntityKind::Npc;
         Category category  = Category::Unknown; // where a mob's outline color comes from, shown or not
         bool alive         = false;
         char name[32]      = {};
         Label label{};              // level and con text: every living mob
         IconSet mobIcons{};
+        InfoIconSet infoIcons{}; // the badge group, already filtered by its switches
         PlayerIconRows playerIcons{};
         uint32_t linkshellArgb = 0; // a player's linkshell color, for its icon
         Pose pose              = Pose::Standing;
@@ -91,6 +95,8 @@ namespace headsup
     public:
         void Update(const std::vector<ActorInput>& actors, const PlayerState& player, const Settings& settings);
         const ActorInfo* Find(ActorPtr actor) const;
+        // The actor with this entity target index; null for 0 or when none has it.
+        const ActorInfo* FindIndex(uint16_t index) const;
         uint32_t OutlinedCount() const { return m_Outlined; }
         const PlayerState& Player() const { return m_Player; }
         // In entity order.
@@ -108,6 +114,11 @@ namespace headsup
     // The first tracked actor pointer in [begin, end), a stack: the live actor being drawn, as pointers further up can
     // be stale leftovers. nullptr when there is none.
     const ActorInfo* FindOwner(const uint32_t* begin, const uint32_t* end, const Tracker& tracker);
+    // FindOwner from just past the first address in [codeBegin, codeEnd), the game's code: the return into the game
+    // from its draw call. Below it are Ashita's and every plugin's frames, and what plugins that ran before HeadsUp
+    // left there, such as another plugin's copy of the target's actor. From begin when no such address is found.
+    const ActorInfo* FindOwnerAboveCaller(const uint32_t* begin, const uint32_t* end, const Tracker& tracker,
+        uint32_t codeBegin, uint32_t codeEnd);
 
     // Yalms from Ashita's squared entity distance. A NaN stays NaN, so no distance limit passes it; a negative value
     // becomes 0.

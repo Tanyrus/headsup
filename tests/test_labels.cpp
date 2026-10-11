@@ -9,7 +9,8 @@ namespace
 {
     MobRecord Mob(uint8_t minLevel, uint8_t maxLevel, int16_t levelMod = 0)
     {
-        return MobRecord{17199648, "Goblin Bounty Hunter", minLevel, maxLevel, kMobAggressive, 300, 0, levelMod, 0};
+        return MobRecord{
+            17199648, "Goblin Bounty Hunter", minLevel, maxLevel, kMobAggressive, 300, 0, levelMod, 0, 0, 0};
     }
 
     std::string Text(const Label& l)
@@ -25,6 +26,7 @@ TEST(a_mob_id_shows_as_its_last_three_hex_digits_or_whole)
     CHECK(MobIdText(17190918, false, MobIdFormat::Off, true).empty());
     CHECK(MobIdText(17190918, false, MobIdFormat::LastThree, true) == "[006]");
     CHECK(MobIdText(17191194, false, MobIdFormat::LastThree, true) == "[11A]");
+    CHECK(MobIdText(17190918, false, MobIdFormat::Decimal, true) == "[17190918]");
     CHECK(MobIdText(17190918, false, MobIdFormat::Full, true) == "[17190918 (0x1065006)]");
 }
 
@@ -33,6 +35,7 @@ TEST(a_placeholders_id_can_show_ph)
     CHECK(MobIdText(17191194, true, MobIdFormat::LastThree, true) == "[PH]");
     CHECK(MobIdText(17191194, true, MobIdFormat::LastThree, false) == "[11A]");
     CHECK(MobIdText(17191194, true, MobIdFormat::Full, true) == "[17191194 (0x106511A)] [PH]");
+    CHECK(MobIdText(17191194, true, MobIdFormat::Decimal, true) == "[17191194] [PH]");
     CHECK(MobIdText(17191194, true, MobIdFormat::Off, true).empty());
 }
 

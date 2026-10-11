@@ -1,0 +1,183 @@
+#include "game_packets.h"
+#include "test.h"
+
+#include <cstring>
+#include <string>
+#include <vector>
+
+using namespace headsup;
+
+namespace
+{
+    std::vector<uint8_t> Packet(size_t size, std::initializer_list<std::pair<size_t, uint16_t>> words)
+    {
+        std::vector<uint8_t> data(size, 0);
+        for (const auto& [offset, value] : words)
+            std::memcpy(data.data() + offset, &value, sizeof(value));
+        return data;
+    }
+}
+
+TEST(a_zone_in_names_the_zones_weather)
+{
+    const std::vector<uint8_t> in = Packet(0x100, {{0x30, 103}, {0x68, 6}}); // zone 103, rain
+    CHECK(ParseZoneInWeather(in.data(), static_cast<uint32_t>(in.size())) == Weather::Rain);
+    CHECK(!ParseZoneInWeather(in.data(), 0x69).has_value()); // too short for the weather
+    const std::vector<uint8_t> odd = Packet(0x100, {{0x30, 103}, {0x68, 25}});
+    CHECK(!ParseZoneInWeather(odd.data(), 0x100).has_value());
+}
+
+TEST(a_weather_change_names_the_new_weather)
+{
+    const std::vector<uint8_t> change = Packet(0x0C, {{0x08, 14}});
+    CHECK(ParseWeather(change.data(), 0x0C) == Weather::Thunder);
+    CHECK(!ParseWeather(change.data(), 0x09).has_value());
+    const std::vector<uint8_t> odd = Packet(0x0C, {{0x08, 99}});
+    CHECK(!ParseWeather(odd.data(), 0x0C).has_value());
+}
+
+TEST(a_conquest_update_names_each_regions_owner)
+{
+    std::vector<uint8_t> data(0xB4, 0);
+    data[0x1D + 4 * 0] = 1;   // Ronfaure: San d'Oria
+    data[0x1D + 4 * 1] = 2;   // Zulkheim: Bastok
+    data[0x1D + 4 * 18] = 4;  // Tavnazia: beastmen
+    data[0x1D + 4 * 2]  = 9;  // nonsense: no one
+    const std::optional<RegionOwners> owners = ParseConquest(data.data(), static_cast<uint32_t>(data.size()));
+    CHECK(owners.has_value());
+    CHECK((*owners)[0] == Nation::SanDoria && (*owners)[1] == Nation::Bastok && (*owners)[18] == Nation::Beastmen);
+    CHECK((*owners)[2] == Nation::None && (*owners)[3] == Nation::None);
+    CHECK(!ParseConquest(data.data(), 0x65).has_value());
+    CHECK(std::string(NationName(Nation::SanDoria)) == "San d'Oria" && std::string(NationName(Nation::None)).empty());
+}
+
+// The weather ids are whole 16-bit words, which a set high byte takes past every weather; each packet is read up to
+// its last byte and no further; and no packet reads as nothing.
+TEST(packets_are_read_as_whole_words_up_to_their_last_byte_and_never_from_nothing)
+{
+    const std::vector<uint8_t> in = Packet(0x6A, {{0x68, 6}});
+    CHECK(ParseZoneInWeather(in.data(), 0x6A) == Weather::Rain);
+    const std::vector<uint8_t> inHigh = Packet(0x6A, {{0x68, 0x0106}});
+    CHECK(!ParseZoneInWeather(inHigh.data(), 0x6A).has_value());
+    const std::vector<uint8_t> change = Packet(0x0A, {{0x08, 6}});
+    CHECK(ParseWeather(change.data(), 0x0A) == Weather::Rain);
+    const std::vector<uint8_t> changeHigh = Packet(0x0A, {{0x08, 0x0106}});
+    CHECK(!ParseWeather(changeHigh.data(), 0x0A).has_value());
+    std::vector<uint8_t> conquest(0x66, 0);
+    conquest[0x1D + 4 * 18] = 3; // Tavnazia: Windurst, in the last byte read
+    const std::optional<RegionOwners> owners = ParseConquest(conquest.data(), 0x66);
+    CHECK(owners.has_value() && (*owners)[18] == Nation::Windurst);
+    CHECK(!ParseZoneInWeather(nullptr, 0x100).has_value() && !ParseWeather(nullptr, 0x100).has_value());
+    CHECK(!ParseConquest(nullptr, 0x100).has_value());
+}
+
+namespace
+{
+    // A check's general packet: Tanyrus (server id 0x01006A2B, index 0x410), WAR 75 / NIN 37, in Phoenix's linkshell.
+    std::vector<uint8_t> InspectGeneralPacket(uint8_t mode = 0x01)
+    {
+        std::vector<uint8_t> p(0x54, 0);
+        const uint32_t id = 0x01006A2B;
+        const uint16_t index = 0x410;
+        std::memcpy(p.data() + 0x04, &id, sizeof(id));
+        std::memcpy(p.data() + 0x08, &index, sizeof(index));
+        p[0x0A] = mode;
+        const uint8_t phoenix[] = {0xA8, 0x83, 0xC5, 0x38, 0x96, 0x3F};
+        std::memcpy(p.data() + 0x10, phoenix, sizeof(phoenix));
+        p[0x22] = 1, p[0x23] = 13, p[0x24] = 75, p[0x25] = 37, p[0x26] = 1;
+        return p;
+    }
+}
+
+TEST(a_linkshell_name_unpacks_from_six_bit_codes)
+{
+    const uint8_t phoenix[] = {0xA8, 0x83, 0xC5, 0x38, 0x96, 0x3F}, ls2[] = {0x9A, 0xDD, 0xFF},
+        letters[] = {0x04, 0x20, 0xC4, 0x14, 0x61, 0xC8, 0x24, 0xA2, 0xCC, 0x34, 0xE3, 0xD0, 0x45, 0x24, 0xD4, 0xFC};
+    CHECK_EQ(LinkshellName(phoenix, sizeof(phoenix)), std::string("Phoenix"));
+    CHECK_EQ(LinkshellName(ls2, sizeof(ls2)), std::string("LS2"));
+    CHECK_EQ(LinkshellName(letters, sizeof(letters)), std::string("abcdefghijklmnopqrst")); // 20 letters, the most
+    const uint8_t none[16] = {};
+    CHECK(LinkshellName(none, sizeof(none)).empty() && LinkshellName(nullptr, 16).empty());
+}
+
+TEST(a_checks_general_packet_carries_the_jobs_levels_and_linkshell)
+{
+    const std::vector<uint8_t> p = InspectGeneralPacket();
+    CHECK(ParseInspectGeneral(p.data(), static_cast<uint32_t>(p.size())) ==
+          (InspectGeneral{0x01006A2B, 0x410, "Phoenix", 1, 13, 75, 37, 0}));
+    CHECK(!ParseInspectGeneral(p.data(), 0x28).has_value()); // short of the master flags
+    const std::vector<uint8_t> equipment = InspectGeneralPacket(0x03);
+    CHECK(!ParseInspectGeneral(equipment.data(), static_cast<uint32_t>(equipment.size())).has_value());
+    CHECK(!ParseInspectGeneral(nullptr, 0x54).has_value());
+}
+
+TEST(a_checks_message_carries_the_name_and_title)
+{
+    std::vector<uint8_t> p(0x94, 0);
+    std::memcpy(p.data() + 0x80, "Tanyrus", 7);
+    const uint32_t title = 206; // NEW_ADVENTURER in Phoenix's title.lua
+    std::memcpy(p.data() + 0x90, &title, sizeof(title));
+    CHECK(ParseInspectMessage(p.data(), 0x94) == (InspectMessage{"Tanyrus", 206}));
+    std::memset(p.data() + 0x80, 'x', 16); // a 16-letter name fills its field with no NUL
+    CHECK_EQ(ParseInspectMessage(p.data(), 0x94)->name, std::string(16, 'x'));
+    CHECK(!ParseInspectMessage(p.data(), 0x93).has_value());
+}
+
+// Each length from 1 to 20, as Phoenix's EncodeStringLinkshell packs it into the item's 15-byte Name and the packet's
+// 16-byte field. A length of 2, 6, 10, 14 or 18 ends on 4 one bits, which read on as a code of 60 ('7') before a 0.
+TEST(a_linkshell_name_of_every_length_unpacks_as_phoenix_packed_it)
+{
+    const struct
+    {
+        const char* name;
+        uint8_t packed[16];
+    } names[] = {
+        {"V", {0xC3, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
+        {"Va", {0xC0, 0x1F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
+        {"Van", {0xC0, 0x13, 0xBF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
+        {"Vana", {0xC0, 0x13, 0x81, 0xFC, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
+        {"VanaD", {0xC0, 0x13, 0x81, 0x7B, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
+        {"VanaDi", {0xC0, 0x13, 0x81, 0x78, 0x9F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
+        {"VanaDie", {0xC0, 0x13, 0x81, 0x78, 0x91, 0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
+        {"VanaDiel", {0xC0, 0x13, 0x81, 0x78, 0x91, 0x4C, 0xFC, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
+        {"VanaDiel2", {0xC0, 0x13, 0x81, 0x78, 0x91, 0x4C, 0xDF, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
+        {"VanaDiel20", {0xC0, 0x13, 0x81, 0x78, 0x91, 0x4C, 0xDF, 0x5F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
+        {"VanaDiel202", {0xC0, 0x13, 0x81, 0x78, 0x91, 0x4C, 0xDF, 0x5D, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
+        {"VanaDiel2026", {0xC0, 0x13, 0x81, 0x78, 0x91, 0x4C, 0xDF, 0x5D, 0xFB, 0xFC, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
+        {"VanaDiel2026E", {0xC0, 0x13, 0x81, 0x78, 0x91, 0x4C, 0xDF, 0x5D, 0xFB, 0x7F, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00}},
+        {"VanaDiel2026Ex", {0xC0, 0x13, 0x81, 0x78, 0x91, 0x4C, 0xDF, 0x5D, 0xFB, 0x7D, 0x8F, 0x00, 0x00, 0x00, 0x00, 0x00}},
+        {"VanaDiel2026Exp", {0xC0, 0x13, 0x81, 0x78, 0x91, 0x4C, 0xDF, 0x5D, 0xFB, 0x7D, 0x84, 0x3F, 0x00, 0x00, 0x00, 0x00}},
+        {"VanaDiel2026Expl", {0xC0, 0x13, 0x81, 0x78, 0x91, 0x4C, 0xDF, 0x5D, 0xFB, 0x7D, 0x84, 0x0C, 0xFC, 0x00, 0x00, 0x00}},
+        {"VanaDiel2026Explo", {0xC0, 0x13, 0x81, 0x78, 0x91, 0x4C, 0xDF, 0x5D, 0xFB, 0x7D, 0x84, 0x0C, 0x3F, 0xF0, 0x00, 0x00}},
+        {"VanaDiel2026Explor", {0xC0, 0x13, 0x81, 0x78, 0x91, 0x4C, 0xDF, 0x5D, 0xFB, 0x7D, 0x84, 0x0C, 0x3D, 0x2F, 0x00, 0x00}},
+        {"VanaDiel2026Explore", {0xC0, 0x13, 0x81, 0x78, 0x91, 0x4C, 0xDF, 0x5D, 0xFB, 0x7D, 0x84, 0x0C, 0x3D, 0x21, 0x7F, 0x00}},
+        {"VanaDiel2026Explorer", {0xC0, 0x13, 0x81, 0x78, 0x91, 0x4C, 0xDF, 0x5D, 0xFB, 0x7D, 0x84, 0x0C, 0x3D, 0x21, 0x52, 0x00}},
+    };
+    for (const auto& n : names)
+        CHECK_EQ(LinkshellName(n.packed, sizeof(n.packed)), std::string(n.name));
+    const uint8_t ls[] = {0x9A, 0xDF, 0x00};
+    CHECK_EQ(LinkshellName(ls, sizeof(ls)), std::string("LS"));
+}
+
+TEST(the_conquest_request_is_a_bare_header_naming_0x05a_and_one_word)
+{
+    const auto word = static_cast<uint16_t>(kConquestRequest[0] | kConquestRequest[1] << 8);
+    CHECK((word & 0x1FF) == kConquestRequestPacket);
+    CHECK(static_cast<size_t>(word >> 9) * 4 == kConquestRequest.size()); // XiPackets: 0x0004 bytes
+    CHECK(kConquestRequest[2] == 0 && kConquestRequest[3] == 0);         // the sync word, the game's to fill
+}
+
+TEST(a_conquest_update_carries_the_tally_your_conquest_points_and_imperial_standing)
+{
+    std::vector<uint8_t> packet(0xB4, 0);
+    const uint32_t points = 12345, standing = 8210;
+    packet[0x8C] = 59;
+    std::memcpy(packet.data() + 0x90, &points, sizeof(points));
+    std::memcpy(packet.data() + 0xB0, &standing, sizeof(standing));
+    std::memset(packet.data() + 0xA0, 0xFF, 0x10); // the Besieged words between them
+    CHECK(ParseConquestStanding(packet.data(), 0xB4) == (ConquestStanding{59, 12345, 8210}));
+    CHECK(!ParseConquestStanding(packet.data(), 0xB3).has_value());
+    CHECK(!ParseConquestStanding(nullptr, 0xB4).has_value());
+    packet[0x8C] = 176; // further off than a week: not the layout HeadsUp expects
+    CHECK(!ParseConquestStanding(packet.data(), 0xB4).has_value());
+}
