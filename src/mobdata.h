@@ -7,6 +7,17 @@
 
 namespace headsup
 {
+    // A mob's immunities (MobImmunity bits), damage taken per type (sdt: damage is multiplied by 1 + sdt / 10000) and
+    // elemental and status resistance ranks (Phoenix clamps them to -3..11), in mobflags.h's Sdt, Element and StatusRank
+    // orders.
+    struct MobResistances
+    {
+        uint32_t immunity;
+        int16_t sdt[kSdtCount];
+        int8_t elementRanks[kElementCount];
+        int8_t statusRanks[kStatusRankCount];
+    };
+
     // One mob as Phoenix's map server loads it (tools/phoenix/refresh.sh).
     struct MobRecord
     {
@@ -19,6 +30,7 @@ namespace headsup
         uint16_t detects;    // MobDetect bits
         int16_t expLevelMod; // added to its level for /check and experience
         uint32_t placeholderOf; // the NM it is a lottery placeholder for, by server ID; 0 when none
+        uint16_t resistances;   // index into the table ResistancesOf reads; 0 is neutral
     };
 
     bool IsAggressive(const MobRecord& mob);
@@ -36,5 +48,8 @@ namespace headsup
     // The record for this server ID when its name matches the entity's; nullptr when there is none or the names
     // differ (data older than the server's ID assignments).
     const MobRecord* FindMob(uint32_t serverId, std::string_view displayName);
+
+    // Its resistances; the neutral set when its index is past the table.
+    const MobResistances& ResistancesOf(const MobRecord& mob);
 
 }

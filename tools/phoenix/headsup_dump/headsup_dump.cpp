@@ -4,8 +4,9 @@
  * A Phoenix C++ module added by headsup's tools/phoenix/refresh.sh. Once
  * zones have spawned their mobs, it spawns the rest, so every mob runs its
  * spawn script, and watches them all live a while, noting any it sees
- * attacking, then writes every loaded mob and the /check and aggro rules
- * the server loaded to $HEADSUP_DUMP_PATH as JSON and exits.
+ * attacking, then writes every loaded mob, with its immunities, damage
+ * taken and resistance ranks, and the /check and aggro rules the server
+ * loaded to $HEADSUP_DUMP_PATH as JSON and exits.
  ************************************************************************/
 
 #include "common/lua.h"
@@ -41,6 +42,25 @@ namespace
     constexpr int kLevelsPerColumn  = 5;  // GetBaseExp reads one column per five player levels
     constexpr int kColumns          = 20; // player levels 1 to 100
     constexpr int kAnimations       = 256;
+    // In tools/gen_mobdata.py's SDT_ORDER, ELEMENT_ORDER and STATUS_RANK_ORDER.
+    constexpr xi::Mod kSdtMods[] = {xi::Mod::SLASH_SDT, xi::Mod::PIERCE_SDT, xi::Mod::IMPACT_SDT, xi::Mod::HTH_SDT,
+        xi::Mod::FIRE_SDT, xi::Mod::ICE_SDT, xi::Mod::WIND_SDT, xi::Mod::EARTH_SDT, xi::Mod::THUNDER_SDT, xi::Mod::WATER_SDT,
+        xi::Mod::LIGHT_SDT, xi::Mod::DARK_SDT};
+    constexpr xi::Mod kElementRankMods[] = {xi::Mod::FIRE_RES_RANK, xi::Mod::ICE_RES_RANK, xi::Mod::WIND_RES_RANK,
+        xi::Mod::EARTH_RES_RANK, xi::Mod::THUNDER_RES_RANK, xi::Mod::WATER_RES_RANK, xi::Mod::LIGHT_RES_RANK,
+        xi::Mod::DARK_RES_RANK};
+    constexpr xi::Mod kStatusRankMods[] = {xi::Mod::PARALYZE_RES_RANK, xi::Mod::BIND_RES_RANK, xi::Mod::SILENCE_RES_RANK,
+        xi::Mod::SLOW_RES_RANK, xi::Mod::POISON_RES_RANK, xi::Mod::LIGHT_SLEEP_RES_RANK, xi::Mod::DARK_SLEEP_RES_RANK,
+        xi::Mod::BLIND_RES_RANK, xi::Mod::STUN_RES_RANK, xi::Mod::GRAVITY_RES_RANK};
+
+    template <size_t N>
+    void WriteMods(FILE* out, const char* key, CMobEntity* PMob, const xi::Mod (&mods)[N])
+    {
+        std::fprintf(out, ",\"%s\":[", key);
+        for (size_t i = 0; i < N; ++i)
+            std::fprintf(out, "%s%d", i ? "," : "", static_cast<int>(PMob->getMod(mods[i])));
+        std::fputs("]", out);
+    }
 
     std::string JsonEscape(const std::string& text)
     {
@@ -244,6 +264,10 @@ class HeadsUpDumpModule : public CPPModule
                     static_cast<int>(PMob->getMobMod(xi::MobMod::Detection)), PMob->m_TrueDetection ? "true" : "false",
                     static_cast<int>(PMob->getMod(xi::Mod::EXP_LVL_MOD)), follows ? "true" : "false",
                     nmOf.contains(PMob->id) ? nmOf.at(PMob->id) : 0u);
+                std::fprintf(out, ",\"immunity\":%u", static_cast<unsigned>(PMob->m_Immunity));
+                WriteMods(out, "sdt", PMob, kSdtMods);
+                WriteMods(out, "elementRanks", PMob, kElementRankMods);
+                WriteMods(out, "statusRanks", PMob, kStatusRankMods);
                 if (const auto seen = seenAttacking.find(PMob); seen != seenAttacking.end())
                     std::fprintf(out, ",\"seenAttacking\":{\"aggro\":%s,\"alwaysAggro\":%d,\"noAggro\":%d}",
                         seen->second.aggro ? "true" : "false", seen->second.alwaysAggro, seen->second.noAggro);

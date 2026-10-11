@@ -15,9 +15,11 @@ class Generate(unittest.TestCase):
         self.assertIn('const unsigned char kFontMarcellusSC[] = {', text)
         self.assertIn('const unsigned char kFontCinzel[] = {', text)
         self.assertIn('const unsigned char kFontCormorantSC[] = {', text)
+        self.assertIn('const unsigned char kFontBarlowCondensed[] = {', text)
         table = text[text.index('const BundledFont kBundledFonts[]'):]
         self.assertLess(table.index('"Marcellus SC"'), table.index('"Cinzel"'))
         self.assertLess(table.index('"Cinzel"'), table.index('"Cormorant SC"'))
+        self.assertLess(table.index('"Cormorant SC"'), table.index('"Barlow Condensed"'))
 
     def test_the_embedded_bytes_are_the_font_file(self):
         text = gen_fonts.generate(self.fonts)

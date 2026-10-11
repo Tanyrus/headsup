@@ -20,6 +20,10 @@ EXPECTED = {
     17199648: ('Goblin Bounty Hunter', 17, 20, True, True, SIGHT),
 }
 MIN_MOBS, MIN_ZONES = 60000, 200
+# Mobs with immunities, with damage taken other than 100%, and with a resistance rank of 4 or more: thousands each in
+# Phoenix, so fewer means the dump read those columns before they were set.
+MIN_RESISTING = 1000
+STRONG_RANK = 4
 # id: EXP_LVL_MOD, set by the mob's spawn script
 EXPECTED_LEVEL_MODS = {
     17190918: -2,  # Wild Rabbit, scripts/zones/East_Ronfaure/mobs/Wild_Rabbit.lua
@@ -28,6 +32,11 @@ EXPECTED_LEVEL_MODS = {
 EXPECTED_PLACEHOLDERS = {
     17191194: 17191196,  # Carrion Worm for Bigmouth Billy, scripts/zones/East_Ronfaure/mobs/Bigmouth_Billy.lua
     17191195: 17191196,
+}
+Immunity = schema.Immunity
+# (zone, name): immunity bits its spawn script adds, which only the spawned mob carries
+EXPECTED_IMMUNITIES = {
+    (103, 'Doman'): Immunity.DARK_SLEEP | Immunity.SILENCE | Immunity.STUN,  # scripts/zones/Valkurm_Dunes/mobs/Doman.lua
 }
 EVEN_MATCH_EXP = 100  # every bracket of every experience table Phoenix ships
 RESTING, SITTING = 33, 47  # xi::Animation Healing and Sit, which CBattleEntity::isSitting names
@@ -38,7 +47,7 @@ def load(path):
     return {r['id']: r for r in schema.parse(pathlib.Path(path).read_text(encoding='utf-8'), str(path))}
 
 
-def check(records, min_mobs=MIN_MOBS, min_zones=MIN_ZONES):
+def check(records, min_mobs=MIN_MOBS, min_zones=MIN_ZONES, min_resisting=MIN_RESISTING):
     problems = []
     if len(records) < min_mobs:
         problems.append(f'only {len(records)} mobs (expected at least {min_mobs})')
@@ -66,6 +75,20 @@ def check(records, min_mobs=MIN_MOBS, min_zones=MIN_ZONES):
         r = records.get(mob_id)
         if r is None or r['placeholderOf'] != nm:
             problems.append(f"{mob_id}: expected a placeholder of {nm}, got {None if r is None else r['placeholderOf']}")
+    counts = {'immunities': sum(1 for r in records.values() if r['immunity']),
+              'damage taken other than 100%': sum(1 for r in records.values() if any(r['sdt'])),
+              f'a resistance rank of {STRONG_RANK} or more': sum(
+                  1 for r in records.values() if any(v >= STRONG_RANK for v in r['elementRanks'] + r['statusRanks']))}
+    for what, count in counts.items():
+        if count < min_resisting:
+            problems.append(f'only {count} mobs with {what} (expected at least {min_resisting})')
+    for (zone, name), bits in EXPECTED_IMMUNITIES.items():
+        found = [r for r in records.values() if r['zone'] == zone and r['name'] == name]
+        if not found:
+            problems.append(f'{name} (zone {zone}): missing')
+        elif any(r['immunity'] != bits for r in found):
+            got = ', '.join(str(r['immunity']) for r in found)
+            problems.append(f'{name} (zone {zone}): expected immunity bits {int(bits)}, got {got}')
     return problems
 
 

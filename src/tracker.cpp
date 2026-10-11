@@ -56,6 +56,10 @@ namespace headsup
 
     void Tracker::Update(const std::vector<ActorInput>& actors, const PlayerState& player, const Settings& settings)
     {
+        BadgeRules badges{.damage = settings.showDamageIcons, .statusRanks = settings.showStatusRankIcons,
+            .immunities = settings.showImmunityIcons, .elementWeakRank = settings.elementWeakRank,
+            .elementResistRank = settings.elementResistRank, .maxElements = settings.maxElements};
+        std::ranges::copy(settings.statusBadges, badges.status);
         m_Actors.clear();
         m_Player   = player;
         m_Min      = UINT32_MAX;
@@ -85,6 +89,7 @@ namespace headsup
                     info.label        = LevelLine(level, settings.showLabels,
                         MobIdText(a.serverId, placeholder, settings.mobId, settings.markPlaceholders));
                     info.mobIcons = IconsFor(mob);
+                    info.infoIcons = InfoIconsFor(mob != nullptr ? &ResistancesOf(*mob) : nullptr, badges);
                 }
                 const bool placeholderColor = placeholder && settings.show[CategoryIndex(Category::Placeholder)];
                 info.category = placeholderColor ? Category::Placeholder : Classify(mob, a.checked ? a.checked->level : 0, player);

@@ -38,7 +38,8 @@ line shows its exact level for that spawn. With mob IDs turned on, a placeholder
 an optional timer above your name counts down to the respawn of each placeholder you see die.
 
 Names are drawn in a bundled serif font, Marcellus SC by default, with Cinzel and Cormorant SC also included and every
-font installed in Windows available too. A monster's name glows in its border color, with a small ornament between the
+font installed in Windows available too. Badge numbers use the bundled Barlow Condensed, plain enough to read at a few
+pixels tall. A monster's name glows in its border color, with a small ornament between the
 name and its level line, so a glance tells you whether it will attack.
 
 ![A Goblin Leecher's red outline and nameplate](resources/nameplate_and_outline.png)

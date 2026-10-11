@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""Generate src/generated/mobdata.inc and mobflags.h from data/phoenix_mobs.tsv (written by tools/phoenix/refresh.sh).
+"""Generate src/generated/mobdata.inc and mobflags.h from data/phoenix_mobs.tsv (written by tools/phoenix/refresh.sh), with
+each distinct set of resistances stored once for the mobs to point at.
 
-This file owns the TSV's format: its columns and ranges, the bits of its flags and detects columns, the names of the
+This file owns the TSV's format: its columns and ranges, the bits of its flags, detects and immunity columns, the order
+of its list columns, the names of the
 data files and the meta file's commit key. The Phoenix tools import it, and the plugin gets the bits from mobflags.h.
 """
 import enum
@@ -12,10 +14,18 @@ import sys
 TSV_NAME = 'phoenix_mobs.tsv'
 META_NAME = 'phoenix_mobs.meta'
 META_COMMIT_KEY = 'phoenix_commit'
-COLUMNS = ['id', 'zone', 'name', 'minLevel', 'maxLevel', 'flags', 'respawn', 'detects', 'expLevelMod', 'placeholderOf']
+COLUMNS = ['id', 'zone', 'name', 'minLevel', 'maxLevel', 'flags', 'respawn', 'detects', 'expLevelMod', 'placeholderOf',
+           'immunity', 'sdt', 'elementRanks', 'statusRanks']
 LIMITS = {'id': (1, 0xFFFFFFFF), 'zone': (0, 0xFFFF), 'minLevel': (0, 255), 'maxLevel': (0, 255), 'flags': (0, 0xFF),
           'respawn': (0, 0xFFFFFFFF), 'detects': (0, 0xFFFF), 'expLevelMod': (-0x8000, 0x7FFF),
-          'placeholderOf': (0, 0xFFFFFFFF)}
+          'placeholderOf': (0, 0xFFFFFFFF), 'immunity': (0, 0xFFFFFFFF)}
+# The order of each list column, as headsup_dump.cpp writes it and the plugin reads it (mobflags.h).
+SDT_ORDER = ['Slashing', 'Piercing', 'Impact', 'H2H', 'Fire', 'Ice', 'Wind', 'Earth', 'Lightning', 'Water', 'Light', 'Dark']
+ELEMENT_ORDER = ['Fire', 'Ice', 'Wind', 'Earth', 'Lightning', 'Water', 'Light', 'Dark']
+STATUS_RANK_ORDER = ['Paralyze', 'Bind', 'Silence', 'Slow', 'Poison', 'LightSleep', 'DarkSleep', 'Blind', 'Stun', 'Gravity']
+# Comma-separated lists: their length and each value's range, what the plugin stores (int16 SDT, int8 ranks).
+LISTS = {'sdt': (len(SDT_ORDER), -0x8000, 0x7FFF), 'elementRanks': (len(ELEMENT_ORDER), -0x80, 0x7F),
+         'statusRanks': (len(STATUS_RANK_ORDER), -0x80, 0x7F)}
 
 
 class MobFlag(enum.IntFlag):
@@ -38,6 +48,29 @@ class Detect(enum.IntFlag):
     SCENT = 0x100
 
 
+class Immunity(enum.IntFlag):
+    """Phoenix's xi::Immunity (data/enums/immunity.yaml)."""
+    ADDLE = 0x00001
+    GRAVITY = 0x00002
+    BIND = 0x00004
+    STUN = 0x00008
+    SILENCE = 0x00010
+    PARALYZE = 0x00020
+    BLIND = 0x00040
+    SLOW = 0x00080
+    POISON = 0x00100
+    ELEGY = 0x00200
+    REQUIEM = 0x00400
+    LIGHT_SLEEP = 0x00800
+    DARK_SLEEP = 0x01000
+    ASPIR = 0x02000
+    TERROR = 0x04000
+    DISPEL = 0x08000
+    PETRIFY = 0x10000
+    PLAGUE = 0x20000
+    CURSE = 0x40000
+
+
 class DataError(ValueError):
     pass
 
@@ -57,6 +90,14 @@ def parse(text: str, source: str = TSV_NAME):
                 if not value:
                     raise DataError(f'{source}:{number}: empty name')
                 record[column] = value
+                continue
+            if column in LISTS:
+                count, lo, hi = LISTS[column]
+                parts = value.split(',')
+                if len(parts) != count or not all(re.fullmatch(r'-?[0-9]+', p) and lo <= int(p) <= hi for p in parts):
+                    raise DataError(f'{source}:{number}: {column} must be {count} whole numbers from {lo} to {hi} '
+                                    f'separated by commas, got {value!r}')
+                record[column] = [int(p) for p in parts]
                 continue
             lo, hi = LIMITS[column]
             if not re.fullmatch(r'-?[0-9]+', value) or not lo <= int(value) <= hi:
@@ -79,16 +120,39 @@ def c_string(text: str) -> str:
     return '"' + ''.join(out) + '"'
 
 
-def c_record(r) -> str:
+NEUTRAL = (0, (0,) * len(SDT_ORDER), (0,) * len(ELEMENT_ORDER), (0,) * len(STATUS_RANK_ORDER))
+
+
+def resistances_key(r):
+    return r['immunity'], tuple(r['sdt']), tuple(r['elementRanks']), tuple(r['statusRanks'])
+
+
+def c_list(values) -> str:
+    return '{' + ', '.join(str(v) for v in values) + '}'
+
+
+def c_resistances(key) -> str:
+    immunity, sdt, elements, statuses = key
+    return f'    {{{immunity}u, {c_list(sdt)}, {c_list(elements)}, {c_list(statuses)}}},'
+
+
+def c_record(r, resistances: int) -> str:
     return (f"    {{{r['id']}u, {c_string(r['name'])}, {r['minLevel']}, {r['maxLevel']}, {r['flags']}, {r['respawn']}u, "
-            f"{r['detects']}, {r['expLevelMod']}, {r['placeholderOf']}u}},")
+            f"{r['detects']}, {r['expLevelMod']}, {r['placeholderOf']}u, {resistances}}},")
 
 
 def generate(records, commit: str) -> str:
+    # Most mobs share their family's values, so each distinct set is stored once; 0 is the neutral one.
+    table = {NEUTRAL: 0}
+    indices = [table.setdefault(resistances_key(r), len(table)) for r in records]
+    if len(table) > 0xFFFF:
+        raise DataError(f'{len(table)} distinct resistances do not fit MobRecord::resistances')
     lines = [f'// Generated by tools/gen_mobdata.py from data/{TSV_NAME} (Phoenix {commit}). Do not edit.',
-             f'// {len(records)} mobs, sorted by server ID.',
-             'const MobRecord kMobs[] = {']
-    lines += [c_record(r) for r in records]
+             f'// {len(records)} mobs, sorted by server ID, and {len(table)} distinct resistances.',
+             'const MobResistances kMobResistances[] = {']
+    lines += [c_resistances(key) for key in table]
+    lines += ['};', '', 'const MobRecord kMobs[] = {']
+    lines += [c_record(r, index) for r, index in zip(records, indices)]
     lines += ['};', '']
     return '\n'.join(lines)
 
@@ -99,12 +163,21 @@ def cpp_enum(name: str, prefix: str, underlying: str, flags) -> list:
     return [f'    enum {name} : {underlying}', '    {'] + [f'        {prefix}{words(m)} = {m.value},' for m in flags] + ['    };']
 
 
+def cpp_order(name: str, members) -> list:
+    return ([f'    enum class {name} : uint8_t', '    {'] + [f'        {m},' for m in members] +
+            ['    };', f'    constexpr int k{name}Count = {len(members)};'])
+
+
 def generate_flags() -> str:
     lines = ['// Generated by tools/gen_mobdata.py. Do not edit.', '#pragma once', '', '#include <cstdint>', '',
              'namespace headsup', '{', '    // Bits of MobRecord::flags.']
     lines += cpp_enum('MobFlag', 'kMob', 'uint8_t', MobFlag)
     lines += ['', "    // Bits of MobRecord::detects: Phoenix's MobMod Detection."]
     lines += cpp_enum('MobDetect', 'kDetect', 'uint16_t', Detect)
+    lines += ['', "    // Bits of MobResistances::immunity: Phoenix's xi::Immunity."]
+    lines += cpp_enum('MobImmunity', 'kImmune', 'uint32_t', Immunity)
+    lines += ['', '    // The order of MobResistances::sdt, ::elementRanks and ::statusRanks.']
+    lines += cpp_order('Sdt', SDT_ORDER) + cpp_order('Element', ELEMENT_ORDER) + cpp_order('StatusRank', STATUS_RANK_ORDER)
     lines += ['}', '']
     return '\n'.join(lines)
 

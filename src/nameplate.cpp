@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include <utility>
 
 namespace headsup
 {
@@ -24,6 +25,13 @@ namespace headsup
         float RowWidth(int count, float size)
         {
             return count > 0 ? static_cast<float>(count) * size + static_cast<float>(count - 1) * kIconGap : 0.0f;
+        }
+
+        int RowCount(int count) { return (count + kIconsPerRow - 1) / kIconsPerRow; }
+        // A group's first row, its widest: its icons, the gaps between them and, for badges, each one's overhang.
+        float FirstRowWidth(int count, float step)
+        {
+            return count > 0 ? static_cast<float>(std::min(count, kIconsPerRow)) * step - kIconGap : 0.0f;
         }
 
         CursorKind CursorFor(uint16_t index, const Settings& settings, const CursorTargets& targets)
@@ -60,6 +68,7 @@ namespace headsup
         const bool mobLines = info.alive && !hidden;
         lines.label         = mobLines && info.label.text[0] != '\0';
         lines.mobIconCount  = mobLines && settings.showIcons && !iconsFailed ? info.mobIcons.count : 0;
+        lines.infoIconCount = mobLines && !iconsFailed ? info.infoIcons.count : 0;
         const bool showPlayerIcons = lines.name && settings.showPlayerIcons && !iconsFailed;
         lines.leftIconCount        = showPlayerIcons ? info.playerIcons.left.count : 0;
         lines.rightIconCount       = showPlayerIcons ? info.playerIcons.right.count : 0;
@@ -114,10 +123,34 @@ namespace headsup
             l.labelY = bottom - sizes.labelHeight;
             bottom   = l.labelY - kLineGap;
         }
-        l.iconsX   = centerX - RowWidth(sizes.mobIconCount, sizes.iconSize) * 0.5f;
-        l.iconsY   = bottom - sizes.iconSize;
-        l.iconStep = sizes.iconSize + kIconGap;
-        if (sizes.mobIconCount > 0) bottom = l.iconsY - kLineGap;
+        const float overhang = sizes.iconSize * kBadgeOverhang;
+        const float hang     = sizes.infoIconCount > 0 ? sizes.iconSize * kBadgeHang : 0.0f;
+        l.iconSize           = sizes.iconSize;
+        // Each group against its edge of the row, which lines up with the level line (the name when there is none); on a
+        // shared side the badges take the edge and the detection icons sit a gap inside the badges' first row, their
+        // widest. The row widens evenly when its groups need the room.
+        const float detectionStep = sizes.iconSize + kIconGap, badgeStep = detectionStep + overhang;
+        const float detectionWidth = FirstRowWidth(sizes.mobIconCount, detectionStep);
+        const float badgeWidth     = FirstRowWidth(sizes.infoIconCount, badgeStep);
+        const bool shared          = sizes.detectionLeft == sizes.badgesLeft;
+        float leftWidth = 0.0f, rightWidth = 0.0f;
+        for (const auto& [left, width] : {std::pair{sizes.detectionLeft, detectionWidth}, std::pair{sizes.badgesLeft, badgeWidth}})
+        {
+            float& side = left ? leftWidth : rightWidth;
+            if (width > 0.0f) side += (side > 0.0f ? kIconGap : 0.0f) + width;
+        }
+        const float between = leftWidth > 0.0f && rightWidth > 0.0f ? kIconGap : 0.0f;
+        const float text    = sizes.labelWidth > 0.0f ? sizes.labelWidth : showName ? sizes.nameWidth : 0.0f;
+        const float row     = std::max(text, leftWidth + between + rightWidth);
+        l.iconsLeftX        = centerX - row * 0.5f;
+        l.iconsRightX       = centerX + row * 0.5f;
+        const float inside  = shared && badgeWidth > 0.0f ? badgeWidth + kIconGap : 0.0f;
+        l.detection         = IconRow{sizes.mobIconCount, detectionStep, inside, sizes.detectionLeft};
+        l.info              = IconRow{sizes.infoIconCount, badgeStep, sizes.badgesLeft ? 0.0f : overhang, sizes.badgesLeft};
+        l.iconRowStep  = sizes.iconSize + hang + kLineGap;
+        l.iconsY       = bottom - hang - sizes.iconSize;
+        const int rows = std::max(RowCount(sizes.mobIconCount), RowCount(sizes.infoIconCount));
+        if (rows > 0) bottom = l.iconsY - static_cast<float>(rows - 1) * l.iconRowStep - kLineGap;
         l.timerStep = sizes.timerHeight + kLineGap;
         l.timersY   = bottom + kLineGap - static_cast<float>(sizes.timerCount) * l.timerStep;
         if (sizes.timerCount > 0) bottom = l.timersY - kLineGap;
@@ -127,6 +160,21 @@ namespace headsup
         l.playerIconsY   = l.nameY + (sizes.nameHeight - sizes.playerIconSize) * 0.5f;
         l.cursor         = CursorAtAnchor(centerX, bottom, sizes.cursorWidth, sizes.cursorHeight, sizes.cursorTip);
         return l;
+    }
+
+    IconSpot IconAt(const NameplateLayout& l, const IconRow& row, int i)
+    {
+        const int line    = i / kIconsPerRow;
+        const int column  = i % kIconsPerRow;
+        const int inLine  = std::min(kIconsPerRow, row.count - line * kIconsPerRow);
+        const float width = static_cast<float>(inLine) * l.iconSize + static_cast<float>(inLine - 1) * (row.step - l.iconSize);
+        const float startX = row.left ? l.iconsLeftX + row.inset : l.iconsRightX - row.inset - width;
+        return IconSpot{startX + static_cast<float>(column) * row.step, l.iconsY - static_cast<float>(line) * l.iconRowStep};
+    }
+
+    IconSpot BadgeAt(IconSpot icon, float iconSize, float width, float height)
+    {
+        return IconSpot{icon.x + iconSize * (1.0f + kBadgeOverhang) - width, icon.y + iconSize * (1.0f + kBadgeHang) - height};
     }
 
     float CursorBob(double seconds, float height)

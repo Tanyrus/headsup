@@ -37,7 +37,9 @@ namespace headsup
             {"replaceCursor", &Settings::replaceCursor}, {"cursorFeather", &Settings::cursorFeather},
             {"chocoboPointer", &Settings::chocoboPointer}, {"fixPointer", &Settings::fixPointer},
             {"showPlayerIcons", &Settings::showPlayerIcons}, {"centerNameAndIcons", &Settings::centerNameAndIcons},
-            {"ownNameColor", &Settings::ownNameColor}};
+            {"ownNameColor", &Settings::ownNameColor}, {"showDamageIcons", &Settings::showDamageIcons},
+            {"showStatusRankIcons", &Settings::showStatusRankIcons}, {"showImmunityIcons", &Settings::showImmunityIcons},
+            {"showRanks", &Settings::showRanks}};
 
         struct IntKey
         {
@@ -61,7 +63,10 @@ namespace headsup
             {"ornamentWidth", &Settings::ornamentWidth, kMinOrnamentWidth, kMaxOrnamentWidth},
             {"ornamentThickness", &Settings::ornamentThickness, kMinOrnamentThickness, kMaxOrnamentThickness},
             {"nameShadow", &Settings::nameShadow, kMinShadowStrength, kMaxShadowStrength},
-            {"labelShadow", &Settings::labelShadow, kMinShadowStrength, kMaxShadowStrength}};
+            {"labelShadow", &Settings::labelShadow, kMinShadowStrength, kMaxShadowStrength},
+            {"elementWeakRank", &Settings::elementWeakRank, kNoWeakRank, kMaxWeakRank},
+            {"elementResistRank", &Settings::elementResistRank, kMinResistRank, kNoResistRank},
+            {"maxElements", &Settings::maxElements, 0, kElementCount}};
 
         struct FloatKey
         {
@@ -81,9 +86,12 @@ namespace headsup
             {"outOfRangeCursorColor", &Settings::outOfRangeCursorColor},
             {"lockedCursorColor", &Settings::lockedCursorColor}, {"nameColor", &Settings::nameColor},
             {"textOutline", &Settings::textOutline}, {"iconTint", &Settings::iconTint}, {"glowColor", &Settings::glowColor},
-            {"ornamentColor", &Settings::ornamentColor}};
+            {"ornamentColor", &Settings::ornamentColor}, {"weakBadgeColor", &Settings::weakBadgeColor},
+            {"resistBadgeColor", &Settings::resistBadgeColor}, {"rankBadgeColor", &Settings::rankBadgeColor},
+            {"immuneBadgeColor", &Settings::immuneBadgeColor}};
 
         constexpr const char* kFontKey = "fontName";
+        constexpr const char* kBadgeFontKey = "badgeFontName";
         // Saved files from before the level line had its own font and shadow take the name's.
         constexpr const char* kLabelFontKey        = "labelFontName";
         constexpr const char* kLabelBoldKey        = "labelFontBold";
@@ -112,6 +120,14 @@ namespace headsup
         const char* const kLookNames[kLookCount]         = {"fantasy"};
         const char* const kChannelKeys[3]               = {"R", "G", "B"};
         const char* const kIconSideNames[kIconSideCount] = {"left", "right", "hide"};
+        constexpr const char* kDetectionSideKey          = "detectionIconSide";
+        constexpr const char* kBadgeSideKey              = "badgeSide";
+        // By StatusRank, each followed by kStatusShowSuffix and the cutoffs' suffixes.
+        const char* const kStatusKeys[kStatusRankCount] = {"paralyze", "bind", "silence", "slow", "poison", "lightSleep",
+            "darkSleep", "blind", "stun", "gravity"};
+        constexpr const char* kStatusShowSuffix   = "Badge";
+        constexpr const char* kWeakRankSuffix     = "WeakRank";
+        constexpr const char* kResistRankSuffix   = "ResistRank";
         const char* const kPlayerIconKeys[kPlayerIconCount] = {"iconGm", "iconMentor", "iconNewAdventurer", "iconLevelSync",
             "iconAway", "iconLinkshell", "iconBazaar", "iconSeekingParty"};
         const char* const kLabelShadeKeys[kLabelShadeCount] = {"labelUnknown", "labelTooWeak", "labelEasyPrey",
@@ -158,7 +174,8 @@ namespace headsup
 
     bool NameplatesOn(const Settings& s)
     {
-        return s.enabled && (s.showLabels || s.mobId != MobIdFormat::Off || s.showIcons || s.replaceMobNames ||
+        return s.enabled && (s.showLabels || s.mobId != MobIdFormat::Off || s.showIcons || s.showDamageIcons ||
+                                s.showStatusRankIcons || s.showImmunityIcons || s.replaceMobNames ||
                                 s.replacePlayerNames || s.replaceNpcNames || s.replaceCursor || s.phTimers);
     }
 
@@ -192,6 +209,7 @@ namespace headsup
             s.*i.field = std::clamp(s.*i.field, i.lo, i.hi);
         if (s.fontName.empty() || s.fontName.size() > kMaxFontName) s.fontName = d.fontName;
         if (s.labelFontName.empty() || s.labelFontName.size() > kMaxFontName) s.labelFontName = d.labelFontName;
+        if (s.badgeFontName.empty() || s.badgeFontName.size() > kMaxFontName) s.badgeFontName = d.badgeFontName;
         s.labelShadowColor = ClampColor(s.labelShadowColor, d.labelShadowColor);
         std::vector<uint8_t> keys;
         for (const uint8_t vk : s.keepPointerKeys)
@@ -207,6 +225,13 @@ namespace headsup
             s.labelColor[k] = ClampColor(s.labelColor[k], d.labelColor[k]);
         for (int c = 0; c < kCategoryCount; ++c)
             s.color[c] = ClampColor(s.color[c], d.color[c]);
+        if (s.detectionIconSide == IconSide::Hidden) s.detectionIconSide = d.detectionIconSide;
+        if (s.badgeSide == IconSide::Hidden) s.badgeSide = d.badgeSide;
+        for (StatusBadgeRule& status : s.statusBadges)
+        {
+            status.weakRank   = std::clamp(status.weakRank, kNoWeakRank, kMaxWeakRank);
+            status.resistRank = std::clamp(status.resistRank, kMinResistRank, kNoResistRank);
+        }
         return s;
     }
 
@@ -224,6 +249,7 @@ namespace headsup
             LoadColor(store, c.key, s.*c.field);
         s.fontName = store.GetString(kFontKey, kDefaultFont);
         s.labelFontName    = store.GetString(kLabelFontKey, s.fontName.c_str());
+        s.badgeFontName    = store.GetString(kBadgeFontKey, kBadgeFont);
         s.labelFontBold    = store.GetBool(kLabelBoldKey, s.fontBold);
         s.scaleCursor      = store.GetBool(kScaleCursorKey, s.scaleWithDistance);
         std::istringstream keys(store.GetString(kKeepPointerKey, ""));
@@ -248,6 +274,22 @@ namespace headsup
             const std::string name = store.GetString(kPlayerIconKeys[i], "");
             for (int side = 0; side < kIconSideCount; ++side)
                 if (name == kIconSideNames[side]) s.playerIconSide[i] = static_cast<IconSide>(side);
+        }
+        // A group takes a side, never "hide".
+        auto loadSide = [&](const char* key, IconSide& side) {
+            const std::string name = store.GetString(key, "");
+            for (const IconSide each : {IconSide::Left, IconSide::Right})
+                if (name == kIconSideNames[static_cast<int>(each)]) side = each;
+        };
+        loadSide(kDetectionSideKey, s.detectionIconSide);
+        loadSide(kBadgeSideKey, s.badgeSide);
+        for (int i = 0; i < kStatusRankCount; ++i)
+        {
+            const std::string base = kStatusKeys[i];
+            StatusBadgeRule& rule  = s.statusBadges[i];
+            rule.show              = store.GetBool((base + kStatusShowSuffix).c_str(), rule.show);
+            rule.weakRank          = LoadInt(store, (base + kWeakRankSuffix).c_str(), rule.weakRank);
+            rule.resistRank        = LoadInt(store, (base + kResistRankSuffix).c_str(), rule.resistRank);
         }
         const std::string mobId = store.GetString(kMobIdKey, "");
         for (int f = 0; f < kMobIdFormatCount; ++f)
@@ -287,6 +329,7 @@ namespace headsup
             setColor(c.key, s.*c.field);
         store.Set(kFontKey, s.fontName.c_str());
         store.Set(kLabelFontKey, s.labelFontName.c_str());
+        store.Set(kBadgeFontKey, s.badgeFontName.c_str());
         setBool(kLabelBoldKey, s.labelFontBold);
         setBool(kScaleCursorKey, s.scaleCursor);
         std::string keys;
@@ -308,6 +351,15 @@ namespace headsup
         }
         for (int i = 0; i < kPlayerIconCount; ++i)
             store.Set(kPlayerIconKeys[i], kIconSideNames[static_cast<int>(s.playerIconSide[i])]);
+        store.Set(kDetectionSideKey, kIconSideNames[static_cast<int>(s.detectionIconSide)]);
+        store.Set(kBadgeSideKey, kIconSideNames[static_cast<int>(s.badgeSide)]);
+        for (int i = 0; i < kStatusRankCount; ++i)
+        {
+            const std::string base = kStatusKeys[i];
+            setBool(base + kStatusShowSuffix, s.statusBadges[i].show);
+            setFloat(base + kWeakRankSuffix, static_cast<float>(s.statusBadges[i].weakRank));
+            setFloat(base + kResistRankSuffix, static_cast<float>(s.statusBadges[i].resistRank));
+        }
         store.Set(kMobIdKey, kMobIdNames[static_cast<int>(s.mobId)]);
         store.Set(kLookKey, kLookNames[static_cast<int>(s.look)]);
         setFloat(kVersionKey, static_cast<float>(kSettingsVersion));

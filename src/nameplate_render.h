@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Ashita.h"
+#include "frame_cache.h"
 #include "game_cursor.h"
 #include "game_names.h"
 #include "icons.h"
@@ -96,7 +97,17 @@ namespace headsup
             int cursorRaster = 0;
             std::vector<PlateTexture> timers;
             int timerRaster  = 0;
+            int badgeRaster  = 0; // the badge group's text height; the badges themselves are shared (m_Badges)
             uint32_t frame   = 0;
+        };
+
+        // A badge's texture is shared by every plate showing the same text in the same color and size.
+        struct BadgeKey
+        {
+            std::string text;
+            uint32_t color = 0;
+            int height     = 0;
+            auto operator<=>(const BadgeKey&) const = default;
         };
 
         struct IconTexture
@@ -125,6 +136,7 @@ namespace headsup
 
         IDirect3DDevice8* m_Device = nullptr;
         std::unordered_map<uint16_t, Plate> m_Plates;
+        FrameCache<BadgeKey, PlateTexture> m_Badges;
         IconTexture m_IconTextures[kIconCount] = {};
         std::vector<Quad> m_Quads;
         std::vector<Shown> m_Shown;

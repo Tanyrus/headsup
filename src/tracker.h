@@ -68,6 +68,7 @@ namespace headsup
         char name[32]      = {};
         Label label{};              // level and con text: every living mob
         IconSet mobIcons{};
+        InfoIconSet infoIcons{}; // the badge group, already filtered by its switches
         PlayerIconRows playerIcons{};
         uint32_t linkshellArgb = 0; // a player's linkshell color, for its icon
         Pose pose              = Pose::Standing;

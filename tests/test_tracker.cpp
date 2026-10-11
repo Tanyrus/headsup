@@ -1,6 +1,7 @@
 #include "test.h"
 #include "tracker.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include <iterator>
@@ -92,7 +93,7 @@ TEST(a_mob_attacks_as_phoenixs_aggro_check_decides)
              Row{"a Too Weak notorious monster", kMobAggressive | kMobNotorious, 50, 55, 0, 0, kLevel75, Category::NmWontAttack},
          })
     {
-        const MobRecord mob{kBountyHunter, "Test Mob", r.minLevel, r.maxLevel, r.flags, 300, 0, r.levelMod, 0};
+        const MobRecord mob{kBountyHunter, "Test Mob", r.minLevel, r.maxLevel, r.flags, 300, 0, r.levelMod, 0, 0};
         auto outcome = [&](Category c) { return std::string(r.why) + ": " + std::to_string(CategoryIndex(c)); };
         CHECK_EQ(outcome(Classify(&mob, r.checkedLevel, r.player)), outcome(r.expected));
     }
@@ -361,4 +362,38 @@ TEST(a_mob_your_party_claimed_is_marked)
     t.Update({Player(0x1000), ours, Mob(0x3000, kSnipper, "Snipper")}, kLevel20, Settings{});
     CHECK(t.Find(0x2000)->claimedByParty);
     CHECK(!t.Find(0x3000)->claimedByParty);
+}
+
+TEST(a_mob_carries_what_it_is_weak_to_resists_and_is_immune_to)
+{
+    Tracker t;
+    Settings s;
+    t.Update({BountyHunter(0x2000)}, kLevel20, s);
+    const MobRecord* record = FindMob(kBountyHunter, "Goblin Bounty Hunter");
+    CHECK(record != nullptr);
+    const InfoIconSet expected = InfoIconsFor(&ResistancesOf(*record), BadgeRules{});
+    const ActorInfo* info      = t.Find(0x2000);
+    CHECK(expected.count > 0 && info->infoIcons.count == expected.count); // goblins are weak to light
+    CHECK(std::equal(expected.icons, expected.icons + expected.count, info->infoIcons.icons));
+    // Its ranks: light -3, the other elements but dark -2; dark sleep -3, gravity -2.
+    auto shown = [&](const Settings& with) {
+        t.Update({BountyHunter(0x2000)}, kLevel20, with);
+        const InfoIconSet& set = t.Find(0x2000)->infoIcons;
+        return std::vector<InfoIcon>(set.icons, set.icons + set.count);
+    };
+    s.elementWeakRank = -3;
+    CHECK(shown(s) == (std::vector<InfoIcon>{{Icon::Light, BadgeKind::WeakRank, -3}}));
+    s             = Settings{};
+    s.maxElements = 2;
+    CHECK(shown(s) == (std::vector<InfoIcon>{{Icon::Light, BadgeKind::WeakRank, -3}, {Icon::Fire, BadgeKind::WeakRank, -2}}));
+    s.statusBadges[static_cast<int>(StatusRank::Gravity)].weakRank = -2;
+    CHECK(shown(s).back() == (InfoIcon{Icon::Gravity, BadgeKind::StatusWeak, -2}));
+    s.statusBadges[static_cast<int>(StatusRank::Gravity)].show = false;
+    CHECK_EQ(shown(s).size(), 2u);
+    s = Settings{};
+    s.showDamageIcons = s.showStatusRankIcons = s.showImmunityIcons = false;
+    t.Update({BountyHunter(0x2000)}, kLevel20, s);
+    CHECK_EQ(t.Find(0x2000)->infoIcons.count, 0);
+    t.Update({BountyHunter(0x2000, 10.0f, false)}, kLevel20, Settings{});
+    CHECK_EQ(t.Find(0x2000)->infoIcons.count, 0); // dead
 }

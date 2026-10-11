@@ -27,6 +27,7 @@ namespace headsup
         bool bold            = false;
         uint32_t shadowColor = 0;
         float shadowStrength = 0.0f; // times the mockup's shadow
+        bool outline         = false; // a crisp edge in shadowColor instead of the soft shadow
         bool operator==(const LineStyle&) const = default;
     };
 
@@ -35,4 +36,9 @@ namespace headsup
     LineStyle NameLineStyle(const Settings& settings);
     // The level line and the placeholder timers.
     LineStyle LevelLineStyle(const Settings& settings);
+    // Badges' numbers, which sit on their icons.
+    LineStyle BadgeLineStyle(const Settings& settings);
+
+    // The color a badge's text takes: weaknesses, resistances, status ranks and immunities each have their own.
+    uint32_t BadgeColor(BadgeKind kind, const Settings& settings);
 }

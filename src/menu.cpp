@@ -68,6 +68,8 @@ namespace headsup
         constexpr float kChoiceColumn  = 200.0f; // where a choice's buttons start in its row
         constexpr float kChoiceWidth   = 64.0f;
         constexpr float kKeyNameWidth  = 110.0f; // where a kept key's Remove button starts
+        constexpr float kStatusColumn  = 120.0f; // where a status's cutoffs start in its row
+        constexpr float kCutoffWidth   = 100.0f;
         constexpr float kOffAlpha      = 0.45f;  // settings of a feature that is off are drawn this faint
         // One size for every page, the tallest included; a longer page scrolls.
         constexpr float kWindowWidth   = 700.0f;
@@ -122,6 +124,8 @@ namespace headsup
             kDebugOutlinesSection   = 1u << 20,
             kDebugNameplatesSection = 1u << 21,
             kDebugFrameSection      = 1u << 22,
+            kBadgesSection          = 1u << 23,
+            kStatusBadgesSection    = 1u << 24,
         };
 
         const char* const kCategoryLabels[kCategoryCount] = {"Aggressive", "Passive", "No data", "Aggressive NM",
@@ -129,6 +133,9 @@ namespace headsup
         const char* const kPlayerIconLabels[kPlayerIconCount] = {"GM", "Mentor", "New adventurer", "Level sync", "Away",
             "Linkshell", "Bazaar", "Seeking party"};
         const char* const kIconSideLabels[kIconSideCount] = {"Left", "Right", "Hide"};
+        constexpr int kGroupSideCount                      = static_cast<int>(IconSide::Right) + 1; // a group cannot hide
+        const char* const kStatusLabels[kStatusRankCount] = {"Paralyze", "Bind", "Silence", "Slow", "Poison", "Light sleep",
+            "Dark sleep", "Blind", "Stun", "Gravity"};
         const char* const kMobIdLabels[kMobIdFormatCount]  = {"Off", "Last 3", "Full"};
         const char* const kPlayerIconTips[kPlayerIconCount] = {"A game master.", "A mentor.", "A new adventurer.",
             "Level synced, outside battlefields.", "Away from the keyboard.", "In a linkshell, in the linkshell's color.",
@@ -146,6 +153,18 @@ namespace headsup
             Category::NmWontAttack, Category::Placeholder, Category::Unknown};
         const char* const kShadeLabels[kLabelShadeCount] = {"Unknown level", "Too Weak", "Easy Prey", "Decent Challenge",
             "Even Match", "Tough", "Very Tough"};
+
+        // A cutoff as its dropdown shows it: the rank as badges read it, or Off past the end.
+        std::string CutoffText(int rank, bool ranks)
+        {
+            return rank == kNoWeakRank || rank == kNoResistRank ? "Off" : RankText(rank, ranks);
+        }
+
+        std::string ElementCountText(int count)
+        {
+            if (count == 0) return "None";
+            return count == kElementCount ? "All" : std::to_string(count);
+        }
 
         void ApplyPhoenixStyle(ImGuiStyle& s)
         {
@@ -353,6 +372,54 @@ namespace headsup
                 Help(tip);
             }
 
+            // A dropdown of the whole numbers from first to last, either way round, each shown as text gives it.
+            template <typename Text>
+            void NumberDropdown(const char* label, int& value, int first, int last, float width, Text text, const char* tip)
+            {
+                gui->SetNextItemWidth(width);
+                if (gui->BeginCombo(label, text(value).c_str(), ImGuiComboFlags_HeightLarge))
+                {
+                    const ImVec2 align    = style.ButtonTextAlign;
+                    style.ButtonTextAlign = ImVec2(0.0f, 0.5f);
+                    const int step        = first <= last ? 1 : -1;
+                    for (int option = first;; option += step)
+                    {
+                        const bool picked = option == value;
+                        char id[64];
+                        std::snprintf(id, sizeof(id), "%s##%s %d", text(option).c_str(), label, option);
+                        if (Button(id, ImVec2(-FLT_MIN, 0.0f), ButtonColors{picked ? kRowPicked : kClear, kRowHovered, kTint}))
+                        {
+                            value   = option;
+                            changed = true;
+                            gui->CloseCurrentPopup();
+                        }
+                        if (picked) gui->SetItemDefaultFocus();
+                        if (option == last) break;
+                    }
+                    style.ButtonTextAlign = align;
+                    gui->EndCombo();
+                }
+                if (tip != nullptr) Help(tip);
+            }
+
+            // A status's switch, then its weakness and resistance cutoffs, faint while the switch is off.
+            void StatusRow(const char* label, StatusBadgeRule& rule, bool ranks, bool off)
+            {
+                const float rowStart = gui->GetCursorPosX();
+                char id[48];
+                std::snprintf(id, sizeof(id), "%s##status", label);
+                Fade(off);
+                changed |= gui->Checkbox(id, &rule.show);
+                Fade(off || !rule.show);
+                const auto cutoff = [ranks](int rank) { return CutoffText(rank, ranks); };
+                gui->SameLine(rowStart + kStatusColumn);
+                std::snprintf(id, sizeof(id), "##%s weakness", label);
+                NumberDropdown(id, rule.weakRank, kMaxWeakRank, kNoWeakRank, kCutoffWidth, cutoff, nullptr);
+                gui->SameLine();
+                std::snprintf(id, sizeof(id), "##%s resistance", label);
+                NumberDropdown(id, rule.resistRank, kMinResistRank, kNoResistRank, kCutoffWidth, cutoff, nullptr);
+            }
+
             void SliderFloat(const char* label, float& value, float lo, float hi, const char* format, const char* number,
                 const char* tip)
             {
@@ -440,6 +507,10 @@ namespace headsup
             ui.gui->Spacing();
             ui.gui->Separator();
         }
+
+        // Whether a mob's icon row shows anything: its detection icons or any part of its badge group.
+        bool AnyBadges(const Settings& s) { return s.showDamageIcons || s.showStatusRankIcons || s.showImmunityIcons; }
+        bool AnyMobIcons(const Settings& s) { return s.showIcons || AnyBadges(s); }
 
         void DrawOutlineSettings(Ui& ui, Settings& s, uint32_t& collapsed, const MenuStatus& status)
         {
@@ -530,7 +601,7 @@ namespace headsup
             ui.Fade(false);
         }
 
-        void DrawMobSettings(Ui& ui, Settings& s, uint32_t& collapsed)
+        void DrawMobSettings(Ui& ui, Settings& s, uint32_t& collapsed, const std::vector<std::string>& fonts)
         {
             ui.Fade(!s.enabled);
             if (ui.Section("Display Options", kMobDisplaySection, collapsed))
@@ -540,8 +611,24 @@ namespace headsup
                 ui.Check("Show level and con", s.showLabels,
                     "Lv 20-23 EP-DC: the level range from the Phoenix data and how it cons to you. After you /check the "
                     "mob, its exact level, until it respawns.");
-                ui.Check("Show icons", s.showIcons,
+                ui.Check("Show detection icons", s.showIcons,
                     "XIUI's MobDB icons: aggressive or passive, whether it links, and how it detects you.");
+                ui.Check("Show weaknesses and resistances", s.showDamageIcons,
+                    "Beside the detection icons: damage types the mob takes more (+25% green) or less (-50% red) damage from, "
+                    "and the elements it is weak to or resists. The Badges section picks which elements show.");
+                ui.Check("Show status weaknesses and resistances", s.showStatusRankIcons,
+                    "Statuses the mob is weak to (green) or resists (yellow). The Status Badges section picks which statuses "
+                    "show and from how weak or resistant.");
+                ui.Check("Show immunities", s.showImmunityIcons, "Statuses the mob is immune to, marked with a red \xC3\x97.");
+                ui.Fade(!s.enabled || !s.showIcons);
+                ui.Choice("Detection icons", s.detectionIconSide, kIconSideLabels, kGroupSideCount,
+                    "Left starts them at the level line's left edge; Right ends them at its right edge. On the badges' side, "
+                    "they sit inside the badges.");
+                ui.Fade(!s.enabled || !AnyBadges(s));
+                ui.Choice("Badges", s.badgeSide, kIconSideLabels, kGroupSideCount,
+                    "Left starts the weaknesses, resistances and immunities at the level line's left edge; Right ends them "
+                    "at its right edge.");
+                ui.Fade(!s.enabled);
                 ui.Fade(!s.enabled || !s.showLabels);
                 ui.Check("Show ornament", s.showOrnament,
                     "A thin line with a diamond between a mob's level line and its name, in its outline color.");
@@ -556,14 +643,48 @@ namespace headsup
                     "The mob's ID on its level line: its last three hex digits (Lv 1-3 EM [006]), as players name NM "
                     "placeholders, or the whole ID in decimal and hex.");
             }
+            ui.Fade(!s.enabled);
+            if (ui.Section("Badges", kBadgesSection, collapsed))
+            {
+                const auto cutoff = [&s](int rank) { return CutoffText(rank, s.showRanks); };
+                ui.Fade(!s.enabled || !(s.showDamageIcons || s.showStatusRankIcons));
+                ui.Check("Show ranks instead of percents", s.showRanks,
+                    "Elements and statuses as Phoenix's resistance ranks, from -3 (weakest) through 0 (neutral) to 11 (all but "
+                    "immune), rather than the wikis' percents: -3 is +50%, 4 is -50%. A damage type's percent stays one.");
+                ui.Fade(!s.enabled || !s.showDamageIcons);
+                ui.NumberDropdown("Element weakness from", s.elementWeakRank, kMaxWeakRank, kNoWeakRank, kCutoffWidth, cutoff,
+                    "Elements the mob is at least this weak to get a green badge: +15% shows every weakness.");
+                ui.NumberDropdown("Element resistance from", s.elementResistRank, kMinResistRank, kNoResistRank, kCutoffWidth,
+                    cutoff, "Elements the mob resists at least this much get a red badge: -15% shows every resistance.");
+                ui.NumberDropdown("Most elements shown", s.maxElements, kElementCount, 0, kCutoffWidth, ElementCountText,
+                    "Past this many, the elements closest to neutral are left off. A weakness stays over a resistance just as "
+                    "far from neutral.");
+                ui.Fade(!s.enabled || !AnyBadges(s));
+                ui.FontDropdown("Badge font", s.badgeFontName, fonts);
+            }
+            ui.Fade(!s.enabled);
+            if (ui.Section("Status Badges", kStatusBadgesSection, collapsed))
+            {
+                const bool off       = !s.enabled || !s.showStatusRankIcons;
+                const float rowStart = ui.gui->GetCursorPosX();
+                ui.Fade(off);
+                ui.gui->SetCursorPosX(rowStart + kStatusColumn);
+                ui.gui->TextUnformatted("Weakness");
+                ui.gui->SameLine(rowStart + kStatusColumn + kCutoffWidth + ui.style.ItemSpacing.x);
+                ui.gui->TextUnformatted("Resistance");
+                for (int i = 0; i < kStatusRankCount; ++i)
+                    ui.StatusRow(kStatusLabels[i], s.statusBadges[i], s.showRanks, off);
+            }
+            ui.Fade(!s.enabled);
             if (ui.Section("Sizes", kMobSizesSection, collapsed))
             {
                 ui.Fade(!s.enabled || !s.replaceMobNames);
                 ui.SliderInt("Name size", s.mobNameSize, kMinTextSize, kMaxTextSize, "%d px", "The height of mob names.");
                 ui.Fade(!s.enabled || !s.showLabels);
                 ui.SliderInt("Level and con size", s.labelSize, kMinTextSize, kMaxTextSize, "%d px", "The level line's height.");
-                ui.Fade(!s.enabled || !s.showIcons);
-                ui.SliderInt("Icon size", s.iconSize, kMinTextSize, kMaxTextSize, "%d px", "Each MobDB icon's width and height.");
+                ui.Fade(!s.enabled || !AnyMobIcons(s));
+                ui.SliderInt("Icon size", s.iconSize, kMinTextSize, kMaxTextSize, "%d px",
+                    "Each icon's width and height; badge numbers are drawn at about two thirds of it.");
                 ui.Fade(!s.enabled || !s.showLabels || !s.showOrnament);
                 ui.SliderInt("Ornament width", s.ornamentWidth, kMinOrnamentWidth, kMaxOrnamentWidth, "%d px",
                     "The line's length.");
@@ -574,7 +695,7 @@ namespace headsup
                     "How strong the glow around mob names is.");
                 ui.SliderInt("Glow size", s.glowSize, kMinGlowSize, kMaxGlowSize, "%d%%", "How far the glow spreads from the letters.");
             }
-            ui.Fade(!s.enabled || (!s.showLabels && s.mobId == MobIdFormat::Off && !s.showIcons));
+            ui.Fade(!s.enabled || (!s.showLabels && s.mobId == MobIdFormat::Off && !AnyMobIcons(s)));
             if (ui.Section("Hide Level and Icons", kHideSection, collapsed))
             {
                 ui.Check("On mobs your party claimed", s.hideClaimedByParty,
@@ -640,8 +761,16 @@ namespace headsup
                 ui.Fade(!s.enabled || !s.showLabels || !s.showOrnament || !s.ownOrnamentColor);
                 ui.Swatch("Own ornament color", s.ornamentColor,
                     "Off: the ornament takes the mob's outline color. On: every ornament takes this color.");
-                ui.Fade(!s.enabled || !s.showIcons);
+                ui.Fade(!s.enabled || !AnyMobIcons(s));
                 ui.Swatch("Icon tint", s.iconTint, "Multiplies the MobDB icons' colors. White keeps them as they are.");
+                ui.Fade(!s.enabled || !(s.showDamageIcons || s.showStatusRankIcons));
+                ui.Swatch("Weakness badge", s.weakBadgeColor, "+25% on a damage type, or an element or status the mob is weak to.");
+                ui.Fade(!s.enabled || !s.showDamageIcons);
+                ui.Swatch("Resistance badge", s.resistBadgeColor, "-50% on a damage type, or an element the mob resists.");
+                ui.Fade(!s.enabled || !s.showStatusRankIcons);
+                ui.Swatch("Status resistance badge", s.rankBadgeColor, "A status the mob resists.");
+                ui.Fade(!s.enabled || !s.showImmunityIcons);
+                ui.Swatch("Immunity badge", s.immuneBadgeColor, "The \xC3\x97 on a status the mob is immune to.");
             }
             ui.Fade(false);
         }
@@ -918,7 +1047,10 @@ namespace headsup
                     if (m_ColorsTab)
                         DrawMobColors(ui, s, m_Collapsed);
                     else
-                        DrawMobSettings(ui, s, m_Collapsed);
+                    {
+                        if (m_Fonts.empty()) m_Fonts = FontChoices(InstalledFontFamilies(), s.fontName);
+                        DrawMobSettings(ui, s, m_Collapsed, m_Fonts);
+                    }
                     break;
                 case kPlayersPage: DrawPlayerSettings(ui, s, m_Collapsed); break;
                 case kNpcsPage: DrawNpcSettings(ui, s, m_Collapsed); break;

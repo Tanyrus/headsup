@@ -20,9 +20,10 @@ namespace headsup
             float u, v;
         };
         constexpr DWORD kQuadFvf          = D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1;
-        constexpr float kOutlinePerHeight = 0.1f; // the cursor's outline width, per pixel of its height
+        constexpr float kOutlinePerHeight = 0.1f; // the cursor's and badges' outline width, per pixel of their height
         constexpr float kPixelCenter      = 0.5f; // Direct3D 8 samples pixel centers at half-pixel offsets
         constexpr float kPercent          = 100.0f;
+        constexpr uint32_t kBadgeIdleFrames = 600; // a badge's texture outlives its last use by about ten seconds
         // From the mockup's CSS: a 22 px name's shadows blur 2 and 3 px, 1 px lower, and its glow 14 px.
         constexpr float kShadowPerHeight     = 0.12f; // the shadow's blur radius, per pixel of text height
         constexpr float kShadowDropPerHeight = 0.05f;
@@ -190,7 +191,8 @@ namespace headsup
         const float shadow   = height * kShadowPerHeight;
         const int drop       = static_cast<int>(std::lround(height * kShadowDropPerHeight));
         const float glowBlur = look.glow != 0 ? height * kGlowPerHeight * look.glowSize : 0.0f;
-        const int margin     = BlurMargin(std::max(glowBlur, shadow + static_cast<float>(drop)));
+        const int edge       = OutlineRadius(pixelHeight);
+        const int margin = look.line.outline ? edge : BlurMargin(std::max(glowBlur, shadow + static_cast<float>(drop)));
         Coverage coverage;
         int markX = kNoMarkColumn;
         if (!RasterizeText(text, look.line.font.c_str(), pixelHeight, look.line.bold, margin, look.markAt, coverage, markX))
@@ -200,7 +202,8 @@ namespace headsup
         }
         const Layers layers{shadow, drop, glowBlur, look.color, look.line.shadowColor, look.glow, look.glowStrength,
             look.line.shadowStrength, markX, look.markColor};
-        if (!Upload(t, Styled(coverage, layers), std::move(key))) return false;
+        Image image = look.line.outline ? Outlined(coverage, edge, look.color, look.line.shadowColor) : Styled(coverage, layers);
+        if (!Upload(t, std::move(image), std::move(key))) return false;
         t.halo = static_cast<float>(margin);
         return true;
     }
@@ -359,6 +362,18 @@ namespace headsup
                     const TextLook timerLook{labelLook.line, line.up ? upColor : kWhite};
                     if (!Prepare(p.timers[timersReady], line.text.c_str(), timerLook, p.timerRaster)) break;
                 }
+                const float badgeShown = iconSize * kBadgeShare * toY;
+                p.badgeRaster          = lines.infoIconCount > 0 ? raster(badgeShown, p.badgeRaster) : 0;
+                std::vector<const PlateTexture*> badges;
+                for (int i = 0; i < lines.infoIconCount; ++i)
+                {
+                    const InfoIcon& item   = info->infoIcons.icons[i];
+                    const std::string text = BadgeText(item, settings.showRanks);
+                    const TextLook badgeLook{BadgeLineStyle(settings), BadgeColor(item.badge, settings)};
+                    PlateTexture& badge = m_Badges.Use(BadgeKey{text, badgeLook.color, p.badgeRaster}, m_Frame);
+                    if (!Prepare(badge, text.c_str(), badgeLook, p.badgeRaster)) break;
+                    badges.push_back(&badge);
+                }
                 const float playerIconSize = nameShown / toY * static_cast<float>(settings.playerIconSize) / kPercent;
 
                 LineSizes sizes;
@@ -377,8 +392,11 @@ namespace headsup
                     sizes.labelWidth  = (p.label.width - 2.0f * p.label.halo) * labelFit / toX;
                     sizes.labelHeight = (p.label.height - 2.0f * p.label.halo) * labelFit / toY;
                 }
-                sizes.mobIconCount = lines.mobIconCount;
-                sizes.iconSize     = iconSize;
+                sizes.mobIconCount  = lines.mobIconCount;
+                sizes.iconSize      = iconSize;
+                sizes.infoIconCount = lines.infoIconCount;
+                sizes.detectionLeft = settings.detectionIconSide == IconSide::Left;
+                sizes.badgesLeft    = settings.badgeSide == IconSide::Left;
                 if (showCursor)
                 {
                     sizes.cursorWidth  = p.cursor.width * cursorFit / toX;
@@ -413,8 +431,21 @@ namespace headsup
                 {
                     const IconTexture* icon = IconTextureFor(info->mobIcons.icons[drawn]);
                     if (icon == nullptr) break;
-                    addQuad(m_Quads, icon->texture, layout.iconsX + static_cast<float>(drawn) * layout.iconStep, layout.iconsY,
-                        iconSize * toX, iconSize * toY, icon->u, icon->v, depth, iconTint);
+                    const IconSpot at = IconAt(layout, layout.detection, drawn);
+                    addQuad(m_Quads, icon->texture, at.x, at.y, iconSize * toX, iconSize * toY, icon->u, icon->v, depth, iconTint);
+                }
+                for (int i = 0; i < lines.infoIconCount; ++i)
+                {
+                    const IconTexture* icon = IconTextureFor(info->infoIcons.icons[i].icon);
+                    if (icon == nullptr) break;
+                    const IconSpot at = IconAt(layout, layout.info, i);
+                    addQuad(m_Quads, icon->texture, at.x, at.y, iconSize * toX, iconSize * toY, icon->u, icon->v, depth, iconTint);
+                    if (i >= static_cast<int>(badges.size()) || badges[i]->texture == nullptr) continue;
+                    const PlateTexture& badge = *badges[i];
+                    const float fit           = FitOf(badgeShown, badge.key.height);
+                    const IconSpot spot       = BadgeAt(at, iconSize, (badge.width - 2.0f * badge.halo) * fit / toX,
+                              (badge.height - 2.0f * badge.halo) * fit / toY);
+                    addText(badge, spot.x, spot.y, fit);
                 }
                 auto addPlayerIcons = [&](const IconSet& row, int count, float x) {
                     for (int i = 0; i < count; ++i)
@@ -443,8 +474,8 @@ namespace headsup
                         layout.timersY + static_cast<float>(i) * layout.timerStep, timerFit);
                 }
                 auto shownHeight = [&](bool shown, float pixels) { return shown ? static_cast<int>(std::lround(pixels / toY)) : 0; };
-                m_Shown.push_back(Shown{info->index, layout.nameX, layout.nameY, layout.labelX, layout.labelY, layout.iconsX,
-                    layout.iconsY, shownHeight(lines.name, nameShown), shownHeight(lines.label, labelShown),
+                m_Shown.push_back(Shown{info->index, layout.nameX, layout.nameY, layout.labelX, layout.labelY,
+                    lines.mobIconCount > 0 ? IconAt(layout, layout.detection, 0).x : layout.centerX, layout.iconsY, shownHeight(lines.name, nameShown), shownHeight(lines.label, labelShown),
                     static_cast<int>(std::lround(iconSize)), drawn, nameColor});
             }
         }
@@ -485,6 +516,8 @@ namespace headsup
             ReleasePlate(it->second);
             it = m_Plates.erase(it);
         }
+        for (PlateTexture& badge : m_Badges.TakeIdle(m_Frame, kBadgeIdleFrames))
+            ReleaseTexture(badge.texture);
     }
 
     void NameplateRenderer::ReleasePlate(Plate& plate)
@@ -510,6 +543,8 @@ namespace headsup
         for (auto& [index, plate] : m_Plates)
             ReleasePlate(plate);
         m_Plates.clear();
+        for (PlateTexture& badge : m_Badges.TakeAll())
+            ReleaseTexture(badge.texture);
     }
 
     void NameplateRenderer::Draw(bool depthTest)

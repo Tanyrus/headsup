@@ -1,6 +1,7 @@
 #include "mobdata.h"
 #include "test.h"
 
+#include <algorithm>
 #include <string>
 
 using namespace headsup;
@@ -39,7 +40,7 @@ TEST(a_mob_aggros_unless_no_aggro_or_a_follower)
     for (const Row& row : {Row{kMobAggressive, true}, Row{kMobAlwaysAggro, true}, Row{0, false},
              Row{kMobAggressive | kMobNoAggro, false}, Row{kMobAlwaysAggro | kMobNoAggro, false}, Row{kMobLink, false},
              Row{kMobAggressive | kMobFollows, false}})
-        CHECK(IsAggressive(MobRecord{1, "Mob", 1, 1, row.flags, 0, 0, 0, 0}) == row.aggressive);
+        CHECK(IsAggressive(MobRecord{1, "Mob", 1, 1, row.flags, 0, 0, 0, 0, 0}) == row.aggressive);
 }
 
 TEST(a_different_name_at_the_id_is_not_a_match)
@@ -111,3 +112,21 @@ TEST(unknown_ids_are_not_found)
     CHECK(FindMob(0xFFFFFFFF, "Snipper") == nullptr);
 }
 
+TEST(a_mob_without_resistances_of_its_own_is_neutral)
+{
+    MobRecord mob{1, "Mob", 1, 1, 0, 0, 0, 0, 0, 0};
+    const MobResistances& neutral = ResistancesOf(mob);
+    CHECK_EQ(neutral.immunity, 0u);
+    CHECK(std::ranges::all_of(neutral.sdt, [](int16_t v) { return v == 0; }));
+    CHECK(std::ranges::all_of(neutral.elementRanks, [](int8_t v) { return v == 0; }));
+    CHECK(std::ranges::all_of(neutral.statusRanks, [](int8_t v) { return v == 0; }));
+    mob.resistances = 0xFFFF; // past the table
+    CHECK(&ResistancesOf(mob) == &neutral);
+}
+
+TEST(a_goblin_is_weak_to_light_as_phoenixs_data_says)
+{
+    const MobRecord* hunter = MobById(17199648);
+    CHECK(hunter != nullptr);
+    CHECK(ResistancesOf(*hunter).elementRanks[static_cast<int>(Element::Light)] <= -3);
+}

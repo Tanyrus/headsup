@@ -34,10 +34,11 @@ namespace headsup
         bool name          = false;
         bool label         = false;
         int mobIconCount   = 0;
+        int infoIconCount  = 0; // the badge group
         int leftIconCount  = 0;
         int rightIconCount = 0;
         CursorKind cursor  = CursorKind::None;
-        bool Any() const { return name || label || mobIconCount > 0 || cursor != CursorKind::None; }
+        bool Any() const { return name || label || mobIconCount > 0 || infoIconCount > 0 || cursor != CursorKind::None; }
     };
     PlateLines ChooseLines(const ActorInfo& info, bool selfEngaged, const Settings& settings,
         const CursorTargets& targets, bool iconsFailed);
@@ -66,6 +67,8 @@ namespace headsup
         float ornamentWidth = 0.0f, ornamentHeight = 0.0f;
         int mobIconCount = 0;
         float iconSize   = 0.0f;
+        int infoIconCount  = 0;
+        bool detectionLeft = true, badgesLeft = false;
         float cursorWidth  = 0.0f;
         float cursorHeight = 0.0f;
         float cursorTip    = 0.5f; // where across its width the cursor points
@@ -77,18 +80,42 @@ namespace headsup
         float timerHeight = 0.0f;
     };
 
+    // How many icons a row of either group holds; the rest wrap onto rows above.
+    constexpr int kIconsPerRow = 8;
+    // A badge's text height, and how far its box reaches past its icon's right and bottom edges, as shares of the icon size.
+    constexpr float kBadgeShare = 0.65f, kBadgeOverhang = 0.35f, kBadgeHang = 0.3f;
+
+    // One group of the icon row: detection icons or the badge group. Both read left to right; a left group starts its
+    // inset past the row's left edge, a right one ends its inset short of the row's right edge.
+    struct IconRow
+    {
+        int count  = 0;
+        float step = 0.0f, inset = 0.0f;
+        bool left  = false;
+    };
+    struct IconSpot
+    {
+        float x, y;
+    };
+
     struct NameplateLayout
     {
         float centerX;
         float nameX, nameY;
         float labelX, labelY;
         float ornamentX, ornamentY;
-        float iconsX, iconsY, iconStep;
+        float iconsY, iconRowStep, iconSize; // iconsY: the top of the row nearest the level line
+        float iconsLeftX, iconsRightX;       // the row's edges: the level line's, or wider when its groups need it
+        IconRow detection, info;
         float timersY, timerStep;
         CursorSpot cursor;
         float leftIconsX, rightIconsX, playerIconsY, playerIconStep;
     };
     NameplateLayout LayoutNameplate(const ScreenBox& plate, const LineSizes& sizes, bool showName);
+    // The i-th icon of a group, wrapping every kIconsPerRow onto the row above.
+    IconSpot IconAt(const NameplateLayout& l, const IconRow& row, int i);
+    // Where a badge of this size goes on its icon.
+    IconSpot BadgeAt(IconSpot icon, float iconSize, float width, float height);
 
     float CursorBob(double seconds, float height);
 

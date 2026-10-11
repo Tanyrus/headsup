@@ -20,7 +20,8 @@ import gen_rules  # noqa: E402
 MobFlag = schema.MobFlag
 MOBTYPE_NOTORIOUS = 0x02  # Phoenix data/enums/mob_type.yaml
 MOB_KEYS = {'id', 'zone', 'name', 'minLevel', 'maxLevel', 'respawn', 'aggro', 'alwaysAggro', 'noAggro', 'type', 'link',
-            'detects', 'trueDetection', 'expLevelMod', 'follows', 'placeholderOf'}
+            'detects', 'trueDetection', 'expLevelMod', 'follows', 'placeholderOf', 'immunity', 'sdt', 'elementRanks',
+            'statusRanks'}
 AGGRO_FIELDS = ('aggro', 'alwaysAggro', 'noAggro')
 
 
@@ -77,9 +78,13 @@ def merge(snapshots):
     return list(merged.values())
 
 
+def cell(value) -> str:
+    return ','.join(str(v) for v in value) if isinstance(value, list) else str(value)
+
+
 def row(mob) -> str:
     values = dict(mob, name=display_name(mob['name']), flags=flags(mob))
-    return '\t'.join(str(values[column]) for column in schema.COLUMNS)
+    return '\t'.join(cell(values[column]) for column in schema.COLUMNS)
 
 
 def trim(first_difference, rows):

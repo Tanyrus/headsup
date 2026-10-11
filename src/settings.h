@@ -56,6 +56,7 @@ namespace headsup
     constexpr int kMinOrnamentWidth = 20, kMaxOrnamentWidth = 300;   // pixels
     constexpr int kMinOrnamentThickness = 3, kMaxOrnamentThickness = 24; // pixels
     constexpr const char* kDefaultFont = "Marcellus SC";
+    constexpr const char* kBadgeFont   = "Barlow Condensed"; // bundled: plain enough to read a few pixels tall
     constexpr size_t kMaxFontName      = 31; // a Windows font name's longest, without its terminator
 
     struct Settings
@@ -67,6 +68,19 @@ namespace headsup
         bool showLabels    = true;  // level and con above every mob's name
         bool replaceMobNames   = true;
         bool showIcons         = true;  // the MobDB icon row
+        bool showDamageIcons     = true;  // the badge group: weaknesses and resistances to damage types and elements
+        bool showStatusRankIcons = true;  // statuses weak or resisted by rank, by statusBadges
+        bool showImmunityIcons   = true;
+        // Each group's side of the plate's center; a side both share has the detection icons nearest the center.
+        IconSide detectionIconSide = IconSide::Left;
+        IconSide badgeSide         = IconSide::Right;
+        // Which elements and statuses get badges, as BadgeRules has them.
+        int elementWeakRank   = BadgeRules{}.elementWeakRank;
+        int elementResistRank = BadgeRules{}.elementResistRank;
+        int maxElements       = BadgeRules{}.maxElements;
+        StatusBadgeRule statusBadges[kStatusRankCount] = {}; // by StatusRank
+        bool showRanks = false; // rank badges as ranks rather than the wikis' percents
+        std::string badgeFontName = kBadgeFont;
         bool hideClaimedByParty = false; // no level line or icons on a mob claimed by you or your party
         bool hideClaimed       = false; // nor on one anyone has claimed
         bool hideTooWeak       = false; // nor on one that cons Too Weak
@@ -134,6 +148,10 @@ namespace headsup
         };
         Color textOutline = {{0.00f, 0.00f, 0.00f}};
         Color iconTint    = {{1.00f, 1.00f, 1.00f}}; // white keeps the icons' own colors
+        Color weakBadgeColor   = {{0.40f, 1.00f, 0.40f}};
+        Color resistBadgeColor = {{1.00f, 0.35f, 0.35f}};
+        Color rankBadgeColor   = {{1.00f, 0.85f, 0.30f}};
+        Color immuneBadgeColor = {{1.00f, 0.25f, 0.25f}};
         bool show[kCategoryCount]   = {true, false, false, true, true, true}; // indexed by Category: no passive or unknown
         Color color[kCategoryCount] = {
             {{1.00f, 0.15f, 0.15f}}, // aggressive

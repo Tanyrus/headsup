@@ -14,6 +14,7 @@ FONTS = [
     ('Marcellus SC', 'kFontMarcellusSC', 'MarcellusSC-Regular.ttf'),
     ('Cinzel', 'kFontCinzel', 'Cinzel-Regular.ttf'),
     ('Cormorant SC', 'kFontCormorantSC', 'CormorantSC-SemiBold.ttf'),
+    ('Barlow Condensed', 'kFontBarlowCondensed', 'BarlowCondensed-Bold.ttf'),
 ]
 
 

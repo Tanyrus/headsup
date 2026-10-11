@@ -12,13 +12,16 @@ MOBS = [
     {'id': 17199648, 'zone': 103, 'name': 'Goblin_Bounty_Hunter', 'minLevel': 17, 'maxLevel': 20, 'respawn': 300,
      'aggro': True, 'alwaysAggro': 0, 'noAggro': 0, 'type': 0,
      'link': True, 'detects': 0x001 | 0x002, 'trueDetection': False, 'expLevelMod': 0, 'follows': False,
-     'placeholderOf': 17199700},
+     'placeholderOf': 17199700, 'immunity': 0x1000 | 0x10, 'sdt': [0, 2500] + [0] * 10,
+     'elementRanks': [-2] * 6 + [-3, 0], 'statusRanks': [0] * 10},
     {'id': 17199105, 'zone': 103, 'name': 'Stag_Crab', 'minLevel': 15, 'maxLevel': 17, 'respawn': 0,
      'aggro': True, 'alwaysAggro': 1, 'noAggro': 0, 'type': 0x04,
-     'link': False, 'detects': 0x002, 'trueDetection': False, 'expLevelMod': 0, 'follows': False, 'placeholderOf': 0},
+     'link': False, 'detects': 0x002, 'trueDetection': False, 'expLevelMod': 0, 'follows': False, 'placeholderOf': 0,
+     'immunity': 0, 'sdt': [0] * 12, 'elementRanks': [0] * 8, 'statusRanks': [0] * 10},
     {'id': 17272838, 'zone': 121, 'name': 'Guardian_Treant', 'minLevel': 32, 'maxLevel': 32, 'respawn': 960,
      'aggro': False, 'alwaysAggro': 0, 'noAggro': 1, 'type': 0x02 | 0x10,
-     'link': False, 'detects': 0x100, 'trueDetection': True, 'expLevelMod': -2, 'follows': True, 'placeholderOf': 0},
+     'link': False, 'detects': 0x100, 'trueDetection': True, 'expLevelMod': -2, 'follows': True, 'placeholderOf': 0,
+     'immunity': 0, 'sdt': [0] * 12, 'elementRanks': [0] * 8, 'statusRanks': [0] * 10},
 ]
 
 # As the dump module writes them: differences out past the table, which GetBaseExp clamps to, and cons as numbers.
@@ -27,6 +30,10 @@ RULES = {'firstDifference': -3,
          'difficulty': [{'minExp': 120, 'con': 5}, {'minExp': 100, 'con': 4}],
          'incrediblyEasyPrey': {'minLevel': 255, 'minExp': 255},
          'sittingAnimations': [33, 47]}
+
+
+ZERO_LISTS = ['0', ','.join(['0'] * 12), ','.join(['0'] * 8), ','.join(['0'] * 10)]
+ZEROS_RECORD = {'immunity': 0, 'sdt': [0] * 12, 'elementRanks': [0] * 8, 'statusRanks': [0] * 10}
 
 
 def dump(mobs, rules=RULES):
@@ -52,15 +59,16 @@ class Compact(unittest.TestCase):
 
     def test_rows_are_sorted_by_id_with_display_names(self):
         self.assertEqual(self.rows[0], ['id', 'zone', 'name', 'minLevel', 'maxLevel', 'flags', 'respawn', 'detects',
-                                        'expLevelMod', 'placeholderOf'])
+                                        'expLevelMod', 'placeholderOf', 'immunity', 'sdt', 'elementRanks', 'statusRanks'])
         self.assertEqual([row[0] for row in self.rows[1:]], ['17199105', '17199648', '17272838'])
         self.assertEqual(self.rows[2], ['17199648', '103', 'Goblin Bounty Hunter', '17', '20', '33', '300', '3', '0',
-                                        '17199700'])
+                                        '17199700', '4112', '0,2500,0,0,0,0,0,0,0,0,0,0', '-2,-2,-2,-2,-2,-2,-3,0',
+                                        '0,0,0,0,0,0,0,0,0,0'])
 
     def test_flags_respawn_detection_and_the_level_mod(self):
-        self.assertEqual(self.rows[1][5:], [str(1 | 2), '0', '2', '0', '0'])  # aggro + always aggro (fished ignored)
+        self.assertEqual(self.rows[1][5:10], [str(1 | 2), '0', '2', '0', '0'])  # aggro + always aggro (fished ignored)
         # no aggro + notorious + true detection + follows (battlefield ignored)
-        self.assertEqual(self.rows[3][5:], [str(4 | 8 | 64 | 128), '960', '256', '-2', '0'])
+        self.assertEqual(self.rows[3][5:10], [str(4 | 8 | 64 | 128), '960', '256', '-2', '0'])
 
     def test_meta(self):
         self.assertIn('phoenix_commit\tabc123\n', self.meta)
@@ -92,7 +100,8 @@ class Trim(unittest.TestCase):
 def mob(**fields):
     base = {'id': 16797854, 'zone': 5, 'name': 'Ice_Elemental', 'minLevel': 76, 'maxLevel': 77, 'respawn': 300,
             'aggro': False, 'alwaysAggro': 0, 'noAggro': 0, 'type': 0, 'link': False, 'detects': 0x020,
-            'trueDetection': False, 'expLevelMod': 0, 'follows': False, 'placeholderOf': 0}
+            'trueDetection': False, 'expLevelMod': 0, 'follows': False, 'placeholderOf': 0, 'immunity': 0,
+            'sdt': [0] * 12, 'elementRanks': [0] * 8, 'statusRanks': [0] * 10}
     base.update(fields)
     return base
 
@@ -132,11 +141,13 @@ class MergeSnapshots(unittest.TestCase):
         self.assertEqual(rows[0][5], '0')
 
     def test_all_but_the_levels_and_aggro_come_from_the_first_snapshot(self):
-        first = mob(minLevel=76, maxLevel=77, link=True, detects=0x002, expLevelMod=-2, placeholderOf=16797860)
+        first = mob(minLevel=76, maxLevel=77, link=True, detects=0x002, expLevelMod=-2, placeholderOf=16797860,
+                    immunity=0x800, statusRanks=[0] * 5 + [6] + [0] * 4)
         later = mob(zone=6, name='Label_Only', minLevel=75, maxLevel=78, respawn=999, type=0x02, detects=0x101,
-                    trueDetection=True, follows=True)
+                    trueDetection=True, follows=True, immunity=0x2)
         rows, _ = self.compact_rows([first], [later])
-        self.assertEqual(rows[0], ['16797854', '5', 'Ice Elemental', '75', '78', '32', '300', '2', '-2', '16797860'])
+        self.assertEqual(rows[0], ['16797854', '5', 'Ice Elemental', '75', '78', '32', '300', '2', '-2', '16797860',
+                                   '2048', ','.join(['0'] * 12), ','.join(['0'] * 8), '0,0,0,0,0,6,0,0,0,0'])
 
     def test_mobs_from_any_snapshot_are_kept_and_counted(self):
         rows, meta = self.compact_rows([mob()], [mob(), mob(id=16797855)])
@@ -190,15 +201,21 @@ class CompactRejects(unittest.TestCase):
                     self.compact_one(json.dumps(dump([mob(**fields)])))
                 self.assertIn(message, str(caught.exception))
 
+    def test_a_resistance_list_the_plugin_cannot_hold(self):
+        with self.assertRaises(compact.schema.DataError) as caught:
+            self.compact_one(json.dumps(dump([mob(sdt=[0] * 11)])))
+        self.assertIn('sdt must be 12 whole numbers', str(caught.exception))
+
     def test_a_truncated_dump_names_its_file(self):
         with self.assertRaises(compact.schema.DataError) as caught:
             self.compact_one(json.dumps(dump([mob()]))[:40])
         self.assertIn('run-1.json: not a complete dump', str(caught.exception))
 
 
-def record(mob_id, zone, name, lo, hi, flags, respawn, detects, level_mod=0, placeholder_of=0):
-    return mob_id, {'id': mob_id, 'zone': zone, 'name': name, 'minLevel': lo, 'maxLevel': hi, 'flags': flags,
-                    'respawn': respawn, 'detects': detects, 'expLevelMod': level_mod, 'placeholderOf': placeholder_of}
+def record(mob_id, zone, name, lo, hi, flags, respawn, detects, level_mod=0, placeholder_of=0, immunity=0):
+    return mob_id, dict({'id': mob_id, 'zone': zone, 'name': name, 'minLevel': lo, 'maxLevel': hi, 'flags': flags,
+                         'respawn': respawn, 'detects': detects, 'expLevelMod': level_mod, 'placeholderOf': placeholder_of},
+                        **dict(ZEROS_RECORD, immunity=immunity))
 
 
 class Validate(unittest.TestCase):
@@ -210,10 +227,11 @@ class Validate(unittest.TestCase):
         record(17190918, 101, 'Wild Rabbit', 1, 1, 0, 60, 257, -2),
         record(17191194, 101, 'Carrion Worm', 4, 5, 0, 180, 2, 0, 17191196),
         record(17191195, 101, 'Carrion Worm', 4, 5, 0, 180, 2, 0, 17191196),
+        record(17199999, 103, 'Doman', 76, 76, 8, 0, 0, immunity=0x1000 | 0x10 | 0x8),
     ])
 
     def check(self, records, **limits):
-        return validate.check(records, **dict(dict(min_mobs=5, min_zones=3), **limits))
+        return validate.check(records, **dict(dict(min_mobs=5, min_zones=3, min_resisting=0), **limits))
 
     def test_known_spawns_pass(self):
         self.assertEqual(self.check(self.RECORDS), [])
@@ -241,14 +259,35 @@ class Validate(unittest.TestCase):
         self.assertEqual(self.check(records), ['17191195: expected a placeholder of 17191196, got 0'])
 
     def test_too_few_mobs_or_zones_fail(self):
-        self.assertEqual(self.check(self.RECORDS, min_mobs=8, min_zones=4),
-                         ['only 7 mobs (expected at least 8)', 'only 3 zones (expected at least 4)'])
+        self.assertEqual(self.check(self.RECORDS, min_mobs=9, min_zones=4),
+                         ['only 8 mobs (expected at least 9)', 'only 3 zones (expected at least 4)'])
+
+    def test_some_mobs_must_resist_something_or_the_columns_were_read_wrong(self):
+        self.assertEqual(self.check(self.RECORDS, min_resisting=1), [
+            'only 0 mobs with damage taken other than 100% (expected at least 1)',
+            'only 0 mobs with a resistance rank of 4 or more (expected at least 1)'])
+        records = dict(self.RECORDS)
+        _, crab = record(17199105, 103, 'Stag Crab', 15, 17, 3, 0, 2)
+        records[17199105] = dict(crab, sdt=[0, 2500] + [0] * 10, statusRanks=[4] + [0] * 9)
+        self.assertEqual(self.check(records, min_resisting=1), [])
+        self.assertEqual(self.check(records, min_resisting=2), [
+            'only 1 mobs with immunities (expected at least 2)',
+            'only 1 mobs with damage taken other than 100% (expected at least 2)',
+            'only 1 mobs with a resistance rank of 4 or more (expected at least 2)'])
+
+    def test_doman_must_carry_the_immunities_its_spawn_script_adds(self):
+        records = dict(self.RECORDS)
+        records.update([record(17199999, 103, 'Doman', 76, 76, 8, 0, 0, immunity=0x1000)])
+        self.assertEqual(self.check(records), ['Doman (zone 103): expected immunity bits 4120, got 4096'])
+        del records[17199999]
+        self.assertEqual(self.check(records), ['Doman (zone 103): missing'])
 
     def test_load_reads_every_column(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = pathlib.Path(tmp) / 'mobs.tsv'
-            path.write_text('id\tzone\tname\tminLevel\tmaxLevel\tflags\trespawn\tdetects\texpLevelMod\tplaceholderOf\n'
-                            '17191194\t101\tCarrion Worm\t4\t5\t0\t180\t2\t0\t17191196\n')
+            path.write_text('id\tzone\tname\tminLevel\tmaxLevel\tflags\trespawn\tdetects\texpLevelMod\tplaceholderOf'
+                            '\timmunity\tsdt\telementRanks\tstatusRanks\n'
+                            '17191194\t101\tCarrion Worm\t4\t5\t0\t180\t2\t0\t17191196\t' + '\t'.join(ZERO_LISTS) + '\n')
             self.assertEqual(validate.load(path), dict([record(17191194, 101, 'Carrion Worm', 4, 5, 0, 180, 2, 0, 17191196)]))
 
 

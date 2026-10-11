@@ -59,6 +59,11 @@ namespace headsup
         return it == std::end(kMobs) || it->id != serverId ? nullptr : &*it;
     }
 
+    const MobResistances& ResistancesOf(const MobRecord& mob)
+    {
+        return mob.resistances < std::size(kMobResistances) ? kMobResistances[mob.resistances] : kMobResistances[0];
+    }
+
     const MobRecord* FindMob(uint32_t serverId, std::string_view displayName)
     {
         const MobRecord* mob = MobById(serverId);

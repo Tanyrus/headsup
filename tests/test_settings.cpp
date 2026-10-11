@@ -119,6 +119,58 @@ textOutlineB=0.5000
 iconTintR=0.7500
 iconTintG=0.5000
 iconTintB=0.9000
+showDamageIcons=false
+showStatusRankIcons=false
+showImmunityIcons=false
+detectionIconSide=right
+badgeSide=left
+elementWeakRank=-3.0000
+elementResistRank=6.0000
+maxElements=3.0000
+showRanks=true
+badgeFontName=Tahoma
+paralyzeBadge=false
+paralyzeWeakRank=-1.0000
+paralyzeResistRank=1.0000
+bindBadge=false
+bindWeakRank=-2.0000
+bindResistRank=2.0000
+silenceBadge=false
+silenceWeakRank=-3.0000
+silenceResistRank=3.0000
+slowBadge=false
+slowWeakRank=-1.0000
+slowResistRank=5.0000
+poisonBadge=false
+poisonWeakRank=-2.0000
+poisonResistRank=6.0000
+lightSleepBadge=false
+lightSleepWeakRank=-3.0000
+lightSleepResistRank=7.0000
+darkSleepBadge=false
+darkSleepWeakRank=-1.0000
+darkSleepResistRank=8.0000
+blindBadge=false
+blindWeakRank=-2.0000
+blindResistRank=9.0000
+stunBadge=false
+stunWeakRank=-3.0000
+stunResistRank=10.0000
+gravityBadge=false
+gravityWeakRank=-1.0000
+gravityResistRank=12.0000
+weakBadgeColorR=0.1000
+weakBadgeColorG=0.2000
+weakBadgeColorB=0.3000
+resistBadgeColorR=0.4000
+resistBadgeColorG=0.5000
+resistBadgeColorB=0.6000
+rankBadgeColorR=0.7000
+rankBadgeColorG=0.8000
+rankBadgeColorB=0.9000
+immuneBadgeColorR=0.9000
+immuneBadgeColorG=0.1000
+immuneBadgeColorB=0.2000
 fontName=Georgia
 labelUnknownR=0.1000
 labelUnknownG=0.1100
@@ -263,6 +315,24 @@ keepPointerKeys=11 1B 51
         s.mobId = MobIdFormat::LastThree;
         s.look  = Look::Fantasy;
         s.keepPointerKeys = {0x11, 0x1B, 0x51};
+        s.showDamageIcons     = false;
+        s.showStatusRankIcons = false;
+        s.showImmunityIcons   = false;
+        s.detectionIconSide   = IconSide::Right;
+        s.badgeSide           = IconSide::Left;
+        s.elementWeakRank     = -3;
+        s.elementResistRank   = 6;
+        s.maxElements         = 3;
+        s.showRanks           = true;
+        s.badgeFontName       = "Tahoma";
+        const int weak[kStatusRankCount]   = {-1, -2, -3, -1, -2, -3, -1, -2, -3, -1};
+        const int resist[kStatusRankCount] = {1, 2, 3, 5, 6, 7, 8, 9, 10, 12};
+        for (int i = 0; i < kStatusRankCount; ++i)
+            s.statusBadges[i] = StatusBadgeRule{false, weak[i], resist[i]};
+        s.weakBadgeColor      = Color{{0.1f, 0.2f, 0.3f}};
+        s.resistBadgeColor    = Color{{0.4f, 0.5f, 0.6f}};
+        s.rankBadgeColor      = Color{{0.7f, 0.8f, 0.9f}};
+        s.immuneBadgeColor    = Color{{0.9f, 0.1f, 0.2f}};
         return s;
     }
 
@@ -291,6 +361,15 @@ TEST(a_player_icon_side_that_is_not_a_side_keeps_its_default)
     MapStore store;
     store.values["iconGm"] = "middle";
     CHECK(LoadSettings(store).playerIconSide[static_cast<int>(PlayerIcon::Gm)] == IconSide::Left);
+}
+
+TEST(a_group_side_that_is_not_left_or_right_keeps_its_default)
+{
+    MapStore store;
+    store.values["detectionIconSide"] = "hide";
+    store.values["badgeSide"]         = "middle";
+    const Settings s                  = LoadSettings(store);
+    CHECK(s.detectionIconSide == IconSide::Left && s.badgeSide == IconSide::Right);
 }
 
 TEST(empty_store_gives_defaults)
@@ -327,7 +406,7 @@ TEST(the_font_list_puts_the_bundled_fonts_first_then_the_installed_ones_sorted_o
 {
     // GDI lists a family once per character set, vertical variants with an @, and a bundled font may be installed too.
     const std::vector<std::string> choices = FontChoices({"Verdana", "arial", "Arial", "@Meiryo", "", "Cinzel"}, "Verdana");
-    const std::vector<std::string> expected{"Marcellus SC", "Cinzel", "Cormorant SC", "arial", "Verdana"};
+    const std::vector<std::string> expected{"Marcellus SC", "Cinzel", "Cormorant SC", "Barlow Condensed", "arial", "Verdana"};
     CHECK(choices == expected);
 }
 
@@ -361,6 +440,13 @@ TEST(clamp_bounds_every_field)
     s.labelFontName  = "";
     s.cursorSize  = 2;
     s.nameRaise   = 99;
+    s.elementWeakRank   = 5;
+    s.elementResistRank = -9;
+    s.maxElements       = 99;
+    s.statusBadges[2]   = StatusBadgeRule{true, 3, 40};
+    s.statusBadges[7]   = StatusBadgeRule{true, -40, -3};
+    s.detectionIconSide = s.badgeSide = IconSide::Hidden;
+    s.badgeFontName     = "";
     const Color wild{{2.0f, -1.0f, 0.5f}};
     s.nameColor = s.textOutline = s.iconTint = s.cursorColor = s.subCursorColor = s.lockedCursorColor = wild;
     s.glowColor = s.ornamentColor = s.labelShadowColor = wild;
@@ -396,6 +482,11 @@ TEST(clamp_bounds_every_field)
     CHECK_EQ(c.iconSize, kMaxTextSize);
     CHECK_EQ(c.cursorSize, kMinTextSize);
     CHECK_EQ(c.nameRaise, kMaxNameRaise);
+    CHECK(c.elementWeakRank == -1 && c.elementResistRank == 1 && c.maxElements == kElementCount);
+    CHECK(c.statusBadges[2] == (StatusBadgeRule{true, -1, kNoResistRank}));
+    CHECK(c.statusBadges[7] == (StatusBadgeRule{true, kNoWeakRank, 1}));
+    CHECK(c.detectionIconSide == IconSide::Left && c.badgeSide == IconSide::Right); // a group cannot hide
+    CHECK(c.badgeFontName == kBadgeFont);
 }
 
 TEST(non_finite_values_fall_back_to_defaults)
@@ -436,13 +527,15 @@ TEST(nameplates_need_the_master_switch_and_a_part)
     Settings none;
     none.showLabels = none.showIcons = false;
     none.replaceMobNames = none.replacePlayerNames = none.replaceNpcNames = none.replaceCursor = false;
+    none.showDamageIcons = none.showStatusRankIcons = none.showImmunityIcons = false;
     CHECK(!NameplatesOn(none));
     auto onlyWithTheSwitch = [](Settings s) {
         CHECK(NameplatesOn(s));
         s.enabled = false;
         CHECK(!NameplatesOn(s));
     };
-    for (bool Settings::*part : {&Settings::showLabels, &Settings::showIcons, &Settings::replaceMobNames,
+    for (bool Settings::*part : {&Settings::showLabels, &Settings::showIcons, &Settings::showDamageIcons,
+             &Settings::showStatusRankIcons, &Settings::showImmunityIcons, &Settings::replaceMobNames,
              &Settings::replacePlayerNames, &Settings::replaceNpcNames, &Settings::replaceCursor, &Settings::phTimers})
     {
         Settings s = none;
@@ -561,4 +654,18 @@ TEST(the_keys_that_keep_the_pointer_are_real_keys_once_each_and_not_too_many)
     MapStore odd;
     odd.values = {{"keepPointerKeys", "11 zz 1B 999"}};
     CHECK(LoadSettings(odd).keepPointerKeys == (std::vector<uint8_t>{0x11, 0x1B}));
+}
+
+TEST(a_file_from_before_the_badge_group_takes_its_defaults)
+{
+    MapStore old;
+    old.values = {{"showIcons", "true"}};
+    const Settings s = LoadSettings(old);
+    CHECK(s.showDamageIcons && s.showStatusRankIcons && s.showImmunityIcons);
+    CHECK(s.detectionIconSide == IconSide::Left && s.badgeSide == IconSide::Right);
+    CHECK(s.elementWeakRank == -1 && s.elementResistRank == 4 && s.maxElements == kElementCount && !s.showRanks);
+    CHECK(s.badgeFontName == kBadgeFont);
+    for (const StatusBadgeRule& status : s.statusBadges)
+        CHECK(status == (StatusBadgeRule{true, kNoWeakRank, 4}));
+    CHECK(s.weakBadgeColor == Settings{}.weakBadgeColor && s.immuneBadgeColor == Settings{}.immuneBadgeColor);
 }
