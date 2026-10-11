@@ -21,10 +21,12 @@ namespace headsup
         return style;
     }
 
-    LineStyle NameLineStyle(const Settings& settings)
+    LineStyle NameLineStyle(const Settings& settings, EntityKind kind)
     {
-        return LineStyle{settings.fontName, settings.fontBold, ToArgb(settings.textOutline),
-            static_cast<float>(settings.nameShadow) / kPercent};
+        const bool player = kind == EntityKind::Player, npc = kind == EntityKind::Npc;
+        const std::string& font = player ? settings.playerFontName : npc ? settings.npcFontName : settings.fontName;
+        const bool bold         = player ? settings.playerFontBold : npc ? settings.npcFontBold : settings.fontBold;
+        return LineStyle{font, bold, ToArgb(settings.textOutline), static_cast<float>(settings.nameShadow) / kPercent};
     }
 
     LineStyle LevelLineStyle(const Settings& settings)

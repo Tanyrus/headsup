@@ -147,14 +147,14 @@ namespace headsup
         };
 
         const char* const kCategoryLabels[kCategoryCount] = {"Aggressive", "Passive", "No data", "Aggressive NM",
-            "Passive NM", "NM placeholder"};
+            "Passive NM", "NM placeholder", "Your claim", "Others' claim"};
         const char* const kPlayerIconLabels[kPlayerIconCount] = {"GM", "Mentor", "New adventurer", "Level sync", "Away",
-            "Linkshell", "Bazaar", "Seeking party"};
+            "Linkshell", "Bazaar", "Seeking party"}; // GM's is never listed: it always shows
         const char* const kIconSideLabels[kIconSideCount] = {"Left", "Right", "Hide"};
         constexpr int kGroupSideCount                      = static_cast<int>(IconSide::Right) + 1; // a group cannot hide
         const char* const kStatusLabels[kStatusRankCount] = {"Paralyze", "Bind", "Silence", "Slow", "Poison", "Light sleep",
             "Dark sleep", "Blind", "Stun", "Gravity"};
-        const char* const kMobIdLabels[kMobIdFormatCount]  = {"Off", "Hex", "Both"};
+        const char* const kMobIdLabels[kMobIdFormatCount]  = {"Off", "Hex", "Decimal", "Both"};
         const char* const kPlayerIconTips[kPlayerIconCount] = {nullptr, nullptr, nullptr,
             "Level synced, outside battlefields.", nullptr, "In the linkshell's color.", nullptr, nullptr};
         const char* const kCategoryTips[kCategoryCount] = {
@@ -163,10 +163,12 @@ namespace headsup
             "Not in the Phoenix data.",
             "Notorious monsters that would attack you.",
             "Notorious monsters that would leave you alone.",
-            "Lottery placeholders, whose death can pop an NM. Off, they take any mob's color."};
-        // Ordinary mobs, notorious monsters and their placeholders, then mobs with no data.
+            "Lottery placeholders, whose death can pop an NM. Off, they take any mob's color.",
+            "Claimed by you or your party. Off, they keep the color they had.",
+            "Claimed by anyone outside your party. Off, they keep the color they had."};
+        // Ordinary mobs, notorious monsters and their placeholders, claimed mobs, then mobs with no data.
         const Category kCategoryOrder[kCategoryCount] = {Category::WillAttack, Category::WontAttack, Category::NmWillAttack,
-            Category::NmWontAttack, Category::Placeholder, Category::Unknown};
+            Category::NmWontAttack, Category::Placeholder, Category::PartyClaim, Category::OtherClaim, Category::Unknown};
         const char* const kShadeLabels[kLabelShadeCount] = {"Unknown level", "Too Weak", "Easy Prey", "Decent Challenge",
             "Even Match", "Tough", "Very Tough"};
         const char* const kBarWidgetLabels[] = {"Zone", "Weather", "Vana'diel", "Target", "Gil",
@@ -934,6 +936,8 @@ namespace headsup
             {
                 ui.SliderInt("Raise names", s.nameRaise, kMinNameRaise, kMaxNameRaise, "%d px",
                     "How far above the game's own spot names sit.");
+                ui.Switch("Stack names", s.stackNames,
+                    "Names that would cover each other rise one over another. Your target's keeps its place.");
                 ui.EndCard();
             }
             ui.Fade(false);
@@ -1004,13 +1008,18 @@ namespace headsup
                 ui.Fade(!s.enabled || !s.replaceMobNames || !s.nameGlow);
                 ui.Switch("Unglow claimed", s.glowOffWhenFighting, "No glow once your party claims the mob.");
                 ui.Fade(!s.enabled);
+                ui.SliderInt("Others' opacity", s.untargetedOpacity, kMinOpacity, kMaxOpacity, "%d%%",
+                    "Other mobs' names and lines while you have a target, so your target's stand out.");
                 ui.Segments("Mob ID", s.mobId, kMobIdLabels, kMobIdFormatCount,
-                    "On the level line. Hex is the last 3 digits players name placeholders by.");
+                    "On the level line. Hex is the last 3 digits players name placeholders by; Decimal is the whole ID.");
                 ui.EndCard();
             }
             ui.Fade(!s.enabled || !AnyMobIcons(s));
             if (ui.BeginCard("Icons", kMobIconsSection, collapsed, nullptr, "Where the detection icons and badges go."))
             {
+                const char* const places[kIconPlaceCount] = {"Edges", "Center", "Inline"};
+                ui.Segments("Placement", s.mobIconPlace, places, kIconPlaceCount,
+                    "Above the level line at its ends, together over its middle, or on the line itself at their sides.");
                 ui.Fade(!s.enabled || !AnyBadges(s));
                 ui.Segments("Badge side", s.badgeSide, kIconSideLabels, kGroupSideCount,
                     "Where weaknesses, statuses and immunities go. Sharing a side, detection icons sit nearer the middle.");
@@ -1166,18 +1175,58 @@ namespace headsup
             ui.Fade(false);
         }
 
-        // Each icon's side of the name, or hidden.
+        // The icons in their order, GM's aside: each row moves up or down, shares the slot above it, and takes a side.
         void DrawPlayerIcons(Ui& ui, Settings& s)
         {
-            const float frame = ui.gui->GetFrameHeight(), segment = ui.Em(kSideSegmentWidth);
-            const float sides = static_cast<float>(kIconSideCount) * segment + 2.0f * ui.Em(kTrayInset);
-            for (int i = 0; i < kPlayerIconCount; ++i)
+            ui.Note("GM always shows, nearest the name. A shared slot shows the first of its icons a player has.");
+            ui.NumberDropdown("Most shown", s.playerIconMax, 1, kMaxPlayerIcons, [](int n) { return std::to_string(n); },
+                "Past this many, the icons last in the order are left off.", ui.Em(kCutoffWidth));
+            std::vector<size_t> places; // where each icon but GM is in the order
+            for (size_t p = 0; p < s.playerIconOrder.size(); ++p)
+                if (s.playerIconOrder[p] != PlayerIcon::Gm) places.push_back(p);
+            const float frame = ui.gui->GetFrameHeight(), gap = ui.style.ItemSpacing.x;
+            const float segment = ui.Em(kSideSegmentWidth), share = ui.Em(kSegmentWidth);
+            const float sides   = static_cast<float>(kIconSideCount) * segment + 2.0f * ui.Em(kTrayInset);
+            const float width   = 2.0f * frame + share + sides + 3.0f * gap;
+            std::optional<std::pair<size_t, size_t>> swap;
+            for (size_t k = 0; k < places.size(); ++k)
             {
-                const float y = ui.Row(kPlayerIconLabels[i], kPlayerIconTips[i], sides);
+                const int i   = static_cast<int>(s.playerIconOrder[places[k]]);
+                const float y = ui.Row(kPlayerIconLabels[i], kPlayerIconTips[i], width);
+                float x       = ui.gui->GetCursorPosX();
                 char id[48];
+                const auto arrow = [&](const char* name, ImGuiDir way, bool end) {
+                    std::snprintf(id, sizeof(id), "##%s %d", name, i);
+                    return ui.Unless(end, [&] { return ui.RoundFrames([&] { return ui.gui->ArrowButton(id, way); }); });
+                };
+                if (arrow("up", ImGuiDir_Up, k == 0)) swap = {places[k - 1], places[k]};
+                ui.gui->SetCursorPos(ImVec2(x += frame + gap, y));
+                if (arrow("down", ImGuiDir_Down, k + 1 == places.size())) swap = {places[k], places[k + 1]};
+                ui.gui->SetCursorPos(ImVec2(x += frame + gap, y));
+                // The first icon has no slot above it to share.
+                bool& shared = s.playerIconShare[i];
+                std::snprintf(id, sizeof(id), "Share##share %d", i);
+                const bool on = shared && k > 0;
+                if (ui.Unless(k == 0, [&] {
+                        return ui.WithText(on ? kText : kMuted, [&] {
+                            return ui.Shape(id, ImVec2(share, frame), on ? kAccentButton : kRaised, frame / 2.0f,
+                                on ? kClear : kRaisedEdge);
+                        });
+                    }))
+                {
+                    shared     = !shared;
+                    ui.changed = true;
+                }
+                ui.Tip("Shares the slot of the icon above it.");
+                ui.gui->SetCursorPos(ImVec2(x += share + gap, y));
                 std::snprintf(id, sizeof(id), "side %d", i);
                 ui.SegmentsAt(id, s.playerIconSide[i], kIconSideLabels, kIconSideCount, segment);
                 ui.EndRowAt(ui.cardX, y, frame);
+            }
+            if (swap)
+            {
+                std::swap(s.playerIconOrder[swap->first], s.playerIconOrder[swap->second]);
+                ui.changed = true;
             }
         }
 
@@ -1188,7 +1237,7 @@ namespace headsup
             {
                 ui.Switch("Player names", s.replacePlayerNames, "Draws player names, yours too, in your font.");
                 ui.Fade(!s.enabled || !s.replacePlayerNames);
-                ui.FontDropdown("Name font", s.fontName, fonts, &s.fontBold);
+                ui.FontDropdown("Name font", s.playerFontName, fonts, &s.playerFontBold);
                 ui.Switch("Icons", s.showPlayerIcons, "Party, bazaar, linkshell and the rest, in HQ. Player Icons places each.");
                 ui.Fade(!s.enabled || !s.replacePlayerNames || !s.showPlayerIcons);
                 ui.Switch("Center icons", s.centerNameAndIcons, "Centers the name and icons together. Off, the name alone.");
@@ -1221,7 +1270,7 @@ namespace headsup
             if (ui.BeginCard("NPC Names", kNpcDisplaySection, collapsed, &s.replaceNpcNames, "Draws NPC names in your font."))
             {
                 ui.Fade(!s.enabled || !s.replaceNpcNames);
-                ui.FontDropdown("Font", s.fontName, fonts, &s.fontBold);
+                ui.FontDropdown("Font", s.npcFontName, fonts, &s.npcFontBold);
                 ui.SliderInt("Size", s.npcNameSize, kMinTextSize, kMaxTextSize, "%d px", nullptr);
                 ui.EndCard();
             }
@@ -1282,6 +1331,8 @@ namespace headsup
                 ui.Fade(!s.enabled || !s.replaceCursor);
                 ui.Switch("Feather", s.cursorFeather, "Phoenix's feather instead of the arrow.");
                 ui.SliderInt("Size", s.cursorSize, kMinTextSize, kMaxTextSize, "%d px", nullptr);
+                ui.SliderInt("Outline", s.cursorOutline, kMinCursorOutline, kMaxCursorOutline, "%d%%",
+                    "Its dark edge, as a share of the usual thickness.");
                 ui.Switch("Scale", s.scaleCursor, "Larger the nearer your target is.");
                 ui.EndCard();
             }

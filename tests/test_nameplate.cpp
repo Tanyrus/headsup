@@ -563,3 +563,101 @@ TEST(a_badge_group_longer_than_the_detection_icons_still_lifts_the_cursor)
     const NameplateLayout l = LayoutNameplate(plate, sizes, true);
     CHECK(Near(l.cursor.y, 135.4f - 16.0f)); // two rows of badges: 160.2, then 137.4
 }
+
+TEST(other_mobs_plates_fade_while_you_have_a_target)
+{
+    Settings s;
+    s.untargetedOpacity = 40;
+    CHECK_EQ(PlateAlpha(s, EntityKind::Mob, kPlainRank, true), 102u);
+    CHECK_EQ(PlateAlpha(s, EntityKind::Mob, kPlainRank, false), kOpaqueAlpha); // no target: nothing fades
+    CHECK_EQ(PlateAlpha(s, EntityKind::Mob, kTargetRank, true), kOpaqueAlpha);
+    CHECK_EQ(PlateAlpha(s, EntityKind::Player, kPlainRank, true), kOpaqueAlpha);
+    CHECK_EQ(WithAlpha(0xFF123456, 102), 0x66123456u);
+    CHECK_EQ(WithAlpha(0x80123456, kOpaqueAlpha), 0x80123456u);
+}
+
+TEST(centered_the_icon_groups_sit_together_over_the_middle)
+{
+    const ScreenBox plate = Box(1000.0f, 200.0f, 1080.0f, 210.0f);
+    const LineSizes sizes{.labelWidth = 100.0f, .labelHeight = 16.0f, .mobIconCount = 1, .iconSize = 16.0f,
+        .infoIconCount = 1, .iconPlace = IconPlace::Center};
+    const NameplateLayout l = LayoutNameplate(plate, sizes, false);
+    // One icon (16), a gap and one badge with its overhang (21.6): 39.6 around the center at 1040.
+    CHECK(Near(IconAt(l, l.detection, 0).x, 1020.2f));
+    CHECK(Near(IconAt(l, l.info, 0).x + 16.0f * (1.0f + kBadgeOverhang), 1059.8f));
+}
+
+TEST(inline_the_icon_groups_sit_on_the_level_line_at_their_sides)
+{
+    const ScreenBox plate = Box(1000.0f, 200.0f, 1080.0f, 210.0f);
+    const LineSizes sizes{.labelWidth = 100.0f, .labelHeight = 16.0f, .mobIconCount = 1, .iconSize = 16.0f,
+        .infoIconCount = 1, .iconPlace = IconPlace::Inline, .cursorWidth = 10.0f, .cursorHeight = 10.0f};
+    const NameplateLayout l = LayoutNameplate(plate, sizes, false);
+    const IconSpot detection = IconAt(l, l.detection, 0);
+    CHECK(Near(detection.x + 16.0f, l.labelX - 4.0f)); // two gaps before the line
+    CHECK(Near(IconAt(l, l.info, 0).x, l.labelX + 100.0f + 4.0f));
+    CHECK(Near(detection.y, l.labelY));
+    // Nothing above the level line moves up for them.
+    const LineSizes alone{.labelWidth = 100.0f, .labelHeight = 16.0f, .iconSize = 16.0f, .cursorWidth = 10.0f,
+        .cursorHeight = 10.0f};
+    CHECK(Near(l.cursor.y, LayoutNameplate(plate, alone, false).cursor.y));
+}
+
+namespace
+{
+    constexpr float kStackGap = 2.0f;
+}
+
+TEST(plates_that_do_not_cover_each_other_keep_their_places)
+{
+    // One beside the other, and one well above.
+    const std::vector<PlateBox> boxes{{100.0f, 200.0f, 200.0f, 230.0f}, {200.0f, 200.0f, 300.0f, 230.0f},
+        {100.0f, 100.0f, 200.0f, 130.0f}};
+    CHECK(StackRises(boxes, kStackGap) == (std::vector<float>{0.0f, 0.0f, 0.0f}));
+}
+
+TEST(a_plate_that_would_cover_one_placed_before_it_rises_clear_of_it)
+{
+    // The second starts 10 lower than the first and half across it: its bottom goes a gap above the first's top.
+    const std::vector<PlateBox> boxes{{100.0f, 200.0f, 200.0f, 230.0f}, {150.0f, 210.0f, 250.0f, 240.0f}};
+    CHECK(StackRises(boxes, kStackGap) == (std::vector<float>{0.0f, 42.0f}));
+}
+
+TEST(plates_stack_one_above_another_and_a_rise_onto_a_third_goes_over_it_too)
+{
+    // Three in one spot: 32 apart, each a gap over the last.
+    const PlateBox spot{100.0f, 200.0f, 200.0f, 230.0f};
+    CHECK(StackRises({spot, spot, spot}, kStackGap) == (std::vector<float>{0.0f, 32.0f, 64.0f}));
+    // The third covers only the first, but clearing it lands on the second, placed above: it goes over both.
+    const std::vector<PlateBox> boxes{{100.0f, 200.0f, 200.0f, 230.0f}, {100.0f, 160.0f, 200.0f, 190.0f},
+        {150.0f, 205.0f, 250.0f, 235.0f}};
+    CHECK(StackRises(boxes, kStackGap) == (std::vector<float>{0.0f, 0.0f, 77.0f}));
+}
+
+TEST(a_plates_box_holds_its_name_level_line_and_icon_rows)
+{
+    const ScreenBox plate = Box(1000.0f, 200.0f, 1080.0f, 210.0f);
+    const LineSizes sizes{.nameWidth = 140.0f, .nameHeight = 18.0f, .labelWidth = 100.0f, .labelHeight = 16.0f,
+        .mobIconCount = 1, .iconSize = 16.0f};
+    const NameplateLayout l = LayoutNameplate(plate, sizes, true);
+    const PlateBox box      = BoxOf(l, sizes, true);
+    CHECK(Near(box.left, l.nameX) && Near(box.right, l.nameX + 140.0f)); // the name is its widest line
+    CHECK(Near(box.top, l.iconsY) && Near(box.bottom, l.nameY + 18.0f));
+    // A player's icons beside the name widen it.
+    const LineSizes player{.nameWidth = 100.0f, .nameHeight = 18.0f, .leftIconCount = 2, .rightIconCount = 1,
+        .playerIconSize = 16.0f};
+    const NameplateLayout pl = LayoutNameplate(plate, player, true);
+    const PlateBox wide      = BoxOf(pl, player, true);
+    CHECK(Near(wide.left, pl.leftIconsX) && Near(wide.right, pl.rightIconsX + 16.0f));
+}
+
+TEST(a_plates_rise_eases_to_where_it_should_be_and_settles_there)
+{
+    CHECK(EaseRise(0.0f, 40.0f, 0.0) == 0.0f);
+    const float soon = EaseRise(0.0f, 40.0f, 0.05);
+    CHECK(soon > 5.0f && soon < 40.0f);
+    CHECK(EaseRise(soon, 40.0f, 0.05) > soon);
+    CHECK(EaseRise(0.0f, 40.0f, 5.0) == 40.0f); // long after: there
+    CHECK(EaseRise(39.8f, 40.0f, 0.001) == 40.0f); // within half a pixel: there, so it stops moving
+    CHECK(EaseRise(40.0f, 0.0f, 5.0) == 0.0f);    // and back down when nothing is under it
+}

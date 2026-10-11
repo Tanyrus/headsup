@@ -12,6 +12,7 @@ namespace headsup
     namespace
     {
         constexpr float kOutlinePerHeight = 0.1f; // the cursor's and badges' outline width, per pixel of their height
+        constexpr float kStackGap         = 2.0f; // screen pixels between plates stacked over one another
         constexpr float kPercent          = 100.0f;
         // From the mockup's CSS: a 22 px name's shadows blur 2 and 3 px, 1 px lower, and its glow 14 px.
         constexpr float kShadowDropPerHeight = 0.05f;
@@ -109,11 +110,13 @@ namespace headsup
     bool NameplateRenderer::PrepareCursor(PlateTexture& t, uint32_t color, int pixelHeight, const Settings& settings)
     {
         const LineStyle shape{settings.cursorFeather ? "feather" : "arrow", false, ToArgb(settings.textOutline)};
-        TextureKey key{"", pixelHeight, 0, TextLook{shape, color}};
+        // Its width is the outline's share, which a texture of the same height must match too.
+        TextureKey key{"", pixelHeight, settings.cursorOutline, TextLook{shape, color}};
         if (t.texture != nullptr && t.key == key) return true;
         if (!RedrawNow(t.texture != nullptr, m_RedrawMs)) return true;
         const Stopwatch stopwatch(m_RedrawMs);
-        const int radius        = OutlineRadius(pixelHeight);
+        const int radius        = std::max(1, WholePixels(static_cast<float>(pixelHeight) * kOutlinePerHeight *
+                                                          static_cast<float>(settings.cursorOutline) / kPercent));
         const Shape& outline    = settings.cursorFeather ? FeatherShape() : ArrowShape();
         const Coverage coverage = ShapeCoverage(outline, pixelHeight, radius);
         if (!Upload(t, Outlined(coverage, radius, color, shape.shadowColor), std::move(key))) return false;
@@ -149,14 +152,26 @@ namespace headsup
         const float screenHeight = names.BackBufferHeight();
         // Cursors are drawn after every nameplate, so another name never covers one.
         std::vector<Quad> cursorQuads;
-        int rank     = kPlainRank; // of the plate whose quads are being added
+        int rank        = kPlainRank; // of the plate whose quads are being added
+        uint32_t opaque = kOpaqueAlpha; // and its alpha
         auto addQuad = [&](std::vector<Quad>& into, IDirect3DTexture8* texture, float x, float y, float width, float height, float u,
                            float v, float depth, uint32_t tint) {
             // Whole pixels in the target keep the text as sharp as it was drawn.
-            const GpuQuad quad{
-                texture, std::round(x * toX), std::round(y * toY), width, height, 0.0f, u, v, depth, tint};
+            const GpuQuad quad{texture, std::round(x * toX), std::round(y * toY), width, height, 0.0f, u, v, depth,
+                WithAlpha(tint, opaque)};
             into.push_back(Quad{quad, rank});
         };
+        // The plates whose names HeadsUp draws, to stack: each one's box and which quads are its.
+        struct Stacked
+        {
+            Plate* plate;
+            PlateBox box;
+            int rank;
+            float depth;
+            uint16_t index;
+            size_t quads, quadsEnd, cursors, cursorsEnd, shown;
+        };
+        std::vector<Stacked> stacked;
         if (NameplatesOn(settings) && !m_NamesFailed && m_Device != nullptr)
         {
             for (const ActorPtr actor : tracker.Actors())
@@ -176,6 +191,7 @@ namespace headsup
                 if (!lines.Any() && !timersHere) continue;
                 Plate& p = m_Plates[info->index];
                 rank     = PlateRank(info->index, targets);
+                opaque   = PlateAlpha(settings, info->kind, rank, targets.target != 0);
                 p.frame  = m_Frame;
 
                 const bool self         = info->index == selfIndex;
@@ -205,7 +221,7 @@ namespace headsup
                 const uint32_t nameColor = settings.ownNameColor ? ToArgb(settings.nameColor) : gameName.color;
                 const uint32_t labelColor = ToArgb(settings.labelColor[static_cast<int>(info->label.shade)]);
                 const PlateStyle style    = StyleFor(*info, lines.label, settings);
-                const LineStyle nameLine  = NameLineStyle(settings);
+                const LineStyle nameLine  = NameLineStyle(settings, info->kind);
                 TextLook nameLook{nameLine, nameColor};
                 if (style.glow)
                 {
@@ -272,6 +288,7 @@ namespace headsup
                 sizes.infoIconCount = lines.infoIconCount;
                 sizes.detectionLeft = settings.detectionIconSide == IconSide::Left;
                 sizes.badgesLeft    = settings.badgeSide == IconSide::Left;
+                sizes.iconPlace     = settings.mobIconPlace;
                 if (showCursor)
                 {
                     sizes.cursorWidth  = p.cursor.width * cursorFit / toX;
@@ -294,6 +311,7 @@ namespace headsup
                 }
                 const NameplateLayout layout = LayoutNameplate(anchor, sizes, lines.name);
                 const float depth            = gameName.depth;
+                const size_t firstQuad = m_Quads.size(), firstCursor = cursorQuads.size();
                 auto addText = [&](const PlateTexture& t, float x, float y, float fit) {
                     addQuad(m_Quads, t.texture, x - t.halo * fit / toX, y - t.halo * fit / toY, t.width * fit, t.height * fit, t.u, t.v,
                         depth, kWhite);
@@ -352,7 +370,39 @@ namespace headsup
                 m_Shown.push_back(Shown{info->index, layout.nameX, layout.nameY, layout.labelX, layout.labelY,
                     lines.mobIconCount > 0 ? IconAt(layout, layout.detection, 0).x : layout.centerX, layout.iconsY, shownHeight(lines.name, nameShown), shownHeight(lines.label, labelShown),
                     static_cast<int>(std::lround(iconSize)), drawn, nameColor});
+                // Only a name HeadsUp draws can move: the game's own stays where the game puts it.
+                if (settings.stackNames && lines.name)
+                    stacked.push_back(Stacked{&p, BoxOf(layout, sizes, true), rank, depth, info->index, firstQuad,
+                        m_Quads.size(), firstCursor, cursorQuads.size(), m_Shown.size() - 1});
+                else
+                    p.rise = 0.0f;
             }
+        }
+        // Your target's plate first, then nearer ones, keep their places, and each plate another would cover rises
+        // over it, by whole pixels of the image so its text stays sharp.
+        std::ranges::sort(stacked, [](const Stacked& a, const Stacked& b) {
+            if (a.rank != b.rank) return a.rank > b.rank;
+            return a.depth != b.depth ? a.depth < b.depth : a.index < b.index;
+        });
+        std::vector<PlateBox> boxes;
+        for (const Stacked& s : stacked)
+            boxes.push_back(s.box);
+        const std::vector<float> rises = StackRises(boxes, kStackGap);
+        for (size_t i = 0; i < stacked.size(); ++i)
+        {
+            const Stacked& s = stacked[i];
+            Plate& p         = *s.plate;
+            p.rise           = EaseRise(p.rise, rises[i], now - p.riseTime);
+            p.riseTime       = now;
+            const float up   = std::round(p.rise * toY);
+            for (size_t q = s.quads; q < s.quadsEnd; ++q)
+                m_Quads[q].gpu.y -= up;
+            for (size_t q = s.cursors; q < s.cursorsEnd; ++q)
+                cursorQuads[q].gpu.y -= up;
+            Shown& shown = m_Shown[s.shown];
+            shown.nameY -= p.rise;
+            shown.labelY -= p.rise;
+            shown.iconsY -= p.rise;
         }
 
         // A lone cursor is drawn at exactly its own size and on top: there is no name to scale by or to sit behind walls with.

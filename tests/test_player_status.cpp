@@ -176,8 +176,8 @@ TEST(player_icons_in_order_left_of_the_name_by_default)
     const PlayerIconRows none = PlayerIcons(PlayerStatus{}, Settings{});
     CHECK(none.left.count == 0 && none.right.count == 0);
     const PlayerIconRows all = PlayerIcons(Everything(), Settings{});
-    CheckRow(all.left, {Icon::Gm, Icon::Mentor, Icon::NewAdventurer, Icon::LevelSync, Icon::Away, Icon::Linkshell,
-                           Icon::Bazaar, Icon::Invite});
+    CheckRow(all.left, {Icon::Mentor, Icon::NewAdventurer, Icon::LevelSync, Icon::Away, Icon::Linkshell, Icon::Bazaar,
+                           Icon::Invite, Icon::Gm}); // GM's nearest the name
     CHECK_EQ(all.right.count, 0);
 }
 
@@ -189,12 +189,36 @@ TEST(each_player_icon_goes_to_its_side_or_nowhere)
     s.playerIconSide[static_cast<int>(PlayerIcon::Away)]      = IconSide::Hidden;
     s.playerIconSide[static_cast<int>(PlayerIcon::Bazaar)]    = IconSide::Hidden;
     const PlayerIconRows rows = PlayerIcons(Everything(), s);
-    CheckRow(rows.left, {Icon::Mentor, Icon::NewAdventurer, Icon::Linkshell, Icon::Invite});
-    CheckRow(rows.right, {Icon::Gm, Icon::LevelSync});
+    CheckRow(rows.left, {Icon::Mentor, Icon::NewAdventurer, Icon::Linkshell, Icon::Invite, Icon::Gm}); // GM's never moves
+    CheckRow(rows.right, {Icon::LevelSync});
     PlayerStatus synced;
     synced.levelSync = true;
     CheckRow(PlayerIcons(synced, s).left, {}); // only what the player has
     CheckRow(PlayerIcons(synced, s).right, {Icon::LevelSync});
+}
+
+TEST(player_icons_follow_their_order_and_the_most_shown)
+{
+    Settings s;
+    s.playerIconOrder = {PlayerIcon::SeekingParty, PlayerIcon::Bazaar, PlayerIcon::Gm, PlayerIcon::Mentor,
+        PlayerIcon::NewAdventurer, PlayerIcon::LevelSync, PlayerIcon::Away, PlayerIcon::Linkshell};
+    s.playerIconMax = 3;
+    CheckRow(PlayerIcons(Everything(), s).left, {Icon::Invite, Icon::Bazaar, Icon::Mentor, Icon::Gm}); // GM's not counted
+}
+
+TEST(icons_sharing_a_slot_show_the_first_the_player_has)
+{
+    Settings s;
+    s.playerIconShare[static_cast<int>(PlayerIcon::NewAdventurer)] = true; // shares Mentor's slot
+    s.playerIconShare[static_cast<int>(PlayerIcon::LevelSync)]     = true; // and so does this
+    PlayerStatus both;
+    both.mentor = both.newAdventurer = both.levelSync = true;
+    CheckRow(PlayerIcons(both, s).left, {Icon::Mentor});
+    PlayerStatus later;
+    later.newAdventurer = later.levelSync = true;
+    CheckRow(PlayerIcons(later, s).left, {Icon::NewAdventurer});
+    s.playerIconSide[static_cast<int>(PlayerIcon::Mentor)] = IconSide::Right; // the slot's side is its first icon's
+    CheckRow(PlayerIcons(later, s).right, {Icon::NewAdventurer});
 }
 
 TEST(level_sync_comes_from_a_characters_sync_packet)

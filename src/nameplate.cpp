@@ -141,16 +141,33 @@ namespace headsup
         }
         const float between = leftWidth > 0.0f && rightWidth > 0.0f ? kIconGap : 0.0f;
         const float text    = sizes.labelWidth > 0.0f ? sizes.labelWidth : showName ? sizes.nameWidth : 0.0f;
-        const float row     = std::max(text, leftWidth + between + rightWidth);
+        const float groups  = leftWidth + between + rightWidth;
+        const float row     = sizes.iconPlace == IconPlace::Center ? groups : std::max(text, groups);
         l.iconsLeftX        = centerX - row * 0.5f;
         l.iconsRightX       = centerX + row * 0.5f;
+        // Inline, the row's edges are the level line's ends pushed out by each side's groups.
+        const bool inline_ = sizes.iconPlace == IconPlace::Inline && sizes.labelHeight > 0.0f;
+        if (inline_)
+        {
+            l.iconsLeftX  = l.labelX - (leftWidth > 0.0f ? kIconGap * 2.0f + leftWidth : 0.0f);
+            l.iconsRightX = l.labelX + sizes.labelWidth + (rightWidth > 0.0f ? kIconGap * 2.0f + rightWidth : 0.0f);
+        }
         const float inside  = shared && badgeWidth > 0.0f ? badgeWidth + kIconGap : 0.0f;
         l.detection         = IconRow{sizes.mobIconCount, detectionStep, inside, sizes.detectionLeft};
         l.info              = IconRow{sizes.infoIconCount, badgeStep, sizes.badgesLeft ? 0.0f : overhang, sizes.badgesLeft};
         l.iconRowStep  = sizes.iconSize + hang + kLineGap;
-        l.iconsY       = bottom - hang - sizes.iconSize;
         const int rows = std::max(RowCount(sizes.mobIconCount), RowCount(sizes.infoIconCount));
-        if (rows > 0) bottom = l.iconsY - static_cast<float>(rows - 1) * l.iconRowStep - kLineGap;
+        if (inline_)
+        {
+            // Centered on the level line; rows past the first wrap above it.
+            l.iconsY = l.labelY + (sizes.labelHeight - sizes.iconSize) * 0.5f;
+            if (rows > 0) bottom = std::min(bottom, l.iconsY - static_cast<float>(rows - 1) * l.iconRowStep - kLineGap);
+        }
+        else
+        {
+            l.iconsY = bottom - hang - sizes.iconSize;
+            if (rows > 0) bottom = l.iconsY - static_cast<float>(rows - 1) * l.iconRowStep - kLineGap;
+        }
         l.timerStep = sizes.timerHeight + kLineGap;
         l.timersY   = bottom + kLineGap - static_cast<float>(sizes.timerCount) * l.timerStep;
         if (sizes.timerCount > 0) bottom = l.timersY - kLineGap;
@@ -175,6 +192,70 @@ namespace headsup
     IconSpot BadgeAt(IconSpot icon, float iconSize, float width, float height)
     {
         return IconSpot{icon.x + iconSize * (1.0f + kBadgeOverhang) - width, icon.y + iconSize * (1.0f + kBadgeHang) - height};
+    }
+
+    PlateBox BoxOf(const NameplateLayout& l, const LineSizes& sizes, bool showName)
+    {
+        PlateBox box{l.centerX, 0.0f, l.centerX, 0.0f};
+        bool any = false;
+        const auto add = [&](float left, float top, float width, float height) {
+            box.left   = std::min(box.left, left);
+            box.right  = std::max(box.right, left + width);
+            box.top    = any ? std::min(box.top, top) : top;
+            box.bottom = any ? std::max(box.bottom, top + height) : top + height;
+            any        = true;
+        };
+        if (showName)
+        {
+            const float right = l.rightIconsX + RowWidth(sizes.rightIconCount, sizes.playerIconSize);
+            const float left  = sizes.leftIconCount > 0 ? l.leftIconsX : l.nameX;
+            add(left, l.nameY, std::max(l.nameX + sizes.nameWidth, sizes.rightIconCount > 0 ? right : 0.0f) - left,
+                sizes.nameHeight);
+        }
+        if (sizes.ornamentHeight > 0.0f) add(l.ornamentX, l.ornamentY, sizes.ornamentWidth, sizes.ornamentHeight);
+        if (sizes.labelHeight > 0.0f) add(l.labelX, l.labelY, sizes.labelWidth, sizes.labelHeight);
+        if (const int rows = std::max(RowCount(sizes.mobIconCount), RowCount(sizes.infoIconCount)); rows > 0)
+        {
+            const float top = l.iconsY - static_cast<float>(rows - 1) * l.iconRowStep;
+            add(l.iconsLeftX, top, l.iconsRightX - l.iconsLeftX, l.iconsY + l.iconSize - top);
+        }
+        return box;
+    }
+
+    std::vector<float> StackRises(const std::vector<PlateBox>& boxes, float gap)
+    {
+        std::vector<float> rises(boxes.size(), 0.0f);
+        for (size_t i = 0; i < boxes.size(); ++i)
+        {
+            const PlateBox& mine = boxes[i];
+            float rise           = 0.0f;
+            // Each pass that finds a plate in the way rises further, so it ends within a pass for every plate placed.
+            for (bool risen = true; risen;)
+            {
+                risen = false;
+                for (size_t j = 0; j < i; ++j)
+                {
+                    const PlateBox& other = boxes[j];
+                    const float top = other.top - rises[j], bottom = other.bottom - rises[j];
+                    if (mine.left >= other.right || other.left >= mine.right) continue;
+                    if (mine.top - rise >= bottom + gap || top >= mine.bottom - rise + gap) continue;
+                    // Rounding can find a plate just cleared still in the way: only a higher rise is a new one.
+                    const float clear = mine.bottom - (top - gap);
+                    if (clear <= rise) continue;
+                    rise  = clear;
+                    risen = true;
+                }
+            }
+            rises[i] = rise;
+        }
+        return rises;
+    }
+
+    float EaseRise(float shown, float target, double seconds)
+    {
+        constexpr float kSettled = 0.5f; // pixels
+        const float next = shown + (target - shown) * static_cast<float>(1.0 - std::exp(-std::max(0.0, seconds) / kScaleEase));
+        return std::fabs(target - next) < kSettled ? target : next;
     }
 
     float CursorBob(double seconds, float height)
@@ -212,6 +293,13 @@ namespace headsup
         if (index == 0) return kPlainRank;
         if (index == targets.subTarget) return kPickedRank;
         return index == targets.target ? kTargetRank : kPlainRank;
+    }
+
+    uint32_t PlateAlpha(const Settings& settings, EntityKind kind, int rank, bool hasTarget)
+    {
+        if (kind != EntityKind::Mob || rank != kPlainRank || !hasTarget) return kOpaqueAlpha;
+        return static_cast<uint32_t>(std::lround(static_cast<float>(kOpaqueAlpha) *
+                                                 static_cast<float>(settings.untargetedOpacity) / 100.0f));
     }
 
     bool DrawnBefore(int rankA, float depthA, int rankB, float depthB)

@@ -27,8 +27,10 @@ namespace headsup
         NmWillAttack,
         NmWontAttack,
         Placeholder, // a lottery placeholder, whatever it would be, while placeholders are shown in their own color
+        PartyClaim,  // claimed by you or your party, whatever it would be, while these are shown in their own color
+        OtherClaim,  // and claimed by anyone else
     };
-    constexpr int kCategoryCount = static_cast<int>(Category::Placeholder) + 1;
+    constexpr int kCategoryCount = static_cast<int>(Category::OtherClaim) + 1;
     constexpr int CategoryIndex(Category category) { return static_cast<int>(category); }
 
     enum class Look : uint8_t
@@ -54,7 +56,7 @@ namespace headsup
 
     constexpr float kMinThickness = 1.0f, kMaxThickness = 16.0f;            // render-target pixels
     constexpr int kMinSmoothness = 4, kMaxSmoothness = 16;                  // shifted copies per mesh
-    constexpr float kMinOutlineDistance = 5.0f, kMaxOutlineDistance = 60.0f; // yalms
+    constexpr float kMinOutlineDistance = 5.0f, kMaxOutlineDistance = 50.0f; // yalms: the game draws no mob past 50
     constexpr int kMinTextSize = 8, kMaxTextSize = 48;   // pixels: name, label, icon and cursor sizes
     constexpr int kMinNameRaise = 0, kMaxNameRaise = 40; // pixels
     constexpr int kMinPlayerIconSize = 50, kMaxPlayerIconSize = 150; // percent of the name's letter height
@@ -73,6 +75,28 @@ namespace headsup
         on.fill(true);
         return on;
     }
+
+    constexpr int kMinCursorOutline = 25, kMaxCursorOutline = 200; // percent
+    constexpr int kMinOpacity = 10, kMaxOpacity = 100; // percent
+    // Where a mob's icon row goes: above the level line with each group at its edge, the groups together over its
+    // middle, or on the level line itself, each group at the side it is set to.
+    enum class IconPlace : uint8_t
+    {
+        Edges,
+        Center,
+        Inline,
+    };
+    constexpr int kIconPlaceCount = static_cast<int>(IconPlace::Inline) + 1;
+
+    // The player icons from first to last, GM's place aside: it always shows, nearest the name on its left.
+    constexpr std::array<PlayerIcon, kPlayerIconCount> DefaultPlayerIconOrder()
+    {
+        std::array<PlayerIcon, kPlayerIconCount> order{};
+        for (int i = 0; i < kPlayerIconCount; ++i)
+            order[i] = static_cast<PlayerIcon>(i);
+        return order;
+    }
+    constexpr int kMaxPlayerIcons = kPlayerIconCount - 1; // GM's aside
 
     constexpr int kMinMenuScale = 70, kMaxMenuScale = 160; // percent
 
@@ -93,6 +117,7 @@ namespace headsup
         // Each group's side of the plate's center; a side both share has the detection icons nearest the center.
         IconSide detectionIconSide = IconSide::Left;
         IconSide badgeSide         = IconSide::Right;
+        IconPlace mobIconPlace     = IconPlace::Edges;
         // Which elements and statuses get badges, as BadgeRules has them.
         int elementWeakRank   = BadgeRules{}.elementWeakRank;
         int elementResistRank = BadgeRules{}.elementResistRank;
@@ -134,6 +159,7 @@ namespace headsup
         bool hideNetstat = false; // and its connection readout (S, R and %) at the top right
         // The game's windows moved out from under Game help's bar, by short name (native_locate.h's ShortName).
         std::vector<std::string> movedWindows = DefaultMovedWindows();
+        int untargetedOpacity = 100; // percent: other mobs' plates while you have a target
         bool hideClaimedByParty = false; // no level line or icons on a mob claimed by you or your party
         bool hideClaimed       = false; // nor on one anyone has claimed
         bool hideTooWeak       = false; // nor on one that cons Too Weak
@@ -147,8 +173,12 @@ namespace headsup
         bool scaleCursor       = true;  // the target cursor's size follows the game's name size, apart from the names
         Look look              = Look::Fantasy; // which style the plates are drawn in
         std::vector<uint8_t> keepPointerKeys; // keys that set off a command without hiding the game's pointer
-        std::string fontName   = kDefaultFont; // a font family installed in Windows
+        std::string fontName   = kDefaultFont; // mob names': a font family installed in Windows
         bool fontBold          = false;
+        std::string playerFontName = kDefaultFont; // players' names, yours too
+        bool playerFontBold        = false;
+        std::string npcFontName    = kDefaultFont;
+        bool npcFontBold           = false;
         bool nameGlow          = true;  // a mob's name glows in its outline color
         bool glowOffWhenFighting = true; // but not once you or your party has claimed it
         int glowStrength       = 100;   // percent of the mockup's glow
@@ -181,13 +211,20 @@ namespace headsup
         bool fixPointer        = true;  // the game reads the mouse in its true client area and syncs its pointer before clicks
         bool showPlayerIcons   = true;  // seeking party, bazaar, linkshell and the rest beside replaced player names
         IconSide playerIconSide[kPlayerIconCount] = {}; // by PlayerIcon: every one left of the name
+        std::array<PlayerIcon, kPlayerIconCount> playerIconOrder = DefaultPlayerIconOrder();
+        // By PlayerIcon: it shares the slot of the icon before it in the order, which shows the first one the player
+        // has.
+        bool playerIconShare[kPlayerIconCount] = {};
+        int playerIconMax = kMaxPlayerIcons; // icons beside a name, GM's aside
         bool centerNameAndIcons = true;  // a player's name and icons centered together over them, rather than the name
         Color cursorColor      = ColorFromRgb(kPhoenixRed); // the target
         Color lockedCursorColor = {{0.65f, 0.40f, 1.00f}};
         Color subCursorColor   = {{0.99f, 0.82f, 0.09f}}; // like XIUI's sub-target tint
         Color outOfRangeCursorColor = {{1.00f, 0.25f, 0.25f}}; // the sub-target out of range, red as the game shows it
         int cursorSize         = 20;    // pixels tall
+        int cursorOutline      = 50;    // percent of the outline's first thickness
         int nameRaise          = 6;     // pixels the names HeadsUp draws sit above the game's, with all above them
+        bool stackNames        = false; // names HeadsUp draws that would cover each other rise over one another
         bool ownNameColor      = false; // names in nameColor instead of the game's color
         Color nameColor        = {{1.00f, 1.00f, 1.00f}};
         Color labelColor[kLabelShadeCount] = {
@@ -205,7 +242,8 @@ namespace headsup
         Color resistBadgeColor = {{1.00f, 0.35f, 0.35f}};
         Color rankBadgeColor   = {{1.00f, 0.85f, 0.30f}};
         Color immuneBadgeColor = {{1.00f, 0.25f, 0.25f}};
-        bool show[kCategoryCount]   = {true, false, false, true, true, true}; // indexed by Category: no passive or unknown
+        // Indexed by Category: no passive or unknown, and claims in the color the mob would have anyway.
+        bool show[kCategoryCount]   = {true, false, false, true, true, true, false, false};
         Color color[kCategoryCount] = {
             {{1.00f, 0.15f, 0.15f}}, // aggressive
             {{0.20f, 1.00f, 0.30f}}, // passive
@@ -213,6 +251,8 @@ namespace headsup
             {{1.00f, 0.60f, 0.10f}}, // aggressive NM
             {{1.00f, 0.84f, 0.00f}}, // passive NM
             {{0.70f, 0.30f, 1.00f}}, // lottery placeholder
+            {{0.30f, 0.65f, 1.00f}}, // claimed by your party
+            {{0.55f, 0.45f, 0.40f}}, // claimed by someone else
         };
         bool operator==(const Settings&) const = default;
     };

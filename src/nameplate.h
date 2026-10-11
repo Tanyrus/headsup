@@ -69,6 +69,7 @@ namespace headsup
         float iconSize   = 0.0f;
         int infoIconCount  = 0;
         bool detectionLeft = true, badgesLeft = false;
+        IconPlace iconPlace = IconPlace::Edges;
         float cursorWidth  = 0.0f;
         float cursorHeight = 0.0f;
         float cursorTip    = 0.5f; // where across its width the cursor points
@@ -117,6 +118,20 @@ namespace headsup
     // Where a badge of this size goes on its icon.
     IconSpot BadgeAt(IconSpot icon, float iconSize, float width, float height);
 
+    // A plate's outline on screen: its name with a player's icons, its level line, ornament and icon rows.
+    struct PlateBox
+    {
+        float left, top, right, bottom;
+    };
+    PlateBox BoxOf(const NameplateLayout& l, const LineSizes& sizes, bool showName);
+    // How far up each plate goes so none covers another: in order, the first keeping its place, each that would cover
+    // a plate already placed rises until its bottom is gap pixels over every one it would touch. Plates side by side
+    // are left alone.
+    std::vector<float> StackRises(const std::vector<PlateBox>& boxes, float gap);
+    // A plate's rise seconds later, on its way to where it should be: most of the way in a fraction of a second, and
+    // there once within half a pixel.
+    float EaseRise(float shown, float target, double seconds);
+
     float CursorBob(double seconds, float height);
 
     // Not rounded, so sizes change as smoothly as the game's names.
@@ -133,6 +148,9 @@ namespace headsup
     // Plates of a higher rank draw over every plate of a lower one: your target's, and over it the one you are picking.
     constexpr int kPlainRank = 0, kTargetRank = 1, kPickedRank = 2;
     int PlateRank(uint16_t index, const CursorTargets& targets);
+    // A plate's alpha, out of kOpaqueAlpha: a mob's that is not picked fades to the menu's opacity while you have a
+    // target.
+    uint32_t PlateAlpha(const Settings& settings, EntityKind kind, int rank, bool hasTarget);
     // Within a rank, farther plates first, so nearer ones cover them.
     bool DrawnBefore(int rankA, float depthA, int rankB, float depthB);
     // The name size the menu sets for this kind of name; self is your own.

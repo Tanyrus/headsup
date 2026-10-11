@@ -100,6 +100,11 @@ namespace headsup
                 }
                 const bool placeholderColor = placeholder && settings.show[CategoryIndex(Category::Placeholder)];
                 info.category = placeholderColor ? Category::Placeholder : Classify(mob, a.checked ? a.checked->level : 0, player);
+                // A claim's color, while it has one, says more than what the mob would do unclaimed.
+                if (a.claimedByParty && settings.show[CategoryIndex(Category::PartyClaim)])
+                    info.category = Category::PartyClaim;
+                else if (a.claimed && !a.claimedByParty && settings.show[CategoryIndex(Category::OtherClaim)])
+                    info.category = Category::OtherClaim;
                 if (settings.enabled && a.alive && a.distance <= settings.maxDistance)
                 {
                     const int category = CategoryIndex(info.category);

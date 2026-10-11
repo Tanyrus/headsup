@@ -32,28 +32,37 @@ Each monster gets a colored border, from Phoenix's own mob data and your level:
 | Purple | A lottery placeholder for a notorious monster |
 | Gray | Not in the mob data |
 
-Green and gray are off until you turn them on in the settings.
+Green and gray are off until you turn them on in the settings. Mobs claimed by your party, and mobs claimed by anyone
+else, can each take a color of their own, which helps in crowded places such as Dynamis. Both are off by default.
+Outlines reach up to 50 yalms, as far as the game draws mobs.
 
 ## Nameplates
 
 Above a monster's name: a row of icons (aggressive or passive, links, and how it detects you: sight, true sight,
 sound, scent, magic, job abilities, low HP) and its level and con, colored like `/check`. After you `/check` it, the
-line shows its exact level for that spawn. With mob IDs turned on, a placeholder shows `[PH]` on its level line, and
-an optional timer above your name counts down to the respawn of each placeholder you see die.
+line shows its exact level for that spawn. Mob IDs show as the last three hex digits players name placeholders by, the
+whole ID in decimal, or both. With them on, a placeholder shows `[PH]` on its level line, and an optional timer above
+your name counts down to the respawn of each placeholder you see die. The icons can sit at the ends of the level line,
+together over its middle, or on the line itself, and while you have a target the other mobs' plates can fade. Where
+several names would cover each other they can stack, each rising over the one in front, while your target's keeps its
+place: "Stack names" on the Global page turns it on.
 
 Names are drawn in a bundled serif font, Marcellus SC by default, with Cinzel and Cormorant SC also included and every
-font installed in Windows available too. Badge numbers use the bundled Barlow Condensed, plain enough to read at a few
+font installed in Windows available too. Mobs, players and NPCs each have their own name font. Badge numbers use the bundled Barlow Condensed, plain enough to read at a few
 pixels tall. A monster's name glows in its border color, with a small ornament between the
 name and its level line, so a glance tells you whether it will attack.
 
 ![A Goblin Leecher's red outline and nameplate](resources/nameplate_and_outline.png)
 
 Players get XIUI's HQ status icons beside their names: seeking party, bazaar, linkshell in its color, away, mentor,
-new adventurer, GM and level sync. Each icon can sit left or right of the name, or be hidden. The names of players
+new adventurer, GM and level sync. Each icon can sit left or right of the name, or be hidden, and they can be put in
+any order, with a limit on how many show. Icons can share a slot, which shows the first of them a player has. GM always
+shows, nearest the name on its left. The names of players
 sitting, resting or in a chair are lowered to their heads.
 
 Your target gets a bobbing arrow, or Phoenix's feather, in place of the game's cursor: one color for your target,
-another while locked on, and another for the sub-target you are picking.
+another while locked on, and another for the sub-target you are picking. Its dark outline can be made thinner or
+thicker.
 
 ![A player's nameplate with their icons and the feather cursor](resources/player_nameplate.png)
 

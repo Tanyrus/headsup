@@ -231,6 +231,24 @@ TEST(a_mobs_level_line_carries_its_id_or_ph_and_a_placeholder_glows_purple)
     CHECK(t.Find(0x4000)->outline && t.Find(0x4000)->argb == ToArgb(s.color[CategoryIndex(Category::WillAttack)]));
 }
 
+TEST(a_claimed_mob_takes_its_claims_color_while_that_is_on)
+{
+    Tracker t;
+    Settings s;
+    ActorInput ours   = Mob(0x2000, kBountyHunter, "Goblin Bounty Hunter");
+    ours.claimed      = true;
+    ours.claimedByParty = true;
+    ActorInput theirs = Mob(0x3000, kBountyHunter, "Goblin Bounty Hunter");
+    theirs.claimed    = true;
+    t.Update({ours, theirs}, kLevel20, s);
+    CHECK(t.Find(0x2000)->category == Category::WillAttack && t.Find(0x3000)->category == Category::WillAttack);
+    s.show[CategoryIndex(Category::PartyClaim)] = true;
+    s.show[CategoryIndex(Category::OtherClaim)] = true;
+    t.Update({ours, theirs}, kLevel20, s);
+    CHECK(t.Find(0x2000)->outline && t.Find(0x2000)->argb == ToArgb(s.color[CategoryIndex(Category::PartyClaim)]));
+    CHECK(t.Find(0x3000)->outline && t.Find(0x3000)->argb == ToArgb(s.color[CategoryIndex(Category::OtherClaim)]));
+}
+
 TEST(a_name_that_does_not_match_the_data_is_unknown)
 {
     Tracker t;

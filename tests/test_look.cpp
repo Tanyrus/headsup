@@ -101,6 +101,11 @@ TEST(the_name_and_the_level_line_each_have_a_font_and_a_shadow)
     s.labelShadowColor = Color{{0.0f, 0.0f, 0.5f}};
     s.labelShadow      = 150;
     CHECK(NameLineStyle(s) == (LineStyle{"Georgia", true, ToArgb(s.textOutline), 0.5f}));
+    s.playerFontName = "Verdana";
+    s.npcFontName    = "Tahoma";
+    s.npcFontBold    = true;
+    CHECK(NameLineStyle(s, EntityKind::Player) == (LineStyle{"Verdana", false, ToArgb(s.textOutline), 0.5f}));
+    CHECK(NameLineStyle(s, EntityKind::Npc) == (LineStyle{"Tahoma", true, ToArgb(s.textOutline), 0.5f}));
     CHECK(LevelLineStyle(s) == (LineStyle{"Cinzel", false, ToArgb(s.labelShadowColor), 1.5f}));
 }
 

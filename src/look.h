@@ -33,7 +33,8 @@ namespace headsup
 
     PlateStyle StyleFor(const ActorInfo& info, bool hasLevelLine, const Settings& settings);
     // Names and the ornament's diamond.
-    LineStyle NameLineStyle(const Settings& settings);
+    // The name font and shadow of this kind of name.
+    LineStyle NameLineStyle(const Settings& settings, EntityKind kind = EntityKind::Mob);
     // The level line and the placeholder timers.
     LineStyle LevelLineStyle(const Settings& settings);
     // Badges' numbers, which sit on their icons.

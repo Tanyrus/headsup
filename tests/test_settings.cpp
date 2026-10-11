@@ -218,6 +218,14 @@ placeholderShow=false
 placeholderR=0.6300
 placeholderG=0.6400
 placeholderB=0.6500
+partyClaimShow=true
+partyClaimR=0.7300
+partyClaimG=0.7400
+partyClaimB=0.7500
+otherClaimShow=true
+otherClaimR=0.8300
+otherClaimG=0.8400
+otherClaimB=0.8500
 iconGm=right
 iconMentor=hide
 iconNewAdventurer=right
@@ -226,6 +234,16 @@ iconAway=right
 iconLinkshell=hide
 iconBazaar=right
 iconSeekingParty=hide
+iconGmShare=false
+iconMentorShare=false
+iconNewAdventurerShare=false
+iconLevelSyncShare=false
+iconAwayShare=false
+iconLinkshellShare=false
+iconBazaarShare=true
+iconSeekingPartyShare=false
+playerIconOrder=iconSeekingParty iconGm iconMentor iconNewAdventurer iconLevelSync iconAway iconLinkshell iconBazaar
+playerIconMax=4.0000
 mobId=lastThree
 look=fantasy
 keepPointerKeys=11 1B 51
@@ -291,9 +309,17 @@ barDistanceIcons=true
 expBar=beside
 jobNames=false
 clock24=false
+stackNames=true
 barTitleFont=Cinzel
 barTextFont=
 barSubtitle=before
+playerFontName=Verdana
+playerFontBold=false
+npcFontName=Cinzel
+npcFontBold=true
+mobIconPlace=inline
+cursorOutline=60.0000
+untargetedOpacity=40.0000
 clockSeconds=true
 serverSeconds=true
 barLatency=true
@@ -385,7 +411,9 @@ helpBarY=8.0000
                  Outline{Category::WontAttack, true, {{0.23f, 0.24f, 0.25f}}}, Outline{Category::Unknown, true, {{0.33f, 0.34f, 0.35f}}},
                  Outline{Category::NmWillAttack, false, {{0.43f, 0.44f, 0.45f}}},
                  Outline{Category::NmWontAttack, false, {{0.53f, 0.54f, 0.55f}}},
-                 Outline{Category::Placeholder, false, {{0.63f, 0.64f, 0.65f}}}})
+                 Outline{Category::Placeholder, false, {{0.63f, 0.64f, 0.65f}}},
+                 Outline{Category::PartyClaim, true, {{0.73f, 0.74f, 0.75f}}},
+                 Outline{Category::OtherClaim, true, {{0.83f, 0.84f, 0.85f}}}})
         {
             s.show[CategoryIndex(o.category)]  = o.show;
             s.color[CategoryIndex(o.category)] = o.color;
@@ -427,8 +455,20 @@ helpBarY=8.0000
         s.expBar     = ExpBarPlace::Beside;
         s.jobNames   = false;
         s.clock24    = false;
+        s.stackNames = true;
         s.barTitleFont = "Cinzel";
         s.barSubtitle = SubtitlePlace::Before;
+        s.playerIconOrder = {PlayerIcon::SeekingParty, PlayerIcon::Gm, PlayerIcon::Mentor, PlayerIcon::NewAdventurer,
+            PlayerIcon::LevelSync, PlayerIcon::Away, PlayerIcon::Linkshell, PlayerIcon::Bazaar};
+        s.playerIconShare[static_cast<int>(PlayerIcon::Bazaar)] = true;
+        s.playerIconMax = 4;
+        s.playerFontName = "Verdana";
+        s.playerFontBold = false;
+        s.npcFontName    = "Cinzel";
+        s.npcFontBold    = true;
+        s.mobIconPlace = IconPlace::Inline;
+        s.cursorOutline = 60;
+        s.untargetedOpacity = 40;
         s.clockSeconds  = true;
         s.serverSeconds = true;
         s.barLatency = true;
@@ -462,6 +502,14 @@ helpBarY=8.0000
                 store.values[line.substr(0, equals)] = line.substr(equals + 1);
         return store;
     }
+}
+
+TEST(players_and_npcs_take_the_mob_name_font_from_a_file_saved_before_they_had_their_own)
+{
+    MapStore old;
+    old.values = {{"settingsVersion", "2.0000"}, {"fontName", "Georgia"}, {"fontBold", "true"}};
+    const Settings s = LoadSettings(old);
+    CHECK(s.playerFontName == "Georgia" && s.npcFontName == "Georgia" && s.playerFontBold && s.npcFontBold);
 }
 
 TEST(a_saved_file_loads_every_setting_and_saves_back_the_same)
