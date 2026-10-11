@@ -141,6 +141,7 @@ namespace headsup
             kWidgetSection        = 1ull << 29,
             kMenuSection          = 1ull << 30,
             kWindowGroupsSection  = 1ull << 31,
+            kResetSection         = 1ull << 32,
             kMobIconsSection      = 1ull << 33,
             kDetectionSection     = 1ull << 34,
             kImmunitiesSection    = 1ull << 35,
@@ -926,6 +927,36 @@ namespace headsup
                 ui.EndCard();
             }
             ui.Fade(false);
+        }
+
+        // Every setting back to HeadsUp's defaults, after a second press.
+        void DrawReset(Ui& ui, Settings& s, uint64_t& collapsed, bool& confirm)
+        {
+            if (!ui.BeginCard("Reset", kResetSection, collapsed)) return;
+            if (!confirm)
+            {
+                if (ui.Action("Reset All Settings", "Every setting on every page back to its default.")) confirm = true;
+            }
+            else
+            {
+                ui.Note("Every setting goes back to its default. This cannot be undone.");
+                const float y = ui.gui->GetCursorPosY();
+                if (ui.WithText(kText, [&] {
+                        ui.gui->SetCursorPosX(ui.cardX + ui.Em(kCardPad));
+                        return ui.Shape("Reset Everything", ImVec2(0.0f, 0.0f), kAccentButton,
+                            ui.gui->GetFrameHeight() / 2.0f);
+                    }))
+                {
+                    s          = Settings{};
+                    ui.changed = true;
+                    confirm    = false;
+                }
+                ui.gui->SameLine();
+                if (ui.Shape("Keep Them", ImVec2(0.0f, 0.0f), kRaised, ui.gui->GetFrameHeight() / 2.0f, kRaisedEdge))
+                    confirm = false;
+                ui.EndRowAt(ui.cardX, y, ui.gui->GetFrameHeight());
+            }
+            ui.EndCard();
         }
 
         void DrawGlobalSettings(Ui& ui, Settings& s, uint64_t& collapsed)
@@ -1896,6 +1927,42 @@ namespace headsup
         }
     }
 
+    namespace
+    {
+        DWORD WINAPI ListInstalledFonts(LPVOID into)
+        {
+            *static_cast<std::vector<std::string>*>(into) = InstalledFontFamilies();
+            return 0;
+        }
+    }
+
+    Menu::~Menu() { WaitForFonts(); }
+
+    void Menu::WaitForFonts()
+    {
+        if (m_FontThread == nullptr) return;
+        WaitForSingleObject(m_FontThread, INFINITE);
+        CloseHandle(m_FontThread);
+        m_FontThread = nullptr;
+    }
+
+    void Menu::ListFonts(const std::string& current)
+    {
+        if (!m_FontsAsked)
+        {
+            m_FontsAsked = true;
+            m_FontThread = CreateThread(nullptr, 0, ListInstalledFonts, &m_Installed, 0, nullptr);
+            if (m_FontThread == nullptr) m_Fonts = FontChoices(InstalledFontFamilies(), current);
+        }
+        if (m_FontThread != nullptr && WaitForSingleObject(m_FontThread, 0) == WAIT_OBJECT_0)
+        {
+            WaitForFonts();
+            m_Fonts = FontChoices(std::move(m_Installed), current);
+        }
+        // Until Windows' are listed, the bundled fonts and the one in use.
+        if (m_Fonts.empty()) m_Fonts = FontChoices({}, current);
+    }
+
     std::string WindowsFontPath(const char* file)
     {
         char windows[MAX_PATH] = {};
@@ -1936,7 +2003,7 @@ namespace headsup
     bool Menu::Draw(IGuiManager* gui, Settings& s, const MenuStatus& status)
     {
         if (!open || gui == nullptr) return false;
-        if (m_Fonts.empty()) m_Fonts = FontChoices(InstalledFontFamilies(), s.fontName);
+        ListFonts(s.fontName);
         // Ashita shares one style between every addon's windows: ours is set for this window and put back after it.
         ImGuiStyle& style       = gui->GetStyle();
         const ImGuiStyle ashita = style;
@@ -1999,7 +2066,10 @@ namespace headsup
                     if (m_ColorsTab)
                         DrawGlobalColors(ui, s, m_Collapsed);
                     else
+                    {
                         DrawGlobalSettings(ui, s, m_Collapsed);
+                        DrawReset(ui, s, m_Collapsed, m_ConfirmReset);
+                    }
                     break;
                 case kOutlinesPage:
                     if (m_ColorsTab)

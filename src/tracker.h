@@ -114,6 +114,11 @@ namespace headsup
     // The first tracked actor pointer in [begin, end), a stack: the live actor being drawn, as pointers further up can
     // be stale leftovers. nullptr when there is none.
     const ActorInfo* FindOwner(const uint32_t* begin, const uint32_t* end, const Tracker& tracker);
+    // FindOwner from just past the first address in [codeBegin, codeEnd), the game's code: the return into the game
+    // from its draw call. Below it are Ashita's and every plugin's frames, and what plugins that ran before HeadsUp
+    // left there, such as another plugin's copy of the target's actor. From begin when no such address is found.
+    const ActorInfo* FindOwnerAboveCaller(const uint32_t* begin, const uint32_t* end, const Tracker& tracker,
+        uint32_t codeBegin, uint32_t codeEnd);
 
     // Yalms from Ashita's squared entity distance. A NaN stays NaN, so no distance limit passes it; a negative value
     // becomes 0.

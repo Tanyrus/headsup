@@ -603,6 +603,21 @@ TEST(inline_the_icon_groups_sit_on_the_level_line_at_their_sides)
     CHECK(Near(l.cursor.y, LayoutNameplate(plate, alone, false).cursor.y));
 }
 
+TEST(text_keeps_its_shape_in_a_scene_image_of_another_shape_than_the_screen)
+{
+    // An image the screen's shape and 1.5 times its size: a 120 x 30 texture is drawn as it is, its 3 px halo 2 screen
+    // pixels up and left of the text's corner.
+    CHECK(PlaceSquarePixels(100.0f, 50.0f, 120.0f, 30.0f, 3.0f, 1.0f, 1.5f, 1.5f) == (SquareQuad{98.0f, 48.0f, 120.0f, 30.0f}));
+    // A 2048 x 2048 image for a 1920 x 1080 screen: text sized for the image's height is drawn 0.5625 as wide, and
+    // the game's copy to the screen gives it back the 4 to 1 shape it was drawn with.
+    const float toX = 2048.0f / 1920.0f, toY = 2048.0f / 1080.0f;
+    const SquareQuad q = PlaceSquarePixels(100.0f, 50.0f, 120.0f, 30.0f, 0.0f, 1.0f, toX, toY);
+    CHECK(Near(q.width, 67.5f) && Near(q.height, 30.0f));
+    CHECK(Near((q.width / toX) / (q.height / toY), 4.0f));
+    // A fit scales both ways alike.
+    CHECK(Near(PlaceSquarePixels(0.0f, 0.0f, 120.0f, 30.0f, 0.0f, 0.5f, toX, toY).width, 33.75f));
+}
+
 namespace
 {
     constexpr float kStackGap = 2.0f;
@@ -660,4 +675,16 @@ TEST(a_plates_rise_eases_to_where_it_should_be_and_settles_there)
     CHECK(EaseRise(0.0f, 40.0f, 5.0) == 40.0f); // long after: there
     CHECK(EaseRise(39.8f, 40.0f, 0.001) == 40.0f); // within half a pixel: there, so it stops moving
     CHECK(EaseRise(40.0f, 0.0f, 5.0) == 0.0f);    // and back down when nothing is under it
+}
+
+TEST(a_plates_size_follows_how_far_it_is_as_the_games_own_names_do)
+{
+    // The game's own names, measured in one frame (a name dump): 0.5625 of full size 10.17 yalms from the camera and
+    // 0.4125 at 14.55, which DistanceScale makes 2.373 and 1.740. The game steps its size; a plate's is smooth.
+    CHECK(Near(ScaleAtDistance(10.174f), 2.373f, 0.03f));
+    CHECK(Near(ScaleAtDistance(14.55f), 1.740f, 0.03f));
+    CHECK(ScaleAtDistance(30.0f) < ScaleAtDistance(29.0f)); // every yalm tells: no steps
+    CHECK(Near(ScaleAtDistance(1.0f), 2.5f) && Near(ScaleAtDistance(0.0f), 2.5f)); // at most 2.5x
+    CHECK(Near(ScaleAtDistance(500.0f), 0.5f));                                    // at least 0.5x
+    CHECK(Near(ScaleAtDistance(std::nanf("")), 1.0f));
 }

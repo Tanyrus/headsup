@@ -304,6 +304,7 @@ public:
         if (const std::string failure = m_WindowHook.Stop(); !failure.empty()) Print(failure + ".");
         if (const std::string failure = m_PointerFix.Stop(); !failure.empty()) Print(failure + ".");
         m_Pointer.Stop();
+        m_Menu.WaitForFonts();
         m_Nameplates.Release();
         UnhookPresent();
         g_Plugin = nullptr;
@@ -315,6 +316,8 @@ public:
         if (m_QuadStates) m_Device->DeleteStateBlock(*m_QuadStates);
         g_BarClicks = nullptr;
         g_BarOn     = false;
+        // Ashita would keep the settings' values loaded after this, for the next load to find even with the file gone.
+        m_AshitaCore->GetConfigurationManager()->Delete(kConfigAlias);
     }
 
     bool Direct3DInitialize(IDirect3DDevice8* device) override
@@ -1067,7 +1070,9 @@ private:
     {
         IConfigurationManager* config = m_AshitaCore->GetConfigurationManager();
         const std::string file        = SettingsFile();
-        // A missing file is fine: every value keeps its default.
+        // Ashita keeps a loaded file's values after the plugin unloads: without this, a file deleted since would load
+        // as it was. A missing file is fine: every value keeps its default.
+        config->Delete(kConfigAlias);
         if (!config->Load(kConfigAlias, SettingsPath().c_str()) && GetFileAttributesA(file.c_str()) != INVALID_FILE_ATTRIBUTES)
             Print("could not read " + file + "; using the defaults, and a change in the menu will overwrite that file");
         AshitaStore store(config);
@@ -1334,8 +1339,9 @@ private:
         IEntity* entity = m_AshitaCore->GetMemoryManager()->GetEntity();
         auto onOff      = [](bool on) { return on ? "on" : "off"; };
         std::fprintf(out,
-            "headsup %.2f: back buffer %.0fx%.0f, player level %d%s, %u outlined, %u nameplates, replace mobs %s players %s npcs %s\n",
-            GetVersion(), m_Names.BackBufferWidth(), m_Names.BackBufferHeight(), m_Player.level,
+            "headsup %.2f: back buffer %.0fx%.0f, scene to screen scale %.3f x %.3f, player level %d%s, %u outlined, %u nameplates, replace mobs %s players %s npcs %s\n",
+            GetVersion(), m_Names.BackBufferWidth(), m_Names.BackBufferHeight(), m_Names.TargetScaleX(),
+            m_Names.TargetScaleY(), m_Player.level,
             m_Player.sitting ? " (sitting)" : "", m_Tracker.OutlinedCount(), static_cast<unsigned>(m_Nameplates.LastShown().size()),
             onOff(m_Settings.replaceMobNames), onOff(m_Settings.replacePlayerNames), onOff(m_Settings.replaceNpcNames));
         if (const std::optional<headsup::NetCounters> net = NetCountersNow())
@@ -1374,6 +1380,16 @@ private:
                     party->GetMemberMP(m), party->GetMemberMPPercent(m), party->GetMemberTP(m),
                     party->GetMemberZone(m), m_Zone);
             }
+        }
+        {
+            // Where the target cursor went: on a nameplate, at the game's own arrow anchor, or nowhere.
+            const headsup::CursorTargets& c = m_CursorTargets;
+            std::fprintf(out, "cursor: target #%u sub #%u%s%s, menu %.0fx%.0f, anchors %s (%.1f,%.1f) sub (%.1f,%.1f); drawn:",
+                c.target, c.subTarget, c.locked ? " locked" : "", c.gameArrowsShown ? ", the game's arrows (not hooked)" : "",
+                m_MenuWidth, m_MenuHeight, c.anchored ? "at" : "unknown", c.anchorX, c.anchorY, c.subAnchorX, c.subAnchorY);
+            for (const headsup::CursorName& name : m_Nameplates.CursorNames())
+                std::fprintf(out, " #%u %s", name.index, name.name.valid ? "on its nameplate" : "at its anchor");
+            std::fprintf(out, "%s\n", m_Nameplates.CursorNames().empty() ? " none" : "");
         }
         if (const headsup::ActorInfo* t = m_Tracker.FindIndex(m_CursorTargets.target); t != nullptr)
             if (const headsup::PlayerCheck* c = m_GameState.PlayerCheckOf(t->serverId))

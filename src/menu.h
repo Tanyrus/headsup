@@ -53,6 +53,10 @@ namespace headsup
     public:
         bool open = false;
 
+        ~Menu();
+        // Before the plugin unloads: the thread listing Windows' fonts runs the plugin's code.
+        void WaitForFonts();
+
         // True when a change should be saved now.
         bool Draw(IGuiManager* gui, Settings& settings, const MenuStatus& status);
         // True once after the Debug page's button was pressed: write the /hu debug report.
@@ -70,6 +74,7 @@ namespace headsup
 
     private:
         bool m_DebugRequested = false;
+        bool m_ConfirmReset   = false; // the reset button was pressed once and asks for a second press
         float m_ScrollTo      = 0.0f;  // where ScrollTo asked for
         int m_ScrollFrames    = 0;     // frames left to ask ImGui for it: a page just opened has no height yet
         int m_ShownPage       = 0;     // the page and tab drawn last, to tell a change
@@ -77,7 +82,13 @@ namespace headsup
         bool m_ColorsTab     = false; // that page's "color settings" tab instead of "settings"
         uint64_t m_Collapsed = 0;     // one bit per collapsed section
         int m_Widget         = 0;     // the Widgets page's picked widget, by BarWidget
-        std::vector<std::string> m_Fonts; // FontChoices, read when the settings window first opens
+        // Windows takes up to a second to list its fonts, which froze the game when a page with a font dropdown first
+        // showed: a thread lists them once the window first opens, and m_Fonts has the bundled ones until it is done.
+        void ListFonts(const std::string& current);
+        std::vector<std::string> m_Fonts;     // FontChoices
+        std::vector<std::string> m_Installed; // the thread's, read once it has ended
+        void* m_FontThread = nullptr;
+        bool m_FontsAsked  = false;
         KeyCapture m_KeyCapture;
         WindowList m_Windows;
         ImFont* m_TextFont  = nullptr;

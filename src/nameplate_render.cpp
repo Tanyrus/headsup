@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <optional>
 #include <utility>
 
 namespace headsup
@@ -161,6 +162,17 @@ namespace headsup
                 WithAlpha(tint, opaque)};
             into.push_back(Quad{quad, rank});
         };
+        // Text, the ornament and the cursor, whose textures have square pixels.
+        auto addSquare = [&](std::vector<Quad>& into, const PlateTexture& t, float x, float y, float fit, float depth) {
+            const SquareQuad q = PlaceSquarePixels(x, y, t.width, t.height, t.halo, fit, toX, toY);
+            addQuad(into, t.texture, q.x, q.y, q.width, q.height, t.u, t.v, depth, kWhite);
+        };
+        // Every plate but yours is sized by how far its owner is from you, with the camera's own distance behind you
+        // added: unlike the game's name size, that changes smoothly as you walk and not at all as the camera turns.
+        const ActorInfo* you     = tracker.FindIndex(selfIndex);
+        const Camera* sceneView  = names.SceneCamera();
+        const std::optional<float> cameraBack =
+            you != nullptr && sceneView != nullptr ? std::optional<float>(Distance(sceneView->eye, you->feet)) : std::nullopt;
         // The plates whose names HeadsUp draws, to stack: each one's box and which quads are its.
         struct Stacked
         {
@@ -196,7 +208,10 @@ namespace headsup
 
                 const bool self         = info->index == selfIndex;
                 const bool scales       = ScalesWithDistance(settings, info->kind, self);
-                p.scale                 = EaseScale(p.scale, DistanceScale(gameName.box.Height(), screenHeight), now - p.scaleTime);
+                // Yours, and any plate while the camera or you are not known, follows the game's name size.
+                const float sized = cameraBack && !self ? ScaleAtDistance(*cameraBack + Distance(info->feet, you->feet))
+                                                        : DistanceScale(gameName.box.Height(), screenHeight);
+                p.scale           = EaseScale(p.scale, sized, now - p.scaleTime);
                 p.scaleTime             = now;
                 const float scale       = scales ? p.scale : 1.0f;
                 const float nameShown   = static_cast<float>(NameSize(settings, info->kind, self)) * scale * toY;
@@ -270,17 +285,17 @@ namespace headsup
                 LineSizes sizes;
                 if (lines.name)
                 {
-                    sizes.nameWidth  = (p.name.width - 2.0f * p.name.halo) * nameFit / toX;
+                    sizes.nameWidth  = (p.name.width - 2.0f * p.name.halo) * nameFit / toY;
                     sizes.nameHeight = (p.name.height - 2.0f * p.name.halo) * nameFit / toY;
                 }
                 if (style.ornament)
                 {
-                    sizes.ornamentWidth  = (p.ornament.width - 2.0f * p.ornament.halo) * ornamentFit / toX;
+                    sizes.ornamentWidth  = (p.ornament.width - 2.0f * p.ornament.halo) * ornamentFit / toY;
                     sizes.ornamentHeight = (p.ornament.height - 2.0f * p.ornament.halo) * ornamentFit / toY;
                 }
                 if (lines.label)
                 {
-                    sizes.labelWidth  = (p.label.width - 2.0f * p.label.halo) * labelFit / toX;
+                    sizes.labelWidth  = (p.label.width - 2.0f * p.label.halo) * labelFit / toY;
                     sizes.labelHeight = (p.label.height - 2.0f * p.label.halo) * labelFit / toY;
                 }
                 sizes.mobIconCount  = lines.mobIconCount;
@@ -291,7 +306,7 @@ namespace headsup
                 sizes.iconPlace     = settings.mobIconPlace;
                 if (showCursor)
                 {
-                    sizes.cursorWidth  = p.cursor.width * cursorFit / toX;
+                    sizes.cursorWidth  = p.cursor.width * cursorFit / toY;
                     sizes.cursorHeight = p.cursor.height * cursorFit / toY;
                     sizes.cursorTip    = p.cursor.tip;
                 }
@@ -313,8 +328,7 @@ namespace headsup
                 const float depth            = gameName.depth;
                 const size_t firstQuad = m_Quads.size(), firstCursor = cursorQuads.size();
                 auto addText = [&](const PlateTexture& t, float x, float y, float fit) {
-                    addQuad(m_Quads, t.texture, x - t.halo * fit / toX, y - t.halo * fit / toY, t.width * fit, t.height * fit, t.u, t.v,
-                        depth, kWhite);
+                    addSquare(m_Quads, t, x, y, fit, depth);
                 };
                 if (lines.name) addText(p.name, layout.nameX, layout.nameY, nameFit);
                 if (style.ornament) addText(p.ornament, layout.ornamentX, layout.ornamentY, ornamentFit);
@@ -336,7 +350,7 @@ namespace headsup
                     if (i >= static_cast<int>(badges.size()) || badges[i]->texture == nullptr) continue;
                     const PlateTexture& badge = *badges[i];
                     const float fit           = FitOf(badgeShown, badge.key.height);
-                    const IconSpot spot       = BadgeAt(at, iconSize, (badge.width - 2.0f * badge.halo) * fit / toX,
+                    const IconSpot spot       = BadgeAt(at, iconSize, (badge.width - 2.0f * badge.halo) * fit / toY,
                               (badge.height - 2.0f * badge.halo) * fit / toY);
                     addText(badge, spot.x, spot.y, fit);
                 }
@@ -355,15 +369,17 @@ namespace headsup
                 addPlayerIcons(info->playerIcons.right, lines.rightIconCount, layout.rightIconsX);
                 if (showCursor)
                 {
-                    addQuad(cursorQuads, p.cursor.texture, layout.cursor.x, layout.cursor.y + CursorBob(now, sizes.cursorHeight),
-                        p.cursor.width * cursorFit, p.cursor.height * cursorFit, p.cursor.u, p.cursor.v, depth, kWhite);
+                    // Over everything, as the game's own arrow is: at the name's depth, the target's own model, a
+                    // door its name sits inside or anything the game has faded out near the camera would hide it.
+                    addSquare(cursorQuads, p.cursor, layout.cursor.x, layout.cursor.y + CursorBob(now, sizes.cursorHeight),
+                        cursorFit, 0.0f);
                     m_CursorNames.push_back(CursorName{info->index, gameName.box});
                 }
                 for (int i = 0; i < sizes.timerCount; ++i)
                 {
                     const PlateTexture& t = p.timers[i];
                     const float timerFit  = FitOf(timerShown, t.key.height);
-                    addText(t, layout.centerX - (t.width - 2.0f * t.halo) * timerFit / toX / 2.0f,
+                    addText(t, layout.centerX - (t.width - 2.0f * t.halo) * timerFit / toY / 2.0f,
                         layout.timersY + static_cast<float>(i) * layout.timerStep, timerFit);
                 }
                 auto shownHeight = [&](bool shown, float pixels) { return shown ? static_cast<int>(std::lround(pixels / toY)) : 0; };
@@ -420,9 +436,8 @@ namespace headsup
                 if (!PrepareCursor(p.cursor, CursorColor(lone.kind, settings), p.cursorRaster, settings)) break;
                 const float fit     = FitOf(cursorShown, p.cursor.key.height);
                 const float height  = p.cursor.height * fit / toY;
-                const CursorSpot at = CursorAtAnchor(lone.x, lone.y, p.cursor.width * fit / toX, height, p.cursor.tip);
-                addQuad(cursorQuads, p.cursor.texture, at.x, at.y + CursorBob(now, height), p.cursor.width * fit,
-                    p.cursor.height * fit, p.cursor.u, p.cursor.v, 0.0f, kWhite);
+                const CursorSpot at = CursorAtAnchor(lone.x, lone.y, p.cursor.width * fit / toY, height, p.cursor.tip);
+                addSquare(cursorQuads, p.cursor, at.x, at.y + CursorBob(now, height), fit, 0.0f);
                 m_CursorNames.push_back(CursorName{lone.index, ScreenBox{}});
             }
         }

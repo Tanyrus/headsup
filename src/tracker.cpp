@@ -150,6 +150,14 @@ namespace headsup
         return nullptr;
     }
 
+    const ActorInfo* FindOwnerAboveCaller(const uint32_t* begin, const uint32_t* end, const Tracker& tracker,
+        uint32_t codeBegin, uint32_t codeEnd)
+    {
+        for (const uint32_t* p = begin; p < end; ++p)
+            if (*p >= codeBegin && *p < codeEnd) return FindOwner(p + 1, end, tracker);
+        return FindOwner(begin, end, tracker);
+    }
+
     float DistanceFromSquared(float squared)
     {
         if (std::isnan(squared)) return squared;

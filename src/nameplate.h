@@ -118,6 +118,18 @@ namespace headsup
     // Where a badge of this size goes on its icon.
     IconSpot BadgeAt(IconSpot icon, float iconSize, float width, float height);
 
+    // A texture drawn with square pixels (text, the ornament, the cursor) as a quad in the scene image: its corner in
+    // screen pixels, halo included, and its size in the image's. The image is toX by toY times the screen and these
+    // are sized by toY, so the width takes toX / toY: the game's copy to the screen then gives the letters their shape
+    // back whatever the image's shape (a 2048 x 2048 scene on a 1920 x 1080 screen drew them 1.78 times too wide).
+    struct SquareQuad
+    {
+        float x, y, width, height;
+        bool operator==(const SquareQuad&) const = default;
+    };
+    SquareQuad PlaceSquarePixels(float x, float y, float width, float height, float halo, float fit, float toX,
+        float toY);
+
     // A plate's outline on screen: its name with a player's icons, its level line, ornament and icon rows.
     struct PlateBox
     {
@@ -136,6 +148,10 @@ namespace headsup
 
     // Not rounded, so sizes change as smoothly as the game's names.
     float DistanceScale(float letterHeight, float screenHeight);
+    // The size DistanceScale gives a game's name this many yalms from the camera, without the game's steps (it sizes
+    // its names in eightieths, by its depth from the camera, so they change in jumps and as the camera turns): 1 for
+    // a distance that is not a number.
+    float ScaleAtDistance(float yalms);
     // The game steps its name size, by 5% at a time far away; a plate eases toward each step. A plate with no size yet
     // (0) takes the size at once.
     float EaseScale(float shown, float target, double seconds);

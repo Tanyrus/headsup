@@ -194,6 +194,13 @@ namespace headsup
         return IconSpot{icon.x + iconSize * (1.0f + kBadgeOverhang) - width, icon.y + iconSize * (1.0f + kBadgeHang) - height};
     }
 
+    SquareQuad PlaceSquarePixels(float x, float y, float width, float height, float halo, float fit, float toX,
+        float toY)
+    {
+        const float around = halo * fit / toY;
+        return SquareQuad{x - around, y - around, width * fit * toX / toY, height * fit};
+    }
+
     PlateBox BoxOf(const NameplateLayout& l, const LineSizes& sizes, bool showName)
     {
         PlateBox box{l.centerX, 0.0f, l.centerX, 0.0f};
@@ -268,6 +275,15 @@ namespace headsup
     {
         const float factor = screenHeight > 0.0f ? letterHeight / (screenHeight / kLettersPerScreen) : 1.0f;
         return std::isfinite(factor) ? std::clamp(factor, kMinScale, kMaxScale) : 1.0f;
+    }
+
+    float ScaleAtDistance(float yalms)
+    {
+        // The game's name size is 5 / yalms + 0.07 of full size (fitted to a name dump), and full size is 4.21875
+        // times DistanceScale's 1: 180 letters a screen over the 42.67 a full-size name's letters make of it.
+        constexpr float kPerYalm = 21.09f, kFarthest = 0.3f;
+        if (std::isnan(yalms)) return 1.0f;
+        return yalms > 0.0f ? std::clamp(kPerYalm / yalms + kFarthest, kMinScale, kMaxScale) : kMaxScale;
     }
 
     float EaseScale(float shown, float target, double seconds)

@@ -69,7 +69,8 @@ thicker.
 It can also put PlayOnline's chocobo back as your mouse pointer, the one the PlayOnline Viewer had.
 
 Every part has its own switch, and fonts, sizes and colors are in the settings. Settings that belong to a feature that
-is off are greyed out and cannot be changed until it is on.
+is off are greyed out and cannot be changed until it is on. The Global page's Reset card puts every setting back to its
+default.
 
 ## Top bar
 

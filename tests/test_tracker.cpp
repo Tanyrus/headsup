@@ -154,6 +154,18 @@ TEST(owner_is_the_first_tracked_pointer_of_any_kind)
     CHECK(FindOwner(std::begin(noActor), std::end(noActor), t) == nullptr);
 }
 
+TEST(owner_is_looked_for_past_the_games_draw_call_not_in_other_plugins_leftovers)
+{
+    Tracker t;
+    t.Update({Player(0x1000), BountyHunter(0x2000)}, kLevel20, Settings{});
+    constexpr uint32_t kCodeBegin = 0x400000, kCodeEnd = 0x500000;
+    // A plugin that ran first left the target (the mob) under the game's return address, 0x401234.
+    const uint32_t playerDraw[] = {0x5, 0x2000, 0x401234, 0x1000};
+    CHECK(FindOwnerAboveCaller(std::begin(playerDraw), std::end(playerDraw), t, kCodeBegin, kCodeEnd) == t.Find(0x1000));
+    const uint32_t noReturn[] = {0x5, 0x2000, 0x1000}; // no game address: the plain scan
+    CHECK(FindOwnerAboveCaller(std::begin(noReturn), std::end(noReturn), t, kCodeBegin, kCodeEnd) == t.Find(0x2000));
+}
+
 TEST(spawn_flags_give_the_kind)
 {
     CHECK(KindFromSpawnFlags(0x10) == EntityKind::Mob);

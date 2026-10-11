@@ -167,10 +167,10 @@ namespace headsup
         MobIdFormat mobId      = MobIdFormat::Off; // a mob's server ID on its level line
         bool markPlaceholders  = true;  // "[PH]" for a lottery placeholder's ID
         bool phTimers          = false; // above your name, a respawn timer for each placeholder you see die
-        bool scaleWithDistance = true;  // sizes follow the game's name size
+        bool scaleWithDistance = true;  // sizes follow how far a name's owner is from you
         bool scaleOwnName      = true;  // your own plate too
         bool scalePlayerNames  = true;  // other players' plates too
-        bool scaleCursor       = true;  // the target cursor's size follows the game's name size, apart from the names
+        bool scaleCursor       = true;  // the target cursor's size follows the distance too, apart from the names
         Look look              = Look::Fantasy; // which style the plates are drawn in
         std::vector<uint8_t> keepPointerKeys; // keys that set off a command without hiding the game's pointer
         std::string fontName   = kDefaultFont; // mob names': a font family installed in Windows

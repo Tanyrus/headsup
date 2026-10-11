@@ -8,6 +8,31 @@ namespace headsup
     {
         constexpr DWORD kWineDeclarationHandles = 0xF0000000; // Wine numbers declaration handles from here
         constexpr uintptr_t kStackScanBytes     = 0x1000;     // the game's draw call chain fits well inside this
+        constexpr const char* kGameModule       = "FFXiMain.dll";
+
+        struct CodeRange
+        {
+            uint32_t begin = 0, end = 0; // empty while the game's module is not found
+        };
+
+        // The game module's code section, read from its headers.
+        CodeRange GameCode()
+        {
+            const auto* base = reinterpret_cast<const uint8_t*>(GetModuleHandleA(kGameModule));
+            if (base == nullptr) return {};
+            const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
+            if (dos->e_magic != IMAGE_DOS_SIGNATURE) return {};
+            const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS32*>(base + dos->e_lfanew);
+            if (nt->Signature != IMAGE_NT_SIGNATURE) return {};
+            const auto* section = IMAGE_FIRST_SECTION(nt);
+            for (unsigned i = 0; i < nt->FileHeader.NumberOfSections; ++i, ++section)
+                if ((section->Characteristics & IMAGE_SCN_MEM_EXECUTE) != 0)
+                {
+                    const auto begin = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(base) + section->VirtualAddress);
+                    return CodeRange{begin, begin + section->Misc.VirtualSize};
+                }
+            return {};
+        }
     }
 
     bool IsDeclarationHandle(DWORD vertexShader)
@@ -84,6 +109,8 @@ namespace headsup
         const auto sp       = reinterpret_cast<uintptr_t>(__builtin_frame_address(0));
         const auto* tib     = reinterpret_cast<const NT_TIB*>(NtCurrentTeb());
         const uintptr_t end = std::min<uintptr_t>(reinterpret_cast<uintptr_t>(tib->StackBase), sp + kStackScanBytes);
-        return FindOwner(reinterpret_cast<const uint32_t*>(sp & ~uintptr_t{3}), reinterpret_cast<const uint32_t*>(end & ~uintptr_t{3}), tracker);
+        static const CodeRange game = GameCode(); // the module stays loaded as long as the game runs
+        return FindOwnerAboveCaller(reinterpret_cast<const uint32_t*>(sp & ~uintptr_t{3}),
+            reinterpret_cast<const uint32_t*>(end & ~uintptr_t{3}), tracker, game.begin, game.end);
     }
 }
