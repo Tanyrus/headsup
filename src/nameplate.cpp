@@ -151,6 +151,11 @@ namespace headsup
         return !drawn || spentMs < kRedrawBudgetMs;
     }
 
+    bool ScalesWithDistance(const Settings& settings, bool self)
+    {
+        return settings.scaleWithDistance && (!self || settings.scaleOwnName);
+    }
+
     int PlateRank(uint16_t index, const CursorTargets& targets)
     {
         if (index == 0) return kPlainRank;

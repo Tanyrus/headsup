@@ -315,6 +315,7 @@ namespace headsup
         if (!DrawsPlate(mode)) return plate;
         if (mode == PlateMode::WhenTargeted && !Targeted(st.target)) return plate;
         const bool deadMob  = st.kind == EntityKind::Mob && !st.alive;
+        const bool fought   = s.glowOffWhenFighting && st.kind == EntityKind::Mob && st.claim == ClaimState::Yours;
         const bool nameOnly = (mode == PlateMode::Expanding && !Targeted(st.target)) || deadMob;
         std::optional<BadgeRules> badgeRules;
         plate.lines.reserve(kPlateLines);
@@ -336,7 +337,7 @@ namespace headsup
             builder.Finish();
             if (builder.items.empty()) continue;
             plate.lines.push_back(ComposedLine{i, std::move(builder.items), LookOf(style, st, s, gameArgb)});
-            if (deadMob) plate.lines.back().look.glow = 0.0f;
+            if (deadMob || fought) plate.lines.back().look.glow = 0.0f;
         }
         if (kind.ornament.on)
         {

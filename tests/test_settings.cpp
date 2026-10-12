@@ -356,6 +356,8 @@ helpBarY=8.0000
         s.enabled           = false;
         s.phTimers          = true;
         s.scaleWithDistance = false;
+        s.scaleOwnName      = false;
+        s.glowOffWhenFighting = false;
         s.scaleCursor       = true; // apart from the names': a dropped key would take theirs
         s.replaceCursor = s.cursorFeather = false;
         s.chocoboPointer = true;
@@ -423,8 +425,8 @@ helpBarY=8.0000
     // The keys of kSavedFile that only a file from before the designer carries: the migration reads them, and nothing
     // writes them.
     const char* const kOldKeys[] = {"showLabels", "replaceMobNames", "showIcons", "hideInCombat", "hideClaimed", "hideTooWeak",
-        "hideWhileEngaged", "markPlaceholders", "fontBold", "nameGlow", "glowOffWhenFighting", "scaleOwnName",
-        "scalePlayerNames", "labelFontBold", "showOrnament", "ownGlowColor", "ownOrnamentColor", "labelFontName", "glowSize",
+        "hideWhileEngaged", "markPlaceholders", "fontBold", "nameGlow", "scalePlayerNames",
+        "labelFontBold", "showOrnament", "ownGlowColor", "ownOrnamentColor", "labelFontName", "glowSize",
         "ornamentWidth", "ornamentThickness", "nameShadow", "labelShadow", "glowColorR", "glowColorG", "glowColorB",
         "ornamentColorR", "ornamentColorG", "ornamentColorB", "labelShadowColorR", "labelShadowColorG", "labelShadowColorB",
         "replacePlayerNames", "replaceNpcNames", "showPlayerIcons", "centerNameAndIcons", "ownNameColor", "mobNameSize",

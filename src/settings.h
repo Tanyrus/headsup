@@ -93,8 +93,10 @@ namespace headsup
         // The game's windows moved out from under Game help's bar, by short name (native_locate.h's ShortName).
         std::vector<std::string> movedWindows = DefaultMovedWindows();
         int untargetedOpacity = 100; // percent: other mobs' plates while you have a target
+        bool glowOffWhenFighting = true; // a mob's lines lose their glow once you or your party has claimed it
         bool phTimers          = false; // above your name, a respawn timer for each placeholder you see die
         bool scaleWithDistance = true;  // sizes follow how far a name's owner is from you
+        bool scaleOwnName      = true;  // your own plate too
         bool scaleCursor       = true;  // the target cursor's size follows the distance too, apart from the names
         std::vector<uint8_t> keepPointerKeys; // keys that set off a command without hiding the game's pointer
         bool replaceCursor     = true;  // our target cursor above the target's nameplate, instead of the game's

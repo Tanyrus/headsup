@@ -289,6 +289,8 @@ namespace headsup
             {
                 ui.SliderInt("Others' Opacity", s.untargetedOpacity, kMinOpacity, kMaxOpacity, "%d%%",
                     "Other mobs' and pets' names and lines while you have a target, so your target's stand out.");
+                ui.Switch("Glow Off While Fighting", s.glowOffWhenFighting,
+                    "No glow on a mob's lines once you or your party has claimed it.");
                 ui.EndCard();
             }
             if (ui.BeginCard("Detection", collapsed, nullptr,
@@ -450,6 +452,7 @@ namespace headsup
                 "The smallest a far name shrinks to.");
             ui.SliderInt("Max Size", s.scaleMax, kMinSizePercent, kMaxSizePercent, "%d%%",
                 "The largest a near name grows to.");
+            ui.Switch("Scale Your Own Name", s.scaleOwnName, "Off, your own nameplate stays one size.");
             ui.EndCard();
         }
         ui.Fade(!s.enabled);

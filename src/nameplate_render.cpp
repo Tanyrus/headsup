@@ -300,11 +300,12 @@ namespace headsup
                                         : DistanceScale(gameName.box.Height(), screenHeight, minScale, maxScale);
                 p.scale                 = EaseScale(p.scale, sized, now - p.scaleTime);
                 p.scaleTime             = now;
-                const float scale       = settings.scaleWithDistance ? p.scale : 1.0f;
+                const bool scales       = ScalesWithDistance(settings, self);
+                const float scale       = scales ? p.scale : 1.0f;
                 const float timerShown  = timerLook.textSize * scale * toY;
                 const float cursorShown = static_cast<float>(settings.cursorSize) * (settings.scaleCursor ? p.scale : 1.0f) * toY;
                 auto raster             = [&](float shown, int current) {
-                    return settings.scaleWithDistance ? RasterHeight(shown, current) : FixedRasterHeight(shown);
+                    return scales ? RasterHeight(shown, current) : FixedRasterHeight(shown);
                 };
                 // A line's text height and a run's badge text height, in the image.
                 auto textShown  = [&](const ComposedLine& line) { return line.look.textSize * scale * toY; };

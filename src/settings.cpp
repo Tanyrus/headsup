@@ -27,7 +27,8 @@ namespace headsup
             bool Settings::*field;
         };
         constexpr BoolKey kBools[] = {{"enabled", &Settings::enabled}, {"phTimers", &Settings::phTimers},
-            {"scaleWithDistance", &Settings::scaleWithDistance}, {"replaceCursor", &Settings::replaceCursor},
+            {"scaleWithDistance", &Settings::scaleWithDistance}, {"scaleOwnName", &Settings::scaleOwnName},
+            {"glowOffWhenFighting", &Settings::glowOffWhenFighting}, {"replaceCursor", &Settings::replaceCursor},
             {"cursorFeather", &Settings::cursorFeather}, {"chocoboPointer", &Settings::chocoboPointer},
             {"fixPointer", &Settings::fixPointer}, {"showRanks", &Settings::showRanks}, {"showBar", &Settings::showBar},
             {"hideHelpBar", &Settings::hideHelpBar}, {"hideNetstat", &Settings::hideNetstat},

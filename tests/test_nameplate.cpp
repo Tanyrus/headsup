@@ -364,6 +364,18 @@ TEST(a_plates_size_follows_how_far_it_is_as_the_games_own_names_do)
     CHECK(Near(ScaleAtDistance(14.55f, 0.8f, 2.0f), 1.740f, 0.03f));
 }
 
+TEST(your_own_name_can_keep_one_size)
+{
+    Settings s;
+    CHECK(ScalesWithDistance(s, true) && ScalesWithDistance(s, false));
+    s.scaleOwnName = false;
+    CHECK(!ScalesWithDistance(s, true));
+    CHECK(ScalesWithDistance(s, false)); // everyone else still scales
+    s.scaleOwnName      = true;
+    s.scaleWithDistance = false; // the main switch turns every name off
+    CHECK(!ScalesWithDistance(s, true) && !ScalesWithDistance(s, false));
+}
+
 TEST(a_cursor_is_kept_inside_the_screen)
 {
     const CursorSpot inside = KeepOnScreen(CursorSpot{100.0f, 100.0f}, 20.0f, 32.0f, 2560.0f, 1440.0f);

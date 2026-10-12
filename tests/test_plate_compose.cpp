@@ -172,6 +172,30 @@ TEST(a_dead_mobs_name_does_not_glow)
     CHECK_EQ(ComposePlate(player, kPlayer, glowing, kGame).lines[0].look.glow, 1.5f);
 }
 
+TEST(a_mob_your_party_has_claimed_can_lose_its_glow)
+{
+    Settings s; // the default design's name glows at full strength; a second line glows here too
+    s.Kind(PlateKind::Mobs).lines[1].glow = 50;
+    ActorInfo yours   = AggressiveMob();
+    yours.state.claim = ClaimState::Yours;
+    yours.state.row   = Category::PartyClaim;
+    const ComposedPlate fought = ComposePlate(yours, kPlayer, s, kGame);
+    CHECK_EQ(fought.lines.size(), size_t{3});
+    CHECK_EQ(fought.lines[1].look.glow, 0.0f);
+    CHECK_EQ(fought.lines[2].look.glow, 0.0f);
+    CHECK_EQ(fought.lines[2].look.shadow, 1.0f); // the rest of its look stays
+    // Another party's mob, and one nobody has touched, keep theirs.
+    ActorInfo theirs   = AggressiveMob();
+    theirs.state.claim = ClaimState::Others;
+    theirs.state.row   = Category::OtherClaim;
+    CHECK_EQ(ComposePlate(theirs, kPlayer, s, kGame).lines[2].look.glow, 1.0f);
+    CHECK_EQ(ComposePlate(AggressiveMob(), kPlayer, s, kGame).lines[1].look.glow, 0.5f);
+    s.glowOffWhenFighting = false;
+    const ComposedPlate kept = ComposePlate(yours, kPlayer, s, kGame);
+    CHECK_EQ(kept.lines[1].look.glow, 0.5f);
+    CHECK_EQ(kept.lines[2].look.glow, 1.0f);
+}
+
 TEST(the_ornament_needs_both_of_the_lines_it_sits_between)
 {
     Settings s;

@@ -142,8 +142,10 @@ color are set in its card.
 
 The Nameplate Style card, on the Entities page, sets what every nameplate shares: a vertical offset, a base font size,
 the Default font (any font installed in Windows), and whether names scale with distance, between a smallest and a
-largest size. With Stack Names on, names that would cover each other rise one over another, while your target's keeps
-its place. The Fading card on the Mobs page makes the other mobs' names fainter while you have a target.
+largest size. With Scale Your Own Name off, your own nameplate stays one size. With Stack Names on, names that would
+cover each other rise one over another, while your target's keeps its place. The Fading card on the Mobs page makes the
+other mobs' names fainter while you have a target, and its Glow Off While Fighting switch takes a mob's glow away once
+you or your party has claimed it.
 
 ![A player's nameplate with their icons and the feather cursor](resources/player_nameplate.png)
 
