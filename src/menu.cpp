@@ -462,7 +462,9 @@ namespace headsup
                     gui->SetCursorPos(ImVec2(x + cardWidth - width, y));
                     int tab = *colorsTab ? 1 : 0;
                     const char* const tabs[] = {"Settings", "Colors"};
+                    const bool was = changed;
                     SegmentsAt("##tabs", tab, tabs, 2, Em(kSegmentWidth));
+                    changed = was;
                     *colorsTab = tab == 1;
                 }
                 EndRowAt(x, y, gui->GetFrameHeight() + Em(0.4f));
@@ -483,23 +485,24 @@ namespace headsup
                 char id[64];
                 std::snprintf(id, sizeof(id), "##card %s", title);
                 Ground(id, ImVec2(cardWidth, height), kStill, Em(kCardRadius), kBorder);
-                // The title row: a chevron and the title; a click anywhere on it but the switch folds the card.
-                gui->SetCursorPos(ImVec2(cardX, cardTop));
+                const float arrowX = cardX + Em(0.5f);
+                const float arrow  = gui->GetFrameHeight();
+                // The switch at the title row's right keeps its own clicks.
+                gui->SetCursorPos(ImVec2(arrowX + arrow, cardTop));
                 std::snprintf(id, sizeof(id), "##fold %s", title);
                 const float switchRoom = enabled != nullptr ? Em(kSwitchWidth) + Em(kCardPad) : 0.0f;
-                gui->SetNextItemAllowOverlap();
-                if (gui->InvisibleButton(id, ImVec2(cardWidth - switchRoom, header))) collapsed ^= bit;
+                const bool rowPressed =
+                    gui->InvisibleButton(id, ImVec2(cardWidth - switchRoom - (arrowX + arrow - cardX), header));
                 const bool hovered = gui->IsItemHovered();
                 Tip(tip);
-                gui->SetCursorPos(ImVec2(cardX + Em(0.5f), cardTop + (header - gui->GetFrameHeight()) / 2.0f));
+                gui->SetCursorPos(ImVec2(arrowX, cardTop + (header - arrow) / 2.0f));
                 std::snprintf(id, sizeof(id), "##arrow %s", title);
-                gui->BeginDisabled(true);
-                WithText(hovered ? kText : kMuted, [&] {
+                const bool arrowPressed = WithText(hovered ? kText : kMuted, [&] {
                     return WithColors(ButtonColors{kClear, kClear, kClear},
                         [&] { return gui->ArrowButton(id, open ? ImGuiDir_Down : ImGuiDir_Right); });
                 });
-                gui->EndDisabled();
-                gui->SetCursorPos(ImVec2(cardX + Em(0.5f) + gui->GetFrameHeight(), cardTop + (header - Em(kCardTitleScale)) / 2.0f));
+                if (arrowPressed || rowPressed) collapsed ^= bit;
+                gui->SetCursorPos(ImVec2(arrowX + arrow, cardTop + (header - Em(kCardTitleScale)) / 2.0f));
                 Title(kHeading, title, kCardTitleScale);
                 if (enabled != nullptr)
                 {
@@ -1455,7 +1458,9 @@ namespace headsup
                         nullptr, nullptr);
                 });
                 ui.gui->SetCursorPos(ImVec2(x + ui.Em(kFilterWidth) + ui.style.ItemSpacing.x, y));
+                const bool was = ui.changed;
                 ui.SwitchAt("##all windows", list.all);
+                ui.changed = was;
                 ui.Tip("Every window the game has, not only the named ones and yours.");
                 ui.EndRowAt(ui.cardX, y, ui.gui->GetFrameHeight());
             }
@@ -1898,6 +1903,8 @@ namespace headsup
                 std::snprintf(text, sizeof(text), "%.2f ms (%.0f fps)", status.frameMs,
                     status.frameMs > 0.0 ? 1000.0 / status.frameMs : 0.0);
                 line("Frame time", text);
+                std::snprintf(text, sizeof(text), "%.0f ms", status.lastSaveMs);
+                line("Last save", text);
                 if (status.player.level > 0)
                     std::snprintf(text, sizeof(text), "%d%s", status.player.level, status.player.sitting ? ", sitting" : "");
                 else

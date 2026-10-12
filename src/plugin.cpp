@@ -12,6 +12,7 @@
 #include "game_names.h"
 #include "game_state.h"
 #include "menu.h"
+#include "menu_state.h"
 #include "mobdata.h"
 #include "nameplate_render.h"
 #include "native_hook.h"
@@ -173,6 +174,8 @@ class HeadsUp final : public IPlugin
 {
     IAshitaCore* m_AshitaCore = nullptr;
     headsup::Settings m_Settings;
+    std::optional<double> m_SettingsChangedAt;
+    double m_LastSaveMs = 0.0;
     headsup::Tracker m_Tracker;
     headsup::PhTimers m_PhTimers;
     std::vector<headsup::TimerLine> m_TimerLines;
@@ -295,6 +298,7 @@ public:
 
     void Release(void) override
     {
+        if (m_SettingsChangedAt) SaveSettings();
         m_AshitaCore->GetInputManager()->GetMouse()->RemoveCallback(kName);
         g_SyncClicks = false;
         g_Gui        = nullptr;
@@ -595,6 +599,7 @@ public:
             .meshes           = m_Outline.MeshesLastFrame(),
             .nameplates       = static_cast<uint32_t>(m_Nameplates.LastShown().size()),
             .frameMs          = m_FrameMs,
+            .lastSaveMs       = m_LastSaveMs,
             .stencilAvailable = m_Outline.StencilAvailable(),
             .drewInScene      = drewInScene,
             .hooked           = m_NameHook.Running(),
@@ -605,8 +610,8 @@ public:
             .seenWindows      = &m_SeenWindows,
         };
         if (m_Menu.open) ApplyMenuFont();
-        if (m_Menu.Draw(m_AshitaCore->GetGuiManager(), m_Settings, status))
-            SaveSettings();
+        if (m_Menu.Draw(m_AshitaCore->GetGuiManager(), m_Settings, status)) m_SettingsChangedAt = now;
+        if (headsup::SaveDue(m_SettingsChangedAt, now, m_LastSaveMs)) SaveSettings();
         if (m_Menu.TakeDebugRequest()) m_DebugPending = true;
         UpdatePointer();
         m_NameHook.NewFrame(NameOwners());
@@ -1081,11 +1086,14 @@ private:
 
     void SaveSettings()
     {
+        const double before = Now();
         IConfigurationManager* config = m_AshitaCore->GetConfigurationManager();
         AshitaStore store(config);
         headsup::SaveSettings(m_Settings, store);
         if (!config->Save(kConfigAlias, SettingsPath().c_str()))
             Print("could not save " + SettingsFile() + "; the change lasts until Ashita closes");
+        m_LastSaveMs        = (Now() - before) * 1000.0;
+        m_SettingsChangedAt = std::nullopt;
     }
 
     static int64_t UnixMsOf(std::chrono::system_clock::time_point clock)

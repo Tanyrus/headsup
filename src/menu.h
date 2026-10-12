@@ -19,6 +19,7 @@ namespace headsup
         uint32_t meshes;
         uint32_t nameplates;
         double frameMs;
+        double lastSaveMs; // the last settings write, for the Debug page
         bool stencilAvailable;
         bool drewInScene; // nameplates went into the game's scene image, behind walls
         bool hooked; // the game's name routine
