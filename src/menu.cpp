@@ -1,7 +1,6 @@
 #include "menu.h"
 
 #include "Ashita.h"
-#include "bar_theme.h"
 #include "menu_pages.h"
 #include "menu_state.h"
 #include "menu_ui.h"
@@ -9,11 +8,8 @@
 
 #include <cfloat>
 #include <cstdio>
-#include <cstring>
 #include <algorithm>
-#include <initializer_list>
 #include <optional>
-#include <unordered_map>
 #include <utility>
 
 namespace headsup
@@ -214,7 +210,8 @@ namespace headsup
                 std::snprintf(text, sizeof(text), "%.2f ms (%.0f fps)", status.frameMs,
                     status.frameMs > 0.0 ? 1000.0 / status.frameMs : 0.0);
                 line("Frame time", text);
-                std::snprintf(text, sizeof(text), "%.0f ms", status.lastSaveMs);
+                std::snprintf(text, sizeof(text), "%.0f ms, %zu %s", status.lastSaveMs, status.lastSaveKeys,
+                    status.lastSaveKeys == 1 ? "key" : "keys");
                 line("Last save", text);
                 if (status.player.level > 0)
                     std::snprintf(text, sizeof(text), "%d%s", status.player.level, status.player.sitting ? ", sitting" : "");

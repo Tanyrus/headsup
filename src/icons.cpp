@@ -83,8 +83,6 @@ namespace headsup
         }
     }
 
-    IconSet IconsFor(const MobRecord* mob) { return IconsFor(mob, kAllDetection); }
-
     DetectionIcon DetectionOf(Icon icon)
     {
         switch (icon)
@@ -152,54 +150,45 @@ namespace headsup
         InfoIconSet set;
         if (mob == nullptr) return set;
         std::vector<InfoIcon> weak, weakRank, resist, resistRank, statusWeak, statusResist;
-        if (rules.damage)
+        for (int i = 0; i < kSdtCount; ++i)
         {
-            for (int i = 0; i < kSdtCount; ++i)
-            {
-                const int percent = SdtPercent(mob->sdt[i]);
-                if (percent > 0) weak.push_back({kSdtIcons[i], BadgeKind::Weak, percent});
-                if (percent < 0) resist.push_back({kSdtIcons[i], BadgeKind::Resist, -percent});
-                if (i < kFirstElementSdt || percent != 0) continue;
-                const int rank = mob->elementRanks[i - kFirstElementSdt];
-                if (Weak(rank, rules.elementWeakRank)) weakRank.push_back({kSdtIcons[i], BadgeKind::WeakRank, rank});
-                if (Resists(rank, rules.elementResistRank)) resistRank.push_back({kSdtIcons[i], BadgeKind::ResistRank, rank});
-            }
-            KeepFurthest(weakRank, resistRank, rules.maxElements);
-            HighestFirst(weak);
-            LowestFirst(weakRank);
-            HighestFirst(resist);
-            HighestFirst(resistRank);
+            const int percent = SdtPercent(mob->sdt[i]);
+            if (percent > 0) weak.push_back({kSdtIcons[i], BadgeKind::Weak, percent});
+            if (percent < 0) resist.push_back({kSdtIcons[i], BadgeKind::Resist, -percent});
+            if (i < kFirstElementSdt || percent != 0) continue;
+            const int rank = mob->elementRanks[i - kFirstElementSdt];
+            if (Weak(rank, rules.elementWeakRank)) weakRank.push_back({kSdtIcons[i], BadgeKind::WeakRank, rank});
+            if (Resists(rank, rules.elementResistRank)) resistRank.push_back({kSdtIcons[i], BadgeKind::ResistRank, rank});
         }
-        if (rules.statusRanks)
+        KeepFurthest(weakRank, resistRank, rules.maxElements);
+        HighestFirst(weak);
+        LowestFirst(weakRank);
+        HighestFirst(resist);
+        HighestFirst(resistRank);
+        for (int i = 0; i < kStatusRankCount; ++i)
         {
-            for (int i = 0; i < kStatusRankCount; ++i)
-            {
-                const StatusBadgeRule& rule = rules.status[i];
-                const int rank              = mob->statusRanks[i];
-                if (!rule.show || (mob->immunity & kRankStatuses[i].immunity) != 0) continue;
-                if (Weak(rank, rule.weakRank)) statusWeak.push_back({kRankStatuses[i].icon, BadgeKind::StatusWeak, rank});
-                if (Resists(rank, rule.resistRank)) statusResist.push_back({kRankStatuses[i].icon, BadgeKind::StatusRank, rank});
-            }
-            MergeSleeps(statusWeak);
-            MergeSleeps(statusResist);
-            LowestFirst(statusWeak);
-            HighestFirst(statusResist);
+            const StatusBadgeRule& rule = rules.status[i];
+            const int rank              = mob->statusRanks[i];
+            if (!rule.show || (mob->immunity & kRankStatuses[i].immunity) != 0) continue;
+            if (Weak(rank, rule.weakRank)) statusWeak.push_back({kRankStatuses[i].icon, BadgeKind::StatusWeak, rank});
+            if (Resists(rank, rule.resistRank)) statusResist.push_back({kRankStatuses[i].icon, BadgeKind::StatusRank, rank});
         }
+        MergeSleeps(statusWeak);
+        MergeSleeps(statusResist);
+        LowestFirst(statusWeak);
+        HighestFirst(statusResist);
         auto add = [&](const InfoIcon& icon) {
             if (set.count < kMaxInfoIcons) set.icons[set.count++] = icon;
         };
         for (const std::vector<InfoIcon>* part : {&weak, &weakRank, &resist, &resistRank, &statusWeak, &statusResist})
             for (const InfoIcon& icon : *part)
                 add(icon);
-        if (rules.immunities)
-        {
-            const uint32_t sleeps = mob->immunity & kBothSleeps;
-            if (sleeps == kBothSleeps) add({Icon::Sleep, BadgeKind::Immune, 0});
-            else if (sleeps == kImmuneLightSleep) add({Icon::LightSleep, BadgeKind::Immune, 0});
-            else if (sleeps == kImmuneDarkSleep) add({Icon::DarkSleep, BadgeKind::Immune, 0});
-            for (const Status& status : kImmunities)
-                if ((mob->immunity & status.immunity) != 0) add({status.icon, BadgeKind::Immune, 0});
-        }
+        const uint32_t sleeps = mob->immunity & kBothSleeps;
+        if (sleeps == kBothSleeps) add({Icon::Sleep, BadgeKind::Immune, 0});
+        else if (sleeps == kImmuneLightSleep) add({Icon::LightSleep, BadgeKind::Immune, 0});
+        else if (sleeps == kImmuneDarkSleep) add({Icon::DarkSleep, BadgeKind::Immune, 0});
+        for (const Status& status : kImmunities)
+            if ((mob->immunity & status.immunity) != 0) add({status.icon, BadgeKind::Immune, 0});
         return set;
     }
 

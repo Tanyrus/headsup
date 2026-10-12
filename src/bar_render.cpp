@@ -1,7 +1,6 @@
 #include "bar_render.h"
 
 #include "argb.h"
-#include "labels.h"
 
 #include <algorithm>
 #include <cmath>
@@ -111,8 +110,7 @@ namespace headsup
         const float shadow = static_cast<float>(pixels) * kShadowPerHeight;
         const int margin   = BlurMargin(shadow + 1.0f);
         Coverage coverage;
-        int markX = kNoMarkColumn;
-        if (!m_Gdi.Rasterize(text.c_str(), font, pixels, false, face.tracking, margin, Label::kNoMark, coverage, markX))
+        if (!m_Gdi.Rasterize(text.c_str(), font, pixels, false, face.tracking, margin, coverage))
         {
             Fail("GDI could not draw text in " + std::string(font));
             return nullptr;

@@ -65,9 +65,9 @@ namespace headsup
         uint32_t ornamentColor = 0;
     };
 
-    // Screenshot mode hides names first, even after /hu off; then the game's names stay while HeadsUp is off or its
-    // nameplates are, and the entity's row decides the rest.
-    HookAction HookActionFor(const EntityState& state, const Settings& settings, bool screenshot);
+    // Screenshot mode hides names first, even after /hu off; then the game's stay while HeadsUp or its nameplates are
+    // off, and the row decides the rest: a name HeadsUp cannot draw (namesFailed) is the game's, a hidden one hidden.
+    HookAction HookActionFor(const EntityState& state, const Settings& settings, bool screenshot, bool namesFailed);
     // The lines this entity shows now, with every tag rendered; empty for a mode that shows nothing.
     ComposedPlate ComposePlate(const ActorInfo& info, const PlayerState& player, const Settings& settings, uint32_t gameArgb);
     // The percent of the base size as pixels.

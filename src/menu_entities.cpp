@@ -189,6 +189,9 @@ namespace headsup
                 if (ui.TagChip(tag) && PutTag(k.lines[editor.line].text, editor.drafts[editor.line].caret, tag))
                     ui.changed = true;
             }
+            // Under the chips, so nothing above moves under the mouse when it comes and goes.
+            if (const std::string note = UnusedTagsNote(k, {Tag::Name}, kShowsNameEnding); !note.empty())
+                ui.Note(note.c_str());
             ui.EndCard();
         }
 
@@ -277,7 +280,7 @@ namespace headsup
             const bool off = !s.enabled || !s.nameplates;
             // A card whose settings show only through tags says which, while no line of the design holds one of them.
             const auto shown = [&](std::initializer_list<Tag> tags) {
-                const std::string note = UnusedTagsNote(s.Kind(PlateKind::Mobs), tags);
+                const std::string note = UnusedTagsNote(s.Kind(PlateKind::Mobs), tags, kShowsTheseEnding);
                 if (!note.empty()) ui.Note(note.c_str());
                 return note.empty();
             };
@@ -285,7 +288,7 @@ namespace headsup
             if (ui.BeginCard("Fading", collapsed))
             {
                 ui.SliderInt("Others' Opacity", s.untargetedOpacity, kMinOpacity, kMaxOpacity, "%d%%",
-                    "Other mobs' names and lines while you have a target, so your target's stand out.");
+                    "Other mobs' and pets' names and lines while you have a target, so your target's stand out.");
                 ui.EndCard();
             }
             if (ui.BeginCard("Detection", collapsed, nullptr,

@@ -206,16 +206,6 @@ TEST(no_glow_and_no_shadow_leave_just_the_letters)
     CHECK_EQ(Pixel(image, 4, 5), 0xFFFFFFFFu);
 }
 
-TEST(the_placeholder_mark_takes_its_own_color_from_its_column_on)
-{
-    Layers layers{0.0f, 0, 0.0f, 0xFFFFFFFFu, 0xFF000000u, 0};
-    layers.markX     = 10;
-    layers.markColor = 0xFFD9A6FFu;
-    const Image image = Styled(Block(12, 4), layers);
-    CHECK_EQ(Pixel(image, 9, 8), 0xFFFFFFFFu);
-    CHECK_EQ(Pixel(image, 10, 8), 0xFFD9A6FFu);
-}
-
 TEST(a_lighter_color_is_half_way_to_white)
 {
     // The placeholder purple: B3 + (FF - B3) / 2 = D9, 4D + (FF - 4D) / 2 = A6, the mockup's [PH] color within two steps.

@@ -38,21 +38,9 @@ namespace headsup
             [&](uint32_t id) { return (id & kClaimerIdBits) == (claimStatus & kClaimerIdBits); });
     }
 
-    bool ReplacesName(const Settings& settings, const ActorInfo& info)
-    {
-        const bool kind = info.kind == EntityKind::Mob      ? settings.replaceMobNames
-                          : info.kind == EntityKind::Player ? settings.replacePlayerNames
-                                                            : settings.replaceNpcNames;
-        return kind && info.name[0] != '\0';
-    }
-
     void Tracker::Update(const std::vector<ActorInput>& actors, const PlayerState& player, const Settings& settings,
         const CursorTargets& targets)
     {
-        BadgeRules badges{.damage = settings.showDamageIcons, .statusRanks = settings.showStatusRankIcons,
-            .immunities = settings.showImmunityIcons, .elementWeakRank = settings.elementWeakRank,
-            .elementResistRank = settings.elementResistRank, .maxElements = settings.maxElements};
-        std::ranges::copy(settings.statusBadges, badges.status);
         m_Actors.clear();
         m_Actors.reserve(actors.size());
         m_Player   = player;
@@ -63,7 +51,7 @@ namespace headsup
         for (const ActorInput& a : actors)
         {
             if (a.actor == 0) continue;
-            // Filled where it is kept: an ActorInfo is half a kilobyte, and Update runs for every actor every frame.
+            // Filled where it is kept: an ActorInfo is some 200 bytes, and Update runs for every actor every frame.
             const auto [entry, added] = m_Actors.try_emplace(a.actor);
             ActorInfo& info           = entry->second;
             if (!added) info = ActorInfo{}; // listed twice: the later entry alone counts
@@ -73,8 +61,6 @@ namespace headsup
             info.alive       = a.alive;
             info.pose        = a.pose;
             info.feet        = a.feet;
-            info.claimedByParty = a.claimedByParty;
-            info.claimed        = a.claimed;
             std::snprintf(info.name, sizeof(info.name), "%s", a.name);
             std::snprintf(info.ownerName, sizeof(info.ownerName), "%s", a.ownerName);
             if (a.checked != nullptr) info.checked = *a.checked;
@@ -95,29 +81,13 @@ namespace headsup
                 const bool placeholder = mob != nullptr && mob->placeholderOf != 0;
                 info.mob               = mob;
                 info.placeholder       = placeholder;
-                if (a.alive)
-                {
-                    const Label level = MakeLabel(mob, a.checked, player.level);
-                    info.level        = level;
-                    info.tooWeak      = level.shade == LabelShade::TooWeak;
-                    info.label        = LevelLine(level, settings.showLabels,
-                        MobIdText(a.serverId, placeholder, settings.mobId, settings.markPlaceholders));
-                    info.mobIcons = IconsFor(mob);
-                    info.infoIcons = InfoIconsFor(mob != nullptr ? &ResistancesOf(*mob) : nullptr, badges);
-                }
+                if (a.alive) info.level = MakeLabel(mob, a.checked, player.level);
                 const Category classified = Classify(mob, a.checked ? a.checked->level : 0, player);
-                st.nature    = NatureOf(classified, placeholder);
+                st.nature     = NatureOf(classified, placeholder);
                 st.classified = classified;
-                st.row       = MobRowOf(st.nature, a.claimedByParty, a.claimed);
-                st.toughness = info.level.shade;
-                st.tooWeak   = info.tooWeak;
-                const bool placeholderColor = placeholder && settings.show[CategoryIndex(Category::Placeholder)];
-                info.category = placeholderColor ? Category::Placeholder : classified;
-                // The bar and look.cpp color a mob by this category.
-                if (a.claimedByParty && settings.show[CategoryIndex(Category::PartyClaim)])
-                    info.category = Category::PartyClaim;
-                else if (a.claimed && !a.claimedByParty && settings.show[CategoryIndex(Category::OtherClaim)])
-                    info.category = Category::OtherClaim;
+                st.row        = MobRowOf(st.nature, a.claimedByParty, a.claimed);
+                st.toughness  = info.level.shade;
+                st.tooWeak    = info.level.shade == LabelShade::TooWeak;
             }
             const OutlineMode mode = OutlineModeOf(st, settings);
             const bool wanted = mode == OutlineMode::Shown || (mode == OutlineMode::WhenTargeted && Targeted(st.target));
@@ -128,11 +98,7 @@ namespace headsup
                 info.argb       = RowColor(st, settings);
                 ++m_Outlined;
             }
-            if (a.kind == EntityKind::Player && a.status)
-            {
-                info.playerIcons   = PlayerIcons(*a.status, settings);
-                info.linkshellArgb = a.status->linkshellArgb;
-            }
+            if (a.kind == EntityKind::Player && a.status) info.linkshellArgb = a.status->linkshellArgb;
             m_Order.push_back(a.actor);
             m_Min = std::min(m_Min, a.actor);
             m_Max = std::max(m_Max, a.actor);

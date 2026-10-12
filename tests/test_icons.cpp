@@ -23,48 +23,48 @@ namespace
 
 TEST(no_data_no_icons)
 {
-    CHECK_EQ(IconsFor(nullptr).count, 0);
+    CHECK_EQ(IconsFor(nullptr, kAllDetection).count, 0);
 }
 
 TEST(aggressive_and_passive_mobs)
 {
     const MobRecord aggressive = Mob(kMobAggressive, 0);
-    CHECK(List(IconsFor(&aggressive)) == std::vector<Icon>{Icon::AggroNQ});
+    CHECK(List(IconsFor(&aggressive, kAllDetection)) == std::vector<Icon>{Icon::AggroNQ});
     const MobRecord always = Mob(kMobAlwaysAggro, 0);
-    CHECK(List(IconsFor(&always)) == std::vector<Icon>{Icon::AggroNQ});
+    CHECK(List(IconsFor(&always, kAllDetection)) == std::vector<Icon>{Icon::AggroNQ});
     const MobRecord passive = Mob(0, 0);
-    CHECK(List(IconsFor(&passive)) == std::vector<Icon>{Icon::PassiveNQ});
+    CHECK(List(IconsFor(&passive, kAllDetection)) == std::vector<Icon>{Icon::PassiveNQ});
 }
 
 TEST(no_aggro_mobs_are_passive)
 {
     // The aggro icon is the mob's nature: it never aggros at all.
     const MobRecord noAggro = Mob(kMobAggressive | kMobNoAggro, 0);
-    CHECK(List(IconsFor(&noAggro)) == std::vector<Icon>{Icon::PassiveNQ});
+    CHECK(List(IconsFor(&noAggro, kAllDetection)) == std::vector<Icon>{Icon::PassiveNQ});
 }
 
 TEST(notorious_monsters_get_hq_icons)
 {
     const MobRecord aggressive = Mob(kMobAggressive | kMobNotorious, 0);
-    CHECK(List(IconsFor(&aggressive)) == std::vector<Icon>{Icon::AggroHQ});
+    CHECK(List(IconsFor(&aggressive, kAllDetection)) == std::vector<Icon>{Icon::AggroHQ});
     const MobRecord passive = Mob(kMobNotorious, 0);
-    CHECK(List(IconsFor(&passive)) == std::vector<Icon>{Icon::PassiveHQ});
+    CHECK(List(IconsFor(&passive, kAllDetection)) == std::vector<Icon>{Icon::PassiveHQ});
 }
 
 TEST(every_icon_in_xiui_order)
 {
     const MobRecord m = Mob(kMobAggressive | kMobLink,
         kDetectSight | kDetectHearing | kDetectScent | kDetectMagic | kDetectAbility | kDetectLowHp);
-    CHECK(List(IconsFor(&m)) == (std::vector<Icon>{Icon::AggroNQ, Icon::Link, Icon::Sight, Icon::Sound, Icon::Scent,
+    CHECK(List(IconsFor(&m, kAllDetection)) == (std::vector<Icon>{Icon::AggroNQ, Icon::Link, Icon::Sight, Icon::Sound, Icon::Scent,
                                     Icon::Magic, Icon::Ability, Icon::Blood}));
 }
 
 TEST(true_detection_replaces_sight)
 {
     const MobRecord sight = Mob(kMobTrueDetection, kDetectSight);
-    CHECK(List(IconsFor(&sight)) == (std::vector<Icon>{Icon::PassiveNQ, Icon::TrueSight}));
+    CHECK(List(IconsFor(&sight, kAllDetection)) == (std::vector<Icon>{Icon::PassiveNQ, Icon::TrueSight}));
     const MobRecord sound = Mob(kMobTrueDetection, kDetectHearing); // true sound: the TrueSight icon and Sound
-    CHECK(List(IconsFor(&sound)) == (std::vector<Icon>{Icon::PassiveNQ, Icon::TrueSight, Icon::Sound}));
+    CHECK(List(IconsFor(&sound, kAllDetection)) == (std::vector<Icon>{Icon::PassiveNQ, Icon::TrueSight, Icon::Sound}));
 }
 
 TEST(every_icon_a_mobs_row_can_hold_has_a_popup_tag)
@@ -78,7 +78,7 @@ TEST(every_icon_a_mobs_row_can_hold_has_a_popup_tag)
             for (size_t bit = 0; bit < std::size(detections); ++bit)
                 if (subset & (1 << bit)) detects |= detections[bit];
             const MobRecord mob = Mob(static_cast<uint8_t>(flags), detects);
-            const IconSet icons = IconsFor(&mob);
+            const IconSet icons = IconsFor(&mob, kAllDetection);
             for (int i = 0; i < icons.count; ++i)
                 CHECK(std::string(IconTag(icons.icons[i])) != "");
         }
@@ -125,13 +125,6 @@ namespace
     {
         const InfoIconSet set = InfoIconsFor(&r, rules);
         return std::vector<InfoIcon>(set.icons, set.icons + set.count);
-    }
-
-    BadgeRules Without(bool BadgeRules::*part)
-    {
-        BadgeRules rules = kStrict;
-        rules.*part      = false;
-        return rules;
     }
 
     int16_t& SdtOf(MobResistances& r, Sdt type) { return r.sdt[static_cast<int>(type)]; }
@@ -315,17 +308,6 @@ TEST(immunities_in_mobdbs_order_and_the_ones_without_icons_left_out)
     r.immunity = kImmunePetrify | kImmuneGravity | kImmuneElegy | kImmuneStun | kImmuneTerror | kImmuneAddle | kImmuneCurse;
     CHECK(Info(r) == (std::vector<InfoIcon>{{Icon::Gravity, BadgeKind::Immune, 0}, {Icon::Stun, BadgeKind::Immune, 0},
                          {Icon::Elegy, BadgeKind::Immune, 0}, {Icon::Petrify, BadgeKind::Immune, 0}}));
-}
-
-TEST(each_switch_turns_its_part_off)
-{
-    MobResistances r = Neutral();
-    SdtOf(r, Sdt::Piercing)         = 2500;
-    RankOf(r, StatusRank::Paralyze) = 6;
-    r.immunity                      = kImmuneBind;
-    CHECK(Info(r, Without(&BadgeRules::damage)) == (std::vector<InfoIcon>{{Icon::Paralyze, BadgeKind::StatusRank, 6}, {Icon::Bind, BadgeKind::Immune, 0}}));
-    CHECK(Info(r, Without(&BadgeRules::statusRanks)) == (std::vector<InfoIcon>{{Icon::Piercing, BadgeKind::Weak, 25}, {Icon::Bind, BadgeKind::Immune, 0}}));
-    CHECK(Info(r, Without(&BadgeRules::immunities)) == (std::vector<InfoIcon>{{Icon::Piercing, BadgeKind::Weak, 25}, {Icon::Paralyze, BadgeKind::StatusRank, 6}}));
 }
 
 TEST(a_mob_with_everything_fits_the_set)

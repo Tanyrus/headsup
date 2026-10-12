@@ -23,7 +23,7 @@ namespace headsup
     // Sends every name the game is about to draw through HeadsUp first: the six bytes at the name routine's hook
     // (native_locate.h) become a jump to a gate that calls OnName with the routine's frame, then either runs the bytes
     // it replaced and resumes the routine, or skips to the routine's exit so the game draws nothing.
-    // An entity whose names the hook may meet this frame, and whether HeadsUp draws them instead of the game.
+    // An entity whose names the hook may meet this frame, and what becomes of them: kept, hidden or replaced.
     struct NameOwner
     {
         uint32_t actor;

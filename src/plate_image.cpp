@@ -270,7 +270,7 @@ namespace headsup
                         paint.Over(strong(shadow[static_cast<size_t>(above * coverage.width + x)]), layers.shadowColor);
                     paint.Over(strong(shadow[i]), layers.shadowColor);
                 }
-                paint.Over(Cover(coverage, i), x >= layers.markX ? layers.markColor : layers.color);
+                paint.Over(Cover(coverage, i), layers.color);
                 image.argb[i] = paint.Color();
             }
         }

@@ -132,9 +132,7 @@ namespace headsup
         }
         const Style style = styleAt(*height);
         Coverage coverage;
-        int markX = kNoMarkColumn;
-        if (!sized || !m_Gdi.Rasterize(text, look.line.font.c_str(), *height, look.line.bold, 0, style.margin, Label::kNoMark,
-                          coverage, markX))
+        if (!sized || !m_Gdi.Rasterize(text, look.line.font.c_str(), *height, look.line.bold, 0, style.margin, coverage))
         {
             FailNames("GDI could not draw text in " + look.line.font + " at " + std::to_string(*height) + " px");
             return false;
@@ -287,7 +285,7 @@ namespace headsup
                 ComposedPlate composed = ComposePlate(*info, tracker.Player(), settings, gameName.color);
                 if (m_Icons.Failed()) DropIcons(composed);
                 const TargetState target = TargetStateOf(info->index, targets);
-                const bool showCursor    = settings.replaceCursor && !targets.gameArrowsShown && Targeted(target);
+                const bool showCursor    = CursorShown(info->index, settings, targets);
                 const bool timersHere    = info->index == selfIndex && !selfTimers.empty();
                 if (composed.lines.empty() && !showCursor && !timersHere) continue;
                 Plate& p = m_Plates[info->index];
@@ -576,8 +574,7 @@ namespace headsup
                 p.frame                 = m_Frame;
                 const float cursorShown = static_cast<float>(settings.cursorSize) * toY;
                 p.cursorRaster          = FixedRasterHeight(cursorShown);
-                const uint32_t color    = CursorColor(TargetStateOf(lone.index, targets), settings);
-                if (!PrepareCursor(p.cursor, color, p.cursorRaster, settings)) break;
+                if (!PrepareCursor(p.cursor, CursorColor(lone.target, settings), p.cursorRaster, settings)) break;
                 const float fit     = FitOf(cursorShown, p.cursor.raster);
                 const float height  = p.cursor.height * fit / toY;
                 const CursorSpot at = CursorAtAnchor(lone.x, lone.y, p.cursor.width * fit / toY, height, p.cursor.tip);

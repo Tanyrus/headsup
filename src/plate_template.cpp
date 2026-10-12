@@ -135,12 +135,12 @@ namespace headsup
         return true;
     }
 
-    std::string UnusedTagsNote(const KindSettings& kind, std::initializer_list<Tag> tags)
+    std::string UnusedTagsNote(const KindSettings& kind, std::initializer_list<Tag> tags, const char* ending)
     {
         constexpr const char* kStart = "Put ";
         constexpr const char* kComma = ", ";
         constexpr const char* kOr    = " or ";
-        constexpr const char* kEnd   = " on a line of the design to show these on a nameplate.";
+        constexpr const char* kWhere = " on a line of the design";
         std::string note;
         size_t left = tags.size();
         for (const Tag tag : tags)
@@ -150,7 +150,7 @@ namespace headsup
             note += TagName(tag);
             --left;
         }
-        return note.empty() ? note : note + kEnd;
+        return note.empty() ? note : note + kWhere + ending;
     }
 
     bool UsesTag(const KindSettings& kind, Tag tag)

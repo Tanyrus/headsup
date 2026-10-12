@@ -9,8 +9,7 @@
 
 namespace headsup
 {
-    // The longest row: a mob's aggro, link, sight or true sight, sound, scent, magic, ability and blood, or every player
-    // icon on one side.
+    // The longest row: a mob's aggro, link, sight or true sight, sound, scent, magic, ability and blood.
     constexpr int kMaxIcons = 8;
 
     struct IconSet
@@ -19,10 +18,8 @@ namespace headsup
         int count = 0;
     };
 
-    // In XIUI's order. The aggro icon is the mob's nature (whether it aggros at all), not whether it would attack this
-    // player.
-    IconSet IconsFor(const MobRecord* mob);
-    // Only the icons whose DetectionIcon bit is in detectionShown.
+    // In XIUI's order, only the icons whose DetectionIcon bit is in detectionShown. The aggro icon is the mob's nature
+    // (whether it aggros at all), not whether it would attack this player.
     IconSet IconsFor(const MobRecord* mob, uint32_t detectionShown);
     // The kind of detection an icon IconsFor gives belongs to; any icon no mob's row holds reads as Aggro.
     DetectionIcon DetectionOf(Icon icon);
@@ -71,7 +68,6 @@ namespace headsup
     };
     struct BadgeRules
     {
-        bool damage = true, statusRanks = true, immunities = true;
         int elementWeakRank = -1, elementResistRank = 4;
         int maxElements = kElementCount; // by rank; past it the smallest differences from neutral go first
         StatusBadgeRule status[kStatusRankCount] = {};

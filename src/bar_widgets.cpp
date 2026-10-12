@@ -53,37 +53,34 @@ namespace headsup
             return g.mainJob == 0 ? "? ? ?" : JobsText(g.mainJob, g.mainLevel, g.subJob, g.subLevel);
         }
 
-        // The tracker fills a mob's level and icons only while it lives; a dead target has neither, but its record
-        // still names its aggro or passive icon.
+        // The tracker fills a mob's level only while it lives; a dead target has none, but its record still names
+        // its aggro or passive icon.
         bool HasLevel(const ActorInfo& target) { return target.level.text[0] != '\0'; }
 
-        std::optional<Icon> MobIcon(const ActorInfo& target)
-        {
-            const IconSet icons = target.mobIcons.count > 0 ? target.mobIcons : IconsFor(target.mob);
-            return icons.count > 0 ? std::optional<Icon>(icons.icons[0]) : std::nullopt;
-        }
-
-        // Every icon of its nature: aggro, linking, how it detects.
+        // Every icon of its nature: aggro first, then linking and how it detects.
         std::vector<Icon> MobIcons(const ActorInfo& target)
         {
-            const IconSet icons = target.mobIcons.count > 0 ? target.mobIcons : IconsFor(target.mob);
+            const IconSet icons = IconsFor(target.mob, kAllDetection);
             return std::vector<Icon>(icons.icons, icons.icons + icons.count);
         }
 
-        uint32_t NameColor(const ActorInfo& target, const Settings& settings)
+        std::optional<Icon> MobIcon(const ActorInfo& target)
         {
-            return ToArgb(settings.color[CategoryIndex(target.category)]);
+            const std::vector<Icon> icons = MobIcons(target);
+            return icons.empty() ? std::nullopt : std::optional<Icon>(icons.front());
         }
+
+        uint32_t NameColor(const ActorInfo& target, const Settings& settings) { return RowColor(target.state, settings); }
 
         uint32_t ShadeColor(const ActorInfo& target, const Settings& settings)
         {
-            return ToArgb(settings.labelColor[static_cast<int>(target.level.shade)]);
+            return ToArgb(settings.palette.toughness[static_cast<int>(target.level.shade)]);
         }
 
         // The nameplate's icons as words, so the popup and the plates say the same, then NM.
         PopupRow Tags(const MobRecord& mob)
         {
-            const IconSet icons = IconsFor(&mob);
+            const IconSet icons = IconsFor(&mob, kAllDetection);
             PopupRow row{RowKind::Tags, 0, {}};
             row.cells.reserve(static_cast<size_t>(icons.count) + 1);
             for (int i = 0; i < icons.count; ++i)
@@ -226,8 +223,7 @@ namespace headsup
             }
 
             PopupRow immune{RowKind::Line, 0, {}};
-            const InfoIconSet immunities =
-                InfoIconsFor(&res, BadgeRules{.damage = false, .statusRanks = false, .immunities = true});
+            const InfoIconSet immunities = InfoIconsOf(&res, BadgeRules{}, BadgeGroup::Immune);
             for (int i = 0; i < immunities.count; ++i)
                 immune.cells.push_back(PopupCell{immunities.icons[i].icon, true, {}});
             if (immune.cells.empty()) immune.cells.push_back(Cell(Text("None", Tone::Neutral)));

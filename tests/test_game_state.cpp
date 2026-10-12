@@ -348,3 +348,18 @@ TEST(another_character_forgets_the_last_ones_conquest_points_and_standing_until_
     Feed(state, full);
     CHECK(state.Standing() == (ConquestStanding{59, 500, 0}));
 }
+
+TEST(a_checked_player_shares_your_linkshell_when_their_check_names_one_you_wear)
+{
+    PlayerCheck check;
+    check.general.linkshell = "Phoenix";
+    const std::vector<std::string> yours{"Vanguard", "Phoenix"}, others{"Vanguard"};
+    CHECK(SharesLinkshell(&check, yours));
+    CHECK(!SharesLinkshell(&check, others));
+    CHECK(!SharesLinkshell(&check, {}));     // you wear none
+    CHECK(!SharesLinkshell(nullptr, yours)); // never checked, so not known
+    // No name is no linkshell: theirs when they wear none, yours when the item's name does not unpack.
+    const std::vector<std::string> unread{""};
+    check.general.linkshell.clear();
+    CHECK(!SharesLinkshell(&check, unread));
+}

@@ -167,11 +167,11 @@ namespace headsup
 
     namespace
     {
-        bool IsAggressive(Nature n) { return n == Nature::Aggressive || n == Nature::AggressiveNm; }
-
         bool Holds(ShowCondition c, const EntityState& s)
         {
             const bool player = s.kind == EntityKind::Player && !s.pet;
+            // By its aggression alone: a placeholder's nature does not say whether it would attack.
+            const bool attacks = s.classified == Category::WillAttack || s.classified == Category::NmWillAttack;
             switch (c)
             {
             case ShowCondition::Targeted: return Targeted(s.target);
@@ -180,8 +180,8 @@ namespace headsup
             case ShowCondition::OthersClaim: return s.claim == ClaimState::Others;
             case ShowCondition::Engaged: return s.engaged;
             case ShowCondition::TooWeak: return s.tooWeak;
-            case ShowCondition::Aggressive: return IsAggressive(s.nature);
-            case ShowCondition::Passive: return s.kind == EntityKind::Mob && !IsAggressive(s.nature);
+            case ShowCondition::Aggressive: return attacks;
+            case ShowCondition::Passive: return s.kind == EntityKind::Mob && !attacks;
             case ShowCondition::PartyMember: return player && s.playerRow == PlayerRow::PartyMember;
             case ShowCondition::Friend: return player && s.playerRow == PlayerRow::Friend;
             case ShowCondition::LinkshellMember: return player && s.playerRow == PlayerRow::LinkshellMember;
@@ -204,5 +204,28 @@ namespace headsup
         const auto same  = [&](const std::string& entry)
         { return std::ranges::equal(entry, name, [&](char a, char b) { return lower(a) == lower(b); }); };
         return std::ranges::any_of(friends, same);
+    }
+
+    bool InYourParty(uint32_t serverId, bool self, std::span<const uint32_t> memberIds)
+    {
+        return !self && std::ranges::find(memberIds, serverId) != memberIds.end();
+    }
+
+    std::unordered_map<uint16_t, uint16_t> PetOwners(std::span<const PetLink> links)
+    {
+        std::unordered_map<uint16_t, uint16_t> owners;
+        for (const PetLink& link : links)
+            if (link.ownerKind == EntityKind::Player && link.pet != 0 && link.pet != link.owner)
+                owners.try_emplace(link.pet, link.owner);
+        return owners;
+    }
+
+    std::optional<PlayerJobs> KnownJobs(const PlayerJobs* own, const PlayerJobs* member, const InspectGeneral* checked)
+    {
+        for (const PlayerJobs* jobs : {own, member})
+            if (jobs != nullptr && jobs->mainJob != 0) return *jobs;
+        if (checked != nullptr && checked->mainJob != 0)
+            return PlayerJobs{checked->mainJob, checked->mainLevel, checked->subJob, checked->subLevel};
+        return std::nullopt;
     }
 }

@@ -74,7 +74,7 @@ namespace headsup
             mobs.rows[CategoryIndex(claim)].outlineColor.source = ColorSource::Claim;
         }
         mobs.lines[0].text         = kTagDetect;
-        mobs.lines[0].iconSize     = 107; // 16 px of a 15 px base, as before
+        mobs.lines[0].iconSize     = 107; // 16 px of a 15 px base
         mobs.lines[1].text         = kTagLevelCon;
         mobs.lines[1].textSize     = 87; // 13 px of 15
         mobs.lines[1].color.source = ColorSource::Toughness;

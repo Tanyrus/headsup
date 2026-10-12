@@ -476,13 +476,14 @@ namespace headsup
             ui.Switch("Background", s.helpBarBackground, "Off, the help text alone, with no bar behind it.");
             ui.EndCard();
         }
-        if (picked == static_cast<int>(BarWidget::GameHelp) || picked < 0 || picked >= kBarWidgetCount) picked = 0;
-        const int w = picked;
         ui.Fade(!BarOn(s));
         if (ui.BeginCard("Widgets", collapsed, nullptr, "Drag a chip to move it; click it for its options."))
         {
             std::optional<Drop> drop; // applied after drawing, so no list changes under its own loop
             DrawTrays(ui, s, picked, drop);
+            // Read after the trays, where a click picks: the options are the clicked chip's in the same frame.
+            if (picked == static_cast<int>(BarWidget::GameHelp) || picked < 0 || picked >= kBarWidgetCount) picked = 0;
+            const int w = picked;
             if (drop) ui.changed |= MoveWidget(s.barSections, drop->from, drop->index, drop->to, drop->at);
             if (ui.Action("Reset Layout", "Puts every widget back in its first place. Switches stay.") &&
                 s.barSections != DefaultPlacement())

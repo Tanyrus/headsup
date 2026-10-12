@@ -11,10 +11,9 @@
 
 namespace headsup
 {
-    bool SaveDue(std::optional<double> changedAt, double now, double lastSaveMs)
+    bool SaveDue(std::optional<double> changedAt, double now, bool windowOpen)
     {
-        if (!changedAt) return false;
-        return lastSaveMs <= kSaveStallMs || now - *changedAt >= kSaveSettleSeconds;
+        return changedAt && (!windowOpen || now - *changedAt >= kSaveSettleSeconds);
     }
 
     const PageInfo kPages[kPageCount] = {

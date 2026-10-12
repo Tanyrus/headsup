@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <limits>
 #include <optional>
 #include <vector>
 
@@ -52,8 +51,6 @@ namespace headsup
     // A text's soft shadow: its blur radius per pixel of the text's height, from the mockup's 22 px name.
     constexpr float kShadowPerHeight = 0.12f;
 
-    constexpr int kNoMarkColumn = std::numeric_limits<int>::max();
-
     // Text as the look draws it, back to front: a glow (the letters blurred, at part strength), a dark shadow (the letters
     // blurred, once in place and once dropped), then the letters. Blurs are CSS radii, twice the Gaussian's sigma; 0 is none.
     struct Layers
@@ -66,8 +63,6 @@ namespace headsup
         uint32_t glowColor   = 0;
         float glowStrength   = 1.0f; // times the mockup's glow, which is solid wherever it would pass full
         float shadowStrength = 1.0f; // times the mockup's shadow, the same way
-        int markX            = kNoMarkColumn; // from this column on, the letters take markColor
-        uint32_t markColor   = 0;
     };
     // The coverage needs a margin of BlurMargin of the wider of the glow and the shadow with its drop.
     Image Styled(const Coverage& coverage, const Layers& layers);

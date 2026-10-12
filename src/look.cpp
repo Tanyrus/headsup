@@ -2,42 +2,9 @@
 
 namespace headsup
 {
-    namespace
-    {
-        constexpr float kPercent = 100.0f;
-    }
-
-    PlateStyle StyleFor(const ActorInfo& info, bool hasLevelLine, const Settings& settings)
-    {
-        PlateStyle style;
-        if (info.kind != EntityKind::Mob || !info.alive) return style;
-        const uint32_t outline = ToArgb(settings.color[CategoryIndex(info.category)]);
-        style.glow          = settings.nameGlow && !(settings.glowOffWhenFighting && info.claimedByParty);
-        style.glowColor     = settings.ownGlowColor ? ToArgb(settings.glowColor) : outline;
-        style.glowStrength  = static_cast<float>(settings.glowStrength) / kPercent;
-        style.glowSize      = static_cast<float>(settings.glowSize) / kPercent;
-        style.ornament      = hasLevelLine && settings.showOrnament;
-        style.ornamentColor = settings.ownOrnamentColor ? ToArgb(settings.ornamentColor) : outline;
-        return style;
-    }
-
-    LineStyle NameLineStyle(const Settings& settings, EntityKind kind)
-    {
-        const bool player = kind == EntityKind::Player, npc = kind == EntityKind::Npc;
-        const std::string& font = player ? settings.playerFontName : npc ? settings.npcFontName : settings.fontName;
-        const bool bold         = player ? settings.playerFontBold : npc ? settings.npcFontBold : settings.fontBold;
-        return LineStyle{font, bold, ToArgb(settings.textOutline), static_cast<float>(settings.nameShadow) / kPercent};
-    }
-
-    LineStyle LevelLineStyle(const Settings& settings)
-    {
-        return LineStyle{settings.labelFontName, settings.labelFontBold, ToArgb(settings.labelShadowColor),
-            static_cast<float>(settings.labelShadow) / kPercent};
-    }
-
     LineStyle BadgeLineStyle(const Settings& settings)
     {
-        return LineStyle{settings.badgeFontName, true, ToArgb(settings.labelShadowColor), 0.0f, true};
+        return LineStyle{settings.badgeFontName, true, ToArgb(LineDesign{}.shadowColor.custom), 0.0f, true};
     }
 
     uint32_t BadgeColor(BadgeKind kind, const Settings& settings)

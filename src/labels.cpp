@@ -1,7 +1,6 @@
 #include "labels.h"
 
 #include <cstdio>
-#include <cstring>
 
 namespace headsup
 {
@@ -24,34 +23,6 @@ namespace headsup
         char text[16];
         std::snprintf(text, sizeof(text), "[%u]", static_cast<unsigned>(serverId));
         return text;
-    }
-
-    std::string MobIdText(uint32_t serverId, bool placeholder, MobIdFormat format, bool markPlaceholders)
-    {
-        const bool marked = placeholder && markPlaceholders;
-        char text[40];
-        switch (format)
-        {
-            case MobIdFormat::Off: return "";
-            case MobIdFormat::LastThree: return marked ? kPlaceholderMark : IdText(serverId);
-            case MobIdFormat::Decimal:
-                return ServerIdText(serverId) + (marked ? std::string(kLabelSeparator) + kPlaceholderMark : "");
-            case MobIdFormat::Full:
-                std::snprintf(text, sizeof(text), "[%u (0x%X)]%s%s", static_cast<unsigned>(serverId), static_cast<unsigned>(serverId),
-                    marked ? kLabelSeparator : "", marked ? kPlaceholderMark : "");
-                return text;
-        }
-        return "";
-    }
-
-    Label LevelLine(const Label& level, bool showLevel, const std::string& id)
-    {
-        const bool both        = showLevel && !id.empty();
-        const std::string text = std::string(showLevel ? level.text : "") + (both ? kLabelSeparator : "") + id;
-        Label line             = level;
-        std::snprintf(line.text, sizeof(line.text), "%s", text.c_str());
-        line.markAt = id.ends_with(kPlaceholderMark) ? text.size() - std::strlen(kPlaceholderMark) : Label::kNoMark;
-        return line;
     }
 
     LabelShade ShadeFor(Con con)
@@ -81,7 +52,7 @@ namespace headsup
     {
         Label label{};
         label.shade = LabelShade::Unknown;
-        const std::string text = "Lv " + LevelText(mob, checked) + kLabelSeparator + ConText(mob, checked, playerLevel);
+        const std::string text = "Lv " + LevelText(mob, checked) + " " + ConText(mob, checked, playerLevel);
         std::snprintf(label.text, sizeof(label.text), "%s", text.c_str());
         if (checked != nullptr && checked->level > 0)
             label.shade = ShadeFor(checked->con);

@@ -12,21 +12,39 @@ using namespace headsup;
 
 TEST(no_change_waiting_means_no_save)
 {
-    CHECK(!SaveDue(std::nullopt, 10.0, 0.0));
-    CHECK(!SaveDue(std::nullopt, 10.0, 500.0));
+    CHECK(!SaveDue(std::nullopt, 10.0, true));
+    CHECK(!SaveDue(std::nullopt, 10.0, false));
 }
 
-TEST(a_change_saves_at_once_after_a_quick_save)
+TEST(a_single_change_saves_half_a_second_later)
 {
-    CHECK(SaveDue(10.0, 10.0, 0.0));
-    CHECK(SaveDue(10.0, 10.0, kSaveStallMs));
+    CHECK(!SaveDue(10.0, 10.0, true));
+    CHECK(!SaveDue(10.0, 10.25, true));
+    CHECK(!SaveDue(10.0, 10.49, true));
+    CHECK(SaveDue(10.0, 10.5, true));
+    CHECK(SaveDue(10.0, 60.0, true));
 }
 
-TEST(a_change_after_a_slow_save_waits_until_it_settles)
+TEST(a_change_every_frame_saves_only_once_the_last_one_has_settled)
 {
-    CHECK(!SaveDue(10.0, 10.0, kSaveStallMs + 1.0));
-    CHECK(!SaveDue(10.0, 10.0 + kSaveSettleSeconds / 2.0, kSaveStallMs + 1.0));
-    CHECK(SaveDue(10.0, 10.0 + kSaveSettleSeconds, kSaveStallMs + 1.0));
+    // A slider dragged for two seconds at 60 frames a second: every frame's change is the last one so far.
+    const double frame = 1.0 / 60.0;
+    double changedAt   = 0.0;
+    for (int f = 0; f < 120; ++f)
+    {
+        changedAt = 10.0 + f * frame;
+        CHECK(!SaveDue(changedAt, changedAt, true));
+    }
+    CHECK(changedAt > 11.9);
+    CHECK(!SaveDue(changedAt, changedAt + 0.25, true));
+    CHECK(!SaveDue(changedAt, changedAt + 0.5 - frame, true));
+    CHECK(SaveDue(changedAt, changedAt + 0.5, true));
+}
+
+TEST(a_change_waiting_when_the_window_is_closed_saves_at_once)
+{
+    CHECK(SaveDue(10.0, 10.0, false));
+    CHECK(SaveDue(10.0, 10.25, false));
 }
 
 TEST(the_sidebar_has_the_five_major_pages_with_their_children_under_them)

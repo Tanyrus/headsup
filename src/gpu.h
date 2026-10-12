@@ -38,10 +38,9 @@ namespace headsup
     {
     public:
         // Text in a font family, white on clear, tracking pixels after each character and margin pixels around it;
-        // false when GDI could not draw or measure it. markX is where the text from byte markAt on starts, or
-        // kNoMarkColumn when markAt is Label::kNoMark.
+        // false when GDI could not draw or measure it.
         bool Rasterize(const char* text, const char* family, int pixelHeight, bool bold, int tracking, int margin,
-            size_t markAt, Coverage& out, int& markX);
+            Coverage& out);
         // The box Rasterize draws the text's letters in, set solid and before its margin, without drawing them; false
         // when GDI cannot measure it.
         bool Extent(const char* text, const char* family, int pixelHeight, bool bold, int& width, int& height);

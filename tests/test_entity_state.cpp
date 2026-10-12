@@ -13,6 +13,15 @@ namespace
         s.nature = nature;
         s.claim  = claim;
         s.row    = MobRowOf(nature, claim == ClaimState::Yours, claim != ClaimState::Unclaimed);
+        s.classified = MobRowOf(nature, false, false);
+        return s;
+    }
+
+    // A lottery placeholder, whose nature says only that: classified is what its aggression makes it.
+    EntityState Placeholder(Category classified)
+    {
+        EntityState s = Mob(Nature::Placeholder);
+        s.classified  = classified;
         return s;
     }
 }
@@ -132,7 +141,13 @@ TEST(each_condition_holds_for_its_state_alone)
     CHECK(holds(ShowCondition::Passive, unclaimed) && !holds(ShowCondition::Passive, yours));
     CHECK(holds(ShowCondition::Aggressive, yours) && !holds(ShowCondition::Aggressive, unclaimed));
     EntityState nm = Mob(Nature::AggressiveNm);
-    CHECK(holds(ShowCondition::Aggressive, nm));
+    CHECK(holds(ShowCondition::Aggressive, nm) && !holds(ShowCondition::Passive, nm));
+    const EntityState passiveNm = Mob(Nature::PassiveNm);
+    CHECK(holds(ShowCondition::Passive, passiveNm) && !holds(ShowCondition::Aggressive, passiveNm));
+    for (const Category attacks : {Category::WillAttack, Category::NmWillAttack})
+        CHECK(holds(ShowCondition::Aggressive, Placeholder(attacks)) && !holds(ShowCondition::Passive, Placeholder(attacks)));
+    for (const Category ignores : {Category::WontAttack, Category::NmWontAttack})
+        CHECK(holds(ShowCondition::Passive, Placeholder(ignores)) && !holds(ShowCondition::Aggressive, Placeholder(ignores)));
     unclaimed.tooWeak = true;
     CHECK(holds(ShowCondition::TooWeak, unclaimed) && !holds(ShowCondition::TooWeak, yours));
     yours.engaged = true;
@@ -227,4 +242,82 @@ TEST(a_players_row_decides_its_own_outline)
     CHECK(OutlineModeOf(friendly, s) == OutlineMode::WhenTargeted);
     friendly.playerRow = PlayerRow::Player;
     CHECK(OutlineModeOf(friendly, s) == OutlineMode::Disabled);
+}
+
+TEST(a_pet_is_the_entity_a_player_names_and_that_player_its_owner)
+{
+    // A dragoon at 1052 with a wyvern at 1840, a player with no pet out, and a summoner at 1054 with Carbuncle at 1841.
+    const PetLink links[] = {{1052, EntityKind::Player, 1840}, {1053, EntityKind::Player, 0},
+        {1054, EntityKind::Player, 1841}};
+    const std::unordered_map<uint16_t, uint16_t> owners = PetOwners(links);
+    CHECK_EQ(owners.size(), size_t{2});
+    CHECK(owners.contains(1840) && owners.at(1840) == 1052);
+    CHECK(owners.contains(1841) && owners.at(1841) == 1054);
+    CHECK(!owners.contains(0));    // no pet out is not entity 0's owner
+    CHECK(!owners.contains(1052)); // and an owner is no one's pet
+    CHECK(PetOwners({}).empty());
+}
+
+TEST(only_a_player_owns_a_pet_and_the_first_to_name_it_keeps_it)
+{
+    // Two players naming entity 1840: the one listed first, the lower target index as the plugin lists them.
+    const PetLink shared[] = {{1052, EntityKind::Player, 1840}, {1060, EntityKind::Player, 1840}};
+    CHECK_EQ(PetOwners(shared).at(1840), 1052);
+    const PetLink sharedBackwards[] = {{1060, EntityKind::Player, 1840}, {1052, EntityKind::Player, 1840}};
+    CHECK_EQ(PetOwners(sharedBackwards).at(1840), 1060);
+    // A mob's or an NPC's pet index names no pet of a player's, and neither takes one from the player after it.
+    const PetLink others[] = {{300, EntityKind::Mob, 301}, {40, EntityKind::Npc, 41}, {300, EntityKind::Mob, 1840},
+        {1052, EntityKind::Player, 1840}};
+    const std::unordered_map<uint16_t, uint16_t> owners = PetOwners(others);
+    CHECK_EQ(owners.size(), size_t{1});
+    CHECK_EQ(owners.at(1840), 1052);
+    // A player whose pet index is their own is nobody's pet.
+    const PetLink own[] = {{1052, EntityKind::Player, 1052}};
+    CHECK(PetOwners(own).empty());
+    const PetLink none[] = {{1052, EntityKind::Player, 0}};
+    CHECK(PetOwners(none).empty());
+}
+
+TEST(a_party_or_alliance_member_is_anyone_on_the_member_list_but_you)
+{
+    const uint32_t members[] = {0x00012345, 0x01098ABC, 0x0100BEEF}; // yours first, as the party list has them
+    CHECK(InYourParty(0x01098ABC, false, members));
+    CHECK(InYourParty(0x0100BEEF, false, members));
+    CHECK(!InYourParty(0x00012345, true, members));  // you are not a member of your own party
+    CHECK(!InYourParty(0x01011111, false, members)); // a stranger
+    CHECK(!InYourParty(0x01098ABC, false, {}));
+}
+
+namespace
+{
+    // RDM 52 / BLM 26, as a check's general part lists them: both jobs, then both levels.
+    InspectGeneral CheckedRedMage()
+    {
+        InspectGeneral g;
+        g.mainJob   = 5;
+        g.subJob    = 4;
+        g.mainLevel = 52;
+        g.subLevel  = 26;
+        return g;
+    }
+}
+
+TEST(a_players_jobs_come_from_the_game_then_the_party_list_then_the_last_check)
+{
+    const PlayerJobs own{1, 75, 13, 37}, member{4, 60, 3, 30};
+    const InspectGeneral checked = CheckedRedMage();
+    CHECK(KnownJobs(&own, &member, &checked) == own);
+    CHECK(KnownJobs(nullptr, &member, &checked) == member);
+    CHECK(KnownJobs(nullptr, nullptr, &checked) == (PlayerJobs{5, 52, 4, 26}));
+    CHECK(!KnownJobs(nullptr, nullptr, nullptr).has_value());
+}
+
+TEST(a_main_job_of_0_knows_nothing_so_the_next_source_is_asked)
+{
+    const PlayerJobs unknown{}, member{4, 60, 3, 30};
+    const InspectGeneral checked = CheckedRedMage(), anonymous{};
+    CHECK(KnownJobs(&unknown, &member, nullptr) == member);                      // you, while zoning
+    CHECK(KnownJobs(nullptr, &unknown, &checked) == (PlayerJobs{5, 52, 4, 26})); // a member in another zone
+    CHECK(!KnownJobs(nullptr, nullptr, &anonymous).has_value());                 // an anonymous player's check
+    CHECK(!KnownJobs(&unknown, &unknown, &anonymous).has_value());
 }

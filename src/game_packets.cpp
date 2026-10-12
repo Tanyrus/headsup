@@ -21,6 +21,9 @@ namespace headsup
         constexpr uint32_t kInspectGeneralLeast = 0x29; // through the master flags
         constexpr uint8_t kGeneralMode          = 0x01;
         constexpr size_t kLinkshellBytes        = 16;
+        // Phoenix's ItemLockFlg::Linkshell on the item, and where its Exdata::Linkshell keeps the packed name.
+        constexpr uint32_t kWornLinkshellFlags  = 0x13;
+        constexpr size_t kItemLinkshell = 0x09, kItemLinkshellBytes = 15;
         constexpr uint32_t kInspectName = 0x80, kInspectTitle = 0x90, kInspectMessageBytes = 0x94;
         constexpr size_t kNameBytes             = 16;
         constexpr unsigned kCodeBits = 6, kLetters = 26, kDigits = 10, kEndCode = 63, kByteBits = 8;
@@ -118,5 +121,11 @@ namespace headsup
         if (data == nullptr || size < kInspectMessageBytes) return std::nullopt;
         const auto* name = reinterpret_cast<const char*>(data + kInspectName);
         return InspectMessage{std::string(name, strnlen(name, kNameBytes)), ReadAt<uint32_t>(data, kInspectTitle)};
+    }
+
+    std::string WornLinkshellName(uint32_t itemFlags, const uint8_t* extra, size_t extraBytes)
+    {
+        if (extra == nullptr || itemFlags != kWornLinkshellFlags || extraBytes < kItemLinkshell + kItemLinkshellBytes) return {};
+        return LinkshellName(extra + kItemLinkshell, kItemLinkshellBytes);
     }
 }

@@ -9,11 +9,10 @@
 
 namespace headsup
 {
-    constexpr double kSaveStallMs       = 20.0; // a save slower than a frame is deferred
-    constexpr double kSaveSettleSeconds = 0.5;  // until this long after the last change
-    // Whether the settings should be written now: a change is waiting, and either the last save was quick or the
-    // change has settled.
-    bool SaveDue(std::optional<double> changedAt, double now, double lastSaveMs);
+    constexpr double kSaveSettleSeconds = 0.5;
+    // Whether the settings should be written now: a change is waiting and no other has come for the settle time, so
+    // a slider being dragged writes no file, or the window is closed, where nothing more can come.
+    bool SaveDue(std::optional<double> changedAt, double now, bool windowOpen);
 
     enum class Page : int { Entities, Mobs, Players, Self, Npcs, Pets, UserInterface, TopBar, MouseCursor, ConfigMenu, Debug };
     constexpr int kPageCount = static_cast<int>(Page::Debug) + 1;

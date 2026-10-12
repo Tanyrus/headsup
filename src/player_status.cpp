@@ -1,7 +1,6 @@
 #include "player_status.h"
 
 #include "bytes.h"
-#include "settings.h"
 
 #include <algorithm>
 
@@ -52,10 +51,6 @@ namespace headsup
         constexpr int kIconHighBits      = 2;   // per slot in a party member's icon mask, each worth 256
         constexpr uint64_t kIconHighMask = 0x3;
         constexpr int kIconLowBits       = 8;
-
-        constexpr Icon kPlayerIconImages[kPlayerIconCount] = {Icon::Gm, Icon::Mentor, Icon::NewAdventurer, Icon::LevelSync,
-            Icon::Away, Icon::Linkshell, Icon::Bazaar, Icon::Invite};
-        static_assert(kPlayerIconCount <= kMaxIcons);
 
         constexpr int kRenderSeekBit      = 20;
         constexpr int kRenderLinkshellBit = 27;
@@ -147,37 +142,5 @@ namespace headsup
         s.newAdventurer = packet->newAdventurer;
         s.gm            = packet->gm;
         return s;
-    }
-
-    PlayerIconRows PlayerIcons(const PlayerStatus& status, const Settings& settings)
-    {
-        const bool has[kPlayerIconCount] = {status.gm, status.mentor, status.newAdventurer, status.levelSync, status.away,
-            status.linkshell, status.bazaar, status.seekingParty};
-        PlayerIconRows rows;
-        int shown          = 0;
-        bool slotOpen      = false; // a slot is started, for the icons after it to share
-        bool slotFilled    = false;
-        IconSide slotSide  = IconSide::Left;
-        for (const PlayerIcon icon : settings.playerIconOrder)
-        {
-            const int i = static_cast<int>(icon);
-            if (icon == PlayerIcon::Gm) continue;
-            const IconSide own = settings.playerIconSide[i];
-            const bool joins   = settings.playerIconShare[i] && slotOpen;
-            if (!joins)
-            {
-                slotOpen   = true;
-                slotFilled = false;
-                slotSide   = own;
-            }
-            if (!has[i] || own == IconSide::Hidden || slotFilled || shown >= settings.playerIconMax) continue;
-            const IconSide side    = slotSide != IconSide::Hidden ? slotSide : own;
-            IconSet& row           = side == IconSide::Right ? rows.right : rows.left;
-            row.icons[row.count++] = kPlayerIconImages[i];
-            slotFilled             = true;
-            ++shown;
-        }
-        if (has[static_cast<int>(PlayerIcon::Gm)]) rows.left.icons[rows.left.count++] = Icon::Gm;
-        return rows;
     }
 }

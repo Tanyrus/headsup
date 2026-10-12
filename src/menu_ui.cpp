@@ -10,7 +10,6 @@ namespace headsup
     }
     std::string TitleCase(const char* text) { return TitleCase(text, text + std::strlen(text)); }
 
-    // Bundled fonts are always there; Windows' are where its Fonts folder has their file.
     bool MenuFontInstalled(const MenuFont& font)
     {
         return font.file == nullptr || GetFileAttributesA(WindowsFontPath(font.file).c_str()) != INVALID_FILE_ATTRIBUTES;

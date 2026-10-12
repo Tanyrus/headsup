@@ -37,9 +37,12 @@ namespace headsup
     std::string InsertTag(std::string text, Tag tag, size_t caret);
     // InsertTag at the caret, which then sits past the tag; false, with nothing changed, when the insert is refused.
     bool PutTag(std::string& text, size_t& caret, Tag tag);
-    // What a card says when its settings show only through tags that no line of the design holds: which tags would
-    // show them. Empty when a line holds any of them.
-    std::string UnusedTagsNote(const KindSettings& kind, std::initializer_list<Tag> tags);
+    // What a card says while no line of the design holds any of its tags: "Put $weak or $resist on a line of the
+    // design", then the ending, which says what that would show. Empty when a line holds one of them.
+    std::string UnusedTagsNote(const KindSettings& kind, std::initializer_list<Tag> tags, const char* ending);
+    constexpr const char* kShowsTheseEnding = " to show these on a nameplate."; // a card of settings the tags show
+    constexpr const char* kShowsNameEnding  = " to show a name: the game's own is hidden where HeadsUp draws the "
+                                              "nameplate.";
     // Whether any line of a design uses the tag.
     bool UsesTag(const KindSettings& kind, Tag tag);
 }

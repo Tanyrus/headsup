@@ -7,6 +7,7 @@
 #include "check.h"
 #include "commands.h"
 #include "d3d_util.h"
+#include "debug_report.h"
 #include "fonts.h"
 #include "game_cursor.h"
 #include "game_names.h"
@@ -56,10 +57,12 @@ namespace
     constexpr const char* kLogsFolder        = "logs";
     constexpr const char* kFolder            = "headsup"; // inside Ashita's config and logs folders
     constexpr const char* kSettingsFile      = "settings.ini";
+    constexpr const char* kNewFileSuffix     = ".new";          // after the process id: the file while it is written
+    constexpr long kMaxSettingsBytes         = 4 * 1024 * 1024; // past this the file is not HeadsUp's to rewrite
+    constexpr double kLinkshellReadSeconds   = 1.0;             // between two reads of the linkshells you wear
     constexpr const char* kSection           = "settings";
     constexpr uint32_t kLockedOn             = 0x01; // ITarget::GetLockedOnFlags
     constexpr int kCaptureFrames             = 120;
-    constexpr int kCapturedPlatesPerFrame    = 16;
     constexpr double kFrameTimeWeight        = 0.05;
     constexpr int32_t kChatMode              = 1; // the chat mode Ashita's own plugins print in
     // The game's menu resolution, which its target window's arrow anchors are in, from its registry settings.
@@ -71,32 +74,23 @@ namespace
     constexpr uint32_t kPartyIconMembers     = 5;  // the other members of your party, whose buffs the game keeps
     constexpr uint32_t kPartyMembers         = 18; // you, your party and the two other alliance parties
     constexpr uint32_t kEngagedStatus        = 1;  // an entity's status while it fights
-
-    const char* EntityName(IEntity* entity, uint32_t index)
-    {
-        if (index >= entity->GetEntityMapSize() || entity->GetRawEntity(index) == nullptr) return "";
-        const char* name = entity->GetName(index);
-        return name != nullptr ? name : "";
-    }
+    // Every container the client keeps items of, the Recycle Bin after Wardrobe 8 included.
+    constexpr auto kContainers               = static_cast<uint32_t>(Ashita::FFXI::Enums::Container::Max);
+    static_assert(headsup::kContainerSlots == sizeof(Ashita::FFXI::items_t::Items) / sizeof(Ashita::FFXI::item_t));
 
     class AshitaStore final : public headsup::SettingsStore
     {
     public:
-        explicit AshitaStore(IConfigurationManager* config)
-            : m_Config(config)
-        {}
+        IConfigurationManager* config = nullptr; // from Initialize on
 
-        bool GetBool(const char* key, bool fallback) override { return m_Config->GetBool(kConfigAlias, kSection, key, fallback); }
-        float GetFloat(const char* key, float fallback) override { return m_Config->GetFloat(kConfigAlias, kSection, key, fallback); }
+        bool GetBool(const char* key, bool fallback) override { return config->GetBool(kConfigAlias, kSection, key, fallback); }
+        float GetFloat(const char* key, float fallback) override { return config->GetFloat(kConfigAlias, kSection, key, fallback); }
         std::string GetString(const char* key, const char* fallback) override
         {
-            const char* value = m_Config->GetString(kConfigAlias, kSection, key);
+            const char* value = config->GetString(kConfigAlias, kSection, key);
             return value != nullptr ? value : fallback;
         }
-        void Set(const char* key, const char* value) override { m_Config->SetValue(kConfigAlias, kSection, key, value); }
-
-    private:
-        IConfigurationManager* m_Config;
+        void Set(const char* key, const char* value) override { config->SetValue(kConfigAlias, kSection, key, value); }
     };
 
     // Set at Initialize and Present, and read by OnMouse, which Ashita calls on the game's thread before the game sees
@@ -175,8 +169,11 @@ class HeadsUp final : public IPlugin
 {
     IAshitaCore* m_AshitaCore = nullptr;
     headsup::Settings m_Settings;
+    AshitaStore m_Store;
+    headsup::ChangedKeys m_SavedKeys{m_Store};
     std::optional<double> m_SettingsChangedAt;
-    double m_LastSaveMs = 0.0;
+    double m_LastSaveMs   = 0.0;
+    size_t m_LastSaveKeys = 0; // how many keys the last save had for the file
     headsup::Tracker m_Tracker;
     headsup::PhTimers m_PhTimers;
     std::vector<headsup::TimerLine> m_TimerLines;
@@ -212,7 +209,6 @@ class HeadsUp final : public IPlugin
     std::optional<double> m_CountersReadAt;
     headsup::ConnectionMeter m_Connection;
     bool m_HooksTried = false;
-    headsup::ScreenBox m_GameNameBox;
     bool m_PointerFailed = false; // said once; tried again when the setting changes
     headsup::Menu m_Menu;
     headsup::PlayerState m_Player;
@@ -220,6 +216,10 @@ class HeadsUp final : public IPlugin
     headsup::GameState m_GameState;
     std::unordered_set<uint16_t> m_BuffSynced; // you and your party, from the buffs the game keeps, this frame
     std::vector<uint32_t> m_PartyIds;           // server IDs of you, your party and alliance, this frame
+    std::vector<std::string> m_Linkshells;      // the linkshells you wear, as last read
+    std::optional<double> m_LinkshellsReadAt;
+    std::unordered_map<uint32_t, headsup::PlayerJobs> m_PartyJobs; // theirs as the party list has them, by server ID
+    headsup::PlayerJobs m_OwnJobs;                                // yours as the game has them, this frame
     bool m_DebugPending = false;
     bool m_Screenshot = false;
     bool m_UiHidden = false;
@@ -284,6 +284,7 @@ public:
         g_Resources  = core->GetResourceManager();
         QueryPerformanceFrequency(&m_QpcFrequency);
         IConfigurationManager* config = core->GetConfigurationManager();
+        m_Store.config                = config;
         m_MenuWidth                   = config->GetFloat(kBootConfig, kRegistry, kMenuWidth, 0.0f);
         m_MenuHeight                  = config->GetFloat(kBootConfig, kRegistry, kMenuHeight, 0.0f);
         size_t fonts = 0;
@@ -305,7 +306,7 @@ public:
 
     void Release(void) override
     {
-        if (m_SettingsChangedAt) SaveSettings();
+        if (m_SettingsChangedAt || m_SavedKeys.Unwritten()) SaveSettings();
         SetScreenshot(false);
         m_AshitaCore->GetInputManager()->GetMouse()->RemoveCallback(kName);
         g_SyncClicks = false;
@@ -429,7 +430,7 @@ public:
             Print("/hu on | /hu off: turn all of HeadsUp (outlines, nameplates, the top bar and the rest) on or off");
             Print("/hu screenshot: hide every name, HeadsUp's bar and menu and every addon window until it is run again; bind it with /bind");
             Print("/hu debug: write what every outline and nameplate show to logs/headsup");
-            Print("/hu menu <page>: open the settings at a page, such as topbar or mobs");
+            Print("/hu menu <page>: open the settings at a page, such as entities, mobs or topbar");
             Print("/hu popup <widget> | off: pin a widget's popup open, such as zone or vanatime");
             Print("/hu windowlog [stop]: write which game windows are open, as it changes, to logs/headsup/windows.log");
 #ifdef HEADSUP_DEV
@@ -615,6 +616,7 @@ public:
             .nameplates       = static_cast<uint32_t>(m_Nameplates.LastShown().size()),
             .frameMs          = m_FrameMs,
             .lastSaveMs       = m_LastSaveMs,
+            .lastSaveKeys     = m_LastSaveKeys,
             .stencilAvailable = m_Outline.StencilAvailable(),
             .drewInScene      = drewInScene,
             .hooked           = m_NameHook.Running(),
@@ -626,7 +628,7 @@ public:
         };
         if (m_Menu.open) ApplyMenuFont();
         if (!m_Screenshot && m_Menu.Draw(m_AshitaCore->GetGuiManager(), m_Settings, status)) m_SettingsChangedAt = now;
-        if (headsup::SaveDue(m_SettingsChangedAt, now, m_LastSaveMs)) SaveSettings();
+        if (headsup::SaveDue(m_SettingsChangedAt, now, m_Menu.open)) SaveSettings();
         if (m_Menu.TakeDebugRequest()) m_DebugPending = true;
         UpdatePointer();
         m_NameHook.NewFrame(NameOwners());
@@ -895,17 +897,14 @@ private:
         }
     }
 
-    // Whose names the hook may meet next frame. A name HeadsUp cannot draw goes back to the game; one that is hidden stays hidden.
+    // Whose names the hook may meet next frame, and what it does with each.
     std::vector<headsup::NameOwner> NameOwners() const
     {
         std::vector<headsup::NameOwner> owners;
         for (const headsup::ActorPtr actor : m_Tracker.Actors())
             if (const headsup::ActorInfo* info = m_Tracker.Find(actor))
-            {
-                headsup::HookAction action = headsup::HookActionFor(info->state, m_Settings, m_Screenshot);
-                if (action == headsup::HookAction::Replace && m_Nameplates.NamesFailed()) action = headsup::HookAction::Keep;
-                owners.push_back({actor, info->index, action});
-            }
+                owners.push_back({actor, info->index,
+                    headsup::HookActionFor(info->state, m_Settings, m_Screenshot, m_Nameplates.NamesFailed())});
         return owners;
     }
 
@@ -958,7 +957,7 @@ private:
     void OnCheckReply(const headsup::CheckReply& reply)
     {
         IEntity* entity = m_AshitaCore->GetMemoryManager()->GetEntity();
-        const headsup::MobRecord* mob = headsup::FindMob(reply.serverId, EntityName(entity, reply.targetIndex));
+        const headsup::MobRecord* mob = headsup::FindMob(reply.serverId, headsup::EntityName(entity, reply.targetIndex));
         m_Checks.Received(reply, headsup::CheckLifetime(mob), Now());
     }
 
@@ -1140,19 +1139,70 @@ private:
         // as it was. A missing file is fine: every value keeps its default.
         config->Delete(kConfigAlias);
         if (!config->Load(kConfigAlias, SettingsPath().c_str()) && GetFileAttributesA(file.c_str()) != INVALID_FILE_ATTRIBUTES)
-            Print("could not read " + file + "; using the defaults, and a change in the menu will overwrite that file");
-        AshitaStore store(config);
-        m_Settings = headsup::LoadSettings(store);
+            Print("could not read " + file + "; using the defaults, which a change in the menu will write into that file");
+        m_Settings = m_SavedKeys.Load();
+        if (m_SavedKeys.Outdated()) m_SettingsChangedAt = Now();
+    }
+
+    // The settings file's bytes: none for a missing file. False for one that cannot be read or is too large.
+    bool ReadSettingsFile(std::string& text)
+    {
+        const std::string path = SettingsFile();
+        std::FILE* in          = std::fopen(path.c_str(), "rb");
+        if (in == nullptr) return GetFileAttributesA(path.c_str()) == INVALID_FILE_ATTRIBUTES;
+        const long size = std::fseek(in, 0, SEEK_END) == 0 ? std::ftell(in) : -1;
+        const bool fits = size >= 0 && size <= kMaxSettingsBytes && std::fseek(in, 0, SEEK_SET) == 0;
+        if (fits) text.resize(static_cast<size_t>(size));
+        const bool read = fits && std::fread(text.data(), 1, text.size(), in) == text.size();
+        std::fclose(in);
+        return read;
+    }
+
+    bool FileHolds(const std::vector<headsup::KeyText>& keys)
+    {
+        std::string text;
+        return ReadSettingsFile(text) && headsup::HoldsIniValues(text, kSection, keys);
+    }
+
+    // The file with the keys set, written whole beside it under this process's own name, flushed to disk and put in
+    // its place in one step.
+    bool WriteSettingsFile(const std::vector<headsup::KeyText>& keys)
+    {
+        std::string text;
+        if (!ReadSettingsFile(text)) return false;
+        const std::string next = headsup::WithIniValues(text, kSection, keys);
+        const std::string path  = SettingsFile();
+        const std::string fresh = path + "." + std::to_string(GetCurrentProcessId()) + kNewFileSuffix;
+        // Over one this process left at an earlier save, and never another client's.
+        const HANDLE out =
+            CreateFileA(fresh.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (out == INVALID_HANDLE_VALUE) return false;
+        DWORD wrote        = 0;
+        const bool flushed = WriteFile(out, next.data(), static_cast<DWORD>(next.size()), &wrote, nullptr) != 0 &&
+                             wrote == next.size() && FlushFileBuffers(out) != 0;
+        if (CloseHandle(out) != 0 && flushed &&
+            MoveFileExA(fresh.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0)
+            return true;
+        DeleteFileA(fresh.c_str());
+        return false;
     }
 
     void SaveSettings()
     {
         const double before = Now();
-        IConfigurationManager* config = m_AshitaCore->GetConfigurationManager();
-        AshitaStore store(config);
-        headsup::SaveSettings(m_Settings, store);
-        if (!config->Save(kConfigAlias, SettingsPath().c_str()))
-            Print("could not save " + SettingsFile() + "; the change lasts until Ashita closes");
+        const std::vector<headsup::KeyText>& keys = m_SavedKeys.Save(m_Settings);
+        m_LastSaveKeys                            = keys.size();
+        if (!keys.empty())
+        {
+            // Ashita's set has already written each key into a file that loaded, and its Save cannot report a failed
+            // write: the file is read back, and written here when it lacks them, as a new install's does.
+            const bool held                  = FileHolds(keys) || (WriteSettingsFile(keys) && FileHolds(keys));
+            const headsup::SaveNotice notice = m_SavedKeys.ReadBack(held);
+            if (notice == headsup::SaveNotice::Failed)
+                Print("could not save " + SettingsFile() + "; the change lasts until Ashita closes");
+            if (notice == headsup::SaveNotice::Saved)
+                Print("saved " + SettingsFile() + ", with the changes it could not take before");
+        }
         m_LastSaveMs        = (Now() - before) * 1000.0;
         m_SettingsChangedAt = std::nullopt;
     }
@@ -1335,14 +1385,50 @@ private:
     void UpdateParty(IParty* party, IPlayer* player)
     {
         m_PartyIds.clear();
+        m_PartyJobs.clear();
         for (uint32_t member = 0; member < kPartyMembers; ++member)
-            if (party->GetMemberIsActive(member) != 0) m_PartyIds.push_back(party->GetMemberServerId(member));
+        {
+            if (party->GetMemberIsActive(member) == 0) continue;
+            const uint32_t serverId = party->GetMemberServerId(member);
+            m_PartyIds.push_back(serverId);
+            m_PartyJobs[serverId] = headsup::PlayerJobs{party->GetMemberMainJob(member), party->GetMemberMainJobLevel(member),
+                party->GetMemberSubJob(member), party->GetMemberSubJobLevel(member)};
+        }
+        m_OwnJobs = headsup::PlayerJobs{player->GetMainJob(), player->GetMainJobLevel(), player->GetSubJob(),
+            player->GetSubJobLevel()};
         m_BuffSynced.clear();
         if (headsup::LevelSyncInBuffs(player->GetBuffs())) m_BuffSynced.insert(m_SelfIndex);
         for (uint32_t member = 0; member < kPartyIconMembers; ++member)
             if (party->GetStatusIconsServerId(member) != 0 &&
                 headsup::LevelSyncInPartyIcons(party->GetStatusIcons(member), party->GetStatusIconsBitMask(member)))
                 m_BuffSynced.insert(static_cast<uint16_t>(party->GetStatusIconsTargetIndex(member)));
+    }
+
+    // The names of the linkshells you wear, from their items: Phoenix equips a linkshell from any container.
+    std::vector<std::string> WornLinkshells() const
+    {
+        IInventory* inventory = m_AshitaCore->GetMemoryManager()->GetInventory();
+        std::vector<std::string> names;
+        for (uint32_t container = 0; container < kContainers; ++container)
+        {
+            const uint32_t last = headsup::LastItemSlot(inventory->GetContainerCountMax(container));
+            for (uint32_t slot = headsup::kGilSlot + 1; slot <= last; ++slot)
+            {
+                const Ashita::FFXI::item_t* item = inventory->GetContainerItem(container, slot);
+                if (item == nullptr) continue;
+                std::string name = headsup::WornLinkshellName(item->Flags, item->Extra, sizeof(item->Extra));
+                if (!name.empty()) names.push_back(std::move(name));
+            }
+        }
+        return names;
+    }
+
+    std::optional<headsup::PlayerJobs> JobsOf(uint16_t index, uint32_t serverId) const
+    {
+        const auto member                 = m_PartyJobs.find(serverId);
+        const headsup::PlayerCheck* check = m_GameState.PlayerCheckOf(serverId);
+        return headsup::KnownJobs(index == m_SelfIndex ? &m_OwnJobs : nullptr,
+            member != m_PartyJobs.end() ? &member->second : nullptr, check != nullptr ? &check->general : nullptr);
     }
 
     void UpdateTracker(double now)
@@ -1352,21 +1438,32 @@ private:
         IPlayer* player = m_AshitaCore->GetMemoryManager()->GetPlayer();
         m_SelfIndex     = static_cast<uint16_t>(party->GetMemberTargetIndex(0));
         UpdateParty(party, player);
+        if (!m_LinkshellsReadAt || now - *m_LinkshellsReadAt >= kLinkshellReadSeconds)
+        {
+            m_Linkshells       = WornLinkshells();
+            m_LinkshellsReadAt = now;
+        }
         const uint32_t count = std::min<uint32_t>(entity->GetEntityMapSize(), headsup::kMaxEntities);
         std::vector<headsup::ActorInput> inputs;
         std::vector<headsup::PhSighting> sightings;
+        std::vector<headsup::PetLink> pets;
         for (uint32_t i = 0; i < count; ++i)
         {
             if (entity->GetRawEntity(i) == nullptr) continue;
+            const auto index    = static_cast<uint16_t>(i);
+            const auto kind     = headsup::KindFromSpawnFlags(entity->GetSpawnFlags(i));
+            const bool isMob    = kind == headsup::EntityKind::Mob;
+            const bool isPlayer = kind == headsup::EntityKind::Player;
+            // Before the actor is asked for: a player without one still owns their pet.
+            pets.push_back(headsup::PetLink{index, kind, entity->GetPetTargetIndex(i)});
             const uintptr_t actor = entity->GetActorPointer(i);
             if (actor == 0) continue;
-            const auto index        = static_cast<uint16_t>(i);
             const uint32_t serverId = entity->GetServerId(i);
-            const auto kind         = headsup::KindFromSpawnFlags(entity->GetSpawnFlags(i));
-            const bool isMob        = kind == headsup::EntityKind::Mob;
+            const bool self         = index == m_SelfIndex;
             const bool alive        = entity->GetHPPercent(i) > 0;
-            const char* name        = EntityName(entity, i);
+            const char* name        = headsup::EntityName(entity, i);
             const uint32_t claim    = entity->GetClaimStatus(i);
+            const uint32_t state    = entity->GetStatus(i);
             if (isMob && !alive) m_Checks.Forget(serverId); // the next spawn rolls a new level
             if (isMob && m_Settings.phTimers)
             {
@@ -1384,17 +1481,29 @@ private:
                 .name     = name,
                 .checked  = isMob ? m_Checks.Result(serverId, now) : nullptr,
                 .status   = CurrentStatus(entity, index, kind),
-                .pose     = kind == headsup::EntityKind::Player ? headsup::PoseFromStatus(entity->GetStatus(i)) : headsup::Pose::Standing,
+                .pose     = isPlayer ? headsup::PoseFromStatus(state) : headsup::Pose::Standing,
                 .feet = headsup::FromEntityPosition(entity->GetLocalPositionX(i), entity->GetLocalPositionY(i), entity->GetLocalPositionZ(i)),
                 .claimedByParty = isMob && headsup::ClaimedByParty(claim, m_PartyIds),
                 .claimed        = isMob && headsup::IsClaimed(claim),
+                .party          = isPlayer && headsup::InYourParty(serverId, self, m_PartyIds),
+                .isFriend       = isPlayer && headsup::IsFriend(m_Settings.friends, name),
+                .linkshell      = isPlayer && headsup::SharesLinkshell(m_GameState.PlayerCheckOf(serverId), m_Linkshells),
+                .engaged        = state == kEngagedStatus,
+                .self           = self,
+                .jobs           = isPlayer ? JobsOf(index, serverId) : std::nullopt,
             });
         }
+        const std::unordered_map<uint16_t, uint16_t> petOwners = headsup::PetOwners(pets);
+        for (headsup::ActorInput& input : inputs)
+            if (const auto owner = petOwners.find(input.index); owner != petOwners.end())
+            {
+                input.pet       = true;
+                input.ownerName = headsup::EntityName(entity, owner->second);
+            }
         const uint32_t ownStatus = entity->GetStatus(m_SelfIndex);
         m_OwnStatus              = ownStatus;
         m_Player.level           = player->GetMainJobLevel();
         m_Player.sitting         = headsup::IsSittingStatus(ownStatus);
-        m_Player.engaged         = ownStatus == kEngagedStatus;
         m_Tracker.Update(inputs, m_Player, m_Settings, m_CursorTargets);
         // With timers off no sightings are passed, so turning them on never takes a placeholder that died meanwhile for
         // one seen dying.
@@ -1404,112 +1513,22 @@ private:
         if (m_Settings.phTimers) m_TimerLines = m_PhTimers.Lines(m_Zone, now);
     }
 
+    headsup::DebugSources DebugSourcesNow() const
+    {
+        return headsup::DebugSources{m_AshitaCore, m_Tracker, m_NameHook, m_Names, m_Nameplates, m_GameState, m_Checks,
+            m_CursorTargets, m_Player, m_Settings, m_MenuWidth, m_MenuHeight, m_Zone, Now(), kVersion};
+    }
+
     void WriteDebugReport()
     {
         std::string path;
         std::FILE* out = OpenLog("debug", path);
         if (out == nullptr) return;
-
-        IEntity* entity = m_AshitaCore->GetMemoryManager()->GetEntity();
-        auto onOff      = [](bool on) { return on ? "on" : "off"; };
-        std::fprintf(out,
-            "headsup %.2f: back buffer %.0fx%.0f, scene to screen scale %.3f x %.3f, player level %d%s, %u outlined, %u nameplates, replace mobs %s players %s npcs %s\n",
-            GetVersion(), m_Names.BackBufferWidth(), m_Names.BackBufferHeight(), m_Names.TargetScaleX(),
-            m_Names.TargetScaleY(), m_Player.level,
-            m_Player.sitting ? " (sitting)" : "", m_Tracker.OutlinedCount(), static_cast<unsigned>(m_Nameplates.LastShown().size()),
-            onOff(m_Settings.replaceMobNames), onOff(m_Settings.replacePlayerNames), onOff(m_Settings.replaceNpcNames));
-        if (const std::optional<headsup::NetCounters> net = NetCountersNow())
-            std::fprintf(out, "connection: R %d S %d meter %d\n", net->received, net->sent, net->health);
-        else
-            std::fprintf(out, "connection: counters not read\n");
-        const std::vector<uint8_t>& conquest = m_GameState.LastConquestPacket();
-        std::fprintf(out, "last 0x05E, %u bytes:", static_cast<unsigned>(conquest.size()));
-        for (size_t i = 0; i < conquest.size(); ++i)
-            std::fprintf(out, "%s%02X", i % 16 == 0 ? "\n  " : " ", conquest[i]);
-        std::fprintf(out, "\n");
-        IPlayer* player       = m_AshitaCore->GetMemoryManager()->GetPlayer();
-        const int16_t* icons  = player->GetStatusIcons();
-        const uint32_t* times = player->GetStatusTimers();
-        const int64_t unixMs  = UnixMsOf(std::chrono::system_clock::now());
-        bool influence        = false;
-        for (int i = 0; icons != nullptr && times != nullptr && i < headsup::kStatusIconSlots; ++i)
-            if (icons[i] == headsup::kSignetEffect || icons[i] == headsup::kSanctionEffect)
-            {
-                const std::optional<double> left = headsup::StatusSecondsLeft(times[i], unixMs);
-                std::fprintf(out, "status %d in icon slot %d: timer %08X, %.0f s left\n", icons[i], i,
-                    static_cast<unsigned>(times[i]), left ? *left : -1.0);
-                influence = true;
-            }
-        if (!influence) std::fprintf(out, "status %d or %d: in no icon slot\n", headsup::kSignetEffect, headsup::kSanctionEffect);
-        {
-            IParty* party = m_AshitaCore->GetMemoryManager()->GetParty();
-            for (uint32_t m = 0; m < static_cast<uint32_t>(headsup::kPartySize); ++m)
-            {
-                if (party->GetMemberIsActive(m) == 0) continue;
-                const char* name = party->GetMemberName(m);
-                std::fprintf(out, "party %u: '%s' %s %u / %s %u HP %u (%u%%) MP %u (%u%%) TP %u zone %u (yours %u)\n", m,
-                    name != nullptr ? name : "", headsup::JobName(party->GetMemberMainJob(m)),
-                    party->GetMemberMainJobLevel(m), headsup::JobName(party->GetMemberSubJob(m)),
-                    party->GetMemberSubJobLevel(m), party->GetMemberHP(m), party->GetMemberHPPercent(m),
-                    party->GetMemberMP(m), party->GetMemberMPPercent(m), party->GetMemberTP(m),
-                    party->GetMemberZone(m), m_Zone);
-            }
-        }
-        {
-            // Where the target cursor went: on a nameplate, at the game's own arrow anchor, or nowhere.
-            const headsup::CursorTargets& c = m_CursorTargets;
-            std::fprintf(out, "cursor: target #%u sub #%u%s%s, menu %.0fx%.0f, anchors %s (%.1f,%.1f) sub (%.1f,%.1f); drawn:",
-                c.target, c.subTarget, c.locked ? " locked" : "", c.gameArrowsShown ? ", the game's arrows (not hooked)" : "",
-                m_MenuWidth, m_MenuHeight, c.anchored ? "at" : "unknown", c.anchorX, c.anchorY, c.subAnchorX, c.subAnchorY);
-            for (const headsup::CursorName& name : m_Nameplates.CursorNames())
-                std::fprintf(out, " #%u %s", name.index, name.name.valid ? "on its nameplate" : "at its anchor");
-            std::fprintf(out, "%s\n", m_Nameplates.CursorNames().empty() ? " none" : "");
-        }
-        if (const headsup::ActorInfo* t = m_Tracker.FindIndex(m_CursorTargets.target); t != nullptr)
-            if (const headsup::PlayerCheck* c = m_GameState.PlayerCheckOf(t->serverId))
-                std::fprintf(out, "check of %s: jobs %u/%u levels %u/%u master %u linkshell \"%s\" title %u\n",
-                    c->message.name.c_str(), c->general.mainJob, c->general.subJob, c->general.mainLevel,
-                    c->general.subLevel, c->general.masterLevel, c->general.linkshell.c_str(), c->message.title);
-        for (const headsup::ActorPtr actor : m_Tracker.Actors())
-        {
-            const headsup::ActorInfo* info = m_Tracker.Find(actor);
-            if (info == nullptr || (!info->outline && m_NameHook.Drawn(info->index) == nullptr)) continue;
-            const char* name                = EntityName(entity, info->index);
-            const uint32_t serverId         = entity->GetServerId(info->index);
-            const headsup::MobRecord* mob = headsup::FindMob(serverId, name);
-            std::fprintf(out, "#%u %u '%s' ", info->index, serverId, name);
-            if (mob != nullptr)
-                std::fprintf(out, "data Lv %u-%u flags %u detects %u respawn %u", mob->minLevel, mob->maxLevel, mob->flags,
-                    mob->detects, mob->respawn);
-            else
-                std::fprintf(out, "no data");
-            std::fprintf(out, " | %s outline %08X label '%s' %08X icons %d", info->alive ? "alive" : "dead",
-                static_cast<unsigned>(info->argb), info->label.text, static_cast<unsigned>(headsup::ToArgb(m_Settings.labelColor[static_cast<int>(info->label.shade)])), info->mobIcons.count);
-            if (const headsup::CheckResult* checked = m_Checks.Result(serverId, Now()))
-                std::fprintf(out, " | checked Lv %d %s", checked->level, headsup::Abbrev(checked->con));
-            if (const headsup::ScreenBox* plate = GameNameBox(info->index))
-                std::fprintf(out, " | game name (%.1f,%.1f)-(%.1f,%.1f)", plate->minX, plate->minY, plate->maxX, plate->maxY);
-            else
-                std::fprintf(out, " | no game name");
-            for (const auto& shown : m_Nameplates.LastShown())
-            {
-                if (shown.index != info->index) continue;
-                std::fprintf(out, " | name %08X %dpx at (%.1f,%.1f)", static_cast<unsigned>(shown.nameColor), shown.nameHeight,
-                    shown.nameX, shown.nameY);
-                for (int i = 0; i < shown.lineCount; ++i)
-                {
-                    const auto& line = shown.lines[i];
-                    std::fprintf(out, " | line %d '%s' at (%.1f,%.1f) %d px, %d icons", i + 1, line.text.c_str(), line.x, line.y,
-                        line.height, line.icons);
-                }
-            }
-            std::fprintf(out, "\n");
-        }
+        headsup::WriteDebugReport(DebugSourcesNow(), NetCountersNow(), out);
         std::fclose(out);
         Print("wrote " + path + "; recording " + std::to_string(kCaptureFrames) + " frames");
         m_CapturePath = path;
-        m_Capture     = "\nframe  dt(ms)  game's names: hooked replaced | nameplates shown, S if drawn into the scene, s<scene to screen scale> | per entity "
-                    "with a game name: index m<body meshes> c<name color> (name box: center, top-bottom)\n";
+        m_Capture     = headsup::kCaptureHeading;
         m_CaptureLeft = kCaptureFrames;
         m_CaptureLast = Now();
     }
@@ -1517,25 +1536,9 @@ private:
     void CaptureFrame()
     {
         if (m_CaptureLeft <= 0) return;
-        const double now               = Now();
-        const headsup::NameStats stats = m_NameHook.Stats();
-        char line[200];
-        std::snprintf(line, sizeof(line), "f%03d %6.1f  %3u %3u | %2u %c s%.3f |", kCaptureFrames - m_CaptureLeft,
-            (now - m_CaptureLast) * 1000.0, stats.names, stats.replaced, static_cast<unsigned>(m_Nameplates.LastShown().size()),
-            m_DrewInScene ? 'S' : '-', m_Names.TargetScaleY());
-        m_Capture += line;
-        int listed = 0;
-        for (const headsup::ActorPtr actor : m_Tracker.Actors())
-        {
-            const headsup::ActorInfo* info = m_Tracker.Find(actor);
-            const headsup::NameFrame* frame = info != nullptr ? m_NameHook.Drawn(info->index) : nullptr;
-            if (frame == nullptr || ++listed > kCapturedPlatesPerFrame) continue;
-            const headsup::DrawnName name = headsup::NameFromFrame(*frame, m_Names.TargetScaleX(), m_Names.TargetScaleY());
-            std::snprintf(line, sizeof(line), " %u m%u c%06X (%.0f,%.0f-%.0f)", info->index, m_Names.MeshDraws(info->index),
-                static_cast<unsigned>(name.color & 0xFFFFFF), name.box.CenterX(), name.box.minY, name.box.maxY);
-            m_Capture += line;
-        }
-        m_Capture += "\n";
+        const double now = Now();
+        m_Capture += headsup::CaptureFrameLine(DebugSourcesNow(), kCaptureFrames - m_CaptureLeft, (now - m_CaptureLast) * 1000.0,
+            m_DrewInScene);
         m_CaptureLast = now;
         if (--m_CaptureLeft == 0)
         {
@@ -1549,15 +1552,6 @@ private:
                 Print("could not add the frame capture to " + m_CapturePath + "; the report before it is complete");
             m_Capture.clear();
         }
-    }
-
-    // The box of the name the game drew for this entity this frame, in back-buffer pixels.
-    const headsup::ScreenBox* GameNameBox(uint16_t index)
-    {
-        const headsup::NameFrame* frame = m_NameHook.Drawn(index);
-        if (frame == nullptr) return nullptr;
-        m_GameNameBox = headsup::NameFromFrame(*frame, m_Names.TargetScaleX(), m_Names.TargetScaleY()).box;
-        return &m_GameNameBox;
     }
 };
 

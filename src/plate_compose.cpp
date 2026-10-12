@@ -188,8 +188,7 @@ namespace headsup
                 if (!IsMob(info)) return out;
                 if (!badgeRules)
                 {
-                    badgeRules = BadgeRules{.damage = true, .statusRanks = true, .immunities = true,
-                        .elementWeakRank = s.elementWeakRank, .elementResistRank = s.elementResistRank,
+                    badgeRules = BadgeRules{.elementWeakRank = s.elementWeakRank, .elementResistRank = s.elementResistRank,
                         .maxElements = s.maxElements};
                     std::ranges::copy(s.statusBadges, badgeRules->status);
                 }
@@ -292,16 +291,17 @@ namespace headsup
         return static_cast<float>(s.baseSize) * static_cast<float>(percent) / kPercent;
     }
 
-    HookAction HookActionFor(const EntityState& state, const Settings& s, bool screenshot)
+    HookAction HookActionFor(const EntityState& state, const Settings& s, bool screenshot, bool namesFailed)
     {
         if (screenshot) return HookAction::Hide;
         if (!s.enabled || !s.nameplates) return HookAction::Keep;
+        const HookAction drawn = namesFailed ? HookAction::Keep : HookAction::Replace;
         switch (s.Kind(PlateKindOf(state)).rows[RowOf(state)].plate)
         {
         case PlateMode::Vanilla: return HookAction::Keep;
         case PlateMode::Hidden: return HookAction::Hide;
-        case PlateMode::WhenTargeted: return Targeted(state.target) ? HookAction::Replace : HookAction::Hide;
-        default: return HookAction::Replace;
+        case PlateMode::WhenTargeted: return Targeted(state.target) ? drawn : HookAction::Hide;
+        default: return drawn;
         }
     }
 
@@ -314,7 +314,8 @@ namespace headsup
         const PlateMode mode     = kind.rows[RowOf(st)].plate;
         if (!DrawsPlate(mode)) return plate;
         if (mode == PlateMode::WhenTargeted && !Targeted(st.target)) return plate;
-        const bool nameOnly = (mode == PlateMode::Expanding && !Targeted(st.target)) || (st.kind == EntityKind::Mob && !st.alive);
+        const bool deadMob  = st.kind == EntityKind::Mob && !st.alive;
+        const bool nameOnly = (mode == PlateMode::Expanding && !Targeted(st.target)) || deadMob;
         std::optional<BadgeRules> badgeRules;
         plate.lines.reserve(kPlateLines);
         for (int i = 0; i < kPlateLines; ++i)
@@ -335,6 +336,7 @@ namespace headsup
             builder.Finish();
             if (builder.items.empty()) continue;
             plate.lines.push_back(ComposedLine{i, std::move(builder.items), LookOf(style, st, s, gameArgb)});
+            if (deadMob) plate.lines.back().look.glow = 0.0f;
         }
         if (kind.ornament.on)
         {

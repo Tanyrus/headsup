@@ -1,5 +1,7 @@
 #include "game_state.h"
 
+#include <algorithm>
+
 namespace headsup
 {
     PacketFollowUp GameState::Received(uint16_t id, const uint8_t* data, uint32_t size)
@@ -120,5 +122,11 @@ namespace headsup
     {
         const auto it = m_PlayerChecks.find(serverId);
         return it != m_PlayerChecks.end() ? &it->second : nullptr;
+    }
+
+    bool SharesLinkshell(const PlayerCheck* check, std::span<const std::string> yours)
+    {
+        if (check == nullptr || check->general.linkshell.empty()) return false;
+        return std::ranges::find(yours, check->general.linkshell) != yours.end();
     }
 }

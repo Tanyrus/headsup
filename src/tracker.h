@@ -2,7 +2,6 @@
 
 #include "con.h"
 #include "entity_state.h"
-#include "icons.h"
 #include "labels.h"
 #include "player_status.h"
 #include "pose.h"
@@ -22,7 +21,6 @@ namespace headsup
     {
         int level    = 0;     // main job level; 0 while unknown (zoning, logging in)
         bool sitting = false; // resting, /sit or a chair: Phoenix lets Too Weak aggressive mobs aggro then
-        bool engaged = false; // your status is engaged
     };
 
     // Phoenix's CZoneEntities::tapMobAggro with its mob data. checkedLevel is the level a /check reported for this
@@ -65,21 +63,13 @@ namespace headsup
         uint16_t index     = 0;     // entity target index
         uint32_t serverId    = 0;       // the mob data key
         const MobRecord* mob = nullptr; // a mob's Phoenix record, when it has one
-        Label level{};                  // a living mob's level and con, as the level line shows them before its ID
+        Label level{};                  // a living mob's level and con, as the bar's Target widget shows them
         EntityKind kind    = EntityKind::Npc;
-        Category category  = Category::Unknown; // where a mob's outline color comes from, shown or not
         bool alive         = false;
         char name[32]      = {};
-        Label label{};              // level and con text: every living mob
-        IconSet mobIcons{};
-        InfoIconSet infoIcons{}; // the badge group, already filtered by its switches
-        PlayerIconRows playerIcons{};
         uint32_t linkshellArgb = 0; // a player's linkshell color, for its icon
         Pose pose              = Pose::Standing;
         WorldPoint feet{};
-        bool claimedByParty    = false;
-        bool claimed           = false;
-        bool tooWeak           = false;
         EntityState state{};
         std::optional<CheckResult> checked{};
         std::optional<PlayerStatus> status{};
@@ -88,15 +78,13 @@ namespace headsup
         char ownerName[32] = {};
     };
 
-    bool ReplacesName(const Settings& settings, const ActorInfo& info);
-
     // Whether a mob's claim (IEntity's ClaimStatus: the claimer's server ID in the low 16 bits, and 1 in the high 16
     // while it is claimed) is held by anyone.
     bool IsClaimed(uint32_t claimStatus);
     // Held by you or a member of your party or alliance.
     bool ClaimedByParty(uint32_t claimStatus, const std::vector<uint32_t>& partyServerIds);
 
-    // Every entity's actor pointer and name, and each mob's level, icons and outline, as of the last Update.
+    // Every entity's actor pointer, name and state, and each mob's level and outline, as of the last Update.
     class Tracker
     {
     public:

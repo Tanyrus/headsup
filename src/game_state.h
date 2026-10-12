@@ -7,6 +7,8 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -28,6 +30,9 @@ namespace headsup
         InspectMessage message; // empty when no message came before the general part
         bool operator==(const PlayerCheck&) const = default;
     };
+
+    // Whether the last check of a player names a linkshell you wear. No name is no linkshell.
+    bool SharesLinkshell(const PlayerCheck* check, std::span<const std::string> yours);
 
     constexpr double kConquestAskGap   = 5.0;  // seconds between two conquest requests, at least
     constexpr double kCurrencyRefresh = 60.0; // seconds between two currency requests while their popup is open

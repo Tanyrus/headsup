@@ -1,6 +1,8 @@
 #include "game_packets.h"
 #include "test.h"
 
+#include <algorithm>
+#include <array>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -157,6 +159,52 @@ TEST(a_linkshell_name_of_every_length_unpacks_as_phoenix_packed_it)
         CHECK_EQ(LinkshellName(n.packed, sizeof(n.packed)), std::string(n.name));
     const uint8_t ls[] = {0x9A, 0xDF, 0x00};
     CHECK_EQ(LinkshellName(ls, sizeof(ls)), std::string("LS"));
+}
+
+namespace
+{
+    constexpr size_t kItemExtraBytes = 28; // Ashita's item_t::Extra
+
+    // A linkshell item's extra data as Phoenix's Exdata::Linkshell lays it out: the group's id and key, its color and
+    // its kind (a shell, a sack or a pearl), then the packed name's 15 bytes.
+    std::array<uint8_t, kItemExtraBytes> LinkshellExtra(std::initializer_list<uint8_t> packedName)
+    {
+        std::array<uint8_t, kItemExtraBytes> extra{};
+        const uint32_t groupId = 0x00001A2B;
+        const uint16_t groupKey = 0x0304, color = 0xF8C4;
+        std::memcpy(extra.data(), &groupId, sizeof(groupId));
+        std::memcpy(extra.data() + 4, &groupKey, sizeof(groupKey));
+        std::memcpy(extra.data() + 6, &color, sizeof(color));
+        extra[8] = 1;
+        std::copy(packedName.begin(), packedName.end(), extra.begin() + 9);
+        return extra;
+    }
+}
+
+TEST(your_linkshells_name_comes_from_the_linkshell_item_you_wear)
+{
+    // Phoenix's ItemLockFlg: 0x13 on a linkshell you wear, 0x05 on other gear you wear, 0x19 on an item in your bazaar.
+    constexpr uint32_t kWornLinkshell = 0x13, kWornGear = 0x05, kInBazaar = 0x19;
+    const auto phoenix = LinkshellExtra({0xA8, 0x83, 0xC5, 0x38, 0x96, 0x3F});
+    CHECK_EQ(WornLinkshellName(kWornLinkshell, phoenix.data(), phoenix.size()), std::string("Phoenix"));
+    for (const uint32_t flags : {uint32_t{0}, kWornGear, kInBazaar}) // a shell in your bag is not the one you wear
+        CHECK(WornLinkshellName(flags, phoenix.data(), phoenix.size()).empty());
+    // The longest name fills the item's 15 bytes.
+    const auto longest =
+        LinkshellExtra({0xC0, 0x13, 0x81, 0x78, 0x91, 0x4C, 0xDF, 0x5D, 0xFB, 0x7D, 0x84, 0x0C, 0x3D, 0x21, 0x52});
+    CHECK_EQ(WornLinkshellName(kWornLinkshell, longest.data(), longest.size()), std::string("VanaDiel2026Explorer"));
+    CHECK(WornLinkshellName(kWornLinkshell, longest.data(), 23).empty()); // short of the name's last byte
+    CHECK(WornLinkshellName(kWornLinkshell, nullptr, kItemExtraBytes).empty());
+}
+
+TEST(a_containers_items_are_looked_for_within_the_slots_the_client_keeps)
+{
+    // Ashita's items_t holds 81 slots, 0 to 80; slot 0 holds no item but the inventory's gil.
+    CHECK_EQ(LastItemSlot(30), 30u); // a new character's inventory
+    CHECK_EQ(LastItemSlot(80), 80u); // the most a container holds
+    CHECK_EQ(LastItemSlot(81), 80u);
+    CHECK_EQ(LastItemSlot(255), 80u); // a capacity the game never gives: no read past the array
+    CHECK_EQ(LastItemSlot(0), 0u);    // a container you have no room in: no slot from 1 on
 }
 
 TEST(the_conquest_request_is_a_bare_header_naming_0x05a_and_one_word)

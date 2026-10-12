@@ -1,13 +1,17 @@
 #pragma once
 
 #include "game_cursor.h"
+#include "game_packets.h"
 #include "labels.h"
 #include "plate_settings.h"
 #include "settings.h"
 
 #include <cstdint>
+#include <optional>
+#include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace headsup
@@ -60,4 +64,21 @@ namespace headsup
     bool LineShows(const LineShow& show, const EntityState& state);
     // Whether the Friends list names this player, ignoring case.
     bool IsFriend(const std::vector<std::string>& friends, std::string_view name);
+    // Whether a player is in your party or alliance: among the members' server IDs, and not you.
+    bool InYourParty(uint32_t serverId, bool self, std::span<const uint32_t> memberIds);
+
+    // An entity's target index and kind, and the index IEntity::GetPetTargetIndex gives for it: 0 with no pet out.
+    struct PetLink
+    {
+        uint16_t owner;
+        EntityKind ownerKind;
+        uint16_t pet;
+    };
+    // Each pet's owner, by the pet's target index: only a player owns one, never itself, and of two naming one pet
+    // the first listed.
+    std::unordered_map<uint16_t, uint16_t> PetOwners(std::span<const PetLink> links);
+
+    // A player's jobs from the first source that knows them: the game's for you, the party list's, then their last
+    // check. Null for a source the player has none of; a main job of 0 (zoning, another zone, anonymous) knows nothing.
+    std::optional<PlayerJobs> KnownJobs(const PlayerJobs* own, const PlayerJobs* member, const InspectGeneral* checked);
 }

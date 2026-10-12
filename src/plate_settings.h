@@ -20,8 +20,8 @@ namespace headsup
         Unknown,
         NmWillAttack,
         NmWontAttack,
-        Placeholder, // a lottery placeholder, whatever it would be, while placeholders are shown in their own color
-        PartyClaim,  // claimed by you or your party, whatever it would be, while these are shown in their own color
+        Placeholder, // a lottery placeholder nobody has claimed, whatever it would do
+        PartyClaim,  // claimed by you or your party, whatever else it is
         OtherClaim,  // and claimed by anyone else
     };
     constexpr int kCategoryCount = static_cast<int>(Category::OtherClaim) + 1;
@@ -81,7 +81,6 @@ namespace headsup
     };
     constexpr int kShowConditionCount = 11;
     constexpr uint32_t ConditionBit(ShowCondition c) { return 1u << static_cast<int>(c); }
-    constexpr uint32_t kAllConditions = (1u << kShowConditionCount) - 1;
     struct LineShow
     {
         bool always   = true;

@@ -32,6 +32,7 @@ namespace
         info.state.alive     = true;
         info.state.nature    = Nature::Aggressive;
         info.state.row       = Category::WillAttack;
+        info.state.classified = Category::WillAttack;
         info.state.toughness = LabelShade::EvenMatch;
         return info;
     }
@@ -51,7 +52,7 @@ namespace
         info.linkshellArgb   = status.linkshellArgb;
         return info;
     }
-    const PlayerState kPlayer{20, false, false};
+    const PlayerState kPlayer{20, false};
     constexpr uint32_t kGame = 0xFFC0C0C0;
 }
 
@@ -150,6 +151,27 @@ TEST(expanding_rows_and_dead_mobs_keep_the_name_alone)
     CHECK_EQ(gone.ornamentAbove, kNoOrnament);
 }
 
+TEST(a_dead_mobs_name_does_not_glow)
+{
+    const Settings s; // the default design: the name glows at full strength
+    CHECK_EQ(ComposePlate(AggressiveMob(), kPlayer, s, kGame).lines[2].look.glow, 1.0f);
+    ActorInfo dead   = AggressiveMob();
+    dead.state.alive = false;
+    const ComposedPlate gone = ComposePlate(dead, kPlayer, s, kGame);
+    CHECK_EQ(gone.lines.size(), size_t{1});
+    CHECK_EQ(gone.lines[0].look.glow, 0.0f);
+    CHECK_EQ(gone.lines[0].look.shadow, 1.0f); // the rest of its look stays
+    // A living mob's name alone keeps its glow, and so does a dead player's.
+    Settings expanding;
+    expanding.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WillAttack)].plate = PlateMode::Expanding;
+    CHECK_EQ(ComposePlate(AggressiveMob(), kPlayer, expanding, kGame).lines[0].look.glow, 1.0f);
+    Settings glowing;
+    glowing.Kind(PlateKind::Players).lines[2].glow = 150;
+    ActorInfo player   = LinkshellPlayer();
+    player.state.alive = false;
+    CHECK_EQ(ComposePlate(player, kPlayer, glowing, kGame).lines[0].look.glow, 1.5f);
+}
+
 TEST(the_ornament_needs_both_of_the_lines_it_sits_between)
 {
     Settings s;
@@ -227,23 +249,46 @@ TEST(the_hook_keeps_vanilla_names_hides_hidden_ones_and_replaces_the_rest)
 {
     Settings s;
     const EntityState mob = AggressiveMob().state;
-    CHECK(HookActionFor(mob, s, false) == HookAction::Replace);
+    CHECK(HookActionFor(mob, s, false, false) == HookAction::Replace);
     s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WillAttack)].plate = PlateMode::Vanilla;
-    CHECK(HookActionFor(mob, s, false) == HookAction::Keep);
+    CHECK(HookActionFor(mob, s, false, false) == HookAction::Keep);
     s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WillAttack)].plate = PlateMode::Hidden;
-    CHECK(HookActionFor(mob, s, false) == HookAction::Hide);
+    CHECK(HookActionFor(mob, s, false, false) == HookAction::Hide);
     s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WillAttack)].plate = PlateMode::WhenTargeted;
-    CHECK(HookActionFor(mob, s, false) == HookAction::Hide);
+    CHECK(HookActionFor(mob, s, false, false) == HookAction::Hide);
     EntityState targeted = mob;
     targeted.target      = TargetState::Targeted;
-    CHECK(HookActionFor(targeted, s, false) == HookAction::Replace);
+    CHECK(HookActionFor(targeted, s, false, false) == HookAction::Replace);
     s.nameplates = false;
-    CHECK(HookActionFor(targeted, s, false) == HookAction::Keep);
-    CHECK(HookActionFor(targeted, s, true) == HookAction::Hide);
+    CHECK(HookActionFor(targeted, s, false, false) == HookAction::Keep);
+    CHECK(HookActionFor(targeted, s, true, false) == HookAction::Hide);
     s.nameplates = true;
     s.enabled    = false;
-    CHECK(HookActionFor(targeted, s, false) == HookAction::Keep);
-    CHECK(HookActionFor(targeted, s, true) == HookAction::Hide); // screenshot mode hides names even after /hu off
+    CHECK(HookActionFor(targeted, s, false, false) == HookAction::Keep);
+    CHECK(HookActionFor(targeted, s, true, false) == HookAction::Hide); // screenshot mode hides names even after /hu off
+}
+
+TEST(a_name_headsup_cannot_draw_goes_back_to_the_game_and_a_hidden_one_stays_hidden)
+{
+    Settings s;
+    PlateMode& row        = s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WillAttack)].plate;
+    const EntityState mob = AggressiveMob().state;
+    EntityState targeted  = mob;
+    targeted.target       = TargetState::Targeted;
+    for (const PlateMode drawn : {PlateMode::Shown, PlateMode::Expanding})
+    {
+        row = drawn;
+        CHECK(HookActionFor(mob, s, false, true) == HookAction::Keep);
+    }
+    row = PlateMode::WhenTargeted;
+    CHECK(HookActionFor(targeted, s, false, true) == HookAction::Keep);
+    CHECK(HookActionFor(mob, s, false, true) == HookAction::Hide); // hidden while it is not your target
+    row = PlateMode::Hidden;
+    CHECK(HookActionFor(mob, s, false, true) == HookAction::Hide);
+    row = PlateMode::Vanilla;
+    CHECK(HookActionFor(mob, s, false, true) == HookAction::Keep);
+    row = PlateMode::Shown;
+    CHECK(HookActionFor(mob, s, true, true) == HookAction::Hide); // screenshot mode still hides every name
 }
 
 TEST(spaces_at_the_ends_of_a_line_or_beside_text_are_dropped)
@@ -448,8 +493,8 @@ TEST(badge_tags_draw_what_the_icon_groups_and_badge_functions_give)
     mobs.lines[0].text = "$weak";
     mobs.lines[1].text = "$resist$status$immune";
     for (StatusBadgeRule& rule : s.statusBadges) rule.weakRank = kMaxWeakRank; // so its status weaknesses show
-    BadgeRules rules{.damage = true, .statusRanks = true, .immunities = true, .elementWeakRank = s.elementWeakRank,
-        .elementResistRank = s.elementResistRank, .maxElements = s.maxElements};
+    BadgeRules rules{.elementWeakRank = s.elementWeakRank, .elementResistRank = s.elementResistRank,
+        .maxElements = s.maxElements};
     std::ranges::copy(s.statusBadges, rules.status);
     const auto expected = [&](bool ranks, std::initializer_list<BadgeGroup> groups)
     {
@@ -485,6 +530,34 @@ TEST(badge_tags_draw_what_the_icon_groups_and_badge_functions_give)
     const std::vector<IconDraw> ranked = composed(Compose(info, s).lines[0]);
     CHECK(ranked == expected(true, {BadgeGroup::Weak}));
     CHECK(ranked != weak);
+}
+
+TEST(the_settings_badge_cutoffs_decide_which_badges_the_tags_draw)
+{
+    // The Goblin Bounty Hunter's ranks: light -3, the other elements but dark -2; dark sleep -3, gravity -2.
+    ActorInfo info = AggressiveMob();
+    info.mob       = MobById(17199648);
+    CHECK(info.mob != nullptr);
+    Settings s;
+    s.Kind(PlateKind::Mobs).lines[0].text = "$weak$resist$status$immune";
+    const auto drawn = [&]
+    {
+        const ComposedPlate plate = Compose(info, s);
+        std::vector<Icon> icons;
+        for (const IconDraw& draw : plate.lines[0].items[0].icons)
+            icons.push_back(draw.icon);
+        return icons;
+    };
+    s.elementWeakRank = -3;
+    CHECK(drawn() == std::vector<Icon>{Icon::Light});
+    s             = Settings{};
+    s.Kind(PlateKind::Mobs).lines[0].text = "$weak$resist$status$immune";
+    s.maxElements = 2;
+    CHECK(drawn() == (std::vector<Icon>{Icon::Light, Icon::Fire}));
+    s.statusBadges[static_cast<int>(StatusRank::Gravity)].weakRank = -2;
+    CHECK(drawn() == (std::vector<Icon>{Icon::Light, Icon::Fire, Icon::Gravity}));
+    s.statusBadges[static_cast<int>(StatusRank::Gravity)].show = false;
+    CHECK(drawn() == (std::vector<Icon>{Icon::Light, Icon::Fire}));
 }
 
 TEST(a_plate_without_icons_keeps_its_texts_and_the_ornament_between_two_lines_still_shown)
