@@ -33,6 +33,7 @@ namespace headsup
         uint16_t index;
         TargetState target;
         float x, y;
+        bool under = false; // the target's own cursor, under the candidate's on the same entity
     };
     std::vector<LoneCursor> LoneCursors(const CursorTargets& targets, const Settings& settings,
         const std::vector<uint16_t>& withNameplateCursor);
@@ -42,6 +43,9 @@ namespace headsup
         float x, y;
     };
     CursorSpot CursorAtAnchor(float anchorX, float anchorY, float width, float height, float tip);
+    // The game's arrow over a candidate sits 10 of its 32 pixels above the one over the target: on a nameplate the
+    // candidate's cursor rises this share of its height over the target's own.
+    constexpr float kPickedCursorRise = 10.0f / 32.0f;
     // A cursor box moved the least that keeps all of it inside a screen this size.
     CursorSpot KeepOnScreen(CursorSpot spot, float width, float height, float screenWidth, float screenHeight);
 

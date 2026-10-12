@@ -17,6 +17,19 @@ TEST(the_cursor_targets_come_from_the_target_slots)
     CHECK_EQ(TargetsFromSlots(false, 5000, 0, false, 2304).target, 0); // past the entity map
 }
 
+TEST(a_pick_started_with_no_target_is_still_a_pick)
+{
+    // ITarget's flag, the target window's and slot 0 in four draw dumps: a pick with a target held, an <stnpc> pick
+    // with none, a plain target, and nothing targeted after a pick.
+    CHECK(Picking(true, true, 13));
+    CHECK(Picking(false, true, 6));
+    CHECK(!Picking(false, false, 13));
+    CHECK(!Picking(false, true, 0));
+    const CursorTargets alone = TargetsFromSlots(Picking(false, true, 6), 6, 0, false, 2304);
+    CHECK_EQ(alone.target, 0);
+    CHECK_EQ(alone.subTarget, 6);
+}
+
 TEST(the_target_windows_anchors_scale_from_the_menu_to_the_back_buffer)
 {
     const CursorWindow window{724.0f, 333.0f, 1294.0f, 329.0f};

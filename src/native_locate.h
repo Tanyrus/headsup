@@ -37,6 +37,8 @@ namespace headsup
         NoArrowDraws,
         AmbiguousArrowDraws,
         ArrowDrawsDiffer,
+        NoRangeColor,
+        AmbiguousRangeColor,
         NoPointerMapping,
         AmbiguousPointerMapping,
         PointerMappingDiffers,
@@ -86,6 +88,16 @@ namespace headsup
     constexpr uint32_t kArrowArgumentBytes = 32;
 
     ArrowCalls LocateArrowCalls(const ImageSection& text);
+
+    // The routine the target window's draw asks for the color of its arrow over the candidate being picked: a thiscall
+    // on the window taking your actor, the candidate's and the colors for in range, out of range and the third, and
+    // answering with one of them. It only reads.
+    struct RangeColor
+    {
+        LocateProblem problem = LocateProblem::None;
+        uint32_t routine      = 0; // RVA
+    };
+    RangeColor LocateRangeColor(const ImageSection& text);
 
     // Where the game guesses its window's client area as GetWindowRect less two SM_CXFRAME across and two SM_CYFRAME
     // and SM_CYCAPTION down (the borders zeroed only in window mode 3): when it reads a mouse message's position, when

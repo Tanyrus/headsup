@@ -95,6 +95,12 @@ namespace headsup
 
     bool Targeted(TargetState target) { return target != TargetState::None; }
 
+    TargetState TargetUnderPick(uint16_t index, const CursorTargets& targets)
+    {
+        if (index == 0 || index != targets.subTarget || index != targets.target) return TargetState::None;
+        return targets.locked ? TargetState::Locked : TargetState::Targeted;
+    }
+
     TargetState TargetStateOf(uint16_t index, const CursorTargets& targets)
     {
         if (index == 0) return TargetState::None;

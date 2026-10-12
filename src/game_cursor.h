@@ -24,7 +24,11 @@ namespace headsup
     // the spell or ability, blue in range, and a yellow taken as out of range too (unconfirmed). Its arrow over the
     // target stays gray.
     std::optional<bool> PickedOutOfRange(uint32_t argb);
+    constexpr uint32_t kArrowInRange = 0xE04040D0, kArrowOutOfRange = 0xE0D04040, kArrowThird = 0xE0D0D040;
 
+    // Whether a sub-target is being picked. ITarget's own flag is off for a pick started with no target (an <stnpc>
+    // macro), where only the target window's flag tells; that one stays set afterwards while nothing is targeted.
+    bool Picking(bool subTargetActive, bool windowPicking, uint32_t slot0);
     // While a sub-target is being picked, ITarget's slot 1 holds the target and slot 0 the candidate.
     CursorTargets TargetsFromSlots(bool picking, uint32_t slot0, uint32_t slot1, bool locked, uint32_t entityCount);
 

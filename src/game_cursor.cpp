@@ -16,6 +16,11 @@ namespace headsup
         return red > blue;
     }
 
+    bool Picking(bool subTargetActive, bool windowPicking, uint32_t slot0)
+    {
+        return subTargetActive || (windowPicking && slot0 != 0);
+    }
+
     CursorTargets TargetsFromSlots(bool picking, uint32_t slot0, uint32_t slot1, bool locked, uint32_t entityCount)
     {
         auto index = [&](uint32_t slot) { return slot < entityCount ? static_cast<uint16_t>(slot) : uint16_t{0}; };

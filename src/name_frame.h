@@ -18,6 +18,7 @@ namespace headsup
         uint32_t actor  = 0;
         uint32_t length = 0; // bytes of text
         float x = 0.0f, y = 0.0f, depth = 0.0f, scaleX = 0.0f, scaleY = 0.0f;
+        float size = 0.0f; // the share of full size the game asked for
         uint32_t text  = 0; // where the game keeps the name's bytes
         uint32_t color = 0, shellColor = 0;
     };
@@ -37,8 +38,12 @@ namespace headsup
         float depth    = 0.0f;
         uint32_t color = 0; // as drawn, opaque
     };
-    // toBackBuffer: back-buffer pixels per pixel of the image the game draws names into.
-    DrawnName NameFromFrame(const NameFrame& frame, float toBackBufferX, float toBackBufferY);
+    // The share of full size the game gives a name drawn at this depth, in the eightieths it steps by.
+    float NameSizeAtDepth(float depth);
+    // toBackBuffer: back-buffer pixels per pixel of the image the game draws names into. The candidate of a sub-target
+    // pick comes at full size, grown down from the same top: picked gives it the height its depth would, so its plate
+    // stays where it was.
+    DrawnName NameFromFrame(const NameFrame& frame, float toBackBufferX, float toBackBufferY, bool picked = false);
 
     // The game lays out a name with a line break itself, so HeadsUp leaves those to it.
     bool SingleLine(const uint8_t* text, uint32_t length);

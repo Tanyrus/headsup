@@ -60,8 +60,14 @@ TEST(while_picking_the_candidate_takes_the_sub_anchor_and_the_target_the_main_on
     CHECK_EQ(lone.size(), 2u);
     CHECK(lone[0].index == 554 && lone[0].target == TargetState::OutOfRange && lone[0].x == 900.0f && lone[0].y == 300.0f);
     CHECK(lone[1].index == 1105 && lone[1].target == TargetState::Targeted && lone[1].x == 1400.0f);
-    const auto same = LoneCursors(Anchored(554, 554), s, {}); // picking the target itself: one cursor, the candidate's
-    CHECK(same.size() == 1u && same[0].target == TargetState::SubTarget && same[0].y == 300.0f);
+    // Picking the target itself: its own cursor at the main anchor, under the candidate's, as the game draws two arrows.
+    const auto same = LoneCursors(Anchored(554, 554), s, {});
+    CHECK_EQ(same.size(), 2u);
+    CHECK(same[0].index == 554 && same[0].under && same[0].target == TargetState::Targeted && same[0].x == 1400.0f &&
+          same[0].y == 608.0f);
+    CHECK(same[1].index == 554 && !same[1].under && same[1].target == TargetState::SubTarget && same[1].x == 900.0f &&
+          same[1].y == 300.0f);
+    CHECK(!lone[0].under && !lone[1].under);
 }
 
 TEST(a_cursor_is_drawn_for_your_target_and_the_one_you_are_picking_alone)

@@ -34,6 +34,10 @@ namespace headsup
             0xBF, 0x96, 0xBE, 0x00, 0x00, 0x00, 0x6A, 0x00, 0x6A, 0x00, 0x6A, 0x00, 0x33, 0xC9, 0x8A, 0x8E, 0xBA, 0x00, 0x00,
             0x00, 0x68, 0x80, 0x80, 0x80, 0xE0, 0x0F, 0xBF, 0xC0, 0x8B, 0x4C, 0x8E, 0x78, 0x68, 0x00, 0x00, 0x80, 0x3F, 0x68,
             0x00, 0x00, 0x80, 0x3F, 0x52, 0x50, 0xE8};
+        // Before them the draw asks for the candidate's color: it pushes yellow, red, the blue in edi, the candidate and
+        // you, and calls the routine on the window in esi.
+        constexpr uint8_t kRangeColorLead[] = {0x68, 0x40, 0xD0, 0xD0, 0xE0, 0x68, 0x40, 0x40, 0xD0, 0xE0, 0x57, 0x52, 0x50,
+            0x8B, 0xCE, 0xE8};
         constexpr uint8_t kPickedArrowLead[] = {0x0F, 0xBF, 0x96, 0xC2, 0x00, 0x00, 0x00, 0x0F, 0xBF, 0x86, 0xC0, 0x00, 0x00,
             0x00, 0x6A, 0x00, 0x6A, 0x00, 0x6A, 0x00, 0x33, 0xC9, 0x8A, 0x8E, 0xBA, 0x00, 0x00, 0x00, 0x57, 0x68, 0x00, 0x00,
             0x80, 0x3F, 0x68, 0x00, 0x00, 0x80, 0x3F, 0x8B, 0x4C, 0x8E, 0x78, 0x52, 0x50, 0xE8};
@@ -292,6 +296,8 @@ namespace headsup
         case LocateProblem::NoArrowDraws: return "the target window's arrow draws were not found";
         case LocateProblem::AmbiguousArrowDraws: return "the target window's arrow draws were found more than once";
         case LocateProblem::ArrowDrawsDiffer: return "the target window's two arrows are not drawn by the same function";
+        case LocateProblem::NoRangeColor: return "the routine that colors the arrow over a sub-target was not found";
+        case LocateProblem::AmbiguousRangeColor: return "the routine that colors the arrow over a sub-target was found more than once";
         case LocateProblem::NoPointerMapping: return "the game's reading of the mouse was not found";
         case LocateProblem::AmbiguousPointerMapping: return "the game's reading of the mouse was found more than once";
         case LocateProblem::PointerMappingDiffers: return "the game reads the mouse through different functions than expected";
@@ -363,6 +369,14 @@ namespace headsup
             }
         if (wrappers != 1) result.problem = LocateProblem::NoEntityCaller;
         return result;
+    }
+
+    RangeColor LocateRangeColor(const ImageSection& text)
+    {
+        const std::vector<uint32_t> asks = CallsAfter(kRangeColorLead, sizeof(kRangeColorLead), text);
+        if (asks.empty()) return RangeColor{LocateProblem::NoRangeColor};
+        if (asks.size() > 1) return RangeColor{LocateProblem::AmbiguousRangeColor};
+        return RangeColor{LocateProblem::None, CallTarget(asks.front(), text)};
     }
 
     ArrowCalls LocateArrowCalls(const ImageSection& text)
