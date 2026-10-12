@@ -512,8 +512,8 @@ public:
         const bool drewInScene = m_DrewInScene;
         m_DrewInScene          = false;
         const double now       = Now();
-        UpdateTracker(now);
         UpdateCursorTargets();
+        UpdateTracker(now);
         g_GameWindow = m_AshitaCore->GetProperties()->GetFinalFantasyHwnd();
         const uint8_t loginStatus = m_AshitaCore->GetMemoryManager()->GetPlayer()->GetLoginStatus();
         // A popup left open at logout would come back with the next character.
@@ -1392,7 +1392,7 @@ private:
         m_Player.level           = player->GetMainJobLevel();
         m_Player.sitting         = headsup::IsSittingStatus(ownStatus);
         m_Player.engaged         = ownStatus == kEngagedStatus;
-        m_Tracker.Update(inputs, m_Player, m_Settings);
+        m_Tracker.Update(inputs, m_Player, m_Settings, m_CursorTargets);
         // With timers off no sightings are passed, so turning them on never takes a placeholder that died meanwhile for
         // one seen dying.
         m_PhTimers.Update(now, sightings);

@@ -167,9 +167,6 @@ namespace headsup
             "Lottery placeholders, whose death can pop an NM. Off, they take any mob's color.",
             "Claimed by you or your party. Off, they keep the color they had.",
             "Claimed by anyone outside your party. Off, they keep the color they had."};
-        // Ordinary mobs, notorious monsters and their placeholders, claimed mobs, then mobs with no data.
-        const Category kCategoryOrder[kCategoryCount] = {Category::WillAttack, Category::WontAttack, Category::NmWillAttack,
-            Category::NmWontAttack, Category::Placeholder, Category::PartyClaim, Category::OtherClaim, Category::Unknown};
         const char* const kShadeLabels[kLabelShadeCount] = {"Unknown level", "Too Weak", "Easy Prey", "Decent Challenge",
             "Even Match", "Tough", "Very Tough"};
         const char* const kBarWidgetLabels[] = {"Zone", "Weather", "Vana'diel", "Target", "Gil",
@@ -906,7 +903,7 @@ namespace headsup
             }
             if (ui.BeginCard("Mobs to Outline", kMobsSection, collapsed))
             {
-                for (const Category category : kCategoryOrder)
+                for (const Category category : kMobRowOrder)
                 {
                     const int c = CategoryIndex(category);
                     ui.Switch(kCategoryLabels[c], s.show[c], kCategoryTips[c]);
@@ -921,7 +918,7 @@ namespace headsup
             ui.Fade(!s.enabled);
             if (ui.BeginCard("Mob Colors", kMobColorsSection, collapsed))
             {
-                for (const Category category : kCategoryOrder)
+                for (const Category category : kMobRowOrder)
                 {
                     const int c = CategoryIndex(category);
                     ui.Fade(!s.enabled || !s.show[c]);

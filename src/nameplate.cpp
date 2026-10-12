@@ -1,4 +1,5 @@
 #include "nameplate.h"
+#include "plate_layout.h"
 
 #include <algorithm>
 #include <cmath>
@@ -9,9 +10,6 @@ namespace headsup
 {
     namespace
     {
-        constexpr float kNameOverlap      = 3.0f;   // pixels: the fonts' own space above the letters is gap enough
-        constexpr float kLineGap          = 2.0f;   // pixels
-        constexpr float kIconGap          = 2.0f;   // pixels
         constexpr float kLettersPerScreen = 180.0f; // the screen is this many typical game letters tall
         constexpr float kMinScale         = 0.5f;
         constexpr float kMaxScale         = 2.5f;

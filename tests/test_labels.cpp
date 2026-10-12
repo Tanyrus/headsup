@@ -141,3 +141,25 @@ TEST(a_level_line_knows_where_its_placeholder_mark_starts)
     CHECK(LevelLine(level, true, MobIdText(17191194, false, MobIdFormat::Full, true)).markAt == Label::kNoMark);
     CHECK(level.markAt == Label::kNoMark);
 }
+
+TEST(level_and_con_text_split_the_label)
+{
+    const MobRecord m = Mob(17, 20);
+    CHECK_EQ(LevelText(&m, nullptr), "17-20");
+    CHECK_EQ(ConText(&m, nullptr, 20), "EP-EM");
+    const CheckResult checked{19, Con::DecentChallenge};
+    CHECK_EQ(LevelText(&m, &checked), "19");
+    CHECK_EQ(ConText(&m, &checked, 20), "DC");
+    const MobRecord modded = Mob(19, 21, -2); // cons as 17-19, shows 19-21
+    CHECK_EQ(LevelText(&modded, nullptr), "19-21");
+    CHECK_EQ(ConText(&modded, nullptr, 20), "EP-DC");
+    const MobRecord scripted = Mob(0, 0); // a level a spawn script sets
+    CHECK_EQ(LevelText(&scripted, nullptr), "?");
+    CHECK_EQ(ConText(&scripted, nullptr, 20), "??");
+    CHECK_EQ(LevelText(nullptr, nullptr), "?");
+    CHECK_EQ(ConText(nullptr, nullptr, 20), "??");
+    CHECK_EQ(ConText(&m, nullptr, 0), "??"); // your level unknown
+    CHECK_EQ(IdText(17190918u), "[006]");
+    CHECK_EQ(IdText(17191194u), "[11A]");
+    CHECK_EQ(ServerIdText(17190918u), "[17190918]");
+}

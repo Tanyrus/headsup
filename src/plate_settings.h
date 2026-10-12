@@ -1,0 +1,180 @@
+#pragma once
+
+#include "color.h"
+#include "labels.h"
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <vector>
+
+namespace headsup
+{
+    enum class Category : uint8_t
+    {
+        WillAttack,
+        WontAttack,
+        Unknown,
+        NmWillAttack,
+        NmWontAttack,
+        Placeholder, // a lottery placeholder, whatever it would be, while placeholders are shown in their own color
+        PartyClaim,  // claimed by you or your party, whatever it would be, while these are shown in their own color
+        OtherClaim,  // and claimed by anyone else
+    };
+    constexpr int kCategoryCount = static_cast<int>(Category::OtherClaim) + 1;
+    constexpr int CategoryIndex(Category category) { return static_cast<int>(category); }
+    // The menu's order for the mob rows: ordinary mobs, notorious monsters and their placeholders, claimed mobs, then mobs
+    // with no data.
+    constexpr Category kMobRowOrder[kCategoryCount] = {Category::WillAttack, Category::WontAttack, Category::NmWillAttack,
+        Category::NmWontAttack, Category::Placeholder, Category::PartyClaim, Category::OtherClaim, Category::Unknown};
+
+    enum class PlateKind : uint8_t { Mobs, Players, Self, Npcs, Pets };
+    constexpr int kPlateKindCount = 5;
+    enum class PlateMode : uint8_t { Hidden, Shown, WhenTargeted, Expanding, Vanilla };
+    constexpr int kPlateModeCount = 5;
+    enum class OutlineMode : uint8_t { Disabled, Shown, WhenTargeted };
+    constexpr int kOutlineModeCount = 3;
+    enum class ColorSource : uint8_t { Custom, Game, Aggression, Toughness, Claim, Target, Type };
+    constexpr int kColorSourceCount = 7;
+    struct ColorPick
+    {
+        ColorSource source = ColorSource::Custom;
+        Color custom       = ColorFromRgb(0xFFFFFF);
+        bool operator==(const ColorPick&) const = default;
+    };
+    enum class Nature : uint8_t { Passive, Aggressive, PassiveNm, AggressiveNm, Placeholder, NoData };
+    constexpr int kNatureCount = 6;
+    enum class ClaimState : uint8_t { Unclaimed, Others, Yours };
+    constexpr int kClaimStateCount = 3;
+    enum class TargetState : uint8_t { None, Targeted, Locked, SubTarget, OutOfRange };
+    constexpr int kTargetStateCount = 5;
+    enum class TargetType : uint8_t { Mob, Npc, Pet, Player, Friend, PartyMember, LinkshellMember };
+    constexpr int kTargetTypeCount = 7;
+    enum class PlayerRow : uint8_t { Player, PartyMember, Friend, LinkshellMember };
+    constexpr int kPlayerRowCount = 4;
+    constexpr int kMaxRows        = kCategoryCount; // the mob rows are Category
+
+    struct Palette
+    {
+        Color aggression[kNatureCount];
+        Color toughness[kLabelShadeCount];
+        Color claim[kClaimStateCount];
+        Color target[kTargetStateCount];
+        Color type[kTargetTypeCount];
+        bool operator==(const Palette&) const = default;
+    };
+    Palette DefaultPalette();
+
+    enum class ShowCondition : uint8_t
+    {
+        Targeted, Unclaimed, YourClaim, OthersClaim, Engaged, TooWeak, Aggressive, Passive, PartyMember, Friend, LinkshellMember
+    };
+    constexpr int kShowConditionCount = 11;
+    constexpr uint32_t ConditionBit(ShowCondition c) { return 1u << static_cast<int>(c); }
+    constexpr uint32_t kAllConditions = (1u << kShowConditionCount) - 1;
+    struct LineShow
+    {
+        bool always   = true;
+        uint32_t when = 0;
+        bool operator==(const LineShow&) const = default;
+    };
+    enum class Align : uint8_t { Left, Center, Right };
+    constexpr int kAlignCount = 3;
+    constexpr int kPlateLines = 3;
+    constexpr int kNoSync     = -1;
+    constexpr int kMinSizePercent = 25, kMaxSizePercent = 400; // text, icon and timer sizes, the scale limits
+    constexpr int kMinGlow = 0, kMaxGlow = 300;                // 0 is no glow
+    constexpr int kMinGlowSize = 25, kMaxGlowSize = 200;
+    constexpr int kMinShadow = 0, kMaxShadow = 200;
+    constexpr int kMinOrnamentWidth = 20, kMaxOrnamentWidth = 300;       // pixels
+    constexpr int kMinOrnamentThickness = 3, kMaxOrnamentThickness = 24; // pixels
+    constexpr size_t kMaxTemplate = 255;                                 // bytes of a line's text
+
+    // The tags a template is built from.
+    constexpr const char* kTagDetect       = "$detect";
+    constexpr const char* kTagWeakResist   = "$weak$resist";
+    constexpr const char* kTagStatus       = "$status";
+    constexpr const char* kTagImmune       = "$immune";
+    constexpr const char* kTagLevelCon     = "Lv $level $con";
+    constexpr const char* kTagId           = "$id";
+    constexpr const char* kTagServerId     = "$serverid";
+    constexpr const char* kTagPlaceholder  = "$ph";
+    constexpr const char* kTagName         = "$name";
+    constexpr const char* kTagGm           = "$gm";
+    constexpr const char* kTagMentor       = "$mentor";
+    constexpr const char* kTagNew          = "$new";
+    constexpr const char* kTagSync         = "$sync";
+    constexpr const char* kTagAway         = "$away";
+    constexpr const char* kTagLinkshell    = "$linkshell";
+    constexpr const char* kTagBazaar       = "$bazaar";
+    constexpr const char* kTagSeeking      = "$seeking";
+    // The default players' name line, which the migration of an all-default file must give back.
+    constexpr const char* kTagPlayerName   = "$mentor$new$sync$away$linkshell$bazaar$seeking$gm$name";
+
+    struct LineDesign
+    {
+        std::string text;
+        int syncWith = kNoSync;
+        LineShow show;
+        Align align = Align::Center;
+        std::string font;
+        bool bold    = false;
+        int textSize = 100;
+        int iconSize = 100;
+        ColorPick color;
+        int shadow = 100;
+        ColorPick shadowColor{ColorSource::Custom, ColorFromRgb(0x000000)};
+        int glow     = 0;
+        int glowSize = 100;
+        ColorPick glowColor{ColorSource::Aggression};
+        bool operator==(const LineDesign&) const = default;
+    };
+
+    enum class OrnamentPlace : uint8_t { BetweenLines1And2, BetweenLines2And3 };
+    constexpr int kOrnamentPlaceCount = 2;
+    // The diamond rule between two of a kind's lines, drawn only while both render.
+    struct OrnamentSettings
+    {
+        bool on            = false;
+        OrnamentPlace place = OrnamentPlace::BetweenLines2And3;
+        int width          = 90;
+        int height         = 6;
+        ColorPick color{ColorSource::Aggression};
+        bool operator==(const OrnamentSettings&) const = default;
+    };
+    struct RowSettings
+    {
+        PlateMode plate     = PlateMode::Shown;
+        OutlineMode outline = OutlineMode::Disabled;
+        ColorPick outlineColor{ColorSource::Aggression};
+        bool operator==(const RowSettings&) const = default;
+    };
+    struct KindSettings
+    {
+        RowSettings rows[kMaxRows];
+        LineDesign lines[kPlateLines];
+        OrnamentSettings ornament;
+        bool operator==(const KindSettings&) const = default;
+    };
+    std::array<KindSettings, kPlateKindCount> DefaultKinds();
+
+    int RowCountOf(PlateKind kind);                // 8, 4, 1, 1, 1
+    const char* RowKey(PlateKind kind, int row);   // "aggressive", "partyMember", "self", ...: settings keys
+    const char* RowLabel(PlateKind kind, int row); // "Aggressive", "Party Member", "Self", ...: the menu
+    const char* KindKey(PlateKind kind);           // "mobs", "players", "self", "npcs", "pets"
+    const char* KindLabel(PlateKind kind);         // "Mobs", "Players", "Self", "NPCs", "Pets"
+    // The conditions a kind's lines may be shown by, in the menu's order.
+    std::vector<ShowCondition> ConditionsFor(PlateKind kind);
+    const char* ConditionLabel(ShowCondition c);
+    // The color sources a kind's picks offer, in the menu's order: text is true for a text color (Game's is offered).
+    std::vector<ColorSource> SourcesFor(PlateKind kind, bool text);
+    const char* SourceLabel(ColorSource s);
+
+    enum class HookAction : uint8_t { Keep, Hide, Replace }; // the game draws the name; nothing draws it; HeadsUp draws
+    enum class DetectionIcon : uint8_t { Aggro, Link, Sight, TrueSight, Sound, Scent, Magic, Ability, Blood };
+    constexpr int kDetectionIconCount = 9;
+    constexpr uint32_t kAllDetection  = (1u << kDetectionIconCount) - 1;
+    constexpr uint32_t DetectionBit(DetectionIcon d) { return 1u << static_cast<int>(d); }
+    const char* DetectionLabel(DetectionIcon d);
+}

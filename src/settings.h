@@ -4,11 +4,13 @@
 #include "bar_placement.h"
 #include "bar_server_time.h"
 #include "bar_types.h"
+#include "color.h"
 #include "currencies.h"
 #include "fonts.h"
 #include "labels.h"
 #include "menu_fonts.h"
 #include "native_locate.h"
+#include "plate_settings.h"
 #include "player_status.h"
 
 #include <array>
@@ -19,40 +21,11 @@
 
 namespace headsup
 {
-    enum class Category : uint8_t
-    {
-        WillAttack,
-        WontAttack,
-        Unknown,
-        NmWillAttack,
-        NmWontAttack,
-        Placeholder, // a lottery placeholder, whatever it would be, while placeholders are shown in their own color
-        PartyClaim,  // claimed by you or your party, whatever it would be, while these are shown in their own color
-        OtherClaim,  // and claimed by anyone else
-    };
-    constexpr int kCategoryCount = static_cast<int>(Category::OtherClaim) + 1;
-    constexpr int CategoryIndex(Category category) { return static_cast<int>(category); }
-
     enum class Look : uint8_t
     {
         Fantasy,
     };
     constexpr int kLookCount = static_cast<int>(Look::Fantasy) + 1;
-
-    // Opaque: outline copies take alpha from the mob's texture, where it shapes hair and cloth cut-outs.
-    struct Color
-    {
-        float v[3]; // r, g, b in 0-1, the layout ImGui's ColorEdit3 edits
-        bool operator==(const Color&) const = default;
-    };
-    // From 0xRRGGBB, exactly: ToArgb gives back the same bytes.
-    constexpr Color ColorFromRgb(uint32_t rgb)
-    {
-        constexpr float kFull = 255.0f;
-        return {{Channel(rgb, kRedShift) / kFull, Channel(rgb, kGreenShift) / kFull, Channel(rgb, kBlueShift) / kFull}};
-    }
-    // Phoenix's royal red, the accent of its own theme (phoenix-platform's --phoenix-accent).
-    constexpr uint32_t kPhoenixRed = 0xC55151;
 
     constexpr float kMinThickness = 1.0f, kMaxThickness = 16.0f;            // render-target pixels
     constexpr int kMinSmoothness = 4, kMaxSmoothness = 16;                  // shifted copies per mesh
@@ -61,10 +34,7 @@ namespace headsup
     constexpr int kMinNameRaise = 0, kMaxNameRaise = 40; // pixels
     constexpr int kMinPlayerIconSize = 50, kMaxPlayerIconSize = 150; // percent of the name's letter height
     constexpr int kMinGlowStrength = 25, kMaxGlowStrength = 300;     // percent of the mockup's glow
-    constexpr int kMinGlowSize = 25, kMaxGlowSize = 200;             // percent: a wider glow takes longer to draw
     constexpr int kMinShadowStrength = 0, kMaxShadowStrength = 200;  // percent of the mockup's shadow
-    constexpr int kMinOrnamentWidth = 20, kMaxOrnamentWidth = 300;   // pixels
-    constexpr int kMinOrnamentThickness = 3, kMaxOrnamentThickness = 24; // pixels
     constexpr const char* kDefaultFont = kMarcellusSC;
     constexpr const char* kBadgeFont   = kBarlowCondensed; // plain enough to read a few pixels tall
     constexpr size_t kMaxFontName      = 31; // a Windows font name's longest, without its terminator
@@ -254,6 +224,19 @@ namespace headsup
             {{0.30f, 0.65f, 1.00f}}, // claimed by your party
             {{0.55f, 0.45f, 0.40f}}, // claimed by someone else
         };
+        bool nameplates = true;
+        bool outlines   = true;
+        int baseSize    = 15; // pixels: a line at 100 percent
+        std::string defaultFont = kDefaultFont;
+        int scaleMin = 50, scaleMax = 250; // percent: the distance scale's limits
+        int timerPercent = 87;
+        std::array<KindSettings, kPlateKindCount> kinds = DefaultKinds();
+        Palette palette = DefaultPalette();
+        uint32_t detectionShown = kAllDetection;
+        std::vector<std::string> friends;
+        Color cursorEdgeColor = ColorFromRgb(0x000000);
+        const KindSettings& Kind(PlateKind k) const { return kinds[static_cast<int>(k)]; }
+        KindSettings& Kind(PlateKind k) { return kinds[static_cast<int>(k)]; }
         bool operator==(const Settings&) const = default;
     };
 

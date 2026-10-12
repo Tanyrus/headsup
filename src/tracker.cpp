@@ -8,16 +8,8 @@ namespace headsup
 {
     namespace
     {
-        constexpr uint32_t kSpawnFlagPlayer = 0x01;
-        constexpr uint32_t kSpawnFlagMob    = 0x10;
         constexpr int kClaimedShift         = 16;
         constexpr uint32_t kClaimerIdBits   = 0xFFFF;
-    }
-
-    EntityKind KindFromSpawnFlags(uint32_t flags)
-    {
-        if ((flags & kSpawnFlagMob) != 0) return EntityKind::Mob;
-        return (flags & kSpawnFlagPlayer) != 0 ? EntityKind::Player : EntityKind::Npc;
     }
 
     Category Classify(const MobRecord* mob, int checkedLevel, const PlayerState& player)
@@ -54,7 +46,8 @@ namespace headsup
         return kind && info.name[0] != '\0';
     }
 
-    void Tracker::Update(const std::vector<ActorInput>& actors, const PlayerState& player, const Settings& settings)
+    void Tracker::Update(const std::vector<ActorInput>& actors, const PlayerState& player, const Settings& settings,
+        const CursorTargets& targets)
     {
         BadgeRules badges{.damage = settings.showDamageIcons, .statusRanks = settings.showStatusRankIcons,
             .immunities = settings.showImmunityIcons, .elementWeakRank = settings.elementWeakRank,
@@ -83,11 +76,25 @@ namespace headsup
             info.claimedByParty = a.claimedByParty;
             info.claimed        = a.claimed;
             std::snprintf(info.name, sizeof(info.name), "%s", a.name);
+            std::snprintf(info.ownerName, sizeof(info.ownerName), "%s", a.ownerName);
+            if (a.checked != nullptr) info.checked = *a.checked;
+            info.status = a.status;
+            info.jobs   = a.jobs;
+            EntityState& st = info.state;
+            st.kind      = a.kind;
+            st.self      = a.self;
+            st.pet       = a.pet;
+            st.alive     = a.alive;
+            st.engaged   = a.engaged;
+            st.target    = TargetStateOf(a.index, targets);
+            st.claim     = a.claimedByParty ? ClaimState::Yours : a.claimed ? ClaimState::Others : ClaimState::Unclaimed;
+            st.playerRow = PlayerRowOf(a.party, a.isFriend, a.linkshell);
             if (a.kind == EntityKind::Mob)
             {
                 const MobRecord* mob   = FindMob(a.serverId, a.name);
                 const bool placeholder = mob != nullptr && mob->placeholderOf != 0;
                 info.mob               = mob;
+                info.placeholder       = placeholder;
                 if (a.alive)
                 {
                     const Label level = MakeLabel(mob, a.checked, player.level);
@@ -98,8 +105,13 @@ namespace headsup
                     info.mobIcons = IconsFor(mob);
                     info.infoIcons = InfoIconsFor(mob != nullptr ? &ResistancesOf(*mob) : nullptr, badges);
                 }
+                const Category classified = Classify(mob, a.checked ? a.checked->level : 0, player);
+                st.nature    = NatureOf(classified, placeholder);
+                st.row       = MobRowOf(st.nature, a.claimedByParty, a.claimed);
+                st.toughness = info.level.shade;
+                st.tooWeak   = info.tooWeak;
                 const bool placeholderColor = placeholder && settings.show[CategoryIndex(Category::Placeholder)];
-                info.category = placeholderColor ? Category::Placeholder : Classify(mob, a.checked ? a.checked->level : 0, player);
+                info.category = placeholderColor ? Category::Placeholder : classified;
                 // A claim's color, while it has one, says more than what the mob would do unclaimed.
                 if (a.claimedByParty && settings.show[CategoryIndex(Category::PartyClaim)])
                     info.category = Category::PartyClaim;

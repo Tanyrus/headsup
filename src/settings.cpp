@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <iterator>
 #include <string>
+#include <utility>
 
 namespace headsup
 {
@@ -43,7 +44,8 @@ namespace headsup
             {"showRanks", &Settings::showRanks}, {"showBar", &Settings::showBar},
             {"hideHelpBar", &Settings::hideHelpBar}, {"hideNetstat", &Settings::hideNetstat},
             {"clockSeconds", &Settings::clockSeconds}, {"serverSeconds", &Settings::serverSeconds},
-            {"stackNames", &Settings::stackNames}};
+            {"stackNames", &Settings::stackNames},
+            {"nameplates", &Settings::nameplates}, {"outlines", &Settings::outlines}};
 
         struct IntKey
         {
@@ -75,7 +77,11 @@ namespace headsup
             {"barTextSize", &Settings::barTextSize, kAutoBarTextSize, kMaxBarTextSize},
             {"popupTextSize", &Settings::popupTextSize, kAutoPopupTextSize, kMaxBarTextSize},
             {"cursorOutline", &Settings::cursorOutline, kMinCursorOutline, kMaxCursorOutline},
-            {"untargetedOpacity", &Settings::untargetedOpacity, kMinOpacity, kMaxOpacity}};
+            {"untargetedOpacity", &Settings::untargetedOpacity, kMinOpacity, kMaxOpacity},
+            {"baseSize", &Settings::baseSize, kMinTextSize, kMaxTextSize},
+            {"scaleMin", &Settings::scaleMin, kMinSizePercent, kMaxSizePercent},
+            {"scaleMax", &Settings::scaleMax, kMinSizePercent, kMaxSizePercent},
+            {"timerPercent", &Settings::timerPercent, kMinSizePercent, kMaxSizePercent}};
 
         struct FloatKey
         {
@@ -97,7 +103,8 @@ namespace headsup
             {"textOutline", &Settings::textOutline}, {"iconTint", &Settings::iconTint}, {"glowColor", &Settings::glowColor},
             {"ornamentColor", &Settings::ornamentColor}, {"weakBadgeColor", &Settings::weakBadgeColor},
             {"resistBadgeColor", &Settings::resistBadgeColor}, {"rankBadgeColor", &Settings::rankBadgeColor},
-            {"immuneBadgeColor", &Settings::immuneBadgeColor}};
+            {"immuneBadgeColor", &Settings::immuneBadgeColor},
+            {"cursorEdgeColor", &Settings::cursorEdgeColor}};
 
         constexpr const char* kFontKey = "fontName";
         constexpr const char* kBadgeFontKey = "badgeFontName";
@@ -132,7 +139,8 @@ namespace headsup
         constexpr const char* kVersionKey = "settingsVersion";
         constexpr int kRedCursorVersion    = 1;
         constexpr int kBundledFontVersion  = 2;
-        constexpr int kSettingsVersion     = kBundledFontVersion;
+        constexpr int kDesignerVersion     = 3;
+        constexpr int kSettingsVersion     = kDesignerVersion;
         constexpr Color kOldCursorColor    = {{1.0f, 1.0f, 1.0f}};
         constexpr const char* kOldFont     = "Trebuchet MS";
         constexpr const char* kShowSuffix = "Show";
@@ -189,6 +197,29 @@ namespace headsup
         const char* const kLabelShadeKeys[kLabelShadeCount] = {"labelUnknown", "labelTooWeak", "labelEasyPrey",
             "labelDecentChallenge", "labelEvenMatch", "labelTough", "labelVeryTough"};
 
+        const char* const kPlateModeNames[kPlateModeCount]       = {"hidden", "shown", "whenTargeted", "expanding", "vanilla"};
+        const char* const kOutlineModeNames[kOutlineModeCount]   = {"disabled", "shown", "whenTargeted"};
+        const char* const kSourceNames[kColorSourceCount]        = {"custom", "game", "aggression", "toughness", "claim", "target", "type"};
+        const char* const kAlignNames[kAlignCount]               = {"left", "center", "right"};
+        const char* const kOrnamentPlaceNames[kOrnamentPlaceCount] = {"lines12", "lines23"};
+        const char* const kNatureKeys[kNatureCount] = {"passive", "aggressive", "passiveNm", "aggressiveNm", "placeholder", "noData"};
+        const char* const kClaimKeys[kClaimStateCount]   = {"unclaimed", "others", "yours"};
+        const char* const kTargetKeys[kTargetStateCount] = {"none", "targeted", "locked", "subTarget", "outOfRange"};
+        const char* const kTypeKeys[kTargetTypeCount]    = {"mob", "npc", "pet", "player", "friend", "partyMember", "linkshell"};
+        const char* const kPaletteKeys[]                 = {"paletteAggression", "paletteToughness", "paletteClaim", "paletteTarget", "paletteType"};
+        constexpr const char* kLabelShadePrefix = "label"; // kLabelShadeKeys' prefix, which the palette's toughness keys drop
+        constexpr const char* kRowInfix         = "Row";
+        constexpr const char* kLineInfix        = "Line";
+        constexpr const char* kOrnamentInfix    = "Ornament";
+        constexpr const char* kDefaultFontKey   = "defaultFont";
+        constexpr const char* kFriendsKey       = "friends";
+        constexpr const char* kDetectionShownKey = "detectionShown";
+        constexpr float kPercentScale = 100.0f;
+        // By PlayerIcon.
+        const char* const kPlayerIconTags[kPlayerIconCount] = {kTagGm, kTagMentor, kTagNew, kTagSync, kTagAway, kTagLinkshell,
+            kTagBazaar, kTagSeeking};
+        constexpr int kMobIconLine = 0, kMobLevelLine = 1, kNameLine = kPlateLines - 1;
+
         float ClampFloat(float v, float lo, float hi, float fallback)
         {
             return std::isfinite(v) ? std::clamp(v, lo, hi) : fallback;
@@ -213,6 +244,360 @@ namespace headsup
             const float v = store.GetFloat(key, static_cast<float>(fallback));
             if (!std::isfinite(v)) return fallback;
             return static_cast<int>(std::clamp<double>(std::round(v), INT_MIN, INT_MAX));
+        }
+
+        std::string Capitalized(const char* key)
+        {
+            std::string text = key;
+            if (!text.empty()) text[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(text[0])));
+            return text;
+        }
+
+        int NameIndex(const char* const* names, int count, const std::string& name, int fallback)
+        {
+            for (int i = 0; i < count; ++i)
+                if (name == names[i]) return i;
+            return fallback;
+        }
+
+        void StoreFloat(SettingsStore& store, const std::string& key, float v)
+        {
+            char text[32];
+            std::snprintf(text, sizeof(text), "%.4f", v);
+            // A value the four places do not hold, such as a color made from a hex code, keeps its precision.
+            if (std::strtof(text, nullptr) != v) std::snprintf(text, sizeof(text), "%.9g", v);
+            store.Set(key.c_str(), text);
+        }
+
+        void StoreColor(SettingsStore& store, const std::string& base, const Color& c)
+        {
+            for (int i = 0; i < 3; ++i)
+                StoreFloat(store, base + kChannelKeys[i], c.v[i]);
+        }
+
+        void StoreBool(SettingsStore& store, const std::string& key, bool v) { store.Set(key.c_str(), v ? "true" : "false"); }
+
+        uint32_t LoadHex(SettingsStore& store, const std::string& key, uint32_t fallback)
+        {
+            const std::string text = store.GetString(key.c_str(), "");
+            char* end              = nullptr;
+            const unsigned long v  = std::strtoul(text.c_str(), &end, kHex);
+            return text.empty() || *end != '\0' ? fallback : static_cast<uint32_t>(v);
+        }
+
+        void StoreHex(SettingsStore& store, const std::string& key, uint32_t v)
+        {
+            char text[16];
+            std::snprintf(text, sizeof(text), "%X", v);
+            store.Set(key.c_str(), text);
+        }
+
+        void LoadPick(SettingsStore& store, const std::string& base, ColorPick& pick)
+        {
+            pick.source = static_cast<ColorSource>(
+                NameIndex(kSourceNames, kColorSourceCount, store.GetString((base + "Source").c_str(), ""), static_cast<int>(pick.source)));
+            LoadColor(store, base, pick.custom);
+        }
+
+        void SavePick(SettingsStore& store, const std::string& base, const ColorPick& pick)
+        {
+            store.Set((base + "Source").c_str(), kSourceNames[static_cast<int>(pick.source)]);
+            StoreColor(store, base, pick.custom);
+        }
+
+        // Where each palette's entries live in Settings::palette, by key.
+        struct PaletteEntry
+        {
+            std::string key;
+            Color* color;
+        };
+        std::vector<PaletteEntry> PaletteEntries(Palette& p)
+        {
+            std::vector<PaletteEntry> entries;
+            auto add = [&](const char* palette, const std::string& entry, Color& color) {
+                entries.push_back({std::string(palette) + entry, &color});
+            };
+            for (int i = 0; i < kNatureCount; ++i)
+                add(kPaletteKeys[0], Capitalized(kNatureKeys[i]), p.aggression[i]);
+            for (int i = 0; i < kLabelShadeCount; ++i)
+                add(kPaletteKeys[1], std::string(kLabelShadeKeys[i]).substr(std::string(kLabelShadePrefix).size()), p.toughness[i]);
+            for (int i = 0; i < kClaimStateCount; ++i)
+                add(kPaletteKeys[2], Capitalized(kClaimKeys[i]), p.claim[i]);
+            for (int i = 0; i < kTargetStateCount; ++i)
+                add(kPaletteKeys[3], Capitalized(kTargetKeys[i]), p.target[i]);
+            for (int i = 0; i < kTargetTypeCount; ++i)
+                add(kPaletteKeys[4], Capitalized(kTypeKeys[i]), p.type[i]);
+            return entries;
+        }
+
+        std::string LineBase(PlateKind kind, int line) { return std::string(KindKey(kind)) + kLineInfix + std::to_string(line + 1); }
+
+        void LoadLine(SettingsStore& store, const std::string& base, LineDesign& line)
+        {
+            auto key = [&](const char* name) { return base + name; };
+            line.text     = store.GetString(key("Text").c_str(), line.text.c_str());
+            line.syncWith = LoadInt(store, key("Sync").c_str(), line.syncWith);
+            line.show.always = store.GetBool(key("Always").c_str(), line.show.always);
+            line.show.when   = LoadHex(store, key("When"), line.show.when);
+            line.align = static_cast<Align>(NameIndex(kAlignNames, kAlignCount, store.GetString(key("Align").c_str(), ""), static_cast<int>(line.align)));
+            line.font     = store.GetString(key("Font").c_str(), line.font.c_str());
+            line.bold     = store.GetBool(key("Bold").c_str(), line.bold);
+            line.textSize = LoadInt(store, key("TextSize").c_str(), line.textSize);
+            line.iconSize = LoadInt(store, key("IconSize").c_str(), line.iconSize);
+            LoadPick(store, key("Color"), line.color);
+            line.shadow = LoadInt(store, key("Shadow").c_str(), line.shadow);
+            LoadPick(store, key("ShadowColor"), line.shadowColor);
+            line.glow     = LoadInt(store, key("Glow").c_str(), line.glow);
+            line.glowSize = LoadInt(store, key("GlowSize").c_str(), line.glowSize);
+            LoadPick(store, key("GlowColor"), line.glowColor);
+        }
+
+        void SaveLine(SettingsStore& store, const std::string& base, const LineDesign& line)
+        {
+            auto key = [&](const char* name) { return base + name; };
+            store.Set(key("Text").c_str(), line.text.c_str());
+            StoreFloat(store, key("Sync"), static_cast<float>(line.syncWith));
+            StoreBool(store, key("Always"), line.show.always);
+            StoreHex(store, key("When"), line.show.when);
+            store.Set(key("Align").c_str(), kAlignNames[static_cast<int>(line.align)]);
+            store.Set(key("Font").c_str(), line.font.c_str());
+            StoreBool(store, key("Bold"), line.bold);
+            StoreFloat(store, key("TextSize"), static_cast<float>(line.textSize));
+            StoreFloat(store, key("IconSize"), static_cast<float>(line.iconSize));
+            SavePick(store, key("Color"), line.color);
+            StoreFloat(store, key("Shadow"), static_cast<float>(line.shadow));
+            SavePick(store, key("ShadowColor"), line.shadowColor);
+            StoreFloat(store, key("Glow"), static_cast<float>(line.glow));
+            StoreFloat(store, key("GlowSize"), static_cast<float>(line.glowSize));
+            SavePick(store, key("GlowColor"), line.glowColor);
+        }
+
+        std::string RowBase(PlateKind kind, int row)
+        {
+            return std::string(KindKey(kind)) + kRowInfix + Capitalized(RowKey(kind, row));
+        }
+
+        void LoadKind(SettingsStore& store, PlateKind kind, KindSettings& k)
+        {
+            for (int r = 0; r < RowCountOf(kind); ++r)
+            {
+                const std::string base = RowBase(kind, r);
+                RowSettings& row       = k.rows[r];
+                row.plate = static_cast<PlateMode>(NameIndex(kPlateModeNames, kPlateModeCount, store.GetString((base + "Plate").c_str(), ""), static_cast<int>(row.plate)));
+                row.outline = static_cast<OutlineMode>(NameIndex(kOutlineModeNames, kOutlineModeCount, store.GetString((base + "Outline").c_str(), ""), static_cast<int>(row.outline)));
+                LoadPick(store, base + "Color", row.outlineColor);
+            }
+            for (int n = 0; n < kPlateLines; ++n)
+                LoadLine(store, LineBase(kind, n), k.lines[n]);
+            const std::string base = std::string(KindKey(kind)) + kOrnamentInfix;
+            OrnamentSettings& o    = k.ornament;
+            o.on     = store.GetBool((base + "On").c_str(), o.on);
+            o.place  = static_cast<OrnamentPlace>(NameIndex(kOrnamentPlaceNames, kOrnamentPlaceCount, store.GetString((base + "Place").c_str(), ""), static_cast<int>(o.place)));
+            o.width  = LoadInt(store, (base + "Width").c_str(), o.width);
+            o.height = LoadInt(store, (base + "Height").c_str(), o.height);
+            LoadPick(store, base + "Color", o.color);
+        }
+
+        void SaveKind(SettingsStore& store, PlateKind kind, const KindSettings& k)
+        {
+            for (int r = 0; r < RowCountOf(kind); ++r)
+            {
+                const std::string base = RowBase(kind, r);
+                store.Set((base + "Plate").c_str(), kPlateModeNames[static_cast<int>(k.rows[r].plate)]);
+                store.Set((base + "Outline").c_str(), kOutlineModeNames[static_cast<int>(k.rows[r].outline)]);
+                SavePick(store, base + "Color", k.rows[r].outlineColor);
+            }
+            for (int n = 0; n < kPlateLines; ++n)
+                SaveLine(store, LineBase(kind, n), k.lines[n]);
+            const std::string base = std::string(KindKey(kind)) + kOrnamentInfix;
+            StoreBool(store, base + "On", k.ornament.on);
+            store.Set((base + "Place").c_str(), kOrnamentPlaceNames[static_cast<int>(k.ornament.place)]);
+            StoreFloat(store, base + "Width", static_cast<float>(k.ornament.width));
+            StoreFloat(store, base + "Height", static_cast<float>(k.ornament.height));
+            SavePick(store, base + "Color", k.ornament.color);
+        }
+
+        void LoadDesigner(SettingsStore& store, Settings& s)
+        {
+            for (int k = 0; k < kPlateKindCount; ++k)
+                LoadKind(store, static_cast<PlateKind>(k), s.kinds[k]);
+            for (const PaletteEntry& e : PaletteEntries(s.palette))
+                LoadColor(store, e.key, *e.color);
+            s.defaultFont    = store.GetString(kDefaultFontKey, s.defaultFont.c_str());
+            s.detectionShown = LoadHex(store, kDetectionShownKey, s.detectionShown);
+            std::istringstream names(store.GetString(kFriendsKey, ""));
+            for (std::string name; names >> name;)
+                s.friends.push_back(name);
+        }
+
+        void SaveDesigner(SettingsStore& store, const Settings& s)
+        {
+            for (int k = 0; k < kPlateKindCount; ++k)
+                SaveKind(store, static_cast<PlateKind>(k), s.kinds[k]);
+            Palette palette = s.palette;
+            for (const PaletteEntry& e : PaletteEntries(palette))
+                StoreColor(store, e.key, *e.color);
+            store.Set(kDefaultFontKey, s.defaultFont.c_str());
+            StoreHex(store, kDetectionShownKey, s.detectionShown);
+            std::string names;
+            for (const std::string& name : s.friends)
+                names += (names.empty() ? "" : " ") + name;
+            store.Set(kFriendsKey, names.c_str());
+        }
+
+        // The icons beside a name, as the old plate laid them: those on the left in the order's turn, GM always last of
+        // them and so nearest the name whatever its side says, then the name, then those on the right.
+        std::string PlayerNameText(const Settings& s)
+        {
+            if (!s.showPlayerIcons) return kTagName;
+            std::string left, right;
+            for (const PlayerIcon icon : s.playerIconOrder)
+            {
+                const int i = static_cast<int>(icon);
+                if (icon == PlayerIcon::Gm) continue;
+                if (s.playerIconSide[i] == IconSide::Left) left += kPlayerIconTags[i];
+                else if (s.playerIconSide[i] == IconSide::Right) right += kPlayerIconTags[i];
+            }
+            return left + kTagGm + kTagName + right;
+        }
+
+        // Reads the old fields, which every file loads, into the designer's: the look a version 2 file had.
+        void MigrateDesigner(Settings& s)
+        {
+            KindSettings& mobs      = s.Kind(PlateKind::Mobs);
+            KindSettings& players   = s.Kind(PlateKind::Players);
+            KindSettings& self      = s.Kind(PlateKind::Self);
+            KindSettings& npcs      = s.Kind(PlateKind::Npcs);
+            LineDesign& mobIcons    = mobs.lines[kMobIconLine];
+            LineDesign& mobLevel    = mobs.lines[kMobLevelLine];
+            LineDesign& mobName     = mobs.lines[kNameLine];
+            const int base          = std::clamp(s.mobNameSize, kMinTextSize, kMaxTextSize);
+            auto percent            = [&](int px) {
+                const float pixels = static_cast<float>(std::clamp(px, kMinTextSize, kMaxTextSize));
+                return static_cast<int>(std::lround(kPercentScale * pixels / static_cast<float>(base)));
+            };
+            // The icons are playerIconSize percent of the name they stand beside.
+            auto IconPercent        = [&](int nameSize) {
+                const float pixels = static_cast<float>(std::clamp(nameSize, kMinTextSize, kMaxTextSize));
+                return static_cast<int>(std::lround(static_cast<float>(s.playerIconSize) * pixels / static_cast<float>(base)));
+            };
+            auto fontOf             = [](const std::string& font) { return font == kDefaultFont ? std::string() : font; };
+            auto setVanilla         = [](KindSettings& k, PlateKind kind) {
+                for (int r = 0; r < RowCountOf(kind); ++r)
+                    k.rows[r].plate = PlateMode::Vanilla;
+            };
+            if (!s.replaceMobNames) setVanilla(mobs, PlateKind::Mobs);
+            if (!s.replacePlayerNames)
+            {
+                setVanilla(players, PlateKind::Players);
+                setVanilla(self, PlateKind::Self);
+            }
+            if (!s.replaceNpcNames) setVanilla(npcs, PlateKind::Npcs);
+
+            const Category natureCategory[kNatureCount] = {Category::WontAttack, Category::WillAttack, Category::NmWontAttack,
+                Category::NmWillAttack, Category::Placeholder, Category::Unknown};
+            bool anyNature = false;
+            for (int n = 0; n < kNatureCount; ++n)
+            {
+                const int c = CategoryIndex(natureCategory[n]);
+                anyNature   = anyNature || s.show[c];
+                mobs.rows[c].outline = s.show[c] ? OutlineMode::Shown : OutlineMode::Disabled;
+                s.palette.aggression[n] = s.color[c];
+            }
+            // Switched off, a claimed mob kept the outline its nature gave it.
+            for (const Category claim : {Category::PartyClaim, Category::OtherClaim})
+            {
+                const int c = CategoryIndex(claim);
+                mobs.rows[c].outline = s.show[c] || anyNature ? OutlineMode::Shown : OutlineMode::Disabled;
+                mobs.rows[c].outlineColor.source = s.show[c] ? ColorSource::Claim : ColorSource::Aggression;
+            }
+            s.palette.claim[static_cast<int>(ClaimState::Yours)]  = s.color[CategoryIndex(Category::PartyClaim)];
+            s.palette.claim[static_cast<int>(ClaimState::Others)] = s.color[CategoryIndex(Category::OtherClaim)];
+            std::ranges::copy(s.labelColor, s.palette.toughness);
+            s.palette.target[static_cast<int>(TargetState::Targeted)]   = s.cursorColor;
+            s.palette.target[static_cast<int>(TargetState::Locked)]     = s.lockedCursorColor;
+            s.palette.target[static_cast<int>(TargetState::SubTarget)]  = s.subCursorColor;
+            s.palette.target[static_cast<int>(TargetState::OutOfRange)] = s.outOfRangeCursorColor;
+            s.cursorEdgeColor = s.textOutline;
+            for (KindSettings& k : s.kinds)
+                for (LineDesign& line : k.lines)
+                    line.shadowColor.custom = s.textOutline;
+            mobLevel.shadowColor.custom = s.labelShadowColor;
+            mobLevel.shadow             = s.labelShadow;
+
+            mobIcons.font = mobName.font = fontOf(s.fontName);
+            mobIcons.bold = mobName.bold = s.fontBold;
+            mobLevel.font = fontOf(s.labelFontName);
+            mobLevel.bold = s.labelFontBold;
+            for (const PlateKind kind : {PlateKind::Players, PlateKind::Self})
+            {
+                LineDesign& line = s.Kind(kind).lines[kNameLine];
+                line.font        = fontOf(s.playerFontName);
+                line.bold        = s.playerFontBold;
+                line.text        = PlayerNameText(s);
+            }
+            players.lines[kNameLine].iconSize = IconPercent(s.playerNameSize);
+            self.lines[kNameLine].iconSize    = IconPercent(s.selfNameSize);
+            npcs.lines[kNameLine].font = fontOf(s.npcFontName);
+            npcs.lines[kNameLine].bold = s.npcFontBold;
+
+            s.baseSize                         = base;
+            mobLevel.textSize                  = percent(s.labelSize);
+            mobIcons.iconSize                  = percent(s.iconSize);
+            players.lines[kNameLine].textSize  = percent(s.playerNameSize);
+            self.lines[kNameLine].textSize     = percent(s.selfNameSize);
+            npcs.lines[kNameLine].textSize     = percent(s.npcNameSize);
+            s.timerPercent                     = percent(s.timerSize);
+
+            std::string level;
+            auto append = [](std::string& text, const std::string& part) { text += (text.empty() || part.empty() ? "" : " ") + part; };
+            if (s.showLabels) append(level, kTagLevelCon);
+            if (s.mobId == MobIdFormat::LastThree) append(level, kTagId);
+            if (s.mobId == MobIdFormat::Decimal) append(level, kTagServerId);
+            if (s.mobId == MobIdFormat::Full) append(level, std::string(kTagServerId) + " " + kTagId);
+            if (s.mobId != MobIdFormat::Off && s.markPlaceholders) append(level, kTagPlaceholder);
+            mobLevel.text = level;
+            std::string badges;
+            if (s.showDamageIcons) badges += kTagWeakResist;
+            if (s.showStatusRankIcons) badges += kTagStatus;
+            if (s.showImmunityIcons) badges += kTagImmune;
+            const std::string detect = s.showIcons ? kTagDetect : "";
+            const bool inlineRow     = s.mobIconPlace == IconPlace::Inline && !level.empty();
+            if (inlineRow)
+            {
+                const bool detectLeft = s.detectionIconSide == IconSide::Left, badgesLeft = s.badgeSide == IconSide::Left;
+                const std::string left  = (badgesLeft ? badges : "") + (detectLeft ? detect : "");
+                const std::string right = (detectLeft ? "" : detect) + (badgesLeft ? "" : badges);
+                std::string row;
+                append(row, left);
+                append(row, level);
+                append(row, right);
+                mobLevel.text = row;
+                mobIcons.text.clear();
+            }
+            else
+                mobIcons.text = s.badgeSide == IconSide::Left ? badges + detect : detect + badges;
+            auto condition = [&]() -> LineShow {
+                if (s.hideClaimed) return LineShow{false, ConditionBit(ShowCondition::Unclaimed)};
+                if (s.hideClaimedByParty)
+                    return LineShow{false, ConditionBit(ShowCondition::Unclaimed) | ConditionBit(ShowCondition::OthersClaim)};
+                return LineShow{};
+            };
+            mobLevel.show = condition();
+            if (!mobIcons.text.empty()) mobIcons.show = mobLevel.show;
+
+            mobName.glow     = s.nameGlow ? s.glowStrength : 0;
+            mobName.glowSize = s.glowSize;
+            if (s.ownGlowColor) mobName.glowColor = ColorPick{ColorSource::Custom, s.glowColor};
+            mobs.ornament.on     = s.showOrnament;
+            mobs.ornament.width  = s.ornamentWidth;
+            mobs.ornament.height = s.ornamentThickness;
+            if (s.ownOrnamentColor) mobs.ornament.color = ColorPick{ColorSource::Custom, s.ornamentColor};
+            for (KindSettings& k : s.kinds)
+            {
+                k.lines[kNameLine].shadow = s.nameShadow;
+                if (s.ownNameColor) k.lines[kNameLine].color = ColorPick{ColorSource::Custom, s.nameColor};
+            }
         }
 
         bool SameIgnoringCase(const std::string& a, const std::string& b)
@@ -292,6 +677,87 @@ namespace headsup
         return choices;
     }
 
+    namespace
+    {
+        void ClampPick(ColorPick& pick, const ColorPick& fallback)
+        {
+            if (static_cast<int>(pick.source) >= kColorSourceCount) pick.source = fallback.source;
+            pick.custom = ClampColor(pick.custom, fallback.custom);
+        }
+
+        void ClampLine(LineDesign& line, const LineDesign& d)
+        {
+            std::ranges::replace(line.text, '\n', ' ');
+            line.text.resize(std::min(line.text.size(), kMaxTemplate));
+            if (line.font.size() > kMaxFontName) line.font.clear();
+            if (static_cast<int>(line.align) >= kAlignCount) line.align = d.align;
+            line.show.when = line.show.when & kAllConditions;
+            line.textSize  = std::clamp(line.textSize, kMinSizePercent, kMaxSizePercent);
+            line.iconSize  = std::clamp(line.iconSize, kMinSizePercent, kMaxSizePercent);
+            line.shadow    = std::clamp(line.shadow, kMinShadow, kMaxShadow);
+            line.glow      = std::clamp(line.glow, kMinGlow, kMaxGlow);
+            line.glowSize  = std::clamp(line.glowSize, kMinGlowSize, kMaxGlowSize);
+            ClampPick(line.color, d.color);
+            ClampPick(line.shadowColor, d.shadowColor);
+            ClampPick(line.glowColor, d.glowColor);
+            if (line.syncWith < 0 || line.syncWith >= kPlateLines) line.syncWith = kNoSync;
+        }
+
+        // A cycle of syncs is cut at its highest-numbered line, so the lower line keeps its source.
+        void BreakSyncCycles(LineDesign (&lines)[kPlateLines])
+        {
+            for (int start = 0; start < kPlateLines; ++start)
+            {
+                int at = start, highest = start;
+                for (int step = 0; step < kPlateLines; ++step)
+                {
+                    at = lines[at].syncWith;
+                    if (at == kNoSync) break;
+                    highest = std::max(highest, at);
+                    if (at == start)
+                    {
+                        lines[highest].syncWith = kNoSync;
+                        break;
+                    }
+                }
+            }
+        }
+
+        void ClampDesigner(Settings& s, const Settings& d)
+        {
+            s.scaleMax = std::max(s.scaleMax, s.scaleMin);
+            for (int k = 0; k < kPlateKindCount; ++k)
+            {
+                KindSettings& kind = s.kinds[k];
+                const KindSettings& defaults = d.kinds[k];
+                for (int r = 0; r < kMaxRows; ++r)
+                {
+                    RowSettings& row = kind.rows[r];
+                    if (static_cast<int>(row.plate) >= kPlateModeCount) row.plate = defaults.rows[r].plate;
+                    if (static_cast<int>(row.outline) >= kOutlineModeCount) row.outline = defaults.rows[r].outline;
+                    ClampPick(row.outlineColor, defaults.rows[r].outlineColor);
+                }
+                for (int n = 0; n < kPlateLines; ++n)
+                    ClampLine(kind.lines[n], defaults.lines[n]);
+                BreakSyncCycles(kind.lines);
+                OrnamentSettings& o = kind.ornament;
+                if (static_cast<int>(o.place) >= kOrnamentPlaceCount) o.place = defaults.ornament.place;
+                o.width  = std::clamp(o.width, kMinOrnamentWidth, kMaxOrnamentWidth);
+                o.height = std::clamp(o.height, kMinOrnamentThickness, kMaxOrnamentThickness);
+                ClampPick(o.color, defaults.ornament.color);
+            }
+            Palette fallback = d.palette;
+            const std::vector<PaletteEntry> entries = PaletteEntries(s.palette), defaults = PaletteEntries(fallback);
+            for (size_t i = 0; i < entries.size(); ++i)
+                *entries[i].color = ClampColor(*entries[i].color, *defaults[i].color);
+            if (s.defaultFont.empty() || s.defaultFont.size() > kMaxFontName) s.defaultFont = d.defaultFont;
+            s.detectionShown &= kAllDetection;
+            std::erase_if(s.friends, [](const std::string& name) {
+                return name.empty() || std::ranges::any_of(name, [](char c) { return std::isspace(static_cast<unsigned char>(c)); });
+            });
+        }
+    }
+
     Settings Clamp(Settings s)
     {
         const Settings d;
@@ -349,6 +815,7 @@ namespace headsup
         if (MenuFontNamed(s.menuFont) == nullptr) s.menuFont = d.menuFont;
         s.menuScale = std::clamp(s.menuScale, kMinMenuScale, kMaxMenuScale);
         if (static_cast<int>(s.barSeparators) >= kBarSeparatorsCount) s.barSeparators = d.barSeparators;
+        ClampDesigner(s, d);
         for (StatusBadgeRule& status : s.statusBadges)
         {
             status.weakRank   = std::clamp(status.weakRank, kNoWeakRank, kMaxWeakRank);
@@ -490,21 +957,16 @@ namespace headsup
         s.playerFontBold = store.GetBool(kPlayerBoldKey, s.fontBold);
         s.npcFontName    = store.GetString(kNpcFontKey, s.fontName.c_str());
         s.npcFontBold    = store.GetBool(kNpcBoldKey, s.fontBold);
+        if (saved < kDesignerVersion) MigrateDesigner(s);
+        else LoadDesigner(store, s);
         return Clamp(s);
     }
 
     void SaveSettings(const Settings& s, SettingsStore& store)
     {
-        auto setBool  = [&](const std::string& key, bool v) { store.Set(key.c_str(), v ? "true" : "false"); };
-        auto setFloat = [&](const std::string& key, float v) {
-            char text[32];
-            std::snprintf(text, sizeof(text), "%.4f", v);
-            store.Set(key.c_str(), text);
-        };
-        auto setColor = [&](const std::string& base, const Color& c) {
-            for (int i = 0; i < 3; ++i)
-                setFloat(base + kChannelKeys[i], c.v[i]);
-        };
+        auto setBool  = [&](const std::string& key, bool v) { StoreBool(store, key, v); };
+        auto setFloat = [&](const std::string& key, float v) { StoreFloat(store, key, v); };
+        auto setColor = [&](const std::string& base, const Color& c) { StoreColor(store, base, c); };
         for (const BoolKey& b : kBools)
             setBool(b.key, s.*b.field);
         for (const IntKey& i : kInts)
@@ -591,6 +1053,7 @@ namespace headsup
         setFloat(kHelpBarXKey, static_cast<float>(s.helpBarX));
         setBool(kHelpBarBackgroundKey, s.helpBarBackground);
         setFloat(kHelpBarYKey, static_cast<float>(s.helpBarY));
+        SaveDesigner(store, s);
         setFloat(kVersionKey, static_cast<float>(kSettingsVersion));
     }
 

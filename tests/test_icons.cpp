@@ -370,3 +370,86 @@ TEST(every_rank_reads_as_the_wikis_percent_and_ranks_past_the_ends_as_the_ends)
     CHECK(RankText(kMinRank - 1, false) == "+50%" && RankText(kMaxRank + 1, false) == "-95%"); // Phoenix clamps them so
     CHECK(RankText(-2, true) == "-2" && RankText(12, true) == "12");
 }
+
+TEST(detection_icons_can_be_filtered_by_kind)
+{
+    const MobRecord m = Mob(kMobAggressive | kMobLink, kDetectSight | kDetectHearing);
+    CHECK(List(IconsFor(&m, kAllDetection)) == (std::vector<Icon>{Icon::AggroNQ, Icon::Link, Icon::Sight, Icon::Sound}));
+    CHECK(List(IconsFor(&m, DetectionBit(DetectionIcon::Link) | DetectionBit(DetectionIcon::Sound))) ==
+          (std::vector<Icon>{Icon::Link, Icon::Sound}));
+    CHECK_EQ(IconsFor(&m, 0).count, 0);
+    CHECK(DetectionOf(Icon::AggroHQ) == DetectionIcon::Aggro);
+    CHECK(DetectionOf(Icon::PassiveNQ) == DetectionIcon::Aggro);
+    CHECK(DetectionOf(Icon::TrueSight) == DetectionIcon::TrueSight);
+}
+
+TEST(the_badge_groups_split_the_info_icons_in_order)
+{
+    MobResistances r = Neutral();
+    SdtOf(r, Sdt::Impact)          = 5000;  // +50%
+    SdtOf(r, Sdt::Slashing)        = -2500; // -25%
+    RankOf(r, StatusRank::Silence) = 6;
+    r.immunity                     = kImmuneStun;
+    const auto group = [&](const MobResistances& mob, const BadgeRules& rules, BadgeGroup g) {
+        const InfoIconSet set = InfoIconsOf(&mob, rules, g);
+        return std::vector<InfoIcon>(set.icons, set.icons + set.count);
+    };
+    CHECK(group(r, BadgeRules{}, BadgeGroup::Weak) == (std::vector<InfoIcon>{{Icon::Impact, BadgeKind::Weak, 50}}));
+    CHECK(group(r, BadgeRules{}, BadgeGroup::Resist) == (std::vector<InfoIcon>{{Icon::Slashing, BadgeKind::Resist, 25}}));
+    CHECK(group(r, BadgeRules{}, BadgeGroup::Status) == (std::vector<InfoIcon>{{Icon::Silence, BadgeKind::StatusRank, 6}}));
+    CHECK(group(r, BadgeRules{}, BadgeGroup::Immune) == (std::vector<InfoIcon>{{Icon::Stun, BadgeKind::Immune, 0}}));
+    CHECK_EQ(InfoIconsOf(nullptr, BadgeRules{}, BadgeGroup::Weak).count, 0);
+
+    // The ranks and the second entries: each group holds an SDT or weakness first and its rank or resistance after.
+    MobResistances s = Neutral();
+    SdtOf(s, Sdt::Piercing)             = 2500;
+    ElementRankOf(s, Element::Fire)     = -3;
+    SdtOf(s, Sdt::H2H)                  = -1000;
+    ElementRankOf(s, Element::Ice)      = 11;
+    RankOf(s, StatusRank::Paralyze)     = -3;
+    RankOf(s, StatusRank::Gravity)      = 6;
+    s.immunity                          = kImmuneBind | kImmuneStun;
+    const BadgeRules rules              = Statuses(-2, 4);
+    CHECK(group(s, rules, BadgeGroup::Weak) ==
+          (std::vector<InfoIcon>{{Icon::Piercing, BadgeKind::Weak, 25}, {Icon::Fire, BadgeKind::WeakRank, -3}}));
+    CHECK(group(s, rules, BadgeGroup::Resist) ==
+          (std::vector<InfoIcon>{{Icon::H2H, BadgeKind::Resist, 10}, {Icon::Ice, BadgeKind::ResistRank, 11}}));
+    CHECK(group(s, rules, BadgeGroup::Status) ==
+          (std::vector<InfoIcon>{{Icon::Paralyze, BadgeKind::StatusWeak, -3}, {Icon::Gravity, BadgeKind::StatusRank, 6}}));
+    CHECK(group(s, rules, BadgeGroup::Immune) ==
+          (std::vector<InfoIcon>{{Icon::Bind, BadgeKind::Immune, 0}, {Icon::Stun, BadgeKind::Immune, 0}}));
+}
+
+TEST(each_icon_a_mobs_row_holds_belongs_to_its_own_filter_kind)
+{
+    struct Pair
+    {
+        Icon icon;
+        DetectionIcon kind;
+        MobRecord mob;
+    };
+    const Pair pairs[] = {
+        {Icon::AggroNQ, DetectionIcon::Aggro, Mob(kMobAggressive, 0)},
+        {Icon::AggroHQ, DetectionIcon::Aggro, Mob(kMobAggressive | kMobNotorious, 0)},
+        {Icon::PassiveNQ, DetectionIcon::Aggro, Mob(0, 0)},
+        {Icon::PassiveHQ, DetectionIcon::Aggro, Mob(kMobNotorious, 0)},
+        {Icon::Link, DetectionIcon::Link, Mob(kMobLink, 0)},
+        {Icon::Sight, DetectionIcon::Sight, Mob(0, kDetectSight)},
+        {Icon::TrueSight, DetectionIcon::TrueSight, Mob(kMobTrueDetection, kDetectSight)},
+        {Icon::Sound, DetectionIcon::Sound, Mob(0, kDetectHearing)},
+        {Icon::Scent, DetectionIcon::Scent, Mob(0, kDetectScent)},
+        {Icon::Magic, DetectionIcon::Magic, Mob(0, kDetectMagic)},
+        {Icon::Ability, DetectionIcon::Ability, Mob(0, kDetectAbility)},
+        {Icon::Blood, DetectionIcon::Blood, Mob(0, kDetectLowHp)},
+    };
+    for (const Pair& p : pairs)
+    {
+        CHECK(DetectionOf(p.icon) == p.kind);
+        const auto holds = [&](uint32_t shown) {
+            const std::vector<Icon> row = List(IconsFor(&p.mob, shown));
+            return std::ranges::find(row, p.icon) != row.end();
+        };
+        CHECK(holds(DetectionBit(p.kind)));
+        CHECK(!holds(kAllDetection & ~DetectionBit(p.kind)));
+    }
+}

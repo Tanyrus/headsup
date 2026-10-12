@@ -1,5 +1,7 @@
 #pragma once
 
+#include "con.h"
+#include "entity_state.h"
 #include "icons.h"
 #include "labels.h"
 #include "player_status.h"
@@ -15,15 +17,6 @@
 namespace headsup
 {
     using ActorPtr = uint32_t; // FFXI is a 32-bit process
-
-    enum class EntityKind : uint8_t
-    {
-        Mob,
-        Player, // you included
-        Npc,
-    };
-    // From IEntity::GetSpawnFlags: the mob bit wins over the player bit, and neither means an NPC.
-    EntityKind KindFromSpawnFlags(uint32_t flags);
 
     struct PlayerState
     {
@@ -54,6 +47,14 @@ namespace headsup
         WorldPoint feet{};
         bool claimedByParty = false;
         bool claimed        = false;
+        bool pet            = false;
+        bool party          = false;
+        bool isFriend       = false;
+        bool linkshell      = false;
+        bool engaged        = false;
+        bool self           = false;
+        std::optional<PlayerJobs> jobs = std::nullopt;
+        const char* ownerName          = "";
     };
 
     struct ActorInfo
@@ -79,6 +80,12 @@ namespace headsup
         bool claimedByParty    = false;
         bool claimed           = false;
         bool tooWeak           = false;
+        EntityState state{};
+        std::optional<CheckResult> checked{};
+        std::optional<PlayerStatus> status{};
+        bool placeholder = false;
+        std::optional<PlayerJobs> jobs{};
+        char ownerName[32] = {};
     };
 
     bool ReplacesName(const Settings& settings, const ActorInfo& info);
@@ -93,7 +100,8 @@ namespace headsup
     class Tracker
     {
     public:
-        void Update(const std::vector<ActorInput>& actors, const PlayerState& player, const Settings& settings);
+        void Update(const std::vector<ActorInput>& actors, const PlayerState& player, const Settings& settings,
+            const CursorTargets& targets);
         const ActorInfo* Find(ActorPtr actor) const;
         // The actor with this entity target index; null for 0 or when none has it.
         const ActorInfo* FindIndex(uint16_t index) const;

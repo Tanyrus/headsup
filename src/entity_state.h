@@ -1,0 +1,56 @@
+#pragma once
+
+#include "game_cursor.h"
+#include "labels.h"
+#include "plate_settings.h"
+#include "settings.h"
+
+#include <cstdint>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace headsup
+{
+    enum class EntityKind : uint8_t
+    {
+        Mob,
+        Player, // you included
+        Npc,
+    };
+    // From IEntity::GetSpawnFlags: the mob bit wins over the player bit, and neither means an NPC.
+    EntityKind KindFromSpawnFlags(uint32_t flags);
+
+    struct PlayerJobs
+    {
+        uint8_t mainJob = 0, mainLevel = 0, subJob = 0, subLevel = 0;
+        bool operator==(const PlayerJobs&) const = default;
+    };
+
+    struct EntityState
+    {
+        EntityKind kind     = EntityKind::Npc;
+        bool self = false, pet = false, alive = false, engaged = false, tooWeak = false;
+        Nature nature       = Nature::NoData;
+        Category row        = Category::Unknown; // mobs
+        PlayerRow playerRow = PlayerRow::Player; // players
+        LabelShade toughness = LabelShade::Unknown;
+        ClaimState claim    = ClaimState::Unclaimed;
+        TargetState target  = TargetState::None;
+        bool operator==(const EntityState&) const = default;
+    };
+
+    Nature NatureOf(Category classified, bool placeholder); // Classify's answer, with the placeholder flag
+    Category MobRowOf(Nature nature, bool claimedByParty, bool claimed);
+    PlayerRow PlayerRowOf(bool party, bool isFriend, bool linkshell);
+    PlateKind PlateKindOf(const EntityState& state);
+    int RowOf(const EntityState& state); // into KindSettings::rows
+    TargetType TypeOf(const EntityState& state);
+    bool Targeted(TargetState target);
+    TargetState TargetStateOf(uint16_t index, const CursorTargets& targets);
+    // A pick's color for this entity: a custom color, the game's name color, or the palette entry its state picks.
+    uint32_t ResolveColor(const ColorPick& pick, const EntityState& state, const Palette& palette, uint32_t gameArgb);
+    bool LineShows(const LineShow& show, const EntityState& state);
+    // Whether the Friends list names this player, ignoring case.
+    bool IsFriend(const std::vector<std::string>& friends, std::string_view name);
+}

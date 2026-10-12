@@ -83,11 +83,31 @@ namespace headsup
         }
     }
 
-    IconSet IconsFor(const MobRecord* mob)
+    IconSet IconsFor(const MobRecord* mob) { return IconsFor(mob, kAllDetection); }
+
+    DetectionIcon DetectionOf(Icon icon)
+    {
+        switch (icon)
+        {
+        case Icon::Link: return DetectionIcon::Link;
+        case Icon::Sight: return DetectionIcon::Sight;
+        case Icon::TrueSight: return DetectionIcon::TrueSight;
+        case Icon::Sound: return DetectionIcon::Sound;
+        case Icon::Scent: return DetectionIcon::Scent;
+        case Icon::Magic: return DetectionIcon::Magic;
+        case Icon::Ability: return DetectionIcon::Ability;
+        case Icon::Blood: return DetectionIcon::Blood;
+        default: return DetectionIcon::Aggro;
+        }
+    }
+
+    IconSet IconsFor(const MobRecord* mob, uint32_t detectionShown)
     {
         IconSet set;
         if (mob == nullptr) return set;
-        auto add = [&](Icon icon) { set.icons[set.count++] = icon; };
+        auto add = [&](Icon icon) {
+            if ((detectionShown & DetectionBit(DetectionOf(icon))) != 0) set.icons[set.count++] = icon;
+        };
 
         const bool notorious = (mob->flags & kMobNotorious) != 0;
         if (IsAggressive(*mob))
@@ -179,6 +199,28 @@ namespace headsup
             else if (sleeps == kImmuneDarkSleep) add({Icon::DarkSleep, BadgeKind::Immune, 0});
             for (const Status& status : kImmunities)
                 if ((mob->immunity & status.immunity) != 0) add({status.icon, BadgeKind::Immune, 0});
+        }
+        return set;
+    }
+
+    InfoIconSet InfoIconsOf(const MobResistances* mob, const BadgeRules& rules, BadgeGroup group)
+    {
+        const InfoIconSet all = InfoIconsFor(mob, rules);
+        InfoIconSet set;
+        for (int i = 0; i < all.count; ++i)
+        {
+            BadgeGroup of = BadgeGroup::Immune;
+            switch (all.icons[i].badge)
+            {
+            case BadgeKind::Weak:
+            case BadgeKind::WeakRank: of = BadgeGroup::Weak; break;
+            case BadgeKind::Resist:
+            case BadgeKind::ResistRank: of = BadgeGroup::Resist; break;
+            case BadgeKind::StatusWeak:
+            case BadgeKind::StatusRank: of = BadgeGroup::Status; break;
+            case BadgeKind::Immune: break;
+            }
+            if (of == group) set.icons[set.count++] = all.icons[i];
         }
         return set;
     }
