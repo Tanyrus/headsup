@@ -56,3 +56,23 @@ TEST(the_game_pointer_is_synced_before_each_click)
     for (const uint32_t other : {0x200u, 0x202u, 0x205u, 0x208u, 0x20Au, 0x20Cu}) // a move, each button's up, the wheel
         CHECK(!ClickMessage(other));
 }
+
+TEST(the_menu_size_is_the_registrys_when_set)
+{
+    const MenuSize size = MenuSizeOf(1920.0f, 1080.0f, 2560.0f, 1440.0f);
+    CHECK_EQ(size.width, 1920.0f);
+    CHECK_EQ(size.height, 1080.0f);
+}
+
+TEST(the_menu_size_falls_back_to_the_back_buffer)
+{
+    const MenuSize size = MenuSizeOf(0.0f, 0.0f, 2560.0f, 1440.0f);
+    CHECK_EQ(size.width, 2560.0f);
+    CHECK_EQ(size.height, 1440.0f);
+    const MenuSize half = MenuSizeOf(1920.0f, 0.0f, 2560.0f, 1440.0f);
+    CHECK_EQ(half.width, 1920.0f);
+    CHECK_EQ(half.height, 1440.0f);
+    const MenuSize other = MenuSizeOf(0.0f, 1080.0f, 2560.0f, 1440.0f);
+    CHECK_EQ(other.width, 2560.0f);
+    CHECK_EQ(other.height, 1080.0f);
+}

@@ -1,6 +1,7 @@
 #include "bar_game_help.h"
 
 #include "bar_layout.h"
+#include "utf16.h"
 
 #include <algorithm>
 
@@ -12,7 +13,7 @@ namespace headsup
         {
             size_t count = 0;
             for (const char c : text)
-                if ((static_cast<unsigned char>(c) & 0xC0) != 0x80) ++count; // not a continuation byte
+                if (!ContinuesCharacter(c)) ++count;
             return count;
         }
 

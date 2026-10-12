@@ -1,40 +1,15 @@
 #pragma once
 
 #include "argb.h"
-#include "icons.h"
 
 #include <cstdint>
 #include <optional>
 
 namespace headsup
 {
-    struct Settings;
-
     constexpr uint16_t kOtherPlayerPacket = 0x00D; // server to client: another player's update
     constexpr uint16_t kOwnStatusPacket   = 0x037; // server to client: the player's own status
     constexpr uint16_t kCharSyncPacket    = 0x067; // server to client: a character's sync, level sync among it
-
-    // The icons beside a player's name, in their order on either side.
-    enum class PlayerIcon : uint8_t
-    {
-        Gm,
-        Mentor,
-        NewAdventurer,
-        LevelSync,
-        Away,
-        Linkshell,
-        Bazaar,
-        SeekingParty,
-    };
-    constexpr int kPlayerIconCount = static_cast<int>(PlayerIcon::SeekingParty) + 1;
-
-    enum class IconSide : uint8_t
-    {
-        Left,
-        Right,
-        Hidden,
-    };
-    constexpr int kIconSideCount = static_cast<int>(IconSide::Hidden) + 1;
 
     struct PlayerStatus
     {
@@ -80,10 +55,4 @@ namespace headsup
 
     // Away, mentor, new adventurer and GM are only in the packets; memory is current for the rest.
     PlayerStatus WithPacketStatus(const PlayerStatus& memory, const PlayerStatus* packet);
-
-    struct PlayerIconRows
-    {
-        IconSet left, right;
-    };
-    PlayerIconRows PlayerIcons(const PlayerStatus& status, const Settings& settings);
 }

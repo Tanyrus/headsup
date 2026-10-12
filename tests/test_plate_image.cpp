@@ -87,6 +87,18 @@ TEST(textures_round_up_to_a_power_of_two)
         CHECK_EQ(TextureSide(pixels), side);
 }
 
+TEST(a_texts_texture_is_no_larger_than_the_device_makes_or_the_client_holds_many_of)
+{
+    CHECK_EQ(TextTextureSide(2048, 2048), 2048);
+    CHECK_EQ(TextTextureSide(4096, 2048), 2048);   // the smaller of the device's two limits
+    CHECK_EQ(TextTextureSide(2048, 4096), 2048);
+    CHECK_EQ(TextTextureSide(1024, 1024), 1024);
+    CHECK_EQ(TextTextureSide(3000, 3000), 2048);   // a 2049 px image is padded to 4096, so only powers of two count
+    CHECK_EQ(TextTextureSide(16384, 16384), 4096); // 16384 by 1024 is 64 MB in a 32-bit client, for one text
+    CHECK_EQ(TextTextureSide(0, 0), 2048);         // the device did not say
+    CHECK_EQ(TextTextureSide(4096, 0), 2048);
+}
+
 TEST(the_arrow_points_down_inside_its_margin)
 {
     const Coverage arrow = ShapeCoverage(ArrowShape(), 8, 2);
@@ -192,16 +204,6 @@ TEST(no_glow_and_no_shadow_leave_just_the_letters)
     const Image image = Styled(Block(4, 4), Layers{0.0f, 0, 0.0f, 0xFFFFFFFFu, 0xFF000000u, 0xFF00FF00u});
     CHECK_EQ(Pixel(image, 3, 5), 0u);
     CHECK_EQ(Pixel(image, 4, 5), 0xFFFFFFFFu);
-}
-
-TEST(the_placeholder_mark_takes_its_own_color_from_its_column_on)
-{
-    Layers layers{0.0f, 0, 0.0f, 0xFFFFFFFFu, 0xFF000000u, 0};
-    layers.markX     = 10;
-    layers.markColor = 0xFFD9A6FFu;
-    const Image image = Styled(Block(12, 4), layers);
-    CHECK_EQ(Pixel(image, 9, 8), 0xFFFFFFFFu);
-    CHECK_EQ(Pixel(image, 10, 8), 0xFFD9A6FFu);
 }
 
 TEST(a_lighter_color_is_half_way_to_white)

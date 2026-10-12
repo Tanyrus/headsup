@@ -3,6 +3,7 @@
 #include "code_patch.h"
 #include "name_frame.h"
 #include "native_locate.h"
+#include "plate_settings.h"
 #include "strip_text.h"
 #include "weather.h"
 
@@ -22,18 +23,19 @@ namespace headsup
     // Sends every name the game is about to draw through HeadsUp first: the six bytes at the name routine's hook
     // (native_locate.h) become a jump to a gate that calls OnName with the routine's frame, then either runs the bytes
     // it replaced and resumes the routine, or skips to the routine's exit so the game draws nothing.
-    // An entity whose names the hook may meet this frame, and whether HeadsUp draws them instead of the game.
+    // An entity whose names the hook may meet this frame, and what becomes of them: kept, hidden or replaced.
     struct NameOwner
     {
         uint32_t actor;
         uint16_t index;
-        bool replace;
+        HookAction action;
     };
 
     struct NameStats
     {
         uint32_t names    = 0; // tracked entities' names the game was about to draw
         uint32_t replaced = 0; // of those, drawn by HeadsUp instead
+        uint32_t hidden   = 0; // of those, drawn by no one
     };
 
     class NameHook

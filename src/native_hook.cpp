@@ -816,7 +816,8 @@ extern "C" uint32_t HeadsUpOnName(uint32_t frame)
     g_Drawn[owner->index]      = name;
     g_DrawnFrame[owner->index] = g_Frame;
     ++g_Stats.names;
-    if (!owner->replace) return 0;
-    ++g_Stats.replaced;
+    if (owner->action == HookAction::Keep) return 0;
+    if (owner->action == HookAction::Hide) ++g_Stats.hidden;
+    else ++g_Stats.replaced;
     return 1;
 }

@@ -270,7 +270,7 @@ namespace headsup
                         paint.Over(strong(shadow[static_cast<size_t>(above * coverage.width + x)]), layers.shadowColor);
                     paint.Over(strong(shadow[i]), layers.shadowColor);
                 }
-                paint.Over(Cover(coverage, i), x >= layers.markX ? layers.markColor : layers.color);
+                paint.Over(Cover(coverage, i), layers.color);
                 image.argb[i] = paint.Color();
             }
         }
@@ -505,6 +505,15 @@ namespace headsup
         while (side < pixels)
             side *= 2;
         return side;
+    }
+
+    int TextTextureSide(uint32_t maxWidth, uint32_t maxHeight)
+    {
+        constexpr uint32_t kLargest = 4096; // by 1024 is 16 MB; a 16384 px side, which devices allow, is 64 MB
+        const uint32_t smaller      = std::min(maxWidth, maxHeight);
+        if (smaller == 0) return kFallbackTextureSide;
+        const int side = static_cast<int>(std::min(smaller, kLargest));
+        return TextureSide(side) == side ? side : TextureSide(side) / 2;
     }
 
     void CopyToCorner(const void* image, int width, int height, void* rows, int pitch, int sideX, int sideY)

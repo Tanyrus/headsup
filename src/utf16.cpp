@@ -10,8 +10,6 @@ namespace headsup
         constexpr uint32_t kMaxCodePoint  = 0x10FFFF;
         // UTF-8: a lead byte's top bits give its sequence's length, and each continuation byte carries six bits.
         constexpr uint8_t kAsciiEnd          = 0x80;
-        constexpr uint8_t kContinuationMask  = 0xC0;
-        constexpr uint8_t kContinuationTag   = 0x80;
         constexpr int kContinuationBits      = 6;
         constexpr uint32_t kContinuationBody = (1u << kContinuationBits) - 1;
         constexpr int kLeadBits              = 8;
@@ -58,7 +56,7 @@ namespace headsup
             for (; taken < static_cast<size_t>(length) && i + taken < utf8.size(); ++taken)
             {
                 const auto next = static_cast<uint8_t>(utf8[i + taken]);
-                if ((next & kContinuationMask) != kContinuationTag) break;
+                if (!ContinuesCharacter(utf8[i + taken])) break;
                 code = (code << kContinuationBits) | (next & kContinuationBody);
             }
             if (taken != static_cast<size_t>(length) || code > kMaxCodePoint)

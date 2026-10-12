@@ -19,6 +19,9 @@ namespace headsup
     // server counts.
     bool IsSittingStatus(uint32_t status);
 
+    // The game's event status: cutscenes and NPC dialogs alike.
+    bool IsEventStatus(uint32_t status);
+
     // A point in the game's world in Direct3D's axes: x, height (up is negative) and the entity's y.
     struct WorldPoint
     {
@@ -35,6 +38,10 @@ namespace headsup
         WorldPoint eye; // where the camera is
     };
     Camera MakeCamera(const float view[16], const float projection[16], float screenHeight);
+    // Some clients draw nothing that carries the camera for long stretches, and one kept from before sits where you
+    // were then: it counts for this many frames after the last draw that gave it.
+    constexpr uint32_t kCameraGraceFrames = 8;
+    bool CameraStillSeen(uint32_t frame, uint32_t seenFrame);
 
     bool RowAtHeight(const Camera& camera, const WorldPoint& feet, float height, float& row);
     bool HeightAtRow(const Camera& camera, const WorldPoint& feet, float row, float& height);

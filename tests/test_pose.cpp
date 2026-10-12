@@ -21,6 +21,16 @@ namespace
 
 }
 
+TEST(a_camera_no_draw_gives_any_more_stops_counting)
+{
+    // A tester's client drew nothing that carries the camera for a whole frame, and the one kept from earlier was 73
+    // yalms from the player and facing away: a kept camera is only good for the moment after its last draw.
+    CHECK(CameraStillSeen(500, 500));
+    CHECK(CameraStillSeen(500 + kCameraGraceFrames, 500));
+    CHECK(!CameraStillSeen(500 + kCameraGraceFrames + 1, 500));
+    CHECK(!CameraStillSeen(90000, 500));
+}
+
 TEST(statuses_give_the_pose)
 {
     CHECK(PoseFromStatus(0) == Pose::Standing);
@@ -120,4 +130,15 @@ TEST(a_camera_knows_where_it_is)
           test::Near(camera.eye.z, 20.0f, 1e-4f));
     CHECK(test::Near(Distance(camera.eye, WorldPoint{10.0f, -5.0f, 17.0f}), 3.0f, 1e-4f));
     CHECK(test::Near(Distance(WorldPoint{0.0f, 0.0f, 0.0f}, WorldPoint{3.0f, 4.0f, 12.0f}), 13.0f, 1e-4f));
+}
+
+TEST(status_4_is_the_games_event_status_and_nothing_else_is)
+{
+    CHECK(IsEventStatus(4));
+    CHECK(!IsEventStatus(0));
+    CHECK(!IsEventStatus(1));
+    CHECK(!IsEventStatus(3));
+    CHECK(!IsEventStatus(5));
+    CHECK(!IsEventStatus(33));
+    CHECK(!IsEventStatus(47));
 }

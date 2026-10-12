@@ -1,25 +1,13 @@
 #pragma once
 
+#include "icons.h"
 #include "settings.h"
-#include "tracker.h"
 
 #include <cstdint>
 #include <string>
 
 namespace headsup
 {
-    // What a look adds to a mob's plate beyond its text: the glow around its name and the ornament above it, in the mob's
-    // outline color unless the menu gives them their own.
-    struct PlateStyle
-    {
-        bool glow          = false;
-        uint32_t glowColor = 0;
-        float glowStrength = 0.0f; // times the mockup's glow
-        float glowSize     = 0.0f; // times the mockup's glow
-        bool ornament      = false;
-        uint32_t ornamentColor = 0;
-    };
-
     // How one line of text is drawn: its font and the shadow under it.
     struct LineStyle
     {
@@ -31,12 +19,6 @@ namespace headsup
         bool operator==(const LineStyle&) const = default;
     };
 
-    PlateStyle StyleFor(const ActorInfo& info, bool hasLevelLine, const Settings& settings);
-    // Names and the ornament's diamond.
-    // The name font and shadow of this kind of name.
-    LineStyle NameLineStyle(const Settings& settings, EntityKind kind = EntityKind::Mob);
-    // The level line and the placeholder timers.
-    LineStyle LevelLineStyle(const Settings& settings);
     // Badges' numbers, which sit on their icons.
     LineStyle BadgeLineStyle(const Settings& settings);
 

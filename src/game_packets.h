@@ -81,4 +81,14 @@ namespace headsup
     // A linkshell's name as Phoenix packs it (EncodeStringLinkshell): 6-bit codes from the first byte's top bits,
     // a-z 1 to 26, A-Z 27 to 52, 0-9 53 to 62, ended by 63 or by four 1 bits and zeros, 20 at most.
     std::string LinkshellName(const uint8_t* packed, size_t bytes);
+    // The name of a linkshell you wear, from its item as the game keeps it (Ashita's item_t), in the bytes a check of
+    // you carries. Empty for any other item.
+    std::string WornLinkshellName(uint32_t itemFlags, const uint8_t* extra, size_t extraBytes);
+    // A container's slots as the client keeps them (Ashita's items_t): items sit from slot 1 to the capacity the game
+    // reports, and the last slot to look in is never past the array's end.
+    constexpr uint32_t kContainerSlots = 81;
+    constexpr uint32_t LastItemSlot(uint32_t capacity)
+    {
+        return capacity < kContainerSlots ? capacity : kContainerSlots - 1;
+    }
 }

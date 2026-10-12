@@ -22,6 +22,12 @@ namespace headsup
         return picking ? CursorTargets{index(slot1), index(slot0), locked} : CursorTargets{index(slot0), 0, locked};
     }
 
+    MenuSize MenuSizeOf(float registryWidth, float registryHeight, float backBufferWidth, float backBufferHeight)
+    {
+        return MenuSize{registryWidth > 0.0f ? registryWidth : backBufferWidth,
+            registryHeight > 0.0f ? registryHeight : backBufferHeight};
+    }
+
     void PlaceAnchors(CursorTargets& targets, const CursorWindow& window, float menuWidth, float menuHeight,
         float backBufferWidth, float backBufferHeight)
     {

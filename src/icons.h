@@ -2,14 +2,14 @@
 
 #include "generated/icon_ids.h"
 #include "mobdata.h"
+#include "plate_settings.h"
 
 #include <cstdint>
 #include <string>
 
 namespace headsup
 {
-    // The longest row: a mob's aggro, link, sight or true sight, sound, scent, magic, ability and blood, or every player
-    // icon on one side.
+    // The longest row: a mob's aggro, link, sight or true sight, sound, scent, magic, ability and blood.
     constexpr int kMaxIcons = 8;
 
     struct IconSet
@@ -18,9 +18,11 @@ namespace headsup
         int count = 0;
     };
 
-    // In XIUI's order. The aggro icon is the mob's nature (whether it aggros at all), not whether it would attack this
-    // player.
-    IconSet IconsFor(const MobRecord* mob);
+    // In XIUI's order, only the icons whose DetectionIcon bit is in detectionShown. The aggro icon is the mob's nature
+    // (whether it aggros at all), not whether it would attack this player.
+    IconSet IconsFor(const MobRecord* mob, uint32_t detectionShown);
+    // The kind of detection an icon IconsFor gives belongs to; any icon no mob's row holds reads as Aggro.
+    DetectionIcon DetectionOf(Icon icon);
     // The word a popup's tag says for an icon IconsFor gives: "Aggressive" for either aggro icon, "True sight"; empty
     // for any other icon.
     const char* IconTag(Icon icon);
@@ -66,7 +68,6 @@ namespace headsup
     };
     struct BadgeRules
     {
-        bool damage = true, statusRanks = true, immunities = true;
         int elementWeakRank = -1, elementResistRank = 4;
         int maxElements = kElementCount; // by rank; past it the smallest differences from neutral go first
         StatusBadgeRule status[kStatusRankCount] = {};
@@ -78,6 +79,10 @@ namespace headsup
     // element's rank counts only when its SDT shows nothing; a status the mob is immune to shows no rank. Light and dark
     // sleep share one Sleep badge when theirs are the same.
     InfoIconSet InfoIconsFor(const MobResistances* mob, const BadgeRules& rules);
+    enum class BadgeGroup : uint8_t { Weak, Resist, Status, Immune };
+    // The entries of InfoIconsFor in one group, in its order: Weak holds Weak and WeakRank, Resist Resist and
+    // ResistRank, Status StatusWeak and StatusRank.
+    InfoIconSet InfoIconsOf(const MobResistances* mob, const BadgeRules& rules, BadgeGroup group);
     // A change in damage taken as the badges spell it: "+25%", "-50%", "0%".
     std::string PercentText(int percent);
     // A rank as the wikis' percent, -3 as "+50%" (150%) and 4 as "-50%", or as the rank itself.

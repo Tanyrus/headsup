@@ -1,7 +1,6 @@
 #include "gpu.h"
 
 #include "game_glyphs.h"
-#include "labels.h"
 #include "utf16.h"
 
 #include <algorithm>
@@ -68,23 +67,15 @@ namespace headsup
     }
 
     bool GdiText::Rasterize(const char* text, const char* family, int pixelHeight, bool bold, int tracking,
-        int margin, size_t markAt, Coverage& out, int& markX)
+        int margin, Coverage& out)
     {
-        markX = kNoMarkColumn;
-        out   = Coverage{};
+        out = Coverage{};
         const HDC dc = WithFont(family, pixelHeight, bold, tracking);
         if (dc == nullptr) return false;
         const std::wstring wide = Utf16(text);
         const auto length       = static_cast<int>(wide.size());
         SIZE size{};
         if (!GetTextExtentPoint32W(dc, wide.c_str(), length, &size)) return false;
-        if (markAt != Label::kNoMark)
-        {
-            const std::wstring before = Utf16(std::string(text).substr(0, markAt));
-            SIZE start{};
-            if (!GetTextExtentPoint32W(dc, before.c_str(), static_cast<int>(before.size()), &start)) return false;
-            markX = margin + start.cx;
-        }
         const int width  = size.cx + 2 * margin;
         const int height = size.cy + 2 * margin;
         BITMAPINFO info{};
@@ -122,14 +113,22 @@ namespace headsup
         return true;
     }
 
-    float GdiText::Measure(const char* text, const char* family, int pixelHeight)
+    bool GdiText::Extent(const char* text, const char* family, int pixelHeight, bool bold, int& width, int& height)
     {
-        const HDC dc = WithFont(family, pixelHeight, false, 0);
-        if (dc == nullptr) return 0.0f;
+        const HDC dc = WithFont(family, pixelHeight, bold, 0);
+        if (dc == nullptr) return false;
         const std::wstring wide = Utf16(text);
         SIZE size{};
-        if (!GetTextExtentPoint32W(dc, wide.c_str(), static_cast<int>(wide.size()), &size)) return 0.0f;
-        return static_cast<float>(size.cx);
+        if (!GetTextExtentPoint32W(dc, wide.c_str(), static_cast<int>(wide.size()), &size)) return false;
+        width  = size.cx;
+        height = size.cy;
+        return true;
+    }
+
+    float GdiText::Measure(const char* text, const char* family, int pixelHeight)
+    {
+        int width = 0, height = 0;
+        return Extent(text, family, pixelHeight, false, width, height) ? static_cast<float>(width) : 0.0f;
     }
 
     LineInk GdiText::FontInk(const char* family, int pixelHeight, const char* glyphs)
@@ -138,8 +137,7 @@ namespace headsup
         if (known != m_Inks.end()) return known->second;
         auto inkOf = [&](const char* text) {
             Coverage coverage;
-            int markX = kNoMarkColumn;
-            return Rasterize(text, family, pixelHeight, false, 0, 0, Label::kNoMark, coverage, markX)
+            return Rasterize(text, family, pixelHeight, false, 0, 0, coverage)
                        ? FindInk(coverage, kInkCoverage)
                        : InkBox{};
         };

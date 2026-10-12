@@ -22,7 +22,7 @@ TEST(each_theme_has_the_mockups_colors_and_shape)
     CHECK_EQ(PaletteOf(BarTheme::PhoenixRedOrnate).accent, 0xFFC55151u);
     CHECK(PaletteOf(BarTheme::PhoenixRedPills).shape == BarShape::Pills);
     CHECK_EQ(PaletteOf(BarTheme::PhoenixRedPills).pillBorder, 0x33D2ABABu); // #d2abab at 20%
-    CHECK(std::string(BarThemeName(BarTheme::PhoenixRedPills)) == "Phoenix red, pills");
+    CHECK(std::string(BarThemeName(BarTheme::PhoenixRedPills)) == "Phoenix Red, Pills");
 }
 
 TEST(sizes_follow_the_bar_height)

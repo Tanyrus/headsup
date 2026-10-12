@@ -1,6 +1,7 @@
 #include "bar_layout.h"
 
 #include "mouse_messages.h"
+#include "utf16.h"
 
 #include <algorithm>
 #include <cmath>
@@ -266,7 +267,7 @@ namespace headsup
         for (int n = 0; n < characters && end < text.size(); ++n)
             do
                 ++end;
-            while (end < text.size() && (static_cast<unsigned char>(text[end]) & 0xC0) == 0x80);
+            while (end < text.size() && ContinuesCharacter(text[end]));
         if (end >= text.size()) return text;
         std::string cut = text.substr(0, end);
         while (!cut.empty() && cut.back() == ' ')
@@ -310,7 +311,7 @@ namespace headsup
         std::vector<size_t> cuts;
         for (size_t end = 1; end < text.size(); ++end)
         {
-            if ((static_cast<unsigned char>(text[end]) & 0xC0) == 0x80) continue; // never cut inside a UTF-8 character
+            if (ContinuesCharacter(text[end])) continue;
             size_t cut = end;
             while (cut > 0 && text[cut - 1] == ' ')
                 --cut;

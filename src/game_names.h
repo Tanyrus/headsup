@@ -45,7 +45,10 @@ namespace headsup
         float TargetScaleY() const { return m_Scene.y; }
         float BackBufferWidth() const { return m_BackBufferWidth; }
         float BackBufferHeight() const { return m_BackBufferHeight; }
-        const Camera* SceneCamera() const { return m_HaveCamera ? &m_Camera : nullptr; }
+        const Camera* SceneCamera() const
+        {
+            return m_HaveCamera && CameraStillSeen(m_Frame, m_CameraFrame) ? &m_Camera : nullptr;
+        }
 
         uint32_t MeshDraws(uint16_t index) const;
         uint32_t FramesSinceMesh(uint16_t index) const;
@@ -78,6 +81,7 @@ namespace headsup
         TargetScale m_Scene;
         uintptr_t m_SceneDepth   = 0;
         Camera m_Camera{};
-        bool m_HaveCamera = false;
+        bool m_HaveCamera      = false;
+        uint32_t m_CameraFrame = 0; // the frame a draw last gave it in
     };
 }

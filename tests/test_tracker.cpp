@@ -46,14 +46,18 @@ namespace
     const PlayerState kLevel20{20, false};
     const PlayerState kLevel75{75, false};
 
-    // Outlines for every category, whatever the defaults show.
+    // Outlines for every mob row, whatever the defaults show.
     Settings EveryCategory()
     {
         Settings s;
-        for (bool& shown : s.show)
-            shown = true;
+        for (RowSettings& row : s.Kind(PlateKind::Mobs).rows)
+            row.outline = OutlineMode::Shown;
         return s;
     }
+
+    uint32_t Aggression(const Settings& s, Nature nature) { return ToArgb(s.palette.aggression[static_cast<int>(nature)]); }
+
+    void SetMobOutline(Settings& s, Category row, OutlineMode mode) { s.Kind(PlateKind::Mobs).rows[CategoryIndex(row)].outline = mode; }
 }
 
 TEST(a_mob_attacks_as_phoenixs_aggro_check_decides)
@@ -102,7 +106,7 @@ TEST(a_mob_attacks_as_phoenixs_aggro_check_decides)
 TEST(players_and_npcs_keep_their_names_without_outlines)
 {
     Tracker t;
-    t.Update({Player(0x1000), Npc(0x1100)}, kLevel20, Settings{});
+    t.Update({Player(0x1000), Npc(0x1100)}, kLevel20, Settings{}, CursorTargets{});
     const ActorInfo* player = t.Find(0x1000);
     const ActorInfo* npc    = t.Find(0x1100);
     CHECK(player != nullptr && npc != nullptr);
@@ -110,42 +114,15 @@ TEST(players_and_npcs_keep_their_names_without_outlines)
     CHECK(std::string(player->name) == "Carrott");
     CHECK(std::string(npc->name) == "Home Point #1");
     CHECK(!player->outline && !npc->outline);
-    CHECK(player->label.text[0] == '\0' && npc->mobIcons.count == 0); // levels and icons come from mob data
+    CHECK(player->level.text[0] == '\0' && npc->mob == nullptr); // levels and icons come from mob data
     CHECK_EQ(t.OutlinedCount(), 0u);
     CHECK(t.Actors() == (std::vector<ActorPtr>{0x1000, 0x1100}));
-}
-
-TEST(a_name_is_replaced_when_its_kind_is_and_it_has_one)
-{
-    ActorInput unnamed = Npc(0x1300);
-    unnamed.index      = 1101;
-    unnamed.name       = "";
-    const std::vector<ActorInput> everyone{BountyHunter(0x1000), Player(0x1100), Npc(0x1200), unnamed};
-    struct Case
-    {
-        bool mobs, players, npcs;
-        bool mob, player, npc;
-    };
-    for (const Case& c : {Case{true, false, false, true, false, false}, Case{false, true, false, false, true, false},
-             Case{false, false, true, false, false, true}})
-    {
-        Settings s;
-        s.replaceMobNames  = c.mobs;
-        s.replacePlayerNames = c.players;
-        s.replaceNpcNames    = c.npcs;
-        Tracker t;
-        t.Update(everyone, kLevel20, s);
-        CHECK(ReplacesName(s, *t.Find(0x1000)) == c.mob);
-        CHECK(ReplacesName(s, *t.Find(0x1100)) == c.player);
-        CHECK(ReplacesName(s, *t.Find(0x1200)) == c.npc);
-        CHECK(!ReplacesName(s, *t.Find(0x1300)));
-    }
 }
 
 TEST(owner_is_the_first_tracked_pointer_of_any_kind)
 {
     Tracker t;
-    t.Update({Player(0x1000), BountyHunter(0x2000)}, kLevel20, Settings{});
+    t.Update({Player(0x1000), BountyHunter(0x2000)}, kLevel20, Settings{}, CursorTargets{});
     const uint32_t playerDraw[] = {0x5, 0x1234, 0x1000, 0x2000}; // stale mob pointer above the live player
     CHECK(FindOwner(std::begin(playerDraw), std::end(playerDraw), t) == t.Find(0x1000));
     const uint32_t mobDraw[] = {0x5, 0x2000, 0x1000};
@@ -157,7 +134,7 @@ TEST(owner_is_the_first_tracked_pointer_of_any_kind)
 TEST(owner_is_looked_for_past_the_games_draw_call_not_in_other_plugins_leftovers)
 {
     Tracker t;
-    t.Update({Player(0x1000), BountyHunter(0x2000)}, kLevel20, Settings{});
+    t.Update({Player(0x1000), BountyHunter(0x2000)}, kLevel20, Settings{}, CursorTargets{});
     constexpr uint32_t kCodeBegin = 0x400000, kCodeEnd = 0x500000;
     // A plugin that ran first left the target (the mob) under the game's return address, 0x401234.
     const uint32_t playerDraw[] = {0x5, 0x2000, 0x401234, 0x1000};
@@ -181,13 +158,13 @@ TEST(players_keep_their_pose_and_feet)
     ActorInput seated = Player(0x1100);
     seated.pose       = Pose::Chair;
     seated.feet       = WorldPoint{61.9f, -0.9f, -98.0f};
-    t.Update({seated, Player(0x1200)}, kLevel20, Settings{});
+    t.Update({seated, Player(0x1200)}, kLevel20, Settings{}, CursorTargets{});
     CHECK(t.Find(0x1100)->pose == Pose::Chair);
     CHECK_EQ(t.Find(0x1100)->feet.z, -98.0f);
     CHECK(t.Find(0x1200)->pose == Pose::Standing);
 }
 
-TEST(players_get_their_status_icons_and_linkshell_color)
+TEST(players_keep_their_status_and_linkshell_color)
 {
     PlayerStatus status;
     status.bazaar = status.linkshell = true;
@@ -195,16 +172,11 @@ TEST(players_get_their_status_icons_and_linkshell_color)
     ActorInput player    = Player(0x1000);
     player.status        = status;
     Tracker t;
-    t.Update({player, Player(0x1100)}, kLevel20, Settings{});
+    t.Update({player, Player(0x1100)}, kLevel20, Settings{}, CursorTargets{});
     const ActorInfo* shopping = t.Find(0x1000);
-    CHECK_EQ(shopping->playerIcons.left.count, 2);
-    CHECK(shopping->playerIcons.left.icons[0] == Icon::Linkshell && shopping->playerIcons.left.icons[1] == Icon::Bazaar);
+    CHECK(shopping->status && shopping->status->bazaar && shopping->status->linkshell && !shopping->status->away);
     CHECK_EQ(shopping->linkshellArgb, 0xFF8F1FFFu);
-    CHECK_EQ(t.Find(0x1100)->playerIcons.left.count, 0); // no status seen yet
-    Settings right;
-    right.playerIconSide[static_cast<int>(PlayerIcon::Bazaar)] = IconSide::Right;
-    t.Update({player}, kLevel20, right);
-    CHECK(t.Find(0x1000)->playerIcons.left.count == 1 && t.Find(0x1000)->playerIcons.right.icons[0] == Icon::Bazaar);
+    CHECK(!t.Find(0x1100)->status); // no status seen yet
 }
 
 TEST(each_category_gets_its_colour)
@@ -213,37 +185,40 @@ TEST(each_category_gets_its_colour)
     const Settings s = EveryCategory();
     t.Update({BountyHunter(0x2000), Mob(0x3000, kSnipper, "Snipper"), Mob(0x4000, 1, "Nobody Here"),
                  Mob(0x5000, kBeachMonk, "Beach Monk"), Mob(0x6000, kBigmouthBilly, "Bigmouth Billy")},
-        kLevel20, s);
-    CHECK_EQ(t.Find(0x2000)->argb, ToArgb(s.color[CategoryIndex(Category::WillAttack)]));
-    CHECK_EQ(t.Find(0x3000)->argb, ToArgb(s.color[CategoryIndex(Category::WontAttack)]));
-    CHECK_EQ(t.Find(0x4000)->argb, ToArgb(s.color[CategoryIndex(Category::Unknown)]));
-    CHECK_EQ(t.Find(0x5000)->argb, ToArgb(s.color[CategoryIndex(Category::NmWillAttack)]));
-    CHECK_EQ(t.Find(0x6000)->argb, ToArgb(s.color[CategoryIndex(Category::NmWontAttack)]));
+        kLevel20, s, CursorTargets{});
+    CHECK_EQ(t.Find(0x2000)->argb, Aggression(s, Nature::Aggressive));
+    CHECK_EQ(t.Find(0x3000)->argb, Aggression(s, Nature::Passive));
+    CHECK_EQ(t.Find(0x4000)->argb, Aggression(s, Nature::NoData));
+    CHECK_EQ(t.Find(0x5000)->argb, Aggression(s, Nature::AggressiveNm));
+    CHECK_EQ(t.Find(0x6000)->argb, Aggression(s, Nature::PassiveNm));
     CHECK_EQ(t.OutlinedCount(), 5u);
 }
 
-TEST(a_mobs_level_line_carries_its_id_or_ph_and_a_placeholder_glows_purple)
+TEST(a_placeholder_is_outlined_by_its_own_row_in_its_own_color)
 {
     Tracker t;
     Settings s;
-    s.mobId           = MobIdFormat::LastThree;
     ActorInput worm   = Mob(0x2000, kCarrionWorm, "Carrion Worm");
     worm.claimed      = true;
-    t.Update({worm, BountyHunter(0x3000)}, kLevel20, s);
+    t.Update({worm, BountyHunter(0x3000), Mob(0x5000, kCarrionWorm, "Carrion Worm")}, kLevel20, s, CursorTargets{});
     const ActorInfo* ph = t.Find(0x2000);
-    CHECK(std::string(ph->label.text) == "Lv 4-5 TW [PH]");
-    CHECK(ph->tooWeak && ph->claimed);
-    CHECK(ph->outline && ph->argb == ToArgb(s.color[CategoryIndex(Category::Placeholder)]));
+    CHECK(std::string(ph->level.text) == "Lv 4-5 TW");
+    CHECK(ph->placeholder && ph->state.tooWeak && ph->state.claim == ClaimState::Others);
+    CHECK(t.Find(0x5000)->outline && t.Find(0x5000)->argb == Aggression(s, Nature::Placeholder));
+    CHECK(ph->outline && ph->argb == Aggression(s, Nature::Placeholder)); // claimed, and the claim row defers to it
     const ActorInfo* hunter = t.Find(0x3000);
-    CHECK(std::string(hunter->label.text) == "Lv 17-20 EP-EM [220]");
-    CHECK(!hunter->tooWeak && !hunter->claimed);
-    s.show[CategoryIndex(Category::Placeholder)] = false;
-    t.Update({Mob(0x2000, kCarrionWorm, "Carrion Worm"), Mob(0x4000, kPoisonFunguar, "Poison Funguar")}, kLevel20, s);
-    CHECK(!t.Find(0x2000)->outline); // colored like any mob: passive, so not outlined
-    CHECK(t.Find(0x4000)->outline && t.Find(0x4000)->argb == ToArgb(s.color[CategoryIndex(Category::WillAttack)]));
+    CHECK(std::string(hunter->level.text) == "Lv 17-20 EP-EM");
+    CHECK(!hunter->placeholder && !hunter->state.tooWeak && hunter->state.claim == ClaimState::Unclaimed);
+    SetMobOutline(s, Category::Placeholder, OutlineMode::ByNature);
+    t.Update({Mob(0x2000, kCarrionWorm, "Carrion Worm"), Mob(0x4000, kPoisonFunguar, "Poison Funguar")}, kLevel20, s, CursorTargets{});
+    CHECK(!t.Find(0x2000)->outline); // passive, so not outlined
+    CHECK(t.Find(0x4000)->outline && t.Find(0x4000)->argb == Aggression(s, Nature::Aggressive)); // the Will Attack row's color
+    SetMobOutline(s, Category::Placeholder, OutlineMode::Disabled);
+    t.Update({Mob(0x2000, kCarrionWorm, "Carrion Worm"), Mob(0x4000, kPoisonFunguar, "Poison Funguar")}, kLevel20, s, CursorTargets{});
+    CHECK(!t.Find(0x2000)->outline && !t.Find(0x4000)->outline); // a placeholder takes its own row, aggressive or not
 }
 
-TEST(a_claimed_mob_takes_its_claims_color_while_that_is_on)
+TEST(a_claimed_mob_takes_its_claim_rows_mode_and_color)
 {
     Tracker t;
     Settings s;
@@ -252,28 +227,33 @@ TEST(a_claimed_mob_takes_its_claims_color_while_that_is_on)
     ours.claimedByParty = true;
     ActorInput theirs = Mob(0x3000, kBountyHunter, "Goblin Bounty Hunter");
     theirs.claimed    = true;
-    t.Update({ours, theirs}, kLevel20, s);
-    CHECK(t.Find(0x2000)->category == Category::WillAttack && t.Find(0x3000)->category == Category::WillAttack);
-    s.show[CategoryIndex(Category::PartyClaim)] = true;
-    s.show[CategoryIndex(Category::OtherClaim)] = true;
-    t.Update({ours, theirs}, kLevel20, s);
-    CHECK(t.Find(0x2000)->outline && t.Find(0x2000)->argb == ToArgb(s.color[CategoryIndex(Category::PartyClaim)]));
-    CHECK(t.Find(0x3000)->outline && t.Find(0x3000)->argb == ToArgb(s.color[CategoryIndex(Category::OtherClaim)]));
+    SetMobOutline(s, Category::PartyClaim, OutlineMode::Disabled);
+    SetMobOutline(s, Category::OtherClaim, OutlineMode::Disabled);
+    t.Update({ours, theirs}, kLevel20, s, CursorTargets{});
+    CHECK(!t.Find(0x2000)->outline && !t.Find(0x3000)->outline); // the claim rows decide, not the aggression rows
+    for (const Category claim : {Category::PartyClaim, Category::OtherClaim})
+    {
+        SetMobOutline(s, claim, OutlineMode::Shown);
+        s.Kind(PlateKind::Mobs).rows[CategoryIndex(claim)].outlineColor.source = ColorSource::Claim;
+    }
+    t.Update({ours, theirs}, kLevel20, s, CursorTargets{});
+    CHECK(t.Find(0x2000)->outline && t.Find(0x2000)->argb == ToArgb(s.palette.claim[static_cast<int>(ClaimState::Yours)]));
+    CHECK(t.Find(0x3000)->outline && t.Find(0x3000)->argb == ToArgb(s.palette.claim[static_cast<int>(ClaimState::Others)]));
 }
 
 TEST(a_name_that_does_not_match_the_data_is_unknown)
 {
     Tracker t;
     const Settings s = EveryCategory();
-    t.Update({Mob(0x2000, kBountyHunter, "Snipper")}, kLevel20, s);
-    CHECK_EQ(t.Find(0x2000)->argb, ToArgb(s.color[CategoryIndex(Category::Unknown)]));
+    t.Update({Mob(0x2000, kBountyHunter, "Snipper")}, kLevel20, s, CursorTargets{});
+    CHECK_EQ(t.Find(0x2000)->argb, Aggression(s, Nature::NoData));
 }
 
 TEST(mobs_beyond_max_distance_are_not_outlined)
 {
     Tracker t;
     const Settings s;
-    t.Update({BountyHunter(0x2000, s.maxDistance), BountyHunter(0x3000, s.maxDistance + 0.5f)}, kLevel20, s);
+    t.Update({BountyHunter(0x2000, s.maxDistance), BountyHunter(0x3000, s.maxDistance + 0.5f)}, kLevel20, s, CursorTargets{});
     CHECK(t.Find(0x2000)->outline);
     CHECK(!t.Find(0x3000)->outline);
 }
@@ -283,7 +263,7 @@ TEST(disabled_outlines_nothing)
     Tracker t;
     Settings s;
     s.enabled = false;
-    t.Update({BountyHunter(0x2000)}, kLevel20, s);
+    t.Update({BountyHunter(0x2000)}, kLevel20, s, CursorTargets{});
     CHECK(!t.Find(0x2000)->outline);
 }
 
@@ -293,7 +273,7 @@ TEST(stencil_refs_stay_between_1_and_255)
     for (ActorPtr i = 0; i < 300; ++i)
         mobs.push_back(BountyHunter(0x10000 + i * 0x10));
     Tracker t;
-    t.Update(mobs, kLevel20, Settings{});
+    t.Update(mobs, kLevel20, Settings{}, CursorTargets{});
     CHECK_EQ(t.Find(0x10000)->stencilRef, 1);
     CHECK_EQ(t.Find(0x10000 + 254 * 0x10)->stencilRef, 255); // an 8-bit stencil's largest value
     CHECK_EQ(t.Find(0x10000 + 255 * 0x10)->stencilRef, 1);
@@ -302,7 +282,7 @@ TEST(stencil_refs_stay_between_1_and_255)
 TEST(unknown_pointers_are_not_found)
 {
     Tracker t;
-    t.Update({Player(0x1000), BountyHunter(0x2000)}, kLevel20, Settings{});
+    t.Update({Player(0x1000), BountyHunter(0x2000)}, kLevel20, Settings{}, CursorTargets{});
     CHECK(t.Find(0x1800) == nullptr);
     CHECK(t.Find(0x10) == nullptr);
     CHECK(t.Find(0x9000) == nullptr);
@@ -316,18 +296,18 @@ TEST(a_checked_spawn_uses_its_level_for_label_and_category)
     const CheckResult check{10, Con::TooWeak};
     ActorInput input = BountyHunter(0x2000);
     input.checked    = &check;
-    t.Update({input}, kLevel20, s);
-    CHECK_EQ(t.Find(0x2000)->label.text, "Lv 10 TW");
-    CHECK_EQ(t.Find(0x2000)->argb, ToArgb(s.color[CategoryIndex(Category::WontAttack)]));
+    t.Update({input}, kLevel20, s, CursorTargets{});
+    CHECK_EQ(t.Find(0x2000)->level.text, "Lv 10 TW");
+    CHECK_EQ(t.Find(0x2000)->argb, Aggression(s, Nature::Passive));
 }
 
 TEST(outlined_count_includes_only_outlined_mobs)
 {
     Tracker t;
     Settings s = EveryCategory();
-    s.show[CategoryIndex(Category::WontAttack)] = false;
+    SetMobOutline(s, Category::WontAttack, OutlineMode::Disabled);
     t.Update({Player(0x1000), BountyHunter(0x2000), Mob(0x3000, kSnipper, "Snipper"), BountyHunter(0x4000, s.maxDistance + 10.0f)},
-        kLevel20, s);
+        kLevel20, s, CursorTargets{});
     CHECK_EQ(t.OutlinedCount(), 1u);
     CHECK(t.Find(0x2000)->outline);
 }
@@ -337,39 +317,37 @@ TEST(every_mob_gets_nameplate_data_at_any_distance)
     // Outlines stop at the max distance and hidden categories; nameplates do not.
     Tracker t;
     Settings s; // passive mobs are not outlined by default
-    t.Update({Player(0x1000), BountyHunter(0x2000, 100.0f), Mob(0x3000, kSnipper, "Snipper")}, kLevel20, s);
+    t.Update({Player(0x1000), BountyHunter(0x2000, 100.0f), Mob(0x3000, kSnipper, "Snipper")}, kLevel20, s, CursorTargets{});
     const ActorInfo* far = t.Find(0x2000);
     CHECK(far->kind == EntityKind::Mob && far->alive && !far->outline);
     CHECK_EQ(far->index, 0x220);
     CHECK(std::string(far->name) == "Goblin Bounty Hunter");
-    CHECK(std::string(far->label.text) == "Lv 17-20 EP-EM");
-    CHECK(far->mobIcons.count >= 1);
-    CHECK(far->mobIcons.icons[0] == Icon::AggroNQ);
-    CHECK(far->category == Category::WillAttack); // its name still glows in the color it would be outlined in
+    CHECK(std::string(far->level.text) == "Lv 17-20 EP-EM");
+    CHECK(far->mob != nullptr && far->mob->id == kBountyHunter);
+    CHECK(far->state.row == Category::WillAttack); // its name still glows in the color it would be outlined in
     const ActorInfo* hidden = t.Find(0x3000);
     CHECK(!hidden->outline);
-    CHECK(std::string(hidden->label.text) == "Lv 19-20 DC-EM");
-    CHECK(hidden->mobIcons.icons[0] == Icon::PassiveNQ);
-    CHECK(hidden->category == Category::WontAttack);
+    CHECK(std::string(hidden->level.text) == "Lv 19-20 DC-EM");
+    CHECK(hidden->mob != nullptr && hidden->mob->id == kSnipper);
+    CHECK(hidden->state.row == Category::WontAttack);
     CHECK(t.Actors() == (std::vector<ActorPtr>{0x1000, 0x2000, 0x3000})); // in entity order
 }
 
 TEST(dead_mobs_keep_only_their_name)
 {
     Tracker t;
-    t.Update({BountyHunter(0x2000, 10.0f, false)}, kLevel20, Settings{});
+    t.Update({BountyHunter(0x2000, 10.0f, false)}, kLevel20, Settings{}, CursorTargets{});
     const ActorInfo* dead = t.Find(0x2000);
     CHECK(!dead->outline);
     CHECK(std::string(dead->name) == "Goblin Bounty Hunter");
-    CHECK(dead->label.text[0] == '\0');
-    CHECK_EQ(dead->mobIcons.count, 0);
+    CHECK(dead->level.text[0] == '\0');
 }
 
-// The target's popup reads a dead mob's record; only its level and icons go.
+// The target's popup reads a dead mob's record; only its level goes.
 TEST(a_dead_mob_keeps_its_record_for_the_popup)
 {
     Tracker t;
-    t.Update({BountyHunter(0x2000, 10.0f, false)}, kLevel20, Settings{});
+    t.Update({BountyHunter(0x2000, 10.0f, false)}, kLevel20, Settings{}, CursorTargets{});
     const ActorInfo* dead = t.Find(0x2000);
     CHECK(dead->mob != nullptr && dead->mob->id == kBountyHunter);
     CHECK(dead->level.text[0] == '\0');
@@ -394,59 +372,10 @@ TEST(a_claim_by_you_or_your_party_is_told_from_anyone_elses)
     CHECK(!ClaimedByParty(0x00012345, {}));
 }
 
-TEST(a_mob_your_party_claimed_is_marked)
-{
-    ActorInput ours     = BountyHunter(0x2000);
-    ours.claimedByParty = true;
-    Tracker t;
-    t.Update({Player(0x1000), ours, Mob(0x3000, kSnipper, "Snipper")}, kLevel20, Settings{});
-    CHECK(t.Find(0x2000)->claimedByParty);
-    CHECK(!t.Find(0x3000)->claimedByParty);
-}
-
-TEST(a_mob_carries_what_it_is_weak_to_resists_and_is_immune_to)
-{
-    auto badges = [] {
-        Settings s;
-        s.showDamageIcons = s.showStatusRankIcons = s.showImmunityIcons = true;
-        return s;
-    };
-    Tracker t;
-    Settings s = badges();
-    t.Update({BountyHunter(0x2000)}, kLevel20, s);
-    const MobRecord* record = FindMob(kBountyHunter, "Goblin Bounty Hunter");
-    CHECK(record != nullptr);
-    const InfoIconSet expected = InfoIconsFor(&ResistancesOf(*record), BadgeRules{});
-    const ActorInfo* info      = t.Find(0x2000);
-    CHECK(expected.count > 0 && info->infoIcons.count == expected.count); // goblins are weak to light
-    CHECK(std::equal(expected.icons, expected.icons + expected.count, info->infoIcons.icons));
-    // Its ranks: light -3, the other elements but dark -2; dark sleep -3, gravity -2.
-    auto shown = [&](const Settings& with) {
-        t.Update({BountyHunter(0x2000)}, kLevel20, with);
-        const InfoIconSet& set = t.Find(0x2000)->infoIcons;
-        return std::vector<InfoIcon>(set.icons, set.icons + set.count);
-    };
-    s.elementWeakRank = -3;
-    CHECK(shown(s) == (std::vector<InfoIcon>{{Icon::Light, BadgeKind::WeakRank, -3}}));
-    s             = badges();
-    s.maxElements = 2;
-    CHECK(shown(s) == (std::vector<InfoIcon>{{Icon::Light, BadgeKind::WeakRank, -3}, {Icon::Fire, BadgeKind::WeakRank, -2}}));
-    s.statusBadges[static_cast<int>(StatusRank::Gravity)].weakRank = -2;
-    CHECK(shown(s).back() == (InfoIcon{Icon::Gravity, BadgeKind::StatusWeak, -2}));
-    s.statusBadges[static_cast<int>(StatusRank::Gravity)].show = false;
-    CHECK_EQ(shown(s).size(), 2u);
-    s = badges();
-    s.showDamageIcons = s.showStatusRankIcons = s.showImmunityIcons = false;
-    t.Update({BountyHunter(0x2000)}, kLevel20, s);
-    CHECK_EQ(t.Find(0x2000)->infoIcons.count, 0);
-    t.Update({BountyHunter(0x2000, 10.0f, false)}, kLevel20, badges());
-    CHECK_EQ(t.Find(0x2000)->infoIcons.count, 0); // dead
-}
-
 TEST(a_mob_carries_its_server_id_record_and_level_line_and_is_found_by_target_index)
 {
     Tracker t;
-    t.Update({BountyHunter(0x2000)}, kLevel20, Settings{});
+    t.Update({BountyHunter(0x2000)}, kLevel20, Settings{}, CursorTargets{});
     const ActorInfo* info = t.FindIndex(BountyHunter(0x2000).index);
     CHECK(info != nullptr && info == t.Find(0x2000));
     CHECK_EQ(info->serverId, kBountyHunter);
@@ -458,9 +387,221 @@ TEST(a_mob_carries_its_server_id_record_and_level_line_and_is_found_by_target_in
 TEST(an_actor_listed_twice_keeps_only_what_its_later_entry_says)
 {
     Tracker t;
-    t.Update({BountyHunter(0x2000), Npc(0x2000)}, kLevel20, EveryCategory());
+    t.Update({BountyHunter(0x2000), Npc(0x2000)}, kLevel20, EveryCategory(), CursorTargets{});
     const ActorInfo* info = t.Find(0x2000);
     CHECK(info != nullptr && info->kind == EntityKind::Npc && std::string(info->name) == "Home Point #1");
-    CHECK(!info->outline && info->mob == nullptr && info->label.text[0] == '\0' && info->mobIcons.count == 0);
+    CHECK(!info->outline && info->mob == nullptr && info->level.text[0] == '\0');
     CHECK(t.FindIndex(BountyHunter(0x2000).index) == nullptr);
+}
+
+TEST(the_tracker_fills_each_entitys_state)
+{
+    // The file's helpers: BountyHunter (Goblin Bounty Hunter, aggressive, 17-20), Mob with kSnipper (passive,
+    // 19-20), Player (index 1052), kLevel20. At level 20 the Bounty Hunter cons EP-EM, so its toughness is Even Match.
+    ActorInput ours     = BountyHunter(0x2000);
+    ours.claimedByParty = true;
+    ours.claimed        = true;
+    ActorInput pet      = Mob(0x3000, kSnipper, "Snipper");
+    pet.pet             = true;
+    ActorInput member   = Player(0x4000);
+    member.party        = true;
+    member.jobs         = PlayerJobs{1, 75, 2, 37};
+    ActorInput you      = Player(0x5000);
+    you.index           = 1053;
+    you.self            = true;
+    you.engaged         = true;
+    CursorTargets targets;
+    targets.target = ours.index;
+    Tracker t;
+    t.Update({ours, pet, member, you}, kLevel20, Settings{}, targets);
+    const ActorInfo* mob = t.Find(0x2000);
+    CHECK(mob->state.kind == EntityKind::Mob);
+    CHECK(mob->state.nature == Nature::Aggressive);
+    CHECK(mob->state.row == Category::PartyClaim);
+    CHECK(mob->state.claim == ClaimState::Yours);
+    CHECK(mob->state.target == TargetState::Targeted);
+    CHECK(mob->state.toughness == LabelShade::EvenMatch);
+    CHECK(!mob->checked);
+    CHECK(t.Find(0x3000)->state.pet);
+    CHECK(t.Find(0x3000)->state.claim == ClaimState::Unclaimed);
+    CHECK(PlateKindOf(t.Find(0x3000)->state) == PlateKind::Pets);
+    CHECK(t.Find(0x4000)->state.playerRow == PlayerRow::PartyMember);
+    CHECK(t.Find(0x4000)->jobs == (PlayerJobs{1, 75, 2, 37}));
+    CHECK(t.Find(0x4000)->state.target == TargetState::None);
+    CHECK(t.Find(0x5000)->state.self && t.Find(0x5000)->state.engaged);
+    CHECK(PlateKindOf(t.Find(0x5000)->state) == PlateKind::Self);
+}
+
+TEST(the_tracker_fills_claims_rows_placeholders_checks_and_dead_mobs)
+{
+    ActorInput friendly = Player(0x1000);
+    friendly.isFriend   = true;
+    ActorInput shared   = Player(0x1100);
+    shared.linkshell    = true;
+    ActorInput trader   = Player(0x1200);
+    trader.status       = PlayerStatus{};
+    trader.status->bazaar = true;
+    ActorInput others   = BountyHunter(0x2000);
+    others.claimed      = true;
+    const CheckResult result{18, Con::DecentChallenge};
+    ActorInput checkedMob = Mob(0x3000, kBountyHunter + 1, "Goblin Bounty Hunter");
+    checkedMob.serverId   = kBountyHunter;
+    checkedMob.index      = 2001;
+    checkedMob.checked    = &result;
+    ActorInput worm       = Mob(0x4000, kCarrionWorm, "Carrion Worm");
+    ActorInput dead       = BountyHunter(0x5000, 10.0f, false);
+    dead.index            = 2002;
+    ActorInput pet        = Mob(0x6000, kSnipper, "Snipper");
+    pet.pet               = true;
+    pet.ownerName         = "Carrott";
+    Tracker t;
+    t.Update({friendly, shared, trader, others, checkedMob, worm, dead, pet}, kLevel20, Settings{}, CursorTargets{});
+    CHECK(t.Find(0x1000)->state.playerRow == PlayerRow::Friend);
+    CHECK(t.Find(0x1100)->state.playerRow == PlayerRow::LinkshellMember);
+    CHECK(t.Find(0x1200)->status && t.Find(0x1200)->status->bazaar);
+    CHECK(t.Find(0x2000)->state.claim == ClaimState::Others);
+    CHECK(t.Find(0x2000)->state.row == Category::OtherClaim);
+    CHECK(t.Find(0x4000)->placeholder);
+    CHECK(t.Find(0x4000)->state.nature == Nature::Placeholder);
+    CHECK(t.Find(0x4000)->state.row == Category::Placeholder);
+    CHECK(t.Find(0x4000)->state.tooWeak);
+    CHECK(t.Find(0x4000)->state.toughness == LabelShade::TooWeak);
+    CHECK(t.Find(0x3000)->checked && t.Find(0x3000)->checked->level == 18);
+    CHECK(t.Find(0x3000)->state.toughness == LabelShade::DecentChallenge);
+    CHECK(!t.Find(0x5000)->state.alive);
+    CHECK(t.Find(0x5000)->state.nature == Nature::Aggressive);
+    CHECK(t.Find(0x5000)->state.row == Category::WillAttack);
+    CHECK(!t.Find(0x5000)->state.tooWeak);
+    CHECK(t.Find(0x5000)->state.toughness == LabelShade::Unknown);
+    CHECK(t.Find(0x6000)->state.pet);
+    CHECK(std::string(t.Find(0x6000)->ownerName) == "Carrott");
+}
+
+TEST(an_outline_follows_its_rows_mode_and_color_pick)
+{
+    Settings s;
+    KindSettings& mobs = s.Kind(PlateKind::Mobs);
+    mobs.rows[CategoryIndex(Category::WontAttack)].outline      = OutlineMode::WhenTargeted;
+    mobs.rows[CategoryIndex(Category::WontAttack)].outlineColor = ColorPick{ColorSource::Custom, {{0.1f, 0.2f, 0.3f}}};
+    s.Kind(PlateKind::Players).rows[static_cast<int>(PlayerRow::Player)].outline      = OutlineMode::Shown;
+    s.Kind(PlateKind::Players).rows[static_cast<int>(PlayerRow::Player)].outlineColor = ColorPick{ColorSource::Type};
+    const ActorInput aggressive = BountyHunter(0x2000);
+    const ActorInput passive    = Mob(0x3000, kSnipper, "Snipper");
+    const ActorInput player     = Player(0x4000);
+    CursorTargets targets;
+    targets.target = passive.index;
+    Tracker t;
+    t.Update({aggressive, passive, player}, kLevel20, s, targets);
+    CHECK(t.Find(0x2000)->outline);
+    CHECK_EQ(t.Find(0x2000)->argb, ToArgb(s.palette.aggression[static_cast<int>(Nature::Aggressive)]));
+    CHECK(t.Find(0x3000)->outline); // targeted
+    CHECK_EQ(t.Find(0x3000)->argb, ToArgb(Color{{0.1f, 0.2f, 0.3f}}));
+    CHECK(t.Find(0x4000)->outline);
+    CHECK_EQ(t.Find(0x4000)->argb, ToArgb(s.palette.type[static_cast<int>(TargetType::Player)]));
+    CHECK_EQ(t.OutlinedCount(), 3u);
+    t.Update({aggressive, passive, player}, kLevel20, s, CursorTargets{});
+    CHECK(!t.Find(0x3000)->outline);
+    CHECK_EQ(RowColor(t.Find(0x3000)->state, s), ToArgb(Color{{0.1f, 0.2f, 0.3f}})); // its row's color, outlined or not
+    CHECK_EQ(t.OutlinedCount(), 2u);
+    s.outlines = false;
+    t.Update({aggressive, passive, player}, kLevel20, s, CursorTargets{});
+    CHECK_EQ(t.OutlinedCount(), 0u);
+}
+
+TEST(a_dead_far_or_disabled_row_mob_gets_no_outline)
+{
+    const Settings s;
+    Tracker t;
+    t.Update({BountyHunter(0x2000, 10.0f, false), BountyHunter(0x3000, s.maxDistance + 1.0f), Mob(0x4000, kSnipper, "Snipper")},
+        kLevel20, s, CursorTargets{});
+    CHECK(!t.Find(0x2000)->outline); // dead
+    CHECK(!t.Find(0x3000)->outline); // past the range
+    CHECK(!t.Find(0x4000)->outline); // the Passive row is Disabled by default
+    CHECK_EQ(t.OutlinedCount(), 0u);
+}
+
+namespace
+{
+    ActorInput Claimed(ActorInput mob, bool byParty)
+    {
+        mob.claimed        = true;
+        mob.claimedByParty = byParty;
+        return mob;
+    }
+
+    const uint32_t kAggressiveArgb = ToArgb(Settings{}.palette.aggression[static_cast<int>(Nature::Aggressive)]);
+    const uint32_t kPlaceholderArgb = ToArgb(Settings{}.palette.aggression[static_cast<int>(Nature::Placeholder)]);
+}
+
+TEST(a_claimed_mob_keeps_the_outline_its_nature_gives_it_by_default)
+{
+    const Settings s;
+    Tracker t;
+    t.Update({Claimed(BountyHunter(0x2000), true), Claimed(Mob(0x3000, kSnipper, "Snipper"), true),
+                 Claimed(BountyHunter(0x4000), false), Claimed(Mob(0x5000, kCarrionWorm, "Carrion Worm"), true)},
+        kLevel20, s, CursorTargets{});
+    CHECK(t.Find(0x2000)->outline && t.Find(0x2000)->argb == kAggressiveArgb);
+    CHECK(!t.Find(0x3000)->outline);
+    CHECK(t.Find(0x4000)->outline && t.Find(0x4000)->argb == kAggressiveArgb);
+    CHECK(t.Find(0x5000)->outline && t.Find(0x5000)->argb == kPlaceholderArgb);
+}
+
+TEST(a_claim_row_set_to_shown_or_disabled_decides_for_the_claimed_mob)
+{
+    Settings s;
+    SetMobOutline(s, Category::PartyClaim, OutlineMode::Shown);
+    Tracker t;
+    const ActorInput snipper = Claimed(Mob(0x3000, kSnipper, "Snipper"), true);
+    t.Update({snipper}, kLevel20, s, CursorTargets{});
+    CHECK(t.Find(0x3000)->outline);
+    CHECK_EQ(t.Find(0x3000)->argb, ToArgb(s.palette.claim[static_cast<int>(ClaimState::Yours)]));
+    SetMobOutline(s, Category::PartyClaim, OutlineMode::Disabled);
+    t.Update({Claimed(BountyHunter(0x2000), true)}, kLevel20, s, CursorTargets{});
+    CHECK(!t.Find(0x2000)->outline);
+}
+
+TEST(a_placeholder_row_by_nature_leaves_the_outline_to_the_mobs_aggression)
+{
+    Settings s;
+    SetMobOutline(s, Category::Placeholder, OutlineMode::ByNature);
+    Tracker t;
+    t.Update({Mob(0x2000, kCarrionWorm, "Carrion Worm"), Mob(0x3000, kPoisonFunguar, "Poison Funguar")}, kLevel20, s, CursorTargets{});
+    CHECK(!t.Find(0x2000)->outline); // passive, and the Passive row is Disabled
+    CHECK(t.Find(0x3000)->outline && t.Find(0x3000)->argb == kAggressiveArgb);
+    SetMobOutline(s, Category::PartyClaim, OutlineMode::ByNature);
+    t.Update({Claimed(Mob(0x3000, kPoisonFunguar, "Poison Funguar"), true)}, kLevel20, s, CursorTargets{});
+    CHECK(t.Find(0x3000)->outline && t.Find(0x3000)->argb == kAggressiveArgb);
+}
+
+TEST(a_claim_row_by_nature_follows_the_aggressive_rows_when_targeted_mode)
+{
+    Settings s;
+    SetMobOutline(s, Category::PartyClaim, OutlineMode::ByNature);
+    SetMobOutline(s, Category::WillAttack, OutlineMode::WhenTargeted);
+    const ActorInput hunter = Claimed(BountyHunter(0x2000), true);
+    CursorTargets targets;
+    targets.target = hunter.index;
+    Tracker t;
+    t.Update({hunter}, kLevel20, s, targets);
+    CHECK(t.Find(0x2000)->outline);
+    t.Update({hunter}, kLevel20, s, CursorTargets{});
+    CHECK(!t.Find(0x2000)->outline);
+}
+
+TEST(a_mob_that_is_someones_pet_is_outlined_by_the_pets_row_alone)
+{
+    ActorInput pet = BountyHunter(0x2000);
+    pet.pet        = true;
+    Settings s;
+    Tracker t;
+    t.Update({pet}, kLevel20, s, CursorTargets{});
+    CHECK(!t.Find(0x2000)->outline); // the Pets rows are Disabled by default, whatever its aggression
+    s.Kind(PlateKind::Pets).rows[0].outline      = OutlineMode::Shown;
+    s.Kind(PlateKind::Pets).rows[0].outlineColor = ColorPick{ColorSource::Custom, {{0.7f, 0.6f, 0.5f}}};
+    for (const Category claim : {Category::PartyClaim, Category::OtherClaim})
+        SetMobOutline(s, claim, OutlineMode::Shown);
+    SetMobOutline(s, Category::WillAttack, OutlineMode::Disabled);
+    t.Update({Claimed(pet, true)}, kLevel20, s, CursorTargets{});
+    CHECK(t.Find(0x2000)->outline);
+    CHECK_EQ(t.Find(0x2000)->argb, ToArgb(Color{{0.7f, 0.6f, 0.5f}}));
 }

@@ -20,35 +20,29 @@ namespace headsup
     };
     constexpr int kLabelShadeCount = static_cast<int>(LabelShade::VeryTough) + 1;
 
-    // Between the level line's parts: "Lv 22-23 IT [106]".
-    constexpr const char* kLabelSeparator = " ";
+    constexpr const char* kPlaceholderMark = "[PH]";
 
     struct Label
     {
-        static constexpr size_t kNoMark = static_cast<size_t>(-1);
-        char text[72];
+        char text[24]; // "Lv 100-255 IEP-IT" at the longest
         LabelShade shade;
-        size_t markAt = kNoMark; // where the placeholder mark starts in text: it is drawn in the placeholder's color
     };
 
     // A mob's server ID holds its zone above its target index, the ID's last three hex digits.
     constexpr int kTargetIndexWidth     = 12;
     constexpr uint32_t kTargetIndexBits = (1u << kTargetIndexWidth) - 1;
 
-    enum class MobIdFormat : uint8_t
-    {
-        Off,
-        LastThree, // the target index, as players name placeholders: "[006]"
-        Decimal,   // the whole ID in decimal, as databases list it: "[17190918]"
-        Full,      // the whole ID in decimal and hex
-    };
-    constexpr int kMobIdFormatCount = static_cast<int>(MobIdFormat::Full) + 1;
-
-    std::string MobIdText(uint32_t serverId, bool placeholder, MobIdFormat format, bool markPlaceholders);
-
-    Label LevelLine(const Label& level, bool showLevel, const std::string& id);
+    // "[006]": the target index in three upper-case hex digits.
+    std::string IdText(uint32_t serverId);
+    // "[17190918]": the whole ID in decimal.
+    std::string ServerIdText(uint32_t serverId);
 
     LabelShade ShadeFor(Con con);
+
+    // "20-23", "22" once checked, "?" when the level is a script's or the mob unknown.
+    std::string LevelText(const MobRecord* mob, const CheckResult* checked);
+    // "EP-DC", "DC" once checked, "??" when the level or yours is unknown.
+    std::string ConText(const MobRecord* mob, const CheckResult* checked, int playerLevel);
 
     Label MakeLabel(const MobRecord* mob, const CheckResult* checked, int playerLevel);
 }

@@ -50,7 +50,7 @@ namespace headsup
         for (const Timer* timer : here)
         {
             const bool up = now >= timer->dueAt;
-            lines.push_back(TimerLine{timer->nmName + " " + MobIdText(timer->serverId, false, MobIdFormat::LastThree, false) + " " +
+            lines.push_back(TimerLine{timer->nmName + " " + IdText(timer->serverId) + " " +
                                           (up ? kUpText : Countdown(timer->dueAt - now)),
                 up});
         }

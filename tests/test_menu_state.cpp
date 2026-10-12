@@ -1,0 +1,256 @@
+#include "menu_state.h"
+#include "settings.h"
+#include "test.h"
+
+#include <cstdio>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
+using namespace headsup;
+
+TEST(no_change_waiting_means_no_save)
+{
+    CHECK(!SaveDue(std::nullopt, 10.0, true));
+    CHECK(!SaveDue(std::nullopt, 10.0, false));
+}
+
+TEST(a_single_change_saves_half_a_second_later)
+{
+    CHECK(!SaveDue(10.0, 10.0, true));
+    CHECK(!SaveDue(10.0, 10.25, true));
+    CHECK(!SaveDue(10.0, 10.49, true));
+    CHECK(SaveDue(10.0, 10.5, true));
+    CHECK(SaveDue(10.0, 60.0, true));
+}
+
+TEST(a_change_every_frame_saves_only_once_the_last_one_has_settled)
+{
+    // A slider dragged for two seconds at 60 frames a second: every frame's change is the last one so far.
+    const double frame = 1.0 / 60.0;
+    double changedAt   = 0.0;
+    for (int f = 0; f < 120; ++f)
+    {
+        changedAt = 10.0 + f * frame;
+        CHECK(!SaveDue(changedAt, changedAt, true));
+    }
+    CHECK(changedAt > 11.9);
+    CHECK(!SaveDue(changedAt, changedAt + 0.25, true));
+    CHECK(!SaveDue(changedAt, changedAt + 0.5 - frame, true));
+    CHECK(SaveDue(changedAt, changedAt + 0.5, true));
+}
+
+TEST(a_change_waiting_when_the_window_is_closed_saves_at_once)
+{
+    CHECK(SaveDue(10.0, 10.0, false));
+    CHECK(SaveDue(10.0, 10.25, false));
+}
+
+TEST(the_sidebar_has_the_five_major_pages_with_their_children_under_them)
+{
+    CHECK_EQ(kPageCount, 11);
+    CHECK(kPages[0].page == Page::Entities && !kPages[0].child);
+    for (int i = 1; i <= 5; ++i)
+        CHECK(kPages[i].child);
+    CHECK(kPages[6].page == Page::UserInterface && !kPages[6].child);
+    CHECK(kPages[7].page == Page::TopBar && kPages[7].child);
+    CHECK(kPages[8].page == Page::MouseCursor && !kPages[8].child);
+    CHECK(kPages[9].page == Page::ConfigMenu && !kPages[9].child);
+    CHECK(kPages[10].page == Page::Debug && !kPages[10].child);
+    CHECK(std::string_view(kPages[6].label) == "User Interface");
+}
+
+TEST(every_page_is_found_by_its_key_and_nothing_else)
+{
+    for (const PageInfo& info : kPages)
+        CHECK(PageNamed(PageKey(info.page)) == info.page);
+    CHECK(PageKey(Page::UserInterface) == "userinterface");
+    CHECK(PageKey(Page::TopBar) == "topbar");
+    CHECK(!PageNamed("global"));
+    CHECK(!PageNamed("widgets"));
+    CHECK(!PageNamed(""));
+}
+
+TEST(every_row_of_the_table_is_the_page_at_its_index)
+{
+    for (int i = 0; i < kPageCount; ++i)
+        CHECK_EQ(static_cast<int>(kPages[i].page), i);
+}
+
+TEST(the_kind_pages_know_their_kind)
+{
+    const std::pair<Page, PlateKind> kinds[] = {{Page::Mobs, PlateKind::Mobs}, {Page::Players, PlateKind::Players},
+        {Page::Self, PlateKind::Self}, {Page::Npcs, PlateKind::Npcs}, {Page::Pets, PlateKind::Pets}};
+    for (const auto& [page, kind] : kinds)
+        CHECK(KindOfPage(page) == kind);
+    for (const Page page : {Page::Entities, Page::UserInterface, Page::TopBar, Page::MouseCursor, Page::ConfigMenu, Page::Debug})
+        CHECK(!KindOfPage(page));
+}
+
+TEST(labels_are_title_case_with_small_words_left_alone_inside)
+{
+    CHECK(TitleCaseText("Hide Level and Icons") == "Hide Level and Icons");
+    CHECK(TitleCaseText("hide level and icons") == "Hide Level and Icons");
+    CHECK(TitleCaseText("NM Placeholders") == "NM Placeholders");
+    CHECK(TitleCaseText("Out of range") == "Out of Range");
+    CHECK(TitleCaseText("Scale with distance") == "Scale with Distance");
+    CHECK(TitleCaseText("of the sea") == "Of the Sea");
+    CHECK(TitleCaseText("NPC or object") == "NPC or Object");
+    CHECK(TitleCaseText("sub-target") == "Sub-Target");
+    CHECK(TitleCaseText("HP") == "HP");
+    CHECK(TitleCaseText("ID (0x1F)") == "ID (0x1F)");
+    CHECK(TitleCaseText("word") == "Word");
+    CHECK(TitleCaseText("") == "");
+}
+
+namespace
+{
+    // What a slider shows for a value, given its format.
+    std::string Shown(const std::string& format, int value)
+    {
+        char text[64];
+        std::snprintf(text, sizeof(text), format.c_str(), value);
+        return text;
+    }
+}
+
+TEST(a_size_slider_shows_its_percent_and_the_pixels_it_is_drawn_at)
+{
+    Settings s;
+    s.baseSize = 15;
+    CHECK_EQ(Shown(SizeFormat(s, 87), 87), "87% (13 px)");   // 13.05
+    CHECK_EQ(Shown(SizeFormat(s, 107), 107), "107% (16 px)"); // 16.05
+    CHECK_EQ(Shown(SizeFormat(s, 90), 90), "90% (14 px)");   // 13.5 is drawn at 14
+    CHECK_EQ(Shown(SizeFormat(s, 100), 100), "100% (15 px)");
+    s.baseSize = 20;
+    CHECK_EQ(Shown(SizeFormat(s, 87), 87), "87% (17 px)"); // 17.4
+    s.baseSize = kMaxTextSize;
+    CHECK_EQ(Shown(SizeFormat(s, kMaxSizePercent), kMaxSizePercent), "400% (192 px)");
+    s.baseSize = kMinTextSize;
+    CHECK_EQ(Shown(SizeFormat(s, kMinSizePercent), kMinSizePercent), "25% (2 px)");
+}
+
+TEST(the_show_dropdown_reads_always_one_condition_how_many_or_never)
+{
+    const std::vector<ShowCondition> mobs = ConditionsFor(PlateKind::Mobs);
+    LineShow show;
+    CHECK_EQ(ShowSummary(show, mobs), "Always");
+    show.when = ConditionBit(ShowCondition::YourClaim);
+    CHECK_EQ(ShowSummary(show, mobs), "Always"); // Always wins over what is checked under it
+    show.always = false;
+    CHECK_EQ(ShowSummary(show, mobs), "Your Claim");
+    show.when |= ConditionBit(ShowCondition::Targeted) | ConditionBit(ShowCondition::TooWeak);
+    CHECK_EQ(ShowSummary(show, mobs), "3 Conditions");
+    show.when = 0;
+    CHECK_EQ(ShowSummary(show, mobs), "Never");
+    // A condition the kind's list does not offer cannot be seen or unchecked there, so it is not counted.
+    show.when = ConditionBit(ShowCondition::Friend) | ConditionBit(ShowCondition::Unclaimed);
+    CHECK_EQ(ShowSummary(show, mobs), "Unclaimed");
+    CHECK_EQ(ShowSummary(show, ConditionsFor(PlateKind::Players)), "Friend");
+    CHECK_EQ(ShowSummary(show, ConditionsFor(PlateKind::Npcs)), "Never");
+}
+
+TEST(a_friend_is_added_trimmed_once_and_only_as_a_character_name)
+{
+    const std::vector<std::string> friends{"Chadmage", "pollux"};
+    CHECK(FriendToAdd(friends, "Tanyrus") == std::string("Tanyrus"));
+    CHECK(FriendToAdd(friends, "  Tanyrus\t") == std::string("Tanyrus"));
+    CHECK(FriendToAdd({}, "Abc") == std::string("Abc"));
+    CHECK(!FriendToAdd(friends, ""));
+    CHECK(!FriendToAdd(friends, "   "));
+    CHECK(!FriendToAdd(friends, "Chadmage"));
+    CHECK(!FriendToAdd(friends, " chadMAGE "));
+    CHECK(!FriendToAdd(friends, "POLLUX"));
+    CHECK(FriendToAdd(friends, "Chad") == std::string("Chad")); // a part of a name is another name
+    CHECK(!FriendToAdd(friends, "Two Words")); // the list is saved with spaces between its names
+    CHECK(!FriendToAdd({}, "Ab"));             // the game takes no name under three letters
+    CHECK(FriendToAdd({}, "Abcdefghijklmno") == std::string("Abcdefghijklmno"));
+    CHECK(!FriendToAdd({}, "Abcdefghijklmnop")); // nor over fifteen
+    CHECK(!FriendToAdd({}, "Chad1"));            // nor anything but letters
+    CHECK(!FriendToAdd({}, "Tom's"));
+    // Whatever it takes, Clamp keeps.
+    for (const char* name : {"Tanyrus", "Abc", "Abcdefghijklmno"})
+    {
+        Settings s;
+        s.friends = {*FriendToAdd({}, name)};
+        CHECK(Clamp(s).friends == s.friends);
+    }
+}
+
+TEST(a_font_dropdown_lists_its_unset_choice_first_then_the_fonts)
+{
+    const std::vector<std::string> fonts{"Barlow Condensed", "Cinzel", "Marcellus SC"};
+    // A line's font: Default first, standing for no name of its own.
+    CHECK_EQ(FontEntryCount(fonts, "Default"), 4);
+    CHECK_EQ(FontEntry(fonts, "Default", ""), 0);
+    CHECK_EQ(FontEntry(fonts, "Default", "Barlow Condensed"), 1);
+    CHECK_EQ(FontEntry(fonts, "Default", "Marcellus SC"), 3);
+    CHECK_EQ(FontEntry(fonts, "Default", "Comic Sans MS"), kNoFontEntry); // saved, and no longer installed
+    CHECK_EQ(FontOfEntry(fonts, "Default", 0), "");
+    CHECK_EQ(FontOfEntry(fonts, "Default", 1), "Barlow Condensed");
+    CHECK_EQ(FontOfEntry(fonts, "Default", 3), "Marcellus SC");
+    CHECK_EQ(FontEntryLabel(fonts, "Default", 0), "Default");
+    CHECK_EQ(FontEntryLabel(fonts, "Default", 2), "Cinzel");
+    CHECK_EQ(FontShown(fonts, "Default", ""), "Default");
+    CHECK_EQ(FontShown(fonts, "Default", "Cinzel"), "Cinzel");
+    CHECK_EQ(FontShown(fonts, "Default", "Comic Sans MS"), "Comic Sans MS"); // shown by its own name all the same
+    // A font that is always one of the list: no unset choice.
+    CHECK_EQ(FontEntryCount(fonts, nullptr), 3);
+    CHECK_EQ(FontEntry(fonts, nullptr, "Barlow Condensed"), 0);
+    CHECK_EQ(FontEntry(fonts, nullptr, "Marcellus SC"), 2);
+    CHECK_EQ(FontEntry(fonts, nullptr, ""), kNoFontEntry);
+    CHECK_EQ(FontEntry(fonts, nullptr, "Comic Sans MS"), kNoFontEntry);
+    CHECK_EQ(FontOfEntry(fonts, nullptr, 0), "Barlow Condensed");
+    CHECK_EQ(FontOfEntry(fonts, nullptr, 2), "Marcellus SC");
+    CHECK_EQ(FontEntryLabel(fonts, nullptr, 1), "Cinzel");
+    CHECK_EQ(FontShown(fonts, nullptr, "Comic Sans MS"), "Comic Sans MS");
+    CHECK_EQ(FontShown(fonts, nullptr, ""), "");
+    // Every entry stands for the font it is found by.
+    for (const char* unset : {static_cast<const char*>(nullptr), "Theme's"})
+        for (int entry = 0; entry < FontEntryCount(fonts, unset); ++entry)
+            CHECK_EQ(FontEntry(fonts, unset, FontOfEntry(fonts, unset, entry)), entry);
+}
+
+TEST(a_line_may_sync_with_any_other_line_that_does_not_borrow_from_it)
+{
+    KindSettings kind;
+    CHECK((SyncTargets(kind, 0) == std::vector<int>{1, 2}));
+    CHECK((SyncTargets(kind, 1) == std::vector<int>{0, 2}));
+    CHECK((SyncTargets(kind, 2) == std::vector<int>{0, 1}));
+    kind.lines[1].syncWith = 0; // line 2 borrows from line 1
+    CHECK((SyncTargets(kind, 0) == std::vector<int>{2}));
+    CHECK((SyncTargets(kind, 1) == std::vector<int>{0, 2}));
+    CHECK((SyncTargets(kind, 2) == std::vector<int>{0, 1}));
+    kind.lines[2].syncWith = 1; // and line 3 from line 2, so both lead to line 1
+    CHECK(SyncTargets(kind, 0).empty());
+    CHECK((SyncTargets(kind, 1) == std::vector<int>{0}));
+    CHECK((SyncTargets(kind, 2) == std::vector<int>{0, 1}));
+    // No choice a dropdown offers makes a cycle for Clamp to cut.
+    for (int line = 0; line < kPlateLines; ++line)
+        for (const int target : SyncTargets(kind, line))
+        {
+            Settings s;
+            s.Kind(PlateKind::Mobs).lines[1].syncWith    = 0;
+            s.Kind(PlateKind::Mobs).lines[2].syncWith    = 1;
+            s.Kind(PlateKind::Mobs).lines[line].syncWith = target;
+            CHECK(Clamp(s) == s);
+        }
+}
+
+TEST(the_sync_dropdown_lists_no_then_its_targets)
+{
+    const std::vector<int> targets{0, 2}; // line 2's, with nothing synced
+    CHECK_EQ(SyncEntry(targets, kNoSync), 0);
+    CHECK_EQ(SyncEntry(targets, 0), 1);
+    CHECK_EQ(SyncEntry(targets, 2), 2);
+    CHECK_EQ(SyncEntry(targets, 1), 0); // a line that is not offered shows as no sync
+    CHECK_EQ(SyncOfEntry(targets, 0), kNoSync);
+    CHECK_EQ(SyncOfEntry(targets, 1), 0);
+    CHECK_EQ(SyncOfEntry(targets, 2), 2);
+    CHECK_EQ(SyncOfEntry(targets, 3), kNoSync);
+    CHECK_EQ(SyncOfEntry({}, 0), kNoSync);
+    CHECK_EQ(SyncEntryLabel(targets, 0), "No");
+    CHECK_EQ(SyncEntryLabel(targets, 1), "Line 1");
+    CHECK_EQ(SyncEntryLabel(targets, 2), "Line 3");
+}

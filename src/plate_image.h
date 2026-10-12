@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <limits>
 #include <optional>
 #include <vector>
 
@@ -52,8 +51,6 @@ namespace headsup
     // A text's soft shadow: its blur radius per pixel of the text's height, from the mockup's 22 px name.
     constexpr float kShadowPerHeight = 0.12f;
 
-    constexpr int kNoMarkColumn = std::numeric_limits<int>::max();
-
     // Text as the look draws it, back to front: a glow (the letters blurred, at part strength), a dark shadow (the letters
     // blurred, once in place and once dropped), then the letters. Blurs are CSS radii, twice the Gaussian's sigma; 0 is none.
     struct Layers
@@ -66,8 +63,6 @@ namespace headsup
         uint32_t glowColor   = 0;
         float glowStrength   = 1.0f; // times the mockup's glow, which is solid wherever it would pass full
         float shadowStrength = 1.0f; // times the mockup's shadow, the same way
-        int markX            = kNoMarkColumn; // from this column on, the letters take markColor
-        uint32_t markColor   = 0;
     };
     // The coverage needs a margin of BlurMargin of the wider of the glow and the shadow with its drop.
     Image Styled(const Coverage& coverage, const Layers& layers);
@@ -129,6 +124,11 @@ namespace headsup
     int WholePixels(float size);
     // A power of two, which every Direct3D 8 card accepts.
     int TextureSide(int pixels);
+    // What a device that reports no largest texture is taken to make.
+    constexpr int kFallbackTextureSide = 2048;
+    // The longest side of a text's texture, from the device's largest width and height (0 for unknown): the smaller,
+    // as a power of two, and no more than the 32-bit client can hold a screenful of.
+    int TextTextureSide(uint32_t maxWidth, uint32_t maxHeight);
     // Puts a width by height image of D3DCOLORs in the top-left corner of a sideX by sideY texture whose rows start
     // pitch bytes apart, and clears the rest, so filtering at the image's edge blends with nothing.
     void CopyToCorner(const void* image, int width, int height, void* rows, int pitch, int sideX, int sideY);

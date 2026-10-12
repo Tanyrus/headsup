@@ -4,67 +4,29 @@
 #include "bar_placement.h"
 #include "bar_server_time.h"
 #include "bar_types.h"
+#include "color.h"
 #include "currencies.h"
 #include "fonts.h"
-#include "labels.h"
+#include "icons.h"
+#include "ini_text.h"
 #include "menu_fonts.h"
 #include "native_locate.h"
-#include "player_status.h"
+#include "plate_settings.h"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace headsup
 {
-    enum class Category : uint8_t
-    {
-        WillAttack,
-        WontAttack,
-        Unknown,
-        NmWillAttack,
-        NmWontAttack,
-        Placeholder, // a lottery placeholder, whatever it would be, while placeholders are shown in their own color
-        PartyClaim,  // claimed by you or your party, whatever it would be, while these are shown in their own color
-        OtherClaim,  // and claimed by anyone else
-    };
-    constexpr int kCategoryCount = static_cast<int>(Category::OtherClaim) + 1;
-    constexpr int CategoryIndex(Category category) { return static_cast<int>(category); }
-
-    enum class Look : uint8_t
-    {
-        Fantasy,
-    };
-    constexpr int kLookCount = static_cast<int>(Look::Fantasy) + 1;
-
-    // Opaque: outline copies take alpha from the mob's texture, where it shapes hair and cloth cut-outs.
-    struct Color
-    {
-        float v[3]; // r, g, b in 0-1, the layout ImGui's ColorEdit3 edits
-        bool operator==(const Color&) const = default;
-    };
-    // From 0xRRGGBB, exactly: ToArgb gives back the same bytes.
-    constexpr Color ColorFromRgb(uint32_t rgb)
-    {
-        constexpr float kFull = 255.0f;
-        return {{Channel(rgb, kRedShift) / kFull, Channel(rgb, kGreenShift) / kFull, Channel(rgb, kBlueShift) / kFull}};
-    }
-    // Phoenix's royal red, the accent of its own theme (phoenix-platform's --phoenix-accent).
-    constexpr uint32_t kPhoenixRed = 0xC55151;
-
     constexpr float kMinThickness = 1.0f, kMaxThickness = 16.0f;            // render-target pixels
     constexpr int kMinSmoothness = 4, kMaxSmoothness = 16;                  // shifted copies per mesh
     constexpr float kMinOutlineDistance = 5.0f, kMaxOutlineDistance = 50.0f; // yalms: the game draws no mob past 50
-    constexpr int kMinTextSize = 8, kMaxTextSize = 48;   // pixels: name, label, icon and cursor sizes
+    constexpr int kMinTextSize = 8, kMaxTextSize = 48;   // pixels: the base and cursor sizes
     constexpr int kMinNameRaise = 0, kMaxNameRaise = 40; // pixels
-    constexpr int kMinPlayerIconSize = 50, kMaxPlayerIconSize = 150; // percent of the name's letter height
-    constexpr int kMinGlowStrength = 25, kMaxGlowStrength = 300;     // percent of the mockup's glow
-    constexpr int kMinGlowSize = 25, kMaxGlowSize = 200;             // percent: a wider glow takes longer to draw
-    constexpr int kMinShadowStrength = 0, kMaxShadowStrength = 200;  // percent of the mockup's shadow
-    constexpr int kMinOrnamentWidth = 20, kMaxOrnamentWidth = 300;   // pixels
-    constexpr int kMinOrnamentThickness = 3, kMaxOrnamentThickness = 24; // pixels
     constexpr const char* kDefaultFont = kMarcellusSC;
     constexpr const char* kBadgeFont   = kBarlowCondensed; // plain enough to read a few pixels tall
     constexpr size_t kMaxFontName      = 31; // a Windows font name's longest, without its terminator
@@ -78,25 +40,6 @@ namespace headsup
 
     constexpr int kMinCursorOutline = 25, kMaxCursorOutline = 200; // percent
     constexpr int kMinOpacity = 10, kMaxOpacity = 100; // percent
-    // Where a mob's icon row goes: above the level line with each group at its edge, the groups together over its
-    // middle, or on the level line itself, each group at the side it is set to.
-    enum class IconPlace : uint8_t
-    {
-        Edges,
-        Center,
-        Inline,
-    };
-    constexpr int kIconPlaceCount = static_cast<int>(IconPlace::Inline) + 1;
-
-    // The player icons from first to last, GM's place aside: it always shows, nearest the name on its left.
-    constexpr std::array<PlayerIcon, kPlayerIconCount> DefaultPlayerIconOrder()
-    {
-        std::array<PlayerIcon, kPlayerIconCount> order{};
-        for (int i = 0; i < kPlayerIconCount; ++i)
-            order[i] = static_cast<PlayerIcon>(i);
-        return order;
-    }
-    constexpr int kMaxPlayerIcons = kPlayerIconCount - 1; // GM's aside
 
     constexpr int kMinMenuScale = 70, kMaxMenuScale = 160; // percent
 
@@ -108,16 +51,6 @@ namespace headsup
         float thickness    = 1.0f;  // render-target pixels
         int smoothness     = 4;     // shifted copies per mesh
         float maxDistance  = 50.0f; // yalms
-        bool showLabels    = true;  // level and con above every mob's name
-        bool replaceMobNames   = true;
-        bool showIcons         = true;  // the MobDB icon row
-        bool showDamageIcons     = false; // the badge group, off since the top bar's popup shows the same: weaknesses
-        bool showStatusRankIcons = false; // and resistances to damage types and elements; statuses by statusBadges
-        bool showImmunityIcons   = false;
-        // Each group's side of the plate's center; a side both share has the detection icons nearest the center.
-        IconSide detectionIconSide = IconSide::Left;
-        IconSide badgeSide         = IconSide::Right;
-        IconPlace mobIconPlace     = IconPlace::Edges;
         // Which elements and statuses get badges, as BadgeRules has them.
         int elementWeakRank   = BadgeRules{}.elementWeakRank;
         int elementResistRank = BadgeRules{}.elementResistRank;
@@ -160,100 +93,37 @@ namespace headsup
         // The game's windows moved out from under Game help's bar, by short name (native_locate.h's ShortName).
         std::vector<std::string> movedWindows = DefaultMovedWindows();
         int untargetedOpacity = 100; // percent: other mobs' plates while you have a target
-        bool hideClaimedByParty = false; // no level line or icons on a mob claimed by you or your party
-        bool hideClaimed       = false; // nor on one anyone has claimed
-        bool hideTooWeak       = false; // nor on one that cons Too Weak
-        bool hideWhileEngaged  = false; // nor on any while you are engaged
-        MobIdFormat mobId      = MobIdFormat::Off; // a mob's server ID on its level line
-        bool markPlaceholders  = true;  // "[PH]" for a lottery placeholder's ID
+        bool glowOffWhenFighting = true; // a mob's lines lose their glow once you or your party has claimed it
         bool phTimers          = false; // above your name, a respawn timer for each placeholder you see die
         bool scaleWithDistance = true;  // sizes follow how far a name's owner is from you
         bool scaleOwnName      = true;  // your own plate too
-        bool scalePlayerNames  = true;  // other players' plates too
         bool scaleCursor       = true;  // the target cursor's size follows the distance too, apart from the names
-        Look look              = Look::Fantasy; // which style the plates are drawn in
         std::vector<uint8_t> keepPointerKeys; // keys that set off a command without hiding the game's pointer
-        std::string fontName   = kDefaultFont; // mob names': a font family installed in Windows
-        bool fontBold          = false;
-        std::string playerFontName = kDefaultFont; // players' names, yours too
-        bool playerFontBold        = false;
-        std::string npcFontName    = kDefaultFont;
-        bool npcFontBold           = false;
-        bool nameGlow          = true;  // a mob's name glows in its outline color
-        bool glowOffWhenFighting = true; // but not once you or your party has claimed it
-        int glowStrength       = 100;   // percent of the mockup's glow
-        int glowSize           = 100;   // percent of the mockup's glow
-        bool ownGlowColor      = false; // the glow in glowColor instead of the outline color
-        Color glowColor        = ColorFromRgb(0xFFB45A); // the mockup's warm glow
-        bool showOrnament      = true;  // between a mob's level line and its name
-        int ornamentWidth      = 90;    // pixels
-        int ornamentThickness  = 6;     // pixels
-        bool ownOrnamentColor  = false; // the ornament in ornamentColor instead of the outline color
-        Color ornamentColor    = ColorFromRgb(0xD9B46A); // the mockup's gold
-        int nameShadow         = 100;   // percent of the mockup's shadow; textOutline is its color
-        std::string labelFontName = kDefaultFont; // the level line and the timers
-        bool labelFontBold     = false;
-        Color labelShadowColor = {{0.00f, 0.00f, 0.00f}};
-        int labelShadow        = 100;   // percent of the mockup's shadow
-        int mobNameSize        = 15;    // pixels
-        int playerNameSize     = 15;    // pixels: other players
-        int selfNameSize       = 15;    // pixels: you
-        int npcNameSize        = 15;    // pixels
-        int labelSize          = 13;    // pixels
-        int timerSize          = 13;    // pixels: your placeholder timers' lines
-        int iconSize           = 16;    // pixels
-        int playerIconSize     = 100;   // percent of the name's letter height
-        bool replacePlayerNames = true; // you included
-        bool replaceNpcNames   = true;
         bool replaceCursor     = true;  // our target cursor above the target's nameplate, instead of the game's
         bool cursorFeather     = true;  // Phoenix's feather instead of the arrow
         bool chocoboPointer    = false; // PlayOnline's chocobo in place of the game's mouse pointer
         bool fixPointer        = true;  // the game reads the mouse in its true client area and syncs its pointer before clicks
-        bool showPlayerIcons   = true;  // seeking party, bazaar, linkshell and the rest beside replaced player names
-        IconSide playerIconSide[kPlayerIconCount] = {}; // by PlayerIcon: every one left of the name
-        std::array<PlayerIcon, kPlayerIconCount> playerIconOrder = DefaultPlayerIconOrder();
-        // By PlayerIcon: it shares the slot of the icon before it in the order, which shows the first one the player
-        // has.
-        bool playerIconShare[kPlayerIconCount] = {};
-        int playerIconMax = kMaxPlayerIcons; // icons beside a name, GM's aside
-        bool centerNameAndIcons = true;  // a player's name and icons centered together over them, rather than the name
-        Color cursorColor      = ColorFromRgb(kPhoenixRed); // the target
-        Color lockedCursorColor = {{0.65f, 0.40f, 1.00f}};
-        Color subCursorColor   = {{0.99f, 0.82f, 0.09f}}; // like XIUI's sub-target tint
-        Color outOfRangeCursorColor = {{1.00f, 0.25f, 0.25f}}; // the sub-target out of range, red as the game shows it
         int cursorSize         = 20;    // pixels tall
         int cursorOutline      = 50;    // percent of the outline's first thickness
         int nameRaise          = 6;     // pixels the names HeadsUp draws sit above the game's, with all above them
         bool stackNames        = false; // names HeadsUp draws that would cover each other rise over one another
-        bool ownNameColor      = false; // names in nameColor instead of the game's color
-        Color nameColor        = {{1.00f, 1.00f, 1.00f}};
-        Color labelColor[kLabelShadeCount] = {
-            {{0.60f, 0.60f, 0.60f}}, // unknown
-            {{0.60f, 0.60f, 0.60f}}, // Too Weak
-            {{0.40f, 1.00f, 0.40f}}, // Easy Prey
-            {{0.45f, 0.70f, 1.00f}}, // Decent Challenge
-            {{1.00f, 1.00f, 1.00f}}, // Even Match
-            {{1.00f, 1.00f, 0.35f}}, // Tough
-            {{1.00f, 0.35f, 0.35f}}, // Very Tough
-        };
-        Color textOutline = {{0.00f, 0.00f, 0.00f}};
-        Color iconTint    = {{1.00f, 1.00f, 1.00f}}; // white keeps the icons' own colors
         Color weakBadgeColor   = {{0.40f, 1.00f, 0.40f}};
         Color resistBadgeColor = {{1.00f, 0.35f, 0.35f}};
         Color rankBadgeColor   = {{1.00f, 0.85f, 0.30f}};
         Color immuneBadgeColor = {{1.00f, 0.25f, 0.25f}};
-        // Indexed by Category: no passive or unknown, and claims in the color the mob would have anyway.
-        bool show[kCategoryCount]   = {true, false, false, true, true, true, false, false};
-        Color color[kCategoryCount] = {
-            {{1.00f, 0.15f, 0.15f}}, // aggressive
-            {{0.20f, 1.00f, 0.30f}}, // passive
-            {{0.70f, 0.70f, 0.70f}}, // unknown
-            {{1.00f, 0.60f, 0.10f}}, // aggressive NM
-            {{1.00f, 0.84f, 0.00f}}, // passive NM
-            {{0.70f, 0.30f, 1.00f}}, // lottery placeholder
-            {{0.30f, 0.65f, 1.00f}}, // claimed by your party
-            {{0.55f, 0.45f, 0.40f}}, // claimed by someone else
-        };
+        bool nameplates = true;
+        bool outlines   = true;
+        int baseSize    = 15; // pixels: a line at 100 percent
+        std::string defaultFont = kDefaultFont;
+        int scaleMin = 50, scaleMax = 250; // percent: the distance scale's limits
+        int timerPercent = 87;
+        std::array<KindSettings, kPlateKindCount> kinds = DefaultKinds();
+        Palette palette = DefaultPalette();
+        uint32_t detectionShown = kAllDetection;
+        std::vector<std::string> friends;
+        Color cursorEdgeColor = ColorFromRgb(0x000000);
+        const KindSettings& Kind(PlateKind k) const { return kinds[static_cast<int>(k)]; }
+        KindSettings& Kind(PlateKind k) { return kinds[static_cast<int>(k)]; }
         bool operator==(const Settings&) const = default;
     };
 
@@ -270,7 +140,6 @@ namespace headsup
     inline constexpr uint8_t kLoginInGame = 2;
     // The bar's settings are on and the character is in game.
     bool BarRuns(const Settings& s, uint8_t loginStatus);
-    bool ReplacesAnyName(const Settings& s);
 
     // The fonts to offer: the installed families (as GDI lists them, once per character set and with vertical variants
     // named @...), each once and sorted, with current added when it is not installed.
@@ -291,6 +160,43 @@ namespace headsup
     Settings Clamp(Settings s);
     Settings LoadSettings(SettingsStore& store);
     void SaveSettings(const Settings& s, SettingsStore& store);
+
+    // What a save has to tell the player: a failure once for a run of them, and the save that ends such a run.
+    enum class SaveNotice : uint8_t { None, Failed, Saved };
+
+    // A store that passes a Set on only when the key's text is not the text the store holds: a Set is Ashita writing
+    // the key into the file, about a third of a millisecond, and a save makes one for every key.
+    class ChangedKeys final : public SettingsStore
+    {
+    public:
+        explicit ChangedKeys(SettingsStore& store)
+            : m_Store(store)
+        {}
+        bool GetBool(const char* key, bool fallback) override { return m_Store.GetBool(key, fallback); }
+        float GetFloat(const char* key, float fallback) override { return m_Store.GetFloat(key, fallback); }
+        std::string GetString(const char* key, const char* fallback) override { return m_Store.GetString(key, fallback); }
+        void Set(const char* key, const char* value) override;
+        // LoadSettings, after asking the store for the text it holds for every key a save writes, so the next save
+        // passes on exactly the keys the file lacks or holds otherwise than a save writes them.
+        Settings Load();
+        // Whether the file loaded is owed a save without waiting for a change: it holds settings, and lacks the
+        // designs' marker or has an older build's version.
+        bool Outdated() const { return m_Outdated; }
+        // SaveSettings. Returns every key passed on that the file is not known to hold, with its latest text: those
+        // of this save, and of earlier ones that ReadBack was not told the file holds.
+        const std::vector<KeyText>& Save(const Settings& s);
+        // After a save, whether the file as read back holds the keys Save returned: only then are they owed no more.
+        SaveNotice ReadBack(bool fileHoldsThem);
+        bool Unwritten() const { return !m_Unwritten.empty(); }
+
+    private:
+        SettingsStore& m_Store;
+        std::unordered_map<std::string, std::string> m_Held; // each key's text as the store holds it
+        std::vector<KeyText> m_Unwritten;
+        bool m_Passing  = true; // off while Load lists the keys of a save
+        bool m_Outdated = false;
+        bool m_Failing  = false; // the last read-back did not hold the keys, which the player was told
+    };
 
     // Opaque D3DCOLOR (A8R8G8B8) for D3DRS_TEXTUREFACTOR, from a color Clamp has kept in 0-1.
     uint32_t ToArgb(const Color& c);

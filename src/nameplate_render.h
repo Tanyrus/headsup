@@ -5,15 +5,16 @@
 #include "game_cursor.h"
 #include "game_names.h"
 #include "gpu.h"
-#include "icons.h"
 #include "look.h"
 #include "nameplate.h"
 #include "native_hook.h"
 #include "ph_timers.h"
 #include "settings.h"
 #include "plate_image.h"
+#include "plate_layout.h"
 #include "tracker.h"
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <unordered_map>
@@ -24,16 +25,27 @@ namespace headsup
     class NameplateRenderer
     {
     public:
-        // For /hu debug and the draw dump.
+        // For /hu debug and the draw dump: a line's text runs joined, where its box starts, the size its text is shown
+        // at (its icons' on a line without text) and how many icons it drew.
+        struct ShownLine
+        {
+            std::string text;
+            float x, y;
+            int height;
+            int icons;
+        };
+        // The name fields are the plate's first text run holding the entity's name: 0 and white without one.
         struct Shown
         {
             uint16_t index;
-            float nameX, nameY, labelX, labelY, iconsX, iconsY;
-            int nameHeight, labelHeight, iconSize, mobIconCount;
+            float nameX, nameY;
+            int nameHeight;
             uint32_t nameColor;
+            ShownLine lines[kPlateLines];
+            int lineCount;
         };
 
-        void SetDevice(IDirect3DDevice8* device) { m_Device = device; }
+        void SetDevice(IDirect3DDevice8* device);
         // toX and toY turn back-buffer pixels into those of the image the nameplates are drawn into.
         void Update(const Tracker& tracker, const GameNames& names, const NameHook& hook, const Settings& settings, float toX, float toY,
             const CursorTargets& targets, double now, uint16_t selfIndex, const std::vector<TimerLine>& selfTimers);
@@ -59,8 +71,6 @@ namespace headsup
             uint32_t color     = 0;
             uint32_t glow      = 0; // 0 for none
             float glowStrength = 0.0f, glowSize = 0.0f;
-            size_t markAt      = Label::kNoMark;
-            uint32_t markColor = 0;
             bool operator==(const TextLook&) const = default;
         };
 
@@ -82,21 +92,27 @@ namespace headsup
             float u = 0.0f, v = 0.0f; // the image's share of its power-of-two texture
             float tip = 0.5f;
             float halo = 0.0f; // the shadow's or glow's margin, in texture pixels: it hangs outside the box the layout places
+            int raster = 0;     // the height it is drawn at: its key's, or less when that image fits no texture
+            bool unfit = false; // it fits none at the smallest height either: no texture, and the key says for what
+        };
+
+        // One of a plate's lines: a texture for each of its text runs, in order, and the ornament above it.
+        struct LineTextures
+        {
+            std::vector<PlateTexture> texts;
+            PlateTexture ornament;
+            int raster         = 0;
+            int ornamentRaster = 0;
         };
 
         struct Plate
         {
-            PlateTexture name;
-            PlateTexture label;
+            LineTextures lines[kPlateLines]; // by the composed line's source
             PlateTexture cursor;
-            PlateTexture ornament;
             float scale      = 0.0f; // eased toward the game's name size
             double scaleTime = 0.0;
             float rise       = 0.0f; // screen pixels above its own place, eased toward clear of the plates under it
             double riseTime  = 0.0;
-            int nameRaster   = 0;
-            int ornamentRaster = 0;
-            int labelRaster  = 0;
             int cursorRaster = 0;
             std::vector<PlateTexture> timers;
             int timerRaster  = 0;
@@ -120,14 +136,20 @@ namespace headsup
         };
 
         bool Prepare(PlateTexture& t, const char* text, const TextLook& look, int pixelHeight);
+        // The icon's badge from the shared ones: null without one, and for every badge once one could not be made.
+        const PlateTexture* PrepareBadge(const IconDraw& icon, const LineStyle& line, int pixelHeight);
         // The ornament's diamond has the shadow of shadowLine.
         bool PrepareOrnament(PlateTexture& t, uint32_t color, int pixelHeight, int width, const LineStyle& shadowLine);
         bool PrepareCursor(PlateTexture& t, uint32_t color, int pixelHeight, const Settings& settings);
         bool Upload(PlateTexture& t, const Image& image, TextureKey key);
+        // Marks t as holding this key with nothing to draw: its image fits no texture at the smallest height either.
+        static void LeaveOut(PlateTexture& t, TextureKey key);
         void FailNames(std::string what);
+        static void ReleaseLine(LineTextures& line);
         static void ReleasePlate(Plate& plate);
 
         IDirect3DDevice8* m_Device = nullptr;
+        int m_LargestSide          = kFallbackTextureSide; // of a text's texture, from the device
         GdiText m_Gdi;
         std::unordered_map<uint16_t, Plate> m_Plates;
         FrameCache<BadgeKey, PlateTexture> m_Badges;
@@ -135,6 +157,12 @@ namespace headsup
         std::vector<Quad> m_Quads;
         std::vector<Shown> m_Shown;
         std::vector<CursorName> m_CursorNames;
+        // Kept from plate to plate so measuring one allocates nothing: its lines as the layout takes them, the text
+        // boxes of the line being measured, a badge for each of its icons (null without one) and which texts are left out.
+        std::array<LineInput, kPlateLines> m_Inputs;
+        std::vector<ItemSize> m_TextSizes;
+        std::vector<const PlateTexture*> m_IconBadges;
+        std::vector<uint8_t> m_LeftOut;
         uint32_t m_Frame           = 0;
         double m_RedrawMs          = 0.0; // spent this frame
         bool m_NamesFailed         = false;

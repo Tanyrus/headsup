@@ -10,6 +10,7 @@ namespace headsup
 {
     namespace
     {
+        constexpr uint32_t kEventStatus      = 4;
         constexpr uint32_t kRestingStatus    = 33;
         constexpr uint32_t kSittingStatus    = 47;
         constexpr uint32_t kFirstChairStatus = 63; // the default chair, then one per chair key item
@@ -49,6 +50,11 @@ namespace headsup
         return Pose::Standing;
     }
 
+    bool IsEventStatus(uint32_t status)
+    {
+        return status == kEventStatus;
+    }
+
     bool IsSittingStatus(uint32_t status)
     {
         return std::find(std::begin(kSittingAnimations), std::end(kSittingAnimations), status) != std::end(kSittingAnimations);
@@ -76,6 +82,11 @@ namespace headsup
         };
         camera.eye = WorldPoint{eye(0), eye(1), eye(2)};
         return camera;
+    }
+
+    bool CameraStillSeen(uint32_t frame, uint32_t seenFrame)
+    {
+        return frame - seenFrame <= kCameraGraceFrames;
     }
 
     bool RowAtHeight(const Camera& camera, const WorldPoint& feet, float height, float& row)

@@ -24,12 +24,22 @@ namespace
         info.alive    = true;
         info.serverId = kBountyHunter;
         info.index    = kBountyHunter & 0xFFF;
-        info.category = Category::WillAttack;
         info.mob      = MobById(kBountyHunter);
         info.level    = MakeLabel(info.mob, nullptr, 20);
-        info.mobIcons = IconsFor(info.mob);
+        info.state.kind       = EntityKind::Mob;
+        info.state.alive      = true;
+        info.state.nature     = Nature::Aggressive;
+        info.state.classified = Category::WillAttack;
+        info.state.row        = Category::WillAttack;
+        info.state.toughness  = info.level.shade;
         std::snprintf(info.name, sizeof(info.name), "%s", "Goblin Bounty Hunter");
         return info;
+    }
+
+    std::vector<Icon> EveryIcon(const ActorInfo& mob)
+    {
+        const IconSet icons = IconsFor(mob.mob, kAllDetection);
+        return std::vector<Icon>(icons.icons, icons.icons + icons.count);
     }
 
     std::string Joined(const std::vector<Span>& spans)
@@ -82,17 +92,18 @@ namespace
 
 TEST(the_target_widget_shows_name_level_and_con_in_their_colors)
 {
+    // The Aggressive row's outline pick is the Aggression palette's; at 20 a 17-20 mob's harder end is an Even Match.
     Settings settings;
+    settings.palette.aggression[static_cast<int>(Nature::Aggressive)] = ColorFromRgb(0x112233);
+    settings.palette.toughness[static_cast<int>(LabelShade::EvenMatch)] = ColorFromRgb(0x445566);
     const ActorInfo goblin = Goblin();
     BarState state;
     state.target          = &goblin;
     const WidgetContent w = BarWidgetContent(BarWidget::Target, state, settings);
     CHECK(w.shown && w.hasPopup);
-    CHECK(w.icons.size() == 1 && w.icons[0] == goblin.mobIcons.icons[0]);
-    const uint32_t nameColor  = ToArgb(settings.color[CategoryIndex(Category::WillAttack)]);
-    const uint32_t shadeColor = ToArgb(settings.labelColor[static_cast<int>(goblin.level.shade)]);
-    CHECK(w.title == (std::vector<Span>{{"Goblin Bounty Hunter", Tone::Own, nameColor}}));
-    CHECK(w.subtitle == (std::vector<Span>{{goblin.level.text, Tone::Own, shadeColor}}));
+    CHECK(w.icons == std::vector<Icon>{Icon::AggroNQ});
+    CHECK(w.title == (std::vector<Span>{{"Goblin Bounty Hunter", Tone::Own, 0xFF112233u}}));
+    CHECK(w.subtitle == (std::vector<Span>{{"Lv 17-20 EP-EM", Tone::Own, 0xFF445566u}}));
 }
 
 TEST(target_details_put_a_mobs_icons_after_its_name_and_its_weaknesses_after_its_level)
@@ -104,7 +115,7 @@ TEST(target_details_put_a_mobs_icons_after_its_name_and_its_weaknesses_after_its
     state.target          = &goblin;
     const WidgetContent w = BarWidgetContent(BarWidget::Target, state, settings);
     CHECK(w.icons.empty()); // none before the name: they follow it
-    CHECK(w.titleIcons == std::vector<Icon>(goblin.mobIcons.icons, goblin.mobIcons.icons + goblin.mobIcons.count));
+    CHECK(w.titleIcons.size() > 1 && w.titleIcons == EveryIcon(goblin));
     std::vector<Icon> weak;
     const InfoIconSet all = InfoIconsFor(&ResistancesOf(*goblin.mob), BadgeRules{});
     for (int i = 0; i < all.count; ++i)
@@ -130,7 +141,6 @@ TEST(no_target_reads_no_target_and_a_player_gets_only_a_name)
     ActorInfo stranger = Goblin(); // a mob the Phoenix data does not have
     stranger.mob       = nullptr;
     stranger.level     = MakeLabel(nullptr, nullptr, 20);
-    stranger.mobIcons  = IconSet{};
     state.target       = &stranger;
     const WidgetContent s = BarWidgetContent(BarWidget::Target, state, settings);
     CHECK(Joined(s.title) == "Goblin Bounty Hunter" && Joined(s.subtitle) == stranger.level.text && !s.hasPopup);
@@ -140,22 +150,20 @@ TEST(no_target_reads_no_target_and_a_player_gets_only_a_name)
 TEST(a_dead_mob_with_data_keeps_its_aggro_icon_and_popup_but_has_no_level)
 {
     Settings settings;
-    ActorInfo dead = Goblin(); // the tracker fills the level and icons only for a living mob
-    dead.alive     = false;
-    dead.level     = Label{};
-    dead.mobIcons  = IconSet{};
+    ActorInfo dead = Goblin(); // the tracker fills the level only for a living mob
+    dead.alive = dead.state.alive = false;
+    dead.level                    = Label{};
+    dead.state.toughness          = LabelShade::Unknown;
     BarState state;
     state.target          = &dead;
     const WidgetContent w = BarWidgetContent(BarWidget::Target, state, settings);
-    const IconSet living  = IconsFor(dead.mob);
-    CHECK(living.count > 0);
-    CHECK(w.icons.size() == 1 && w.icons[0] == living.icons[0]);
-    const uint32_t nameColor = ToArgb(settings.color[CategoryIndex(Category::WillAttack)]);
+    CHECK(w.icons == std::vector<Icon>{Icon::AggroNQ});
+    const uint32_t nameColor = ToArgb(settings.palette.aggression[static_cast<int>(Nature::Aggressive)]);
     CHECK(w.title == (std::vector<Span>{{"Goblin Bounty Hunter", Tone::Own, nameColor}}));
     CHECK(w.subtitle.empty());
     CHECK(w.hasPopup);
     const PopupContent popup = BarPopupContent(BarWidget::Target, state, settings);
-    CHECK(popup.icon == living.icons[0]);
+    CHECK(popup.icon == Icon::AggroNQ);
     const PopupRow& top = popup.sections[0].rows[0];
     CHECK(top.cells.size() == 1);
     CHECK(Joined(top.cells[0].text) == "ID 220");
