@@ -121,3 +121,14 @@ TEST(a_camera_knows_where_it_is)
     CHECK(test::Near(Distance(camera.eye, WorldPoint{10.0f, -5.0f, 17.0f}), 3.0f, 1e-4f));
     CHECK(test::Near(Distance(WorldPoint{0.0f, 0.0f, 0.0f}, WorldPoint{3.0f, 4.0f, 12.0f}), 13.0f, 1e-4f));
 }
+
+TEST(status_4_is_the_games_event_status_and_nothing_else_is)
+{
+    CHECK(IsEventStatus(4));
+    CHECK(!IsEventStatus(0));
+    CHECK(!IsEventStatus(1));
+    CHECK(!IsEventStatus(3));
+    CHECK(!IsEventStatus(5));
+    CHECK(!IsEventStatus(33));
+    CHECK(!IsEventStatus(47));
+}

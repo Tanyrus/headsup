@@ -10,6 +10,7 @@ namespace headsup
 {
     namespace
     {
+        constexpr uint32_t kEventStatus      = 4;
         constexpr uint32_t kRestingStatus    = 33;
         constexpr uint32_t kSittingStatus    = 47;
         constexpr uint32_t kFirstChairStatus = 63; // the default chair, then one per chair key item
@@ -47,6 +48,11 @@ namespace headsup
         if (status == kSittingStatus) return Pose::Sitting;
         if (status >= kFirstChairStatus && status <= kLastChairStatus) return Pose::Chair;
         return Pose::Standing;
+    }
+
+    bool IsEventStatus(uint32_t status)
+    {
+        return status == kEventStatus;
     }
 
     bool IsSittingStatus(uint32_t status)

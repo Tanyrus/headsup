@@ -223,6 +223,7 @@ class HeadsUp final : public IPlugin
     bool m_DebugPending = false;
     bool m_Screenshot = false;
     bool m_UiHidden = false;
+    uint32_t m_OwnStatus = 0;
     float m_GuiAlpha = 1.0f;
     int m_GuiFlags = 0;
     bool m_FontsWereVisible = true, m_PrimitivesWereVisible = true;
@@ -517,7 +518,7 @@ public:
         const uint8_t loginStatus = m_AshitaCore->GetMemoryManager()->GetPlayer()->GetLoginStatus();
         // A popup left open at logout would come back with the next character.
         if (loginStatus != headsup::kLoginInGame) m_BarInput.Reset();
-        m_UiHidden = m_Screenshot;
+        m_UiHidden = m_Screenshot || headsup::IsEventStatus(m_OwnStatus);
         g_BarOn = headsup::BarRuns(m_Settings, loginStatus) && !m_Bar.Failed();
         g_BarHidden = m_UiHidden;
         // Opening Region Info asks the server for the conquest standings; HeadsUp asks the same once per zone-in.
@@ -567,7 +568,9 @@ public:
             m_Bar.DrawPopup(gui, gui->GetIO().DisplaySize.x / m_Names.BackBufferWidth());
         m_BarDrawn = false;
         m_ArrowHook.Hide(m_Settings.enabled && m_Settings.replaceCursor);
-        const headsup::HiddenWindows hidden{.helpBar = m_Settings.enabled && m_Settings.hideHelpBar,
+        // The game's help bar is the only help left while an event hides HeadsUp's bar; a screenshot wants neither.
+        const bool helpGone = m_Settings.hideHelpBar && (m_Screenshot || !headsup::IsEventStatus(m_OwnStatus));
+        const headsup::HiddenWindows hidden{.helpBar = m_Settings.enabled && helpGone,
             .netstat = m_Settings.enabled && m_Settings.hideNetstat};
         const std::optional<headsup::HelpBand> band = HelpBandNow();
         const bool movesWindows = (band && band->bottom != 0) || !m_Settings.windowOffsets.empty() ||
@@ -1385,6 +1388,7 @@ private:
             });
         }
         const uint32_t ownStatus = entity->GetStatus(m_SelfIndex);
+        m_OwnStatus              = ownStatus;
         m_Player.level           = player->GetMainJobLevel();
         m_Player.sitting         = headsup::IsSittingStatus(ownStatus);
         m_Player.engaged         = ownStatus == kEngagedStatus;

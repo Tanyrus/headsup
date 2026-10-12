@@ -19,6 +19,9 @@ namespace headsup
     // server counts.
     bool IsSittingStatus(uint32_t status);
 
+    // The game's event status: cutscenes and NPC dialogs alike.
+    bool IsEventStatus(uint32_t status);
+
     // A point in the game's world in Direct3D's axes: x, height (up is negative) and the entity's y.
     struct WorldPoint
     {
