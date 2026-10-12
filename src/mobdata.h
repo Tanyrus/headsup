@@ -62,19 +62,9 @@ namespace headsup
 
     bool IsAggressive(const MobRecord& mob);
 
-    // Whether two names have the same letters and digits, ignoring case. Phoenix drops apostrophes the client shows:
-    // its "Goblins Dragonfly" is the client's "Goblin's Dragonfly".
-    bool SameMobName(std::string_view a, std::string_view b);
-    // Phoenix names a mob whose template has no display name after its template key, which adds tags after the name
-    // the client shows: its "Stink Bats OHR" and "Lost Soul war ENS" are the client's "Stink Bats" and "Lost Soul".
-    bool TaggedMobName(std::string_view recorded, std::string_view shown);
-
-    // The record for this server ID whatever its name; nullptr when there is none.
+    // The record for this server ID; nullptr when there is none. The name an entity shows is not asked: the renamer
+    // addon writes its own over the game's, and Phoenix's own names carry tags the client's lack.
     const MobRecord* MobById(uint32_t serverId);
-
-    // The record for this server ID when its name matches the entity's; nullptr when there is none or the names
-    // differ (data older than the server's ID assignments).
-    const MobRecord* FindMob(uint32_t serverId, std::string_view displayName);
 
     // Its resistances; the neutral set when its index is past the table.
     const MobResistances& ResistancesOf(const MobRecord& mob);

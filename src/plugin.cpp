@@ -956,9 +956,7 @@ private:
 
     void OnCheckReply(const headsup::CheckReply& reply)
     {
-        IEntity* entity = m_AshitaCore->GetMemoryManager()->GetEntity();
-        const headsup::MobRecord* mob = headsup::FindMob(reply.serverId, headsup::EntityName(entity, reply.targetIndex));
-        m_Checks.Received(reply, headsup::CheckLifetime(mob), Now());
+        m_Checks.Received(reply, headsup::CheckLifetime(headsup::MobById(reply.serverId)), Now());
     }
 
     void Print(const std::string& message)
@@ -1468,7 +1466,7 @@ private:
             if (isMob && m_Settings.phTimers)
             {
                 const bool bodyDrawn = m_Names.FramesSinceMesh(index) <= headsup::kMeshGraceFrames;
-                if (const auto sighting = headsup::SightingOf(headsup::FindMob(serverId, name), alive, bodyDrawn))
+                if (const auto sighting = headsup::SightingOf(headsup::MobById(serverId), alive, bodyDrawn))
                     sightings.push_back(*sighting);
             }
             inputs.push_back(headsup::ActorInput{

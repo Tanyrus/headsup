@@ -19,12 +19,12 @@ namespace
 
 TEST(a_placeholder_is_seen_with_its_respawn_and_its_nms_name)
 {
-    const MobRecord* worm = FindMob(kWorm, "Carrion Worm");
+    const MobRecord* worm = MobById(kWorm);
     const auto seen       = SightingOf(worm, false, true);
     CHECK(seen.has_value());
     CHECK(seen->serverId == kWorm && seen->respawnSeconds == 180 && seen->nmName == "Bigmouth Billy");
     CHECK(!seen->alive && seen->bodyDrawn);
-    CHECK(!SightingOf(FindMob(kBigmouthBilly, "Bigmouth Billy"), true, true).has_value()); // not a placeholder
+    CHECK(!SightingOf(MobById(kBigmouthBilly), true, true).has_value()); // not a placeholder
     CHECK(!SightingOf(nullptr, true, true).has_value());
     MobRecord orphan     = *worm;
     orphan.placeholderOf = 1; // an NM the data does not have

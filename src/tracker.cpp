@@ -77,7 +77,7 @@ namespace headsup
             st.playerRow = PlayerRowOf(a.party, a.isFriend, a.linkshell);
             if (a.kind == EntityKind::Mob)
             {
-                const MobRecord* mob   = FindMob(a.serverId, a.name);
+                const MobRecord* mob   = MobById(a.serverId);
                 const bool placeholder = mob != nullptr && mob->placeholderOf != 0;
                 info.mob               = mob;
                 info.placeholder       = placeholder;
