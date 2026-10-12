@@ -55,6 +55,13 @@ namespace headsup
             if (CursorShown(index, settings, targets) && !onNameplate)
                 lone.push_back(LoneCursor{index, TargetStateOf(index, targets), x, y});
         };
+        // Drawn in this order: on one entity the target's own cursor goes under the candidate's.
+        if (const TargetState under = TargetUnderPick(targets.target, targets); under != TargetState::None)
+        {
+            const bool onNameplate = std::ranges::find(withNameplateCursor, targets.target) != withNameplateCursor.end();
+            if (CursorShown(targets.target, settings, targets) && !onNameplate)
+                lone.push_back(LoneCursor{targets.target, under, targets.anchorX, targets.anchorY, true});
+        }
         add(targets.subTarget, targets.subAnchorX, targets.subAnchorY);
         if (targets.target != targets.subTarget) add(targets.target, targets.anchorX, targets.anchorY);
         return lone;

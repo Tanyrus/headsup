@@ -287,6 +287,7 @@ namespace headsup
                 if (m_Icons.Failed()) DropIcons(composed);
                 const TargetState target = TargetStateOf(info->index, targets);
                 const bool showCursor    = CursorShown(info->index, settings, targets);
+                const TargetState under  = showCursor ? TargetUnderPick(info->index, targets) : TargetState::None;
                 const bool timersHere    = info->index == selfIndex && !selfTimers.empty();
                 if (composed.lines.empty() && !showCursor && !timersHere) continue;
                 Plate& p = m_Plates[info->index];
@@ -393,7 +394,9 @@ namespace headsup
                     return true;
                 };
                 if (!measureLines() ||
-                    (showCursor && !PrepareCursor(p.cursor, CursorColor(target, settings), p.cursorRaster, settings)))
+                    (showCursor && !PrepareCursor(p.cursor, CursorColor(target, settings), p.cursorRaster, settings)) ||
+                    (under != TargetState::None &&
+                        !PrepareCursor(p.cursorUnder, CursorColor(under, settings), p.cursorRaster, settings)))
                     break;
                 const int ornamentSource =
                     composed.ornamentAbove != kNoOrnament ? composed.lines[static_cast<size_t>(composed.ornamentAbove)].source : kNoOrnament;
@@ -511,10 +514,19 @@ namespace headsup
                 {
                     // Over everything, as the game's own arrow is: at the name's depth, the target's own model, a
                     // door its name sits inside or anything the game has faded out near the camera would hide it.
-                    const CursorSpot kept = KeepOnScreen(
-                        CursorSpot{layout.cursor.x, layout.cursor.y + CursorBob(now, cursorBox.height)},
-                        cursorBox.width, cursorBox.height, screenWidth, screenHeight);
-                    addSquare(cursorQuads, p.cursor, kept.x, kept.y, FitOf(cursorShown, p.cursor.raster), 0.0f);
+                    const float fit = FitOf(cursorShown, p.cursor.raster);
+                    float top       = layout.cursor.y + CursorBob(now, cursorBox.height);
+                    auto addCursor  = [&](const PlateTexture& cursor) {
+                        const CursorSpot kept = KeepOnScreen(CursorSpot{layout.cursor.x, top}, cursorBox.width, cursorBox.height,
+                            screenWidth, screenHeight);
+                        addSquare(cursorQuads, cursor, kept.x, kept.y, fit, 0.0f);
+                    };
+                    if (under != TargetState::None)
+                    {
+                        addCursor(p.cursorUnder);
+                        top -= cursorBox.height * kPickedCursorRise;
+                    }
+                    addCursor(p.cursor);
                     m_CursorNames.push_back(CursorName{info->index, gameName.box});
                 }
                 for (int i = 0; i < timersReady; ++i)
@@ -576,13 +588,14 @@ namespace headsup
                 p.frame                 = m_Frame;
                 const float cursorShown = static_cast<float>(settings.cursorSize) * toY;
                 p.cursorRaster          = FixedRasterHeight(cursorShown);
-                if (!PrepareCursor(p.cursor, CursorColor(lone.target, settings), p.cursorRaster, settings)) break;
-                const float fit     = FitOf(cursorShown, p.cursor.raster);
-                const float height  = p.cursor.height * fit / toY;
-                const CursorSpot at = CursorAtAnchor(lone.x, lone.y, p.cursor.width * fit / toY, height, p.cursor.tip);
+                PlateTexture& cursor = lone.under ? p.cursorUnder : p.cursor;
+                if (!PrepareCursor(cursor, CursorColor(lone.target, settings), p.cursorRaster, settings)) break;
+                const float fit     = FitOf(cursorShown, cursor.raster);
+                const float height  = cursor.height * fit / toY;
+                const CursorSpot at = CursorAtAnchor(lone.x, lone.y, cursor.width * fit / toY, height, cursor.tip);
                 const CursorSpot kept = KeepOnScreen(CursorSpot{at.x, at.y + CursorBob(now, height)},
-                    p.cursor.width * fit / toY, height, screenWidth, screenHeight);
-                addSquare(cursorQuads, p.cursor, kept.x, kept.y, fit, 0.0f);
+                    cursor.width * fit / toY, height, screenWidth, screenHeight);
+                addSquare(cursorQuads, cursor, kept.x, kept.y, fit, 0.0f);
                 m_CursorNames.push_back(CursorName{lone.index, ScreenBox{}});
             }
         }
@@ -621,6 +634,7 @@ namespace headsup
         for (LineTextures& line : plate.lines)
             ReleaseLine(line);
         ReleaseTexture(plate.cursor.texture);
+        ReleaseTexture(plate.cursorUnder.texture);
         for (PlateTexture& timer : plate.timers)
             ReleaseTexture(timer.texture);
         plate.timers.clear();

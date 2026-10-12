@@ -109,6 +109,7 @@ namespace headsup
         {
             LineTextures lines[kPlateLines]; // by the composed line's source
             PlateTexture cursor;
+            PlateTexture cursorUnder; // the target's own, while it is also the candidate being picked
             float scale      = 0.0f; // eased toward the game's name size
             double scaleTime = 0.0;
             float rise       = 0.0f; // screen pixels above its own place, eased toward clear of the plates under it

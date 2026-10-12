@@ -79,6 +79,23 @@ TEST(the_plate_kind_and_row_follow_the_state)
     CHECK(TypeOf(npc) == TargetType::Npc);
 }
 
+TEST(your_target_keeps_its_own_cursor_under_the_candidates_while_you_pick_it)
+{
+    CursorTargets t;
+    t.target = t.subTarget = 5;
+    CHECK(TargetStateOf(5, t) == TargetState::SubTarget); // the candidate's, on top
+    CHECK(TargetUnderPick(5, t) == TargetState::Targeted);
+    t.locked = true;
+    CHECK(TargetUnderPick(5, t) == TargetState::Locked);
+    CHECK(TargetUnderPick(7, t) == TargetState::None);
+    t.subTarget = 9; // picking someone else: each has one cursor
+    CHECK(TargetUnderPick(5, t) == TargetState::None);
+    CHECK(TargetUnderPick(9, t) == TargetState::None);
+    t.subTarget = 0;
+    CHECK(TargetUnderPick(5, t) == TargetState::None);
+    CHECK(TargetUnderPick(0, CursorTargets{}) == TargetState::None);
+}
+
 TEST(the_target_state_comes_from_the_slots)
 {
     CursorTargets t;
