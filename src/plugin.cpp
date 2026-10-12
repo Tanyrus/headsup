@@ -895,14 +895,17 @@ private:
         }
     }
 
-    // Whose names the hook may meet next frame. A name is HeadsUp's only while it can still draw it.
+    // Whose names the hook may meet next frame. A name HeadsUp cannot draw goes back to the game; one that is hidden stays hidden.
     std::vector<headsup::NameOwner> NameOwners() const
     {
         std::vector<headsup::NameOwner> owners;
-        const bool replacing = headsup::NameplatesOn(m_Settings) && !m_Nameplates.NamesFailed();
         for (const headsup::ActorPtr actor : m_Tracker.Actors())
             if (const headsup::ActorInfo* info = m_Tracker.Find(actor))
-                owners.push_back({actor, info->index, (replacing && headsup::ReplacesName(m_Settings, *info)) || m_Screenshot});
+            {
+                headsup::HookAction action = headsup::HookActionFor(info->state, m_Settings, m_Screenshot);
+                if (action == headsup::HookAction::Replace && m_Nameplates.NamesFailed()) action = headsup::HookAction::Keep;
+                owners.push_back({actor, info->index, action});
+            }
         return owners;
     }
 
@@ -1489,10 +1492,17 @@ private:
             else
                 std::fprintf(out, " | no game name");
             for (const auto& shown : m_Nameplates.LastShown())
-                if (shown.index == info->index)
-                    std::fprintf(out, " | name %08X %dpx at (%.1f,%.1f), label %dpx at (%.1f,%.1f), %d icons %dpx at (%.1f,%.1f)",
-                        static_cast<unsigned>(shown.nameColor), shown.nameHeight, shown.nameX, shown.nameY, shown.labelHeight,
-                        shown.labelX, shown.labelY, shown.mobIconCount, shown.iconSize, shown.iconsX, shown.iconsY);
+            {
+                if (shown.index != info->index) continue;
+                std::fprintf(out, " | name %08X %dpx at (%.1f,%.1f)", static_cast<unsigned>(shown.nameColor), shown.nameHeight,
+                    shown.nameX, shown.nameY);
+                for (int i = 0; i < shown.lineCount; ++i)
+                {
+                    const auto& line = shown.lines[i];
+                    std::fprintf(out, " | line %d '%s' at (%.1f,%.1f) %d px, %d icons", i + 1, line.text.c_str(), line.x, line.y,
+                        line.height, line.icons);
+                }
+            }
             std::fprintf(out, "\n");
         }
         std::fclose(out);

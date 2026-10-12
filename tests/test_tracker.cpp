@@ -46,14 +46,18 @@ namespace
     const PlayerState kLevel20{20, false};
     const PlayerState kLevel75{75, false};
 
-    // Outlines for every category, whatever the defaults show.
+    // Outlines for every mob row, whatever the defaults show.
     Settings EveryCategory()
     {
         Settings s;
-        for (bool& shown : s.show)
-            shown = true;
+        for (RowSettings& row : s.Kind(PlateKind::Mobs).rows)
+            row.outline = OutlineMode::Shown;
         return s;
     }
+
+    uint32_t Aggression(const Settings& s, Nature nature) { return ToArgb(s.palette.aggression[static_cast<int>(nature)]); }
+
+    void SetMobOutline(Settings& s, Category row, OutlineMode mode) { s.Kind(PlateKind::Mobs).rows[CategoryIndex(row)].outline = mode; }
 }
 
 TEST(a_mob_attacks_as_phoenixs_aggro_check_decides)
@@ -214,11 +218,11 @@ TEST(each_category_gets_its_colour)
     t.Update({BountyHunter(0x2000), Mob(0x3000, kSnipper, "Snipper"), Mob(0x4000, 1, "Nobody Here"),
                  Mob(0x5000, kBeachMonk, "Beach Monk"), Mob(0x6000, kBigmouthBilly, "Bigmouth Billy")},
         kLevel20, s, CursorTargets{});
-    CHECK_EQ(t.Find(0x2000)->argb, ToArgb(s.color[CategoryIndex(Category::WillAttack)]));
-    CHECK_EQ(t.Find(0x3000)->argb, ToArgb(s.color[CategoryIndex(Category::WontAttack)]));
-    CHECK_EQ(t.Find(0x4000)->argb, ToArgb(s.color[CategoryIndex(Category::Unknown)]));
-    CHECK_EQ(t.Find(0x5000)->argb, ToArgb(s.color[CategoryIndex(Category::NmWillAttack)]));
-    CHECK_EQ(t.Find(0x6000)->argb, ToArgb(s.color[CategoryIndex(Category::NmWontAttack)]));
+    CHECK_EQ(t.Find(0x2000)->argb, Aggression(s, Nature::Aggressive));
+    CHECK_EQ(t.Find(0x3000)->argb, Aggression(s, Nature::Passive));
+    CHECK_EQ(t.Find(0x4000)->argb, Aggression(s, Nature::NoData));
+    CHECK_EQ(t.Find(0x5000)->argb, Aggression(s, Nature::AggressiveNm));
+    CHECK_EQ(t.Find(0x6000)->argb, Aggression(s, Nature::PassiveNm));
     CHECK_EQ(t.OutlinedCount(), 5u);
 }
 
@@ -229,21 +233,25 @@ TEST(a_mobs_level_line_carries_its_id_or_ph_and_a_placeholder_glows_purple)
     s.mobId           = MobIdFormat::LastThree;
     ActorInput worm   = Mob(0x2000, kCarrionWorm, "Carrion Worm");
     worm.claimed      = true;
-    t.Update({worm, BountyHunter(0x3000)}, kLevel20, s, CursorTargets{});
+    t.Update({worm, BountyHunter(0x3000), Mob(0x5000, kCarrionWorm, "Carrion Worm")}, kLevel20, s, CursorTargets{});
     const ActorInfo* ph = t.Find(0x2000);
     CHECK(std::string(ph->label.text) == "Lv 4-5 TW [PH]");
     CHECK(ph->tooWeak && ph->claimed);
-    CHECK(ph->outline && ph->argb == ToArgb(s.color[CategoryIndex(Category::Placeholder)]));
+    CHECK(t.Find(0x5000)->outline && t.Find(0x5000)->argb == Aggression(s, Nature::Placeholder));
+    CHECK(ph->outline && ph->argb == Aggression(s, Nature::Placeholder)); // claimed, and the claim row defers to it
     const ActorInfo* hunter = t.Find(0x3000);
     CHECK(std::string(hunter->label.text) == "Lv 17-20 EP-EM [220]");
     CHECK(!hunter->tooWeak && !hunter->claimed);
-    s.show[CategoryIndex(Category::Placeholder)] = false;
+    SetMobOutline(s, Category::Placeholder, OutlineMode::ByNature);
     t.Update({Mob(0x2000, kCarrionWorm, "Carrion Worm"), Mob(0x4000, kPoisonFunguar, "Poison Funguar")}, kLevel20, s, CursorTargets{});
-    CHECK(!t.Find(0x2000)->outline); // colored like any mob: passive, so not outlined
-    CHECK(t.Find(0x4000)->outline && t.Find(0x4000)->argb == ToArgb(s.color[CategoryIndex(Category::WillAttack)]));
+    CHECK(!t.Find(0x2000)->outline); // passive, so not outlined
+    CHECK(t.Find(0x4000)->outline && t.Find(0x4000)->argb == Aggression(s, Nature::Aggressive)); // the Will Attack row's color
+    SetMobOutline(s, Category::Placeholder, OutlineMode::Disabled);
+    t.Update({Mob(0x2000, kCarrionWorm, "Carrion Worm"), Mob(0x4000, kPoisonFunguar, "Poison Funguar")}, kLevel20, s, CursorTargets{});
+    CHECK(!t.Find(0x2000)->outline && !t.Find(0x4000)->outline); // a placeholder takes its own row, aggressive or not
 }
 
-TEST(a_claimed_mob_takes_its_claims_color_while_that_is_on)
+TEST(a_claimed_mob_takes_its_claim_rows_mode_and_color)
 {
     Tracker t;
     Settings s;
@@ -257,8 +265,19 @@ TEST(a_claimed_mob_takes_its_claims_color_while_that_is_on)
     s.show[CategoryIndex(Category::PartyClaim)] = true;
     s.show[CategoryIndex(Category::OtherClaim)] = true;
     t.Update({ours, theirs}, kLevel20, s, CursorTargets{});
-    CHECK(t.Find(0x2000)->outline && t.Find(0x2000)->argb == ToArgb(s.color[CategoryIndex(Category::PartyClaim)]));
-    CHECK(t.Find(0x3000)->outline && t.Find(0x3000)->argb == ToArgb(s.color[CategoryIndex(Category::OtherClaim)]));
+    CHECK(t.Find(0x2000)->category == Category::PartyClaim && t.Find(0x3000)->category == Category::OtherClaim);
+    SetMobOutline(s, Category::PartyClaim, OutlineMode::Disabled);
+    SetMobOutline(s, Category::OtherClaim, OutlineMode::Disabled);
+    t.Update({ours, theirs}, kLevel20, s, CursorTargets{});
+    CHECK(!t.Find(0x2000)->outline && !t.Find(0x3000)->outline); // the claim rows decide, not the aggression rows
+    for (const Category claim : {Category::PartyClaim, Category::OtherClaim})
+    {
+        SetMobOutline(s, claim, OutlineMode::Shown);
+        s.Kind(PlateKind::Mobs).rows[CategoryIndex(claim)].outlineColor.source = ColorSource::Claim;
+    }
+    t.Update({ours, theirs}, kLevel20, s, CursorTargets{});
+    CHECK(t.Find(0x2000)->outline && t.Find(0x2000)->argb == ToArgb(s.palette.claim[static_cast<int>(ClaimState::Yours)]));
+    CHECK(t.Find(0x3000)->outline && t.Find(0x3000)->argb == ToArgb(s.palette.claim[static_cast<int>(ClaimState::Others)]));
 }
 
 TEST(a_name_that_does_not_match_the_data_is_unknown)
@@ -266,7 +285,7 @@ TEST(a_name_that_does_not_match_the_data_is_unknown)
     Tracker t;
     const Settings s = EveryCategory();
     t.Update({Mob(0x2000, kBountyHunter, "Snipper")}, kLevel20, s, CursorTargets{});
-    CHECK_EQ(t.Find(0x2000)->argb, ToArgb(s.color[CategoryIndex(Category::Unknown)]));
+    CHECK_EQ(t.Find(0x2000)->argb, Aggression(s, Nature::NoData));
 }
 
 TEST(mobs_beyond_max_distance_are_not_outlined)
@@ -318,14 +337,14 @@ TEST(a_checked_spawn_uses_its_level_for_label_and_category)
     input.checked    = &check;
     t.Update({input}, kLevel20, s, CursorTargets{});
     CHECK_EQ(t.Find(0x2000)->label.text, "Lv 10 TW");
-    CHECK_EQ(t.Find(0x2000)->argb, ToArgb(s.color[CategoryIndex(Category::WontAttack)]));
+    CHECK_EQ(t.Find(0x2000)->argb, Aggression(s, Nature::Passive));
 }
 
 TEST(outlined_count_includes_only_outlined_mobs)
 {
     Tracker t;
     Settings s = EveryCategory();
-    s.show[CategoryIndex(Category::WontAttack)] = false;
+    SetMobOutline(s, Category::WontAttack, OutlineMode::Disabled);
     t.Update({Player(0x1000), BountyHunter(0x2000), Mob(0x3000, kSnipper, "Snipper"), BountyHunter(0x4000, s.maxDistance + 10.0f)},
         kLevel20, s, CursorTargets{});
     CHECK_EQ(t.OutlinedCount(), 1u);
@@ -546,4 +565,133 @@ TEST(the_tracker_fills_claims_rows_placeholders_checks_and_dead_mobs)
     CHECK(t.Find(0x5000)->state.toughness == LabelShade::Unknown);
     CHECK(t.Find(0x6000)->state.pet);
     CHECK(std::string(t.Find(0x6000)->ownerName) == "Carrott");
+}
+
+TEST(an_outline_follows_its_rows_mode_and_color_pick)
+{
+    Settings s;
+    KindSettings& mobs = s.Kind(PlateKind::Mobs);
+    mobs.rows[CategoryIndex(Category::WontAttack)].outline      = OutlineMode::WhenTargeted;
+    mobs.rows[CategoryIndex(Category::WontAttack)].outlineColor = ColorPick{ColorSource::Custom, {{0.1f, 0.2f, 0.3f}}};
+    s.Kind(PlateKind::Players).rows[static_cast<int>(PlayerRow::Player)].outline      = OutlineMode::Shown;
+    s.Kind(PlateKind::Players).rows[static_cast<int>(PlayerRow::Player)].outlineColor = ColorPick{ColorSource::Type};
+    const ActorInput aggressive = BountyHunter(0x2000);
+    const ActorInput passive    = Mob(0x3000, kSnipper, "Snipper");
+    const ActorInput player     = Player(0x4000);
+    CursorTargets targets;
+    targets.target = passive.index;
+    Tracker t;
+    t.Update({aggressive, passive, player}, kLevel20, s, targets);
+    CHECK(t.Find(0x2000)->outline);
+    CHECK_EQ(t.Find(0x2000)->argb, ToArgb(s.palette.aggression[static_cast<int>(Nature::Aggressive)]));
+    CHECK(t.Find(0x3000)->outline); // targeted
+    CHECK_EQ(t.Find(0x3000)->argb, ToArgb(Color{{0.1f, 0.2f, 0.3f}}));
+    CHECK(t.Find(0x4000)->outline);
+    CHECK_EQ(t.Find(0x4000)->argb, ToArgb(s.palette.type[static_cast<int>(TargetType::Player)]));
+    CHECK_EQ(t.OutlinedCount(), 3u);
+    t.Update({aggressive, passive, player}, kLevel20, s, CursorTargets{});
+    CHECK(!t.Find(0x3000)->outline);
+    CHECK_EQ(RowColor(t.Find(0x3000)->state, s), ToArgb(Color{{0.1f, 0.2f, 0.3f}})); // its row's color, outlined or not
+    CHECK_EQ(t.OutlinedCount(), 2u);
+    s.outlines = false;
+    t.Update({aggressive, passive, player}, kLevel20, s, CursorTargets{});
+    CHECK_EQ(t.OutlinedCount(), 0u);
+}
+
+TEST(a_dead_far_or_disabled_row_mob_gets_no_outline)
+{
+    const Settings s;
+    Tracker t;
+    t.Update({BountyHunter(0x2000, 10.0f, false), BountyHunter(0x3000, s.maxDistance + 1.0f), Mob(0x4000, kSnipper, "Snipper")},
+        kLevel20, s, CursorTargets{});
+    CHECK(!t.Find(0x2000)->outline); // dead
+    CHECK(!t.Find(0x3000)->outline); // past the range
+    CHECK(!t.Find(0x4000)->outline); // the Passive row is Disabled by default
+    CHECK_EQ(t.OutlinedCount(), 0u);
+}
+
+namespace
+{
+    ActorInput Claimed(ActorInput mob, bool byParty)
+    {
+        mob.claimed        = true;
+        mob.claimedByParty = byParty;
+        return mob;
+    }
+
+    const uint32_t kAggressiveArgb = ToArgb(Settings{}.palette.aggression[static_cast<int>(Nature::Aggressive)]);
+    const uint32_t kPlaceholderArgb = ToArgb(Settings{}.palette.aggression[static_cast<int>(Nature::Placeholder)]);
+}
+
+TEST(a_claimed_mob_keeps_the_outline_its_nature_gives_it_by_default)
+{
+    const Settings s;
+    Tracker t;
+    t.Update({Claimed(BountyHunter(0x2000), true), Claimed(Mob(0x3000, kSnipper, "Snipper"), true),
+                 Claimed(BountyHunter(0x4000), false), Claimed(Mob(0x5000, kCarrionWorm, "Carrion Worm"), true)},
+        kLevel20, s, CursorTargets{});
+    CHECK(t.Find(0x2000)->outline && t.Find(0x2000)->argb == kAggressiveArgb);
+    CHECK(!t.Find(0x3000)->outline);
+    CHECK(t.Find(0x4000)->outline && t.Find(0x4000)->argb == kAggressiveArgb);
+    CHECK(t.Find(0x5000)->outline && t.Find(0x5000)->argb == kPlaceholderArgb);
+}
+
+TEST(a_claim_row_set_to_shown_or_disabled_decides_for_the_claimed_mob)
+{
+    Settings s;
+    SetMobOutline(s, Category::PartyClaim, OutlineMode::Shown);
+    Tracker t;
+    const ActorInput snipper = Claimed(Mob(0x3000, kSnipper, "Snipper"), true);
+    t.Update({snipper}, kLevel20, s, CursorTargets{});
+    CHECK(t.Find(0x3000)->outline);
+    CHECK_EQ(t.Find(0x3000)->argb, ToArgb(s.palette.claim[static_cast<int>(ClaimState::Yours)]));
+    SetMobOutline(s, Category::PartyClaim, OutlineMode::Disabled);
+    t.Update({Claimed(BountyHunter(0x2000), true)}, kLevel20, s, CursorTargets{});
+    CHECK(!t.Find(0x2000)->outline);
+}
+
+TEST(a_placeholder_row_by_nature_leaves_the_outline_to_the_mobs_aggression)
+{
+    Settings s;
+    SetMobOutline(s, Category::Placeholder, OutlineMode::ByNature);
+    Tracker t;
+    t.Update({Mob(0x2000, kCarrionWorm, "Carrion Worm"), Mob(0x3000, kPoisonFunguar, "Poison Funguar")}, kLevel20, s, CursorTargets{});
+    CHECK(!t.Find(0x2000)->outline); // passive, and the Passive row is Disabled
+    CHECK(t.Find(0x3000)->outline && t.Find(0x3000)->argb == kAggressiveArgb);
+    SetMobOutline(s, Category::PartyClaim, OutlineMode::ByNature);
+    t.Update({Claimed(Mob(0x3000, kPoisonFunguar, "Poison Funguar"), true)}, kLevel20, s, CursorTargets{});
+    CHECK(t.Find(0x3000)->outline && t.Find(0x3000)->argb == kAggressiveArgb);
+}
+
+TEST(a_claim_row_by_nature_follows_the_aggressive_rows_when_targeted_mode)
+{
+    Settings s;
+    SetMobOutline(s, Category::PartyClaim, OutlineMode::ByNature);
+    SetMobOutline(s, Category::WillAttack, OutlineMode::WhenTargeted);
+    const ActorInput hunter = Claimed(BountyHunter(0x2000), true);
+    CursorTargets targets;
+    targets.target = hunter.index;
+    Tracker t;
+    t.Update({hunter}, kLevel20, s, targets);
+    CHECK(t.Find(0x2000)->outline);
+    t.Update({hunter}, kLevel20, s, CursorTargets{});
+    CHECK(!t.Find(0x2000)->outline);
+}
+
+TEST(a_mob_that_is_someones_pet_is_outlined_by_the_pets_row_alone)
+{
+    ActorInput pet = BountyHunter(0x2000);
+    pet.pet        = true;
+    Settings s;
+    Tracker t;
+    t.Update({pet}, kLevel20, s, CursorTargets{});
+    CHECK(!t.Find(0x2000)->outline); // the Pets rows are Disabled by default, whatever its aggression
+    s.Kind(PlateKind::Pets).rows[0].outline      = OutlineMode::Shown;
+    s.Kind(PlateKind::Pets).rows[0].outlineColor = ColorPick{ColorSource::Custom, {{0.7f, 0.6f, 0.5f}}};
+    for (const Category claim : {Category::PartyClaim, Category::OtherClaim})
+        SetMobOutline(s, claim, OutlineMode::Shown);
+    SetMobOutline(s, Category::WillAttack, OutlineMode::Disabled);
+    t.Update({Claimed(pet, true)}, kLevel20, s, CursorTargets{});
+    CHECK(t.Find(0x2000)->outline);
+    CHECK_EQ(t.Find(0x2000)->argb, ToArgb(Color{{0.7f, 0.6f, 0.5f}}));
 }

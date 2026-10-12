@@ -7,6 +7,8 @@
 #include "tracker.h"
 
 #include <cstdint>
+#include <functional>
+#include <optional>
 #include <vector>
 
 namespace headsup
@@ -148,12 +150,12 @@ namespace headsup
 
     float CursorBob(double seconds, float height);
 
-    // Not rounded, so sizes change as smoothly as the game's names.
-    float DistanceScale(float letterHeight, float screenHeight);
+    // Not rounded, so sizes change as smoothly as the game's names; kept within the two limits.
+    float DistanceScale(float letterHeight, float screenHeight, float minScale, float maxScale);
     // The size DistanceScale gives a game's name this many yalms from the camera, without the game's steps (it sizes
     // its names in eightieths, by its depth from the camera, so they change in jumps and as the camera turns): 1 for
     // a distance that is not a number.
-    float ScaleAtDistance(float yalms);
+    float ScaleAtDistance(float yalms, float minScale, float maxScale);
     // The game steps its name size, by 5% at a time far away; a plate eases toward each step. A plate with no size yet
     // (0) takes the size at once.
     float EaseScale(float shown, float target, double seconds);
@@ -175,5 +177,21 @@ namespace headsup
     int NameSize(const Settings& settings, EntityKind kind, bool self);
     // Heights come in steps, and current (the height drawn now) is kept until the shown size falls a step below it or
     // rises a little above it, so text is redrawn only when its size really changes and never flickers between two.
+    // The steps end at a tallest one, which text shown taller is stretched from.
     int RasterHeight(float pixels, int current);
+    // The height text that keeps its size is drawn at: the size in whole pixels, to RasterHeight's tallest.
+    int FixedRasterHeight(float pixels);
+    // Whether an image whose ink is width by height, with halo pixels around it, fits a texture of this side.
+    bool FitsTexture(int width, int height, int halo, int side);
+    // The height to try so the image fits: raster when the image drawn at it fits, else raster scaled down by what the
+    // image is over, in whole pixels, not below the smallest step and never above raster.
+    int FittingRaster(int raster, int width, int height, int halo, int side);
+    // An image as measured at one height: its ink box and the halo around it.
+    struct ImageSize
+    {
+        int width = 0, height = 0, halo = 0;
+    };
+    // The tallest height, raster at most, at which the image fits a texture of this side, or nothing when it fits at
+    // none. Letters are whole pixels wide at every height, so a scaled-down image is measured and scaled again.
+    std::optional<int> RasterThatFits(int raster, int side, const std::function<ImageSize(int)>& measure);
 }

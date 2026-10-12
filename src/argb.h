@@ -27,7 +27,7 @@ namespace headsup
         return (argb & ~kAlphaMask) | (scaled << kAlphaShift);
     }
 
-    // Half way to white, opaque: the ornament's diamond and the placeholder mark against the outline color.
+    // Half way to white, opaque: the ornament's diamond against its hairline.
     constexpr uint32_t Lighter(uint32_t argb)
     {
         auto channel = [&](int shift) {

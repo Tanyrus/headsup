@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 
 using namespace headsup;
 using test::Box;
@@ -271,15 +272,24 @@ TEST(the_cursors_point_sits_over_the_center)
     CHECK(Near(LayoutNameplate(plate, sizes, false).cursor.x, 1035.0f));
 }
 
+namespace
+{
+    constexpr float kLeastScale = 0.5f, kMostScale = 2.5f; // the settings' defaults
+}
+
 TEST(scale_follows_the_game_name_with_limits)
 {
     // 1440p: a typical game letter is 8 px (1440 / 180).
-    CHECK(Near(DistanceScale(8.0f, 1440.0f), 1.0f));
-    CHECK(Near(DistanceScale(10.0f, 1440.0f), 1.25f)); // smoothly, not in whole pixels
-    CHECK(Near(DistanceScale(100.0f, 1440.0f), 2.5f)); // at most 2.5x
-    CHECK(Near(DistanceScale(1.0f, 1440.0f), 0.5f));   // at least 0.5x
-    CHECK(Near(DistanceScale(std::nanf(""), 1440.0f), 1.0f));
-    CHECK(Near(DistanceScale(8.0f, 0.0f), 1.0f));
+    CHECK(Near(DistanceScale(8.0f, 1440.0f, kLeastScale, kMostScale), 1.0f));
+    CHECK(Near(DistanceScale(10.0f, 1440.0f, kLeastScale, kMostScale), 1.25f)); // smoothly, not in whole pixels
+    CHECK(Near(DistanceScale(100.0f, 1440.0f, kLeastScale, kMostScale), 2.5f)); // at most 2.5x
+    CHECK(Near(DistanceScale(1.0f, 1440.0f, kLeastScale, kMostScale), 0.5f));   // at least 0.5x
+    CHECK(Near(DistanceScale(std::nanf(""), 1440.0f, kLeastScale, kMostScale), 1.0f));
+    CHECK(Near(DistanceScale(8.0f, 0.0f, kLeastScale, kMostScale), 1.0f));
+    // The limits are the caller's.
+    CHECK(Near(DistanceScale(100.0f, 1440.0f, 0.8f, 1.2f), 1.2f));
+    CHECK(Near(DistanceScale(1.0f, 1440.0f, 0.8f, 1.2f), 0.8f));
+    CHECK(Near(DistanceScale(8.0f, 1440.0f, 0.8f, 1.2f), 1.0f));
 }
 
 TEST(text_is_redrawn_only_when_its_size_moves_a_step)
@@ -292,6 +302,95 @@ TEST(text_is_redrawn_only_when_its_size_moves_a_step)
     CHECK_EQ(RasterHeight(14.0f, 18), 15);
     CHECK_EQ(RasterHeight(15.2f, 15), 15); // and back up is not a step yet: no flicker at the edge
     CHECK_EQ(RasterHeight(2.0f, 0), 6);    // the smallest
+}
+
+TEST(text_is_drawn_no_taller_than_the_tallest_step_and_stretched_past_it)
+{
+    // Up to 180 px (48 px letters at 2.5 times their size in an image 1.5 times the screen) the limit moves no step.
+    struct Case
+    {
+        float pixels;
+        int current, raster;
+    };
+    for (const Case& c : {Case{55.0f, 0, 56}, Case{56.0f, 0, 70}, Case{72.0f, 70, 70}, Case{108.0f, 0, 109}, Case{135.0f, 0, 136},
+             Case{137.0f, 136, 136}, Case{150.0f, 136, 171}, Case{170.0f, 171, 171}, Case{179.0f, 171, 171}, Case{180.0f, 171, 213},
+             Case{180.0f, 0, 213}, Case{200.0f, 213, 213}, Case{213.0f, 0, 213}})
+        CHECK_EQ(RasterHeight(c.pixels, c.current), c.raster);
+    // 768 px letters in that image: the tallest step, which the quad stretches.
+    CHECK_EQ(RasterHeight(1152.0f, 0), 213);
+    CHECK_EQ(RasterHeight(214.0f, 0), 213);
+    CHECK_EQ(RasterHeight(1152.0f, 171), 213);
+    // Once there, no size above it asks for another raster, so nothing is redrawn as the size moves.
+    for (const float pixels : {181.0f, 213.0f, 224.0f, 266.0f, 300.0f, 1152.0f})
+        CHECK_EQ(RasterHeight(pixels, 213), 213);
+    CHECK_EQ(RasterHeight(169.0f, 213), 171); // and a smaller size steps down from it
+
+    // Text that keeps its size is drawn at it, to the same limit.
+    CHECK_EQ(FixedRasterHeight(72.4f), 72);
+    CHECK_EQ(FixedRasterHeight(0.2f), 1);
+    CHECK_EQ(FixedRasterHeight(213.0f), 213);
+    CHECK_EQ(FixedRasterHeight(288.0f), 213);
+}
+
+TEST(a_text_too_large_for_a_texture_is_drawn_smaller_until_its_image_fits)
+{
+    // Ink 1500 by 130 with a 20 px halo around it is 1540 by 170.
+    CHECK(FitsTexture(1500, 130, 20, 2048));
+    CHECK(FitsTexture(2008, 130, 20, 2048)); // exactly the side
+    CHECK(!FitsTexture(2009, 130, 20, 2048));
+    CHECK(!FitsTexture(300, 2009, 20, 2048)); // too tall
+    CHECK_EQ(FittingRaster(100, 1500, 130, 20, 2048), 100);
+    CHECK_EQ(FittingRaster(100, 2008, 130, 20, 2048), 100);
+    CHECK_EQ(FittingRaster(100, 4056, 130, 20, 2048), 50);  // 4096 wide: twice too wide
+    CHECK_EQ(FittingRaster(100, 400000, 130, 20, 2048), 6); // never below the smallest step
+    CHECK_EQ(FittingRaster(100, 2000, 130, 40, 2048), 98);  // the halo counts: 2080 wide
+    CHECK_EQ(FittingRaster(100, 2000, 130, 24, 2048), 100); // and 2048 with a thinner one
+    CHECK_EQ(FittingRaster(200, 300, 2260, 150, 2048), 160); // a glow's halo can make it too tall: 2560
+    CHECK_EQ(FittingRaster(213, 4990, 300, 0, 4096), 174);  // 174.8, not rounded up: at 175 it is 4 px too wide
+    CHECK_EQ(FittingRaster(4, 400000, 130, 20, 2048), 4);   // a height under the smallest step is not raised to it
+}
+
+namespace
+{
+    // Letters that each advance a whole number of pixels, as GDI's do, under a text's shadow margin. asked counts
+    // the heights it is measured at.
+    std::function<ImageSize(int)> Letters(int count, float em, int& asked)
+    {
+        return [count, em, &asked](int height) {
+            ++asked;
+            const auto size = static_cast<float>(height);
+            const int halo  = static_cast<int>(std::ceil(size * 0.12f + std::round(size * 0.05f)));
+            return ImageSize{count * static_cast<int>(std::lround(em * size)), height, halo};
+        };
+    }
+}
+
+TEST(a_long_text_steps_down_until_its_measured_image_fits)
+{
+    int asked = 0;
+    CHECK_EQ(RasterThatFits(100, 4096, Letters(10, 0.5f, asked)).value_or(0), 100);
+    CHECK_EQ(asked, 1); // it fits as it is
+    // 100 letters of 0.85 em are 11648 px at 136, which scales to 47, where they measure 4016.
+    asked = 0;
+    CHECK_EQ(RasterThatFits(136, 4096, Letters(100, 0.85f, asked)).value_or(0), 47);
+    CHECK_EQ(asked, 2);
+    // From 171 and from 213 they scale to 48, where whole-pixel advances make them 4116: one step more, so the line
+    // is drawn at every distance and not at some.
+    asked = 0;
+    CHECK_EQ(RasterThatFits(171, 4096, Letters(100, 0.85f, asked)).value_or(0), 47);
+    CHECK_EQ(asked, 3);
+    CHECK_EQ(RasterThatFits(213, 4096, Letters(100, 0.85f, asked)).value_or(0), 47);
+    // 255 letters of 0.3 em from 213 scale to 53, measure 4100 there and at 52, and 3845 at 51.
+    asked = 0;
+    CHECK_EQ(RasterThatFits(213, 4096, Letters(255, 0.3f, asked)).value_or(0), 51);
+    CHECK_EQ(asked, 4);
+    // Too long at the smallest step: no height, and it is not asked there twice.
+    asked = 0;
+    CHECK(!RasterThatFits(213, 4096, Letters(2000, 1.0f, asked)).has_value());
+    CHECK_EQ(asked, 2);
+    asked = 0;
+    CHECK(!RasterThatFits(4, 4096, Letters(2000, 1.0f, asked)).has_value());
+    CHECK_EQ(asked, 1);
 }
 
 TEST(the_cursor_sits_on_the_name_when_nothing_else_is_above_it)
@@ -681,12 +780,16 @@ TEST(a_plates_size_follows_how_far_it_is_as_the_games_own_names_do)
 {
     // The game's own names, measured in one frame (a name dump): 0.5625 of full size 10.17 yalms from the camera and
     // 0.4125 at 14.55, which DistanceScale makes 2.373 and 1.740. The game steps its size; a plate's is smooth.
-    CHECK(Near(ScaleAtDistance(10.174f), 2.373f, 0.03f));
-    CHECK(Near(ScaleAtDistance(14.55f), 1.740f, 0.03f));
-    CHECK(ScaleAtDistance(30.0f) < ScaleAtDistance(29.0f)); // every yalm tells: no steps
-    CHECK(Near(ScaleAtDistance(1.0f), 2.5f) && Near(ScaleAtDistance(0.0f), 2.5f)); // at most 2.5x
-    CHECK(Near(ScaleAtDistance(500.0f), 0.5f));                                    // at least 0.5x
-    CHECK(Near(ScaleAtDistance(std::nanf("")), 1.0f));
+    CHECK(Near(ScaleAtDistance(10.174f, kLeastScale, kMostScale), 2.373f, 0.03f));
+    CHECK(Near(ScaleAtDistance(14.55f, kLeastScale, kMostScale), 1.740f, 0.03f));
+    CHECK(ScaleAtDistance(30.0f, kLeastScale, kMostScale) < ScaleAtDistance(29.0f, kLeastScale, kMostScale)); // every yalm tells: no steps
+    CHECK(Near(ScaleAtDistance(1.0f, kLeastScale, kMostScale), 2.5f) && Near(ScaleAtDistance(0.0f, kLeastScale, kMostScale), 2.5f)); // at most 2.5x
+    CHECK(Near(ScaleAtDistance(500.0f, kLeastScale, kMostScale), 0.5f));                                                          // at least 0.5x
+    CHECK(Near(ScaleAtDistance(std::nanf(""), kLeastScale, kMostScale), 1.0f));
+    // The limits are the caller's: a plate at your feet is the largest it may be, a far one the smallest.
+    CHECK(Near(ScaleAtDistance(1.0f, 0.8f, 1.2f), 1.2f) && Near(ScaleAtDistance(0.0f, 0.8f, 1.2f), 1.2f));
+    CHECK(Near(ScaleAtDistance(500.0f, 0.8f, 1.2f), 0.8f));
+    CHECK(Near(ScaleAtDistance(14.55f, 0.8f, 2.0f), 1.740f, 0.03f));
 }
 
 TEST(a_cursor_is_kept_inside_the_screen)

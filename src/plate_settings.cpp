@@ -53,9 +53,13 @@ namespace headsup
     {
         std::array<KindSettings, kPlateKindCount> kinds;
         KindSettings& mobs = kinds[static_cast<int>(PlateKind::Mobs)];
-        for (const Category shown : {Category::WillAttack, Category::NmWillAttack, Category::NmWontAttack, Category::Placeholder,
-                 Category::PartyClaim, Category::OtherClaim})
+        for (const Category shown : {Category::WillAttack, Category::NmWillAttack, Category::NmWontAttack, Category::Placeholder})
             mobs.rows[CategoryIndex(shown)].outline = OutlineMode::Shown;
+        for (const Category claim : {Category::PartyClaim, Category::OtherClaim})
+        {
+            mobs.rows[CategoryIndex(claim)].outline              = OutlineMode::ByNature;
+            mobs.rows[CategoryIndex(claim)].outlineColor.source = ColorSource::Claim;
+        }
         mobs.lines[0].text         = kTagDetect;
         mobs.lines[0].iconSize     = 107; // 16 px of a 15 px base, as before
         mobs.lines[1].text         = kTagLevelCon;

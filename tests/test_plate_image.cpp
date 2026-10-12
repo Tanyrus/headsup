@@ -87,6 +87,18 @@ TEST(textures_round_up_to_a_power_of_two)
         CHECK_EQ(TextureSide(pixels), side);
 }
 
+TEST(a_texts_texture_is_no_larger_than_the_device_makes_or_the_client_holds_many_of)
+{
+    CHECK_EQ(TextTextureSide(2048, 2048), 2048);
+    CHECK_EQ(TextTextureSide(4096, 2048), 2048);   // the smaller of the device's two limits
+    CHECK_EQ(TextTextureSide(2048, 4096), 2048);
+    CHECK_EQ(TextTextureSide(1024, 1024), 1024);
+    CHECK_EQ(TextTextureSide(3000, 3000), 2048);   // a 2049 px image is padded to 4096, so only powers of two count
+    CHECK_EQ(TextTextureSide(16384, 16384), 4096); // 16384 by 1024 is 64 MB in a 32-bit client, for one text
+    CHECK_EQ(TextTextureSide(0, 0), 2048);         // the device did not say
+    CHECK_EQ(TextTextureSide(4096, 0), 2048);
+}
+
 TEST(the_arrow_points_down_inside_its_margin)
 {
     const Coverage arrow = ShapeCoverage(ArrowShape(), 8, 2);

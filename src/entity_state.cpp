@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <optional>
 
 namespace headsup
 {
@@ -115,6 +116,53 @@ namespace headsup
         case ColorSource::Type: return ToArgb(p.type[static_cast<int>(TypeOf(s))]);
         }
         return ToArgb(pick.custom);
+    }
+
+    namespace
+    {
+        struct Deciding
+        {
+            const RowSettings* row;
+            Nature nature; // the aggression an Aggression pick reads
+        };
+
+        // Empty when the chain ends on a row that is itself ByNature.
+        std::optional<Deciding> Decide(const EntityState& s, const Settings& settings)
+        {
+            const PlateKind plateKind = PlateKindOf(s);
+            const KindSettings& kind  = settings.Kind(plateKind);
+            if (plateKind != PlateKind::Mobs) return Deciding{&kind.rows[RowOf(s)], s.nature};
+            Category row = s.row;
+            Nature nature = s.nature;
+            for (;;)
+            {
+                const RowSettings& r = kind.rows[CategoryIndex(row)];
+                if (r.outline != OutlineMode::ByNature) return Deciding{&r, nature};
+                if (row == s.classified) return std::nullopt;
+                if (IsClaimRow(row) && s.nature == Nature::Placeholder)
+                    row = Category::Placeholder;
+                else
+                {
+                    row    = s.classified;
+                    nature = NatureOf(s.classified, false);
+                }
+            }
+        }
+    }
+
+    OutlineMode OutlineModeOf(const EntityState& s, const Settings& settings)
+    {
+        const std::optional<Deciding> d = Decide(s, settings);
+        return d ? d->row->outline : OutlineMode::Disabled;
+    }
+
+    uint32_t RowColor(const EntityState& s, const Settings& settings)
+    {
+        const std::optional<Deciding> d = Decide(s, settings);
+        if (!d) return kWhite;
+        const ColorPick& pick = d->row->outlineColor;
+        if (pick.source == ColorSource::Aggression) return ToArgb(settings.palette.aggression[static_cast<int>(d->nature)]);
+        return ResolveColor(pick, s, settings.palette, kWhite); // Game is not offered for outlines
     }
 
     namespace

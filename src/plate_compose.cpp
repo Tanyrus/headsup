@@ -152,6 +152,11 @@ namespace headsup
             }
         }
 
+        bool IsBadgeTag(Tag tag)
+        {
+            return tag == Tag::Weak || tag == Tag::Resist || tag == Tag::Status || tag == Tag::Immune;
+        }
+
         BadgeGroup GroupOf(Tag tag)
         {
             switch (tag)
@@ -214,6 +219,7 @@ namespace headsup
             std::string pending;
             bool pendingName = false;
             bool trimNext    = false; // a tag that rendered nothing sat after a space, so the next literal's first space goes
+            bool badgeRun    = false; // the last icon run is a badge group's, which wraps apart from other icons
 
             bool AfterIcons() const { return !items.empty() && items.back().kind == ItemKind::Icons; }
             void Space(size_t count)
@@ -261,12 +267,12 @@ namespace headsup
                 pendingName = false;
             }
 
-            void Icons(std::vector<IconDraw> v)
+            void Icons(std::vector<IconDraw> v, bool badges)
             {
                 if (v.empty()) return Empty();
                 trimNext = false;
                 Flush(true);
-                if (AfterIcons())
+                if (AfterIcons() && badgeRun == badges)
                     items.back().icons.insert(items.back().icons.end(), v.begin(), v.end());
                 else
                 {
@@ -274,6 +280,7 @@ namespace headsup
                     item.icons     = std::move(v);
                     items.push_back(std::move(item));
                 }
+                badgeRun = badges;
             }
 
             void Finish() { Flush(false); }
@@ -323,7 +330,7 @@ namespace headsup
                 else if (IsTextTag(atom.tag))
                     builder.Text(TagText(atom.tag, info, player), atom.tag == Tag::Name);
                 else
-                    builder.Icons(TagIcons(atom.tag, info, s, badgeRules));
+                    builder.Icons(TagIcons(atom.tag, info, s, badgeRules), IsBadgeTag(atom.tag));
             }
             builder.Finish();
             if (builder.items.empty()) continue;
@@ -344,5 +351,68 @@ namespace headsup
             }
         }
         return plate;
+    }
+
+    namespace
+    {
+        // A line left without items is no line, and the ornament goes with either line it sat between.
+        void DropEmptyLines(ComposedPlate& plate)
+        {
+            const auto empty = [](const ComposedLine& line) { return line.items.empty(); };
+            if (const int above = plate.ornamentAbove; above > 0)
+            {
+                const auto lower    = plate.lines.begin() + above;
+                const auto gone     = static_cast<int>(std::count_if(plate.lines.begin(), lower, empty));
+                plate.ornamentAbove = empty(*lower) || empty(*(lower - 1)) ? kNoOrnament : above - gone;
+            }
+            std::erase_if(plate.lines, empty);
+        }
+    }
+
+    void DropIcons(ComposedPlate& plate)
+    {
+        for (ComposedLine& line : plate.lines)
+            std::erase_if(line.items, [](const PlateItem& item) { return item.kind != ItemKind::Text; });
+        DropEmptyLines(plate);
+    }
+
+    void DropTexts(ComposedPlate& plate, std::span<const uint8_t> leftOut)
+    {
+        size_t text = 0;
+        for (ComposedLine& line : plate.lines)
+        {
+            std::vector<PlateItem>& items = line.items;
+            size_t kept                   = 0;
+            for (size_t i = 0; i < items.size(); ++i)
+            {
+                const bool gone = items[i].kind == ItemKind::Text && leftOut[text++] != 0;
+                // A gap sets two items apart: at a line's start, or after another gap, it has nothing to.
+                const bool loose = items[i].kind == ItemKind::Space && (kept == 0 || items[kept - 1].kind == ItemKind::Space);
+                if (gone || loose) continue;
+                if (kept != i) items[kept] = std::move(items[i]);
+                ++kept;
+            }
+            if (kept > 0 && items[kept - 1].kind == ItemKind::Space) --kept;
+            items.resize(kept);
+        }
+        DropEmptyLines(plate);
+    }
+
+    LineLook TimerLook(const Settings& s)
+    {
+        LineLook look = LookOf(LineDesign{}, EntityState{}, s, kWhite);
+        look.textSize = BasePixels(s, s.timerPercent);
+        return look;
+    }
+
+    void JoinTexts(const ComposedLine& line, std::string& text)
+    {
+        text.clear();
+        for (const PlateItem& item : line.items)
+        {
+            if (item.kind != ItemKind::Text) continue;
+            if (!text.empty()) text += kSpace;
+            text += item.text;
+        }
     }
 }

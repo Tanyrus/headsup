@@ -712,26 +712,22 @@ TEST(nameplates_need_the_master_switch_and_a_part)
 {
     CHECK(NameplatesOn(Settings{}));
     Settings none;
-    none.showLabels = none.showIcons = false;
-    none.replaceMobNames = none.replacePlayerNames = none.replaceNpcNames = none.replaceCursor = false;
-    none.showDamageIcons = none.showStatusRankIcons = none.showImmunityIcons = false;
+    none.nameplates = none.replaceCursor = none.phTimers = false;
     CHECK(!NameplatesOn(none));
-    auto onlyWithTheSwitch = [](Settings s) {
-        CHECK(NameplatesOn(s));
-        s.enabled = false;
-        CHECK(!NameplatesOn(s));
-    };
-    for (bool Settings::*part : {&Settings::showLabels, &Settings::showIcons, &Settings::showDamageIcons,
-             &Settings::showStatusRankIcons, &Settings::showImmunityIcons, &Settings::replaceMobNames,
-             &Settings::replacePlayerNames, &Settings::replaceNpcNames, &Settings::replaceCursor, &Settings::phTimers})
+    for (bool Settings::*part : {&Settings::nameplates, &Settings::replaceCursor, &Settings::phTimers})
     {
         Settings s = none;
         s.*part    = true;
-        onlyWithTheSwitch(s);
+        CHECK(NameplatesOn(s));
+        s.enabled = false;
+        CHECK(!NameplatesOn(s));
     }
-    Settings ids = none;
-    ids.mobId    = MobIdFormat::LastThree;
-    onlyWithTheSwitch(ids);
+    Settings cursorOnly = none;
+    cursorOnly.replaceCursor = true;
+    CHECK(NameplatesOn(cursorOnly));
+    Settings oldPart = none;
+    oldPart.showLabels = oldPart.showIcons = oldPart.replaceMobNames = true;
+    CHECK(!NameplatesOn(oldPart));
 }
 
 TEST(a_color_from_hex_draws_as_the_same_hex)
@@ -1025,8 +1021,13 @@ TEST(the_default_designs_reproduce_todays_look)
     CHECK(mobs.rows[CategoryIndex(Category::WillAttack)].outline == OutlineMode::Shown);
     CHECK(mobs.rows[CategoryIndex(Category::WontAttack)].outline == OutlineMode::Disabled);
     CHECK(mobs.rows[CategoryIndex(Category::Unknown)].outline == OutlineMode::Disabled);
-    CHECK(mobs.rows[CategoryIndex(Category::PartyClaim)].outline == OutlineMode::Shown);
-    CHECK(mobs.rows[CategoryIndex(Category::PartyClaim)].outlineColor.source == ColorSource::Aggression);
+    for (const Category claim : {Category::PartyClaim, Category::OtherClaim})
+    {
+        CHECK(mobs.rows[CategoryIndex(claim)].outline == OutlineMode::ByNature);
+        CHECK(mobs.rows[CategoryIndex(claim)].outlineColor.source == ColorSource::Claim);
+    }
+    CHECK(mobs.rows[CategoryIndex(Category::Placeholder)].outline == OutlineMode::Shown);
+    CHECK(mobs.rows[CategoryIndex(Category::Placeholder)].outlineColor.source == ColorSource::Aggression);
     for (const RowSettings& row : mobs.rows)
         CHECK(row.plate == PlateMode::Shown);
     const KindSettings& players = d.Kind(PlateKind::Players);
@@ -1206,6 +1207,7 @@ TEST(an_old_file_migrates_field_by_field)
     CHECK(mobs.lines[1].show == (LineShow{false, ConditionBit(ShowCondition::Unclaimed)}));
     CHECK(mobs.lines[2].show == LineShow{});
     CHECK(mobs.rows[CategoryIndex(Category::PartyClaim)].outline == OutlineMode::Shown); // its own switch was on
+    CHECK(mobs.rows[CategoryIndex(Category::PartyClaim)].outlineColor.source == ColorSource::Claim);
     CHECK_EQ(mobs.lines[2].glow, 0); // nameGlow=false
     CHECK(!mobs.ornament.on);        // showOrnament=false
     CHECK(mobs.ornament.color.source == ColorSource::Custom); // ownOrnamentColor=true
@@ -1269,22 +1271,42 @@ namespace
     const RowSettings& OthersRow(const Settings& s) { return s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::OtherClaim)]; }
 }
 
-TEST(claim_rows_are_outlined_by_their_own_switch_or_any_nature_switch)
+TEST(a_claim_row_is_shown_in_the_claim_color_only_by_its_own_switch_else_by_nature)
 {
-    const Settings none = Load2({});
-    CHECK(PartyRow(none).outline == OutlineMode::Shown && PartyRow(none).outlineColor.source == ColorSource::Aggression);
-    CHECK(OthersRow(none).outline == OutlineMode::Shown && OthersRow(none).outlineColor.source == ColorSource::Aggression);
+    for (const Settings& s : {Load2({}), Load2WithNaturesOff({})})
+    {
+        CHECK(PartyRow(s).outline == OutlineMode::ByNature && OthersRow(s).outline == OutlineMode::ByNature);
+        CHECK(PartyRow(s).outlineColor.source == ColorSource::Claim);
+    }
     const Settings party = Load2({{"partyClaimShow", "true"}});
     CHECK(PartyRow(party).outline == OutlineMode::Shown && PartyRow(party).outlineColor.source == ColorSource::Claim);
-    CHECK(OthersRow(party).outlineColor.source == ColorSource::Aggression);
-    const Settings others = Load2({{"otherClaimShow", "true"}});
-    CHECK(OthersRow(others).outlineColor.source == ColorSource::Claim);
-    CHECK(PartyRow(others).outlineColor.source == ColorSource::Aggression);
-    const Settings off = Load2WithNaturesOff({});
-    CHECK(PartyRow(off).outline == OutlineMode::Disabled && OthersRow(off).outline == OutlineMode::Disabled);
-    const Settings onlyOthers = Load2WithNaturesOff({{"otherClaimShow", "true"}});
-    CHECK(OthersRow(onlyOthers).outline == OutlineMode::Shown && OthersRow(onlyOthers).outlineColor.source == ColorSource::Claim);
-    CHECK(PartyRow(onlyOthers).outline == OutlineMode::Disabled);
+    CHECK(OthersRow(party).outline == OutlineMode::ByNature);
+    const Settings others = Load2WithNaturesOff({{"otherClaimShow", "true"}});
+    CHECK(OthersRow(others).outline == OutlineMode::Shown && OthersRow(others).outlineColor.source == ColorSource::Claim);
+    CHECK(PartyRow(others).outline == OutlineMode::ByNature);
+}
+
+TEST(the_placeholder_row_is_shown_by_its_switch_else_by_nature)
+{
+    const Settings on  = Load2({{"placeholderShow", "true"}});
+    const Settings off = Load2({{"placeholderShow", "false"}});
+    CHECK(on.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::Placeholder)].outline == OutlineMode::Shown);
+    CHECK(off.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::Placeholder)].outline == OutlineMode::ByNature);
+}
+
+TEST(by_nature_round_trips_on_a_claim_row_and_is_reset_elsewhere)
+{
+    Settings s;
+    s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::OtherClaim)].outline = OutlineMode::ByNature;
+    MapStore store;
+    SaveSettings(s, store);
+    CHECK(LoadSettings(store).Kind(PlateKind::Mobs).rows[CategoryIndex(Category::OtherClaim)].outline == OutlineMode::ByNature);
+    s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WillAttack)].outline = OutlineMode::ByNature;
+    s.Kind(PlateKind::Players).rows[static_cast<int>(PlayerRow::Player)].outline = OutlineMode::ByNature;
+    const Settings c = Clamp(s);
+    CHECK(c.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WillAttack)].outline == OutlineMode::Shown);
+    CHECK(c.Kind(PlateKind::Players).rows[static_cast<int>(PlayerRow::Player)].outline == OutlineMode::Disabled);
+    CHECK(c.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::OtherClaim)].outline == OutlineMode::ByNature);
 }
 
 TEST(the_mob_icon_row_is_written_as_the_old_plate_laid_it_out)

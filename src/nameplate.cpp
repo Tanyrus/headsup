@@ -1,4 +1,5 @@
 #include "nameplate.h"
+#include "plate_image.h"
 #include "plate_layout.h"
 
 #include <algorithm>
@@ -11,13 +12,14 @@ namespace headsup
     namespace
     {
         constexpr float kLettersPerScreen = 180.0f; // the screen is this many typical game letters tall
-        constexpr float kMinScale         = 0.5f;
-        constexpr float kMaxScale         = 2.5f;
         constexpr double kBobPeriod       = 1.2;    // seconds
         constexpr float kBobShare         = 0.15f;  // of the cursor's height
         constexpr float kRasterSmallest   = 6.0f;   // pixels
         constexpr float kRasterStep       = 1.25f;
         constexpr float kRasterOverscale  = 1.05f;  // text is scaled up this much before it is redrawn larger
+        // The step 48 px letters reach at 2.5 times their size in an image 1.5 times the screen (180 px). A texture
+        // cannot grow with a design's largest sizes, so taller text is this one stretched.
+        constexpr int kRasterTallest      = 213;
         constexpr double kScaleEase       = 0.15;   // seconds: two thirds of the way to a new size in this time
 
         float RowWidth(int count, float size)
@@ -31,6 +33,9 @@ namespace headsup
         {
             return count > 0 ? static_cast<float>(std::min(count, kIconsPerRow)) * step - kIconGap : 0.0f;
         }
+
+        // An image's longer side with its halo on both ends.
+        int LongerSide(int width, int height, int halo) { return std::max(width, height) + 2 * halo; }
 
         CursorKind CursorFor(uint16_t index, const Settings& settings, const CursorTargets& targets)
         {
@@ -275,19 +280,19 @@ namespace headsup
         return -static_cast<float>((phase + 1.0) * 0.5) * height * kBobShare;
     }
 
-    float DistanceScale(float letterHeight, float screenHeight)
+    float DistanceScale(float letterHeight, float screenHeight, float minScale, float maxScale)
     {
         const float factor = screenHeight > 0.0f ? letterHeight / (screenHeight / kLettersPerScreen) : 1.0f;
-        return std::isfinite(factor) ? std::clamp(factor, kMinScale, kMaxScale) : 1.0f;
+        return std::isfinite(factor) ? std::clamp(factor, minScale, maxScale) : 1.0f;
     }
 
-    float ScaleAtDistance(float yalms)
+    float ScaleAtDistance(float yalms, float minScale, float maxScale)
     {
         // The game's name size is 5 / yalms + 0.07 of full size (fitted to a name dump), and full size is 4.21875
         // times DistanceScale's 1: 180 letters a screen over the 42.67 a full-size name's letters make of it.
         constexpr float kPerYalm = 21.09f, kFarthest = 0.3f;
         if (std::isnan(yalms)) return 1.0f;
-        return yalms > 0.0f ? std::clamp(kPerYalm / yalms + kFarthest, kMinScale, kMaxScale) : kMaxScale;
+        return yalms > 0.0f ? std::clamp(kPerYalm / yalms + kFarthest, minScale, maxScale) : maxScale;
     }
 
     float EaseScale(float shown, float target, double seconds)
@@ -344,8 +349,38 @@ namespace headsup
         const auto drawn = static_cast<float>(current);
         if (current > 0 && pixels <= drawn * kRasterOverscale && pixels * kRasterStep >= drawn) return current;
         float size = kRasterSmallest;
-        while (size < pixels)
+        while (size < pixels && size < static_cast<float>(kRasterTallest))
             size *= kRasterStep;
-        return static_cast<int>(std::lround(size));
+        return std::min(static_cast<int>(std::lround(size)), kRasterTallest);
+    }
+
+    int FixedRasterHeight(float pixels)
+    {
+        return WholePixels(std::min(pixels, static_cast<float>(kRasterTallest)));
+    }
+
+    bool FitsTexture(int width, int height, int halo, int side)
+    {
+        return LongerSide(width, height, halo) <= side;
+    }
+
+    int FittingRaster(int raster, int width, int height, int halo, int side)
+    {
+        if (FitsTexture(width, height, halo, side)) return raster;
+        const long long fitting = static_cast<long long>(raster) * side / LongerSide(width, height, halo);
+        return std::min(raster, std::max(static_cast<int>(kRasterSmallest), static_cast<int>(fitting)));
+    }
+
+    std::optional<int> RasterThatFits(int raster, int side, const std::function<ImageSize(int)>& measure)
+    {
+        // Each pass is at a smaller height, so there are no more passes than heights.
+        for (int height = raster;;)
+        {
+            const ImageSize image = measure(height);
+            if (FitsTexture(image.width, image.height, image.halo, side)) return height;
+            const int smaller = FittingRaster(height, image.width, image.height, image.halo, side);
+            if (smaller >= height) return std::nullopt;
+            height = smaller;
+        }
     }
 }

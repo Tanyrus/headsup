@@ -7,6 +7,7 @@
 #include "tracker.h"
 
 #include <cstdint>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -20,9 +21,10 @@ namespace headsup
         uint32_t badgeColor = 0;
         bool operator==(const IconDraw&) const = default;
     };
+    inline bool HasBadge(const IconDraw& icon) { return !icon.badge.empty(); }
     enum class ItemKind : uint8_t { Text, Icons, Space };
-    // Text: a run of letters drawn as one texture. Icons: a row of icons, badges hanging off them. Space: a gap of this
-    // many spaces between an icon run and its neighbor.
+    // Text: a run of letters drawn as one texture. Icons: a run of icons, a badge group's or other icons' and never
+    // both, as the two wrap apart. Space: a gap of this many spaces between an icon run and its neighbor.
     // name: a Text run that holds the entity's name, which the debug report and the developer's watch follow.
     struct PlateItem
     {
@@ -70,4 +72,14 @@ namespace headsup
     ComposedPlate ComposePlate(const ActorInfo& info, const PlayerState& player, const Settings& settings, uint32_t gameArgb);
     // The percent of the base size as pixels.
     float BasePixels(const Settings& settings, int percent);
+    // A plate as it is drawn once Direct3D could not make an icon: its icon runs and their gaps go, and so do the
+    // lines left empty, and the ornament with either line it sat between.
+    void DropIcons(ComposedPlate& plate);
+    // A plate without the texts whose image fits no texture: leftOut holds a flag for each Text item in the plate's
+    // order. Their items go, with the gaps that set them apart, the lines left empty and the ornament as above.
+    void DropTexts(ComposedPlate& plate, std::span<const uint8_t> leftOut);
+    // Your placeholder timers' lines: the default font and an untouched line's shadow, white, at the timers' size.
+    LineLook TimerLook(const Settings& settings);
+    // text becomes the line's text runs joined by spaces, as the debug report names the line.
+    void JoinTexts(const ComposedLine& line, std::string& text);
 }

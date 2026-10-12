@@ -42,6 +42,9 @@ namespace headsup
         // kNoMarkColumn when markAt is Label::kNoMark.
         bool Rasterize(const char* text, const char* family, int pixelHeight, bool bold, int tracking, int margin,
             size_t markAt, Coverage& out, int& markX);
+        // The box Rasterize draws the text's letters in, set solid and before its margin, without drawing them; false
+        // when GDI cannot measure it.
+        bool Extent(const char* text, const char* family, int pixelHeight, bool bold, int& width, int& height);
         // How wide Rasterize draws the text in the family's regular weight, set solid, in pixels, without drawing it;
         // 0 when GDI cannot measure it.
         float Measure(const char* text, const char* family, int pixelHeight);

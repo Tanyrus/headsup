@@ -3,8 +3,10 @@
 #include "test.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdio>
 #include <string>
+#include <vector>
 
 using namespace headsup;
 
@@ -483,4 +485,208 @@ TEST(badge_tags_draw_what_the_icon_groups_and_badge_functions_give)
     const std::vector<IconDraw> ranked = composed(Compose(info, s).lines[0]);
     CHECK(ranked == expected(true, {BadgeGroup::Weak}));
     CHECK(ranked != weak);
+}
+
+TEST(a_plate_without_icons_keeps_its_texts_and_the_ornament_between_two_lines_still_shown)
+{
+    Settings s;
+    ComposedPlate plate = Compose(AggressiveMob(), s);
+    CHECK_EQ(plate.lines.size(), size_t{3});
+    DropIcons(plate);
+    CHECK_EQ(plate.lines.size(), size_t{2}); // the icon line is gone
+    CHECK_EQ(plate.lines[0].source, 1);
+    CHECK_EQ(Rendered(plate.lines[0]), "Lv 17-20 EP-EM");
+    CHECK_EQ(plate.lines[1].source, 2);
+    CHECK_EQ(plate.ornamentAbove, 1); // over the name, which is one line higher in the plate
+
+    ComposedPlate player = Compose(LinkshellPlayer(), s);
+    DropIcons(player);
+    CHECK_EQ(player.lines.size(), size_t{1});
+    CHECK_EQ(player.lines[0].items.size(), size_t{1});
+    CHECK_EQ(Rendered(player.lines[0]), "Chadmage");
+    CHECK_EQ(player.ornamentAbove, kNoOrnament);
+
+    KindSettings& mobs = s.Kind(PlateKind::Mobs);
+    mobs.lines[1].text = "$detect $name - $detect";
+    ComposedPlate gaps = Compose(AggressiveMob(), s);
+    CHECK_EQ(gaps.lines[1].items.size(), size_t{5}); // icons, a gap, text, a gap, icons
+    DropIcons(gaps);
+    CHECK_EQ(gaps.lines[0].items.size(), size_t{1}); // the gaps go with their icons
+    CHECK_EQ(Rendered(gaps.lines[0]), "Young Quadav -");
+}
+
+TEST(the_ornament_goes_with_either_line_that_was_only_icons)
+{
+    Settings s;
+    KindSettings& mobs  = s.Kind(PlateKind::Mobs);
+    mobs.ornament.place = OrnamentPlace::BetweenLines1And2;
+    ComposedPlate above = Compose(AggressiveMob(), s);
+    CHECK_EQ(above.ornamentAbove, 1);
+    DropIcons(above); // line 1, the icons, is the upper of its two
+    CHECK_EQ(above.lines.size(), size_t{2});
+    CHECK_EQ(above.ornamentAbove, kNoOrnament);
+
+    mobs.lines[0].text = "Lv $level";
+    mobs.lines[1].text = "$detect";
+    ComposedPlate below = Compose(AggressiveMob(), s);
+    CHECK_EQ(below.ornamentAbove, 1);
+    DropIcons(below); // and here the lower
+    CHECK_EQ(below.lines.size(), size_t{2});
+    CHECK_EQ(below.ornamentAbove, kNoOrnament);
+
+    mobs.lines[1].text = "$detect$id";
+    ComposedPlate kept = Compose(AggressiveMob(), s);
+    DropIcons(kept);
+    CHECK_EQ(kept.lines.size(), size_t{3});
+    CHECK_EQ(kept.ornamentAbove, 1);
+}
+
+TEST(a_lines_texts_join_with_spaces_for_the_debug_report)
+{
+    Settings s;
+    KindSettings& mobs = s.Kind(PlateKind::Mobs);
+    mobs.lines[1].text = "$name$detect($level)";
+    const ComposedPlate plate = Compose(AggressiveMob(), s);
+    std::string text = "what the last plate left";
+    JoinTexts(plate.lines[1], text);
+    CHECK_EQ(text, "Young Quadav (17-20)");
+    JoinTexts(plate.lines[0], text); // only icons
+    CHECK_EQ(text, "");
+    JoinTexts(plate.lines[2], text);
+    CHECK_EQ(text, "Young Quadav");
+}
+
+TEST(placeholder_timers_take_the_default_font_and_a_plain_lines_shadow)
+{
+    Settings s;
+    s.baseSize     = 20;
+    s.timerPercent = 50;
+    s.defaultFont  = "Tahoma";
+    // No line's design reaches them.
+    LineDesign& name = s.Kind(PlateKind::Self).lines[2];
+    name.font        = "Cinzel";
+    name.bold        = true;
+    name.shadow      = 0;
+    name.glow        = 100;
+    name.color       = ColorPick{ColorSource::Custom, {{1.0f, 0.0f, 0.0f}}};
+    const LineLook look = TimerLook(s);
+    CHECK_EQ(look.font, "Tahoma");
+    CHECK(!look.bold);
+    CHECK_EQ(look.textSize, 10.0f);
+    CHECK_EQ(look.color, kWhite);
+    CHECK_EQ(look.shadow, 1.0f);
+    CHECK_EQ(look.shadowColor, kBlack);
+    CHECK_EQ(look.glow, 0.0f);
+}
+
+TEST(badge_tags_join_each_other_and_start_a_run_of_their_own_beside_other_icons)
+{
+    const MobRecord* hunter = MobById(17199648);
+    CHECK(hunter != nullptr);
+    ActorInfo info = AggressiveMob();
+    info.mob       = hunter;
+    Settings s;
+    for (StatusBadgeRule& rule : s.statusBadges) rule.weakRank = kMaxWeakRank;
+    KindSettings& mobs = s.Kind(PlateKind::Mobs);
+    const auto oneRun  = [&](const char* text)
+    {
+        mobs.lines[0].text        = text;
+        const ComposedPlate plate = Compose(info, s);
+        CHECK_EQ(plate.lines[0].items.size(), size_t{1});
+        return plate.lines[0].items[0].icons;
+    };
+    const std::vector<IconDraw> detection = oneRun("$detect");
+    const std::vector<IconDraw> badges    = oneRun("$weak$resist$status$immune");
+    CHECK(!detection.empty() && std::ranges::none_of(detection, HasBadge));
+    CHECK(!badges.empty() && std::ranges::all_of(badges, HasBadge));
+    CHECK(oneRun("$resist$status$immune").size() < badges.size()); // the hunter has a weakness; the rest join without it
+
+    mobs.lines[0].text       = "$detect$weak$resist$status$immune";
+    const ComposedPlate both = Compose(info, s);
+    CHECK_EQ(both.lines[0].items.size(), size_t{2}); // nothing between them: the layout sets them an item gap apart
+    CHECK(both.lines[0].items[0].kind == ItemKind::Icons && both.lines[0].items[0].icons == detection);
+    CHECK(both.lines[0].items[1].kind == ItemKind::Icons && both.lines[0].items[1].icons == badges);
+
+    mobs.lines[0].text          = "$weak$resist$status$immune$detect";
+    const ComposedPlate flipped = Compose(info, s);
+    CHECK_EQ(flipped.lines[0].items.size(), size_t{2});
+    CHECK(flipped.lines[0].items[0].icons == badges);
+    CHECK(flipped.lines[0].items[1].icons == detection);
+
+    // A mob with nothing to badge has the detection run alone, and a player's icons make one run.
+    mobs.lines[0].text          = "$detect$weak$resist$status$immune";
+    const ComposedPlate neutral = Compose(AggressiveMob(), s);
+    CHECK_EQ(neutral.lines[0].items.size(), size_t{1});
+    CHECK_EQ(Rendered(neutral.lines[0]), "[4]");
+    const ComposedPlate player = Compose(LinkshellPlayer(), s);
+    CHECK_EQ(player.lines[0].items.size(), size_t{2});
+    CHECK_EQ(Rendered(player.lines[0]), "[2]Chadmage");
+}
+
+// Para (16785716) has something in each of the four badge groups under the default rules.
+TEST(each_badge_tag_keeps_apart_from_the_detection_icons)
+{
+    const MobRecord* para = MobById(16785716);
+    CHECK(para != nullptr);
+    ActorInfo info = AggressiveMob();
+    info.mob       = para;
+    Settings s;
+    std::string& text = s.Kind(PlateKind::Mobs).lines[0].text;
+    for (const char* tag : {"$weak", "$resist", "$status", "$immune"})
+    {
+        text                      = std::string("$detect") + tag;
+        const ComposedPlate plate = Compose(info, s);
+        CHECK_EQ(plate.lines[0].items.size(), size_t{2});
+        CHECK(std::ranges::none_of(plate.lines[0].items[0].icons, HasBadge));
+        CHECK(!plate.lines[0].items[1].icons.empty() && std::ranges::all_of(plate.lines[0].items[1].icons, HasBadge));
+    }
+    text = "$weak$resist$status$immune";
+    CHECK_EQ(Compose(info, s).lines[0].items.size(), size_t{1});
+}
+
+TEST(a_text_left_out_takes_its_item_and_an_emptied_line_takes_the_ornament_beside_it)
+{
+    const Settings s;
+    // The default mob plate: icons, the level line, the name, and the ornament over the name.
+    ComposedPlate level = Compose(AggressiveMob(), s);
+    DropTexts(level, std::vector<uint8_t>{1, 0});
+    CHECK_EQ(level.lines.size(), size_t{2});
+    CHECK_EQ(level.lines[0].source, 0);
+    CHECK_EQ(level.lines[1].source, 2);
+    CHECK_EQ(level.ornamentAbove, kNoOrnament); // it sat between the level line and the name
+
+    ComposedPlate name = Compose(AggressiveMob(), s);
+    DropTexts(name, std::vector<uint8_t>{0, 1});
+    CHECK_EQ(name.lines.size(), size_t{2});
+    CHECK_EQ(Rendered(name.lines[1]), "Lv 17-20 EP-EM");
+    CHECK_EQ(name.ornamentAbove, kNoOrnament);
+    for (const ComposedLine& line : name.lines)
+        CHECK(std::ranges::none_of(line.items, [](const PlateItem& item) { return item.name; }));
+
+    ComposedPlate whole = Compose(AggressiveMob(), s);
+    DropTexts(whole, std::vector<uint8_t>{0, 0});
+    CHECK_EQ(whole.lines.size(), size_t{3});
+    CHECK_EQ(whole.ornamentAbove, 2);
+}
+
+TEST(a_text_left_out_beside_icons_takes_the_gap_that_set_it_apart)
+{
+    Settings s;
+    KindSettings& mobs = s.Kind(PlateKind::Mobs);
+    mobs.lines[0].text = "$name $detect";         // text, gap, icons
+    mobs.lines[1].text = "$detect $name $detect"; // icons, gap, text, gap, icons
+    mobs.lines[2].text = "$id$detect$name";       // text, icons, text
+    ComposedPlate plate = Compose(AggressiveMob(), s);
+    CHECK_EQ(plate.lines[1].items.size(), size_t{5});
+    DropTexts(plate, std::vector<uint8_t>{1, 1, 0, 1}); // every name; the ID stays
+    CHECK_EQ(plate.lines.size(), size_t{3});
+    CHECK_EQ(Rendered(plate.lines[0]), "[4]");    // no gap before the icons
+    CHECK_EQ(Rendered(plate.lines[1]), "[4] [4]"); // one gap between the two runs, not two
+    CHECK_EQ(Rendered(plate.lines[2]), "[006][4]");
+    CHECK_EQ(plate.ornamentAbove, 2);
+    mobs.lines[1].text = "$detect $name";
+    ComposedPlate last = Compose(AggressiveMob(), s);
+    DropTexts(last, std::vector<uint8_t>{0, 1, 0, 0});
+    CHECK_EQ(Rendered(last.lines[0]), "Young Quadav [4]");
+    CHECK_EQ(Rendered(last.lines[1]), "[4]"); // nor a gap after them
 }

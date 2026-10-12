@@ -33,8 +33,15 @@ namespace headsup
     constexpr int kPlateKindCount = 5;
     enum class PlateMode : uint8_t { Hidden, Shown, WhenTargeted, Expanding, Vanilla };
     constexpr int kPlateModeCount = 5;
-    enum class OutlineMode : uint8_t { Disabled, Shown, WhenTargeted };
-    constexpr int kOutlineModeCount = 3;
+    // ByNature, on the Placeholder and claim rows of mobs only, steps aside for the row under it.
+    enum class OutlineMode : uint8_t { Disabled, Shown, WhenTargeted, ByNature };
+    constexpr int kOutlineModeCount = 4;
+    constexpr bool IsClaimRow(Category row) { return row == Category::PartyClaim || row == Category::OtherClaim; }
+    constexpr bool CanOutlineByNature(PlateKind kind, int row)
+    {
+        const Category category = static_cast<Category>(row);
+        return kind == PlateKind::Mobs && (category == Category::Placeholder || IsClaimRow(category));
+    }
     enum class ColorSource : uint8_t { Custom, Game, Aggression, Toughness, Claim, Target, Type };
     constexpr int kColorSourceCount = 7;
     struct ColorPick

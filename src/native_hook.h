@@ -3,6 +3,7 @@
 #include "code_patch.h"
 #include "name_frame.h"
 #include "native_locate.h"
+#include "plate_settings.h"
 #include "strip_text.h"
 #include "weather.h"
 
@@ -27,13 +28,14 @@ namespace headsup
     {
         uint32_t actor;
         uint16_t index;
-        bool replace;
+        HookAction action;
     };
 
     struct NameStats
     {
         uint32_t names    = 0; // tracked entities' names the game was about to draw
         uint32_t replaced = 0; // of those, drawn by HeadsUp instead
+        uint32_t hidden   = 0; // of those, drawn by no one
     };
 
     class NameHook

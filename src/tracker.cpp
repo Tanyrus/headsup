@@ -107,27 +107,26 @@ namespace headsup
                 }
                 const Category classified = Classify(mob, a.checked ? a.checked->level : 0, player);
                 st.nature    = NatureOf(classified, placeholder);
+                st.classified = classified;
                 st.row       = MobRowOf(st.nature, a.claimedByParty, a.claimed);
                 st.toughness = info.level.shade;
                 st.tooWeak   = info.tooWeak;
                 const bool placeholderColor = placeholder && settings.show[CategoryIndex(Category::Placeholder)];
                 info.category = placeholderColor ? Category::Placeholder : classified;
-                // A claim's color, while it has one, says more than what the mob would do unclaimed.
+                // The bar and look.cpp color a mob by this category.
                 if (a.claimedByParty && settings.show[CategoryIndex(Category::PartyClaim)])
                     info.category = Category::PartyClaim;
                 else if (a.claimed && !a.claimedByParty && settings.show[CategoryIndex(Category::OtherClaim)])
                     info.category = Category::OtherClaim;
-                if (settings.enabled && a.alive && a.distance <= settings.maxDistance)
-                {
-                    const int category = CategoryIndex(info.category);
-                    if (settings.show[category])
-                    {
-                        info.outline    = true;
-                        info.stencilRef = static_cast<uint8_t>(m_Outlined % kMaxStencilRef + 1);
-                        info.argb       = ToArgb(settings.color[category]);
-                        ++m_Outlined;
-                    }
-                }
+            }
+            const OutlineMode mode = OutlineModeOf(st, settings);
+            const bool wanted = mode == OutlineMode::Shown || (mode == OutlineMode::WhenTargeted && Targeted(st.target));
+            if (settings.enabled && settings.outlines && wanted && a.alive && a.distance <= settings.maxDistance)
+            {
+                info.outline    = true;
+                info.stencilRef = static_cast<uint8_t>(m_Outlined % kMaxStencilRef + 1);
+                info.argb       = RowColor(st, settings);
+                ++m_Outlined;
             }
             if (a.kind == EntityKind::Player && a.status)
             {

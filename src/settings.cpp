@@ -198,7 +198,7 @@ namespace headsup
             "labelDecentChallenge", "labelEvenMatch", "labelTough", "labelVeryTough"};
 
         const char* const kPlateModeNames[kPlateModeCount]       = {"hidden", "shown", "whenTargeted", "expanding", "vanilla"};
-        const char* const kOutlineModeNames[kOutlineModeCount]   = {"disabled", "shown", "whenTargeted"};
+        const char* const kOutlineModeNames[kOutlineModeCount]   = {"disabled", "shown", "whenTargeted", "byNature"};
         const char* const kSourceNames[kColorSourceCount]        = {"custom", "game", "aggression", "toughness", "claim", "target", "type"};
         const char* const kAlignNames[kAlignCount]               = {"left", "center", "right"};
         const char* const kOrnamentPlaceNames[kOrnamentPlaceCount] = {"lines12", "lines23"};
@@ -496,20 +496,19 @@ namespace headsup
 
             const Category natureCategory[kNatureCount] = {Category::WontAttack, Category::WillAttack, Category::NmWontAttack,
                 Category::NmWillAttack, Category::Placeholder, Category::Unknown};
-            bool anyNature = false;
             for (int n = 0; n < kNatureCount; ++n)
             {
                 const int c = CategoryIndex(natureCategory[n]);
-                anyNature   = anyNature || s.show[c];
-                mobs.rows[c].outline = s.show[c] ? OutlineMode::Shown : OutlineMode::Disabled;
+                const bool steps = CanOutlineByNature(PlateKind::Mobs, c);
+                mobs.rows[c].outline = s.show[c] ? OutlineMode::Shown : steps ? OutlineMode::ByNature : OutlineMode::Disabled;
                 s.palette.aggression[n] = s.color[c];
             }
             // Switched off, a claimed mob kept the outline its nature gave it.
             for (const Category claim : {Category::PartyClaim, Category::OtherClaim})
             {
                 const int c = CategoryIndex(claim);
-                mobs.rows[c].outline = s.show[c] || anyNature ? OutlineMode::Shown : OutlineMode::Disabled;
-                mobs.rows[c].outlineColor.source = s.show[c] ? ColorSource::Claim : ColorSource::Aggression;
+                mobs.rows[c].outline = s.show[c] ? OutlineMode::Shown : OutlineMode::ByNature;
+                mobs.rows[c].outlineColor.source = ColorSource::Claim;
             }
             s.palette.claim[static_cast<int>(ClaimState::Yours)]  = s.color[CategoryIndex(Category::PartyClaim)];
             s.palette.claim[static_cast<int>(ClaimState::Others)] = s.color[CategoryIndex(Category::OtherClaim)];
@@ -615,9 +614,7 @@ namespace headsup
 
     bool NameplatesOn(const Settings& s)
     {
-        return s.enabled && (s.showLabels || s.mobId != MobIdFormat::Off || s.showIcons || s.showDamageIcons ||
-                                s.showStatusRankIcons || s.showImmunityIcons || s.replaceMobNames ||
-                                s.replacePlayerNames || s.replaceNpcNames || s.replaceCursor || s.phTimers);
+        return s.enabled && (s.nameplates || s.replaceCursor || s.phTimers);
     }
 
     void UseHeadsUpWindowDefaults(Settings& s)
@@ -734,7 +731,9 @@ namespace headsup
                 {
                     RowSettings& row = kind.rows[r];
                     if (static_cast<int>(row.plate) >= kPlateModeCount) row.plate = defaults.rows[r].plate;
-                    if (static_cast<int>(row.outline) >= kOutlineModeCount) row.outline = defaults.rows[r].outline;
+                    if (static_cast<int>(row.outline) >= kOutlineModeCount ||
+                        (row.outline == OutlineMode::ByNature && !CanOutlineByNature(static_cast<PlateKind>(k), r)))
+                        row.outline = defaults.rows[r].outline;
                     ClampPick(row.outlineColor, defaults.rows[r].outlineColor);
                 }
                 for (int n = 0; n < kPlateLines; ++n)

@@ -122,14 +122,22 @@ namespace headsup
         return true;
     }
 
-    float GdiText::Measure(const char* text, const char* family, int pixelHeight)
+    bool GdiText::Extent(const char* text, const char* family, int pixelHeight, bool bold, int& width, int& height)
     {
-        const HDC dc = WithFont(family, pixelHeight, false, 0);
-        if (dc == nullptr) return 0.0f;
+        const HDC dc = WithFont(family, pixelHeight, bold, 0);
+        if (dc == nullptr) return false;
         const std::wstring wide = Utf16(text);
         SIZE size{};
-        if (!GetTextExtentPoint32W(dc, wide.c_str(), static_cast<int>(wide.size()), &size)) return 0.0f;
-        return static_cast<float>(size.cx);
+        if (!GetTextExtentPoint32W(dc, wide.c_str(), static_cast<int>(wide.size()), &size)) return false;
+        width  = size.cx;
+        height = size.cy;
+        return true;
+    }
+
+    float GdiText::Measure(const char* text, const char* family, int pixelHeight)
+    {
+        int width = 0, height = 0;
+        return Extent(text, family, pixelHeight, false, width, height) ? static_cast<float>(width) : 0.0f;
     }
 
     LineInk GdiText::FontInk(const char* family, int pixelHeight, const char* glyphs)

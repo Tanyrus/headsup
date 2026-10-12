@@ -1893,7 +1893,8 @@ namespace headsup
                 line("Nameplates", text);
                 line("Drawn", status.drewInScene ? "into the scene" : "on top");
                 if (status.hooked)
-                    std::snprintf(text, sizeof(text), "%u, %u by HeadsUp", status.names.names, status.names.replaced);
+                    std::snprintf(text, sizeof(text), "%u, %u by HeadsUp, %u hidden", status.names.names,
+                        status.names.replaced, status.names.hidden);
                 else
                     std::snprintf(text, sizeof(text), "not hooked");
                 line("Game's names", text);

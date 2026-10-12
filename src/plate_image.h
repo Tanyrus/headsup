@@ -129,6 +129,11 @@ namespace headsup
     int WholePixels(float size);
     // A power of two, which every Direct3D 8 card accepts.
     int TextureSide(int pixels);
+    // What a device that reports no largest texture is taken to make.
+    constexpr int kFallbackTextureSide = 2048;
+    // The longest side of a text's texture, from the device's largest width and height (0 for unknown): the smaller,
+    // as a power of two, and no more than the 32-bit client can hold a screenful of.
+    int TextTextureSide(uint32_t maxWidth, uint32_t maxHeight);
     // Puts a width by height image of D3DCOLORs in the top-left corner of a sideX by sideY texture whose rows start
     // pitch bytes apart, and clears the rest, so filtering at the image's edge blends with nothing.
     void CopyToCorner(const void* image, int width, int height, void* rows, int pitch, int sideX, int sideY);

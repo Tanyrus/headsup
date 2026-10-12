@@ -161,3 +161,70 @@ TEST(a_friend_is_named_in_the_list_whatever_the_case)
     CHECK(!IsFriend(friends, ""));
     CHECK(!IsFriend({}, "Chadmage"));
 }
+
+TEST(a_rows_color_is_what_its_outline_pick_resolves_to)
+{
+    Settings s;
+    EntityState aggressive;
+    aggressive.kind   = EntityKind::Mob;
+    aggressive.alive  = true;
+    aggressive.nature = Nature::Aggressive;
+    aggressive.row    = Category::WillAttack;
+    CHECK_EQ(RowColor(aggressive, s), ToArgb(s.palette.aggression[static_cast<int>(Nature::Aggressive)]));
+    EntityState claimed = aggressive;
+    claimed.row         = Category::PartyClaim;
+    claimed.claim       = ClaimState::Yours;
+    claimed.classified  = Category::WillAttack;
+    CHECK_EQ(RowColor(claimed, s), ToArgb(s.palette.aggression[static_cast<int>(Nature::Aggressive)])); // by nature by default
+    s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::PartyClaim)].outline = OutlineMode::Shown;
+    CHECK_EQ(RowColor(claimed, s), ToArgb(s.palette.claim[static_cast<int>(ClaimState::Yours)]));
+    s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WillAttack)].outlineColor = ColorPick{ColorSource::Custom, {{0.4f, 0.5f, 0.6f}}};
+    CHECK_EQ(RowColor(aggressive, s), ToArgb(Color{{0.4f, 0.5f, 0.6f}}));
+}
+
+TEST(the_row_that_decides_follows_by_nature_down_the_chain)
+{
+    Settings s;
+    EntityState claimed;
+    claimed.kind       = EntityKind::Mob;
+    claimed.alive      = true;
+    claimed.nature     = Nature::Passive;
+    claimed.classified = Category::WontAttack;
+    claimed.row        = Category::PartyClaim;
+    claimed.claim      = ClaimState::Yours;
+    CHECK(OutlineModeOf(claimed, s) == OutlineMode::Disabled); // the Passive row
+    CHECK_EQ(RowColor(claimed, s), ToArgb(s.palette.aggression[static_cast<int>(Nature::Passive)]));
+    s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WontAttack)].outline = OutlineMode::ByNature; // set by hand, unclamped
+    CHECK(OutlineModeOf(claimed, s) == OutlineMode::Disabled);
+    EntityState placeholder = claimed;
+    placeholder.nature      = Nature::Placeholder;
+    CHECK(OutlineModeOf(placeholder, s) == OutlineMode::Shown); // claim steps aside to the Placeholder row
+    s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::Placeholder)].outline = OutlineMode::ByNature;
+    CHECK(OutlineModeOf(placeholder, s) == OutlineMode::Disabled); // ... which steps aside to the Passive row, also by hand
+}
+
+TEST(a_placeholder_that_falls_through_takes_its_aggressions_color)
+{
+    Settings s;
+    s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::Placeholder)].outline = OutlineMode::ByNature;
+    EntityState funguar;
+    funguar.kind       = EntityKind::Mob;
+    funguar.alive      = true;
+    funguar.nature     = Nature::Placeholder;
+    funguar.classified = Category::WillAttack;
+    funguar.row        = Category::Placeholder;
+    CHECK(OutlineModeOf(funguar, s) == OutlineMode::Shown);
+    CHECK_EQ(RowColor(funguar, s), ToArgb(s.palette.aggression[static_cast<int>(Nature::Aggressive)]));
+}
+
+TEST(a_players_row_decides_its_own_outline)
+{
+    Settings s;
+    s.Kind(PlateKind::Players).rows[static_cast<int>(PlayerRow::Friend)].outline = OutlineMode::WhenTargeted;
+    EntityState friendly;
+    friendly.kind      = EntityKind::Player;
+    friendly.playerRow = PlayerRow::Friend;
+    CHECK(OutlineModeOf(friendly, s) == OutlineMode::WhenTargeted);
+    friendly.playerRow = PlayerRow::Player;
+    CHECK(OutlineModeOf(friendly, s) == OutlineMode::Disabled);
+}
