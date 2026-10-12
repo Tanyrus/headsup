@@ -1365,13 +1365,16 @@ private:
     void UpdateCursorTargets()
     {
         ITarget* target = m_AshitaCore->GetMemoryManager()->GetTarget();
-        const bool picking = target->GetIsSubTargetActive() != 0;
-        m_CursorTargets    = headsup::TargetsFromSlots(picking, target->GetTargetIndex(0), target->GetTargetIndex(1),
+        const Ashita::FFXI::targetwindow_t* window = target->GetRawStructureWindow();
+        const uint32_t slot0                       = target->GetTargetIndex(0);
+        const bool picking =
+            headsup::Picking(target->GetIsSubTargetActive() != 0, window != nullptr && window->m_Sub != 0, slot0);
+        m_CursorTargets = headsup::TargetsFromSlots(picking, slot0, target->GetTargetIndex(1),
             (target->GetLockedOnFlags() & kLockedOn) != 0, m_AshitaCore->GetMemoryManager()->GetEntity()->GetEntityMapSize());
         if (!picking) m_ArrowHook.ForgetPicked();
         m_CursorTargets.outOfRange      = picking && headsup::PickedOutOfRange(m_ArrowHook.PickedColor()).value_or(false);
         m_CursorTargets.gameArrowsShown = !m_ArrowHook.Running();
-        if (const Ashita::FFXI::targetwindow_t* window = target->GetRawStructureWindow())
+        if (window != nullptr)
         {
             const headsup::MenuSize size = headsup::MenuSizeOf(
                 m_MenuWidth, m_MenuHeight, m_Names.BackBufferWidth(), m_Names.BackBufferHeight());
