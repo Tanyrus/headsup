@@ -116,11 +116,17 @@ namespace headsup
         m_Device->SetRenderState(D3DRS_STENCILPASS, D3DSTENCILOP_REPLACE);
         m_Device->SetRenderState(D3DRS_STENCILFAIL, D3DSTENCILOP_KEEP);
         m_Device->SetRenderState(D3DRS_STENCILZFAIL, D3DSTENCILOP_KEEP);
+        // The mesh is only marked here, in neither color nor depth: the game's own draw of it follows untouched, so a
+        // plugin that lights or shadows that draw still gets it.
+        DWORD colorWrite = 0;
+        m_Device->GetRenderState(D3DRS_COLORWRITEENABLE, &colorWrite);
+        m_Device->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
+        m_Device->SetRenderState(D3DRS_COLORWRITEENABLE, 0);
         draw();
 
+        m_Device->SetRenderState(D3DRS_COLORWRITEENABLE, colorWrite);
         m_Device->SetRenderState(D3DRS_STENCILFUNC, D3DCMP_NOTEQUAL);
         m_Device->SetRenderState(D3DRS_STENCILPASS, D3DSTENCILOP_KEEP);
-        m_Device->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
         m_Device->SetRenderState(D3DRS_FOGENABLE, FALSE);
         m_Device->SetRenderState(D3DRS_TEXTUREFACTOR, owner.argb);
         m_Device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);

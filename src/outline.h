@@ -19,7 +19,8 @@ namespace headsup
         // Our own draws come back through the hooks, for the caller to ignore.
         bool Drawing() const { return m_InDraw; }
         const ActorInfo* CharacterMeshOwner(const Tracker& tracker);
-        // True when it drew the mesh itself, and the caller must then block the game's draw.
+        // Marks the mesh in the stencil and draws its border around it, before the game's own draw of the mesh, which
+        // the caller lets through. False when there is no stencil to mark.
         bool DrawOutlined(D3DPRIMITIVETYPE type, UINT minIndex, UINT numVertices, UINT startIndex, UINT primCount,
             const ActorInfo& owner, const Settings& settings);
 

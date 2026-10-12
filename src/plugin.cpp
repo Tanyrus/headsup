@@ -689,10 +689,8 @@ public:
         headsup::CaptureStack(owner->index);
 #endif
         m_Names.CountMesh(owner->index);
-        const bool replaced =
-            outlines && owner->outline && m_Outline.DrawOutlined(type, minIndex, numVertices, startIndex, primCount, *owner, m_Settings);
-        if (replaced) MarkHidden();
-        return replaced;
+        if (outlines && owner->outline) m_Outline.DrawOutlined(type, minIndex, numVertices, startIndex, primCount, *owner, m_Settings);
+        return false;
     }
 
     bool Direct3DDrawPrimitiveUP(D3DPRIMITIVETYPE type, UINT primCount, const void* vertices, UINT stride) override
