@@ -165,6 +165,13 @@ namespace headsup
         return unset != nullptr && entry == 0 ? unset : FontOfEntry(fonts, unset, entry);
     }
 
+    int StepFontEntry(int count, int entry, int step)
+    {
+        if (count <= 0) return kNoFontEntry;
+        if (entry == kNoFontEntry) return step > 0 ? 0 : count - 1;
+        return ((entry + step) % count + count) % count;
+    }
+
     std::string FontShown(const std::vector<std::string>& fonts, const char* unset, const std::string& font)
     {
         const int entry = FontEntry(fonts, unset, font);

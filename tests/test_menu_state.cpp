@@ -178,6 +178,21 @@ TEST(a_friend_is_added_trimmed_once_and_only_as_a_character_name)
     }
 }
 
+TEST(a_font_dropdowns_arrows_step_through_its_list_and_around_its_ends)
+{
+    const std::vector<std::string> fonts{"Barlow Condensed", "Cinzel", "Marcellus SC"};
+    const int count = FontEntryCount(fonts, "Default"); // Default, then the three
+    CHECK_EQ(FontOfEntry(fonts, "Default", StepFontEntry(count, FontEntry(fonts, "Default", "Cinzel"), 1)), "Marcellus SC");
+    CHECK_EQ(FontOfEntry(fonts, "Default", StepFontEntry(count, FontEntry(fonts, "Default", "Cinzel"), -1)), "Barlow Condensed");
+    CHECK_EQ(StepFontEntry(count, 3, 1), 0);  // past the last font, back to Default
+    CHECK_EQ(StepFontEntry(count, 0, -1), 3); // and before Default, the last
+    // A saved font the list lacks has no place in it: the arrows start from the list's ends.
+    CHECK_EQ(StepFontEntry(count, kNoFontEntry, 1), 0);
+    CHECK_EQ(StepFontEntry(count, kNoFontEntry, -1), 3);
+    CHECK_EQ(StepFontEntry(1, 0, 1), 0);
+    CHECK_EQ(StepFontEntry(0, kNoFontEntry, 1), kNoFontEntry); // nothing to step to
+}
+
 TEST(a_font_dropdown_lists_its_unset_choice_first_then_the_fonts)
 {
     const std::vector<std::string> fonts{"Barlow Condensed", "Cinzel", "Marcellus SC"};

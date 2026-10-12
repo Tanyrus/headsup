@@ -504,30 +504,43 @@ namespace headsup
             EndRowAt(cardX, y, gui->GetFrameHeight());
         }
 
-        // A dropdown of fonts. unset, when given, is a first choice that stands for an empty name; bold, when given,
-        // is a checkbox in the row's last frame, where a color pick has its swatch.
+        // A dropdown of fonts between two arrows that step to the font before and after. unset, when given, is a first
+        // choice that stands for an empty name; bold, when given, is a checkbox in the row's last frame, where a color
+        // pick has its swatch.
         void FontDropdown(const char* label, std::string& font, const std::vector<std::string>& choices,
             const char* tip = nullptr, const char* unset = nullptr, bool* bold = nullptr)
         {
             const float frame = gui->GetFrameHeight();
-            const float list  = Em(kControlWidth) - (bold != nullptr ? frame + style.ItemSpacing.x : 0.0f);
+            const float step  = frame + style.ItemSpacing.x;
+            const float list  = Em(kControlWidth) - 2.0f * step - (bold != nullptr ? step : 0.0f);
             const float y     = Row(label, tip, Em(kControlWidth));
             const float x     = gui->GetCursorPosX();
+            const int count   = FontEntryCount(choices, unset);
+            const int picked  = FontEntry(choices, unset, font);
+            int chosen        = picked;
             char id[64];
+            const auto arrow = [&](const char* side, ImGuiDir direction, int by) {
+                std::snprintf(id, sizeof(id), "##%s font %s", side, label);
+                if (SquareFrames([&] { return gui->ArrowButton(id, direction); })) chosen = StepFontEntry(count, picked, by);
+            };
+            arrow("previous", ImGuiDir_Left, -1);
+            gui->SetCursorPos(ImVec2(x + step, y));
             std::snprintf(id, sizeof(id), "##font %s", label);
-            const int picked = FontEntry(choices, unset, font);
-            int chosen       = 0;
-            if (ListPopup(id, FontShown(choices, unset, font), list, FontEntryCount(choices, unset),
-                    [&](int entry) { return FontEntryLabel(choices, unset, entry); }, picked, chosen) &&
-                chosen != picked)
+            int listed = 0;
+            if (ListPopup(id, FontShown(choices, unset, font), list, count,
+                    [&](int entry) { return FontEntryLabel(choices, unset, entry); }, picked, listed))
+                chosen = listed;
+            Tip(tip);
+            gui->SetCursorPos(ImVec2(x + step + list + style.ItemSpacing.x, y));
+            arrow("next", ImGuiDir_Right, 1);
+            if (chosen != picked && chosen != kNoFontEntry)
             {
                 font    = FontOfEntry(choices, unset, chosen);
                 changed = true;
             }
-            Tip(tip);
             if (bold != nullptr)
             {
-                gui->SetCursorPos(ImVec2(x + list + style.ItemSpacing.x, y));
+                gui->SetCursorPos(ImVec2(x + 2.0f * step + list + style.ItemSpacing.x, y));
                 std::snprintf(id, sizeof(id), "##bold %s", label);
                 if (gui->Checkbox(id, bold)) changed = true;
                 Tip(kBoldTip);
