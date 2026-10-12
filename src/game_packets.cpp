@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <functional>
 #include <iterator>
 
 namespace headsup
@@ -14,6 +15,8 @@ namespace headsup
         constexpr uint32_t kZoneInWeather = 0x68, kZoneInPlayer = 0x04, kWeatherNumber = 0x08;
         constexpr uint32_t kFirstOwner = 0x1D, kRegionStride = 4;
         constexpr uint32_t kNextTally = 0x8C, kConquestPoints = 0x90, kImperialStanding = 0xB0;
+        constexpr uint32_t kSanDoriaShare = 0x86, kBastokShare = 0x87, kWindurstShare = 0x88, kBeastmenShare = 0x94;
+        constexpr unsigned kWholePercent = 100;
         const char* const kNationNames[] = {"", "San d'Oria", "Bastok", "Windurst", "Beastmen"};
         constexpr uint32_t kNationColors[] = {0xFF8D8D8D, 0xFFE05A5A, 0xFF5B8DEF, kBarGreen, 0xFFB38AD8};
         constexpr uint32_t kInspectId = 0x04, kInspectIndex = 0x08, kInspectMode = 0x0A, kInspectLinkshell = 0x10;
@@ -66,6 +69,19 @@ namespace headsup
         if (data[kNextTally] > kMaxTallyVanaDays) return std::nullopt;
         return ConquestStanding{data[kNextTally], ReadAt<uint32_t>(data, kConquestPoints),
             ReadAt<uint32_t>(data, kImperialStanding)};
+    }
+
+    std::optional<RegionShares> ParseRegionShares(const uint8_t* data, uint32_t size)
+    {
+        if (data == nullptr || size <= kBeastmenShare) return std::nullopt;
+        RegionShares shares{{{Nation::SanDoria, data[kSanDoriaShare]}, {Nation::Bastok, data[kBastokShare]},
+            {Nation::Windurst, data[kWindurstShare]}, {Nation::Beastmen, data[kBeastmenShare]}}};
+        unsigned total = 0;
+        for (const RegionShare& share : shares)
+            total += share.percent;
+        if (total > kWholePercent) return std::nullopt;
+        std::ranges::stable_sort(shares, std::ranges::greater{}, &RegionShare::percent);
+        return shares;
     }
 
     const char* NationName(Nation nation)

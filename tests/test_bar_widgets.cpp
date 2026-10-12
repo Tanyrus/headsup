@@ -596,6 +596,35 @@ TEST(the_zone_popup_says_when_no_one_holds_the_region_or_it_is_not_known_yet)
     CHECK(Lines(cityBefore.sections[0]) == (std::vector<std::string>{"Region San d'Oria", "Zone 230"}));
 }
 
+TEST(the_zone_popup_ranks_the_influence_in_its_region_over_the_time_to_the_tally)
+{
+    Settings settings;
+    BarState state;
+    state.zone   = 100;           // West Ronfaure, Ronfaure (region 0)
+    state.unixMs = 1791527400000; // Friday 15:30 JST: 203,400 s to Monday 00:00 JST
+    RegionOwners owners{};
+    owners[0]    = Nation::SanDoria;
+    state.owners = owners;
+    CHECK(Section(BarPopupContent(BarWidget::Zone, state, settings), "Influence") == nullptr); // not known yet
+    state.shares =
+        RegionShares{{{Nation::SanDoria, 61}, {Nation::Bastok, 21}, {Nation::Windurst, 11}, {Nation::Beastmen, 5}}};
+    const PopupContent popup       = BarPopupContent(BarWidget::Zone, state, settings);
+    const PopupSection* influence = Section(popup, "Influence");
+    CHECK(influence != nullptr);
+    CHECK(Lines(popup.sections[0]) == (std::vector<std::string>{"Region Ronfaure", "Held by San d'Oria", "Zone 100"}));
+    CHECK(Lines(*influence) == (std::vector<std::string>{"San d'Oria 61%", "Bastok 21%", "Windurst 11%", "Beastmen 5%",
+                                   "Tally in 2d 8h"}));
+    for (const PopupRow& row : influence->rows)
+        CHECK(row.kind == RowKind::Pair); // each figure at the right edge
+    CHECK(influence->rows[1].cells[0].text == ListOf(Colored("Bastok ", NationColor(Nation::Bastok))));
+    state.shares =
+        RegionShares{{{Nation::SanDoria, 0}, {Nation::Bastok, 0}, {Nation::Windurst, 0}, {Nation::Beastmen, 0}}};
+    const PopupContent quiet = BarPopupContent(BarWidget::Zone, state, settings);
+    CHECK(Lines(*Section(quiet, "Influence")) == (std::vector<std::string>{"No influence yet", "Tally in 2d 8h"}));
+    state.zone = 230; // Southern San d'Oria: a city region, outside the conquest
+    CHECK(Section(BarPopupContent(BarWidget::Zone, state, settings), "Influence") == nullptr);
+}
+
 namespace
 {
     // You, a healer low on HP and MP, a red mage, and a black mage in Aht Urhgan Whitegate.
@@ -647,6 +676,8 @@ namespace
             owners[1]     = Nation::Bastok;
             state.owners  = owners;
             state.standing = ConquestStanding{58, 12345, 8210};
+            state.shares =
+                RegionShares{{{Nation::Bastok, 52}, {Nation::SanDoria, 30}, {Nation::Windurst, 10}, {Nation::Beastmen, 8}}};
             state.weather = Weather::DustStorm;
             state.strip    = StripText{"Mog Wardrobe 8", "Help on the selected item"};
             state.stripBag = BagCount{3, 80};
@@ -668,6 +699,7 @@ namespace
         s.weather = full.weather;
         s.owners  = full.owners;
         s.standing = full.standing;
+        s.shares   = full.shares;
         if (needs.unixTime) s.unixMs = full.unixMs;
         if (needs.localTime)
         {

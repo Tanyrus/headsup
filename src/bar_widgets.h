@@ -57,6 +57,7 @@ namespace headsup
         std::optional<Weather> weather; // the latest from the server; nullopt before one since loading or zoning
         std::optional<RegionOwners> owners; // nullopt before a conquest update
         std::optional<ConquestStanding> standing; // nullopt before a conquest update
+        std::optional<RegionShares> shares; // nullopt before a conquest update since the last zone-in
         std::optional<FrameReport> frames; // nullopt before the first frame
         std::optional<JobReport> job; // nullopt while the game reports no job
         std::optional<ConnectionReport> connection;
@@ -65,7 +66,7 @@ namespace headsup
     };
 
     // The parts of BarState that the shown widgets and the open popup read, for the plugin to gather only those; it
-    // always copies the weather, the owners and the standing, which GameState keeps from packets.
+    // always copies the weather, the owners, the standing and the shares, which GameState keeps from packets.
     struct BarNeeds
     {
         bool unixTime   = false; // unixMs

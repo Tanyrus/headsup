@@ -21,7 +21,7 @@ namespace headsup
             "Bags", "Clock", "Game help", "Server time", "FPS", "Job", "Connection", "Party", "Conquest",
             "Signet", "Distance"};
         const char* const kBarWidgetTips[] = {
-            "The zone, its region and who holds it.",
+            "The zone, its region and who holds it. Hover for the influence there and the conquest tally.",
             "The weather now and today's chance of it. Hover for the forecast.",
             "The Vana'diel day, time and moon.",
             "Your target's name, level and con. Hover a mob for its details.",

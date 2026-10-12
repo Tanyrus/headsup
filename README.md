@@ -191,7 +191,7 @@ A bar across the top of the screen, on by default, with these widgets from left 
 
 | Widget | Shows | Hover for |
 |---|---|---|
-| Zone | The zone's name, its region and who holds it | The region, who holds it and the zone's ID |
+| Zone | The zone's name, its region and who holds it | The region, who holds it and the zone's ID; in a conquest region, each nation's and the beastmen's share of this week's influence there, the largest first, and the time to the tally |
 | Weather | The weather now, with its element, and today's chance of it | A five-day forecast, starting today |
 | Vana'diel | The weekday in its element's color, the time and moon | The date, and when the day and moon change |
 | Job | Your jobs and levels, and the EXP to your next level (your merits at 75), over a bar of it | EXP per hour, the time to level, limit points |
@@ -237,7 +237,8 @@ reply, rounded to a frame.
 
 After each zone change (and after loading) HeadsUp asks the server for the conquest standings, as opening Region Info
 does, while the Zone or Conquest widget is on, so the zone's owner and your conquest points show without opening that
-menu.
+menu. It asks again each minute while the Zone widget's popup is open, as the influence changes through the week.
+Whoever holds the largest share when the tally comes takes the region.
 
 The bar stays off until your character is in game, so it does not draw over the login screens.
 

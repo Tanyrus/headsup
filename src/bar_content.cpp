@@ -20,7 +20,13 @@ namespace headsup
 
     PopupRow Labeled(std::string label, Span value)
     {
-        return PopupRow{RowKind::Pair, 0, ListOf(Cell(Text(std::move(label) + " ", Tone::Dim)), Cell(std::move(value)))};
+        return Labeled(Text(std::move(label), Tone::Dim), std::move(value));
+    }
+
+    PopupRow Labeled(Span label, Span value)
+    {
+        label.text += " ";
+        return PopupRow{RowKind::Pair, 0, ListOf(Cell(std::move(label)), Cell(std::move(value)))};
     }
 
     PopupRow Grid(int columns, size_t cells)

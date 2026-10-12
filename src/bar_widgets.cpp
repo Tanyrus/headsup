@@ -296,7 +296,8 @@ namespace headsup
         auto shown = [&](BarWidget widget) { return settings.barWidgets[static_cast<int>(widget)]; };
         BarNeeds needs;
         needs.unixTime   = shown(BarWidget::Weather) || shown(BarWidget::VanaTime) || shown(BarWidget::ServerTime) ||
-                           shown(BarWidget::Conquest);
+                           shown(BarWidget::Conquest) ||
+                           (shown(BarWidget::Zone) && open == BarWidget::Zone); // the popup counts down to the tally
         needs.localTime  = shown(BarWidget::EarthTime);
         needs.zone       = shown(BarWidget::Zone) || shown(BarWidget::Weather) ||
                      (shown(BarWidget::Signet) && open == BarWidget::Signet); // the popup says where it works
@@ -502,6 +503,19 @@ namespace headsup
             }
             rows.rows.push_back(Line(Cell(ListOf(Text("Zone ", Tone::Dim), Text(std::to_string(state.zone))))));
             popup.sections = ListOf(std::move(rows));
+            if (InConquest(zone) && state.shares)
+            {
+                PopupSection influence{"Influence", {}};
+                // The largest share is first.
+                if (state.shares->front().percent == 0)
+                    influence.rows.push_back(LineOf("No influence yet", Tone::Dim));
+                else
+                    for (const RegionShare& share : *state.shares)
+                        influence.rows.push_back(Labeled(Colored(NationName(share.nation), NationColor(share.nation)),
+                            Text(std::to_string(share.percent) + "%")));
+                influence.rows.push_back(Labeled("Tally in", Text(SpanText(SecondsToTally(state.unixMs)))));
+                popup.sections.push_back(std::move(influence));
+            }
             break;
         }
         case BarWidget::Weather:

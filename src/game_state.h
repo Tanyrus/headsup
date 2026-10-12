@@ -35,7 +35,7 @@ namespace headsup
     bool SharesLinkshell(const PlayerCheck* check, std::span<const std::string> yours);
 
     constexpr double kConquestAskGap   = 5.0;  // seconds between two conquest requests, at least
-    constexpr double kCurrencyRefresh = 60.0; // seconds between two currency requests while their popup is open
+    constexpr double kPopupRefresh    = 60.0; // seconds between two requests for what an open popup shows
 
     // What the server's packets say, each parsed once as it arrives, whether or not anything shows it.
     class GameState
@@ -50,19 +50,21 @@ namespace headsup
         const std::optional<Weather>& ZoneWeather() const { return m_Weather; }
         const std::optional<RegionOwners>& Owners() const { return m_Owners; }
         const std::optional<ConquestStanding>& Standing() const { return m_Standing; }
+        const std::optional<RegionShares>& Shares() const { return m_Shares; }
         // The last conquest packet as it came, which /hu debug writes to check its layout against.
         const std::vector<uint8_t>& LastConquestPacket() const { return m_ConquestBytes; }
         const PlayerCheck* PlayerCheckOf(uint32_t serverId) const;
 
         // Whether HeadsUp should ask for the conquest standings (kConquestRequest) now: once after loading and once per
-        // zone-in, while no conquest update has come since, and never within kConquestAskGap of the last ask. open:
-        // the bar runs with the Zone or Conquest widget on and the game is not zoning.
-        bool ConquestRequestDue(double now, bool open) const;
+        // zone-in, while no conquest update has come since, never within kConquestAskGap of the last ask, and again
+        // every kPopupRefresh while refresh (the Zone popup, which shows them, is open). open: the bar runs with the
+        // Zone or Conquest widget on and the game is not zoning.
+        bool ConquestRequestDue(double now, bool open, bool refresh) const;
         void ConquestRequested(double now);
 
         const CurrencyValues& Currencies() const { return m_Currencies; }
         // Whether HeadsUp should ask for the currencies (kCurrencies1Request and _2) now: as the conquest standings
-        // are, once after loading and once per zone-in, and again every kCurrencyRefresh while refresh (their popup
+        // are, once after loading and once per zone-in, and again every kPopupRefresh while refresh (their popup
         // is open). open: the bar runs with the Gil widget on and the game is not zoning.
         bool CurrencyRequestDue(double now, bool open, bool refresh) const;
         void CurrencyRequested(double now);
@@ -74,6 +76,7 @@ namespace headsup
         std::optional<Weather> m_Weather;
         std::optional<RegionOwners> m_Owners; // kept across zoning
         std::optional<ConquestStanding> m_Standing; // kept across zoning, not across characters
+        std::optional<RegionShares> m_Shares;       // of the region zoned into: the next zone's may be another
         std::optional<uint32_t> m_Player;           // your server id, from the last zone-in
         std::vector<uint8_t> m_ConquestBytes;
         bool m_ConquestOwed = true;           // loading counts as a zone-in

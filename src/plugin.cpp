@@ -522,11 +522,13 @@ public:
         m_UiHidden = m_Screenshot || headsup::IsEventStatus(m_OwnStatus);
         g_BarOn = headsup::BarRuns(m_Settings, loginStatus) && !m_Bar.Failed();
         g_BarHidden = m_UiHidden;
-        // Opening Region Info asks the server for the conquest standings; HeadsUp asks the same once per zone-in.
+        // Opening Region Info asks the server for the conquest standings; HeadsUp asks the same once per zone-in, and
+        // again while the Zone popup shows them.
         const bool wantsConquest = m_Settings.barWidgets[static_cast<int>(headsup::BarWidget::Zone)] ||
                                    m_Settings.barWidgets[static_cast<int>(headsup::BarWidget::Conquest)];
         if (m_GameState.ConquestRequestDue(now, g_BarOn && wantsConquest &&
-                                                    m_AshitaCore->GetMemoryManager()->GetPlayer()->GetIsZoning() == 0))
+                                                    m_AshitaCore->GetMemoryManager()->GetPlayer()->GetIsZoning() == 0,
+                m_BarInput.Open() == headsup::BarWidget::Zone))
         {
             auto request = headsup::kConquestRequest; // Ashita takes the bytes as non-const
             m_AshitaCore->GetPacketManager()->AddOutgoingPacket(headsup::kConquestRequestPacket,
@@ -1264,6 +1266,7 @@ private:
         s.weather = WeatherNow();
         s.owners   = m_GameState.Owners();
         s.standing = m_GameState.Standing();
+        s.shares   = m_GameState.Shares();
         if (needs.unixTime || needs.localTime || needs.signet)
         {
             const auto clock = std::chrono::system_clock::now();
