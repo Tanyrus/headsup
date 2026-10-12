@@ -18,15 +18,19 @@ namespace headsup
         constexpr uint32_t kFrameDepth  = 0x48;
         constexpr uint32_t kFrameScaleX = 0x4C;
         constexpr uint32_t kFrameScaleY = 0x50;
-        // The return address, then the arguments: the first and third are not read.
+        // The return address, then the arguments: the first is not read.
         constexpr uint32_t kFrameCaller     = 0x6D4;
         constexpr uint32_t kFrameText       = 0x6DC;
+        constexpr uint32_t kFrameSize       = 0x6E0;
         constexpr uint32_t kFrameColor      = 0x6E4;
         constexpr uint32_t kFrameShellColor = 0x6E8;
 
         constexpr uint8_t kLineBreak = '\n';
         // The frame's scale is pixels per game unit, and the game's letters are 10 units tall (12 with a descender).
         constexpr float kLetterUnits = 10.0f;
+        // A name's depth is 1 - 0.1 / its yalms from the camera, and the game sizes it at 5.12 / yalms + 0.056 of full
+        // size, to the nearest eightieth: 513 of 525 names in draw dumps exactly, the rest a step or two off.
+        constexpr float kNearPlane = 0.1f, kSizePerYalm = 5.12f, kSizeFar = 0.056f, kSizeSteps = 80.0f;
         // Names are drawn through a modulate-2x texture stage, so the frame's color is half what shows.
         constexpr uint32_t kNameModulate = 2;
 
@@ -51,6 +55,7 @@ namespace headsup
         read.scaleX     = At<float>(frame, kFrameScaleX);
         read.scaleY     = At<float>(frame, kFrameScaleY);
         read.text       = At<uint32_t>(frame, kFrameText);
+        read.size       = At<float>(frame, kFrameSize);
         read.color      = At<uint32_t>(frame, kFrameColor);
         read.shellColor = At<uint32_t>(frame, kFrameShellColor);
         return read;
@@ -74,12 +79,21 @@ namespace headsup
         return std::find(text, text + length, kLineBreak) == text + length;
     }
 
-    DrawnName NameFromFrame(const NameFrame& frame, float toBackBufferX, float toBackBufferY)
+    float NameSizeAtDepth(float depth)
+    {
+        if (!(depth > 0.0f && depth < 1.0f)) return 1.0f;
+        const float yalms = kNearPlane / (1.0f - depth);
+        return std::min(1.0f, std::round((kSizePerYalm / yalms + kSizeFar) * kSizeSteps) / kSizeSteps);
+    }
+
+    DrawnName NameFromFrame(const NameFrame& frame, float toBackBufferX, float toBackBufferY, bool picked)
     {
         DrawnName name;
         const float x = frame.x * toBackBufferX, top = frame.y * toBackBufferY;
+        float height = kLetterUnits * frame.scaleY * toBackBufferY;
+        if (picked && frame.size > 0.0f) height *= std::min(1.0f, NameSizeAtDepth(frame.depth) / frame.size);
         name.box.Add(x, top);
-        name.box.Add(x, top + kLetterUnits * frame.scaleY * toBackBufferY);
+        name.box.Add(x, top + height);
         name.depth = frame.depth;
         name.color = ShownColor(frame.color, kNameModulate);
         return name;

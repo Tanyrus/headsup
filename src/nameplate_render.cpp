@@ -277,7 +277,8 @@ namespace headsup
                 if (info == nullptr) continue;
                 const NameFrame* frame = hook.Drawn(info->index);
                 if (frame == nullptr) continue;
-                const DrawnName gameName = NameFromFrame(*frame, names.TargetScaleX(), names.TargetScaleY());
+                const DrawnName gameName =
+                    NameFromFrame(*frame, names.TargetScaleX(), names.TargetScaleY(), info->index == targets.subTarget);
                 // Checked where our name goes: a seated player's head can be in view with the game's name above the screen.
                 ScreenBox anchor = PlaceName(gameName.box, names.SceneCamera(), info->feet, info->pose);
                 if (!NameOnScreen(anchor, screenWidth, screenHeight)) continue;

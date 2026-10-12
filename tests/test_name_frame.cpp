@@ -75,6 +75,7 @@ TEST(a_frame_is_read_at_the_routines_offsets)
     CHECK_EQ(frame.text, 0x0084EC48u);
     CHECK_EQ(frame.color, 0xC0808080u);
     CHECK_EQ(frame.shellColor, 0x001F0F0Fu);
+    CHECK_EQ(frame.size, 0.9375f);
 }
 
 TEST(a_name_drawn_by_either_caller_passes)
@@ -197,6 +198,44 @@ TEST(a_drawn_name_keeps_the_games_color_for_it)
     CHECK_EQ(name.color, 0xFFC2FFC2u);
     CHECK(Near(name.box.Height(), 16.9f, 0.1f));
     CHECK(Near(name.box.minY, 380.0f, 0.1f));
+}
+
+TEST(the_games_name_size_follows_from_its_depth)
+{
+    // Names in name and draw dumps, by depth: Carrott's frame above asked for 75 eightieths, Lombaria's letters were
+    // half of full size, a Fernfelling Chapuli 30 yalms off 17 eightieths (7.2 of 33.75 pixels), your own name full.
+    CHECK_EQ(NameSizeAtDepth(0.982814f), 0.9375f);
+    CHECK_EQ(NameSizeAtDepth(0.991222f), 0.5f);
+    CHECK_EQ(NameSizeAtDepth(0.996829f), 0.2125f);
+    CHECK_EQ(NameSizeAtDepth(0.975268f), 1.0f);
+    CHECK_EQ(NameSizeAtDepth(1.0f), 1.0f); // no scene depth: left as it is
+    CHECK_EQ(NameSizeAtDepth(0.0f), 1.0f);
+}
+
+TEST(a_picked_candidates_name_keeps_the_height_its_depth_gives)
+{
+    // The Chapuli while it was the candidate of a sub-target pick (/hu namedump): the game asked for full size, and the
+    // letters grew down from the same top, 377.5 to 411.3. Targeted without a pick they ran from 377.5 to 384.7.
+    NameFrame chapuli;
+    chapuli.x      = 2123.69f;
+    chapuli.y      = 566.29f;
+    chapuli.depth  = 0.996829f;
+    chapuli.scaleX = 9.0f;
+    chapuli.scaleY = 5.0625f;
+    chapuli.size   = 1.0f;
+    const DrawnName grown = NameFromFrame(chapuli, kToBackBuffer, kToBackBuffer);
+    CHECK(Near(grown.box.minY, 377.5f, 0.1f));
+    CHECK(Near(grown.box.maxY, 411.3f, 0.1f));
+    const DrawnName picked = NameFromFrame(chapuli, kToBackBuffer, kToBackBuffer, true);
+    CHECK(Near(picked.box.minY, 377.5f, 0.1f));
+    CHECK(Near(picked.box.maxY, 384.7f, 0.1f));
+    // With the target window hidden the game does not enlarge it, and nothing is taken off.
+    chapuli.size   = 0.2125f;
+    chapuli.scaleY = 5.0625f * 0.2125f;
+    CHECK(Near(NameFromFrame(chapuli, kToBackBuffer, kToBackBuffer, true).box.maxY, 384.7f, 0.1f));
+    chapuli.size = 0.2f; // a step under what its depth gives: never made taller
+    chapuli.scaleY = 5.0625f * 0.2f;
+    CHECK(Near(NameFromFrame(chapuli, kToBackBuffer, kToBackBuffer, true).box.Height(), 6.75f, 0.01f));
 }
 
 TEST(each_axis_is_scaled_by_its_own_factor)
