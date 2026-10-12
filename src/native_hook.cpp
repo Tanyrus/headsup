@@ -166,6 +166,9 @@ namespace headsup
         uintptr_t g_WindowMoveTo = 0;       // MCD::MoveTo, or 0 when it was not found
         using WindowMoveToFn     = void(__attribute__((thiscall))*)(uintptr_t mcd, int x, int y);
         uint32_t g_PickedColor  = 0;
+        uintptr_t g_RangeColor  = 0; // the window's thiscall that picks the candidate arrow's color
+        using RangeColorFn      = uint32_t(__attribute__((thiscall))*)(const void* window, uintptr_t you, uintptr_t candidate,
+            uint32_t inRange, uint32_t outOfRange, uint32_t third);
         bool g_FixPointer       = false;
         uintptr_t g_ControllerGlobal = 0; // where the game keeps its mouse controller
         uintptr_t g_ShowPointer      = 0; // the controller's thiscall that shows (1) or hides (0) the pointer
@@ -396,6 +399,8 @@ namespace headsup
             Retarget(target, Address(target), gate), Retarget(picked, Address(picked), gate)};
         g_HeadsUpArrowDraw = moduleBase + calls.draw;
         g_PickedReturn     = moduleBase + calls.picked + kBranchLength;
+        const RangeColor range = LocateRangeColor(text);
+        g_RangeColor           = range.problem == LocateProblem::None ? moduleBase + range.routine : 0;
         if (const std::string failure = PutIn(patches); !failure.empty()) return failure;
         m_Calls = patches;
         return "";
@@ -414,6 +419,13 @@ namespace headsup
     void ArrowHook::Hide(bool hide) { g_HideArrows = hide; }
     uint32_t ArrowHook::PickedColor() const { return g_PickedColor; }
     void ArrowHook::ForgetPicked() { g_PickedColor = 0; }
+
+    uint32_t ArrowHook::CandidateColor(const void* window, uintptr_t yourActor, uintptr_t candidateActor) const
+    {
+        if (!Running() || g_RangeColor == 0 || window == nullptr || yourActor == 0 || candidateActor == 0) return 0;
+        return reinterpret_cast<RangeColorFn>(g_RangeColor)(window, yourActor, candidateActor, kArrowInRange, kArrowOutOfRange,
+            kArrowThird);
+    }
 }
 
 namespace headsup

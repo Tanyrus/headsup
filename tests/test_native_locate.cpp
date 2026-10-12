@@ -235,6 +235,40 @@ TEST(arrow_draws_into_different_functions_are_left_alone)
 
 namespace
 {
+    // Where the same draw asks for the color of the candidate's arrow: it pushes the two colors that are not the
+    // usual one, then that one from edi, the candidate and you, and calls the routine at 0x1515A0 on the window.
+    constexpr uint32_t kRangeColorAsk = 0x1514D3;
+    constexpr uint32_t kRangeColor    = 0x1515A0;
+
+    Image RangeClient()
+    {
+        Image image;
+        image.Put(kRangeColorAsk, {0x68, 0x40, 0xD0, 0xD0, 0xE0, 0x68, 0x40, 0x40, 0xD0, 0xE0, 0x57, 0x52, 0x50, 0x8B, 0xCE, 0xE8,
+                                      0xB9, 0x00, 0x00, 0x00});
+        return image;
+    }
+}
+
+TEST(the_candidate_arrows_color_comes_from_one_routine)
+{
+    const RangeColor found = LocateRangeColor(RangeClient().Text());
+    CHECK(found.problem == LocateProblem::None);
+    CHECK_EQ(found.routine, kRangeColor);
+}
+
+TEST(a_client_that_asks_for_the_arrows_color_another_way_has_no_routine)
+{
+    Image image = RangeClient();
+    image.Put(kRangeColorAsk + 1, {0x41}); // another color
+    CHECK(LocateRangeColor(image.Text()).problem == LocateProblem::NoRangeColor);
+    CHECK(LocateRangeColor(Image{}.Text()).problem == LocateProblem::NoRangeColor);
+    Image twice = RangeClient();
+    std::memcpy(twice.At(0x100000), twice.At(kRangeColorAsk), 0x14);
+    CHECK(LocateRangeColor(twice.Text()).problem == LocateProblem::AmbiguousRangeColor);
+}
+
+namespace
+{
     // Where the same dump guesses the client area from GetWindowRect and the system's border sizes: reading a mouse
     // message's position, moving Windows' pointer to the game's, and panning at the pointer area's edge. Each loads
     // GetSystemMetrics into a different register.

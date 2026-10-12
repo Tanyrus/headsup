@@ -86,6 +86,9 @@ namespace headsup
         // The color of the arrow the game last drew over a candidate being picked, or 0 since forgotten.
         uint32_t PickedColor() const;
         void ForgetPicked();
+        // The color the game would give that arrow now, asked of its own routine: the draw that asks is skipped while
+        // HudBeGone hides the target window. 0 when the routine was not found or there is nobody to ask about.
+        uint32_t CandidateColor(const void* window, uintptr_t yourActor, uintptr_t candidateActor) const;
 
     private:
         std::array<CodePatch, 2> m_Calls; // the target's and the candidate's
