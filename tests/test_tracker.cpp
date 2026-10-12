@@ -194,6 +194,23 @@ TEST(each_category_gets_its_colour)
     CHECK_EQ(t.OutlinedCount(), 5u);
 }
 
+TEST(a_renamed_mob_keeps_the_data_its_server_id_gives)
+{
+    // The renamer addon writes its own names over the game's, often to mark placeholders and the notorious monsters
+    // they bring: a mob's record follows its server ID alone.
+    Tracker t;
+    const Settings s;
+    t.Update({Mob(0x2000, kCarrionWorm, "Carrion Worm (PH)"), Mob(0x3000, kBigmouthBilly, "NM Billy"),
+                 Mob(0x4000, kBountyHunter, "")},
+        kLevel20, s, CursorTargets{});
+    const ActorInfo* ph = t.Find(0x2000);
+    CHECK(ph->mob != nullptr && ph->placeholder && ph->state.nature == Nature::Placeholder);
+    const ActorInfo* nm = t.Find(0x3000);
+    CHECK(nm->mob != nullptr && !nm->placeholder && nm->state.nature == Nature::PassiveNm);
+    const ActorInfo* unnamed = t.Find(0x4000);
+    CHECK(unnamed->mob != nullptr && unnamed->state.nature == Nature::Aggressive);
+}
+
 TEST(a_placeholder_is_outlined_by_its_own_row_in_its_own_color)
 {
     Tracker t;
@@ -241,11 +258,12 @@ TEST(a_claimed_mob_takes_its_claim_rows_mode_and_color)
     CHECK(t.Find(0x3000)->outline && t.Find(0x3000)->argb == ToArgb(s.palette.claim[static_cast<int>(ClaimState::Others)]));
 }
 
-TEST(a_name_that_does_not_match_the_data_is_unknown)
+TEST(a_mob_whose_server_id_the_data_lacks_is_unknown)
 {
     Tracker t;
     const Settings s = EveryCategory();
-    t.Update({Mob(0x2000, kBountyHunter, "Snipper")}, kLevel20, s, CursorTargets{});
+    t.Update({Mob(0x2000, 1, "Goblin Bounty Hunter")}, kLevel20, s, CursorTargets{}); // a known name is not enough
+    CHECK(t.Find(0x2000)->mob == nullptr);
     CHECK_EQ(t.Find(0x2000)->argb, Aggression(s, Nature::NoData));
 }
 

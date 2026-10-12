@@ -10,7 +10,7 @@ using namespace headsup;
 
 TEST(lookup_by_server_id)
 {
-    const MobRecord* m = FindMob(17199648, "Goblin Bounty Hunter");
+    const MobRecord* m = MobById(17199648);
     CHECK(m != nullptr);
     CHECK_EQ(m->minLevel, 17);
     CHECK_EQ(m->maxLevel, 20);
@@ -21,11 +21,11 @@ TEST(lookup_by_server_id)
 
 TEST(passive_and_notorious_flags)
 {
-    const MobRecord* snipper = FindMob(17199322, "Snipper");
+    const MobRecord* snipper = MobById(17199322);
     CHECK(snipper != nullptr);
     CHECK_EQ(snipper->flags, 0);
     CHECK_EQ(snipper->detects, kDetectHearing); // crabs detect by sound
-    const MobRecord* monk = FindMob(17199603, "Beach Monk");
+    const MobRecord* monk = MobById(17199603);
     CHECK(monk != nullptr);
     CHECK_EQ(monk->flags, kMobAggressive | kMobNotorious);
 }
@@ -43,73 +43,38 @@ TEST(a_mob_aggros_unless_no_aggro_or_a_follower)
         CHECK(IsAggressive(MobRecord{1, "Mob", 1, 1, row.flags, 0, 0, 0, 0, 0, 0}) == row.aggressive);
 }
 
-TEST(a_different_name_at_the_id_is_not_a_match)
-{
-    CHECK(FindMob(17199648, "Snipper") == nullptr);
-    CHECK(FindMob(17199648, "") == nullptr);
-}
-
-TEST(names_match_without_punctuation_or_case)
-{
-    CHECK(FindMob(17199577, "Goblin's Dragonfly") != nullptr); // Phoenix: "Goblins Dragonfly"
-    CHECK(SameMobName("Do'Bho Venomtail", "DoBho Venomtail"));
-    CHECK(SameMobName("goblin bounty hunter", "Goblin Bounty Hunter"));
-    CHECK(!SameMobName("Goblin Bounty Hunter", "Goblin Bounty Hunters"));
-    CHECK(!SameMobName("Bat", ""));
-}
-
-TEST(a_record_named_after_phoenixs_template_key_is_the_clients_mob)
-{
-    // Outer Horutoto Ruins' bats: Phoenix's Stink_Bats_OHR template has no display name, so the data holds "Stink Bats
-    // OHR"; the client, and a Windows tester's /hu debug, show "Stink Bats".
-    const MobRecord* bats = FindMob(17571844, "Stink Bats");
-    CHECK(bats != nullptr);
-    CHECK_EQ(bats->minLevel, 15);
-    CHECK_EQ(bats->maxLevel, 18);
-}
-
-TEST(only_whole_tag_words_after_the_clients_name_match)
-{
-    // Every tag seen against the client's own names: zones and areas, jobs, eras, weapons.
-    CHECK(TaggedMobName("Lost Soul war ENS", "Lost Soul"));
-    CHECK(TaggedMobName("Death Jacket CN RFS", "Death Jacket"));
-    CHECK(TaggedMobName("Tapanas Minion past", "Tapana's Minion"));
-    CHECK(!TaggedMobName("Locus Tomb Worm past", "Locus Dire Bat")); // another mob at that ID, in King Ranperre's Tomb
-    CHECK(!TaggedMobName("Chaser Bat past", "Stink Bats"));        // as many letters, then a tag: still another mob
-    CHECK(!TaggedMobName("Bats past", "Bat"));                     // a longer word, not a tag
-    CHECK(!TaggedMobName("Iron CraniumV1", "Iron Cranium"));       // glued on: not a whole word
-    CHECK(!TaggedMobName("Stink Bats", "Stink Bats OHR"));         // the client's name is never the longer
-    CHECK(!TaggedMobName("Stink Bats", "Stink Bats"));             // the same name is SameMobName's
-    CHECK(!TaggedMobName("Lost Soul war ENS", ""));
-}
-
 TEST(a_starter_mobs_level_mod)
 {
-    const MobRecord* rabbit = FindMob(17190918, "Wild Rabbit"); // East Ronfaure; its spawn script sets -2
+    const MobRecord* rabbit = MobById(17190918); // East Ronfaure; its spawn script sets -2
     CHECK(rabbit != nullptr);
     CHECK_EQ(rabbit->expLevelMod, -2);
-    CHECK_EQ(FindMob(17199648, "Goblin Bounty Hunter")->expLevelMod, 0);
+    CHECK_EQ(MobById(17199648)->expLevelMod, 0);
 }
 
 TEST(a_placeholder_knows_its_nm)
 {
     // East Ronfaure's Carrion Worms either side of Bigmouth Billy (its script's phList).
-    CHECK_EQ(FindMob(17191194, "Carrion Worm")->placeholderOf, 17191196u);
-    CHECK_EQ(FindMob(17191195, "Carrion Worm")->placeholderOf, 17191196u);
-    CHECK_EQ(FindMob(17191196, "Bigmouth Billy")->placeholderOf, 0u);
+    CHECK_EQ(MobById(17191194)->placeholderOf, 17191196u);
+    CHECK_EQ(MobById(17191195)->placeholderOf, 17191196u);
+    CHECK_EQ(MobById(17191196)->placeholderOf, 0u);
 }
 
-TEST(a_record_by_id_alone_is_found_whatever_its_name)
+TEST(a_record_keeps_phoenixs_own_name_for_the_mob)
 {
     const MobRecord* billy = MobById(17191196);
     CHECK(billy != nullptr && std::string(billy->name) == "Bigmouth Billy");
-    CHECK(MobById(1) == nullptr);
+    // Outer Horutoto Ruins' bats: Phoenix's Stink_Bats_OHR template has no display name, so the data holds its key
+    // where the client shows "Stink Bats".
+    const MobRecord* bats = MobById(17571844);
+    CHECK(bats != nullptr && std::string(bats->name) == "Stink Bats OHR");
+    CHECK_EQ(bats->minLevel, 15);
+    CHECK_EQ(bats->maxLevel, 18);
 }
 
 TEST(unknown_ids_are_not_found)
 {
-    CHECK(FindMob(1, "Snipper") == nullptr);
-    CHECK(FindMob(0xFFFFFFFF, "Snipper") == nullptr);
+    CHECK(MobById(1) == nullptr);
+    CHECK(MobById(0xFFFFFFFF) == nullptr);
 }
 
 TEST(a_mob_without_resistances_of_its_own_is_neutral)

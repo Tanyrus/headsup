@@ -97,7 +97,7 @@ namespace headsup
             if (info == nullptr || (!info->outline && frame == nullptr)) continue;
             const char* name        = EntityName(entity, info->index);
             const uint32_t serverId = entity->GetServerId(info->index);
-            const MobRecord* mob    = FindMob(serverId, name);
+            const MobRecord* mob    = MobById(serverId);
             std::fprintf(out, "#%u %u '%s' ", info->index, serverId, name);
             if (mob != nullptr)
                 std::fprintf(out, "data Lv %u-%u flags %u detects %u respawn %u", mob->minLevel, mob->maxLevel, mob->flags,
