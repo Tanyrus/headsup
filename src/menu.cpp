@@ -100,17 +100,9 @@ namespace headsup
             if (ui.BeginCard("Settings Window", collapsed))
             {
                 std::vector<std::string> names;
-                int font = 0;
                 for (const MenuFont& f : kMenuFonts)
-                    if (MenuFontInstalled(f))
-                    {
-                        if (s.menuFont == f.name) font = static_cast<int>(names.size());
-                        names.emplace_back(f.name);
-                    }
-                const int was = font;
-                ui.NumberDropdown("Font", font, 0, static_cast<int>(names.size()) - 1,
-                    [&](int i) { return names[static_cast<size_t>(i)]; }, "Titles stay in the bar's font.");
-                if (font != was) s.menuFont = names[static_cast<size_t>(font)];
+                    if (MenuFontInstalled(f)) names.emplace_back(f.name);
+                ui.FontDropdown("Font", s.menuFont, names, "Titles stay in the bar's font.");
                 ui.SliderInt("Size", s.menuScale, kMinMenuScale, kMaxMenuScale, "%d%%", "Drag its corner to resize the window.");
                 ui.EndCard();
             }

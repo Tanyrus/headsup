@@ -64,6 +64,9 @@ namespace headsup
     std::string FontOfEntry(const std::vector<std::string>& fonts, const char* unset, int entry);
     std::string FontEntryLabel(const std::vector<std::string>& fonts, const char* unset, int entry);
     std::string FontShown(const std::vector<std::string>& fonts, const char* unset, const std::string& font);
+    // The entry one before (step -1) or after (1) this one, around the list's ends; from no entry, the list's last or
+    // first.
+    int StepFontEntry(int count, int entry, int step);
 
     // The lines a line may borrow its style from: every other line whose own chain of syncs does not lead back to
     // it, so no choice makes a cycle for Clamp to cut.
