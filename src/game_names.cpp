@@ -71,7 +71,8 @@ namespace headsup
         D3DMATRIX view{}, projection{};
         if (FAILED(m_Device->GetTransform(D3DTS_VIEW, &view)) || FAILED(m_Device->GetTransform(D3DTS_PROJECTION, &projection)))
             return;
-        m_Camera     = MakeCamera(&view.m[0][0], &projection.m[0][0], m_BackBufferHeight);
+        m_Camera      = MakeCamera(&view.m[0][0], &projection.m[0][0], m_BackBufferHeight);
+        m_CameraFrame = m_Frame;
         m_CameraSeen = m_HaveCamera = true;
     }
 

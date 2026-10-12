@@ -84,6 +84,11 @@ namespace headsup
         return camera;
     }
 
+    bool CameraStillSeen(uint32_t frame, uint32_t seenFrame)
+    {
+        return frame - seenFrame <= kCameraGraceFrames;
+    }
+
     bool RowAtHeight(const Camera& camera, const WorldPoint& feet, float height, float& row)
     {
         const ClipYW clip = ClipAt(camera, feet, height);

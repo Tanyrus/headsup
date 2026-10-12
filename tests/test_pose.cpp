@@ -21,6 +21,16 @@ namespace
 
 }
 
+TEST(a_camera_no_draw_gives_any_more_stops_counting)
+{
+    // A tester's client drew nothing that carries the camera for a whole frame, and the one kept from earlier was 73
+    // yalms from the player and facing away: a kept camera is only good for the moment after its last draw.
+    CHECK(CameraStillSeen(500, 500));
+    CHECK(CameraStillSeen(500 + kCameraGraceFrames, 500));
+    CHECK(!CameraStillSeen(500 + kCameraGraceFrames + 1, 500));
+    CHECK(!CameraStillSeen(90000, 500));
+}
+
 TEST(statuses_give_the_pose)
 {
     CHECK(PoseFromStatus(0) == Pose::Standing);
