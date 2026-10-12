@@ -676,13 +676,14 @@ namespace headsup
 
     namespace
     {
-        void ClampPick(ColorPick& pick, const ColorPick& fallback)
+        // A source the pick's own dropdown does not offer, as a file from before may hold, goes back to the default.
+        void ClampPick(ColorPick& pick, const ColorPick& fallback, const std::vector<ColorSource>& offered)
         {
-            if (static_cast<int>(pick.source) >= kColorSourceCount) pick.source = fallback.source;
+            if (std::ranges::find(offered, pick.source) == offered.end()) pick.source = fallback.source;
             pick.custom = ClampColor(pick.custom, fallback.custom);
         }
 
-        void ClampLine(LineDesign& line, const LineDesign& d)
+        void ClampLine(LineDesign& line, const LineDesign& d, const std::vector<ColorSource>& offered)
         {
             std::ranges::replace(line.text, '\n', ' ');
             line.text.resize(std::min(line.text.size(), kMaxTemplate));
@@ -694,9 +695,9 @@ namespace headsup
             line.shadow    = std::clamp(line.shadow, kMinShadow, kMaxShadow);
             line.glow      = std::clamp(line.glow, kMinGlow, kMaxGlow);
             line.glowSize  = std::clamp(line.glowSize, kMinGlowSize, kMaxGlowSize);
-            ClampPick(line.color, d.color);
-            ClampPick(line.shadowColor, d.shadowColor);
-            ClampPick(line.glowColor, d.glowColor);
+            ClampPick(line.color, d.color, offered);
+            ClampPick(line.shadowColor, d.shadowColor, offered);
+            ClampPick(line.glowColor, d.glowColor, offered);
             if (line.syncWith < 0 || line.syncWith >= kPlateLines) line.syncWith = kNoSync;
         }
 
@@ -727,6 +728,8 @@ namespace headsup
             {
                 KindSettings& kind = s.kinds[k];
                 const KindSettings& defaults = d.kinds[k];
+                const std::vector<ColorSource> text = SourcesFor(static_cast<PlateKind>(k), true);
+                const std::vector<ColorSource> plain = SourcesFor(static_cast<PlateKind>(k), false);
                 for (int r = 0; r < kMaxRows; ++r)
                 {
                     RowSettings& row = kind.rows[r];
@@ -734,16 +737,16 @@ namespace headsup
                     if (static_cast<int>(row.outline) >= kOutlineModeCount ||
                         (row.outline == OutlineMode::ByNature && !CanOutlineByNature(static_cast<PlateKind>(k), r)))
                         row.outline = defaults.rows[r].outline;
-                    ClampPick(row.outlineColor, defaults.rows[r].outlineColor);
+                    ClampPick(row.outlineColor, defaults.rows[r].outlineColor, plain);
                 }
                 for (int n = 0; n < kPlateLines; ++n)
-                    ClampLine(kind.lines[n], defaults.lines[n]);
+                    ClampLine(kind.lines[n], defaults.lines[n], text);
                 BreakSyncCycles(kind.lines);
                 OrnamentSettings& o = kind.ornament;
                 if (static_cast<int>(o.place) >= kOrnamentPlaceCount) o.place = defaults.ornament.place;
                 o.width  = std::clamp(o.width, kMinOrnamentWidth, kMaxOrnamentWidth);
                 o.height = std::clamp(o.height, kMinOrnamentThickness, kMaxOrnamentThickness);
-                ClampPick(o.color, defaults.ornament.color);
+                ClampPick(o.color, defaults.ornament.color, plain);
             }
             Palette fallback = d.palette;
             const std::vector<PaletteEntry> entries = PaletteEntries(s.palette), defaults = PaletteEntries(fallback);
@@ -751,9 +754,12 @@ namespace headsup
                 *entries[i].color = ClampColor(*entries[i].color, *defaults[i].color);
             if (s.defaultFont.empty() || s.defaultFont.size() > kMaxFontName) s.defaultFont = d.defaultFont;
             s.detectionShown &= kAllDetection;
-            std::erase_if(s.friends, [](const std::string& name) {
-                return name.empty() || std::ranges::any_of(name, [](char c) { return std::isspace(static_cast<unsigned char>(c)); });
-            });
+            std::vector<std::string> friends;
+            for (std::string& name : s.friends)
+                if (IsCharacterName(name) &&
+                    std::ranges::none_of(friends, [&](const std::string& kept) { return SameIgnoringCase(kept, name); }))
+                    friends.push_back(std::move(name));
+            s.friends = std::move(friends);
         }
     }
 

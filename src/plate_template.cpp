@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <utility>
 
 namespace headsup
 {
@@ -122,6 +123,34 @@ namespace headsup
         if (text.size() + name.size() > kMaxTemplate) return text;
         text.insert(std::min(caret, text.size()), name);
         return text;
+    }
+
+    bool PutTag(std::string& text, size_t& caret, Tag tag)
+    {
+        const size_t at  = std::min(caret, text.size());
+        const size_t was = text.size();
+        text             = InsertTag(std::move(text), tag, at);
+        if (text.size() == was) return false;
+        caret = at + (text.size() - was);
+        return true;
+    }
+
+    std::string UnusedTagsNote(const KindSettings& kind, std::initializer_list<Tag> tags)
+    {
+        constexpr const char* kStart = "Put ";
+        constexpr const char* kComma = ", ";
+        constexpr const char* kOr    = " or ";
+        constexpr const char* kEnd   = " on a line of the design to show these on a nameplate.";
+        std::string note;
+        size_t left = tags.size();
+        for (const Tag tag : tags)
+        {
+            if (UsesTag(kind, tag)) return {};
+            note += note.empty() ? kStart : left > 1 ? kComma : kOr;
+            note += TagName(tag);
+            --left;
+        }
+        return note.empty() ? note : note + kEnd;
     }
 
     bool UsesTag(const KindSettings& kind, Tag tag)

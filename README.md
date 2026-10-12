@@ -144,10 +144,10 @@ what that is. Bar text runs from 9 to 32 px and popup text from 10 to 32 px. The
 
 | Theme | Look |
 |---|---|
-| Phoenix gold | Ornate: an edge line with diamonds, and a framed target. The default. |
-| Umbra dark | Each part in a dark rounded pill |
-| Phoenix red, ornate | The ornate look in red |
-| Phoenix red, pills | The pill look in red |
+| Phoenix Gold | Ornate: an edge line with diamonds, and a framed target. The default. |
+| Umbra Dark | Each part in a dark rounded pill |
+| Phoenix Red, Ornate | The ornate look in red |
+| Phoenix Red, Pills | The pill look in red |
 
 The game's help bar is the strip across the top that shows a menu's title and help text while a menu is open. HeadsUp's
 bar covers its top, and the rest of it shows below the bar unless the bar is taller. The switch, off by default, stops

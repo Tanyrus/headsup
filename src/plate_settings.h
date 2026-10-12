@@ -1,12 +1,14 @@
 #pragma once
 
 #include "color.h"
+#include "generated/mobflags.h"
 #include "labels.h"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace headsup
@@ -184,4 +186,33 @@ namespace headsup
     constexpr uint32_t kAllDetection  = (1u << kDetectionIconCount) - 1;
     constexpr uint32_t DetectionBit(DetectionIcon d) { return 1u << static_cast<int>(d); }
     const char* DetectionLabel(DetectionIcon d);
+
+    // A character's name is letters alone, this many of them, as Phoenix's validateCharacterName has it.
+    constexpr size_t kMinCharacterName = 3, kMaxCharacterName = 15;
+    bool IsCharacterName(std::string_view name);
+
+    // The menu's words, each as a row shows it: Title Case, as TitleCaseText gives it.
+    const char* PlateModeLabel(PlateMode mode);
+    const char* OutlineModeLabel(OutlineMode mode);
+    const char* NatureLabel(Nature nature);
+    const char* ToughnessLabel(LabelShade shade);
+    const char* ClaimLabel(ClaimState claim);
+    const char* TargetStateLabel(TargetState target);
+    const char* TargetTypeLabel(TargetType type);
+    // When a target state applies, for the ones whose name does not say; nullptr for the rest.
+    const char* TargetStateTip(TargetState target);
+    const char* StatusRankLabel(StatusRank status);
+    extern const char* const kAlignLabels[kAlignCount];
+    extern const char* const kOrnamentPlaceLabels[kOrnamentPlaceCount];
+    extern const char* const kLineLabels[kPlateLines]; // a line's box and its style tab
+
+    // How many of the outline modes a row's dropdown offers, from the first: all but ByNature where it cannot be.
+    int OutlineModesFor(PlateKind kind, int row);
+    // Whether a row in this mode draws an outline in its own color pick: under ByNature another row's pick is used.
+    constexpr bool HasOutlineColor(OutlineMode mode)
+    {
+        return mode == OutlineMode::Shown || mode == OutlineMode::WhenTargeted;
+    }
+    // Whether HeadsUp draws a plate, always or at times, for a row in this mode.
+    constexpr bool DrawsPlate(PlateMode mode) { return mode != PlateMode::Hidden && mode != PlateMode::Vanilla; }
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Ashita.h"
+#include "menu_state.h"
 #include "native_hook.h"
 #include "settings.h"
 #include "tracker.h"
@@ -8,6 +9,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace headsup
@@ -44,6 +46,17 @@ namespace headsup
         std::vector<uint8_t> held;
     };
 
+    // A kind page's own state, begun anew when another kind's page opens: the line last typed in, which takes a
+    // clicked tag, the three lines' boxes, the Line Style tab that is open and the name being typed for Friends.
+    struct DesignEditor
+    {
+        PlateKind kind = PlateKind::Mobs;
+        int line       = 0;
+        int styleTab   = 0;
+        LineDraft drafts[kPlateLines] = {};
+        char friendName[kMaxCharacterName + 1] = {};
+    };
+
     // A font file in Windows' Fonts folder.
     std::string WindowsFontPath(const char* file);
 
@@ -66,9 +79,9 @@ namespace headsup
         // Ashita's.
         void SetFonts(ImFont* text, ImFont* title, float textScale);
         bool HasFonts() const { return m_TextFont != nullptr; }
-        // Opens the window at the page named, as its sidebar spells it in lower case without spaces ("topbar"), on
-        // its colors tab when colors; false for a name no page has.
-        bool OpenPage(const std::string& name, bool colors);
+        // Opens the window at the page named, as its sidebar spells it in lower case without spaces ("topbar");
+        // false for a name no page has.
+        bool OpenPage(const std::string& name);
         // Scrolls the page this far down when it is next drawn: to its top when the page changes, and where a
         // developer's command asks to see its lower cards.
         void ScrollTo(float pixels);
@@ -78,10 +91,9 @@ namespace headsup
         bool m_ConfirmReset   = false; // the reset button was pressed once and asks for a second press
         float m_ScrollTo      = 0.0f;  // where ScrollTo asked for
         int m_ScrollFrames    = 0;     // frames left to ask ImGui for it: a page just opened has no height yet
-        int m_ShownPage       = 0;     // the page and tab drawn last, to tell a change
-        int m_Page           = 0;
-        bool m_ColorsTab     = false; // that page's "color settings" tab instead of "settings"
-        uint64_t m_Collapsed = 0;     // one bit per collapsed section
+        int m_ShownPage       = 0;     // the page drawn last, to tell a change
+        Page m_Page           = Page::Entities;
+        std::unordered_set<std::string> m_Collapsed; // the ids of the collapsed cards: window state, never saved
         int m_Widget         = 0;     // the Widgets page's picked widget, by BarWidget
         // Windows takes up to a second to list its fonts, which froze the game when a page with a font dropdown first
         // showed: a thread lists them once the window first opens, and m_Fonts has the bundled ones until it is done.
@@ -92,6 +104,7 @@ namespace headsup
         bool m_FontsAsked  = false;
         KeyCapture m_KeyCapture;
         WindowList m_Windows;
+        DesignEditor m_Design;
         ImFont* m_TextFont  = nullptr;
         ImFont* m_TitleFont = nullptr;
         float m_TextScale   = 1.0f; // m_TextFont's size over Ashita's font size

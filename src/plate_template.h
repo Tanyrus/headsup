@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -34,6 +35,11 @@ namespace headsup
     std::vector<Tag> TagsFor(PlateKind kind);
     // The text with the tag's name put in at byte caret, clamped to the text's end; unchanged when it would pass kMaxTemplate.
     std::string InsertTag(std::string text, Tag tag, size_t caret);
+    // InsertTag at the caret, which then sits past the tag; false, with nothing changed, when the insert is refused.
+    bool PutTag(std::string& text, size_t& caret, Tag tag);
+    // What a card says when its settings show only through tags that no line of the design holds: which tags would
+    // show them. Empty when a line holds any of them.
+    std::string UnusedTagsNote(const KindSettings& kind, std::initializer_list<Tag> tags);
     // Whether any line of a design uses the tag.
     bool UsesTag(const KindSettings& kind, Tag tag);
 }

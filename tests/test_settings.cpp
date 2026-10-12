@@ -1153,6 +1153,70 @@ TEST(clamp_keeps_designer_values_in_range)
     CHECK_EQ(c.friends[0], "Fine");
 }
 
+TEST(clamp_puts_a_color_source_its_kind_does_not_offer_back_to_the_default)
+{
+    const Settings d;
+    Settings s;
+    const Color mine{{0.1f, 0.2f, 0.3f}};
+    KindSettings& players = s.Kind(PlateKind::Players);
+    players.rows[static_cast<int>(PlayerRow::Friend)].outlineColor = ColorPick{ColorSource::Aggression, mine};
+    players.lines[0].glowColor  = ColorPick{ColorSource::Toughness, mine};
+    players.lines[2].color      = ColorPick{ColorSource::Claim, mine};
+    players.ornament.color      = ColorPick{ColorSource::Game, mine}; // the game's color is a text line's alone
+    s.Kind(PlateKind::Pets).rows[0].outlineColor = ColorPick{ColorSource::Target, mine}; // offered: kept
+    KindSettings& mobs = s.Kind(PlateKind::Mobs);
+    mobs.rows[CategoryIndex(Category::WontAttack)].outlineColor = ColorPick{ColorSource::Aggression, mine};
+    mobs.rows[CategoryIndex(Category::Unknown)].outlineColor    = ColorPick{ColorSource::Game, mine};
+    mobs.rows[CategoryIndex(Category::OtherClaim)].outlineColor = ColorPick{ColorSource::Game, mine};
+    mobs.lines[0].glowColor = ColorPick{ColorSource::Toughness, mine};
+    mobs.lines[0].color     = ColorPick{ColorSource::Game, mine};
+    const Settings c = Clamp(s);
+    const KindSettings& p = c.Kind(PlateKind::Players);
+    CHECK((p.rows[static_cast<int>(PlayerRow::Friend)].outlineColor == ColorPick{ColorSource::Type, mine}));
+    CHECK((p.lines[0].glowColor == ColorPick{ColorSource::Type, mine}));
+    CHECK((p.lines[2].color == ColorPick{d.Kind(PlateKind::Players).lines[2].color.source, mine}));
+    CHECK(p.lines[2].color.source == ColorSource::Game);
+    CHECK((p.ornament.color == ColorPick{ColorSource::Type, mine}));
+    CHECK((c.Kind(PlateKind::Pets).rows[0].outlineColor == ColorPick{ColorSource::Target, mine}));
+    const KindSettings& m = c.Kind(PlateKind::Mobs);
+    CHECK((m.rows[CategoryIndex(Category::WontAttack)].outlineColor == ColorPick{ColorSource::Aggression, mine}));
+    CHECK((m.rows[CategoryIndex(Category::Unknown)].outlineColor == ColorPick{ColorSource::Aggression, mine}));
+    CHECK((m.rows[CategoryIndex(Category::OtherClaim)].outlineColor == ColorPick{ColorSource::Claim, mine}));
+    CHECK((m.lines[0].glowColor == ColorPick{ColorSource::Toughness, mine}));
+    CHECK((m.lines[0].color == ColorPick{ColorSource::Game, mine}));
+    CHECK(Clamp(d) == d);
+}
+
+TEST(a_file_that_saved_aggression_on_a_kind_without_one_loads_as_target_type)
+{
+    MapStore saved;
+    SaveSettings(Settings{}, saved);
+    for (const char* key : {"playersRowPlayerColorSource", "selfLine3GlowColorSource", "npcsOrnamentColorSource",
+             "petsRowPetColorSource"})
+    {
+        CHECK(saved.values.contains(key));
+        saved.values[key] = "aggression";
+    }
+    saved.values["mobsRowPassiveColorSource"] = "aggression";
+    const Settings s = LoadSettings(saved);
+    CHECK(s.Kind(PlateKind::Players).rows[static_cast<int>(PlayerRow::Player)].outlineColor.source == ColorSource::Type);
+    CHECK(s.Kind(PlateKind::Self).lines[2].glowColor.source == ColorSource::Type);
+    CHECK(s.Kind(PlateKind::Npcs).ornament.color.source == ColorSource::Type);
+    CHECK(s.Kind(PlateKind::Pets).rows[0].outlineColor.source == ColorSource::Type);
+    CHECK(s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WontAttack)].outlineColor.source == ColorSource::Aggression);
+    CHECK(s == Settings{});
+}
+
+TEST(clamp_keeps_each_character_name_among_the_friends_once)
+{
+    Settings s;
+    s.friends = {"Tanyrus", "Ab", "tanyrus", "Chad1", "Pollux", "Abcdefghijklmnop", "POLLUX", "Two Words", "", "Abc",
+        "Tom's"};
+    const Settings c = Clamp(s);
+    CHECK((c.friends == std::vector<std::string>{"Tanyrus", "Pollux", "Abc"})); // the first spelling of each stays
+    CHECK(Clamp(c).friends == c.friends);
+}
+
 TEST(an_old_file_migrates_field_by_field)
 {
     MapStore store;

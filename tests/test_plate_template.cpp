@@ -77,12 +77,52 @@ TEST(a_tag_is_put_in_at_the_caret_or_the_end)
     CHECK_EQ(InsertTag(std::string(kMaxTemplate - 5, 'x'), Tag::Name, 0).size(), kMaxTemplate);
 }
 
+TEST(a_tag_put_at_the_caret_moves_the_caret_past_it)
+{
+    std::string text = "Lv  EP";
+    size_t caret     = 3;
+    CHECK(PutTag(text, caret, Tag::Level));
+    CHECK_EQ(text, "Lv $level EP");
+    CHECK_EQ(caret, size_t{9});
+    CHECK(PutTag(text, caret, Tag::Con)); // the next chip clicked lands after the first
+    CHECK_EQ(text, "Lv $level$con EP");
+    CHECK_EQ(caret, size_t{13});
+    caret = 99; // a caret left past the end of a text that has since shortened
+    CHECK(PutTag(text, caret, Tag::Ph));
+    CHECK_EQ(text, "Lv $level$con EP$ph");
+    CHECK_EQ(caret, text.size());
+    std::string full(kMaxTemplate - 2, 'x');
+    caret = kMaxTemplate + 5; // a refused tag leaves even a caret past the end where it was
+    CHECK(!PutTag(full, caret, Tag::Name));
+    CHECK_EQ(full, std::string(kMaxTemplate - 2, 'x'));
+    CHECK_EQ(caret, kMaxTemplate + 5);
+}
+
 TEST(a_design_uses_a_tag_when_any_line_holds_it)
 {
     KindSettings kind;
     kind.lines[1].text = "Lv $level";
     CHECK(UsesTag(kind, Tag::Level));
     CHECK(!UsesTag(kind, Tag::Con));
+}
+
+TEST(a_card_of_tags_no_line_holds_says_which_tag_would_show_it)
+{
+    KindSettings kind;
+    kind.lines[0].text = "$detect";
+    kind.lines[2].text = "$name";
+    CHECK_EQ(UnusedTagsNote(kind, {Tag::Detect}), "");
+    CHECK_EQ(UnusedTagsNote(kind, {Tag::Status}), "Put $status on a line of the design to show these on a nameplate.");
+    CHECK_EQ(UnusedTagsNote(kind, {Tag::Weak, Tag::Resist}),
+        "Put $weak or $resist on a line of the design to show these on a nameplate.");
+    CHECK_EQ(UnusedTagsNote(kind, {Tag::Weak, Tag::Resist, Tag::Status, Tag::Immune}),
+        "Put $weak, $resist, $status or $immune on a line of the design to show these on a nameplate.");
+    kind.lines[1].text = "Lv $level $resist";
+    CHECK_EQ(UnusedTagsNote(kind, {Tag::Weak, Tag::Resist}), ""); // one of a card's tags is enough
+    CHECK_EQ(UnusedTagsNote(kind, {Tag::Weak, Tag::Resist, Tag::Status, Tag::Immune}), "");
+    CHECK_EQ(UnusedTagsNote(kind, {Tag::Weak}), "Put $weak on a line of the design to show these on a nameplate.");
+    kind.lines[1].text = "$$resist"; // a doubled mark is a dollar sign, not the tag
+    CHECK(!UnusedTagsNote(kind, {Tag::Resist}).empty());
 }
 
 TEST(the_default_templates_use_only_tags_the_catalog_knows)

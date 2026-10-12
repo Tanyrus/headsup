@@ -397,7 +397,7 @@ public:
         }
         else if (args[1] == "menu" && args.size() > 2)
         {
-            if (!m_Menu.OpenPage(args[2], args.size() > 3 && args[3] == "colors"))
+            if (!m_Menu.OpenPage(args[2]))
                 Print("/hu menu: no page is named " + args[2] + ".");
 #ifdef HEADSUP_DEV
             // A number last scrolls the page that many pixels down.
@@ -429,7 +429,7 @@ public:
             Print("/hu on | /hu off: turn all of HeadsUp (outlines, nameplates, the top bar and the rest) on or off");
             Print("/hu screenshot: hide every name, HeadsUp's bar and menu and every addon window until it is run again; bind it with /bind");
             Print("/hu debug: write what every outline and nameplate show to logs/headsup");
-            Print("/hu menu <page> [colors]: open the settings at a page, such as topbar or mobs");
+            Print("/hu menu <page>: open the settings at a page, such as topbar or mobs");
             Print("/hu popup <widget> | off: pin a widget's popup open, such as zone or vanatime");
             Print("/hu windowlog [stop]: write which game windows are open, as it changes, to logs/headsup/windows.log");
 #ifdef HEADSUP_DEV

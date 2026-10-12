@@ -9,16 +9,29 @@ namespace headsup
         const char* const kMobRowKeys[kCategoryCount]   = {"aggressive", "passive", "noData", "aggressiveNm", "passiveNm", "placeholder", "partyClaim", "othersClaim"};
         const char* const kMobRowLabels[kCategoryCount] = {"Aggressive", "Passive", "No Data", "Aggressive NM", "Passive NM", "NM Placeholder", "Party Claim", "Others' Claim"};
         const char* const kPlayerRowKeys[kPlayerRowCount]   = {"player", "partyMember", "friend", "linkshell"};
-        const char* const kPlayerRowLabels[kPlayerRowCount] = {"Players", "Party Members", "Friends", "Linkshell Co-members"};
+        const char* const kPlayerRowLabels[kPlayerRowCount] = {"Players", "Party Members", "Friends", "Linkshell Co-Members"};
         const char* const kOneRowKeys[kPlateKindCount]   = {"", "", "self", "npc", "pet"};
         const char* const kOneRowLabels[kPlateKindCount] = {"", "", "Self", "NPCs", "Pets"};
         const char* const kKindKeys[kPlateKindCount]     = {"mobs", "players", "self", "npcs", "pets"};
         const char* const kKindLabels[kPlateKindCount]   = {"Mobs", "Players", "Self", "NPCs", "Pets"};
         const char* const kConditionLabels[kShowConditionCount] = {"When Targeted", "Unclaimed", "Your Claim", "Others' Claim",
-            "Engaged in Combat", "Too Weak", "Aggressive", "Passive", "Party Member", "Friend", "Linkshell Co-member"};
+            "Engaged in Combat", "Too Weak", "Aggressive", "Passive", "Party Member", "Friend", "Linkshell Co-Member"};
         const char* const kSourceLabels[kColorSourceCount] = {"Custom", "Game's", "Aggression", "Toughness", "Claim", "Target Status", "Target Type"};
-        const char* const kDetectionLabels[kDetectionIconCount] = {"Aggressive or passive", "Links", "Sight", "True sight", "Sound",
-            "Scent", "Magic", "Job abilities", "Low HP"};
+        const char* const kDetectionLabels[kDetectionIconCount] = {"Aggressive or Passive", "Links", "Sight", "True Sight", "Sound",
+            "Scent", "Magic", "Job Abilities", "Low HP"};
+        const char* const kPlateModeLabels[kPlateModeCount]     = {"Hidden", "Shown", "When Targeted", "Expanding", "Vanilla"};
+        const char* const kOutlineModeLabels[kOutlineModeCount] = {"Disabled", "Shown", "When Targeted", "By Nature"};
+        const char* const kNatureLabels[kNatureCount] = {"Passive", "Aggressive", "Passive NM", "Aggressive NM", "NM Placeholder", "No Data"};
+        const char* const kToughnessLabels[kLabelShadeCount] = {"Unknown Level", "Too Weak", "Easy Prey", "Decent Challenge",
+            "Even Match", "Tough", "Very Tough"};
+        const char* const kClaimLabels[kClaimStateCount]        = {"Unclaimed", "Others' Claim", "Your Claim"};
+        const char* const kTargetStateLabels[kTargetStateCount] = {"Not Targeted", "Targeted", "Locked On", "Sub-Target", "Out of Range"};
+        const char* const kTargetStateTips[kTargetStateCount]   = {nullptr, nullptr, nullptr, "Picking for a spell, ability or trade.",
+            "A sub-target out of the spell or ability's range."};
+        const char* const kTargetTypeLabels[kTargetTypeCount]   = {"Mob", "NPC or Object", "Pet", "Player", "Friend", "Party Member",
+            "Linkshell Co-Member"};
+        const char* const kStatusRankLabels[kStatusRankCount]   = {"Paralyze", "Bind", "Silence", "Slow", "Poison", "Light Sleep",
+            "Dark Sleep", "Blind", "Stun", "Gravity"};
 
         LineDesign NameLine(const char* text)
         {
@@ -73,6 +86,17 @@ namespace headsup
         kinds[static_cast<int>(PlateKind::Self)].lines[2]    = player;
         kinds[static_cast<int>(PlateKind::Npcs)].lines[2]    = NameLine(kTagName);
         kinds[static_cast<int>(PlateKind::Pets)].lines[2]    = NameLine(kTagName);
+        // Only a mob has an aggression, and only the Mobs page offers that palette: the other kinds' picks start on
+        // one theirs do.
+        for (const PlateKind kind : {PlateKind::Players, PlateKind::Self, PlateKind::Npcs, PlateKind::Pets})
+        {
+            KindSettings& k = kinds[static_cast<int>(kind)];
+            for (RowSettings& row : k.rows)
+                row.outlineColor.source = ColorSource::Type;
+            for (LineDesign& line : k.lines)
+                line.glowColor.source = ColorSource::Type;
+            k.ornament.color.source = ColorSource::Type;
+        }
         return kinds;
     }
 
@@ -131,4 +155,29 @@ namespace headsup
 
     const char* SourceLabel(ColorSource s) { return kSourceLabels[static_cast<int>(s)]; }
     const char* DetectionLabel(DetectionIcon d) { return kDetectionLabels[static_cast<int>(d)]; }
+    const char* PlateModeLabel(PlateMode mode) { return kPlateModeLabels[static_cast<int>(mode)]; }
+    const char* OutlineModeLabel(OutlineMode mode) { return kOutlineModeLabels[static_cast<int>(mode)]; }
+    const char* NatureLabel(Nature nature) { return kNatureLabels[static_cast<int>(nature)]; }
+    const char* ToughnessLabel(LabelShade shade) { return kToughnessLabels[static_cast<int>(shade)]; }
+    const char* ClaimLabel(ClaimState claim) { return kClaimLabels[static_cast<int>(claim)]; }
+    const char* TargetStateLabel(TargetState target) { return kTargetStateLabels[static_cast<int>(target)]; }
+    const char* TargetTypeLabel(TargetType type) { return kTargetTypeLabels[static_cast<int>(type)]; }
+    const char* StatusRankLabel(StatusRank status) { return kStatusRankLabels[static_cast<int>(status)]; }
+    const char* TargetStateTip(TargetState target) { return kTargetStateTips[static_cast<int>(target)]; }
+
+    bool IsCharacterName(std::string_view name)
+    {
+        const auto letter = [](char c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'); };
+        return name.size() >= kMinCharacterName && name.size() <= kMaxCharacterName && std::ranges::all_of(name, letter);
+    }
+
+    const char* const kAlignLabels[kAlignCount]                 = {"Left", "Center", "Right"};
+    const char* const kOrnamentPlaceLabels[kOrnamentPlaceCount] = {"Lines 1-2", "Lines 2-3"};
+    const char* const kLineLabels[kPlateLines]                  = {"Line 1", "Line 2", "Line 3"};
+
+    int OutlineModesFor(PlateKind kind, int row)
+    {
+        static_assert(static_cast<int>(OutlineMode::ByNature) == kOutlineModeCount - 1);
+        return CanOutlineByNature(kind, row) ? kOutlineModeCount : kOutlineModeCount - 1;
+    }
 }

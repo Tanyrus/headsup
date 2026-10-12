@@ -36,7 +36,7 @@ namespace headsup
                 .highlight = 0xFF3A2525},
         };
         const char* const kNames[kBarThemeCount] = {
-            "Phoenix gold", "Umbra dark", "Phoenix red, ornate", "Phoenix red, pills"};
+            "Phoenix Gold", "Umbra Dark", "Phoenix Red, Ornate", "Phoenix Red, Pills"};
     }
 
     const BarPalette& PaletteOf(BarTheme theme)

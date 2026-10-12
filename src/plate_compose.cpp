@@ -312,7 +312,7 @@ namespace headsup
         if (!s.enabled || !s.nameplates) return plate;
         const KindSettings& kind = s.Kind(PlateKindOf(st));
         const PlateMode mode     = kind.rows[RowOf(st)].plate;
-        if (mode == PlateMode::Hidden || mode == PlateMode::Vanilla) return plate;
+        if (!DrawsPlate(mode)) return plate;
         if (mode == PlateMode::WhenTargeted && !Targeted(st.target)) return plate;
         const bool nameOnly = (mode == PlateMode::Expanding && !Targeted(st.target)) || (st.kind == EntityKind::Mob && !st.alive);
         std::optional<BadgeRules> badgeRules;
