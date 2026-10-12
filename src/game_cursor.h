@@ -33,6 +33,13 @@ namespace headsup
     {
         float ankX, ankY, subAnkX, subAnkY;
     };
+    struct MenuSize
+    {
+        float width, height;
+    };
+    // The game's menu resolution: the registry's, or the back buffer's where the registry holds 0, which makes the
+    // game use the window's size.
+    MenuSize MenuSizeOf(float registryWidth, float registryHeight, float backBufferWidth, float backBufferHeight);
     // In the back buffer's pixels; a size not known yet (0) leaves the targets unanchored.
     void PlaceAnchors(CursorTargets& targets, const CursorWindow& window, float menuWidth, float menuHeight,
         float backBufferWidth, float backBufferHeight);

@@ -58,6 +58,8 @@ namespace headsup
         float x, y;
     };
     CursorSpot CursorAtAnchor(float anchorX, float anchorY, float width, float height, float tip);
+    // A cursor box moved the least that keeps all of it inside a screen this size.
+    CursorSpot KeepOnScreen(CursorSpot spot, float width, float height, float screenWidth, float screenHeight);
 
     // 0 for a line that is not shown.
     struct LineSizes

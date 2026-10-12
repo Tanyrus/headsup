@@ -688,3 +688,21 @@ TEST(a_plates_size_follows_how_far_it_is_as_the_games_own_names_do)
     CHECK(Near(ScaleAtDistance(500.0f), 0.5f));                                    // at least 0.5x
     CHECK(Near(ScaleAtDistance(std::nanf("")), 1.0f));
 }
+
+TEST(a_cursor_is_kept_inside_the_screen)
+{
+    const CursorSpot inside = KeepOnScreen(CursorSpot{100.0f, 100.0f}, 20.0f, 32.0f, 2560.0f, 1440.0f);
+    CHECK_EQ(inside.x, 100.0f);
+    CHECK_EQ(inside.y, 100.0f);
+    const CursorSpot above = KeepOnScreen(CursorSpot{100.0f, -50.0f}, 20.0f, 32.0f, 2560.0f, 1440.0f);
+    CHECK_EQ(above.y, 0.0f);
+    const CursorSpot right = KeepOnScreen(CursorSpot{2555.0f, 100.0f}, 20.0f, 32.0f, 2560.0f, 1440.0f);
+    CHECK_EQ(right.x, 2540.0f);
+    const CursorSpot left = KeepOnScreen(CursorSpot{-5.0f, 100.0f}, 20.0f, 32.0f, 2560.0f, 1440.0f);
+    CHECK_EQ(left.x, 0.0f);
+    const CursorSpot huge = KeepOnScreen(CursorSpot{50.0f, 50.0f}, 3000.0f, 2000.0f, 2560.0f, 1440.0f);
+    CHECK_EQ(huge.x, 0.0f);
+    CHECK_EQ(huge.y, 0.0f);
+    const CursorSpot below = KeepOnScreen(CursorSpot{100.0f, 1430.0f}, 20.0f, 32.0f, 2560.0f, 1440.0f);
+    CHECK_EQ(below.y, 1408.0f);
+}

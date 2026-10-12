@@ -371,8 +371,10 @@ namespace headsup
                 {
                     // Over everything, as the game's own arrow is: at the name's depth, the target's own model, a
                     // door its name sits inside or anything the game has faded out near the camera would hide it.
-                    addSquare(cursorQuads, p.cursor, layout.cursor.x, layout.cursor.y + CursorBob(now, sizes.cursorHeight),
-                        cursorFit, 0.0f);
+                    const CursorSpot kept = KeepOnScreen(
+                        CursorSpot{layout.cursor.x, layout.cursor.y + CursorBob(now, sizes.cursorHeight)},
+                        sizes.cursorWidth, sizes.cursorHeight, screenWidth, screenHeight);
+                    addSquare(cursorQuads, p.cursor, kept.x, kept.y, cursorFit, 0.0f);
                     m_CursorNames.push_back(CursorName{info->index, gameName.box});
                 }
                 for (int i = 0; i < sizes.timerCount; ++i)
@@ -437,7 +439,9 @@ namespace headsup
                 const float fit     = FitOf(cursorShown, p.cursor.key.height);
                 const float height  = p.cursor.height * fit / toY;
                 const CursorSpot at = CursorAtAnchor(lone.x, lone.y, p.cursor.width * fit / toY, height, p.cursor.tip);
-                addSquare(cursorQuads, p.cursor, at.x, at.y + CursorBob(now, height), fit, 0.0f);
+                const CursorSpot kept = KeepOnScreen(CursorSpot{at.x, at.y + CursorBob(now, height)},
+                    p.cursor.width * fit / toY, height, screenWidth, screenHeight);
+                addSquare(cursorQuads, p.cursor, kept.x, kept.y, fit, 0.0f);
                 m_CursorNames.push_back(CursorName{lone.index, ScreenBox{}});
             }
         }

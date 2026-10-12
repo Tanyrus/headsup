@@ -1261,10 +1261,14 @@ private:
         m_CursorTargets.outOfRange      = picking && headsup::PickedOutOfRange(m_ArrowHook.PickedColor()).value_or(false);
         m_CursorTargets.gameArrowsShown = !m_ArrowHook.Running();
         if (const Ashita::FFXI::targetwindow_t* window = target->GetRawStructureWindow())
+        {
+            const headsup::MenuSize size = headsup::MenuSizeOf(
+                m_MenuWidth, m_MenuHeight, m_Names.BackBufferWidth(), m_Names.BackBufferHeight());
             headsup::PlaceAnchors(m_CursorTargets,
                 headsup::CursorWindow{static_cast<float>(window->m_AnkX), static_cast<float>(window->m_AnkY),
                     static_cast<float>(window->m_SubAnkX), static_cast<float>(window->m_SubAnkY)},
-                m_MenuWidth, m_MenuHeight, m_Names.BackBufferWidth(), m_Names.BackBufferHeight());
+                size.width, size.height, m_Names.BackBufferWidth(), m_Names.BackBufferHeight());
+        }
     }
 
     void UpdateParty(IParty* party, IPlayer* player)

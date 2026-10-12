@@ -96,6 +96,12 @@ namespace headsup
         return CursorSpot{anchorX - width * tip, anchorY - height};
     }
 
+    CursorSpot KeepOnScreen(CursorSpot spot, float width, float height, float screenWidth, float screenHeight)
+    {
+        return CursorSpot{std::clamp(spot.x, 0.0f, std::max(0.0f, screenWidth - width)),
+            std::clamp(spot.y, 0.0f, std::max(0.0f, screenHeight - height))};
+    }
+
     NameplateLayout LayoutNameplate(const ScreenBox& plate, const LineSizes& sizes, bool showName)
     {
         NameplateLayout l{};
