@@ -235,7 +235,7 @@ namespace headsup
     }
 
     void BarRenderer::Update(const BarState& state, const Settings& settings, float screenWidth, float screenHeight,
-        BarInput& input)
+        BarInput& input, bool hidden)
     {
         ++m_Frame;
         m_Quads.clear();
@@ -286,6 +286,11 @@ namespace headsup
         input.Frame(layout, widgets.hasPopup);
         m_PopupStart = m_Quads.size();
         input.SetPopup(AddPopup(look, state, layout, screenWidth, screenHeight, input));
+        if (hidden)
+        {
+            m_Quads.clear();
+            m_PopupStart = 0;
+        }
 
         for (Texture& t : m_Texts.TakeIdle(m_Frame, kIdleFrames))
             ReleaseTexture(t.texture);

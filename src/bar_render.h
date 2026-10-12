@@ -27,9 +27,10 @@ namespace headsup
     public:
         void SetDevice(IDirect3DDevice8* device) { m_Device = device; }
         // Lays out this frame's bar and open popup, makes their quads and tells input where everything is. While the
-        // bar is off or failed it releases everything it made, so call it every frame.
+        // bar is off or failed it releases everything it made, so call it every frame. hidden: laid out, so windows
+        // under it keep their places, but drawn and clicked as nothing.
         void Update(const BarState& state, const Settings& settings, float screenWidth, float screenHeight,
-            BarInput& input);
+            BarInput& input, bool hidden);
         // The bar on the back buffer, after the nameplates. Changes render states.
         void Draw();
         // The open popup, as an ImGui window in its tooltip layer: Ashita draws ImGui after every plugin has drawn, and

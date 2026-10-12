@@ -106,6 +106,7 @@ namespace
     IGuiManager* g_Gui              = nullptr;
     headsup::BarClicks* g_BarClicks = nullptr;
     bool g_BarOn                    = false;
+    bool g_BarHidden                = false;
     float g_BarScaleX               = 1.0f; // back-buffer pixels per client pixel
     float g_BarScaleY               = 1.0f;
     IResourceManager* g_Resources   = nullptr; // for the target popup's drops, from Initialize to Release
@@ -146,12 +147,12 @@ namespace
     {
         // An Ashita window takes the mouse. Asked only when read: the bar ignores it while off or for blocked messages.
         const bool overGui =
-            ((g_BarOn && !blocked) || g_SyncClicks) && g_Gui != nullptr && g_Gui->GetIO().WantCaptureMouse;
+            ((g_BarOn && !g_BarHidden && !blocked) || g_SyncClicks) && g_Gui != nullptr && g_Gui->GetIO().WantCaptureMouse;
         if (g_BarClicks != nullptr)
         {
             const float x = static_cast<float>(static_cast<int16_t>(LOWORD(lParam))) * g_BarScaleX;
             const float y = static_cast<float>(static_cast<int16_t>(HIWORD(lParam))) * g_BarScaleY;
-            if (g_BarClicks->Take(message, static_cast<uint32_t>(wParam), x, y, g_BarOn, overGui, blocked)) return TRUE;
+            if (g_BarClicks->Take(message, static_cast<uint32_t>(wParam), x, y, g_BarOn && !g_BarHidden, overGui, blocked)) return TRUE;
         }
         if (!g_SyncClicks) return FALSE;
         // The game takes a click where its pointer last was, which is somewhere else after the mouse moved over another
@@ -220,6 +221,11 @@ class HeadsUp final : public IPlugin
     std::unordered_set<uint16_t> m_BuffSynced; // you and your party, from the buffs the game keeps, this frame
     std::vector<uint32_t> m_PartyIds;           // server IDs of you, your party and alliance, this frame
     bool m_DebugPending = false;
+    bool m_Screenshot = false;
+    bool m_UiHidden = false;
+    float m_GuiAlpha = 1.0f;
+    int m_GuiFlags = 0;
+    bool m_FontsWereVisible = true, m_PrimitivesWereVisible = true;
     bool m_PlatesPlaced = false; // this frame, in the scene or at the back-buffer EndScene
 
 #ifdef HEADSUP_DEV
@@ -299,6 +305,7 @@ public:
     void Release(void) override
     {
         if (m_SettingsChangedAt) SaveSettings();
+        SetScreenshot(false);
         m_AshitaCore->GetInputManager()->GetMouse()->RemoveCallback(kName);
         g_SyncClicks = false;
         g_Gui        = nullptr;
@@ -352,6 +359,8 @@ public:
             SaveSettings();
             Print(std::string("HeadsUp ") + (m_Settings.enabled ? "on" : "off"));
         }
+        else if (args[1] == "screenshot")
+            SetScreenshot(!m_Screenshot);
         else if (args[1] == "debug")
             m_DebugPending = true;
         else if (args[1] == "popup" && args.size() > 2)
@@ -417,6 +426,7 @@ public:
         {
             Print("/headsup or /hu: open or close the settings window");
             Print("/hu on | /hu off: turn all of HeadsUp (outlines, nameplates, the top bar and the rest) on or off");
+            Print("/hu screenshot: hide every name, HeadsUp's bar and menu and every addon window until it is run again; bind it with /bind");
             Print("/hu debug: write what every outline and nameplate show to logs/headsup");
             Print("/hu menu <page> [colors]: open the settings at a page, such as topbar or mobs");
             Print("/hu popup <widget> | off: pin a widget's popup open, such as zone or vanatime");
@@ -507,7 +517,9 @@ public:
         const uint8_t loginStatus = m_AshitaCore->GetMemoryManager()->GetPlayer()->GetLoginStatus();
         // A popup left open at logout would come back with the next character.
         if (loginStatus != headsup::kLoginInGame) m_BarInput.Reset();
+        m_UiHidden = m_Screenshot;
         g_BarOn = headsup::BarRuns(m_Settings, loginStatus) && !m_Bar.Failed();
+        g_BarHidden = m_UiHidden;
         // Opening Region Info asks the server for the conquest standings; HeadsUp asks the same once per zone-in.
         const bool wantsConquest = m_Settings.barWidgets[static_cast<int>(headsup::BarWidget::Zone)] ||
                                    m_Settings.barWidgets[static_cast<int>(headsup::BarWidget::Conquest)];
@@ -545,7 +557,7 @@ public:
         }
         // Off, the bar is given nothing to show, and releases what it made.
         m_Bar.Update(g_BarOn ? BarStateNow(now) : headsup::BarState{}, m_Settings, m_Names.BackBufferWidth(),
-            m_Names.BackBufferHeight(), m_BarInput);
+            m_Names.BackBufferHeight(), m_BarInput, m_UiHidden);
         if (const std::string failure = m_Bar.TakeFailure(); !failure.empty())
             Print("the top bar is off until HeadsUp reloads: " + failure + ".");
         // Over ImGui from Present; through ImGui, under addons that draw over its windows, when Present is not hooked.
@@ -610,7 +622,7 @@ public:
             .seenWindows      = &m_SeenWindows,
         };
         if (m_Menu.open) ApplyMenuFont();
-        if (m_Menu.Draw(m_AshitaCore->GetGuiManager(), m_Settings, status)) m_SettingsChangedAt = now;
+        if (!m_Screenshot && m_Menu.Draw(m_AshitaCore->GetGuiManager(), m_Settings, status)) m_SettingsChangedAt = now;
         if (headsup::SaveDue(m_SettingsChangedAt, now, m_LastSaveMs)) SaveSettings();
         if (m_Menu.TakeDebugRequest()) m_DebugPending = true;
         UpdatePointer();
@@ -634,7 +646,7 @@ public:
             m_Names.UseScene(m_NameHook.SceneTarget(), m_NameHook.SceneDepth());
             plates = m_Names.NamesThisFrame();
         }
-        const bool bar = g_BarOn && !std::exchange(m_BarDrawn, true);
+        const bool bar = g_BarOn && !g_BarHidden && !std::exchange(m_BarDrawn, true);
         if (plates)
         {
             m_Names.FinishText();
@@ -815,6 +827,12 @@ private:
     // toX and toY: the bound render target's pixels per back-buffer pixel.
     void DrawNameplates(float toX, float toY, bool depthTest)
     {
+        if (m_Screenshot)
+        {
+            m_Nameplates.Clear();
+            m_PlatesPlaced = true;
+            return;
+        }
         m_Nameplates.Update(m_Tracker, m_Names, m_NameHook, m_Settings, toX, toY, m_CursorTargets, Now(), m_SelfIndex, m_TimerLines);
         m_Nameplates.Draw(depthTest);
         m_PlatesPlaced = true;
@@ -826,6 +844,12 @@ private:
     void DrawNameplatesBeforeSceneCopy()
     {
         if (!headsup::NameplatesOn(m_Settings)) return;
+        if (m_Screenshot)
+        {
+            m_Nameplates.Clear();
+            m_PlatesPlaced = true;
+            return;
+        }
         m_Names.UseScene(m_NameHook.SceneTarget(), m_NameHook.SceneDepth());
         if (!m_Names.SceneCopyStarting()) return;
         m_Names.FinishText();
@@ -837,6 +861,37 @@ private:
         if (!saved) PlatesNotDrawn();
     }
 
+    // Every name, HeadsUp's bar and menu, and every addon's ImGui, font and primitive drawing go, and come back when it
+    // is run again or HeadsUp unloads. Outlines and the game's own windows stay.
+    void SetScreenshot(bool on)
+    {
+        if (on == m_Screenshot) return;
+        m_Screenshot                  = on;
+        IGuiManager* gui              = m_AshitaCore->GetGuiManager();
+        IFontManager* fonts           = m_AshitaCore->GetFontManager();
+        IPrimitiveManager* primitives = m_AshitaCore->GetPrimitiveManager();
+        if (on)
+        {
+            m_GuiAlpha = gui->GetStyle().Alpha;
+            m_GuiFlags = gui->GetIO().ConfigFlags;
+            gui->GetStyle().Alpha = 0.0f;
+            gui->GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
+            m_FontsWereVisible      = fonts->GetVisible();
+            m_PrimitivesWereVisible = primitives->GetVisible();
+            fonts->SetVisible(false);
+            primitives->SetVisible(false);
+            Print("screenshot mode: names, the bar, the menu and every addon window are hidden; /hu screenshot brings them back.");
+        }
+        else
+        {
+            gui->GetStyle().Alpha    = m_GuiAlpha;
+            gui->GetIO().ConfigFlags = m_GuiFlags;
+            fonts->SetVisible(m_FontsWereVisible);
+            primitives->SetVisible(m_PrimitivesWereVisible);
+            Print("screenshot mode off.");
+        }
+    }
+
     // Whose names the hook may meet next frame. A name is HeadsUp's only while it can still draw it.
     std::vector<headsup::NameOwner> NameOwners() const
     {
@@ -844,7 +899,7 @@ private:
         const bool replacing = headsup::NameplatesOn(m_Settings) && !m_Nameplates.NamesFailed();
         for (const headsup::ActorPtr actor : m_Tracker.Actors())
             if (const headsup::ActorInfo* info = m_Tracker.Find(actor))
-                owners.push_back({actor, info->index, replacing && headsup::ReplacesName(m_Settings, *info)});
+                owners.push_back({actor, info->index, (replacing && headsup::ReplacesName(m_Settings, *info)) || m_Screenshot});
         return owners;
     }
 
@@ -1042,7 +1097,7 @@ private:
     // The open popup, over every ImGui window: in a scene of its own, with the bar's quad states.
     void DrawOverGui()
     {
-        if (!g_BarOn || m_Device == nullptr || FAILED(m_Device->BeginScene())) return;
+        if (!g_BarOn || g_BarHidden || m_Device == nullptr || FAILED(m_Device->BeginScene())) return;
         WithQuadStates([&] { m_Bar.DrawPopupQuads(); });
         m_Device->EndScene();
     }
