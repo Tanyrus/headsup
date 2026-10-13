@@ -125,6 +125,8 @@ namespace headsup
                 form.FontDropdown("Font", s.menuFont, menuFonts, "Titles stay in the bar's font.");
                 form.SliderInt("Size", s.menuScale, kMinMenuScale, kMaxMenuScale, "%d%%",
                     "Drag its corner to resize the window.");
+                form.SliderInt("Window Opacity", s.menuOpacity, kMinMenuOpacity, kMaxOpacity, "%d%%",
+                    "How much of the game shows through this window.");
                 form.EndCard();
             }
             Reset(form, s, state.confirmReset);
@@ -555,8 +557,8 @@ namespace headsup
 
         // entryTip, when given, says for an entry when it applies.
         template <typename Entry>
-        void PaletteCard(Form& form, const char* title, const char* tip, Color* colors, int count, const char* (*label)(Entry),
-            const char* (*entryTip)(Entry) = nullptr)
+        void PaletteCard(Form& form, const char* title, const char* tip, Color* colors, const Color* defaults, int count,
+            const char* (*label)(Entry), const char* (*entryTip)(Entry) = nullptr)
         {
             if (!form.BeginCard(title, nullptr, tip)) return;
             // Two columns, the first the longer.
@@ -567,7 +569,7 @@ namespace headsup
                 if (i == first) form.Raw("</div><div class=\"column second\">");
                 const auto entry = static_cast<Entry>(i);
                 form.Swatch((std::string(label(entry)) + "##" + title).c_str(), colors[i],
-                    entryTip != nullptr ? entryTip(entry) : nullptr);
+                    entryTip != nullptr ? entryTip(entry) : nullptr, &defaults[i]);
             }
             form.Raw("</div></div>");
             form.EndCard();
@@ -717,6 +719,7 @@ namespace headsup
             form.SliderInt(label("Glow Size").c_str(), line.glowSize, kMinGlowSize, kMaxGlowSize, "%d%%",
                 "How far the halo spreads.");
             form.ColorPickRow(label("Glow Color").c_str(), line.glowColor, sources, "The halo's color.");
+            form.Switch(label("Disable Glow In Combat").c_str(), line.glowOffInCombat, kGlowOffTips[static_cast<int>(kind)]);
             form.EndCard();
         }
 
@@ -742,6 +745,31 @@ namespace headsup
             form.EndCard();
         }
 
+        void Opacity(Form& form, Settings& s, PlateKind kind)
+        {
+            OpacitySettings& o = s.Kind(kind).opacity;
+            const bool off     = !s.enabled || !s.nameplates;
+            form.Fade(off);
+            if (!form.BeginCard("Nameplate Opacity", nullptr, "Changes the opacity of the nameplate depending on what you are targeting."))
+                return;
+            form.SliderInt("No Target", o.noTarget, kMinOpacity, kMaxOpacity, "%d%%",
+                "If you have no target, use this opacity for all nameplates.");
+            form.SliderInt("Not Targeted", o.notTargeted, kMinOpacity, kMaxOpacity, "%d%%",
+                "If you have a target, but this is not your target, use this opacity for the nameplate.");
+            form.SliderInt("Is Targeted", o.targeted, kMinOpacity, kMaxOpacity, "%d%%",
+                "If this is your target, use this opacity for the nameplate.");
+            // Your own nameplate is never far from you.
+            if (kind != PlateKind::Self)
+            {
+                form.Switch("Fade In", o.fadeIn,
+                    "Nameplates grow fainter with distance: at the opacity above within 10 yalms, almost gone at the range.");
+                form.Fade(off || !o.fadeIn);
+                form.SliderFloat("Range", o.range, kMinOutlineDistance, kMaxOutlineDistance, "%.0f yalms",
+                    "Where a nameplate that fades in is almost gone.");
+            }
+            form.EndCard();
+        }
+
         void MobCards(Form& form, Settings& s, const std::vector<std::string>& fonts)
         {
             const bool off = !s.enabled || !s.nameplates;
@@ -752,14 +780,6 @@ namespace headsup
                 return note.empty();
             };
             form.Fade(off);
-            if (form.BeginCard("Fading"))
-            {
-                form.SliderInt("Others' Opacity", s.untargetedOpacity, kMinOpacity, kMaxOpacity, "%d%%",
-                    "Other mobs' and pets' names and lines while you have a target, so your target's stand out.");
-                form.Switch("Glow Off While Fighting", s.glowOffWhenFighting,
-                    "No glow on a mob's lines once you or your party has claimed it.");
-                form.EndCard();
-            }
             if (form.BeginCard("Detection Icons", nullptr,
                     "Which icons the Detection tag shows: aggression, linking and how it senses you, in MobDB's icons."))
             {
@@ -787,13 +807,14 @@ namespace headsup
                     "widget's popup takes its ranks and colors from here too."))
             {
                 shown({Tag::Weak, Tag::Resist, Tag::Status, Tag::Immune});
-                form.FontDropdown("Badge Font", s.badgeFontName, fonts);
+                form.FontDropdown("Badge Font", s.badgeFontName, fonts, nullptr, kDefaultFontChoice);
                 form.Switch("Use Rank System", s.showRanks,
                     "Phoenix's ranks, -3 to 11, instead of percents. -3 is +50% and 4 is -50%.");
-                form.Swatch("Weak Color", s.weakBadgeColor, nullptr);
-                form.Swatch("Resist Color", s.resistBadgeColor, nullptr);
-                form.Swatch("Status Resist Color", s.rankBadgeColor, nullptr);
-                form.Swatch("Immune Color", s.immuneBadgeColor, nullptr);
+                static const Settings kDefaults;
+                form.Swatch("Weak Color", s.weakBadgeColor, nullptr, &kDefaults.weakBadgeColor);
+                form.Swatch("Resist Color", s.resistBadgeColor, nullptr, &kDefaults.resistBadgeColor);
+                form.Swatch("Status Resist Color", s.rankBadgeColor, nullptr, &kDefaults.rankBadgeColor);
+                form.Swatch("Immune Color", s.immuneBadgeColor, nullptr, &kDefaults.immuneBadgeColor);
                 form.EndCard();
             }
             const auto cutoff    = [&s](int rank) { return CutoffText(rank, s.showRanks); };
@@ -904,6 +925,11 @@ namespace headsup
                 form.FontDropdown("Default Font", s.defaultFont, fonts, "The font of every line whose own font is Default.");
                 form.SliderInt("Base Icon Size", s.baseIconSize, kMinTextSize, kMaxTextSize, "%d px",
                     "Every line's icon size is a percent of this.");
+                int dash = static_cast<int>(s.dashMark);
+                form.MarkupDropdown("Replace Dashes (-)", dash, {"No", kDotMark, kSquareMark, kDiamondMark},
+                    "What a dash typed in a nameplate design, or between the two ends of a level or a difficulty, is drawn as.",
+                    [](int mark) { return std::string(kDashMarkTips[mark]); });
+                s.dashMark = static_cast<DashMark>(dash);
                 form.Switch("Scale with Distance", s.scaleWithDistance, "Sizes follow how far a name's owner is from you.");
                 form.Fade(!s.enabled || !s.nameplates || !s.scaleWithDistance);
                 form.Indent(true);
@@ -978,14 +1004,16 @@ namespace headsup
                 form.EndCard();
             }
             form.Fade(!s.enabled);
-            PaletteCard(form, "Colors: Aggression", kAggressionColorsTip, s.palette.aggression, kNatureCount, NatureLabel);
+            static const Palette kPalette = DefaultPalette();
+            PaletteCard(form, "Colors: Aggression", kAggressionColorsTip, s.palette.aggression, kPalette.aggression, kNatureCount,
+                NatureLabel);
             PaletteCard(form, "Colors: Toughness",
                 (std::string(kToughnessColorsTip) + " Easy Prey covers Incredibly Easy Prey, and Very Tough covers Incredibly Tough.").c_str(),
-                s.palette.toughness, kLabelShadeCount, ToughnessLabel);
-            PaletteCard(form, "Colors: Claim Status", kClaimColorsTip, s.palette.claim, kClaimStateCount, ClaimLabel);
+                s.palette.toughness, kPalette.toughness, kLabelShadeCount, ToughnessLabel);
+            PaletteCard(form, "Colors: Claim Status", kClaimColorsTip, s.palette.claim, kPalette.claim, kClaimStateCount, ClaimLabel);
             PaletteCard(form, "Colors: Targeting", (std::string(kTargetingColorsTip) + " The target cursor takes these too.").c_str(),
-                s.palette.target, kTargetStateCount, TargetStateLabel, TargetStateTip);
-            PaletteCard(form, "Colors: Entity Type", kEntityTypeColorsTip, s.palette.type, kTargetTypeCount, TargetTypeLabel);
+                s.palette.target, kPalette.target, kTargetStateCount, TargetStateLabel, TargetStateTip);
+            PaletteCard(form, "Colors: Entity Type", kEntityTypeColorsTip, s.palette.type, kPalette.type, kTargetTypeCount, TargetTypeLabel);
             form.Fade(false);
         }
 
@@ -1014,6 +1042,7 @@ namespace headsup
                 NameplateDesign(form, s, kind, editor);
                 LineStyles(form, s, kind, fonts, editor);
                 Ornament(form, s, kind);
+                Opacity(form, s, kind);
             }
             switch (kind)
             {

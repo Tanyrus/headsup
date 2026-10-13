@@ -1,5 +1,6 @@
 #include "menu_document.h"
 
+#include "bar_document.h"
 #include "markup.h"
 #include "menu_sizes.h"
 
@@ -87,8 +88,10 @@ namespace headsup
                ";background-color:" + color(c.background) + ";border:1px " + color(c.border) + ";border-radius:" +
                Em(kCardRadius * 1.5f) + ";color:" + color(c.text) + ";font-family:\"" + look.textFont + "\";z-index:5;}";
         // The window comes in a little small and grows to its size.
-        css += "body.open{animation:0.22s cubic-out window-in;}";
-        css += "@keyframes window-in{from{opacity:0;transform:scale(0.97);}to{opacity:1;transform:scale(1);}}";
+        // Its fade has no end of its own: it ends at the opacity the window is set to.
+        css += "body.open{animation:0.22s cubic-out window-in, 0.22s cubic-out window-fade;}";
+        css += "@keyframes window-in{from{transform:scale(0.97);}to{transform:scale(1);}}";
+        css += "@keyframes window-fade{from{opacity:0;}}";
         css += "div{display:block;}handle{display:block;}";
         css += ".hidden{display:none;}";
         // The frame: the title bar moves the window, the corner resizes it.
@@ -257,6 +260,14 @@ namespace headsup
         css += ".swatch{box-sizing:border-box;width:" + frame + ";height:" + frame + ";border-radius:" + radius +
                ";border:1px " + color(c.raisedEdge) + ";}";
         css += ".swatch.none{border-color:transparent;}";
+        // The marks a dash can be drawn as, in the Replace Dashes list.
+        css += ".dash{display:inline-block;width:0.6em;height:0.6em;background-color:" + color(c.text) + ";}";
+        css += ".dash.dot{border-radius:0.3em;}";
+        css += ".dash.diamond{width:0.5em;height:0.5em;transform:rotate(45deg);}";
+        // The arrow that puts a color back to its default.
+        css += ".reset{width:" + frame + ";height:" + frame + ";decorator:image(\"" + ResetSource(c.muted, kResetArrowPixels) +
+               "\" contain);}";
+        css += ".reset:hover{decorator:image(\"" + ResetSource(c.accent, kResetArrowPixels) + "\" contain);}";
         css += ".picker{padding:0.4em;}";
         css += ".pick-row{position:relative;display:flex;flex-direction:row;align-items:center;margin-bottom:0.3em;}";
         css += ".pick-name{width:1.2em;color:" + color(c.label) + ";}";

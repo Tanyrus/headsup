@@ -454,3 +454,118 @@ TEST(a_lines_ink_runs_from_its_glyphs_top_to_their_bottom_with_the_h_on_its_base
     CHECK(!LineInkOf(InkBox{}, capital).has_value()); // GDI drew nothing: no ink to keep
     CHECK(!LineInkOf(glyphs, InkBox{}).has_value());
 }
+
+namespace
+{
+    // Whether a point is in a circular arrow in a square of this size, from its middle with x right and y up: a
+    // ring 0.11 of the size thick at 0.32 of it from the middle, but for the eighth counterclockwise of straight
+    // up, and at the ring's top a head pointing left into that gap, 0.26 long and 0.34 tall at its base.
+    bool InsideResetArrow(float x, float y, float size)
+    {
+        const float pi = 3.14159265f, radius = 0.32f * size, length = 0.26f * size;
+        float turn = std::atan2(-x, y); // counterclockwise from straight up
+        if (turn < 0.0f) turn += 2.0f * pi;
+        const bool ring = std::fabs(std::hypot(x, y) - radius) <= 0.055f * size && turn >= pi / 4.0f;
+        const bool head = x <= 0.0f && x >= -length && std::fabs(y - radius) <= 0.17f * size * (x + length) / length;
+        return ring || head;
+    }
+}
+
+TEST(the_reset_arrow_turns_counterclockwise_to_a_head_at_its_top)
+{
+    constexpr int kGrid = 16; // points across a pixel
+    for (const int size : {16, 32, 45})
+    {
+        const Image arrow = ResetArrow(size, 0xFFFFFFFFu);
+        CHECK(arrow.width == size && arrow.height == size);
+        const float half = static_cast<float>(size) / 2.0f;
+        float worst      = 0.0f;
+        for (int y = 0; y < size; ++y)
+            for (int x = 0; x < size; ++x)
+            {
+                int in = 0;
+                for (int sy = 0; sy < kGrid; ++sy)
+                    for (int sx = 0; sx < kGrid; ++sx)
+                        in += InsideResetArrow(static_cast<float>(x) + (static_cast<float>(sx) + 0.5f) / kGrid - half,
+                            half - static_cast<float>(y) - (static_cast<float>(sy) + 0.5f) / kGrid, static_cast<float>(size));
+                worst = std::max(worst, std::fabs(static_cast<float>(Alpha(arrow, x, y)) / 255.0f -
+                                                  static_cast<float>(in) / (kGrid * kGrid)));
+            }
+        CHECK(worst < 0.15f);
+        // Its ring passes the right, the bottom and the left, and its middle and corners are clear.
+        const int reach = static_cast<int>(0.32f * static_cast<float>(size));
+        CHECK(Alpha(arrow, size / 2 + reach, size / 2) > 128);
+        CHECK(Alpha(arrow, size / 2, size / 2 + reach) > 128);
+        CHECK(Alpha(arrow, size / 2 - reach - 1, size / 2) > 128);
+        CHECK(Alpha(arrow, size / 2, size / 2) == 0 && Alpha(arrow, 0, 0) == 0 && Alpha(arrow, size - 1, size - 1) == 0);
+    }
+}
+
+namespace
+{
+    int RowInk(const Coverage& c, int y)
+    {
+        int ink = 0;
+        for (int x = 0; x < c.width; ++x)
+            ink += At(c, x, y) > 127 ? 1 : 0;
+        return ink;
+    }
+}
+
+TEST(a_mark_is_a_small_shape_in_a_line_as_tall_as_its_text)
+{
+    // For text 40 pixels tall inside a margin of 3: as tall as the text's own image, and a little over its middle.
+    for (const DashMark mark : {DashMark::Dot, DashMark::Square, DashMark::Diamond})
+    {
+        const Coverage c = MarkCoverage(mark, 40, 3);
+        CHECK_EQ(c.height, 46);
+        CHECK(c.width > 6 + 8 && c.width < 6 + 30); // narrower than it is tall, with room either side
+        int first = c.height, last = -1, widest = 0;
+        for (int y = 0; y < c.height; ++y)
+        {
+            if (RowInk(c, y) == 0) continue;
+            first  = std::min(first, y);
+            last   = y;
+            widest = std::max(widest, RowInk(c, y));
+        }
+        CHECK(first > 3 + 8 && last < 3 + 36);            // clear of the letters' tops and of their feet
+        CHECK(last - first + 1 >= 8 && last - first + 1 <= 18);
+        const int middle = (first + last) / 2;
+        CHECK(middle >= 3 + 20 && middle <= 3 + 27);      // where a dash sits, a little under the line's middle
+        for (int y = 0; y < c.height; ++y)                 // the same either side of its middle
+            for (int x = 0; x < c.width / 2; ++x)
+                CHECK(std::abs(At(c, x, y) - At(c, c.width - 1 - x, y)) <= 2);
+        // A square is as wide in every row; a diamond and a dot are widest in their middle and narrow to their ends.
+        if (mark == DashMark::Square)
+            CHECK(RowInk(c, first + 1) == widest && RowInk(c, last - 1) == widest);
+        else
+            CHECK(RowInk(c, middle) == widest && RowInk(c, first) < widest && RowInk(c, last) < widest);
+        // A diamond comes to a point; a dot is still wide a quarter of its way down.
+        const int quarter = first + (last - first) / 4;
+        if (mark == DashMark::Diamond) CHECK(RowInk(c, quarter) * 10 <= widest * 7);
+        if (mark == DashMark::Dot) CHECK(RowInk(c, quarter) * 10 >= widest * 8);
+    }
+}
+
+TEST(pieces_are_joined_side_by_side_into_one_line_with_one_margin_around_it)
+{
+    // Two pieces with a margin of 1 around a 2 by 2 and a 3 by 2 block.
+    Coverage a{4, 4, std::vector<uint8_t>(16, 0)}, b{5, 4, std::vector<uint8_t>(20, 0)};
+    for (int y = 1; y < 3; ++y)
+    {
+        for (int x = 1; x < 3; ++x)
+            a.alpha[static_cast<size_t>(y * 4 + x)] = 200;
+        for (int x = 1; x < 4; ++x)
+            b.alpha[static_cast<size_t>(y * 5 + x)] = 100;
+    }
+    const Coverage joined = Joined({a, b}, 1);
+    CHECK(joined.width == 2 + 3 + 2 && joined.height == 4);
+    for (int x = 0; x < joined.width; ++x)
+    {
+        CHECK_EQ(At(joined, x, 0), 0);
+        CHECK_EQ(At(joined, x, 1), x == 0 || x == 6 ? 0 : x < 3 ? 200 : 100);
+    }
+    // One piece is itself, and none is an empty line.
+    CHECK(Joined({a}, 1).alpha == a.alpha);
+    CHECK(Joined({}, 1).width == 2 && Joined({}, 1).alpha.empty() == false);
+}

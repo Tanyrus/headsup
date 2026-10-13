@@ -72,6 +72,7 @@ namespace headsup
         // Puts the window where the settings have it, or in the screen's middle; then keeps the settings to where the
         // player moves and sizes it. True when they changed.
         bool Place(const MenuHost& host, Settings& settings, float pixels);
+        void ApplyOpacity();
         void ApplyBlocks(const std::vector<FormBlock>& blocks);
         void ApplyValues(const std::vector<FormValue>& values);
         void ApplyPopup(const std::optional<FormPopup>& popup);
@@ -83,6 +84,7 @@ namespace headsup
         Rml::ElementDocument* m_Document = nullptr;
         MenuLook m_Look;              // what the document was built with
         float m_FontPixels = 0.0f;
+        int m_Opacity      = 0; // the percent the document was last given; 0 for none yet
         bool m_Visible     = false;
         bool m_Placed      = false;   // it has its first place
         std::optional<std::array<int, 4>> m_OpenedAt; // where it was first laid out: left, top, width, height

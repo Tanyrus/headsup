@@ -356,7 +356,6 @@ helpBarY=8.0000
         s.phTimers          = true;
         s.scaleWithDistance = false;
         s.scaleOwnName      = false;
-        s.glowOffWhenFighting = false;
         s.scaleCursor       = true; // apart from the names': a dropped key would take theirs
         s.cursorStyle = CursorStyle::Vanilla; // the cursor was switched off
         s.chocoboPointer = true;
@@ -396,7 +395,6 @@ helpBarY=8.0000
         s.barTitleFont = "Cinzel";
         s.barSubtitle = SubtitlePlace::Before;
         s.cursorOutlineThickness = 120; // 60 of before
-        s.untargetedOpacity = 40;
         s.clockSeconds  = true;
         s.barLatency = true;
         s.barHeight    = 48;
@@ -424,7 +422,7 @@ helpBarY=8.0000
 
     // The keys of kSavedFile that only an older build's file carries: a migration reads them, or nothing does, and
     // nothing writes them.
-    const char* const kOldKeys[] = {"thickness", "cursorSize", "cursorOutline", "replaceCursor", "cursorFeather", "barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
+    const char* const kOldKeys[] = {"untargetedOpacity", "glowOffWhenFighting", "thickness", "cursorSize", "cursorOutline", "replaceCursor", "cursorFeather", "barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
         "serverClockZone", "showLabels", "replaceMobNames", "showIcons", "hideInCombat", "hideClaimed", "hideTooWeak",
         "hideWhileEngaged", "markPlaceholders", "fontBold", "nameGlow", "scalePlayerNames",
         "labelFontBold", "showOrnament", "ownGlowColor", "ownOrnamentColor", "labelFontName", "glowSize",
@@ -591,6 +589,8 @@ TEST(clamp_bounds_every_field)
     between.smoothness     = 9;
     between.maxDistance    = 5.0f;
     between.outlineOpacity = 0;
+    between.menuOpacity    = 5; // a window too faint to find again could not be set back
+    CHECK_EQ(Clamp(between).menuOpacity, kMinMenuOpacity);
     CHECK_EQ(Clamp(between).smoothness, 8);
     CHECK_EQ(Clamp(between).maxDistance, 15.0f);
     CHECK_EQ(Clamp(between).outlineOpacity, kMinOpacity);
@@ -602,7 +602,7 @@ TEST(clamp_bounds_every_field)
     CHECK(c.elementWeakRank == -1 && c.elementResistRank == 1 && c.maxElements == kElementCount);
     CHECK(c.statusBadges[2] == (StatusBadgeRule{true, -1, kNoResistRank}));
     CHECK(c.statusBadges[7] == (StatusBadgeRule{true, kNoWeakRank, 1}));
-    CHECK(c.badgeFontName == kBadgeFont);
+    CHECK(c.badgeFontName.empty()); // no font of its own: the default font
     CHECK_EQ(c.barHeight, kMaxBarHeight);
     CHECK(c.barTheme == BarTheme::PhoenixGold && c.barCurrency == kGilCurrency);
 }
@@ -788,11 +788,12 @@ TEST(the_screenshot_key_is_one_real_key_or_none)
 TEST(a_file_from_before_the_badge_group_takes_its_defaults)
 {
     MapStore old;
-    old.values = {{"showIcons", "true"}};
+    old.values = {{"enabled", "true"}, {"showIcons", "true"}};
     const Settings s = LoadSettings(old);
     CHECK_EQ(s.Kind(PlateKind::Mobs).lines[0].text, "$detect"); // no badges: the top bar's popup shows them
     CHECK(s.elementWeakRank == -1 && s.elementResistRank == 4 && s.maxElements == kElementCount && !s.showRanks);
-    CHECK(s.badgeFontName == kBadgeFont);
+    CHECK(s.badgeFontName == kBadgeFont); // the font badges had, where a new install's are in the default font
+    CHECK_EQ(s.detectionShown, kAllDetection); // and every icon, the aggression one too, which a new install hides
     for (const StatusBadgeRule& status : s.statusBadges)
         CHECK(status == (StatusBadgeRule{true, kNoWeakRank, 4}));
     CHECK(s.weakBadgeColor == Settings{}.weakBadgeColor && s.immuneBadgeColor == Settings{}.immuneBadgeColor);
@@ -1053,7 +1054,8 @@ TEST(the_default_designs_reproduce_todays_look)
     CHECK_EQ(d.baseSize, 15);
     CHECK_EQ(d.scaleMin, 50);
     CHECK_EQ(d.scaleMax, 250);
-    CHECK_EQ(d.detectionShown, kAllDetection);
+    // Every detection icon but the aggression one, which the outline's color already says.
+    CHECK_EQ(d.detectionShown, kAllDetection & ~DetectionBit(DetectionIcon::Aggro));
 }
 
 TEST(the_palettes_keep_todays_colors)
@@ -1117,7 +1119,10 @@ TEST(every_designer_key_round_trips)
     line.glow          = 120;
     line.glowSize      = 70;
     line.glowColor     = ColorPick{ColorSource::Type};
+    line.glowOffInCombat = false;
     mobs.ornament      = OrnamentSettings{OrnamentPlace::Top, 120, 9, ColorPick{ColorSource::Target}};
+    mobs.opacity       = OpacitySettings{70, 35, 95, true, 22.0f};
+    s.Kind(PlateKind::Self).opacity.noTarget = 55;
     s.Kind(PlateKind::Pets).lines[0].text = "$owner's $name";
     s.palette.claim[static_cast<int>(ClaimState::Yours)] = {{0.7f, 0.8f, 0.9f}};
     s.nameplates = false;
@@ -1133,6 +1138,7 @@ TEST(every_designer_key_round_trips)
     s.cursorColor     = ColorPick{ColorSource::Custom, {{0.9f, 0.8f, 0.1f}}};
     s.cursorStyle     = CursorStyle::File;
     s.cursorFile      = "My Cursor";
+    s.dashMark        = DashMark::Square;
     MapStore store;
     SaveSettings(s, store);
     CHECK(LoadSettings(store) == s);
@@ -1954,6 +1960,49 @@ TEST(a_cursors_edge_color_of_before_is_its_custom_color_and_its_own_color_follow
     CHECK((Settings{}.cursorEdgeColor == ColorPick{ColorSource::Custom, {{0.0f, 0.0f, 0.0f}}}));
 }
 
+TEST(the_one_opacity_and_glow_switch_of_before_go_to_the_mobs_and_pets_they_were_for)
+{
+    // Other mobs' plates had one opacity while you had a target, pets among them, and one switch took the glow
+    // off every line of a mob your party had claimed.
+    MapStore file = Version3File(Settings{}, {{"untargetedOpacity", "40.0000"}, {"glowOffWhenFighting", "false"}},
+        {"mobsOpacityNotTargeted", "petsOpacityNotTargeted", "mobsLine1GlowOffInCombat", "mobsLine2GlowOffInCombat",
+            "mobsLine3GlowOffInCombat"});
+    file.addsDefaults = true;
+    const Settings loaded = LoadSettings(file);
+    CHECK_EQ(loaded.Kind(PlateKind::Mobs).opacity.notTargeted, 40);
+    CHECK_EQ(loaded.Kind(PlateKind::Pets).opacity.notTargeted, 40);
+    CHECK_EQ(loaded.Kind(PlateKind::Players).opacity.notTargeted, 100);
+    CHECK_EQ(loaded.Kind(PlateKind::Mobs).opacity.targeted, 100);
+    for (const LineDesign& line : loaded.Kind(PlateKind::Mobs).lines)
+        CHECK(!line.glowOffInCombat);
+    // A new install's mob lines lose their glow in combat, and no other kind's do.
+    const Settings fresh;
+    for (int k = 0; k < kPlateKindCount; ++k)
+        for (const LineDesign& line : fresh.kinds[k].lines)
+            CHECK_EQ(line.glowOffInCombat, static_cast<PlateKind>(k) == PlateKind::Mobs);
+    // Keys of their own stand, and the two of before are never written again.
+    Settings own;
+    own.Kind(PlateKind::Mobs).opacity.notTargeted     = 75;
+    own.Kind(PlateKind::Mobs).lines[0].glowOffInCombat = false;
+    MapStore saved = Version3File(own, {{"untargetedOpacity", "40.0000"}, {"glowOffWhenFighting", "true"}}, {});
+    CHECK(LoadSettings(saved) == own);
+    SaveSettings(own, saved);
+    CHECK(std::ranges::find(saved.sets, "untargetedOpacity") == saved.sets.end());
+    CHECK(std::ranges::find(saved.sets, "glowOffWhenFighting") == saved.sets.end());
+}
+
+TEST(a_kinds_opacity_is_bounded_and_your_own_nameplate_never_fades_with_distance)
+{
+    Settings s;
+    s.Kind(PlateKind::Npcs).opacity = OpacitySettings{0, 500, -3, true, 900.0f};
+    s.Kind(PlateKind::Self).opacity.fadeIn = true;
+    const Settings c = Clamp(s);
+    CHECK((c.Kind(PlateKind::Npcs).opacity == OpacitySettings{kMinOpacity, kMaxOpacity, kMinOpacity, true, kMaxOutlineDistance}));
+    CHECK(!c.Kind(PlateKind::Self).opacity.fadeIn);
+    s.Kind(PlateKind::Npcs).opacity.range = 1.0f;
+    CHECK_EQ(Clamp(s).Kind(PlateKind::Npcs).opacity.range, kMinOutlineDistance);
+}
+
 TEST(the_cursors_two_switches_of_before_become_its_style)
 {
     // The cursor was on or off, and a feather or an arrow.
@@ -1992,10 +2041,17 @@ TEST(a_cursor_file_is_a_name_and_never_a_path)
     named.cursorStyle = CursorStyle::File;
     named.cursorFile  = "My Cursor 2";
     CHECK(Clamp(named) == named);
-    // A style no build knows is the default.
+    // A style no build knows is the default, and so is a dash mark.
     Settings wild;
     wild.cursorStyle = static_cast<CursorStyle>(9);
+    wild.dashMark    = static_cast<DashMark>(9);
     CHECK(Clamp(wild).cursorStyle == CursorStyle::Feather);
+    CHECK(Clamp(wild).dashMark == DashMark::Diamond);
+    // A file from before dashes had marks draws them as diamonds, as a new install does.
+    MapStore file = Version3File(Settings{}, {}, {"dashMark"});
+    CHECK(LoadSettings(file).dashMark == DashMark::Diamond);
+    file.values["dashMark"] = "no";
+    CHECK(LoadSettings(file).dashMark == DashMark::None);
 }
 
 TEST(a_cursor_saved_as_one_size_keeps_its_shape_and_its_edge)

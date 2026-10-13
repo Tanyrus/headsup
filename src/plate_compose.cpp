@@ -85,6 +85,10 @@ namespace headsup
             return draw;
         }
 
+        // The tags whose text joins two ends with a dash, which is drawn as a design's own dashes are. A name's dash
+        // is part of the name.
+        bool DashesAreMarks(Tag tag) { return tag == Tag::Level || tag == Tag::Con; }
+
         bool IsMob(const ActorInfo& info) { return info.state.kind == EntityKind::Mob; }
         bool IsPlayer(const ActorInfo& info) { return info.state.kind == EntityKind::Player; }
 
@@ -306,8 +310,12 @@ namespace headsup
         // An NPC has no life to lose, whatever its health reads.
         const bool dead     = !st.alive && st.kind != EntityKind::Npc;
         const bool deadMob  = dead && st.kind == EntityKind::Mob;
-        const bool fought   = s.glowOffWhenFighting && st.kind == EntityKind::Mob && st.claim == ClaimState::Yours;
+        const bool fought   = InCombat(st);
         const bool nameOnly = deadMob || player.inEvent;
+        const auto marked   = [dash = DashChar(s.dashMark)](std::string text) {
+            std::ranges::replace(text, kDash, dash);
+            return text;
+        };
         std::optional<BadgeRules> badgeRules;
         plate.lines.reserve(kPlateLines);
         for (int i = 0; i < kPlateLines; ++i)
@@ -319,16 +327,19 @@ namespace headsup
             {
                 if (nameOnly && !(atom.isTag && atom.tag == Tag::Name)) continue;
                 if (!atom.isTag)
-                    builder.Literal(atom.text);
+                    builder.Literal(marked(atom.text));
                 else if (IsTextTag(atom.tag))
-                    builder.Text(TagText(atom.tag, info, player), atom.tag == Tag::Name);
+                {
+                    const std::string text = TagText(atom.tag, info, player);
+                    builder.Text(DashesAreMarks(atom.tag) ? marked(text) : text, atom.tag == Tag::Name);
+                }
                 else
                     builder.Icons(TagIcons(atom.tag, info, s, badgeRules), IsBadgeTag(atom.tag));
             }
             builder.Finish();
             if (builder.items.empty()) continue;
             plate.lines.push_back(ComposedLine{i, std::move(builder.items), LookOf(style, st, s, gameArgb)});
-            if (deadMob || fought) plate.lines.back().look.glow = 0.0f;
+            if (deadMob || (fought && style.glowOffInCombat)) plate.lines.back().look.glow = 0.0f;
             if (dead) plate.lines.back().look.color = kDeadTextArgb;
         }
         plate.ornament      = kind.ornament.place;
@@ -412,7 +423,7 @@ namespace headsup
         {
             if (item.kind != ItemKind::Text) continue;
             if (!text.empty()) text += kSpace;
-            text += item.text;
+            text += WithDashes(item.text);
         }
     }
 }

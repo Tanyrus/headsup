@@ -274,3 +274,74 @@ TEST(the_games_own_cursor_has_no_settings_and_a_picture_no_color)
         CHECK(hidden(vanilla, row));
     CHECK(!hidden(vanilla, "entities-target-cursor-cursor-style-label-row")); // the list stays, to pick another
 }
+
+TEST(every_kind_has_a_nameplate_opacity_card_and_yours_none_of_its_fading)
+{
+    Window w;
+    for (const Page page : {Page::Mobs, Page::Players, Page::Npcs, Page::Pets, Page::Self})
+    {
+        w.state.page = page;
+        const std::string card = std::string(PageKey(page)) + "-nameplate-opacity";
+        const Form form        = w.Pass();
+        const FormBlock* block = Block(form, card.c_str());
+        CHECK(block != nullptr);
+        CHECK(Has(block->rml, (card + "-no-target").c_str()) && Has(block->rml, (card + "-not-targeted").c_str()) &&
+              Has(block->rml, (card + "-is-targeted").c_str()));
+        CHECK_EQ(Has(block->rml, (card + "-fade-in").c_str()), page != Page::Self);
+        if (page == Page::Self) continue;
+        // The range is the fade's own: it shows once Fade In is on.
+        CHECK(ClassOn(form, (card + "-range-label-row").c_str(), "off"));
+        const Form faded = w.Pass({{card + "-fade-in", kClickEvent, ""}});
+        CHECK(faded.changed && w.settings.Kind(*KindOfPage(page)).opacity.fadeIn);
+        CHECK(!ClassOn(faded, (card + "-range-label-row").c_str(), "off"));
+        w.Pass({{card + "-not-targeted", kChangeEvent, "35"}});
+        CHECK_EQ(w.settings.Kind(*KindOfPage(page)).opacity.notTargeted, 35);
+    }
+}
+
+TEST(a_lines_glow_can_be_switched_off_for_combat_once_it_has_a_glow)
+{
+    Window w;
+    w.state.page = Page::Players;
+    const char* row = "players-line-style-disable-glow-in-combat-players0-label-row";
+    CHECK(ClassOn(w.Pass(), row, "off")); // no glow, nothing to switch off
+    w.settings.Kind(PlateKind::Players).lines[0].glow = 80;
+    CHECK(!ClassOn(w.Pass(), row, "off"));
+    CHECK(w.Pass({{"players-line-style-disable-glow-in-combat-players0", kClickEvent, ""}}).changed);
+    CHECK(w.settings.Kind(PlateKind::Players).lines[0].glowOffInCombat);
+}
+
+TEST(a_color_off_its_default_has_an_arrow_that_puts_it_back)
+{
+    Window w;
+    const char* arrow = "entities-colors-claim-status-claimed-yours-colors-claim-status-reset";
+    const Color original = w.settings.palette.claim[static_cast<int>(ClaimState::Yours)];
+    CHECK(ClassOn(w.Pass(), arrow, "hidden")); // nothing to put back
+    w.settings.palette.claim[static_cast<int>(ClaimState::Yours)] = Color{{0.1f, 0.2f, 0.3f}};
+    const Form moved = w.Pass();
+    CHECK(!ClassOn(moved, arrow, "hidden"));
+    CHECK(ClassOn(moved, "entities-colors-claim-status-unclaimed-colors-claim-status-reset", "hidden")); // each color its own
+    const Form back = w.Pass({{arrow, kClickEvent, ""}});
+    CHECK(back.changed && w.settings.palette.claim[static_cast<int>(ClaimState::Yours)] == original);
+    CHECK(ClassOn(back, arrow, "hidden"));
+    // A badge color has one too.
+    w.state.page = Page::Mobs;
+    w.settings.weakBadgeColor = Color{{0.0f, 0.0f, 0.0f}};
+    w.Pass({{"mobs-badges-weak-color-reset", kClickEvent, ""}});
+    CHECK(w.settings.weakBadgeColor == Settings{}.weakBadgeColor);
+}
+
+TEST(the_dash_marks_are_listed_as_shapes_and_no_words_but_no)
+{
+    Window w;
+    const char* list = "entities-nameplates-replace-dashes";
+    const Form open  = w.Pass({{list, kClickEvent, ""}});
+    CHECK(open.popup);
+    CHECK(Has(open.popup->rml, ">No<"));
+    for (const char* shape : {"dash dot", "dash square", "dash diamond"})
+        CHECK(Has(open.popup->rml, shape));
+    CHECK(!Has(open.popup->rml, "Diamond") && !Has(open.popup->rml, "Square") && !Has(open.popup->rml, "Dot"));
+    CHECK(ClassOn(open, "entities-nameplates-replace-dashes-o-3", "picked")); // the diamond, a new install's
+    CHECK(w.Pass({{"entities-nameplates-replace-dashes-o-0", kClickEvent, ""}}).changed);
+    CHECK(w.settings.dashMark == DashMark::None);
+}

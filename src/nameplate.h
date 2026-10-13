@@ -115,7 +115,8 @@ namespace headsup
     int PlateRank(uint16_t index, const CursorTargets& targets);
     // A plate's alpha, out of kOpaqueAlpha: a mob's that is not picked fades to the menu's opacity while you have a
     // target.
-    uint32_t PlateAlpha(const Settings& settings, EntityKind kind, int rank, bool hasTarget);
+    // rank: PlateRank's. distance: yalms from you, which counts only for a kind that fades in.
+    uint32_t PlateAlpha(const OpacitySettings& opacity, int rank, bool hasTarget, float distance);
     // Within a rank, farther plates first, so nearer ones cover them.
     bool DrawnBefore(int rankA, float depthA, int rankB, float depthB);
     // Heights come in steps, and current (the height drawn now) is kept until the shown size falls a step below it or

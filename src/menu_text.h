@@ -118,6 +118,18 @@ namespace headsup
 
     const char* const kSmoothnessLabels[kSmoothnessLevelCount] = {"Low", "Medium", "High", "Ultra"}; // by SmoothnessLevel
 
+    // By PlateKind: when a line that drops its glow in combat does so.
+    const char* const kGlowOffTips[kPlateKindCount] = {"No glow on this line once you or your party has claimed the mob.",
+        "No glow on this line while the player has their weapon out.", "No glow on this line while you have your weapon out.",
+        "No glow on this line while the NPC is fighting.", "No glow on this line while the pet is fighting."};
+
+    // The Replace Dashes list shows the marks themselves, as the window's style draws them (menu_document).
+    constexpr const char* kDotMark     = "<div class=\"dash dot\"></div>";
+    constexpr const char* kSquareMark  = "<div class=\"dash square\"></div>";
+    constexpr const char* kDiamondMark = "<div class=\"dash diamond\"></div>";
+    const char* const kDashMarkTips[kDashMarkCount] = {"Dashes stay dashes.", "A dot.", "A square.",
+        "A diamond, as at the middle of an ornament."}; // by DashMark
+
     // By CursorStyle: a File's label is its own name.
     const char* const kCursorStyleLabels[kCursorStyleCount] = {"Vanilla", "Triangle", "Phoenix Feather", "Chocobo", ""};
     const char* const kCursorStyleTips[kCursorStyleCount] = {

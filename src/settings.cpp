@@ -29,7 +29,7 @@ namespace headsup
         };
         constexpr BoolKey kBools[] = {{"enabled", &Settings::enabled}, {"phTimers", &Settings::phTimers},
             {"scaleWithDistance", &Settings::scaleWithDistance}, {"scaleOwnName", &Settings::scaleOwnName},
-            {"glowOffWhenFighting", &Settings::glowOffWhenFighting}, {"chocoboPointer", &Settings::chocoboPointer},
+            {"chocoboPointer", &Settings::chocoboPointer},
             {"fixPointer", &Settings::fixPointer}, {"showRanks", &Settings::showRanks}, {"showBar", &Settings::showBar},
             {"hideHelpBar", &Settings::hideHelpBar}, {"hideNetstat", &Settings::hideNetstat},
             {"screenshotHidesGame", &Settings::screenshotHidesGame},
@@ -47,6 +47,7 @@ namespace headsup
         constexpr IntKey kInts[] = {{"smoothness", &Settings::smoothness, kMinSmoothness, kMaxSmoothness},
             {"outlineThickness", &Settings::outlineThickness, kMinOutlineThickness, kMaxOutlineThickness},
             {"outlineOpacity", &Settings::outlineOpacity, kMinOpacity, kMaxOpacity},
+            {"menuOpacity", &Settings::menuOpacity, kMinMenuOpacity, kMaxOpacity},
             {"cursorRaise", &Settings::cursorRaise, -kMaxCursorRaise, kMaxCursorRaise},
             {"nameRaise", &Settings::nameRaise, kMinNameRaise, kMaxNameRaise},
             {"elementWeakRank", &Settings::elementWeakRank, kNoWeakRank, kMaxWeakRank},
@@ -55,7 +56,6 @@ namespace headsup
             {"barHeight", &Settings::barHeight, kMinBarHeight, kMaxBarHeight},
             {"barTextSize", &Settings::barTextSize, kAutoBarTextSize, kMaxBarTextSize},
             {"popupTextSize", &Settings::popupTextSize, kAutoPopupTextSize, kMaxBarTextSize},
-            {"untargetedOpacity", &Settings::untargetedOpacity, kMinOpacity, kMaxOpacity},
             {"baseSize", &Settings::baseSize, kMinTextSize, kMaxTextSize},
             {"baseIconSize", &Settings::baseIconSize, kMinTextSize, kMaxTextSize},
             {"scaleMin", &Settings::scaleMin, kMinSizePercent, kMaxSizePercent},
@@ -71,6 +71,8 @@ namespace headsup
         constexpr const char* kCursorWidthKey  = kRebasedInts[0].key;
         constexpr const char* kCursorHeightKey = kRebasedInts[1].key;
         constexpr const char* kCursorEdgeKey   = kRebasedInts[2].key;
+        constexpr const char* kDashMarkKey = "dashMark";
+        const char* const kDashMarkNames[kDashMarkCount] = {"no", "dot", "square", "diamond"};
         constexpr const char* kCursorStyleKey = "cursorStyle";
         constexpr const char* kCursorFileKey  = "cursorFile";
         const char* const kCursorStyleNames[kCursorStyleCount] = {"vanilla", "triangle", "feather", "chocobo", "file"};
@@ -200,6 +202,10 @@ namespace headsup
         const char* const kPaletteKeys[]                 = {"paletteAggression", "paletteToughness", "paletteClaim", "paletteTarget", "paletteType"};
         constexpr const char* kLabelShadePrefix = "label"; // kLabelShadeKeys' prefix, which the palette's toughness keys drop
         constexpr const char* kRowInfix         = "Row";
+        constexpr const char* kOpacityInfix     = "Opacity";
+        constexpr const char* kGlowOffSuffix    = "GlowOffInCombat";
+        constexpr const char* kOldUntargetedKey = "untargetedOpacity";   // every mob's that was not your target
+        constexpr const char* kOldGlowOffKey    = "glowOffWhenFighting"; // every line of a mob your party had claimed
         constexpr const char* kOldPetRow        = "Pet"; // the pets' one row of before, after kRowInfix
         constexpr const char* kLineInfix        = "Line";
         constexpr const char* kOrnamentInfix    = "Ornament";
@@ -404,6 +410,7 @@ namespace headsup
             StoreFloat(store, key("Glow"), static_cast<float>(line.glow));
             StoreFloat(store, key("GlowSize"), static_cast<float>(line.glowSize));
             SavePick(store, key("GlowColor"), line.glowColor);
+            StoreBool(store, key(kGlowOffSuffix), line.glowOffInCombat);
         }
 
         std::string RowBase(PlateKind kind, int row)
@@ -443,6 +450,30 @@ namespace headsup
             LoadPick(store, base + "Color", o.color);
         }
 
+        // A kind's opacities and its lines' glow in combat, from a file of any age: the kind's own keys, else what
+        // the two settings of before held. Those covered the mobs: one opacity for every mob that was not your target,
+        // pets among them, and one switch for the glow of a mob your party had claimed.
+        void LoadOpacity(SettingsStore& store, PlateKind kind, KindSettings& k)
+        {
+            const std::string base = std::string(KindKey(kind)) + kOpacityInfix;
+            OpacitySettings& o     = k.opacity;
+            const std::string notTargeted = base + "NotTargeted";
+            const bool faded              = kind == PlateKind::Mobs || kind == PlateKind::Pets;
+            o.noTarget    = LoadInt(store, (base + "NoTarget").c_str(), o.noTarget);
+            o.notTargeted = Rebased(store, notTargeted, faded ? kOldUntargetedKey : notTargeted, o.notTargeted,
+                [](float before) { return before; });
+            o.targeted    = LoadInt(store, (base + "Targeted").c_str(), o.targeted);
+            o.fadeIn      = store.GetBool((base + "FadeIn").c_str(), o.fadeIn);
+            o.range       = store.GetFloat((base + "Range").c_str(), o.range);
+            const std::optional<bool> before = kind == PlateKind::Mobs ? HeldSwitch(store, kOldGlowOffKey) : std::nullopt;
+            for (int n = 0; n < kPlateLines; ++n)
+            {
+                LineDesign& line = k.lines[n];
+                line.glowOffInCombat =
+                    HeldSwitch(store, (LineBase(kind, n) + kGlowOffSuffix).c_str()).value_or(before.value_or(line.glowOffInCombat));
+            }
+        }
+
         void SaveKind(SettingsStore& store, PlateKind kind, const KindSettings& k)
         {
             for (int r = 0; r < RowCountOf(kind); ++r)
@@ -459,6 +490,12 @@ namespace headsup
             StoreFloat(store, base + "Width", static_cast<float>(k.ornament.width));
             StoreFloat(store, base + "Height", static_cast<float>(k.ornament.height));
             SavePick(store, base + "Color", k.ornament.color);
+            const std::string opacity = std::string(KindKey(kind)) + kOpacityInfix;
+            StoreFloat(store, opacity + "NoTarget", static_cast<float>(k.opacity.noTarget));
+            StoreFloat(store, opacity + "NotTargeted", static_cast<float>(k.opacity.notTargeted));
+            StoreFloat(store, opacity + "Targeted", static_cast<float>(k.opacity.targeted));
+            StoreBool(store, opacity + "FadeIn", k.opacity.fadeIn);
+            StoreFloat(store, opacity + "Range", k.opacity.range);
         }
 
         void LoadDesigner(SettingsStore& store, Settings& s)
@@ -720,6 +757,7 @@ namespace headsup
             KindSettings& self      = s.Kind(PlateKind::Self);
             KindSettings& npcs      = s.Kind(PlateKind::Npcs);
             KindSettings& pets      = s.Kind(PlateKind::Pets); // drawn as mobs then: the mobs' keys covered them
+            s.detectionShown        = kAllDetection;           // such a file showed every icon, the aggression one too
             LineDesign& mobIcons    = mobs.lines[kMobIconLine];
             LineDesign& mobLevel    = mobs.lines[kMobLevelLine];
             LineDesign& mobName     = mobs.lines[kNameLine];
@@ -1021,6 +1059,12 @@ namespace headsup
                 o.width  = std::clamp(o.width, kMinOrnamentWidth, kMaxOrnamentWidth);
                 o.height = std::clamp(o.height, kMinOrnamentThickness, kMaxOrnamentThickness);
                 ClampPick(o.color, defaults.ornament.color, plain);
+                OpacitySettings& opacity = kind.opacity;
+                for (int OpacitySettings::*percent : {&OpacitySettings::noTarget, &OpacitySettings::notTargeted, &OpacitySettings::targeted})
+                    opacity.*percent = std::clamp(opacity.*percent, kMinOpacity, kMaxOpacity);
+                opacity.range = ClampFloat(opacity.range, kMinOutlineDistance, kMaxOutlineDistance, defaults.opacity.range);
+                // Your own nameplate is never far from you.
+                if (static_cast<PlateKind>(k) == PlateKind::Self) opacity.fadeIn = false;
             }
             Palette fallback = d.palette;
             const std::vector<PaletteEntry> entries = PaletteEntries(s.palette), defaults = PaletteEntries(fallback);
@@ -1051,7 +1095,7 @@ namespace headsup
         for (const IntKey& i : kRebasedInts)
             s.*i.field = std::clamp(s.*i.field, i.lo, i.hi);
         s.smoothness = SmoothnessCopies(SmoothnessLevelOf(s.smoothness));
-        if (s.badgeFontName.empty() || s.badgeFontName.size() > kMaxFontName) s.badgeFontName = d.badgeFontName;
+        if (s.badgeFontName.size() > kMaxFontName) s.badgeFontName = d.badgeFontName;
         if (s.barTitleFont.size() > kMaxFontName) s.barTitleFont = d.barTitleFont;
         if (s.barTextFont.size() > kMaxFontName) s.barTextFont = d.barTextFont;
         std::vector<uint8_t> keys;
@@ -1075,6 +1119,7 @@ namespace headsup
         if (!named) s.cursorFile.clear();
         if (static_cast<int>(s.cursorStyle) >= kCursorStyleCount || (s.cursorStyle == CursorStyle::File && !named))
             s.cursorStyle = d.cursorStyle;
+        if (static_cast<int>(s.dashMark) >= kDashMarkCount) s.dashMark = d.dashMark;
         ClampPick(s.cursorColor, d.cursorColor, CursorSources());
         ClampPick(s.cursorEdgeColor, d.cursorEdgeColor, CursorSources());
         if (static_cast<int>(s.barTheme) >= kBarThemeCount) s.barTheme = d.barTheme;
@@ -1118,6 +1163,8 @@ namespace headsup
         else if (wasArrow)
             s.cursorStyle = CursorStyle::Triangle;
         s.cursorFile   = store.GetString(kCursorFileKey, "");
+        s.dashMark     = static_cast<DashMark>(
+            NameIndex(kDashMarkNames, kDashMarkCount, store.GetString(kDashMarkKey, ""), static_cast<int>(s.dashMark)));
         s.cursorHeight = Rebased(store, kCursorHeightKey, kOldCursorSizeKey, s.cursorHeight, [](float size) { return size; });
         s.cursorWidth  = Rebased(store, kCursorWidthKey, kOldCursorSizeKey, s.cursorWidth, [&](float size) {
             return static_cast<float>(NaturalCursorWidth(wasArrow ? CursorStyle::Triangle : CursorStyle::Feather, Whole(size)));
@@ -1130,7 +1177,8 @@ namespace headsup
             LoadColor(store, c.key, s.*c.field);
         LoadPick(store, kCursorPickKey, s.cursorColor);
         LoadPick(store, kCursorEdgePickKey, s.cursorEdgeColor);
-        s.badgeFontName = store.GetString(kBadgeFontKey, kBadgeFont);
+        // A file from before badges had a font of their own to name keeps the one they were set in.
+        s.badgeFontName = store.GetString(kBadgeFontKey, file ? kBadgeFont : s.badgeFontName.c_str());
         s.barTitleFont  = store.GetString(kBarTitleFontKey, "");
         s.barTextFont   = store.GetString(kBarTextFontKey, "");
         s.scaleCursor   = store.GetBool(kScaleCursorKey, file ? s.scaleWithDistance : s.scaleCursor);
@@ -1207,6 +1255,8 @@ namespace headsup
         const float saved = store.GetFloat(kVersionKey, 0.0f);
         if (saved >= kDesignerVersion || store.GetBool(kDesignsSavedKey, false)) LoadDesigner(store, s);
         else if (file) MigrateDesigner(LoadOld(store, saved), s);
+        for (int k = 0; k < kPlateKindCount; ++k)
+            LoadOpacity(store, static_cast<PlateKind>(k), s.kinds[k]);
         return Clamp(s);
     }
 
@@ -1227,6 +1277,7 @@ namespace headsup
             setColor(c.key, s.*c.field);
         store.Set(kCursorStyleKey, CursorStyleName(s.cursorStyle));
         store.Set(kCursorFileKey, s.cursorFile.c_str());
+        store.Set(kDashMarkKey, kDashMarkNames[static_cast<int>(s.dashMark)]);
         SavePick(store, kCursorPickKey, s.cursorColor);
         SavePick(store, kCursorEdgePickKey, s.cursorEdgeColor);
         store.Set(kBadgeFontKey, s.badgeFontName.c_str());

@@ -26,7 +26,7 @@ TEST(phoenix_moves_and_lights_up_in_its_own_red)
 {
     const std::string rml = MenuDocument(MenuLook{MenuTheme::Phoenix, "Segoe UI", "Marcellus SC"});
     // The window and a popup come in with a short animation, and a card's rows fade in.
-    CHECK(Has(rml, "body.open{animation:0.22s cubic-out window-in;}"));
+    CHECK(Has(rml, "body.open{animation:0.22s cubic-out window-in, 0.22s cubic-out window-fade;}"));
     CHECK(Has(rml, "#popup.open{animation:0.16s cubic-out drop-in;}"));
     CHECK(Has(rml, "@keyframes drop-in{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0px);}}"));
     CHECK(Has(rml, "animation:0.2s cubic-out fade-in;}"));
@@ -48,7 +48,7 @@ TEST(aurora_is_slate_and_cyan)
     CHECK_EQ(MenuColorsOf(MenuTheme::Aurora).accent, 0xFF5EE6FFu);
     const std::string rml = MenuDocument(MenuLook{MenuTheme::Aurora, "Segoe UI", "Marcellus SC"});
     // The window and its popup come in with a short animation, and a slider's filled part is a gradient.
-    CHECK(Has(rml, "body.open{animation:0.22s cubic-out window-in;}"));
+    CHECK(Has(rml, "body.open{animation:0.22s cubic-out window-in, 0.22s cubic-out window-fade;}"));
     CHECK(Has(rml, "@keyframes drop-in{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0px);}}"));
     CHECK(Has(rml, "input.range sliderprogress{"));
     CHECK(Has(rml, "decorator:horizontal-gradient(#5ee6ff59 #b48cff59);"));

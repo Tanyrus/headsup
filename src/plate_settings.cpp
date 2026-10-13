@@ -83,6 +83,8 @@ namespace headsup
         mobs.lines[1].color.source = ColorSource::Toughness;
         mobs.lines[2]              = NameLine(kTagName);
         mobs.lines[2].glow         = 100;
+        for (LineDesign& line : mobs.lines)
+            line.glowOffInCombat = true;
         mobs.ornament.place        = OrnamentPlace::BelowMiddle;
         const LineDesign player = NameLine(kTagPlayerName);
         kinds[static_cast<int>(PlateKind::Players)].lines[2] = player;

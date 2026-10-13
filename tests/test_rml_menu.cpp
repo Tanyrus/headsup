@@ -556,6 +556,31 @@ TEST(a_toggles_knob_slides_across_its_track_in_both_themes)
     }
 }
 
+TEST(the_window_is_as_opaque_as_its_setting_from_the_moment_it_opens)
+{
+    // Opening, it comes in from nothing and never passes its own opacity.
+    Window window;
+    window.menu.open = false;
+    window.Frames(2);
+    window.settings.menuOpacity = 50;
+    window.menu.open            = true;
+    float most = 0.0f;
+    for (int frame = 0; frame < 12; ++frame)
+    {
+        window.Frames();
+        most = std::max(most, window.Find("page")->GetOwnerDocument()->GetComputedValues().opacity());
+    }
+    CHECK(most > 0.49f && most < 0.51f);
+    CHECK_EQ(window.Find("page")->GetOwnerDocument()->GetComputedValues().opacity(), 0.5f);
+    // The slider on the Config Menu page sets it, and the window follows while it is dragged.
+    window.Page("configmenu");
+    CHECK(window.Drag("configmenu-settings-window-window-opacity", Rml::Vector2f(400.0f, 0.0f)));
+    CHECK_EQ(window.settings.menuOpacity, 100);
+    window.Frames(2);
+    CHECK_EQ(window.Find("page")->GetOwnerDocument()->GetComputedValues().opacity(), 1.0f);
+    CHECK_EQ(window.Said(), "");
+}
+
 TEST(a_setting_of_something_switched_off_is_not_shown)
 {
     Window window;

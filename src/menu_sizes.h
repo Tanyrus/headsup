@@ -36,4 +36,5 @@ namespace headsup
     constexpr float kTipWidth       = 20.0f;
     constexpr float kHeaderRow      = 2.4f;  // a card's title row
     constexpr float kLineNameWidth  = 6.6f;  // "Middle Line", before its design box
+    constexpr int kResetArrowPixels = 48;    // the reset arrow's picture, drawn smaller than it is
 }

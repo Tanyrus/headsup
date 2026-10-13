@@ -6,6 +6,7 @@
 #include "bar_types.h"
 #include "color.h"
 #include "currencies.h"
+#include "dash_mark.h"
 #include "fonts.h"
 #include "icons.h"
 #include "ini_text.h"
@@ -32,7 +33,7 @@ namespace headsup
     constexpr int kDefaultIconSize = 16;                 // pixels: the base icon size
     constexpr int kMinNameRaise = 0, kMaxNameRaise = 40; // pixels
     constexpr const char* kDefaultFont = kMarcellusSC;
-    constexpr const char* kBadgeFont   = kBarlowCondensed; // plain enough to read a few pixels tall
+    constexpr const char* kBadgeFont   = kBarlowCondensed; // what badges were set in before they took the default font
     constexpr size_t kMaxFontName      = 31; // a Windows font name's longest, without its terminator
 
     constexpr std::array<bool, kBarWidgetCount> AllOn()
@@ -57,6 +58,7 @@ namespace headsup
     constexpr int kMinOpacity = 10, kMaxOpacity = 100; // percent
 
     constexpr int kMinMenuScale = 70, kMaxMenuScale = 160; // percent
+    constexpr int kMinMenuOpacity = 30; // percent: fainter, the window could not be found to set it back
     constexpr int kMaxMenuSide  = 16384; // pixels: more than any screen is across
 
     constexpr int kMaxHelpBarOffset = 4000; // pixels either way
@@ -75,7 +77,7 @@ namespace headsup
         int maxElements       = BadgeRules{}.maxElements;
         StatusBadgeRule statusBadges[kStatusRankCount] = {}; // by StatusRank
         bool showRanks = false; // rank badges as ranks rather than the wikis' percents
-        std::string badgeFontName = kBadgeFont;
+        std::string badgeFontName; // badges' numbers; empty for the default font
         bool showBar       = true;
         BarTheme barTheme  = BarTheme::PhoenixGold;
         BarSeparators barSeparators = BarSeparators::Theme;
@@ -95,6 +97,7 @@ namespace headsup
         bool helpBarBackground = true;           // off, the help text alone
         std::string menuFont = kDefaultMenuFont; // the settings window's text, by its kMenuFonts name
         int menuScale        = 100;              // percent: the settings window's text and everything sized by it
+        int menuOpacity      = 100;              // percent
         MenuTheme menuTheme  = MenuTheme::Phoenix;
         // Where the player left the settings window, in pixels; no width for one never moved, which opens in the
         // screen's middle.
@@ -117,8 +120,6 @@ namespace headsup
         bool screenshotHidesGame = true; // screenshot mode takes the game's own windows and chat too
         // The game's windows moved out from under Game help's bar, by short name (native_locate.h's ShortName).
         std::vector<std::string> movedWindows = DefaultMovedWindows();
-        int untargetedOpacity = 100; // percent: other mobs' plates while you have a target
-        bool glowOffWhenFighting = true; // a mob's lines lose their glow once you or your party has claimed it
         bool phTimers          = false; // above your name, a respawn timer for each placeholder you see die
         bool scaleWithDistance = true;  // sizes follow how far a name's owner is from you
         bool scaleOwnName      = true;  // your own plate too
@@ -143,12 +144,13 @@ namespace headsup
         bool outlines   = true;
         int baseSize    = 15; // pixels: a line's text at 100 percent
         int baseIconSize = kDefaultIconSize; // and its icons
+        DashMark dashMark = DashMark::Diamond; // what a dash in a design, or between a level's ends, is drawn as
         std::string defaultFont = kDefaultFont;
         int scaleMin = 50, scaleMax = 250; // percent: the distance scale's limits
         int timerPercent = 87;
         std::array<KindSettings, kPlateKindCount> kinds = DefaultKinds();
         Palette palette = DefaultPalette();
-        uint32_t detectionShown = kAllDetection;
+        uint32_t detectionShown = kDefaultDetection;
         std::vector<std::string> friends;
         ColorPick cursorColor{ColorSource::Target};
         ColorPick cursorEdgeColor{ColorSource::Custom, ColorFromRgb(0x000000)};

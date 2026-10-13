@@ -150,6 +150,7 @@ namespace headsup
         int glow     = 0;
         int glowSize = 100;
         ColorPick glowColor{ColorSource::Aggression};
+        bool glowOffInCombat = false; // no glow while its entity fights: on for a mob's lines
         bool operator==(const LineDesign&) const = default;
     };
 
@@ -173,11 +174,23 @@ namespace headsup
         ColorPick outlineColor{ColorSource::Aggression};
         bool operator==(const RowSettings&) const = default;
     };
+    // How opaque a kind's nameplates are, in percent, by what you target: with no target, as another than your
+    // target, and as your target. Fading in, each is whole within kFadeNearYalms and almost nothing at the range.
+    struct OpacitySettings
+    {
+        int noTarget    = 100;
+        int notTargeted = 100;
+        int targeted    = 100;
+        bool fadeIn     = false;
+        float range     = 50.0f; // yalms
+        bool operator==(const OpacitySettings&) const = default;
+    };
     struct KindSettings
     {
         RowSettings rows[kMaxRows];
         LineDesign lines[kPlateLines];
         OrnamentSettings ornament;
+        OpacitySettings opacity;
         bool operator==(const KindSettings&) const = default;
     };
     std::array<KindSettings, kPlateKindCount> DefaultKinds();
@@ -201,6 +214,8 @@ namespace headsup
     enum class DetectionIcon : uint8_t { Aggro, Link, Sight, TrueSight, Sound, Scent, Magic, Ability, Blood };
     constexpr int kDetectionIconCount = 9;
     constexpr uint32_t kAllDetection  = (1u << kDetectionIconCount) - 1;
+    // What a new install shows: all but the aggression icon, which the outline's color already tells.
+    constexpr uint32_t kDefaultDetection = kAllDetection & ~(1u << static_cast<int>(DetectionIcon::Aggro));
     constexpr uint32_t DetectionBit(DetectionIcon d) { return 1u << static_cast<int>(d); }
     const char* DetectionLabel(DetectionIcon d);
 

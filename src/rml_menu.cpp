@@ -137,13 +137,14 @@ namespace headsup
         if (m_Document == nullptr) return false;
         m_Look       = std::move(look);
         m_FontPixels = 0.0f;
+        m_Opacity    = 0;
         m_Sidebar    = m_Document->GetElementById(kMenuSidebarId);
         m_Page       = m_Document->GetElementById(kMenuPageId);
         m_PageTitle  = m_Document->GetElementById(kMenuPageTitleId);
         m_Popup      = m_Document->GetElementById(kMenuPopupId);
         m_Tip        = m_Document->GetElementById(kMenuTipId);
         for (const Rml::EventId id : {Rml::EventId::Click, Rml::EventId::Change, Rml::EventId::Dragdrop,
-                 Rml::EventId::Mouseover, Rml::EventId::Mousemove})
+                 Rml::EventId::Mouseover, Rml::EventId::Mousemove, Rml::EventId::Animationend})
             m_Document->AddEventListener(id, this);
         // On their way down: taking and losing the keyboard do not come back up, and a text box keeps its keys.
         for (const Rml::EventId id : {Rml::EventId::Focus, Rml::EventId::Blur, Rml::EventId::Keydown})
@@ -214,6 +215,7 @@ namespace headsup
             {
             case FormValueKind::Class: element->SetClass(value.name, value.on); break;
             case FormValueKind::Text: element->SetInnerRML(EscapedRml(value.text)); break;
+            case FormValueKind::Markup: element->SetInnerRML(value.text); break;
             case FormValueKind::Property: element->SetProperty(value.name, value.text); break;
             case FormValueKind::Value:
             {
@@ -291,9 +293,20 @@ namespace headsup
             SetPx(m_Tip, Rml::PropertyId::Top, std::round(in.y + kTipDrop));
     }
 
+    void RmlMenu::ApplyOpacity()
+    {
+        m_Document->SetProperty(Rml::PropertyId::Opacity, Rml::Property(static_cast<float>(m_Opacity) / kPercent, Rml::Unit::NUMBER));
+    }
+
     void RmlMenu::ProcessEvent(Rml::Event& event)
     {
         if (m_Document == nullptr) return;
+        // The fade the window opens with ends by taking its opacity off the document: it is put back at once.
+        if (event.GetId() == Rml::EventId::Animationend && event.GetTargetElement() == m_Document)
+        {
+            ApplyOpacity();
+            return;
+        }
         Rml::Element* target = event.GetTargetElement();
         Rml::Element* named  = WithId(target);
         const std::string id = named != nullptr ? named->GetId() : std::string();
@@ -377,6 +390,11 @@ namespace headsup
         {
             m_FontPixels = pixels;
             SetPx(m_Document, Rml::PropertyId::FontSize, pixels);
+        }
+        if (settings.menuOpacity != m_Opacity)
+        {
+            m_Opacity = settings.menuOpacity;
+            ApplyOpacity();
         }
         if (!m_Visible)
         {

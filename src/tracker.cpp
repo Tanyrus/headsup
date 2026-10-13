@@ -51,6 +51,7 @@ namespace headsup
             info.serverId    = a.serverId;
             info.kind        = a.kind;
             info.alive       = a.alive;
+            info.distance    = a.distance;
             info.pose        = a.pose;
             info.feet        = a.feet;
             std::snprintf(info.name, sizeof(info.name), "%s", a.name);

@@ -70,6 +70,7 @@ namespace headsup
         Label level{};                  // a living mob's level and con, as the bar's Target widget shows them
         EntityKind kind    = EntityKind::Npc;
         bool alive         = false;
+        float distance     = 0.0f;  // yalms from you
         char name[32]      = {};
         uint32_t linkshellArgb = 0; // a player's linkshell color, for its icon
         Pose pose              = Pose::Standing;

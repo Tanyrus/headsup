@@ -283,7 +283,7 @@ namespace headsup
         Slider(slider, label, value, lo, hi, StepOf(format), Formatted(format, static_cast<double>(value)), tip);
     }
 
-    bool Form::ListControl(const std::string& control, const std::string& shown, float width, const std::string& tip)
+    bool Form::ListControl(const std::string& control, const std::string& shown, float width, const std::string& tip, bool markup)
     {
         if (!m_Off && Clicked(control))
         {
@@ -296,18 +296,40 @@ namespace headsup
         Out() += "<div class=\"dd\" id=\"" + control + "\"" + TipAttribute(tip) + " style=\"width:" +
                  Em(width > 0.0f ? width : kControlWidth) + ";\"><div class=\"dd-val\" id=\"" + control +
                  "-val\"></div><div class=\"dd-arrow\"></div></div>";
-        Set(control + "-val", FormValueKind::Text, {}, shown);
+        Set(control + "-val", markup ? FormValueKind::Markup : FormValueKind::Text, {}, shown);
         Set(control, FormValueKind::Class, "off", {}, m_Off);
         Set(control, FormValueKind::Class, "open", {}, open);
         return open;
     }
 
+    void Form::MarkupDropdown(const char* label, int& value, const std::vector<std::string>& rows, const char* tip,
+        const OptionTip& option)
+    {
+        Row(label, tip);
+        const std::string control = Id(label);
+        const int count           = static_cast<int>(rows.size());
+        const int picked          = std::clamp(value, 0, count - 1);
+        if (ListControl(control, rows[static_cast<size_t>(picked)], 0.0f, option ? option(picked) : std::string(), true))
+        {
+            std::string rml;
+            for (int i = 0; i < count; ++i)
+                rml += ListRow(control, i, rows[static_cast<size_t>(i)], i == picked, option ? option(i) : std::string(), true);
+            int chosen = picked;
+            if (ListChoice(control, std::move(rml), count, chosen) && chosen != picked)
+            {
+                value   = chosen;
+                changed = true;
+            }
+        }
+        EndRow();
+    }
+
     std::string Form::ListRow(const std::string& control, int index, const std::string& name, bool picked,
-        const std::string& tip)
+        const std::string& tip, bool markup)
     {
         const std::string row = control + "-o-" + std::to_string(index);
         Set(row, FormValueKind::Class, "picked", {}, picked);
-        return "<div class=\"opt\" id=\"" + row + "\"" + TipAttribute(tip) + ">" + EscapedRml(name) + "</div>";
+        return "<div class=\"opt\" id=\"" + row + "\"" + TipAttribute(tip) + ">" + (markup ? name : EscapedRml(name)) + "</div>";
     }
 
     bool Form::ListChoice(const std::string& control, std::string rows, int count, int& chosen)
@@ -432,9 +454,21 @@ namespace headsup
         Set(swatch, FormValueKind::Class, "off", {}, m_Off);
     }
 
-    void Form::Swatch(const char* label, Color& color, const char* tip)
+    void Form::Swatch(const char* label, Color& color, const char* tip, const Color* original)
     {
         Row(label, tip);
+        if (original != nullptr)
+        {
+            const std::string reset = Id(std::string(label) + " reset");
+            if (!m_Off && Clicked(reset) && color != *original)
+            {
+                color   = *original;
+                changed = true;
+            }
+            // In the markup either way, hidden while there is nothing to put back: a color changed builds nothing.
+            Out() += "<div class=\"reset\" id=\"" + reset + "\" tip=\"Back to its default.\"></div>";
+            Set(reset, FormValueKind::Class, "hidden", {}, color == *original);
+        }
         SwatchAt(label, color);
         EndRow();
     }

@@ -17,7 +17,7 @@ namespace
     {
         std::string out;
         for (const PlateItem& item : line.items)
-            out += item.kind == ItemKind::Text ? item.text : item.kind == ItemKind::Space ? std::string(static_cast<size_t>(item.spaces), ' ') : "[" + std::to_string(item.icons.size()) + "]";
+            out += item.kind == ItemKind::Text ? WithDashes(item.text) : item.kind == ItemKind::Space ? std::string(static_cast<size_t>(item.spaces), ' ') : "[" + std::to_string(item.icons.size()) + "]";
         return out;
     }
     const MobRecord kQuadav{17190918, "Young Quadav", 17, 20, kMobAggressive | kMobLink, 300, kDetectSight | kDetectHearing, 0, 0, 0, 0};
@@ -61,7 +61,7 @@ TEST(the_default_mob_design_composes_todays_three_lines)
     const Settings s;
     const ComposedPlate plate = ComposePlate(AggressiveMob(), kPlayer, s, kGame);
     CHECK_EQ(plate.lines.size(), size_t{3});
-    CHECK_EQ(Rendered(plate.lines[0]), "[4]"); // aggro, link, sight, sound
+    CHECK_EQ(Rendered(plate.lines[0]), "[3]"); // link, sight, sound
     CHECK_EQ(Rendered(plate.lines[1]), "Lv 17-20 EP-EM");
     CHECK_EQ(Rendered(plate.lines[2]), "Young Quadav");
     CHECK_EQ(plate.lines[1].look.color, ToArgb(s.palette.toughness[static_cast<int>(LabelShade::EvenMatch)]));
@@ -101,7 +101,7 @@ TEST(text_around_a_tag_merges_into_one_run_and_spaces_beside_icons_become_gaps)
     CHECK(line.items[1].kind == ItemKind::Space);
     CHECK_EQ(line.items[1].spaces, 1);
     CHECK(line.items[2].kind == ItemKind::Text);
-    CHECK_EQ(line.items[2].text, "- Young Quadav (17-20)");
+    CHECK_EQ(WithDashes(line.items[2].text), "- Young Quadav (17-20)");
 }
 
 TEST(lines_with_nothing_to_show_are_skipped)
@@ -231,10 +231,25 @@ TEST(a_mob_your_party_has_claimed_can_lose_its_glow)
     theirs.state.row   = Category::OtherClaim;
     CHECK_EQ(ComposePlate(theirs, kPlayer, s, kGame).lines[2].look.glow, 1.0f);
     CHECK_EQ(ComposePlate(AggressiveMob(), kPlayer, s, kGame).lines[1].look.glow, 0.5f);
-    s.glowOffWhenFighting = false;
+    // Each line has the switch for itself.
+    s.Kind(PlateKind::Mobs).lines[1].glowOffInCombat = false;
     const ComposedPlate kept = ComposePlate(yours, kPlayer, s, kGame);
     CHECK_EQ(kept.lines[1].look.glow, 0.5f);
-    CHECK_EQ(kept.lines[2].look.glow, 1.0f);
+    CHECK_EQ(kept.lines[2].look.glow, 0.0f);
+    // A line that takes its style from another takes that line's switch with it.
+    s.Kind(PlateKind::Mobs).lines[2].syncWith = 1;
+    CHECK_EQ(ComposePlate(yours, kPlayer, s, kGame).lines[2].look.glow, 0.5f);
+    // A player's line has it too, off by default: with it on, their name stops glowing while their weapon is out.
+    Settings glowing;
+    LineDesign& name = glowing.Kind(PlateKind::Players).lines[2];
+    name.glow        = 150;
+    ActorInfo fighter      = LinkshellPlayer();
+    fighter.state.engaged  = true;
+    CHECK_EQ(ComposePlate(fighter, kPlayer, glowing, kGame).lines[0].look.glow, 1.5f);
+    name.glowOffInCombat = true;
+    CHECK_EQ(ComposePlate(fighter, kPlayer, glowing, kGame).lines[0].look.glow, 0.0f);
+    fighter.state.engaged = false;
+    CHECK_EQ(ComposePlate(fighter, kPlayer, glowing, kGame).lines[0].look.glow, 1.5f);
 }
 
 TEST(the_ornament_needs_both_of_the_lines_it_sits_between)
@@ -320,11 +335,52 @@ TEST(each_mob_tag_renders_its_text_or_icons)
     CHECK_EQ(Rendered(ComposePlate(AggressiveMob(), kPlayer, s, kGame).lines[0]), "[006] [17190918]");
 }
 
+TEST(a_dash_in_a_design_or_between_a_levels_ends_is_drawn_as_the_mark_chosen)
+{
+    Settings s; // a new install's dashes are diamonds
+    s.Kind(PlateKind::Mobs).lines[1].text = "Lv $level - $con";
+    ActorInfo mob = AggressiveMob();
+    std::snprintf(mob.name, sizeof(mob.name), "Ga-Bhu");
+    const auto level = [&] { return ComposePlate(mob, kPlayer, s, kGame).lines[1].items[0].text; };
+    const std::string diamond(1, DashChar(DashMark::Diamond)), dot(1, DashChar(DashMark::Dot));
+    CHECK_EQ(level(), "Lv 17" + diamond + "20 " + diamond + " EP" + diamond + "EM");
+    // A name's dash is part of the name: it stays a dash.
+    CHECK_EQ(ComposePlate(mob, kPlayer, s, kGame).lines[2].items[0].text, "Ga-Bhu");
+    s.dashMark = DashMark::Dot;
+    CHECK_EQ(level(), "Lv 17" + dot + "20 " + dot + " EP" + dot + "EM");
+    s.dashMark = DashMark::None;
+    CHECK_EQ(level(), "Lv 17-20 - EP-EM");
+    // Each mark has a character of its own, none of them a dash, and a report reads them as dashes.
+    CHECK(diamond != dot && diamond != "-" && dot != "-");
+    CHECK(MarkOfChar(diamond[0]) == DashMark::Diamond && MarkOfChar(dot[0]) == DashMark::Dot && !MarkOfChar('-'));
+    CHECK_EQ(WithDashes("Lv 17" + diamond + "20 " + dot), "Lv 17-20 -");
+}
+
+TEST(a_text_is_split_at_its_marks_into_what_is_drawn_in_turn)
+{
+    const std::string diamond(1, DashChar(DashMark::Diamond)), square(1, DashChar(DashMark::Square));
+    CHECK((SplitMarks("Lv 17" + diamond + "20") ==
+           std::vector<TextPiece>{{"Lv 17", DashMark::None}, {"", DashMark::Diamond}, {"20", DashMark::None}}));
+    // A mark at either end, and two side by side, leave no empty stretch of letters between them.
+    CHECK((SplitMarks(square + square + "a" + diamond) ==
+           std::vector<TextPiece>{{"", DashMark::Square}, {"", DashMark::Square}, {"a", DashMark::None}, {"", DashMark::Diamond}}));
+    CHECK((SplitMarks("Ga-Bhu") == std::vector<TextPiece>{{"Ga-Bhu", DashMark::None}}));
+    CHECK(SplitMarks("").empty());
+}
+
 TEST(detection_icons_follow_the_detection_filter)
 {
     Settings s;
     s.detectionShown = DetectionBit(DetectionIcon::Link);
     CHECK_EQ(Rendered(ComposePlate(AggressiveMob(), kPlayer, s, kGame).lines[0]), "[1]");
+    // A new install leaves out the aggression icon, which the outline's color already tells.
+    const auto icons = [](const Settings& with) {
+        return ComposePlate(AggressiveMob(), kPlayer, with, kGame).lines[0].items[0].icons.size();
+    };
+    Settings every;
+    every.detectionShown = kAllDetection;
+    CHECK_EQ(icons(Settings{}) + 1, icons(every));
+    CHECK(ComposePlate(AggressiveMob(), kPlayer, Settings{}, kGame).lines[0].items[0].icons[0].icon != Icon::AggroNQ);
 }
 
 TEST(player_tags_render_jobs_and_levels_when_known)
@@ -834,7 +890,7 @@ TEST(badge_tags_join_each_other_and_start_a_run_of_their_own_beside_other_icons)
     mobs.lines[0].text          = "$detect$weak$resist$status$immune";
     const ComposedPlate neutral = Compose(AggressiveMob(), s);
     CHECK_EQ(neutral.lines[0].items.size(), size_t{1});
-    CHECK_EQ(Rendered(neutral.lines[0]), "[4]");
+    CHECK_EQ(Rendered(neutral.lines[0]), "[3]");
     const ComposedPlate player = Compose(LinkshellPlayer(), s);
     CHECK_EQ(player.lines[0].items.size(), size_t{2});
     CHECK_EQ(Rendered(player.lines[0]), "[2]Chadmage");
@@ -897,13 +953,13 @@ TEST(a_text_left_out_beside_icons_takes_the_gap_that_set_it_apart)
     CHECK_EQ(plate.lines[1].items.size(), size_t{5});
     DropTexts(plate, std::vector<uint8_t>{1, 1, 0, 1}); // every name; the ID stays
     CHECK_EQ(plate.lines.size(), size_t{3});
-    CHECK_EQ(Rendered(plate.lines[0]), "[4]");    // no gap before the icons
-    CHECK_EQ(Rendered(plate.lines[1]), "[4] [4]"); // one gap between the two runs, not two
-    CHECK_EQ(Rendered(plate.lines[2]), "[006][4]");
+    CHECK_EQ(Rendered(plate.lines[0]), "[3]");    // no gap before the icons
+    CHECK_EQ(Rendered(plate.lines[1]), "[3] [3]"); // one gap between the two runs, not two
+    CHECK_EQ(Rendered(plate.lines[2]), "[006][3]");
     CHECK_EQ(OrnamentLineOf(plate).line, 2);
     mobs.lines[1].text = "$detect $name";
     ComposedPlate last = Compose(AggressiveMob(), s);
     DropTexts(last, std::vector<uint8_t>{0, 1, 0, 0});
-    CHECK_EQ(Rendered(last.lines[0]), "Young Quadav [4]");
-    CHECK_EQ(Rendered(last.lines[1]), "[4]"); // nor a gap after them
+    CHECK_EQ(Rendered(last.lines[0]), "Young Quadav [3]");
+    CHECK_EQ(Rendered(last.lines[1]), "[3]"); // nor a gap after them
 }

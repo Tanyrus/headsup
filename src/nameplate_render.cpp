@@ -18,6 +18,7 @@ namespace headsup
     {
         constexpr float kOutlinePerHeight = 0.1f; // a badge's outline width, per pixel of its height
         constexpr float kStackGap         = 2.0f; // screen pixels between plates stacked over one another
+        constexpr const char* kLineSample = "H"; // any letter: GDI gives a line's height with it
         constexpr float kPercent          = 100.0f;
         // From the mockup's CSS: a 22 px name's shadows blur 2 and 3 px, 1 px lower, and its glow 14 px.
         constexpr float kShadowDropPerHeight = 0.05f;
@@ -114,11 +115,33 @@ namespace headsup
                 look.line.outline ? style.edge : BlurMargin(std::max(style.glowBlur, style.shadow + static_cast<float>(style.drop)));
             return style;
         };
+        // A text with dashes drawn as marks is its stretches of letters and the marks, side by side.
+        const std::vector<TextPiece> pieces = SplitMarks(text);
+        const bool marked = std::ranges::any_of(pieces, [](const TextPiece& piece) { return piece.mark != DashMark::None; });
+        const char* font  = look.line.font.c_str();
+        // The height of a line of this font, which a mark is sized by: 0 when GDI cannot say.
+        auto lineHeight = [&](int at) {
+            int width = 0, line = 0;
+            return m_Gdi.Extent(kLineSample, font, at, look.line.style, width, line) ? line : 0;
+        };
+        auto extent = [&](int at, int& width, int& height) {
+            if (!marked) return m_Gdi.Extent(text, font, at, look.line.style, width, height);
+            height = lineHeight(at);
+            width  = 0;
+            for (const TextPiece& piece : pieces)
+            {
+                int pieceWidth = MarkWidth(piece.mark, height), pieceHeight = 0;
+                if (piece.mark == DashMark::None && !m_Gdi.Extent(piece.text.c_str(), font, at, look.line.style, pieceWidth, pieceHeight))
+                    return false;
+                width += pieceWidth;
+            }
+            return height > 0;
+        };
         // Measured before it is drawn: a long line at a tall height is more than GDI has the memory to draw at all.
         bool sized = true;
         const std::optional<int> height = RasterThatFits(pixelHeight, m_LargestSide, [&](int at) {
             ImageSize image{0, 0, styleAt(at).margin};
-            sized = sized && m_Gdi.Extent(text, look.line.font.c_str(), at, look.line.style, image.width, image.height);
+            sized = sized && extent(at, image.width, image.height);
             return sized ? image : ImageSize{};
         });
         // Too long at any height is the design's to shorten: failing here would turn every nameplate off.
@@ -135,7 +158,21 @@ namespace headsup
         }
         const Style style = styleAt(*height);
         Coverage coverage;
-        if (!sized || !m_Gdi.Rasterize(text, look.line.font.c_str(), *height, look.line.style, 0, style.margin, coverage))
+        auto rasterize = [&] {
+            if (!marked) return m_Gdi.Rasterize(text, font, *height, look.line.style, 0, style.margin, coverage);
+            const int line = lineHeight(*height);
+            std::vector<Coverage> drawn(pieces.size());
+            for (size_t i = 0; i < pieces.size(); ++i)
+            {
+                if (pieces[i].mark != DashMark::None)
+                    drawn[i] = MarkCoverage(pieces[i].mark, line, style.margin);
+                else if (!m_Gdi.Rasterize(pieces[i].text.c_str(), font, *height, look.line.style, 0, style.margin, drawn[i]))
+                    return false;
+            }
+            coverage = Joined(drawn, style.margin);
+            return line > 0;
+        };
+        if (!sized || !rasterize())
         {
             FailNames("GDI could not draw text in " + look.line.font + " at " + std::to_string(*height) + " px");
             return false;
@@ -306,7 +343,7 @@ namespace headsup
                 if (composed.lines.empty() && !showCursor && !timersHere) continue;
                 Plate& p = m_Plates[info->index];
                 rank     = PlateRank(info->index, targets);
-                opaque   = PlateAlpha(settings, info->kind, rank, targets.target != 0);
+                opaque   = PlateAlpha(settings.Kind(PlateKindOf(info->state)).opacity, rank, targets.target != 0, info->distance);
                 p.frame  = m_Frame;
 
                 const bool self = info->index == selfIndex;
@@ -539,12 +576,15 @@ namespace headsup
                             screenWidth, screenHeight);
                         addSquare(cursorQuads, cursor, kept.x, kept.y, fit, 0.0f);
                     };
+                    // The cursor is no part of the nameplate: it stays whole however faint the plate is.
+                    const uint32_t plate = std::exchange(opaque, kOpaqueAlpha);
                     if (under != TargetState::None)
                     {
                         addCursor(p.cursorUnder);
                         top -= cursorBox.height * kPickedCursorRise;
                     }
                     addCursor(p.cursor);
+                    opaque = plate;
                     m_CursorNames.push_back(CursorName{info->index, gameName.box});
                 }
                 for (int i = 0; i < timersReady; ++i)

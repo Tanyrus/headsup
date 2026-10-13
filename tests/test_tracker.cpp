@@ -285,6 +285,7 @@ TEST(an_outline_is_as_opaque_as_the_setting_and_fainter_with_distance_only_when_
     CHECK_EQ(t.Find(0x2000)->outlineAlpha, 153); // 60 percent, a new install's
     CHECK_EQ(t.Find(0x3000)->outlineAlpha, 153);
     CHECK_EQ(t.Find(0x3000)->argb, color); // the color itself stays whole
+    CHECK_EQ(t.Find(0x3000)->distance, 30.0f); // which a nameplate that fades in reads too
     s.outlineOpacity = 100;
     s.outlineFadeIn  = true;
     t.Update({BountyHunter(0x2000, 8.0f), BountyHunter(0x3000, 30.0f), BountyHunter(0x4000, s.maxDistance)}, kLevel20, s,

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "dash_mark.h"
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -69,6 +70,14 @@ namespace headsup
     // A hard edge grown radius pixels around a shape, for the cursor: the coverage needs a margin of radius.
     Image Outlined(const Coverage& coverage, int radius, uint32_t color, uint32_t outlineColor);
 
+    // A dash drawn as a mark, as a piece of a text textHeight pixels tall inside a margin: the mark where a dash
+    // would sit, with a little room either side.
+    Coverage MarkCoverage(DashMark mark, int textHeight, int margin);
+    // How wide that piece is without its margin.
+    int MarkWidth(DashMark mark, int textHeight);
+    // Pieces of one line, each inside the same margin, side by side as one piece inside that margin.
+    Coverage Joined(const std::vector<Coverage>& pieces, int margin);
+
     // A picture at another size: each new pixel is the average of what it covers of the old, weighted by alpha so a
     // clear pixel's color darkens nothing.
     Image Resized(const Image& picture, int width, int height);
@@ -103,6 +112,8 @@ namespace headsup
     Image Coin(int size, uint32_t color);
     // A five-pointed star with a point straight up, in the circle size pixels across.
     Image Star(int size, uint32_t color);
+    // A circular arrow in a square size pixels across: most of a ring, turning counterclockwise to a head at its top.
+    Image ResetArrow(int size, uint32_t color);
 
     // A size in whole pixels, at least one: what text and images are drawn at.
     int WholePixels(float size);

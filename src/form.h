@@ -38,6 +38,7 @@ namespace headsup
     {
         Value,    // a slider's or a text box's value
         Text,     // an element's text
+        Markup,   // an element's content, as RML
         Class,    // a class (name) on or off
         Property, // a style property (name)
     };
@@ -153,6 +154,9 @@ namespace headsup
             DropdownAt(label, value, first, last, text, width, nullptr, option);
             EndRow();
         }
+        // A dropdown whose rows, and the closed control, show RML of the page's own where the others show words.
+        void MarkupDropdown(const char* label, int& value, const std::vector<std::string>& rows, const char* tip,
+            const OptionTip& option = {});
         // A dropdown of fonts between two arrows that step to the font before and after. unset, when given, is a
         // first choice that stands for an empty name.
         void FontDropdown(const char* label, std::string& font, const std::vector<std::string>& choices,
@@ -160,7 +164,8 @@ namespace headsup
         // Joined buttons that each switch a bit of their own, the lowest first: any of them together.
         void Toggles(const char* label, uint8_t& bits, const char* const* options, int count, const char* tip,
             float segment = 0.0f);
-        void Swatch(const char* label, Color& color, const char* tip);
+        // original: the color's default. While the color is another, an arrow before the swatch puts it back.
+        void Swatch(const char* label, Color& color, const char* tip, const Color* original = nullptr);
         // A color pick: the dropdown of its source, then the swatch of a custom color.
         void ColorPickRow(const char* label, ColorPick& pick, const std::vector<ColorSource>& sources, const char* tip);
         // When a line shows, as a dropdown of checks: Always, under which every condition reads checked, then each
@@ -250,9 +255,11 @@ namespace headsup
         // The label a row shows: what is before "##", each word capitalized.
         static std::string Shown(const char* label);
         // A dropdown's closed control: what it shows and its arrow. True while its popup is open.
-        bool ListControl(const std::string& control, const std::string& shown, float width, const std::string& tip = {});
+        // markup: shown, or name, is RML and not words to escape.
+        bool ListControl(const std::string& control, const std::string& shown, float width, const std::string& tip = {},
+            bool markup = false);
         std::string ListRow(const std::string& control, int index, const std::string& name, bool picked,
-            const std::string& tip = {});
+            const std::string& tip = {}, bool markup = false);
         // Opens the popup with rows, and tells which of them was clicked.
         bool ListChoice(const std::string& control, std::string rows, int count, int& chosen);
         // A slider's newest whole value, when it moved.

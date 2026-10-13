@@ -16,7 +16,7 @@ namespace headsup
     namespace
     {
         constexpr std::string_view kIconKind = "icon", kStripKind = "strip", kDiamondKind = "diamond", kCoinKind = "coin",
-                                   kStarKind = "star";
+                                   kStarKind = "star", kResetKind = "reset";
         // RmlUi blurs a glow by a Gaussian of this share of its width; the bar's shadow is a CSS blur radius, twice
         // its Gaussian's.
         constexpr float kGlowSigmaPerWidth = 0.4f;
@@ -174,6 +174,11 @@ namespace headsup
         return std::string(kHostSource) + std::string(kStarKind) + kSeparator + std::to_string(pixels);
     }
 
+    std::string ResetSource(uint32_t argb, int pixels)
+    {
+        return std::string(kHostSource) + std::string(kResetKind) + kSeparator + Hex(argb) + kSeparator + std::to_string(pixels);
+    }
+
     std::optional<Image> HostImage(std::string_view name)
     {
         if (name.substr(0, kHostSource.size()) != kHostSource) return std::nullopt;
@@ -201,11 +206,11 @@ namespace headsup
             return StripColumn(static_cast<int>(*rows), static_cast<int>(*below), p.stripTop, p.stripMiddle, p.stripBottom,
                 p.bottomLine, p.underLine, p.below);
         }
-        if (kind == kDiamondKind && parts.size() == 3)
+        if ((kind == kDiamondKind || kind == kResetKind) && parts.size() == 3)
         {
             const std::optional<uint32_t> color = number(1, kHexBase), pixels = number(2);
             if (!color || !pixels) return std::nullopt;
-            return Diamond(static_cast<int>(*pixels), *color);
+            return kind == kDiamondKind ? Diamond(static_cast<int>(*pixels), *color) : ResetArrow(static_cast<int>(*pixels), *color);
         }
         if ((kind == kCoinKind || kind == kStarKind) && parts.size() == 2)
         {

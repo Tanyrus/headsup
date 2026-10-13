@@ -170,8 +170,12 @@ namespace headsup
         constexpr float kRimShade    = 0.6f; // a coin's rim, as a share of its color
         constexpr int kStarPoints    = 5;
         constexpr float kStarNotch   = 0.381966f; // a pentagram's notches, (3 - sqrt 5) / 2 of its points' radius
-        constexpr int kStarSamples   = 8;         // across a pixel, each way
+        constexpr int kPixelSamples  = 8;         // across a pixel, each way: the star's and the reset arrow's
         constexpr float kPi          = 3.14159265f;
+        // The reset arrow, in shares of its square: its ring's middle from the center and its thickness, the eighth
+        // of a turn left open, and the head's length and half its base.
+        constexpr float kResetRadius = 0.32f, kResetStroke = 0.11f, kResetGap = kPi / 4.0f;
+        constexpr float kResetHeadLength = 0.26f, kResetHeadHalf = 0.17f;
     }
 
     int BlurMargin(float blur)
@@ -242,6 +246,82 @@ namespace headsup
     Image Outlined(const Coverage& coverage, int radius, uint32_t color, uint32_t outlineColor)
     {
         return OutlinedWith(coverage, radius, outlineColor, [&](int, int) { return color; });
+    }
+
+    namespace
+    {
+        // A mark's size and room, in shares of its text's height: across (a diamond, corner to corner, a little
+        // more than the others, which fill their box), the room either side, and how far down the line its middle is.
+        constexpr float kMarkShare = 0.3f, kDiamondShare = 0.4f, kMarkRoom = 0.1f, kMarkMiddle = 0.57f;
+        constexpr int kMarkSamples = 4; // across a pixel, each way
+
+        float MarkAcross(DashMark mark, int textHeight)
+        {
+            return static_cast<float>(WholePixels(static_cast<float>(textHeight) * (mark == DashMark::Diamond ? kDiamondShare : kMarkShare)));
+        }
+    }
+
+    int MarkWidth(DashMark mark, int textHeight)
+    {
+        return static_cast<int>(MarkAcross(mark, textHeight)) + 2 * WholePixels(static_cast<float>(textHeight) * kMarkRoom);
+    }
+
+    Coverage MarkCoverage(DashMark mark, int textHeight, int margin)
+    {
+        const int height = std::max(1, textHeight), width = MarkWidth(mark, height);
+        Coverage c{width + 2 * margin, height + 2 * margin, {}};
+        c.alpha.assign(static_cast<size_t>(c.width) * static_cast<size_t>(c.height), 0);
+        const float half = MarkAcross(mark, height) / 2.0f;
+        // Its middle on the middle of a row, so that it is the same above and below.
+        const float middleX = static_cast<float>(c.width) / 2.0f;
+        const float middleY = static_cast<float>(margin) + std::floor(static_cast<float>(height) * kMarkMiddle) + 0.5f;
+        const auto inside   = [&](float x, float y) {
+            const float dx = std::fabs(x - middleX), dy = std::fabs(y - middleY);
+            switch (mark)
+            {
+            case DashMark::Dot: return dx * dx + dy * dy <= half * half;
+            case DashMark::Square: return dx <= half && dy <= half;
+            case DashMark::Diamond: return dx + dy <= half;
+            case DashMark::None: break;
+            }
+            return false;
+        };
+        for (int y = 0; y < c.height; ++y)
+            for (int x = 0; x < c.width; ++x)
+            {
+                int covered = 0;
+                for (int sy = 0; sy < kMarkSamples; ++sy)
+                    for (int sx = 0; sx < kMarkSamples; ++sx)
+                        covered += inside(static_cast<float>(x) + (static_cast<float>(sx) + 0.5f) / kMarkSamples,
+                            static_cast<float>(y) + (static_cast<float>(sy) + 0.5f) / kMarkSamples);
+                c.alpha[static_cast<size_t>(y * c.width + x)] =
+                    static_cast<uint8_t>(std::lround(kFullCoverage * static_cast<float>(covered) / (kMarkSamples * kMarkSamples)));
+            }
+        return c;
+    }
+
+    Coverage Joined(const std::vector<Coverage>& pieces, int margin)
+    {
+        Coverage joined{2 * margin, 2 * margin, {}};
+        for (const Coverage& piece : pieces)
+        {
+            joined.width += piece.width - 2 * margin;
+            joined.height = std::max(joined.height, piece.height);
+        }
+        joined.alpha.assign(static_cast<size_t>(joined.width) * static_cast<size_t>(joined.height), 0);
+        int left = 0;
+        for (const Coverage& piece : pieces)
+        {
+            // Margins overlap their neighbors': whatever a letter leans into its own stays.
+            for (int y = 0; y < piece.height; ++y)
+                for (int x = 0; x < piece.width; ++x)
+                {
+                    uint8_t& into = joined.alpha[static_cast<size_t>(y * joined.width + left + x)];
+                    into          = std::max(into, piece.alpha[static_cast<size_t>(y * piece.width + x)]);
+                }
+            left += piece.width - 2 * margin;
+        }
+        return joined;
     }
 
     Image Resized(const Image& picture, int width, int height)
@@ -438,12 +518,44 @@ namespace headsup
             for (int x = 0; x < s; ++x)
             {
                 int covered = 0;
-                for (int sy = 0; sy < kStarSamples; ++sy)
-                    for (int sx = 0; sx < kStarSamples; ++sx)
-                        covered += inside(static_cast<float>(x) + (static_cast<float>(sx) + 0.5f) / kStarSamples - half,
-                            half - static_cast<float>(y) - (static_cast<float>(sy) + 0.5f) / kStarSamples);
+                for (int sy = 0; sy < kPixelSamples; ++sy)
+                    for (int sx = 0; sx < kPixelSamples; ++sx)
+                        covered += inside(static_cast<float>(x) + (static_cast<float>(sx) + 0.5f) / kPixelSamples - half,
+                            half - static_cast<float>(y) - (static_cast<float>(sy) + 0.5f) / kPixelSamples);
                 Paint paint;
-                paint.Over(static_cast<float>(covered) / (kStarSamples * kStarSamples), color);
+                paint.Over(static_cast<float>(covered) / (kPixelSamples * kPixelSamples), color);
+                image.argb[static_cast<size_t>(y * s + x)] = paint.Color();
+            }
+        return image;
+    }
+
+    Image ResetArrow(int size, uint32_t color)
+    {
+        const int s = std::max(1, size);
+        Image image{s, s, std::vector<uint32_t>(static_cast<size_t>(s) * static_cast<size_t>(s), 0)};
+        const float side = static_cast<float>(s), half = side / 2.0f;
+        const float radius = side * kResetRadius, stroke = side * kResetStroke / 2.0f;
+        // The head's corners, in pixels from the image's corner: its tip left of the ring's top, its base across it.
+        const float tipX = half - side * kResetHeadLength, topY = half - radius, base = side * kResetHeadHalf;
+        const auto inside = [&](float x, float y) {
+            const float dx = x - half, dy = y - half;
+            // Counterclockwise from straight up as the screen shows it, y running down.
+            const float turn = std::atan2(-dx, -dy);
+            const bool gap   = turn >= 0.0f && turn < kResetGap;
+            if (std::fabs(std::hypot(dx, dy) - radius) <= stroke && !gap) return true;
+            // The head narrows evenly from its base at the ring's top to its tip.
+            return x >= tipX && x <= half && std::fabs(y - topY) * (half - tipX) <= base * (x - tipX);
+        };
+        for (int y = 0; y < s; ++y)
+            for (int x = 0; x < s; ++x)
+            {
+                int covered = 0;
+                for (int sy = 0; sy < kPixelSamples; ++sy)
+                    for (int sx = 0; sx < kPixelSamples; ++sx)
+                        covered += inside(static_cast<float>(x) + (static_cast<float>(sx) + 0.5f) / kPixelSamples,
+                            static_cast<float>(y) + (static_cast<float>(sy) + 0.5f) / kPixelSamples);
+                Paint paint;
+                paint.Over(static_cast<float>(covered) / (kPixelSamples * kPixelSamples), color);
                 image.argb[static_cast<size_t>(y * s + x)] = paint.Color();
             }
         return image;

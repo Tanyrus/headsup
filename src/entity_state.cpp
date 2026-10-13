@@ -133,6 +133,11 @@ namespace headsup
         return ToArgb(pick.custom);
     }
 
+    bool InCombat(const EntityState& state)
+    {
+        return PlateKindOf(state) == PlateKind::Mobs ? state.claim == ClaimState::Yours : state.engaged;
+    }
+
     uint32_t CursorColorOf(const ColorPick& pick, const EntityState& state, const Palette& palette)
     {
         const std::vector<ColorSource> readable = SourcesFor(PlateKindOf(state), false);

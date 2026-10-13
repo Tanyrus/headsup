@@ -340,14 +340,29 @@ TEST(a_badge_is_readable_on_a_default_icon_and_leaves_the_icons_top_half_clear)
     CHECK(1.0f + kBadgeHang - kBadgeShare >= 0.5f); // where its box starts, as a share of the icon from the icon's top
 }
 
-TEST(other_mobs_plates_fade_while_you_have_a_target)
+TEST(a_nameplates_opacity_goes_by_what_you_target_and_by_distance_when_it_fades_in)
 {
-    Settings s;
-    s.untargetedOpacity = 40;
-    CHECK_EQ(PlateAlpha(s, EntityKind::Mob, kPlainRank, true), 102u);
-    CHECK_EQ(PlateAlpha(s, EntityKind::Mob, kPlainRank, false), kOpaqueAlpha); // no target: nothing fades
-    CHECK_EQ(PlateAlpha(s, EntityKind::Mob, kTargetRank, true), kOpaqueAlpha);
-    CHECK_EQ(PlateAlpha(s, EntityKind::Player, kPlainRank, true), kOpaqueAlpha);
+    OpacitySettings o;
+    o.noTarget    = 80;
+    o.notTargeted = 40;
+    o.targeted    = 90;
+    CHECK_EQ(PlateAlpha(o, kPlainRank, false, 5.0f), 204u); // you have no target
+    CHECK_EQ(PlateAlpha(o, kPlainRank, true, 5.0f), 102u);  // you have one, and it is another
+    CHECK_EQ(PlateAlpha(o, kTargetRank, true, 5.0f), 230u); // it is this one
+    CHECK_EQ(PlateAlpha(o, kPickedRank, true, 5.0f), 230u); // or this is the one you are picking
+    CHECK_EQ(PlateAlpha(o, kPickedRank, false, 5.0f), 230u);
+    CHECK_EQ(PlateAlpha(o, kPlainRank, true, 45.0f), 102u); // distance counts for nothing unless it fades in
+    // Fading in, each of the three is whole within 10 yalms and a hundredth at the range, evenly between.
+    o.fadeIn = true;
+    o.range  = 50.0f;
+    CHECK_EQ(PlateAlpha(o, kPlainRank, true, 8.0f), 102u);
+    CHECK_EQ(PlateAlpha(o, kPlainRank, true, 30.0f), 52u); // 102 * 0.505
+    CHECK_EQ(PlateAlpha(o, kPlainRank, true, 50.0f), 1u);
+    CHECK_EQ(PlateAlpha(o, kTargetRank, true, 30.0f), 116u); // 229.5 * 0.505
+    CHECK_EQ(PlateAlpha(o, kPlainRank, false, 30.0f), 103u); // 204 * 0.505
+    o.range = 30.0f;
+    CHECK_EQ(PlateAlpha(o, kPlainRank, false, 20.0f), 103u); // half way to a nearer range
+    CHECK_EQ(PlateAlpha(OpacitySettings{}, kPlainRank, true, 45.0f), kOpaqueAlpha); // a new install's: whole
     CHECK_EQ(WithAlpha(0xFF123456, 102), 0x66123456u);
     CHECK_EQ(WithAlpha(0x80123456, kOpaqueAlpha), 0x80123456u);
 }
