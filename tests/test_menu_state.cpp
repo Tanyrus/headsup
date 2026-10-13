@@ -269,3 +269,18 @@ TEST(the_sync_dropdown_lists_no_then_its_targets)
     CHECK_EQ(SyncEntryLabel(targets, 1), "Line 1");
     CHECK_EQ(SyncEntryLabel(targets, 2), "Line 3");
 }
+
+TEST(the_clocks_zone_dropdown_lists_local_first_and_then_every_zone)
+{
+    CHECK_EQ(kClockZoneChoices, kClockZoneCount + 1);
+    CHECK(ClockZoneChoiceName(0) == "Local" && ClockZoneChoiceName(1) == "Japan (JST)");
+    CHECK(ClockZoneChoiceName(kClockZoneChoices - 1) == "Australia Eastern (AET)");
+    CHECK(ClockZoneChoice(std::nullopt) == 0 && !ClockZoneOfChoice(0).has_value());
+    CHECK(!ClockZoneOfChoice(-1).has_value() && !ClockZoneOfChoice(kClockZoneChoices).has_value());
+    for (int z = 0; z < kClockZoneCount; ++z)
+    {
+        const auto zone = static_cast<ClockZone>(z);
+        CHECK(ClockZoneOfChoice(ClockZoneChoice(zone)) == zone);
+        CHECK(ClockZoneChoiceName(ClockZoneChoice(zone)) == ClockZoneName(zone));
+    }
+}

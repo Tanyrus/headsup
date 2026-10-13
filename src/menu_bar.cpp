@@ -382,9 +382,15 @@ namespace headsup
                     [](int c) { return std::string(kCurrencyTable[c].name); }, nullptr);
                 break;
             case BarWidget::EarthTime:
+            {
+                int zone = ClockZoneChoice(s.clockZone);
+                ui.NumberDropdown("Time zone", zone, 0, kClockZoneChoices - 1, ClockZoneChoiceName,
+                    "Local is your computer's. Another zone goes before the time, as in PDT 21:07.");
+                s.clockZone = ClockZoneOfChoice(zone);
                 ui.Switch("24-hour", s.clock24, "Also Server time.");
                 ui.Switch("Seconds", s.clockSeconds, nullptr);
                 break;
+            }
             case BarWidget::ServerTime:
             {
                 int zone = static_cast<int>(s.serverClockZone);
@@ -398,6 +404,11 @@ namespace headsup
             }
             case BarWidget::Job:
             {
+                const char* const layouts[kJobLayoutCount] = {"Jobs first", "EXP first", "EXP only"};
+                ui.Segments("Layout", s.jobLayout, layouts, kJobLayoutCount,
+                    "Which is the larger line, your jobs and levels or your EXP, with the other under it; or the EXP "
+                    "alone.",
+                    ui.Em(kWideSegmentWidth));
                 const char* const places[kExpBarPlaceCount] = {"Under", "Beside", "Off"};
                 ui.Segments("EXP bar", s.expBar, places, kExpBarPlaceCount, nullptr);
                 ui.Switch("Job names", s.jobNames, "Off, the levels alone.");

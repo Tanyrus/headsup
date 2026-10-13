@@ -88,7 +88,7 @@ namespace headsup
         return total * kHour / span;
     }
 
-    WidgetContent JobWidget(const std::optional<JobReport>& job, ExpBarPlace bar, bool jobNames)
+    WidgetContent JobWidget(const std::optional<JobReport>& job, ExpBarPlace bar, bool jobNames, JobLayout layout)
     {
         WidgetContent w;
         w.shown = true;
@@ -98,24 +98,27 @@ namespace headsup
             return w;
         }
         const JobSample& s = job->sample;
-        if (jobNames)
-            w.title = ListOf(Text(Jobs(s)));
-        else
-            w.title = ListOf(Text("Lv " + std::to_string(s.mainLevel) +
-                                  (s.subLevel > 0 && !std::string(JobName(s.subJob)).empty()
-                                          ? " / " + std::to_string(s.subLevel)
-                                          : "")));
+        Span jobs = Text(jobNames ? Jobs(s)
+                                  : "Lv " + std::to_string(s.mainLevel) +
+                                        (s.subLevel > 0 && !std::string(JobName(s.subJob)).empty()
+                                                ? " / " + std::to_string(s.subLevel)
+                                                : ""));
+        Span exp;
         if (AtCap(s))
         {
-            w.subtitle = ListOf(Text(std::to_string(s.merits) + (s.merits == 1 ? " merit" : " merits"), Tone::Dim));
+            exp        = Text(std::to_string(s.merits) + (s.merits == 1 ? " merit" : " merits"));
             w.progress = static_cast<float>(std::min(s.limitPoints, kLimitPointsPerMerit)) / kLimitPointsPerMerit;
         }
         else
         {
-            w.subtitle = ListOf(Text(Grouped(ToNext(s)) + " EXP to next", Tone::Dim));
+            exp = Text(Grouped(ToNext(s)) + " EXP to next");
             if (s.expNeeded > 0)
                 w.progress = static_cast<float>(std::min(s.exp, s.expNeeded)) / static_cast<float>(s.expNeeded);
         }
+        Span& smaller = layout == JobLayout::JobsFirst ? exp : jobs;
+        smaller.tone  = Tone::Dim;
+        w.title       = ListOf(layout == JobLayout::JobsFirst ? jobs : exp);
+        if (layout != JobLayout::ExpOnly) w.subtitle = ListOf(smaller);
         if (bar == ExpBarPlace::Off) w.progress.reset();
         w.progressBeside = bar == ExpBarPlace::Beside;
         w.hasPopup       = true;

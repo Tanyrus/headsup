@@ -1,5 +1,6 @@
 #pragma once
 
+#include "bar_server_time.h"
 #include "plate_settings.h"
 
 #include <optional>
@@ -32,6 +33,12 @@ namespace headsup
     // A label with each word capitalized after a space or a hyphen ("Sub-Target"), but for the small words inside it
     // ("Hide Level and Icons"); letters already capital stay.
     std::string TitleCaseText(std::string_view text);
+
+    // The Clock widget's Time Zone dropdown: the computer's own zone first, as no zone picked, then every ClockZone.
+    constexpr int kClockZoneChoices = kClockZoneCount + 1;
+    int ClockZoneChoice(const std::optional<ClockZone>& zone);
+    std::optional<ClockZone> ClockZoneOfChoice(int choice);
+    std::string ClockZoneChoiceName(int choice);
 
     struct Settings;
     // A size slider's format: its percent, then the pixels that percent of the base size is drawn at before the

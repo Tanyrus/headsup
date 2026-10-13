@@ -65,8 +65,9 @@ namespace headsup
         bool operator==(const JobReport&) const = default;
     };
 
-    // jobNames off: the levels alone, "Lv 30 / 15".
+    // jobNames off: the levels alone, "Lv 30 / 15". layout: which of the jobs and the EXP is the title, the other
+    // under it, or the EXP alone.
     WidgetContent JobWidget(const std::optional<JobReport>& job, ExpBarPlace bar = ExpBarPlace::Under,
-        bool jobNames = true);
+        bool jobNames = true, JobLayout layout = JobLayout::JobsFirst);
     PopupContent JobPopup(const std::optional<JobReport>& job);
 }

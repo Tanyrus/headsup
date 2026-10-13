@@ -16,6 +16,11 @@ namespace headsup
         return changedAt && (!windowOpen || now - *changedAt >= kSaveSettleSeconds);
     }
 
+    namespace
+    {
+        constexpr const char* kLocalZoneLabel = "Local";
+    }
+
     const PageInfo kPages[kPageCount] = {
         {Page::Entities, "Entities", false},
         {Page::Mobs, "Mobs", true},
@@ -73,6 +78,20 @@ namespace headsup
             at = end < result.size() ? end + 1 : end;
         }
         return result;
+    }
+
+    int ClockZoneChoice(const std::optional<ClockZone>& zone) { return zone ? static_cast<int>(*zone) + 1 : 0; }
+
+    std::optional<ClockZone> ClockZoneOfChoice(int choice)
+    {
+        if (choice < 1 || choice >= kClockZoneChoices) return std::nullopt;
+        return static_cast<ClockZone>(choice - 1);
+    }
+
+    std::string ClockZoneChoiceName(int choice)
+    {
+        const std::optional<ClockZone> zone = ClockZoneOfChoice(choice);
+        return zone ? ClockZoneName(*zone) : kLocalZoneLabel;
     }
 
     std::string SizeFormat(const Settings& settings, int percent)

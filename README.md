@@ -194,7 +194,7 @@ A bar across the top of the screen, on by default, with these widgets from left 
 | Zone | The zone's name, its region and who holds it | The zone's ID and region; in a conquest region, each nation's and the beastmen's share of this week's influence there, the largest first, with a star beside whoever holds it, and the time to the tally |
 | Weather | The weather now, with its element, and today's chance of it | A five-day forecast, starting today |
 | Vana'diel | The weekday in its element's color, the time and moon | The date, and when the day and moon change |
-| Job | Your jobs and levels, and the EXP to your next level (your merits at 75), over a bar of it | EXP per hour, the time to level, limit points |
+| Job | Your jobs and levels, and the EXP to your next level (your merits at 75), over a bar of it; its Layout can put the EXP first, as the larger line, or show the EXP alone | EXP per hour, the time to level, limit points |
 | Party | How many are in your party, with the lowest HP and MP in your zone | Each member's jobs, levels, HP, MP and TP |
 | Signet | The time left on Signet or Sanction, only while one is on | What it gives and whether it works where you are |
 | Server time | The time in Japan, which Phoenix keeps, or another time zone's | The time to the daily reset and the conquest tally |
@@ -203,7 +203,7 @@ A bar across the top of the screen, on by default, with these widgets from left 
 | Bags | Your inventory's used and maximum space | Every bag you have |
 | Connection | The game's own S and R, bytes sent and received a second; amber when no data arrives, red once the game's meter drops, with the latency if switched on | Latency, the last server data, this session's totals |
 | FPS | Frames per second | The frame time and the slowest recent frame |
-| Clock | The time on your computer | The date |
+| Clock | The time on your computer, or in a time zone you pick, with the zone before it | The date there |
 | Distance | How far your target is, in yalms | Nothing |
 
 Under the bar at the screen's left, Game help has a thin bordered box of its own while the game has help to show, all
@@ -256,7 +256,7 @@ In the Widgets card, Left, Center and Right are trays side by side, each holding
 with a lit dot on each one that is on. A chip drags to another place in its tray or into another tray, an empty one
 too, and "Reset Layout" puts every widget back in its first place. A click on a chip shows that widget's options below
 the trays: Enabled, its section, its second line and icons where it has them, and its own options (Target's details,
-Gil's currency, the clocks' 24-hour and seconds switches and Server time's time zone, Job's EXP bar under or beside the
+Gil's currency, the clocks' time zones and 24-hour and seconds switches, Job's layout, its EXP bar under or beside the
 text or off and its job names, Connection's latency).
 
 Separators picks diamonds or none between neighbouring widgets in any theme, and starts at the theme's own. "Text Size"

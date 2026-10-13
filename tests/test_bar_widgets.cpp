@@ -1248,6 +1248,68 @@ TEST(the_job_widget_puts_its_exp_bar_under_beside_or_nowhere_and_can_show_levels
     CHECK(Joined(BarWidgetContent(BarWidget::Job, state, settings).title) == "Lv 30");
 }
 
+TEST(the_job_widget_can_put_its_exp_first_or_show_it_alone)
+{
+    Settings settings;
+    BarState state;
+    JobSample s;
+    s.mainJob = 1, s.mainLevel = 30, s.subJob = 13, s.subLevel = 15;
+    s.exp = 4140, s.expNeeded = 7600;
+    state.job          = JobReport{s, std::nullopt};
+    settings.jobLayout = JobLayout::ExpFirst;
+    WidgetContent w    = BarWidgetContent(BarWidget::Job, state, settings);
+    CHECK(w.title == ListOf(Text("3,460 EXP to next"))); // the larger line, in the title's own tone
+    CHECK(w.subtitle == ListOf(Text("WAR 30 / NIN 15", Tone::Dim)));
+    CHECK(w.figures && w.hasPopup && w.progress && std::fabs(*w.progress - 4140.0f / 7600.0f) < 1e-6f);
+    settings.jobNames = false;
+    CHECK(Joined(BarWidgetContent(BarWidget::Job, state, settings).subtitle) == "Lv 30 / 15");
+    settings.jobLayout = JobLayout::ExpOnly;
+    w                  = BarWidgetContent(BarWidget::Job, state, settings);
+    CHECK(Joined(w.title) == "3,460 EXP to next" && w.subtitle.empty() && w.progress.has_value());
+    s.mainLevel = 75, s.subLevel = 37, s.merits = 7, s.meritsMax = 10, s.limitPoints = 4210;
+    state.job = JobReport{s, std::nullopt};
+    w         = BarWidgetContent(BarWidget::Job, state, settings);
+    CHECK(w.title == ListOf(Text("7 merits")) && w.subtitle.empty() && w.progress == 0.421f);
+    state.job.reset(); // the title screen
+    w = BarWidgetContent(BarWidget::Job, state, settings);
+    CHECK(Joined(w.title) == "-" && w.subtitle.empty());
+}
+
+// 2026-10-09 06:30:42 UTC is Friday 15:30:42 in Japan and still Thursday 23:30:42 on the US Pacific coast, on daylight
+// time.
+TEST(the_clock_reads_in_the_zone_picked_for_it_with_that_zones_date_in_its_popup)
+{
+    Settings settings;
+    BarState state;
+    state.unixMs    = 1791527400000 + 42000;
+    state.earthYear = 2026, state.earthMonth = 10, state.earthDay = 9; // the computer's own: 08:30:42 in Berlin
+    state.earthHour = 8, state.earthMinute = 30, state.earthSecond = 42;
+    CHECK(!settings.clockZone.has_value());
+    CHECK(Joined(BarWidgetContent(BarWidget::EarthTime, state, settings).title) == "08:30");
+    CHECK(Joined(BarPopupContent(BarWidget::EarthTime, state, settings).title) == "2026-10-09");
+    settings.clockZone = ClockZone::UsPacific;
+    CHECK(Joined(BarWidgetContent(BarWidget::EarthTime, state, settings).title) == "PDT 23:30");
+    CHECK(Joined(BarPopupContent(BarWidget::EarthTime, state, settings).title) == "2026-10-08");
+    settings.clockZone    = ClockZone::Japan;
+    settings.clock24      = false;
+    settings.clockSeconds = true;
+    CHECK(Joined(BarWidgetContent(BarWidget::EarthTime, state, settings).title) == "JST 3:30:42 PM");
+    CHECK(Joined(BarPopupContent(BarWidget::EarthTime, state, settings).title) == "2026-10-09");
+}
+
+TEST(a_clock_in_a_picked_zone_is_read_from_the_time_alone_and_the_computers_from_its_own)
+{
+    Settings settings;
+    for (bool& on : settings.barWidgets)
+        on = false;
+    settings.barWidgets[static_cast<int>(BarWidget::EarthTime)] = true;
+    const BarNeeds own = NeedsOf(settings, std::nullopt);
+    CHECK(own.localTime && !own.unixTime);
+    settings.clockZone   = ClockZone::Utc;
+    const BarNeeds zoned = NeedsOf(settings, std::nullopt);
+    CHECK(zoned.unixTime && !zoned.localTime);
+}
+
 TEST(the_clocks_read_on_a_twelve_hour_clock_when_asked)
 {
     CHECK(ClockText(21, 7, true) == "21:07" && ClockText(21, 7, false) == "9:07 PM");

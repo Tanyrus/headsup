@@ -848,6 +848,27 @@ TEST(the_bar_sections_load_by_name_and_keep_every_widget)
     CHECK(saved.values["barCenter"].empty() && saved.values["barLeft"].rfind("target zone", 0) == 0);
 }
 
+TEST(the_job_layout_and_the_clocks_zone_are_saved_by_name_and_an_unknown_name_keeps_the_default)
+{
+    MapStore store;
+    store.values    = {{"jobLayout", "expOnly"}, {"clockZone", "usPacific"}};
+    const Settings s = LoadSettings(store);
+    CHECK(s.jobLayout == JobLayout::ExpOnly && s.clockZone == ClockZone::UsPacific);
+    CHECK(s.serverClockZone == ClockZone::Japan); // Server time's zone is its own
+    MapStore saved;
+    SaveSettings(s, saved);
+    CHECK(saved.values["jobLayout"] == "expOnly" && saved.values["clockZone"] == "usPacific");
+    CHECK(LoadSettings(saved) == s);
+    MapStore fresh;
+    SaveSettings(Settings{}, fresh);
+    CHECK(fresh.values["jobLayout"] == "jobsFirst" && fresh.values["clockZone"] == "local");
+    store.values       = {{"jobLayout", "sideways"}, {"clockZone", "mars"}};
+    const Settings odd = LoadSettings(store);
+    CHECK(odd.jobLayout == JobLayout::JobsFirst && !odd.clockZone.has_value());
+    store.values = {{"jobLayout", "expFirst"}, {"clockZone", "local"}};
+    CHECK(LoadSettings(store).jobLayout == JobLayout::ExpFirst && !LoadSettings(store).clockZone.has_value());
+}
+
 TEST(separators_that_are_not_a_choice_keep_the_themes)
 {
     MapStore store;

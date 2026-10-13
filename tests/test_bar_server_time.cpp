@@ -35,6 +35,21 @@ TEST(the_tally_is_the_next_monday_midnight_in_japan)
     CHECK_EQ(SecondsToTally(kMonday0000Jst + 10 * 3600000), 6 * kDay + 14 * kHour);
 }
 
+TEST(a_zones_time_carries_its_own_date)
+{
+    const ZoneTime pacific = ZoneAt(ClockZone::UsPacific, kFriday1530Jst); // Thursday 23:30 there
+    CHECK(pacific.year == 2026 && pacific.month == 10 && pacific.day == 8);
+    const ZoneTime japan = ZoneAt(ClockZone::Japan, kFriday1530Jst);
+    CHECK(japan.year == 2026 && japan.month == 10 && japan.day == 9);
+    constexpr int64_t kNewYearsEve = 1798747200000; // 2026-12-31 20:00 UTC: 05:00 on 1 January in Japan
+    const ZoneTime first = ZoneAt(ClockZone::Japan, kNewYearsEve), last = ZoneAt(ClockZone::UsHawaii, kNewYearsEve);
+    CHECK(first.year == 2027 && first.month == 1 && first.day == 1);
+    CHECK(last.year == 2026 && last.month == 12 && last.day == 31);
+    constexpr int64_t kLeapDay = 1835438400000; // 2028-02-29 12:00 UTC
+    const ZoneTime leap = ZoneAt(ClockZone::UsHawaii, kLeapDay);
+    CHECK(leap.year == 2028 && leap.month == 2 && leap.day == 29 && leap.hour == 2);
+}
+
 TEST(a_clock_zone_follows_its_daylight_saving_rule)
 {
     // 2026: the US changes on 8 March and 1 November, Europe on 29 March and 25 October, Sydney on 5 April and

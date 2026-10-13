@@ -68,6 +68,15 @@ namespace headsup
     };
     constexpr int kExpBarPlaceCount = static_cast<int>(ExpBarPlace::Off) + 1;
 
+    // What the Job widget shows larger: its jobs and levels over its EXP, the EXP over them, or the EXP alone.
+    enum class JobLayout : uint8_t
+    {
+        JobsFirst,
+        ExpFirst,
+        ExpOnly,
+    };
+    constexpr int kJobLayoutCount = static_cast<int>(JobLayout::ExpOnly) + 1;
+
     constexpr int kMinBarHeight = 24, kMaxBarHeight = 64; // pixels
     // A bar or popup text size setting's leftmost position, Auto: the size follows the bar height. Set sizes run from
     // the next pixel, the fonts' readable floor and the bar's smallest detail line.

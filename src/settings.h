@@ -16,6 +16,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -69,6 +70,7 @@ namespace headsup
         std::array<bool, kBarWidgetCount> barWidgets = kBarWidgetDefaults; // by BarWidget
         int barCurrency = kGilCurrency; // the Gil widget's, by kCurrencyTable
         ClockZone serverClockZone = ClockZone::Japan; // the Server time widget's clock
+        std::optional<ClockZone> clockZone;           // the Clock widget's; none for the computer's own
         std::vector<WindowOffset> windowOffsets; // each game window's move from where the game puts it
         std::vector<WindowGroup> windowGroups;   // windows moved together
         bool allUnderBar  = false; // every game window opening in the screen's upper half goes under the bar
@@ -81,6 +83,7 @@ namespace headsup
         std::array<bool, kBarWidgetCount> barSecondLine = AllOn(); // by BarWidget: its second line
         std::array<bool, kBarWidgetCount> barIcons      = AllOn(); // by BarWidget: its icons and gil's coin
         ExpBarPlace expBar = ExpBarPlace::Under;
+        JobLayout jobLayout = JobLayout::JobsFirst;
         SubtitlePlace barSubtitle = SubtitlePlace::After; // a widget's second line on a bar too short for two
         bool jobNames      = true;
         bool clock24       = true; // the Clock and Server time widgets
