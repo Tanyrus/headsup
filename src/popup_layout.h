@@ -24,6 +24,7 @@ namespace headsup
             Text,
             Icon,
             ImmuneMark, // a ×, its ink centered in the piece: inside an immune icon, at its bottom right
+            Star,       // a starred cell's star, after its text
             Rule,       // an ornate heading's fading line
             Tag,        // a tag's frame, under its text
             Card,       // a section's rounded ground, under its heading and rows

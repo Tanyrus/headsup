@@ -15,6 +15,7 @@ namespace headsup
         constexpr float kCapScale        = 1.4f; // an end cap's diamond, in diamonds
         constexpr int kOuterGap          = 2; // an ornate popup's outer border
         constexpr uint32_t kCoinColor    = 0xFFE8C35A;
+        constexpr uint32_t kStarColor    = kCoinColor; // a popup's star, in the coin's gold
         constexpr float kRadiusScale     = 100.0f; // an image key keeps a radius in hundredths
         constexpr float kFitSteps        = 10.0f;  // a fitted text's room is kept in tenths of a pixel
         constexpr int kFewLetters        = 3;      // the least of the target's name worth its room on the bar
@@ -44,6 +45,7 @@ namespace headsup
             kDiamond,
             kCoin,
             kRule,
+            kStar,
         };
 
         // Text is rasterized white and takes its color from its quad's tint; the tint keeps its own alpha, as the
@@ -558,6 +560,14 @@ namespace headsup
             case PopupPiece::Kind::Icon:
                 AddIcon(piece.icon, px, py, piece.width, piece.height);
                 break;
+            case PopupPiece::Kind::Star:
+            {
+                const int s = WholePixels(piece.width);
+                const ImageKey key{.kind = kStar, .width = s, .height = s, .colors = {kStarColor}};
+                AddImage(Picture(key, [&] { return Star(s, kStarColor); }), px, py, static_cast<float>(s),
+                    static_cast<float>(s));
+                break;
+            }
             case PopupPiece::Kind::Rule:
             {
                 const int w = WholePixels(piece.width);

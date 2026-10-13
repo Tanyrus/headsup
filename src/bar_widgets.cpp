@@ -494,9 +494,10 @@ namespace headsup
                 const Nation owner = OwnerOf(zone, state);
                 for (const RegionShare& share : *state.shares)
                 {
-                    std::vector<Span> name = ListOf(Colored(NationName(share.nation), NationColor(share.nation)));
-                    if (share.nation == owner) name.push_back(Text(std::string(kDot) + "holds it", Tone::Dim));
-                    influence.rows.push_back(Labeled(std::move(name), Text(std::to_string(share.percent) + "%")));
+                    PopupRow row = Labeled(Colored(NationName(share.nation), NationColor(share.nation)),
+                        Text(std::to_string(share.percent) + "%"));
+                    row.cells[0].star = share.nation == owner;
+                    influence.rows.push_back(std::move(row));
                 }
                 influence.rows.push_back(Labeled("Tally in", Text(SpanText(SecondsToTally(state.unixMs)))));
                 popup.sections.push_back(std::move(influence));

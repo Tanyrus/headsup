@@ -117,6 +117,8 @@ namespace headsup
     Image Diamond(int size, uint32_t color);
     // Gil's coin: a disc size pixels across with a 1 px rim at 60% of its color's brightness.
     Image Coin(int size, uint32_t color);
+    // A five-pointed star with a point straight up, in the circle size pixels across.
+    Image Star(int size, uint32_t color);
     // A 1 px line width long, color at the left fading to clear at the right: an ornate popup's heading rule.
     Image FadingRule(int width, uint32_t color);
 

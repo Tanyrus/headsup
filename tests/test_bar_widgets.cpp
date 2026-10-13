@@ -592,7 +592,7 @@ TEST(the_zone_popup_has_the_zones_number_beside_its_name_over_its_region)
     CHECK(Joined(unknown.title) == "Zone 999" && unknown.sections.empty());
 }
 
-TEST(the_zone_popup_ranks_the_influence_in_its_region_and_marks_who_holds_it)
+TEST(the_zone_popup_ranks_the_influence_in_its_region_and_stars_who_holds_it)
 {
     Settings settings;
     BarState state;
@@ -608,26 +608,30 @@ TEST(the_zone_popup_ranks_the_influence_in_its_region_and_marks_who_holds_it)
     const PopupSection* influence = Section(popup, "Influence");
     CHECK(influence != nullptr);
     CHECK(Lines(popup.sections[0]) == (std::vector<std::string>{"Region Ronfaure"}));
-    CHECK(Lines(*influence) == (std::vector<std::string>{"San d'Oria \xC2\xB7 holds it 61%", "Bastok 21%", "Windurst 11%",
-                                   "Beastmen 5%", "Tally in 2d 8h"}));
+    CHECK(Lines(*influence) == (std::vector<std::string>{"San d'Oria 61%", "Bastok 21%", "Windurst 11%", "Beastmen 5%",
+                                   "Tally in 2d 8h"}));
     for (const PopupRow& row : influence->rows)
         CHECK(row.kind == RowKind::Pair); // each figure at the right edge
-    CHECK(influence->rows[0].cells[0].text ==
-          ListOf(Colored("San d'Oria", NationColor(Nation::SanDoria)), Text(" \xC2\xB7 holds it ", Tone::Dim)));
     CHECK(influence->rows[1].cells[0].text == ListOf(Colored("Bastok ", NationColor(Nation::Bastok))));
+    // Which lines carry the holder's star, top to bottom.
+    const auto starred = [&] {
+        std::vector<bool> stars;
+        const PopupContent now = BarPopupContent(BarWidget::Zone, state, settings); // named: the loop reads its rows
+        for (const PopupRow& row : Section(now, "Influence")->rows)
+            stars.push_back(row.cells[0].star);
+        return stars;
+    };
+    CHECK(starred() == (std::vector<bool>{true, false, false, false, false}));
     (*state.owners)[0] = Nation::Beastmen; // a holder behind in the race keeps its place in it
-    CHECK(Lines(*Section(BarPopupContent(BarWidget::Zone, state, settings), "Influence")) ==
-          (std::vector<std::string>{"San d'Oria 61%", "Bastok 21%", "Windurst 11%", "Beastmen \xC2\xB7 holds it 5%",
-              "Tally in 2d 8h"}));
-    (*state.owners)[0] = Nation::None; // no one holds it: no line says so
-    CHECK(Lines(*Section(BarPopupContent(BarWidget::Zone, state, settings), "Influence")) ==
-          (std::vector<std::string>{"San d'Oria 61%", "Bastok 21%", "Windurst 11%", "Beastmen 5%", "Tally in 2d 8h"}));
+    CHECK(starred() == (std::vector<bool>{false, false, false, true, false}));
+    (*state.owners)[0] = Nation::None; // no one holds it
+    CHECK(starred() == (std::vector<bool>{false, false, false, false, false}));
     (*state.owners)[0] = Nation::Windurst; // a new week: no influence yet, in the nations' order
     state.shares =
         RegionShares{{{Nation::SanDoria, 0}, {Nation::Bastok, 0}, {Nation::Windurst, 0}, {Nation::Beastmen, 0}}};
     CHECK(Lines(*Section(BarPopupContent(BarWidget::Zone, state, settings), "Influence")) ==
-          (std::vector<std::string>{"San d'Oria 0%", "Bastok 0%", "Windurst \xC2\xB7 holds it 0%", "Beastmen 0%",
-              "Tally in 2d 8h"}));
+          (std::vector<std::string>{"San d'Oria 0%", "Bastok 0%", "Windurst 0%", "Beastmen 0%", "Tally in 2d 8h"}));
+    CHECK(starred() == (std::vector<bool>{false, false, true, false, false}));
     state.zone = 230; // Southern San d'Oria: a city region, outside the conquest
     CHECK(Section(BarPopupContent(BarWidget::Zone, state, settings), "Influence") == nullptr);
 }
