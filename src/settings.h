@@ -28,6 +28,7 @@ namespace headsup
     constexpr int kMinSmoothness = 4, kMaxSmoothness = 16;                  // shifted copies per mesh
     constexpr float kMinOutlineDistance = 5.0f, kMaxOutlineDistance = 50.0f; // yalms: the game draws no mob past 50
     constexpr int kMinTextSize = 8, kMaxTextSize = 48;   // pixels: the base and cursor sizes
+    constexpr int kDefaultIconSize = 16;                 // pixels: the base icon size
     constexpr int kMinNameRaise = 0, kMaxNameRaise = 40; // pixels
     constexpr const char* kDefaultFont = kMarcellusSC;
     constexpr const char* kBadgeFont   = kBarlowCondensed; // plain enough to read a few pixels tall
@@ -123,7 +124,8 @@ namespace headsup
         Color immuneBadgeColor = {{1.00f, 0.25f, 0.25f}};
         bool nameplates = true;
         bool outlines   = true;
-        int baseSize    = 15; // pixels: a line at 100 percent
+        int baseSize    = 15; // pixels: a line's text at 100 percent
+        int baseIconSize = kDefaultIconSize; // and its icons
         std::string defaultFont = kDefaultFont;
         int scaleMin = 50, scaleMax = 250; // percent: the distance scale's limits
         int timerPercent = 87;

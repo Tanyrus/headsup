@@ -468,7 +468,7 @@ TEST(players_and_npcs_take_the_mob_name_font_from_a_file_saved_before_they_had_t
     old.values = {{"settingsVersion", "2.0000"}, {"fontName", "Georgia"}, {"fontBold", "true"}};
     const Settings s = LoadSettings(old);
     for (const PlateKind kind : {PlateKind::Players, PlateKind::Self, PlateKind::Npcs})
-        CHECK(s.Kind(kind).lines[2].font == "Georgia" && s.Kind(kind).lines[2].bold);
+        CHECK(s.Kind(kind).lines[2].font == "Georgia" && s.Kind(kind).lines[2].style == StyleBit(FontStyle::Bold));
 }
 
 TEST(a_saved_file_loads_every_setting_and_saves_back_the_same)
@@ -512,7 +512,8 @@ TEST(a_group_side_that_is_not_left_or_right_keeps_its_default)
 {
     // On the level line the detection icons lead and the badges trail, each at its default side.
     MapStore store;
-    store.values = {{"showDamageIcons", "true"}, {"mobIconPlace", "inline"}, {"detectionIconSide", "hide"}, {"badgeSide", "middle"}};
+    store.values = {{"enabled", "true"}, {"showDamageIcons", "true"}, {"mobIconPlace", "inline"}, {"detectionIconSide", "hide"},
+        {"badgeSide", "middle"}};
     CHECK_EQ(LoadSettings(store).Kind(PlateKind::Mobs).lines[1].text, "$detect Lv $level $con $weak$resist");
 }
 
@@ -526,6 +527,7 @@ TEST(a_whole_number_too_large_for_an_int_is_clamped_like_any_other)
 {
     // A hand-edited file: the value saturates and Clamp takes it to the nearest limit, not past the other end.
     MapStore store;
+    store.values["enabled"]    = "true"; // which every build's file holds: without it there is no file to read
     store.values["nameSize"]   = "1e10";
     store.values["labelSize"]  = "-1e10";
     store.values["cursorSize"] = "3e9";
@@ -635,7 +637,7 @@ namespace
     MapStore TargetCursor(const char* r, const char* g, const char* b)
     {
         MapStore store;
-        store.values = {{"cursorColorR", r}, {"cursorColorG", g}, {"cursorColorB", b}};
+        store.values = {{"enabled", "true"}, {"cursorColorR", r}, {"cursorColorG", g}, {"cursorColorB", b}};
         return store;
     }
 
@@ -667,18 +669,18 @@ TEST(an_old_target_cursor_of_any_other_color_is_kept)
 TEST(a_file_from_before_the_level_line_had_its_own_font_and_shadow_keeps_the_names)
 {
     MapStore old;
-    old.values = {{"fontName", "Georgia"}, {"fontBold", "true"}, {"textOutlineR", "0.2500"}, {"textOutlineG", "0.2400"},
-        {"textOutlineB", "0.5000"}};
+    old.values = {{"enabled", "true"}, {"fontName", "Georgia"}, {"fontBold", "true"}, {"textOutlineR", "0.2500"},
+        {"textOutlineG", "0.2400"}, {"textOutlineB", "0.5000"}};
     const Settings s        = LoadSettings(old);
     const LineDesign& level = s.Kind(PlateKind::Mobs).lines[1];
-    CHECK(level.font == "Georgia" && level.bold);
+    CHECK(level.font == "Georgia" && level.style == StyleBit(FontStyle::Bold));
     CHECK(level.shadowColor.custom == (Color{{0.25f, 0.24f, 0.5f}}));
 }
 
 TEST(a_file_from_before_each_kind_had_a_name_size_gives_all_of_them_its_one)
 {
     MapStore old;
-    old.values = {{"nameSize", "20.0000"}};
+    old.values = {{"enabled", "true"}, {"nameSize", "20.0000"}};
     const Settings s = LoadSettings(old);
     CHECK_EQ(s.baseSize, 20);
     for (const PlateKind kind : {PlateKind::Players, PlateKind::Self, PlateKind::Npcs})
@@ -986,7 +988,8 @@ TEST(the_default_designs_reproduce_todays_look)
     const Settings d;
     const KindSettings& mobs = d.Kind(PlateKind::Mobs);
     CHECK_EQ(mobs.lines[0].text, "$detect");
-    CHECK_EQ(mobs.lines[0].iconSize, 107);
+    CHECK_EQ(mobs.lines[0].iconSize, 100); // of the base icon size, 16 px
+    CHECK_EQ(d.baseIconSize, 16);
     CHECK_EQ(mobs.lines[1].text, "Lv $level $con");
     CHECK_EQ(mobs.lines[1].textSize, 87);
     CHECK(mobs.lines[1].color.source == ColorSource::Toughness);
@@ -994,11 +997,10 @@ TEST(the_default_designs_reproduce_todays_look)
     CHECK(mobs.lines[2].color.source == ColorSource::Game);
     CHECK_EQ(mobs.lines[2].glow, 100);
     CHECK(mobs.lines[2].glowColor.source == ColorSource::Aggression);
-    CHECK(mobs.ornament.on);
-    CHECK(mobs.ornament.place == OrnamentPlace::BetweenLines2And3);
+    CHECK(mobs.ornament.place == OrnamentPlace::BelowMiddle);
     CHECK_EQ(mobs.ornament.width, 90);
     CHECK(mobs.ornament.color.source == ColorSource::Aggression);
-    CHECK(!d.Kind(PlateKind::Players).ornament.on);
+    CHECK(d.Kind(PlateKind::Players).ornament.place == OrnamentPlace::Disabled);
     CHECK(mobs.rows[CategoryIndex(Category::WillAttack)].outline == OutlineMode::Shown);
     CHECK(mobs.rows[CategoryIndex(Category::WontAttack)].outline == OutlineMode::Disabled);
     CHECK(mobs.rows[CategoryIndex(Category::Unknown)].outline == OutlineMode::Disabled);
@@ -1071,22 +1073,24 @@ TEST(every_designer_key_round_trips)
     mobs.rows[CategoryIndex(Category::WontAttack)].plate   = PlateMode::WhenTargeted;
     mobs.rows[CategoryIndex(Category::WontAttack)].outline = OutlineMode::WhenTargeted;
     mobs.rows[CategoryIndex(Category::WontAttack)].outlineColor = ColorPick{ColorSource::Custom, {{0.1f, 0.2f, 0.3f}}};
+    mobs.rows[CategoryIndex(Category::Dead)] = RowSettings{PlateMode::Hidden, OutlineMode::Shown, ColorPick{ColorSource::Toughness}};
     LineDesign& line = mobs.lines[1];
     line.text     = "Lv $level $con $$ $id";
     line.syncWith = 2;
     line.show     = LineShow{false, ConditionBit(ShowCondition::Targeted) | ConditionBit(ShowCondition::YourClaim)};
     line.align    = Align::Right;
     line.font     = "Cinzel";
-    line.bold     = true;
+    line.style    = StyleBit(FontStyle::Italic) | StyleBit(FontStyle::Underline);
     line.textSize = 150;
     line.iconSize = 60;
     line.color    = ColorPick{ColorSource::Claim};
     line.shadow   = 40;
+    line.padding  = 7;
     line.shadowColor   = ColorPick{ColorSource::Custom, {{0.4f, 0.5f, 0.6f}}};
     line.glow          = 120;
     line.glowSize      = 70;
     line.glowColor     = ColorPick{ColorSource::Type};
-    mobs.ornament      = OrnamentSettings{true, OrnamentPlace::BetweenLines1And2, 120, 9, ColorPick{ColorSource::Target}};
+    mobs.ornament      = OrnamentSettings{OrnamentPlace::Top, 120, 9, ColorPick{ColorSource::Target}};
     s.Kind(PlateKind::Pets).lines[0].text = "$owner's $name";
     s.palette.claim[static_cast<int>(ClaimState::Yours)] = {{0.7f, 0.8f, 0.9f}};
     s.nameplates = false;
@@ -1107,7 +1111,7 @@ TEST(every_designer_key_round_trips)
     CHECK_EQ(store.values.at("mobsLine2When"), "5");
     CHECK_EQ(store.values.at("petsLine1Text"), "$owner's $name");
     CHECK_EQ(store.values.at("friends"), "Tanyrus Chadmage");
-    CHECK_EQ(store.values.at("settingsVersion"), "3.0000");
+    CHECK_EQ(store.values.at("settingsVersion"), "4.0000");
 }
 
 TEST(clamp_breaks_sync_cycles_keeping_the_lower_line)
@@ -1211,7 +1215,7 @@ TEST(a_file_that_saved_aggression_on_a_kind_without_one_loads_as_target_type)
     MapStore saved;
     SaveSettings(Settings{}, saved);
     for (const char* key : {"playersRowPlayerColorSource", "selfLine3GlowColorSource", "npcsOrnamentColorSource",
-             "petsRowPetColorSource"})
+             "petsRowOthersPetColorSource"})
     {
         CHECK(saved.values.contains(key));
         saved.values[key] = "aggression";
@@ -1221,7 +1225,7 @@ TEST(a_file_that_saved_aggression_on_a_kind_without_one_loads_as_target_type)
     CHECK(s.Kind(PlateKind::Players).rows[static_cast<int>(PlayerRow::Player)].outlineColor.source == ColorSource::Type);
     CHECK(s.Kind(PlateKind::Self).lines[2].glowColor.source == ColorSource::Type);
     CHECK(s.Kind(PlateKind::Npcs).ornament.color.source == ColorSource::Type);
-    CHECK(s.Kind(PlateKind::Pets).rows[0].outlineColor.source == ColorSource::Type);
+    CHECK(s.Kind(PlateKind::Pets).rows[static_cast<int>(PetRow::Others)].outlineColor.source == ColorSource::Type);
     CHECK(s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WontAttack)].outlineColor.source == ColorSource::Aggression);
     CHECK(s == Settings{});
 }
@@ -1270,9 +1274,9 @@ TEST(an_old_file_migrates_field_by_field)
                  std::strtof(store.values.at("lockedCursorColorB").c_str(), nullptr)}}));
     // Fonts and sizes.
     CHECK_EQ(mobs.lines[2].font, store.values.at("fontName"));
-    CHECK(mobs.lines[2].bold); // fontBold=true
+    CHECK_EQ(mobs.lines[2].style, StyleBit(FontStyle::Bold)); // fontBold=true
     CHECK_EQ(s.Kind(PlateKind::Pets).lines[2].font, store.values.at("fontName"));
-    CHECK(s.Kind(PlateKind::Pets).lines[2].bold);
+    CHECK_EQ(s.Kind(PlateKind::Pets).lines[2].style, StyleBit(FontStyle::Bold));
     CHECK_EQ(mobs.lines[1].font, store.values.at("labelFontName"));
     CHECK_EQ(s.Kind(PlateKind::Players).lines[2].font, store.values.at("playerFontName"));
     CHECK_EQ(s.Kind(PlateKind::Npcs).lines[2].font, store.values.at("npcFontName"));
@@ -1280,7 +1284,7 @@ TEST(an_old_file_migrates_field_by_field)
     CHECK_EQ(s.baseSize, base);
     CHECK_EQ(mobs.lines[2].textSize, 100);
     CHECK_EQ(mobs.lines[1].textSize, std::lround(100.0f * std::strtof(store.values.at("labelSize").c_str(), nullptr) / static_cast<float>(base)));
-    CHECK_EQ(mobs.lines[0].iconSize, std::lround(100.0f * std::strtof(store.values.at("iconSize").c_str(), nullptr) / static_cast<float>(base)));
+    CHECK_EQ(mobs.lines[0].iconSize, 150); // iconSize=24 px, of the 16 px base icon
     CHECK_EQ(s.Kind(PlateKind::Self).lines[2].textSize, std::lround(100.0f * std::strtof(store.values.at("selfNameSize").c_str(), nullptr) / static_cast<float>(base)));
     // showLabels=false with mobId=lastThree leaves the ID alone on line 2; showIcons=false with the three badge
     // switches on leaves the badge tags on line 1; hideClaimed shows both lines on unclaimed mobs only.
@@ -1294,22 +1298,22 @@ TEST(an_old_file_migrates_field_by_field)
     CHECK(mobs.rows[CategoryIndex(Category::PartyClaim)].outline == OutlineMode::Shown); // its own switch was on
     CHECK(mobs.rows[CategoryIndex(Category::PartyClaim)].outlineColor.source == ColorSource::Claim);
     CHECK_EQ(mobs.lines[2].glow, 0); // nameGlow=false
-    CHECK(!mobs.ornament.on);        // showOrnament=false
+    CHECK(mobs.ornament.place == OrnamentPlace::Disabled); // showOrnament=false
     CHECK(mobs.ornament.color.source == ColorSource::Custom); // ownOrnamentColor=true
     CHECK_EQ(mobs.ornament.width, static_cast<int>(std::strtof(store.values.at("ornamentWidth").c_str(), nullptr)));
     CHECK_EQ(mobs.ornament.height, static_cast<int>(std::strtof(store.values.at("ornamentThickness").c_str(), nullptr)));
-    CHECK_EQ(mobs.lines[2].shadow, static_cast<int>(std::strtof(store.values.at("nameShadow").c_str(), nullptr)));
+    CHECK_EQ(mobs.lines[2].shadow, 33); // nameShadow=50, of a unit that is now one and a half of it
     // ownNameColor, nameShadow and the player icon size reach the players' name line too.
     const LineDesign& playerName = s.Kind(PlateKind::Players).lines[2];
     CHECK(mobs.lines[2].color.source == ColorSource::Custom && playerName.color.source == ColorSource::Custom);
     CHECK_EQ(playerName.shadow, mobs.lines[2].shadow);
-    CHECK_EQ(playerName.iconSize, 130); // playerIconSize=120 of playerNameSize=13 over mobNameSize=12
-    CHECK_EQ(s.Kind(PlateKind::Self).lines[2].iconSize, 170); // of selfNameSize=17
+    CHECK_EQ(playerName.iconSize, 98); // playerIconSize=120 of playerNameSize=13 is 15.6 px, of the 16 px base icon
+    CHECK_EQ(s.Kind(PlateKind::Self).lines[2].iconSize, 128); // of selfNameSize=17: 20.4 px
     CHECK_EQ(playerName.text, "$name"); // showPlayerIcons=false
     // Saved again, the file carries the new version and the new keys.
     MapStore again;
     SaveSettings(s, again);
-    CHECK_EQ(again.values.at("settingsVersion"), "3.0000");
+    CHECK_EQ(again.values.at("settingsVersion"), "4.0000");
     CHECK(LoadSettings(again) == s);
 }
 
@@ -1434,8 +1438,8 @@ TEST(a_players_name_line_carries_the_icons_the_old_settings_showed_on_each_side)
 TEST(a_players_icons_are_a_percent_of_that_players_own_name_size)
 {
     const Settings s = Load2({{"mobNameSize", "20"}, {"playerNameSize", "14"}, {"selfNameSize", "24"}, {"playerIconSize", "100"}});
-    CHECK_EQ(s.Kind(PlateKind::Players).lines[2].iconSize, 70);
-    CHECK_EQ(s.Kind(PlateKind::Self).lines[2].iconSize, 120);
+    CHECK_EQ(s.Kind(PlateKind::Players).lines[2].iconSize, 88); // 14 px of the 16 px base icon
+    CHECK_EQ(s.Kind(PlateKind::Self).lines[2].iconSize, 150); // 24 px
 }
 
 TEST(the_hide_switches_that_have_a_condition_become_one_and_the_others_are_dropped)
@@ -1472,10 +1476,10 @@ TEST(the_old_glow_and_shadow_settings_reach_the_mob_lines_and_the_cursor_edge)
     const Settings shadow = Load2({{"labelShadow", "40"}, {"labelShadowColorR", "0.1"}, {"labelShadowColorG", "0.2"},
         {"labelShadowColorB", "0.3"}, {"nameShadow", "170"}});
     const KindSettings& mobs = shadow.Kind(PlateKind::Mobs);
-    CHECK_EQ(mobs.lines[1].shadow, 40);
+    CHECK_EQ(mobs.lines[1].shadow, 27); // 40 of the unit before, which was two thirds of this one
     CHECK(mobs.lines[1].shadowColor.custom == (Color{{0.1f, 0.2f, 0.3f}}));
-    CHECK_EQ(mobs.lines[2].shadow, 170);
-    CHECK_EQ(shadow.Kind(PlateKind::Players).lines[2].shadow, 170);
+    CHECK_EQ(mobs.lines[2].shadow, 113); // 170 likewise
+    CHECK_EQ(shadow.Kind(PlateKind::Players).lines[2].shadow, 113);
     const Settings outline = Load2({{"textOutlineR", "0.6"}, {"textOutlineG", "0.7"}, {"textOutlineB", "0.8"}});
     const Color edge{{0.6f, 0.7f, 0.8f}};
     CHECK(outline.cursorEdgeColor == edge);
@@ -1553,7 +1557,7 @@ TEST(the_first_save_after_a_migration_passes_on_every_key_the_file_lacks_and_non
         passed[k.key] = k.text;
     CHECK(passed == expected);
     CHECK_EQ(file.sets.size(), passed.size()); // each key once
-    for (const char* designer : {"mobsRowAggressivePlate", "mobsLine3Text", "petsLine1TextSize", "selfOrnamentOn",
+    for (const char* designer : {"mobsRowAggressivePlate", "mobsLine3Text", "petsLine1TextSize", "selfOrnamentVisibility",
              "paletteAggressionPassiveR", "defaultFont", "friends", "nameplateDesigns", "settingsVersion"})
         CHECK(passed.contains(designer));
     for (const char* old : kOldKeys)
@@ -1631,7 +1635,7 @@ TEST(a_file_an_older_or_earlier_build_saved_is_owed_a_save_that_gives_it_the_ver
         ChangedKeys keys(olderBuild);
         const Settings s = keys.Load();
         CHECK(keys.Outdated());
-        CHECK((keys.Save(s) == std::vector<KeyText>{{"settingsVersion", "3.0000"}}));
+        CHECK((keys.Save(s) == std::vector<KeyText>{{"settingsVersion", "4.0000"}}));
     }
     {
         ChangedKeys keys(earlierBuild);
@@ -1646,7 +1650,7 @@ TEST(a_file_an_older_or_earlier_build_saved_is_owed_a_save_that_gives_it_the_ver
     // Nothing is owed to this build's own file, to a newer build's, or where there is no file.
     CHECK(!OutdatedWhenLoaded(SavedByThisBuild()));
     MapStore newerBuild = SavedByThisBuild();
-    newerBuild.values["settingsVersion"] = "4.0000";
+    newerBuild.values["settingsVersion"] = "5.0000";
     CHECK(!OutdatedWhenLoaded(newerBuild));
     CHECK(!OutdatedWhenLoaded(MapStore{}));
     // A value edited by hand waits for a save like any other.
@@ -1785,22 +1789,160 @@ TEST(a_version_3_file_from_before_the_marker_loads_its_designs)
     MapStore file;
     SaveSettings(designed, file);
     file.values.erase("nameplateDesigns");
-    CHECK_EQ(file.values.at("settingsVersion"), "3.0000");
+    CHECK_EQ(file.values.at("settingsVersion"), "4.0000");
     CHECK(LoadSettings(file) == designed);
 }
 
 TEST(a_row_saved_as_expanding_shows_its_nameplate)
 {
     // The Expanding mode is gone: its row drew a nameplate, whole for a target, so it is Shown.
-    Settings hidden;
-    hidden.Kind(PlateKind::Npcs).rows[0].plate = PlateMode::Hidden;
+    // And not the row's default, which a name no build knows falls back on: a pet row's is When Targeted.
+    const auto yours = [](const Settings& s) { return s.Kind(PlateKind::Pets).rows[static_cast<int>(PetRow::Yours)].plate; };
     MapStore file;
-    SaveSettings(hidden, file);
-    CHECK(LoadSettings(file).Kind(PlateKind::Npcs).rows[0].plate == PlateMode::Hidden);
-    file.values["npcsRowNpcPlate"] = "expanding";
-    CHECK(LoadSettings(file).Kind(PlateKind::Npcs).rows[0].plate == PlateMode::Shown);
-    file.values["npcsRowNpcPlate"] = "vanilla";
-    CHECK(LoadSettings(file).Kind(PlateKind::Npcs).rows[0].plate == PlateMode::Vanilla);
+    SaveSettings(Settings{}, file);
+    CHECK(yours(LoadSettings(file)) == PlateMode::WhenTargeted);
+    file.values["petsRowYourPetPlate"] = "expanding";
+    CHECK(yours(LoadSettings(file)) == PlateMode::Shown);
+    file.values["petsRowYourPetPlate"] = "nonsense";
+    CHECK(yours(LoadSettings(file)) == PlateMode::WhenTargeted);
+}
+
+namespace
+{
+    // A file as the build before the review saved it: this build's, less the keys the review added, at version 3.
+    // old: the keys such a file held that this build no longer writes, with their values.
+    MapStore Version3File(const Settings& s, std::initializer_list<std::pair<const char*, const char*>> old,
+        std::initializer_list<const char*> added)
+    {
+        MapStore file;
+        SaveSettings(s, file);
+        for (const char* key : added)
+            file.values.erase(key);
+        for (const auto& [key, value] : old)
+            file.values[key] = value;
+        file.values["settingsVersion"] = "3.0000";
+        file.sets.clear();
+        return file;
+    }
+}
+
+TEST(a_shadow_saved_before_its_unit_grew_keeps_its_look)
+{
+    // 100 percent is now one and a half of the shadow it was: 150 from before is 100, and 100 is 67.
+    MapStore file = Version3File(Settings{}, {{"mobsLine3Shadow", "150.0000"}, {"mobsLine2Shadow", "100.0000"}},
+        {"mobsLine3ShadowStrength", "mobsLine2ShadowStrength"});
+    const Settings loaded = LoadSettings(file);
+    CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[2].shadow, 100);
+    CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[1].shadow, 67);
+    // Such a file is owed a save, which gives it the new keys and leaves the old ones as they were.
+    ChangedKeys keys(file);
+    const Settings again = keys.Load();
+    CHECK(keys.Outdated() && again == loaded);
+    keys.Save(again);
+    CHECK_EQ(file.values.at("mobsLine2ShadowStrength"), "67.0000");
+    CHECK_EQ(file.values.at("mobsLine2Shadow"), "100.0000");
+    CHECK(std::ranges::find(file.sets, "mobsLine2Shadow") == file.sets.end());
+    CHECK_EQ(file.values.at("settingsVersion"), "4.0000");
+    // The build before, run again, writes its own key: this build goes by its own.
+    file.values["mobsLine2Shadow"] = "200.0000";
+    CHECK_EQ(LoadSettings(file).Kind(PlateKind::Mobs).lines[1].shadow, 67);
+    // A file with neither key has the default.
+    file.values.erase("mobsLine2Shadow");
+    file.values.erase("mobsLine2ShadowStrength");
+    CHECK_EQ(LoadSettings(file).Kind(PlateKind::Mobs).lines[1].shadow, 100);
+}
+
+TEST(an_icon_size_saved_as_a_share_of_the_font_size_keeps_its_pixels)
+{
+    // A line's icons were a percent of the base font size, and are one of the base icon size, 16 px: 107 percent of a
+    // 20 px font was 21.4 px, which is 134 percent of 16.
+    Settings before;
+    before.baseSize = 20;
+    MapStore file = Version3File(before, {{"mobsLine1IconSize", "107.0000"}, {"playersLine3IconSize", "50.0000"}},
+        {"mobsLine1IconScale", "playersLine3IconScale", "baseIconSize"});
+    const Settings loaded = LoadSettings(file);
+    CHECK_EQ(loaded.baseIconSize, 16);
+    CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[0].iconSize, 134);
+    CHECK_EQ(loaded.Kind(PlateKind::Players).lines[2].iconSize, 63); // 10 px
+    // Saved under its own key, it is read back as it is, whatever the base sizes become.
+    Settings changed    = loaded;
+    changed.baseSize    = 30;
+    changed.baseIconSize = 24;
+    SaveSettings(changed, file);
+    CHECK(std::ranges::find(file.sets, "mobsLine1IconSize") == file.sets.end());
+    CHECK(LoadSettings(file) == changed);
+}
+
+TEST(an_ornament_saved_as_a_switch_and_two_lines_is_where_it_was)
+{
+    // Before, an ornament was on or off and sat between lines 1 and 2 or between 2 and 3.
+    const auto place = [](const char* on, const char* lines) {
+        MapStore file = Version3File(Settings{}, {{"npcsOrnamentOn", on}, {"npcsOrnamentPlace", lines}}, {"npcsOrnamentVisibility"});
+        return LoadSettings(file).Kind(PlateKind::Npcs).ornament.place;
+    };
+    CHECK(place("true", "lines12") == OrnamentPlace::AboveMiddle);
+    CHECK(place("true", "lines23") == OrnamentPlace::BelowMiddle);
+    CHECK(place("false", "lines12") == OrnamentPlace::Disabled);
+    CHECK(place("false", "lines23") == OrnamentPlace::Disabled);
+    // Its own key stands whatever the switch from before says: that key is never written again.
+    Settings top;
+    top.Kind(PlateKind::Npcs).ornament.place = OrnamentPlace::Top;
+    MapStore file = Version3File(top, {{"npcsOrnamentOn", "false"}, {"npcsOrnamentPlace", "lines23"}}, {});
+    CHECK(LoadSettings(file).Kind(PlateKind::Npcs).ornament.place == OrnamentPlace::Top);
+    SaveSettings(top, file);
+    CHECK(std::ranges::find(file.sets, "npcsOrnamentOn") == file.sets.end());
+    CHECK(std::ranges::find(file.sets, "npcsOrnamentPlace") == file.sets.end());
+}
+
+TEST(the_one_pet_row_of_before_becomes_all_four)
+{
+    // Pets had one row. A file from then gives what that row held to each of the four, and saves them as four.
+    MapStore file = Version3File(Settings{},
+        {{"petsRowPetPlate", "hidden"}, {"petsRowPetOutline", "shown"}, {"petsRowPetColorSource", "custom"},
+            {"petsRowPetColorR", "0.2500"}, {"petsRowPetColorG", "0.5000"}, {"petsRowPetColorB", "0.7500"}},
+        {"petsRowYourPetPlate", "petsRowYourPetOutline", "petsRowYourPetColorSource", "petsRowPartyPetPlate",
+            "petsRowPartyPetOutline", "petsRowFriendPetPlate", "petsRowFriendPetOutline", "petsRowOthersPetPlate",
+            "petsRowOthersPetOutline"});
+    const Settings loaded = LoadSettings(file);
+    for (int row = 0; row < kPetRowCount; ++row)
+    {
+        const RowSettings& pets = loaded.Kind(PlateKind::Pets).rows[row];
+        CHECK(pets.plate == PlateMode::Hidden && pets.outline == OutlineMode::Shown);
+    }
+    const RowSettings& yours = loaded.Kind(PlateKind::Pets).rows[static_cast<int>(PetRow::Yours)];
+    CHECK((yours.outlineColor == ColorPick{ColorSource::Custom, {{0.25f, 0.5f, 0.75f}}}));
+    // A row with keys of its own goes by them, whatever the one row of before says.
+    Settings changed = loaded;
+    changed.Kind(PlateKind::Pets).rows[static_cast<int>(PetRow::Party)].plate = PlateMode::Shown;
+    SaveSettings(changed, file);
+    CHECK(std::ranges::find(file.sets, "petsRowPetPlate") == file.sets.end());
+    CHECK(LoadSettings(file) == changed);
+    // A new install's four rows show a pet's nameplate when it is targeted, and never outline it.
+    const Settings fresh;
+    for (int row = 0; row < kPetRowCount; ++row)
+    {
+        const RowSettings& pets = fresh.Kind(PlateKind::Pets).rows[row];
+        CHECK(pets.plate == PlateMode::WhenTargeted && pets.outline == OutlineMode::Disabled);
+    }
+}
+
+TEST(a_line_saved_as_bold_is_bold_among_its_styles)
+{
+    // Bold was a switch of its own before a line had styles.
+    MapStore file = Version3File(Settings{}, {{"mobsLine3Bold", "true"}, {"mobsLine2Bold", "false"}},
+        {"mobsLine3Style", "mobsLine2Style"});
+    const Settings loaded = LoadSettings(file);
+    CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[2].style, StyleBit(FontStyle::Bold));
+    CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[1].style, 0);
+    // Its styles are saved under their own key, which then stands whatever the switch says.
+    Settings styled = loaded;
+    styled.Kind(PlateKind::Mobs).lines[2].style = StyleBit(FontStyle::Italic) | StyleBit(FontStyle::Underline);
+    SaveSettings(styled, file);
+    CHECK(std::ranges::find(file.sets, "mobsLine3Bold") == file.sets.end());
+    CHECK_EQ(LoadSettings(file).Kind(PlateKind::Mobs).lines[2].style, StyleBit(FontStyle::Italic) | StyleBit(FontStyle::Underline));
+    // A style no build knows is dropped.
+    file.values["mobsLine3Style"] = "FF";
+    CHECK_EQ(LoadSettings(file).Kind(PlateKind::Mobs).lines[2].style, kAllFontStyles);
 }
 
 TEST(pets_migrate_as_the_mobs_they_were_drawn_as)
@@ -1814,10 +1956,17 @@ TEST(pets_migrate_as_the_mobs_they_were_drawn_as)
         {"playerFontBold", "false"}, {"npcFontName", "Cinzel"}, {"npcFontBold", "false"}});
     const LineDesign& petName = fonts.Kind(PlateKind::Pets).lines[2];
     CHECK_EQ(petName.font, "Georgia");
-    CHECK(petName.bold);
-    CHECK(fonts.Kind(PlateKind::Pets).lines[0].font.empty() && !fonts.Kind(PlateKind::Pets).lines[0].bold);
-    const Settings plain = Load2({});
-    CHECK(plain.Kind(PlateKind::Pets) == Settings{}.Kind(PlateKind::Pets));
+    CHECK_EQ(petName.style, StyleBit(FontStyle::Bold));
+    CHECK(fonts.Kind(PlateKind::Pets).lines[0].font.empty() && fonts.Kind(PlateKind::Pets).lines[0].style == 0);
+    // But for its shadows, which were of the unit before, such a file's pets are today's.
+    // And it shows their nameplates, as it showed any mob's.
+    const Settings plain   = Load2({});
+    KindSettings expected  = Settings{}.Kind(PlateKind::Pets);
+    for (LineDesign& line : expected.lines)
+        line.shadow = 67;
+    for (int row = 0; row < kPetRowCount; ++row)
+        expected.rows[row].plate = PlateMode::Shown;
+    CHECK(plain.Kind(PlateKind::Pets) == expected);
 }
 
 TEST(a_line_too_long_is_cut_between_characters)

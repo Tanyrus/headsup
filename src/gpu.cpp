@@ -44,14 +44,23 @@ namespace headsup
         texture = nullptr;
     }
 
-    HDC GdiText::WithFont(std::string_view family, int pixelHeight, bool bold, int tracking)
+    namespace
+    {
+        // GDI measures an italic text by its letters' cells, and the last letter leans past its own: the room it is
+        // drawn and measured with, as a share of the text's height.
+        constexpr int kItalicLeanShare = 4;
+        int Lean(int pixelHeight, uint8_t style) { return HasStyle(style, FontStyle::Italic) ? pixelHeight / kItalicLeanShare : 0; }
+    }
+
+    HDC GdiText::WithFont(std::string_view family, int pixelHeight, uint8_t style, int tracking)
     {
         if (m_Context == nullptr) m_Context = CreateCompatibleDC(nullptr);
         if (m_Context == nullptr) return nullptr;
-        HFONT& font = m_Fonts.Use(std::tuple{family, pixelHeight, bold}, m_Frame);
+        HFONT& font = m_Fonts.Use(std::tuple{family, pixelHeight, style}, m_Frame);
         // A negative height asks for the character height, without the font's internal leading.
         if (font == nullptr)
-            font = CreateFontW(-pixelHeight, 0, 0, 0, bold ? FW_BOLD : FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+            font = CreateFontW(-pixelHeight, 0, 0, 0, HasStyle(style, FontStyle::Bold) ? FW_BOLD : FW_NORMAL,
+                HasStyle(style, FontStyle::Italic) ? TRUE : FALSE, HasStyle(style, FontStyle::Underline) ? TRUE : FALSE, FALSE, DEFAULT_CHARSET,
                 OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
                 Utf16(std::string(family)).c_str());
         if (font == nullptr) return nullptr;
@@ -61,17 +70,17 @@ namespace headsup
         return m_Context;
     }
 
-    bool GdiText::Rasterize(const char* text, const char* family, int pixelHeight, bool bold, int tracking,
+    bool GdiText::Rasterize(const char* text, const char* family, int pixelHeight, uint8_t style, int tracking,
         int margin, Coverage& out)
     {
         out = Coverage{};
-        const HDC dc = WithFont(family, pixelHeight, bold, tracking);
+        const HDC dc = WithFont(family, pixelHeight, style, tracking);
         if (dc == nullptr) return false;
         const std::wstring wide = Utf16(text);
         const auto length       = static_cast<int>(wide.size());
         SIZE size{};
         if (!GetTextExtentPoint32W(dc, wide.c_str(), length, &size)) return false;
-        const int width  = size.cx + 2 * margin;
+        const int width  = size.cx + Lean(pixelHeight, style) + 2 * margin;
         const int height = size.cy + 2 * margin;
         BITMAPINFO info{};
         info.bmiHeader.biSize        = sizeof(info.bmiHeader);
@@ -108,14 +117,14 @@ namespace headsup
         return true;
     }
 
-    bool GdiText::Extent(const char* text, const char* family, int pixelHeight, bool bold, int& width, int& height)
+    bool GdiText::Extent(const char* text, const char* family, int pixelHeight, uint8_t style, int& width, int& height)
     {
-        const HDC dc = WithFont(family, pixelHeight, bold, 0);
+        const HDC dc = WithFont(family, pixelHeight, style, 0);
         if (dc == nullptr) return false;
         const std::wstring wide = Utf16(text);
         SIZE size{};
         if (!GetTextExtentPoint32W(dc, wide.c_str(), static_cast<int>(wide.size()), &size)) return false;
-        width  = size.cx;
+        width  = size.cx + Lean(pixelHeight, style);
         height = size.cy;
         return true;
     }
@@ -126,7 +135,7 @@ namespace headsup
         if (known != m_Inks.end()) return known->second;
         auto inkOf = [&](const char* text) {
             Coverage coverage;
-            return Rasterize(text, family, pixelHeight, false, 0, 0, coverage)
+            return Rasterize(text, family, pixelHeight, 0, 0, 0, coverage)
                        ? FindInk(coverage, kInkCoverage)
                        : InkBox{};
         };

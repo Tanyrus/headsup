@@ -1695,6 +1695,14 @@ private:
             member != m_PartyJobs.end() ? &member->second : nullptr, check != nullptr ? &check->general : nullptr);
     }
 
+    // Your own title is the client's; another player's comes with a check of them.
+    uint32_t TitleOf(bool self, uint32_t serverId, IPlayer* player) const
+    {
+        if (self) return player->GetTitle();
+        const headsup::PlayerCheck* check = m_GameState.PlayerCheckOf(serverId);
+        return check != nullptr ? check->message.title : 0;
+    }
+
     void UpdateTracker(double now)
     {
         IEntity* entity = m_AshitaCore->GetMemoryManager()->GetEntity();
@@ -1755,14 +1763,19 @@ private:
                 .engaged        = state == kEngagedStatus,
                 .self           = self,
                 .jobs           = isPlayer ? JobsOf(index, serverId) : std::nullopt,
+                .title          = isPlayer ? TitleOf(self, serverId, player) : 0,
             });
         }
         const std::unordered_map<uint16_t, uint16_t> petOwners = headsup::PetOwners(pets);
         for (headsup::ActorInput& input : inputs)
             if (const auto owner = petOwners.find(input.index); owner != petOwners.end())
             {
-                input.pet       = true;
-                input.ownerName = headsup::EntityName(entity, owner->second);
+                const uint16_t ownerIndex = owner->second;
+                const bool yours          = ownerIndex == m_SelfIndex;
+                input.pet                 = true;
+                input.ownerName           = headsup::EntityName(entity, ownerIndex);
+                input.petRow = headsup::PetRowOf(yours, headsup::InYourParty(entity->GetServerId(ownerIndex), yours, m_PartyIds),
+                    headsup::IsFriend(m_Settings.friends, input.ownerName));
             }
         m_Player.level   = player->GetMainJobLevel();
         m_Player.sitting = headsup::IsSittingStatus(entity->GetStatus(m_SelfIndex));

@@ -150,9 +150,12 @@ namespace headsup
             EndRow();
         }
         // A dropdown of fonts between two arrows that step to the font before and after. unset, when given, is a
-        // first choice that stands for an empty name; bold, when given, is a checkbox after them.
+        // first choice that stands for an empty name.
         void FontDropdown(const char* label, std::string& font, const std::vector<std::string>& choices,
-            const char* tip = nullptr, const char* unset = nullptr, bool* bold = nullptr);
+            const char* tip = nullptr, const char* unset = nullptr);
+        // Joined buttons that each switch a bit of their own, the lowest first: any of them together.
+        void Toggles(const char* label, uint8_t& bits, const char* const* options, int count, const char* tip,
+            float segment = 0.0f);
         void Swatch(const char* label, Color& color, const char* tip);
         // A color pick: the dropdown of its source, then the swatch of a custom color.
         void ColorPickRow(const char* label, ColorPick& pick, const std::vector<ColorSource>& sources, const char* tip);

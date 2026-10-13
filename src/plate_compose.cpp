@@ -6,6 +6,7 @@
 #include "labels.h"
 #include "look.h"
 #include "plate_template.h"
+#include "titles.h"
 
 #include <algorithm>
 #include <optional>
@@ -37,11 +38,12 @@ namespace headsup
         {
             LineLook look;
             look.font        = d.font.empty() ? s.defaultFont : d.font;
-            look.bold        = d.bold;
+            look.style       = d.style;
             look.textSize    = BasePixels(s, d.textSize);
-            look.iconSize    = BasePixels(s, d.iconSize);
+            look.iconSize    = static_cast<float>(s.baseIconSize) * static_cast<float>(d.iconSize) / kPercent;
+            look.padding     = static_cast<float>(d.padding);
             look.color       = ResolveColor(d.color, state, s.palette, gameArgb);
-            look.shadow      = static_cast<float>(d.shadow) / kPercent;
+            look.shadow      = static_cast<float>(d.shadow) / kPercent * kShadowUnit;
             look.shadowColor = ResolveColor(d.shadowColor, state, s.palette, gameArgb);
             look.glow        = static_cast<float>(d.glow) / kPercent;
             look.glowSize    = static_cast<float>(d.glowSize) / kPercent;
@@ -62,6 +64,7 @@ namespace headsup
             case Tag::Ph:
             case Tag::Job:
             case Tag::Owner:
+            case Tag::Title:
                 return true;
             default:
                 return false;
@@ -115,6 +118,8 @@ namespace headsup
                 return IsMob(info) && info.placeholder ? kPlaceholderMark : std::string();
             case Tag::Job:
                 return IsPlayer(info) && info.jobs && info.jobs->mainJob != 0 ? JobText(*info.jobs) : std::string();
+            case Tag::Title:
+                return IsPlayer(info) ? TitleName(info.title) : std::string();
             default:
                 return {};
             }
@@ -298,7 +303,9 @@ namespace headsup
         const PlateMode mode     = kind.rows[RowOf(st)].plate;
         if (!DrawsPlate(mode)) return plate;
         if (mode == PlateMode::WhenTargeted && !Targeted(st.target)) return plate;
-        const bool deadMob  = st.kind == EntityKind::Mob && !st.alive;
+        // An NPC has no life to lose, whatever its health reads.
+        const bool dead     = !st.alive && st.kind != EntityKind::Npc;
+        const bool deadMob  = dead && st.kind == EntityKind::Mob;
         const bool fought   = s.glowOffWhenFighting && st.kind == EntityKind::Mob && st.claim == ClaimState::Yours;
         const bool nameOnly = deadMob || player.inEvent;
         std::optional<BadgeRules> badgeRules;
@@ -322,37 +329,43 @@ namespace headsup
             if (builder.items.empty()) continue;
             plate.lines.push_back(ComposedLine{i, std::move(builder.items), LookOf(style, st, s, gameArgb)});
             if (deadMob || fought) plate.lines.back().look.glow = 0.0f;
+            if (dead) plate.lines.back().look.color = kDeadTextArgb;
         }
-        if (kind.ornament.on)
-        {
-            const int upper = kind.ornament.place == OrnamentPlace::BetweenLines1And2 ? 0 : 1;
-            const auto at   = [&](int source) {
-                for (size_t i = 0; i < plate.lines.size(); ++i)
-                    if (plate.lines[i].source == source) return static_cast<int>(i);
-                return kNoOrnament;
-            };
-            if (at(upper) != kNoOrnament && at(upper + 1) != kNoOrnament)
-            {
-                plate.ornamentAbove = at(upper + 1);
-                plate.ornamentColor = ResolveColor(kind.ornament.color, st, s.palette, gameArgb);
-            }
-        }
+        plate.ornament      = kind.ornament.place;
+        plate.ornamentColor = ResolveColor(kind.ornament.color, st, s.palette, gameArgb);
         return plate;
+    }
+
+    OrnamentAt OrnamentLineOf(const ComposedPlate& plate)
+    {
+        const int count = static_cast<int>(plate.lines.size());
+        const auto at   = [&](int source) {
+            for (int i = 0; i < count; ++i)
+                if (plate.lines[static_cast<size_t>(i)].source == source) return i;
+            return kNoOrnament;
+        };
+        // Between two lines it goes over the lower of them, and only while the upper shows too.
+        const auto between = [&](int upper, int lower) {
+            return at(upper) != kNoOrnament && at(lower) != kNoOrnament ? OrnamentAt{at(lower), false} : OrnamentAt{};
+        };
+        if (count == 0) return {};
+        switch (plate.ornament)
+        {
+        case OrnamentPlace::Disabled: break;
+        case OrnamentPlace::Top: return {0, false};
+        case OrnamentPlace::AboveMiddle: return between(kTopLine, kMiddleLine);
+        case OrnamentPlace::BelowMiddle: return between(kMiddleLine, kBottomLine);
+        case OrnamentPlace::Bottom: return {count - 1, true};
+        }
+        return {};
     }
 
     namespace
     {
-        // A line left without items is no line, and the ornament goes with either line it sat between.
+        // A line left without items is no line.
         void DropEmptyLines(ComposedPlate& plate)
         {
-            const auto empty = [](const ComposedLine& line) { return line.items.empty(); };
-            if (const int above = plate.ornamentAbove; above > 0)
-            {
-                const auto lower    = plate.lines.begin() + above;
-                const auto gone     = static_cast<int>(std::count_if(plate.lines.begin(), lower, empty));
-                plate.ornamentAbove = empty(*lower) || empty(*(lower - 1)) ? kNoOrnament : above - gone;
-            }
-            std::erase_if(plate.lines, empty);
+            std::erase_if(plate.lines, [](const ComposedLine& line) { return line.items.empty(); });
         }
     }
 

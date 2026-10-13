@@ -104,13 +104,17 @@ namespace headsup
         "Notorious monsters that would leave you alone.",
         "Lottery placeholders, whose death can pop an NM, while nobody has claimed them.",
         "Claimed by you or your party, whatever else it is.",
-        "Claimed by anyone outside your party, whatever else it is."}; // by Category
+        "Claimed by anyone outside your party, whatever else it is.",
+        "Dead, until its body is gone. It keeps its name alone."}; // by Category
     const char* const kPlayerRowTips[kPlayerRowCount] = {
         "Every player the rows below do not cover.",
         "In your party.",
         "Named in the Friends card below, and not in your party.",
         "In your linkshell, and neither in your party nor a friend. The game tells a player's linkshell only when "
         "you /check them."}; // by PlayerRow
+    const char* const kPetRowTips[kPetRowCount] = {"A pet of yours.", "A pet of someone in your party.",
+        "A pet of a friend who is not in your party.", "Anyone else's pet."}; // by PetRow
+
     // What each option of a dropdown does, which it says under the pointer.
     inline const char* PlateModeTip(PlateMode mode)
     {
@@ -136,6 +140,13 @@ namespace headsup
             kAggressionColorsTip, kToughnessColorsTip, kClaimColorsTip, kTargetingColorsTip, kEntityTypeColorsTip};
         return kTips[static_cast<int>(source)];
     }
+    inline const char* OrnamentPlaceTip(OrnamentPlace place)
+    {
+        static const char* const kTips[kOrnamentPlaceCount] = {"No ornament.", "Over the nameplate's first line.",
+            "Between the top and middle lines, while both show.", "Between the middle and bottom lines, while both show.",
+            "Under the nameplate's last line."};
+        return kTips[static_cast<int>(place)];
+    }
     constexpr const char* kShowAlwaysTip = "The line shows whatever else holds.";
     inline const char* ConditionTip(ShowCondition condition)
     {
@@ -143,7 +154,7 @@ namespace headsup
             "While you or your party has claimed the mob.", "While someone outside your party has claimed the mob.",
             "While it is fighting.", "While the mob is too weak to be worth experience.", "While the mob would attack you.",
             "While the mob would leave you alone.", "While the player is in your party.", "While the player is a friend.",
-            "While the player is in your linkshell."};
+            "While the player is in your linkshell.", "While the pet is yours."};
         return kTips[static_cast<int>(condition)];
     }
 
@@ -153,7 +164,7 @@ namespace headsup
         {
         case PlateKind::Mobs: return kMobRowTips[row];
         case PlateKind::Players: return kPlayerRowTips[row];
-        case PlateKind::Pets: return "Any player's pet.";
+        case PlateKind::Pets: return kPetRowTips[row];
         default: return nullptr;
         }
     }

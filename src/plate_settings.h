@@ -23,13 +23,15 @@ namespace headsup
         Placeholder, // a lottery placeholder nobody has claimed, whatever it would do
         PartyClaim,  // claimed by you or your party, whatever else it is
         OtherClaim,  // and claimed by anyone else
+        Dead,        // dead, whatever it was and whoever claimed it
     };
-    constexpr int kCategoryCount = static_cast<int>(Category::OtherClaim) + 1;
+    constexpr int kCategoryCount = static_cast<int>(Category::Dead) + 1;
     constexpr int CategoryIndex(Category category) { return static_cast<int>(category); }
-    // The menu's order for the mob rows: ordinary mobs, notorious monsters and their placeholders, claimed mobs, then mobs
-    // with no data.
+    // The menu's order for the mob rows: ordinary mobs, notorious monsters and their placeholders, claimed mobs, dead
+    // ones, then mobs with no data.
     constexpr Category kMobRowOrder[kCategoryCount] = {Category::WillAttack, Category::WontAttack, Category::NmWillAttack,
-        Category::NmWontAttack, Category::Placeholder, Category::PartyClaim, Category::OtherClaim, Category::Unknown};
+        Category::NmWontAttack, Category::Placeholder, Category::PartyClaim, Category::OtherClaim, Category::Dead,
+        Category::Unknown};
 
     enum class PlateKind : uint8_t { Mobs, Players, Self, Npcs, Pets };
     constexpr int kPlateKindCount = 5;
@@ -62,6 +64,8 @@ namespace headsup
     constexpr int kTargetTypeCount = 7;
     enum class PlayerRow : uint8_t { Player, PartyMember, Friend, LinkshellMember };
     constexpr int kPlayerRowCount = 4;
+    enum class PetRow : uint8_t { Yours, Party, Friend, Others }; // by its owner
+    constexpr int kPetRowCount = 4;
     constexpr int kMaxRows        = kCategoryCount; // the mob rows are Category
 
     struct Palette
@@ -77,9 +81,10 @@ namespace headsup
 
     enum class ShowCondition : uint8_t
     {
-        Targeted, Unclaimed, YourClaim, OthersClaim, Engaged, TooWeak, Aggressive, Passive, PartyMember, Friend, LinkshellMember
+        Targeted, Unclaimed, YourClaim, OthersClaim, Engaged, TooWeak, Aggressive, Passive, PartyMember, Friend, LinkshellMember,
+        OwnerIsYou
     };
-    constexpr int kShowConditionCount = 11;
+    constexpr int kShowConditionCount = 12;
     constexpr uint32_t ConditionBit(ShowCondition c) { return 1u << static_cast<int>(c); }
     struct LineShow
     {
@@ -87,6 +92,12 @@ namespace headsup
         uint32_t when = 0;
         bool operator==(const LineShow&) const = default;
     };
+    // A line's font styles: any of them together, as bits.
+    enum class FontStyle : uint8_t { Bold = 1, Italic = 2, Underline = 4 };
+    constexpr int kFontStyleCount    = 3;
+    constexpr uint8_t kAllFontStyles = 7;
+    constexpr uint8_t StyleBit(FontStyle style) { return static_cast<uint8_t>(style); }
+    constexpr bool HasStyle(uint8_t styles, FontStyle style) { return (styles & StyleBit(style)) != 0; }
     enum class Align : uint8_t { Left, Center, Right };
     constexpr int kAlignCount = 3;
     constexpr int kPlateLines = 3;
@@ -95,6 +106,8 @@ namespace headsup
     constexpr int kMinGlow = 0, kMaxGlow = 300;                // 0 is no glow
     constexpr int kMinGlowSize = 25, kMaxGlowSize = 200;
     constexpr int kMinShadow = 0, kMaxShadow = 200;
+    constexpr float kShadowUnit = 1.5f; // a shadow strength of 100 percent, in the mockup's shadows
+    constexpr int kMaxLinePadding = 10; // pixels
     constexpr int kMinOrnamentWidth = 20, kMaxOrnamentWidth = 300;       // pixels
     constexpr int kMinOrnamentThickness = 3, kMaxOrnamentThickness = 24; // pixels
     constexpr size_t kMaxTemplate = 255;                                 // bytes of a line's text
@@ -127,9 +140,10 @@ namespace headsup
         LineShow show;
         Align align = Align::Center;
         std::string font;
-        bool bold    = false;
-        int textSize = 100;
+        uint8_t style = 0; // FontStyle bits
+        int textSize  = 100;
         int iconSize = 100;
+        int padding  = 0; // pixels of extra space under the line; over it for the bottom line, which stays on the name
         ColorPick color;
         int shadow = 100;
         ColorPick shadowColor{ColorSource::Custom, ColorFromRgb(0x000000)};
@@ -139,13 +153,14 @@ namespace headsup
         bool operator==(const LineDesign&) const = default;
     };
 
-    enum class OrnamentPlace : uint8_t { BetweenLines1And2, BetweenLines2And3 };
-    constexpr int kOrnamentPlaceCount = 2;
-    // The diamond rule between two of a kind's lines, drawn only while both render.
+    constexpr int kTopLine = 0, kMiddleLine = 1, kBottomLine = kPlateLines - 1; // the design's lines
+    // Where a kind's diamond rule goes: over the plate's first line, between the middle line and the one over or
+    // under it while both show, or under the plate's last line.
+    enum class OrnamentPlace : uint8_t { Disabled, Top, AboveMiddle, BelowMiddle, Bottom };
+    constexpr int kOrnamentPlaceCount = 5;
     struct OrnamentSettings
     {
-        bool on            = false;
-        OrnamentPlace place = OrnamentPlace::BetweenLines2And3;
+        OrnamentPlace place = OrnamentPlace::Disabled;
         int width          = 90;
         int height         = 6;
         ColorPick color{ColorSource::Aggression};
@@ -167,7 +182,7 @@ namespace headsup
     };
     std::array<KindSettings, kPlateKindCount> DefaultKinds();
 
-    int RowCountOf(PlateKind kind);                // 8, 4, 1, 1, 1
+    int RowCountOf(PlateKind kind);                // 9, 4, 1, 1, 4
     const char* RowKey(PlateKind kind, int row);   // "aggressive", "partyMember", "self", ...: settings keys
     const char* RowLabel(PlateKind kind, int row); // "Aggressive", "Party Member", "Self", ...: the menu
     const char* KindKey(PlateKind kind);           // "mobs", "players", "self", "npcs", "pets"
@@ -203,6 +218,7 @@ namespace headsup
     const char* TargetStateTip(TargetState target);
     const char* StatusRankLabel(StatusRank status);
     extern const char* const kAlignLabels[kAlignCount];
+    extern const char* const kFontStyleLabels[kFontStyleCount]; // by bit, the lowest first
     extern const char* const kOrnamentPlaceLabels[kOrnamentPlaceCount];
     extern const char* const kLineLabels[kPlateLines]; // a line's box and its style tab
 

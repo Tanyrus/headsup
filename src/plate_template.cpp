@@ -38,6 +38,7 @@ namespace headsup
             {Tag::Level, "$level", "Level",
                 "A mob's level, or range, as 20-23; its exact level after a /check. A player's main job level when known.",
                 kMobKinds | kPlayerKinds},
+            {Tag::Title, "$title", "Title", "The player's title: yours, and a player's once you have checked them.", kPlayerKinds},
             {Tag::Con, "$con", "Difficulty", "The con at each end of the level range, as EP-DC; one con after a /check.", kMobKinds},
             {Tag::Id, "$id", "ID", "The last three hex digits of the mob's ID, as players name placeholders: [106].", kMobKinds},
             {Tag::ServerId, "$serverid", "Server ID", "The mob's whole server ID in decimal: [17190918].", kMobKinds},

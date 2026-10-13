@@ -693,11 +693,16 @@ namespace headsup
                     "Where the line sits against the bottom line. A line wider than it hangs past its other end.",
                     kControlWidth / kAlignCount);
             form.FontDropdown(label("Font").c_str(), line.font, fonts,
-                "The line's font. Default is the font on the Entities page.", kDefaultFontChoice, &line.bold);
+                "The line's font. Default is the font on the Entities page.", kDefaultFontChoice);
+            form.Toggles(label("Font Style").c_str(), line.style, kFontStyleLabels, kFontStyleCount, "Any of the three together.",
+                kControlWidth / kFontStyleCount);
             form.SliderInt(label("Text Size").c_str(), line.textSize, kMinSizePercent, kMaxSizePercent, "%d%%",
                 "Of the base font size on the Entities page.");
             form.SliderInt(label("Icon Size").c_str(), line.iconSize, kMinSizePercent, kMaxSizePercent, "%d%%",
-                "Every icon on this line, of the base font size.");
+                "Every icon on this line, of the base icon size on the Entities page.");
+            form.SliderInt(label("Padding").c_str(), line.padding, 0, kMaxLinePadding, "%d px",
+                n < kPlateLines - 1 ? "Extra space under this line, which moves it and what is above it up."
+                                    : "Extra space over this line, which moves the lines above it up.");
             form.ColorPickRow(label("Text Color").c_str(), line.color, sources,
                 "The text's color: your own, the game's, or a palette by the entity's state.");
             form.SliderInt(label("Shadow Strength").c_str(), line.shadow, kMinShadow, kMaxShadow, "%d%%",
@@ -719,11 +724,14 @@ namespace headsup
             OrnamentSettings& o = s.Kind(kind).ornament;
             const bool off      = !s.enabled || !s.nameplates;
             form.Fade(off);
-            if (!form.BeginCard("Ornament", &o.on, "A diamond rule between two of the lines, drawn while both show.")) return;
-            form.Fade(off || !o.on);
+            if (!form.BeginCard("Ornament", nullptr, "A diamond rule over, under or between the nameplate's lines.")) return;
             const std::string scope = std::string("##") + KindKey(kind) + " ornament";
-            form.Segments(("Position" + scope).c_str(), o.place, kOrnamentPlaceLabels, kOrnamentPlaceCount,
-                "Which two lines it sits between. It shows only while both do.", kControlWidth / kOrnamentPlaceCount);
+            int place               = static_cast<int>(o.place);
+            form.NumberDropdown(("Visibility" + scope).c_str(), place, 0, kOrnamentPlaceCount - 1,
+                [](int p) { return std::string(kOrnamentPlaceLabels[p]); }, "Where the ornament goes, if anywhere.", 0.0f,
+                [](int p) { return std::string(OrnamentPlaceTip(static_cast<OrnamentPlace>(p))); });
+            o.place = static_cast<OrnamentPlace>(place);
+            form.Fade(off || o.place == OrnamentPlace::Disabled);
             form.SliderInt(("Width" + scope).c_str(), o.width, kMinOrnamentWidth, kMaxOrnamentWidth, "%d px",
                 "The rule's length, before the distance scale.");
             form.SliderInt(("Height" + scope).c_str(), o.height, kMinOrnamentThickness, kMaxOrnamentThickness, "%d px",
@@ -890,8 +898,10 @@ namespace headsup
             {
                 form.Fade(!s.enabled || !s.nameplates);
                 form.SliderInt("Base Font Size", s.baseSize, kMinTextSize, kMaxTextSize, "%d px",
-                    "Every line's text and icon size is a percent of this.");
+                    "Every line's text size is a percent of this.");
                 form.FontDropdown("Default Font", s.defaultFont, fonts, "The font of every line whose own font is Default.");
+                form.SliderInt("Base Icon Size", s.baseIconSize, kMinTextSize, kMaxTextSize, "%d px",
+                    "Every line's icon size is a percent of this.");
                 form.Switch("Scale with Distance", s.scaleWithDistance, "Sizes follow how far a name's owner is from you.");
                 form.Fade(!s.enabled || !s.nameplates || !s.scaleWithDistance);
                 form.Indent(true);

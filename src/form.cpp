@@ -310,8 +310,31 @@ namespace headsup
         return false;
     }
 
+    void Form::Toggles(const char* label, uint8_t& bits, const char* const* options, int count, const char* tip, float segment)
+    {
+        Row(label, tip);
+        const std::string base  = Id(label);
+        const std::string width = Em(segment > 0.0f ? segment : kSegmentWidth);
+        Out() += "<div class=\"segs\" id=\"" + base + "\">";
+        for (int option = 0; option < count; ++option)
+        {
+            const std::string seg = base + "-s-" + std::to_string(option);
+            const auto bit        = static_cast<uint8_t>(1u << option);
+            if (!m_Off && Clicked(seg))
+            {
+                bits ^= bit;
+                changed = true;
+            }
+            Out() += "<div class=\"seg\" id=\"" + seg + "\" style=\"width:" + width + ";\">" + EscapedRml(options[option]) + "</div>";
+            Set(seg, FormValueKind::Class, "picked", {}, (bits & bit) != 0);
+        }
+        Out() += "</div>";
+        Set(base, FormValueKind::Class, "off", {}, m_Off);
+        EndRow();
+    }
+
     void Form::FontDropdown(const char* label, std::string& font, const std::vector<std::string>& choices, const char* tip,
-        const char* unset, bool* bold)
+        const char* unset)
     {
         Row(label, tip);
         const int count  = FontEntryCount(choices, unset);
@@ -321,11 +344,11 @@ namespace headsup
         if (Pressable("<div class=\"tri left\"></div>", (name + " previous").c_str(), "btn step", nullptr))
             chosen = StepFontEntry(count, picked, -1);
         int listed = 0;
-        // The arrows and the checkbox take their room from the dropdown, so the row ends where a slider's does.
+        // The arrows take their room from the dropdown, so the row ends where a slider's does.
         const float step = 1.6f + 0.5f;
         // A long family's name is cut in the list and in the closed control: both say it whole under the pointer.
         const std::string shown = FontShown(choices, unset, font);
-        if (ListAt(label, shown, kControlWidth - 2.0f * step - (bold != nullptr ? step : 0.0f), count,
+        if (ListAt(label, shown, kControlWidth - 2.0f * step, count,
                 [&](int entry) { return FontEntryLabel(choices, unset, entry); }, picked, listed, shown.c_str(),
                 [&](int entry) { return FontEntryLabel(choices, unset, entry); }))
             chosen = listed;
@@ -336,7 +359,6 @@ namespace headsup
             font    = FontOfEntry(choices, unset, chosen);
             changed = true;
         }
-        if (bold != nullptr) CheckAt((name + " bold").c_str(), *bold);
         EndRow();
     }
 

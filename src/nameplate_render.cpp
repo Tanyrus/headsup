@@ -30,7 +30,7 @@ namespace headsup
 
         LineStyle StyleOf(const LineLook& look)
         {
-            return LineStyle{look.font, look.bold, look.shadowColor, look.shadow};
+            return LineStyle{look.font, look.style, look.shadowColor, look.shadow};
         }
 
         // Adds the time from its making to its end to spent.
@@ -115,7 +115,7 @@ namespace headsup
         bool sized = true;
         const std::optional<int> height = RasterThatFits(pixelHeight, m_LargestSide, [&](int at) {
             ImageSize image{0, 0, styleAt(at).margin};
-            sized = sized && m_Gdi.Extent(text, look.line.font.c_str(), at, look.line.bold, image.width, image.height);
+            sized = sized && m_Gdi.Extent(text, look.line.font.c_str(), at, look.line.style, image.width, image.height);
             return sized ? image : ImageSize{};
         });
         // Too long at any height is the design's to shorten: failing here would turn every nameplate off.
@@ -132,7 +132,7 @@ namespace headsup
         }
         const Style style = styleAt(*height);
         Coverage coverage;
-        if (!sized || !m_Gdi.Rasterize(text, look.line.font.c_str(), *height, look.line.bold, 0, style.margin, coverage))
+        if (!sized || !m_Gdi.Rasterize(text, look.line.font.c_str(), *height, look.line.style, 0, style.margin, coverage))
         {
             FailNames("GDI could not draw text in " + look.line.font + " at " + std::to_string(*height) + " px");
             return false;
@@ -351,7 +351,8 @@ namespace headsup
                 if (!prepareTexts()) break;
                 // A text that fits no texture leaves the plate before it is measured, so nothing keeps room for it.
                 if (std::ranges::any_of(m_LeftOut, [](uint8_t leftOut) { return leftOut != 0; })) DropTexts(composed, m_LeftOut);
-                const size_t lineCount = composed.lines.size();
+                const size_t lineCount      = composed.lines.size();
+                const OrnamentAt ornamentAt = OrnamentLineOf(composed);
                 // The plate's texts are its lines' textures in order, less the ones left out.
                 auto nextText = [](const LineTextures& lt, size_t& at) -> const PlateTexture& {
                     while (lt.texts[at].unfit)
@@ -381,7 +382,7 @@ namespace headsup
                                 m_IconBadges.push_back(PrepareBadge(draw, badgeLine, p.badgeRaster));
                         }
                         MeasureLine(line, m_TextSizes, scale, m_Inputs[i]);
-                        if (static_cast<int>(i) != composed.ornamentAbove) continue;
+                        if (static_cast<int>(i) != ornamentAt.line) continue;
                         lt.ornamentRaster = raster(ornamentShown, lt.ornamentRaster);
                         const int width   = WholePixels(static_cast<float>(lt.ornamentRaster) * static_cast<float>(ornament.width) /
                                                         static_cast<float>(ornament.height));
@@ -390,6 +391,7 @@ namespace headsup
                         const ItemSize box         = boxOf(lt.ornament, ornamentShown);
                         m_Inputs[i].ornamentWidth  = box.width;
                         m_Inputs[i].ornamentHeight = box.height;
+                        m_Inputs[i].ornamentUnder  = ornamentAt.under;
                     }
                     return true;
                 };
@@ -399,7 +401,7 @@ namespace headsup
                         !PrepareCursor(p.cursorUnder, CursorColor(under, settings), p.cursorRaster, settings)))
                     break;
                 const int ornamentSource =
-                    composed.ornamentAbove != kNoOrnament ? composed.lines[static_cast<size_t>(composed.ornamentAbove)].source : kNoOrnament;
+                    ornamentAt.line != kNoOrnament ? composed.lines[static_cast<size_t>(ornamentAt.line)].source : kNoOrnament;
                 for (int source = 0; source < kPlateLines; ++source)
                 {
                     LineTextures& lt = p.lines[source];

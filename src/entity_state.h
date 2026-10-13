@@ -39,6 +39,7 @@ namespace headsup
         Category row        = Category::Unknown; // mobs
         Category classified = Category::Unknown; // the row its aggression alone gives, under any claim or placeholder row
         PlayerRow playerRow = PlayerRow::Player; // players
+        PetRow petRow       = PetRow::Others;    // pets
         LabelShade toughness = LabelShade::Unknown;
         ClaimState claim    = ClaimState::Unclaimed;
         TargetState target  = TargetState::None;
@@ -46,8 +47,10 @@ namespace headsup
     };
 
     Nature NatureOf(Category classified, bool placeholder); // Classify's answer, with the placeholder flag
-    Category MobRowOf(Nature nature, bool claimedByParty, bool claimed);
+    Category MobRowOf(Nature nature, bool claimedByParty, bool claimed, bool alive);
     PlayerRow PlayerRowOf(bool party, bool isFriend, bool linkshell);
+    // A pet's row by its owner: you, a member of your party, a friend, or anyone else.
+    PetRow PetRowOf(bool ownerIsYou, bool ownerInParty, bool ownerIsFriend);
     PlateKind PlateKindOf(const EntityState& state);
     int RowOf(const EntityState& state); // into KindSettings::rows
     TargetType TypeOf(const EntityState& state);

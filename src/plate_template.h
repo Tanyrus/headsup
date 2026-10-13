@@ -16,9 +16,9 @@ namespace headsup
     enum class Tag : uint8_t
     {
         Name, Level, Con, Id, ServerId, Ph, Detect, Weak, Resist, Status, Immune, Gm, Mentor, New, Sync, Away, Linkshell,
-        Bazaar, Seeking, Job, Owner
+        Bazaar, Seeking, Job, Owner, Title
     };
-    constexpr int kTagCount = static_cast<int>(Tag::Owner) + 1;
+    constexpr int kTagCount = static_cast<int>(Tag::Title) + 1;
     constexpr char kTagMark = '$';
 
     struct Atom

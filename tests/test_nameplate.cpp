@@ -318,7 +318,7 @@ TEST(a_badge_hangs_past_its_icons_bottom_right_corner)
 TEST(a_badge_is_readable_on_a_default_icon_and_leaves_the_icons_top_half_clear)
 {
     const Settings s;
-    const float iconSize = BasePixels(s, s.Kind(PlateKind::Mobs).lines[0].iconSize);
+    const float iconSize = static_cast<float>(s.baseIconSize * s.Kind(PlateKind::Mobs).lines[0].iconSize) / 100.0f;
     CHECK(iconSize * kBadgeShare >= 10.0f);             // its text box, about 7 px of digits
     CHECK(1.0f + kBadgeHang - kBadgeShare >= 0.5f); // where its box starts, as a share of the icon from the icon's top
 }

@@ -6,17 +6,19 @@ namespace headsup
 {
     namespace
     {
-        const char* const kMobRowKeys[kCategoryCount]   = {"aggressive", "passive", "noData", "aggressiveNm", "passiveNm", "placeholder", "partyClaim", "othersClaim"};
-        const char* const kMobRowLabels[kCategoryCount] = {"Aggressive", "Passive", "No Data", "NM (Aggressive)", "NM (Passive)", "NM (Placeholder)", "Claimed (Yours)", "Claimed (Others')"};
+        const char* const kMobRowKeys[kCategoryCount]   = {"aggressive", "passive", "noData", "aggressiveNm", "passiveNm", "placeholder", "partyClaim", "othersClaim", "dead"};
+        const char* const kMobRowLabels[kCategoryCount] = {"Aggressive", "Passive", "No Data", "NM (Aggressive)", "NM (Passive)", "NM (Placeholder)", "Claimed (Yours)", "Claimed (Others')", "Dead"};
         const char* const kPlayerRowKeys[kPlayerRowCount]   = {"player", "partyMember", "friend", "linkshell"};
         const char* const kPlayerRowLabels[kPlayerRowCount] = {"Players", "Party Members", "Friends", "Linkshell Members"};
-        const char* const kOneRowKeys[kPlateKindCount]   = {"", "", "self", "npc", "pet"};
-        const char* const kOneRowLabels[kPlateKindCount] = {"", "", "Self", "NPCs", "Pets"};
+        const char* const kPetRowKeys[kPetRowCount]   = {"yourPet", "partyPet", "friendPet", "othersPet"};
+        const char* const kPetRowLabels[kPetRowCount] = {"Your Pets", "Party Pets", "Friend Pets", "Others' Pets"};
+        const char* const kOneRowKeys[kPlateKindCount]   = {"", "", "self", "npc", ""};
+        const char* const kOneRowLabels[kPlateKindCount] = {"", "", "Self", "NPCs", ""};
         const char* const kKindKeys[kPlateKindCount]     = {"mobs", "players", "self", "npcs", "pets"};
         const char* const kKindLabels[kPlateKindCount]   = {"Mobs", "Players", "Self", "NPCs", "Pets"};
         const char* const kConditionLabels[kShowConditionCount] = {"When Targeted", "When Unclaimed", "When Claimed by You",
             "When Claimed by Others", "When Engaged in Combat", "When Too Weak", "When Aggressive", "When Passive",
-            "When Party Member", "When Friend", "When Linkshell Member"};
+            "When Party Member", "When Friend", "When Linkshell Member", "When Owner is You"};
         const char* const kSourceLabels[kColorSourceCount] = {"Custom", "Vanilla Color", "Color by Aggression", "Color by Toughness",
             "Color by Claim Status", "Color by Targeting", "Color by Entity Type"};
         const char* const kDetectionLabels[kDetectionIconCount] = {"Aggression", "Links", "Sight", "True Sight", "Sound",
@@ -76,18 +78,20 @@ namespace headsup
             mobs.rows[CategoryIndex(claim)].outlineColor.source = ColorSource::Claim;
         }
         mobs.lines[0].text         = kTagDetect;
-        mobs.lines[0].iconSize     = 107; // 16 px of a 15 px base
         mobs.lines[1].text         = kTagLevelCon;
         mobs.lines[1].textSize     = 87; // 13 px of 15
         mobs.lines[1].color.source = ColorSource::Toughness;
         mobs.lines[2]              = NameLine(kTagName);
         mobs.lines[2].glow         = 100;
-        mobs.ornament.on           = true;
+        mobs.ornament.place        = OrnamentPlace::BelowMiddle;
         const LineDesign player = NameLine(kTagPlayerName);
         kinds[static_cast<int>(PlateKind::Players)].lines[2] = player;
         kinds[static_cast<int>(PlateKind::Self)].lines[2]    = player;
         kinds[static_cast<int>(PlateKind::Npcs)].lines[2]    = NameLine(kTagName);
-        kinds[static_cast<int>(PlateKind::Pets)].lines[2]    = NameLine(kTagName);
+        KindSettings& pets = kinds[static_cast<int>(PlateKind::Pets)];
+        pets.lines[2]      = NameLine(kTagName);
+        for (int row = 0; row < kPetRowCount; ++row)
+            pets.rows[row].plate = PlateMode::WhenTargeted;
         // Only a mob has an aggression, and only the Mobs page offers that palette: the other kinds' picks start on
         // one theirs do.
         for (const PlateKind kind : {PlateKind::Players, PlateKind::Self, PlateKind::Npcs, PlateKind::Pets})
@@ -108,6 +112,7 @@ namespace headsup
         {
         case PlateKind::Mobs: return kCategoryCount;
         case PlateKind::Players: return kPlayerRowCount;
+        case PlateKind::Pets: return kPetRowCount;
         default: return 1;
         }
     }
@@ -116,6 +121,7 @@ namespace headsup
     {
         if (kind == PlateKind::Mobs) return kMobRowKeys[row];
         if (kind == PlateKind::Players) return kPlayerRowKeys[row];
+        if (kind == PlateKind::Pets) return kPetRowKeys[row];
         return kOneRowKeys[static_cast<int>(kind)];
     }
 
@@ -123,6 +129,7 @@ namespace headsup
     {
         if (kind == PlateKind::Mobs) return kMobRowLabels[row];
         if (kind == PlateKind::Players) return kPlayerRowLabels[row];
+        if (kind == PlateKind::Pets) return kPetRowLabels[row];
         return kOneRowLabels[static_cast<int>(kind)];
     }
 
@@ -139,6 +146,7 @@ namespace headsup
         case PlateKind::Players:
             return {ShowCondition::Targeted, ShowCondition::PartyMember, ShowCondition::Friend, ShowCondition::LinkshellMember};
         case PlateKind::Self: return {ShowCondition::Targeted, ShowCondition::Engaged};
+        case PlateKind::Pets: return {ShowCondition::Targeted, ShowCondition::OwnerIsYou};
         default: return {ShowCondition::Targeted};
         }
     }
@@ -174,7 +182,9 @@ namespace headsup
     }
 
     const char* const kAlignLabels[kAlignCount]                 = {"Left", "Center", "Right"};
-    const char* const kOrnamentPlaceLabels[kOrnamentPlaceCount] = {"Lines 1-2", "Lines 2-3"};
+    const char* const kFontStyleLabels[kFontStyleCount]         = {"Bold", "Italics", "Underline"};
+    const char* const kOrnamentPlaceLabels[kOrnamentPlaceCount] = {"Disabled", "Top", "Above Middle Line", "Below Middle Line",
+        "Bottom"};
     const char* const kLineLabels[kPlateLines]                  = {"Top Line", "Middle Line", "Bottom Line"};
 
     int OutlineModesFor(PlateKind kind, int row)

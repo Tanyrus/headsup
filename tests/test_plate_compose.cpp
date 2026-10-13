@@ -67,11 +67,11 @@ TEST(the_default_mob_design_composes_todays_three_lines)
     CHECK_EQ(plate.lines[1].look.color, ToArgb(s.palette.toughness[static_cast<int>(LabelShade::EvenMatch)]));
     CHECK_EQ(plate.lines[2].look.color, kGame);
     CHECK_EQ(plate.lines[2].look.glowColor, ToArgb(s.palette.aggression[static_cast<int>(Nature::Aggressive)]));
-    CHECK_EQ(plate.ornamentAbove, 2);
+    CHECK_EQ(OrnamentLineOf(plate).line, 2);
     CHECK_EQ(plate.ornamentColor, ToArgb(s.palette.aggression[static_cast<int>(Nature::Aggressive)]));
     CHECK_EQ(plate.lines[2].look.textSize, 15.0f);
     CHECK_EQ(plate.lines[1].look.textSize, BasePixels(s, 87));
-    CHECK_EQ(plate.lines[0].look.iconSize, BasePixels(s, 107));
+    CHECK_EQ(plate.lines[0].look.iconSize, 16.0f); // the whole of the base icon size
     CHECK_EQ(plate.lines[0].source, 0);
 }
 
@@ -141,7 +141,39 @@ TEST(a_dead_mob_keeps_its_name_alone)
     const ComposedPlate gone = ComposePlate(dead, kPlayer, d, kGame);
     CHECK_EQ(gone.lines.size(), size_t{1});
     CHECK_EQ(Rendered(gone.lines[0]), "Young Quadav");
-    CHECK_EQ(gone.ornamentAbove, kNoOrnament);
+    CHECK_EQ(OrnamentLineOf(gone).line, kNoOrnament);
+    // The Dead row decides whether it has a nameplate at all.
+    dead.state.row = Category::Dead;
+    d.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::Dead)].plate = PlateMode::Hidden;
+    CHECK(ComposePlate(dead, kPlayer, d, kGame).lines.empty());
+    CHECK(HookActionFor(dead.state, d, false, false) == HookAction::Hide);
+}
+
+TEST(a_dead_entitys_text_is_dark_grey_whatever_its_colors)
+{
+    Settings s;
+    s.Kind(PlateKind::Mobs).lines[2].color    = ColorPick{ColorSource::Custom, {{1.0f, 0.0f, 0.0f}}};
+    s.Kind(PlateKind::Players).lines[2].color = ColorPick{ColorSource::Type};
+    s.Kind(PlateKind::Players).lines[1].text  = "$job";
+    ActorInfo mob   = AggressiveMob();
+    const uint32_t living = ComposePlate(mob, kPlayer, s, kGame).lines.back().look.color;
+    mob.state.alive = false;
+    const ComposedPlate dead = ComposePlate(mob, kPlayer, s, kGame);
+    CHECK(living != kDeadTextArgb && dead.lines.back().look.color == kDeadTextArgb);
+    CHECK_EQ(dead.lines.back().look.shadowColor, kBlack); // its shadow is as it was
+    // A dead player keeps every line, each in the grey.
+    ActorInfo player   = LinkshellPlayer();
+    player.jobs        = PlayerJobs{1, 75, 2, 37};
+    player.state.alive = false;
+    const ComposedPlate fallen = ComposePlate(player, kPlayer, s, kGame);
+    CHECK_EQ(fallen.lines.size(), size_t{2});
+    for (const ComposedLine& line : fallen.lines)
+        CHECK_EQ(line.look.color, kDeadTextArgb);
+    // An NPC has no life to lose: whatever its health reads, its colors are its own.
+    ActorInfo npc;
+    npc.state.kind = EntityKind::Npc;
+    std::snprintf(npc.name, sizeof(npc.name), "Signpost");
+    CHECK_EQ(ComposePlate(npc, kPlayer, s, kGame).lines.back().look.color, kGame);
 }
 
 TEST(in_a_cutscene_or_a_dialog_every_plate_keeps_its_name_alone)
@@ -155,7 +187,7 @@ TEST(in_a_cutscene_or_a_dialog_every_plate_keeps_its_name_alone)
     const ComposedPlate mob = ComposePlate(targeted, watching, s, kGame);
     CHECK_EQ(mob.lines.size(), size_t{1});
     CHECK_EQ(Rendered(mob.lines[0]), "Young Quadav");
-    CHECK_EQ(mob.ornamentAbove, kNoOrnament);
+    CHECK_EQ(OrnamentLineOf(mob).line, kNoOrnament);
     // A player's icons go with the rest: the linkshell and seeking-party marks beside the name.
     CHECK(Rendered(ComposePlate(LinkshellPlayer(), kPlayer, s, kGame).lines.back()) != "Chadmage");
     const ComposedPlate player = ComposePlate(LinkshellPlayer(), watching, s, kGame);
@@ -172,7 +204,7 @@ TEST(a_dead_mobs_name_does_not_glow)
     const ComposedPlate gone = ComposePlate(dead, kPlayer, s, kGame);
     CHECK_EQ(gone.lines.size(), size_t{1});
     CHECK_EQ(gone.lines[0].look.glow, 0.0f);
-    CHECK_EQ(gone.lines[0].look.shadow, 1.0f); // the rest of its look stays
+    CHECK_EQ(gone.lines[0].look.shadow, kShadowUnit); // the rest of its look stays
     // A dead player's name keeps its glow.
     Settings glowing;
     glowing.Kind(PlateKind::Players).lines[2].glow = 150;
@@ -192,7 +224,7 @@ TEST(a_mob_your_party_has_claimed_can_lose_its_glow)
     CHECK_EQ(fought.lines.size(), size_t{3});
     CHECK_EQ(fought.lines[1].look.glow, 0.0f);
     CHECK_EQ(fought.lines[2].look.glow, 0.0f);
-    CHECK_EQ(fought.lines[2].look.shadow, 1.0f); // the rest of its look stays
+    CHECK_EQ(fought.lines[2].look.shadow, kShadowUnit); // the rest of its look stays
     // Another party's mob, and one nobody has touched, keep theirs.
     ActorInfo theirs   = AggressiveMob();
     theirs.state.claim = ClaimState::Others;
@@ -210,13 +242,40 @@ TEST(the_ornament_needs_both_of_the_lines_it_sits_between)
     Settings s;
     KindSettings& mobs = s.Kind(PlateKind::Mobs);
     mobs.lines[1].text = "";
-    CHECK_EQ(ComposePlate(AggressiveMob(), kPlayer, s, kGame).ornamentAbove, kNoOrnament);
-    mobs.ornament.place = OrnamentPlace::BetweenLines1And2;
+    CHECK_EQ(OrnamentLineOf(ComposePlate(AggressiveMob(), kPlayer, s, kGame)).line, kNoOrnament);
+    mobs.ornament.place = OrnamentPlace::AboveMiddle;
     mobs.lines[1].text  = "Lv $level";
     const ComposedPlate plate = ComposePlate(AggressiveMob(), kPlayer, s, kGame);
-    CHECK_EQ(plate.ornamentAbove, 1); // the composed index of design line 2
-    mobs.ornament.on = false;
-    CHECK_EQ(ComposePlate(AggressiveMob(), kPlayer, s, kGame).ornamentAbove, kNoOrnament);
+    CHECK_EQ(OrnamentLineOf(plate).line, 1); // the composed index of the middle line, which it stands over
+    CHECK(!OrnamentLineOf(plate).under);
+    mobs.ornament.place = OrnamentPlace::Disabled;
+    CHECK_EQ(OrnamentLineOf(ComposePlate(AggressiveMob(), kPlayer, s, kGame)).line, kNoOrnament);
+}
+
+TEST(an_ornament_at_the_top_or_the_bottom_goes_with_whichever_line_is_first_or_last)
+{
+    Settings s;
+    KindSettings& mobs = s.Kind(PlateKind::Mobs);
+    mobs.ornament.place = OrnamentPlace::Top;
+    OrnamentAt at = OrnamentLineOf(ComposePlate(AggressiveMob(), kPlayer, s, kGame));
+    CHECK(at.line == 0 && !at.under);
+    mobs.ornament.place = OrnamentPlace::Bottom;
+    at = OrnamentLineOf(ComposePlate(AggressiveMob(), kPlayer, s, kGame));
+    CHECK(at.line == 2 && at.under);
+    // With the bottom line empty the middle line is the plate's last, and the ornament goes under that.
+    mobs.lines[2].text = "";
+    at = OrnamentLineOf(ComposePlate(AggressiveMob(), kPlayer, s, kGame));
+    CHECK(at.line == 1 && at.under);
+    // A plate left with one line by a text that fits no texture keeps both.
+    ComposedPlate plate = ComposePlate(AggressiveMob(), kPlayer, s, kGame);
+    CHECK_EQ(plate.lines.size(), size_t{2});
+    DropIcons(plate);
+    CHECK_EQ(plate.lines.size(), size_t{1});
+    CHECK(OrnamentLineOf(plate).line == 0 && OrnamentLineOf(plate).under);
+    plate.ornament = OrnamentPlace::Top;
+    CHECK(OrnamentLineOf(plate).line == 0 && !OrnamentLineOf(plate).under);
+    plate.lines.clear();
+    CHECK_EQ(OrnamentLineOf(plate).line, kNoOrnament);
 }
 
 TEST(a_line_takes_the_style_of_the_line_it_syncs_with)
@@ -224,12 +283,12 @@ TEST(a_line_takes_the_style_of_the_line_it_syncs_with)
     Settings s;
     KindSettings& mobs = s.Kind(PlateKind::Mobs);
     mobs.lines[2].textSize = 200;
-    mobs.lines[2].bold     = true;
+    mobs.lines[2].style    = StyleBit(FontStyle::Bold) | StyleBit(FontStyle::Underline);
     mobs.lines[1].syncWith = 2;
     mobs.lines[1].textSize = 50;
     const ComposedPlate plate = ComposePlate(AggressiveMob(), kPlayer, s, kGame);
     CHECK_EQ(plate.lines[1].look.textSize, BasePixels(s, 200));
-    CHECK(plate.lines[1].look.bold);
+    CHECK_EQ(plate.lines[1].look.style, StyleBit(FontStyle::Bold) | StyleBit(FontStyle::Underline));
     CHECK_EQ(Rendered(plate.lines[1]), "Lv 17-20 EP-EM"); // its own text
 }
 
@@ -358,7 +417,7 @@ TEST(a_synced_line_follows_the_chain_to_the_style_it_shows)
     mobs.lines[0].syncWith = 1;
     mobs.lines[1].syncWith = 2;
     mobs.lines[1].textSize = 50;
-    mobs.lines[2].bold     = true;
+    mobs.lines[2].style    = StyleBit(FontStyle::Bold) | StyleBit(FontStyle::Underline);
     mobs.lines[2].textSize = 200;
     mobs.lines[0].text     = "$id";
     const ComposedPlate plate = Compose(AggressiveMob(), s);
@@ -366,7 +425,7 @@ TEST(a_synced_line_follows_the_chain_to_the_style_it_shows)
     for (int i = 0; i < 2; ++i)
     {
         CHECK_EQ(plate.lines[i].look.textSize, BasePixels(s, 200));
-        CHECK(plate.lines[i].look.bold);
+        CHECK_EQ(plate.lines[i].look.style, StyleBit(FontStyle::Bold) | StyleBit(FontStyle::Underline));
     }
     CHECK_EQ(Rendered(plate.lines[0]), "[006]");
     CHECK_EQ(Rendered(plate.lines[1]), "Lv 17-20 EP-EM");
@@ -451,6 +510,8 @@ TEST(each_kind_composes_from_its_own_design)
     ActorInfo pet = AggressiveMob();
     pet.state.pet = true;
     std::snprintf(pet.ownerName, sizeof(pet.ownerName), "Carrott");
+    CHECK(Compose(pet, s).lines.empty()); // a pet's nameplate shows when it is targeted
+    pet.state.target = TargetState::Targeted;
     const ComposedPlate pets = Compose(pet, s);
     CHECK_EQ(pets.lines.size(), size_t{1});
     CHECK_EQ(Rendered(pets.lines[0]), "Young Quadav (Carrott)");
@@ -488,6 +549,24 @@ TEST(jobs_show_alone_when_there_is_no_sub_job_and_nothing_when_unknown)
     CHECK_EQ(Rendered(Compose(info, s).lines[0]), "Chadmage");
 }
 
+TEST(a_players_title_shows_once_known_and_takes_its_space_with_it_when_not)
+{
+    Settings s;
+    s.Kind(PlateKind::Players).lines[2].text = "$name, $title";
+    s.Kind(PlateKind::Mobs).lines[2].text    = "$name $title";
+    ActorInfo info = LinkshellPlayer();
+    info.status.reset();
+    CHECK_EQ(Rendered(Compose(info, s).lines[0]), "Chadmage,"); // unknown until they are checked
+    info.title = 266;
+    CHECK_EQ(Rendered(Compose(info, s).lines[0]), "Chadmage, Looks Sublime in a Subligar");
+    info.title = 60000; // a title the data does not have
+    CHECK_EQ(Rendered(Compose(info, s).lines[0]), "Chadmage,");
+    // A mob has no title, whatever number its entity carries.
+    ActorInfo mob = AggressiveMob();
+    mob.title     = 266;
+    CHECK_EQ(Rendered(Compose(mob, s).lines.back()), "Young Quadav");
+}
+
 TEST(a_dead_player_keeps_its_whole_plate)
 {
     ActorInfo info   = LinkshellPlayer();
@@ -501,14 +580,14 @@ TEST(the_ornament_follows_the_composed_index_when_a_line_above_is_skipped)
     s.Kind(PlateKind::Mobs).lines[0].text = "";
     const ComposedPlate plate = Compose(AggressiveMob(), s);
     CHECK_EQ(plate.lines.size(), size_t{2});
-    CHECK_EQ(plate.ornamentAbove, 1);
+    CHECK_EQ(OrnamentLineOf(plate).line, 1);
     Settings d;
     d.Kind(PlateKind::Mobs).lines[1].text = "$name";
     ActorInfo dead   = AggressiveMob();
     dead.state.alive = false;
     const ComposedPlate gone = Compose(dead, d);
     CHECK_EQ(gone.lines.size(), size_t{2});
-    CHECK_EQ(gone.ornamentAbove, 1); // two name lines still have the rule between them
+    CHECK_EQ(OrnamentLineOf(gone).line, 1); // two name lines still have the rule between them
 }
 
 // Goblin Bounty Hunter (17199648) is weak to light by rank, which the Weak group shows as a rank badge.
@@ -600,14 +679,14 @@ TEST(a_plate_without_icons_keeps_its_texts_and_the_ornament_between_two_lines_st
     CHECK_EQ(plate.lines[0].source, 1);
     CHECK_EQ(Rendered(plate.lines[0]), "Lv 17-20 EP-EM");
     CHECK_EQ(plate.lines[1].source, 2);
-    CHECK_EQ(plate.ornamentAbove, 1); // over the name, which is one line higher in the plate
+    CHECK_EQ(OrnamentLineOf(plate).line, 1); // over the name, which is one line higher in the plate
 
     ComposedPlate player = Compose(LinkshellPlayer(), s);
     DropIcons(player);
     CHECK_EQ(player.lines.size(), size_t{1});
     CHECK_EQ(player.lines[0].items.size(), size_t{1});
     CHECK_EQ(Rendered(player.lines[0]), "Chadmage");
-    CHECK_EQ(player.ornamentAbove, kNoOrnament);
+    CHECK_EQ(OrnamentLineOf(player).line, kNoOrnament);
 
     KindSettings& mobs = s.Kind(PlateKind::Mobs);
     mobs.lines[1].text = "$detect $name - $detect";
@@ -622,26 +701,26 @@ TEST(the_ornament_goes_with_either_line_that_was_only_icons)
 {
     Settings s;
     KindSettings& mobs  = s.Kind(PlateKind::Mobs);
-    mobs.ornament.place = OrnamentPlace::BetweenLines1And2;
+    mobs.ornament.place = OrnamentPlace::AboveMiddle;
     ComposedPlate above = Compose(AggressiveMob(), s);
-    CHECK_EQ(above.ornamentAbove, 1);
+    CHECK_EQ(OrnamentLineOf(above).line, 1);
     DropIcons(above); // line 1, the icons, is the upper of its two
     CHECK_EQ(above.lines.size(), size_t{2});
-    CHECK_EQ(above.ornamentAbove, kNoOrnament);
+    CHECK_EQ(OrnamentLineOf(above).line, kNoOrnament);
 
     mobs.lines[0].text = "Lv $level";
     mobs.lines[1].text = "$detect";
     ComposedPlate below = Compose(AggressiveMob(), s);
-    CHECK_EQ(below.ornamentAbove, 1);
+    CHECK_EQ(OrnamentLineOf(below).line, 1);
     DropIcons(below); // and here the lower
     CHECK_EQ(below.lines.size(), size_t{2});
-    CHECK_EQ(below.ornamentAbove, kNoOrnament);
+    CHECK_EQ(OrnamentLineOf(below).line, kNoOrnament);
 
     mobs.lines[1].text = "$detect$id";
     ComposedPlate kept = Compose(AggressiveMob(), s);
     DropIcons(kept);
     CHECK_EQ(kept.lines.size(), size_t{3});
-    CHECK_EQ(kept.ornamentAbove, 1);
+    CHECK_EQ(OrnamentLineOf(kept).line, 1);
 }
 
 TEST(a_lines_texts_join_with_spaces_for_the_debug_report)
@@ -659,6 +738,41 @@ TEST(a_lines_texts_join_with_spaces_for_the_debug_report)
     CHECK_EQ(text, "Young Quadav");
 }
 
+TEST(a_lines_icons_are_a_share_of_the_base_icon_size_whatever_the_font_size)
+{
+    Settings s;
+    s.baseSize     = 30;
+    s.baseIconSize = 20;
+    s.Kind(PlateKind::Mobs).lines[0].iconSize = 50;
+    const ComposedPlate plate = ComposePlate(AggressiveMob(), kPlayer, s, kGame);
+    CHECK_EQ(plate.lines[0].look.iconSize, 10.0f);
+    CHECK_EQ(plate.lines.back().look.textSize, 30.0f);
+}
+
+TEST(a_line_carries_its_padding_and_a_synced_line_the_one_it_borrows)
+{
+    Settings s;
+    KindSettings& mobs = s.Kind(PlateKind::Mobs);
+    mobs.lines[1].padding  = 6;
+    mobs.lines[2].syncWith = 1;
+    const ComposedPlate plate = ComposePlate(AggressiveMob(), kPlayer, s, kGame);
+    CHECK_EQ(plate.lines[0].look.padding, 0.0f);
+    CHECK_EQ(plate.lines[1].look.padding, 6.0f);
+    CHECK_EQ(plate.lines[2].look.padding, 6.0f);
+}
+
+TEST(a_lines_shadow_at_100_percent_is_one_and_a_half_of_the_mockups)
+{
+    Settings s;
+    LineDesign& name = s.Kind(PlateKind::Mobs).lines[2];
+    CHECK_EQ(name.shadow, 100);
+    CHECK_EQ(ComposePlate(AggressiveMob(), kPlayer, s, kGame).lines.back().look.shadow, 1.5f);
+    name.shadow = 200;
+    CHECK_EQ(ComposePlate(AggressiveMob(), kPlayer, s, kGame).lines.back().look.shadow, 3.0f);
+    name.shadow = 0;
+    CHECK_EQ(ComposePlate(AggressiveMob(), kPlayer, s, kGame).lines.back().look.shadow, 0.0f);
+}
+
 TEST(placeholder_timers_take_the_default_font_and_a_plain_lines_shadow)
 {
     Settings s;
@@ -668,16 +782,16 @@ TEST(placeholder_timers_take_the_default_font_and_a_plain_lines_shadow)
     // No line's design reaches them.
     LineDesign& name = s.Kind(PlateKind::Self).lines[2];
     name.font        = "Cinzel";
-    name.bold        = true;
+    name.style       = StyleBit(FontStyle::Italic);
     name.shadow      = 0;
     name.glow        = 100;
     name.color       = ColorPick{ColorSource::Custom, {{1.0f, 0.0f, 0.0f}}};
     const LineLook look = TimerLook(s);
     CHECK_EQ(look.font, "Tahoma");
-    CHECK(!look.bold);
+    CHECK_EQ(look.style, 0);
     CHECK_EQ(look.textSize, 10.0f);
     CHECK_EQ(look.color, kWhite);
-    CHECK_EQ(look.shadow, 1.0f);
+    CHECK_EQ(look.shadow, kShadowUnit);
     CHECK_EQ(look.shadowColor, kBlack);
     CHECK_EQ(look.glow, 0.0f);
 }
@@ -756,20 +870,20 @@ TEST(a_text_left_out_takes_its_item_and_an_emptied_line_takes_the_ornament_besid
     CHECK_EQ(level.lines.size(), size_t{2});
     CHECK_EQ(level.lines[0].source, 0);
     CHECK_EQ(level.lines[1].source, 2);
-    CHECK_EQ(level.ornamentAbove, kNoOrnament); // it sat between the level line and the name
+    CHECK_EQ(OrnamentLineOf(level).line, kNoOrnament); // it sat between the level line and the name
 
     ComposedPlate name = Compose(AggressiveMob(), s);
     DropTexts(name, std::vector<uint8_t>{0, 1});
     CHECK_EQ(name.lines.size(), size_t{2});
     CHECK_EQ(Rendered(name.lines[1]), "Lv 17-20 EP-EM");
-    CHECK_EQ(name.ornamentAbove, kNoOrnament);
+    CHECK_EQ(OrnamentLineOf(name).line, kNoOrnament);
     for (const ComposedLine& line : name.lines)
         CHECK(std::ranges::none_of(line.items, [](const PlateItem& item) { return item.name; }));
 
     ComposedPlate whole = Compose(AggressiveMob(), s);
     DropTexts(whole, std::vector<uint8_t>{0, 0});
     CHECK_EQ(whole.lines.size(), size_t{3});
-    CHECK_EQ(whole.ornamentAbove, 2);
+    CHECK_EQ(OrnamentLineOf(whole).line, 2);
 }
 
 TEST(a_text_left_out_beside_icons_takes_the_gap_that_set_it_apart)
@@ -786,7 +900,7 @@ TEST(a_text_left_out_beside_icons_takes_the_gap_that_set_it_apart)
     CHECK_EQ(Rendered(plate.lines[0]), "[4]");    // no gap before the icons
     CHECK_EQ(Rendered(plate.lines[1]), "[4] [4]"); // one gap between the two runs, not two
     CHECK_EQ(Rendered(plate.lines[2]), "[006][4]");
-    CHECK_EQ(plate.ornamentAbove, 2);
+    CHECK_EQ(OrnamentLineOf(plate).line, 2);
     mobs.lines[1].text = "$detect $name";
     ComposedPlate last = Compose(AggressiveMob(), s);
     DropTexts(last, std::vector<uint8_t>{0, 1, 0, 0});

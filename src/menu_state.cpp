@@ -66,7 +66,7 @@ namespace headsup
 
     std::string TitleCaseText(std::string_view text)
     {
-        constexpr std::array<std::string_view, 9> kSmallWords = {"and", "or", "of", "the", "to", "in", "on", "with", "by"};
+        constexpr std::array<std::string_view, 10> kSmallWords = {"and", "or", "of", "the", "to", "in", "on", "with", "by", "is"};
         std::string result(text);
         for (size_t at = 0; at < result.size();)
         {

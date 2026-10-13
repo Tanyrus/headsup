@@ -12,8 +12,8 @@ namespace
         s.alive  = true;
         s.nature = nature;
         s.claim  = claim;
-        s.row    = MobRowOf(nature, claim == ClaimState::Yours, claim != ClaimState::Unclaimed);
-        s.classified = MobRowOf(nature, false, false);
+        s.row    = MobRowOf(nature, claim == ClaimState::Yours, claim != ClaimState::Unclaimed, true);
+        s.classified = MobRowOf(nature, false, false, true);
         return s;
     }
 
@@ -38,11 +38,33 @@ TEST(a_classified_category_maps_to_its_nature_and_a_placeholder_wins)
 
 TEST(a_claim_wins_over_the_placeholder_which_wins_over_the_nature)
 {
-    CHECK(MobRowOf(Nature::Aggressive, false, false) == Category::WillAttack);
-    CHECK(MobRowOf(Nature::Placeholder, false, false) == Category::Placeholder);
-    CHECK(MobRowOf(Nature::Placeholder, false, true) == Category::OtherClaim);
-    CHECK(MobRowOf(Nature::Placeholder, true, true) == Category::PartyClaim);
-    CHECK(MobRowOf(Nature::NoData, false, false) == Category::Unknown);
+    CHECK(MobRowOf(Nature::Aggressive, false, false, true) == Category::WillAttack);
+    CHECK(MobRowOf(Nature::Placeholder, false, false, true) == Category::Placeholder);
+    CHECK(MobRowOf(Nature::Placeholder, false, true, true) == Category::OtherClaim);
+    CHECK(MobRowOf(Nature::Placeholder, true, true, true) == Category::PartyClaim);
+    CHECK(MobRowOf(Nature::NoData, false, false, true) == Category::Unknown);
+    // A pet's row is its owner's standing with you, the nearest first.
+    CHECK(PetRowOf(true, false, false) == PetRow::Yours);
+    CHECK(PetRowOf(false, true, true) == PetRow::Party);
+    CHECK(PetRowOf(false, false, true) == PetRow::Friend);
+    CHECK(PetRowOf(false, false, false) == PetRow::Others);
+    EntityState friendsPet;
+    friendsPet.kind   = EntityKind::Mob;
+    friendsPet.pet    = true;
+    friendsPet.petRow = PetRow::Friend;
+    CHECK(PlateKindOf(friendsPet) == PlateKind::Pets);
+    CHECK_EQ(RowOf(friendsPet), static_cast<int>(PetRow::Friend));
+    // Only your own pet's lines show by "When Owner is You", and no player's or mob's.
+    const LineShow yours{false, ConditionBit(ShowCondition::OwnerIsYou)};
+    CHECK(!LineShows(yours, friendsPet));
+    friendsPet.petRow = PetRow::Yours;
+    CHECK(LineShows(yours, friendsPet));
+    friendsPet.pet = false;
+    CHECK(!LineShows(yours, friendsPet));
+    // Dead, it is in the Dead row whatever it was and whoever claimed it.
+    CHECK(MobRowOf(Nature::Aggressive, false, false, false) == Category::Dead);
+    CHECK(MobRowOf(Nature::Placeholder, true, true, false) == Category::Dead);
+    CHECK(MobRowOf(Nature::NoData, false, true, false) == Category::Dead);
 }
 
 TEST(a_party_member_outranks_a_friend_who_outranks_a_linkshell_co_member)
@@ -59,7 +81,7 @@ TEST(the_plate_kind_and_row_follow_the_state)
     pet.kind = EntityKind::Mob;
     pet.pet  = true;
     CHECK(PlateKindOf(pet) == PlateKind::Pets);
-    CHECK_EQ(RowOf(pet), 0);
+    CHECK_EQ(RowOf(pet), static_cast<int>(PetRow::Others)); // nobody's it is known to be
     EntityState you;
     you.kind = EntityKind::Player;
     you.self = true;

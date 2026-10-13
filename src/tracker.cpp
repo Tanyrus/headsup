@@ -58,6 +58,7 @@ namespace headsup
             if (a.checked != nullptr) info.checked = *a.checked;
             info.status = a.status;
             info.jobs   = a.jobs;
+            info.title  = a.title;
             EntityState& st = info.state;
             st.kind      = a.kind;
             st.self      = a.self;
@@ -67,6 +68,7 @@ namespace headsup
             st.target    = TargetStateOf(a.index, targets);
             st.claim     = a.claimedByParty ? ClaimState::Yours : a.claimed ? ClaimState::Others : ClaimState::Unclaimed;
             st.playerRow = PlayerRowOf(a.party, a.isFriend, a.linkshell);
+            st.petRow    = a.petRow;
             if (a.kind == EntityKind::Mob)
             {
                 const MobRecord* mob   = MobById(a.serverId);
@@ -77,13 +79,15 @@ namespace headsup
                 const Category classified = Classify(mob, a.checked ? a.checked->level : 0, player);
                 st.nature     = NatureOf(classified, placeholder);
                 st.classified = classified;
-                st.row        = MobRowOf(st.nature, a.claimedByParty, a.claimed);
+                st.row        = MobRowOf(st.nature, a.claimedByParty, a.claimed, a.alive);
                 st.toughness  = info.level.shade;
                 st.tooWeak    = info.level.shade == LabelShade::TooWeak;
             }
             const OutlineMode mode = OutlineModeOf(st, settings);
             const bool wanted = mode == OutlineMode::Shown || (mode == OutlineMode::WhenTargeted && Targeted(st.target));
-            if (settings.enabled && settings.outlines && wanted && a.alive && a.distance <= settings.maxDistance)
+            // A dead mob's row decides for it; nothing else dead is outlined.
+            const bool outlinable = a.alive || a.kind == EntityKind::Mob;
+            if (settings.enabled && settings.outlines && wanted && outlinable && a.distance <= settings.maxDistance)
             {
                 info.outline    = true;
                 info.stencilRef = static_cast<uint8_t>(m_Outlined % kMaxStencilRef + 1);

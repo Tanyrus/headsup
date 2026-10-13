@@ -47,6 +47,7 @@ namespace headsup
         bool claimedByParty = false;
         bool claimed        = false;
         bool pet            = false;
+        PetRow petRow       = PetRow::Others; // a pet's, by its owner
         bool party          = false;
         bool isFriend       = false;
         bool linkshell      = false;
@@ -54,6 +55,7 @@ namespace headsup
         bool self           = false;
         std::optional<PlayerJobs> jobs = std::nullopt;
         const char* ownerName          = "";
+        uint32_t title                 = 0; // a player's, 0 while unknown
     };
 
     struct ActorInfo
@@ -77,6 +79,7 @@ namespace headsup
         bool placeholder = false;
         std::optional<PlayerJobs> jobs{};
         char ownerName[32] = {};
+        uint32_t title     = 0; // a player's, 0 while unknown
     };
 
     // Whether a mob's claim (IEntity's ClaimStatus: the claimer's whole server ID, and 0 once the claim has ended) is

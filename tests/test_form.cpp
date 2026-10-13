@@ -263,6 +263,29 @@ TEST(segments_and_tabs_mark_the_picked_one_and_take_a_click)
     CHECK(ClassOn(clicked, "p-c-tabs-t-2", "picked") && ClassOn(clicked, "p-c-one-line-s-0", "picked"));
 }
 
+TEST(joined_toggles_each_switch_a_bit_of_their_own)
+{
+    FormState state;
+    uint8_t bits = 0b100;
+    const char* const labels[] = {"One", "Two", "Three"};
+    const auto pass = [&](const std::vector<FormEvent>& events) {
+        Form form(events, state);
+        form.pageKey = "p";
+        form.BeginCard("C");
+        form.Toggles("Style", bits, labels, 3, nullptr);
+        form.EndCard();
+        return form;
+    };
+    const Form first = pass({});
+    CHECK(!ClassOn(first, "p-c-style-s-0", "picked") && ClassOn(first, "p-c-style-s-2", "picked") && !first.changed);
+    const Form on = pass({{"p-c-style-s-0", kClickEvent, ""}});
+    CHECK(on.changed && bits == 0b101);
+    CHECK(ClassOn(on, "p-c-style-s-0", "picked") && ClassOn(on, "p-c-style-s-2", "picked"));
+    const Form off = pass({{"p-c-style-s-2", kClickEvent, ""}});
+    CHECK(off.changed && bits == 0b001 && !ClassOn(off, "p-c-style-s-2", "picked"));
+    CHECK_EQ(off.blocks[0].rml, first.blocks[0].rml); // a toggle replaces no markup
+}
+
 TEST(a_swatch_opens_three_sliders_and_the_color_as_written)
 {
     FormState state;
