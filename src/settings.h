@@ -69,7 +69,6 @@ namespace headsup
         int popupTextSize  = kAutoPopupTextSize; // the popups' text size, or Auto
         std::array<bool, kBarWidgetCount> barWidgets = kBarWidgetDefaults; // by BarWidget
         int barCurrency = kGilCurrency; // the Gil widget's, by kCurrencyTable
-        ClockZone serverClockZone = ClockZone::Japan; // the Server time widget's clock
         std::optional<ClockZone> clockZone;           // the Clock widget's; none for the computer's own
         std::vector<WindowOffset> windowOffsets; // each game window's move from where the game puts it
         std::vector<WindowGroup> windowGroups;   // windows moved together
@@ -86,9 +85,9 @@ namespace headsup
         JobLayout jobLayout = JobLayout::JobsFirst;
         SubtitlePlace barSubtitle = SubtitlePlace::After; // a widget's second line on a bar too short for two
         bool jobNames      = true;
-        bool clock24       = true; // the Clock and Server time widgets
-        bool clockSeconds  = false; // the Clock widget's seconds
-        bool serverSeconds = false; // and Server time's
+        bool clock24       = true;  // the Clock widget's two lines
+        bool clockSeconds  = false; // its own line's seconds
+        bool clockServerTime = false; // the server's time under its own
         bool barLatency    = false; // the Connection widget's round trip after its rates
         BarPlacement barSections = DefaultPlacement(); // where each widget sits, by BarSection
         bool hideHelpBar = false; // skip the game's own help bar across the top of the screen

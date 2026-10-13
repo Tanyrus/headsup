@@ -851,24 +851,34 @@ TEST(a_help_line_without_a_caption_wraps_in_the_popup_under_a_fixed_title)
     CHECK(lines[0] + " " + lines[1] == help);
 }
 
-TEST(the_server_time_widget_shows_japans_time_and_its_popup_the_resets)
+TEST(the_clock_can_stack_the_servers_time_under_its_own_and_its_popup_has_the_resets)
 {
     Settings settings;
-    settings.barWidgets[static_cast<int>(BarWidget::ServerTime)] = true;
     BarState state;
-    state.unixMs = 1791527400000; // Friday 15:30 JST
-    const WidgetContent w = BarWidgetContent(BarWidget::ServerTime, state, settings);
-    CHECK(w.shown && w.hasPopup && w.figures && Joined(w.title) == "JST 15:30" && Joined(w.subtitle) == "Friday");
-    const PopupContent p = BarPopupContent(BarWidget::ServerTime, state, settings);
-    CHECK(Joined(p.title) == "Server time");
-    CHECK(Lines(p.sections[0]) ==
-          (std::vector<std::string>{"Friday 15:30 JST", "Daily reset in 8h 30m", "Conquest tally in 2d 8h"}));
-    CHECK(!BarWidgetContent(BarWidget::ServerTime, state, Settings{}).shown); // off by default
-    settings.serverClockZone = ClockZone::UsPacific;
-    CHECK(Joined(BarWidgetContent(BarWidget::ServerTime, state, settings).title) == "PDT 23:30");
-    CHECK(Lines(BarPopupContent(BarWidget::ServerTime, state, settings).sections[0]) ==
-          (std::vector<std::string>{"Thursday 23:30 PDT", "Friday 15:30 JST", "Daily reset in 8h 30m",
-              "Conquest tally in 2d 8h"}));
+    state.unixMs    = 1791527400000 + 42000; // Friday 15:30:42 JST, Thursday 23:30:42 on the US Pacific coast
+    state.earthYear = 2026, state.earthMonth = 10, state.earthDay = 9; // the computer's own: 08:30:42 in Berlin
+    state.earthHour = 8, state.earthMinute = 30, state.earthSecond = 42;
+    WidgetContent w = BarWidgetContent(BarWidget::EarthTime, state, settings);
+    CHECK(w.shown && w.hasPopup && Joined(w.title) == "08:30" && w.subtitle.empty()); // not stacked unless asked
+    settings.clockServerTime = true;
+    w                        = BarWidgetContent(BarWidget::EarthTime, state, settings);
+    CHECK(Joined(w.title) == "08:30" && w.subtitle == ListOf(Text("JST 15:30", Tone::Dim)));
+    settings.clockSeconds = true; // the seconds are the upper line's
+    settings.clock24      = false;
+    w                     = BarWidgetContent(BarWidget::EarthTime, state, settings);
+    CHECK(Joined(w.title) == "8:30:42 AM" && Joined(w.subtitle) == "JST 3:30 PM");
+    settings.clockZone = ClockZone::UsPacific;
+    w                  = BarWidgetContent(BarWidget::EarthTime, state, settings);
+    CHECK(Joined(w.title) == "PDT 11:30:42 PM" && Joined(w.subtitle) == "JST 3:30 PM");
+    // The popup has the server's clock and its resets whether stacked or not: 8h 29m 18s to Saturday 00:00 JST.
+    for (const bool stacked : {true, false})
+    {
+        settings.clockServerTime = stacked;
+        const PopupContent p     = BarPopupContent(BarWidget::EarthTime, state, settings);
+        CHECK(Joined(p.title) == "2026-10-08"); // the Pacific coast's date
+        CHECK(p.sections.size() == 1 && Lines(p.sections[0]) == (std::vector<std::string>{"Server time Friday 15:30 JST",
+                                                                    "Daily reset in 8h 29m", "Conquest tally in 2d 8h"}));
+    }
 }
 
 TEST(the_fps_widget_shows_frames_a_second_and_its_popup_the_frame_times)
@@ -1308,6 +1318,13 @@ TEST(a_clock_in_a_picked_zone_is_read_from_the_time_alone_and_the_computers_from
     settings.clockZone   = ClockZone::Utc;
     const BarNeeds zoned = NeedsOf(settings, std::nullopt);
     CHECK(zoned.unixTime && !zoned.localTime);
+    settings.clockZone.reset();
+    settings.clockServerTime = true; // the server's line goes by the time, the computer's by its own
+    const BarNeeds stacked   = NeedsOf(settings, std::nullopt);
+    CHECK(stacked.unixTime && stacked.localTime);
+    settings.clockServerTime = false;
+    const BarNeeds opened    = NeedsOf(settings, BarWidget::EarthTime); // the popup counts down to the resets
+    CHECK(opened.unixTime && opened.localTime);
 }
 
 TEST(the_clocks_read_on_a_twelve_hour_clock_when_asked)
@@ -1319,9 +1336,6 @@ TEST(the_clocks_read_on_a_twelve_hour_clock_when_asked)
     BarState state;
     state.earthHour = 9, state.earthMinute = 30;
     CHECK(Joined(BarWidgetContent(BarWidget::EarthTime, state, settings).title) == "9:30 AM");
-    settings.barWidgets[static_cast<int>(BarWidget::ServerTime)] = true;
-    state.unixMs = 1791527400000; // Friday 15:30 JST
-    CHECK(Joined(BarWidgetContent(BarWidget::ServerTime, state, settings).title) == "JST 3:30 PM");
 }
 
 TEST(the_clocks_add_seconds_when_asked)
@@ -1333,11 +1347,6 @@ TEST(the_clocks_add_seconds_when_asked)
     CHECK(Joined(BarWidgetContent(BarWidget::EarthTime, state, settings).title) == "09:30");
     settings.clockSeconds = true;
     CHECK(Joined(BarWidgetContent(BarWidget::EarthTime, state, settings).title) == "09:30:07");
-    settings.barWidgets[static_cast<int>(BarWidget::ServerTime)] = true;
-    state.unixMs = 1791527400000 + 42000; // Friday 15:30:42 JST
-    CHECK(Joined(BarWidgetContent(BarWidget::ServerTime, state, settings).title) == "JST 15:30");
-    settings.serverSeconds = true;
-    CHECK(Joined(BarWidgetContent(BarWidget::ServerTime, state, settings).title) == "JST 15:30:42");
 }
 
 TEST(the_connection_widget_adds_its_latency_when_asked)

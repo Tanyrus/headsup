@@ -197,13 +197,12 @@ A bar of widgets across the top of the screen, on by default, with these widgets
 | Job | Your jobs and levels, and the EXP to your next level (your merits at 75), over a bar of it; its Layout can put the EXP first, as the larger line, or show the EXP alone | EXP per hour, the time to level, limit points |
 | Party | How many are in your party, with the lowest HP and MP in your zone | Each member's jobs, levels, HP, MP and TP |
 | Signet | The time left on Signet or Sanction, only while one is on | What it gives and whether it works where you are |
-| Server time | The time in Japan, which Phoenix keeps, or another time zone's | The time to the daily reset and the conquest tally |
 | Target | A monster's name in its border color, its level and con | Weaknesses, resistances, immunities, tags, spawn, drops at Treasure Hunter 0 and what can be stolen; for a player you checked, their jobs, master level, linkshell and title, as of your check |
 | Gil | Your gil, or the currency picked in its section | Gil and every currency you have |
 | Bags | Your inventory's used and maximum space | Every bag you have |
 | Connection | The game's own S and R, bytes sent and received a second; amber when no data arrives, red once the game's meter drops, with the latency if switched on | Latency, the last server data, this session's totals |
 | FPS | Frames per second | The frame time and the slowest recent frame |
-| Clock | The time on your computer, or in a time zone you pick, with the zone before it | The date there |
+| Clock | The time on your computer, or in a time zone you pick, with the zone before it; with Server Time on, Japan's time, which Phoenix keeps, on a second line under it | The date there, the server's time, and the time to the daily reset and the conquest tally |
 | Distance | How far your target is, in yalms | Nothing |
 
 Under the bar at the screen's left, Game help has a thin bordered box of its own while the game has help to show, all
@@ -229,7 +228,7 @@ weather the game keeps; if HeadsUp cannot find it, it goes by the server's weath
 weather until one comes. While the Gil widget is on, HeadsUp asks the server for your currencies with the two requests
 the game's Currencies menu sends: once after loading, once per zone and each minute while the widget's popup is open.
 
-Game help's bar, Job, Connection, FPS and Distance start on, and Server time, Party and Signet start off. The connection's S and R come from the game's own readout, which
+Game help's bar, Job, Connection, FPS and Distance start on, and Party and Signet start off. The connection's S and R come from the game's own readout, which
 the bar covers and the "Hide Readout" switch stops the game drawing; they show "-" if HeadsUp
 cannot find them in the game's memory. The latency is HeadsUp's own measure, from a packet sent to the server's next
 reply, rounded to a frame.
@@ -255,7 +254,7 @@ position and whether it has a background.
 
 The Widgets card, at the top of its page, has a tab for each widget, in two rows. A tab holds the widget's options:
 Enabled, its section, its second line and icons where it has them, and its own. Those are Target's details, Gil's
-currency, the Clock's and Server time's time zones with their 24-hour and seconds switches, Connection's latency, and
+currency, the Clock's time zone, its Server Time line and its 24-hour and seconds switches, Connection's latency, and
 for Job its layout (jobs first, EXP first or EXP only), its EXP bar under or beside the text or off, and its job
 names.
 

@@ -35,7 +35,6 @@ namespace headsup
         Bags,
         EarthTime,
         GameHelp,
-        ServerTime,
         Fps,
         Job,
         Connection,
@@ -47,7 +46,7 @@ namespace headsup
     // Which widgets a new settings file shows, by BarWidget. to_array takes its size from the list, so a widget added
     // to BarWidget without a default here fails the assert.
     constexpr auto kBarWidgetDefaults =
-        std::to_array<bool>({true, true, true, true, true, true, true, true, false, true, true, true, false, false, true});
+        std::to_array<bool>({true, true, true, true, true, true, true, true, true, true, true, false, false, true});
     static_assert(kBarWidgetDefaults.size() == kBarWidgetCount);
 
     // Where a widget's second line goes when the bar is too short for two: nowhere, or beside its title.

@@ -150,33 +150,14 @@ namespace headsup
         return std::string(t.abbreviation) + " " + ClockText(t.hour, t.minute, twentyFour, seconds ? t.second : -1);
     }
 
-    WidgetContent ServerTimeWidget(int64_t unixMs, ClockZone zone, bool twentyFour, bool seconds)
+    PopupSection ServerTimeRows(int64_t unixMs)
     {
-        const ZoneTime t = ZoneAt(zone, unixMs);
-        WidgetContent w;
-        w.shown    = true;
-        w.title    = ListOf(Text(ZoneClockText(t, twentyFour, seconds)));
-        w.subtitle = ListOf(Text(JstWeekdayName(t.weekday), Tone::Dim));
-        w.hasPopup = true;
-        w.figures  = true;
-        return w;
-    }
-
-    PopupContent ServerTimePopup(int64_t unixMs, ClockZone zone)
-    {
-        PopupContent popup;
-        popup.title = ListOf(Text("Server time"));
+        const ZoneTime t = ZoneAt(ClockZone::Japan, unixMs);
         PopupSection rows;
-        const auto line = [&](ClockZone z) {
-            const ZoneTime t = ZoneAt(z, unixMs);
-            rows.rows.push_back(LineOf(std::string(JstWeekdayName(t.weekday)) + " " + HourMinute(t.hour, t.minute) +
-                                       " " + t.abbreviation));
-        };
-        line(zone);
-        if (zone != ClockZone::Japan) line(ClockZone::Japan); // the server's, which the resets go by
+        rows.rows.push_back(Labeled("Server time", Text(std::string(JstWeekdayName(t.weekday)) + " " +
+                                                        HourMinute(t.hour, t.minute) + " " + t.abbreviation)));
         rows.rows.push_back(Labeled("Daily reset in", Text(SpanText(SecondsToDailyReset(unixMs)))));
         rows.rows.push_back(Labeled("Conquest tally in", Text(SpanText(SecondsToTally(unixMs)))));
-        popup.sections = ListOf(std::move(rows));
-        return popup;
+        return rows;
     }
 }

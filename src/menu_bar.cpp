@@ -18,8 +18,7 @@ namespace headsup
     namespace
     {
         const char* const kBarWidgetLabels[] = {"Zone", "Weather", "Vana'diel", "Target", "Gil",
-            "Bags", "Clock", "Game help", "Server time", "FPS", "Job", "Connection", "Party", "Signet",
-            "Distance"};
+            "Bags", "Clock", "Game help", "FPS", "Job", "Connection", "Party", "Signet", "Distance"};
         const char* const kBarWidgetTips[] = {
             "The zone, its region and who holds it. Hover for the influence there and the conquest tally.",
             "The weather now and today's chance of it. Hover for the forecast.",
@@ -27,9 +26,9 @@ namespace headsup
             "Your target's name, level and con. Hover a mob for its details.",
             "Gil, or another currency. Hover for every currency.",
             "How full your inventory is. Hover for every bag.",
-            "Your computer's time, or another time zone's.",
+            "Your computer's time, or another time zone's, over the server's if you like. Hover for the daily reset and "
+            "conquest tally.",
             "The game's help text, in a bar of its own under the top panel.",
-            "The server's time, or another zone's. Hover for the daily reset and conquest tally.",
             "Frames per second. Hover for frame times.",
             "Jobs, levels and EXP to the next level, with a bar. Hover for EXP per hour.",
             "Bytes sent and received each second; amber or red when data stops. Hover for latency.",
@@ -395,19 +394,10 @@ namespace headsup
                 ui.NumberDropdown("Time zone", zone, 0, kClockZoneChoices - 1, ClockZoneChoiceName,
                     "Local is your computer's. Another zone goes before the time, as in PDT 21:07.");
                 s.clockZone = ClockZoneOfChoice(zone);
-                ui.Switch("24-hour", s.clock24, "Also Server time.");
-                ui.Switch("Seconds", s.clockSeconds, nullptr);
-                break;
-            }
-            case BarWidget::ServerTime:
-            {
-                int zone = static_cast<int>(s.serverClockZone);
-                ui.NumberDropdown("Time zone", zone, 0, kClockZoneCount - 1,
-                    [](int z) { return std::string(ClockZoneName(static_cast<ClockZone>(z))); },
-                    "Resets still go by Japan's.");
-                s.serverClockZone = static_cast<ClockZone>(zone);
-                ui.Switch("24-hour", s.clock24, "Also the Clock.");
-                ui.Switch("Seconds", s.serverSeconds, nullptr);
+                ui.Switch("Server time", s.clockServerTime,
+                    "Japan's time, which the server keeps and the resets go by, as a second line under your own.");
+                ui.Switch("24-hour", s.clock24, nullptr);
+                ui.Switch("Seconds", s.clockSeconds, "On your own line.");
                 break;
             }
             case BarWidget::Job:

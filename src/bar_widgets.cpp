@@ -295,12 +295,13 @@ namespace headsup
     {
         auto shown = [&](BarWidget widget) { return settings.barWidgets[static_cast<int>(widget)]; };
         BarNeeds needs;
-        // The Clock in a zone of its own goes by the time alone; in the computer's, by what Windows makes of it.
-        const bool zonedClock = shown(BarWidget::EarthTime) && settings.clockZone.has_value();
-        needs.unixTime   = shown(BarWidget::Weather) || shown(BarWidget::VanaTime) || shown(BarWidget::ServerTime) ||
-                           zonedClock ||
+        // The Clock in a zone of its own goes by the time alone, as its server line and its popup's resets do; in the
+        // computer's zone, by what Windows makes of the time.
+        const bool clock = shown(BarWidget::EarthTime), zonedClock = clock && settings.clockZone.has_value();
+        needs.unixTime   = shown(BarWidget::Weather) || shown(BarWidget::VanaTime) || zonedClock ||
+                           (clock && (settings.clockServerTime || open == BarWidget::EarthTime)) ||
                            (shown(BarWidget::Zone) && open == BarWidget::Zone); // the popup counts down to the tally
-        needs.localTime  = shown(BarWidget::EarthTime) && !zonedClock;
+        needs.localTime  = clock && !zonedClock;
         needs.zone       = shown(BarWidget::Zone) || shown(BarWidget::Weather) ||
                      (shown(BarWidget::Signet) && open == BarWidget::Signet); // the popup says where it works
         needs.target     = shown(BarWidget::Target) || shown(BarWidget::Distance);
@@ -449,12 +450,13 @@ namespace headsup
                     ? ZoneClockText(ZoneAt(*settings.clockZone, state.unixMs), settings.clock24, settings.clockSeconds)
                     : ClockText(state.earthHour, state.earthMinute, settings.clock24,
                           settings.clockSeconds ? state.earthSecond : -1)));
+            if (settings.clockServerTime)
+                w.subtitle = ListOf(Text(
+                    ZoneClockText(ZoneAt(ClockZone::Japan, state.unixMs), settings.clock24, false), Tone::Dim));
             w.hasPopup = true;
             break;
         case BarWidget::GameHelp:
             return WidgetContent{};
-        case BarWidget::ServerTime:
-            return ServerTimeWidget(state.unixMs, settings.serverClockZone, settings.clock24, settings.serverSeconds);
         case BarWidget::Fps:
             return FpsWidget(state.frames);
         case BarWidget::Job:
@@ -601,12 +603,11 @@ namespace headsup
             }
             popup.title =
                 ListOf(Text(std::to_string(year) + "-" + Printed("%02d", month) + "-" + Printed("%02d", day)));
+            popup.sections = ListOf(ServerTimeRows(state.unixMs));
             break;
         }
         case BarWidget::GameHelp:
             return GameHelpPopup(state.strip, StripBagFill(state));
-        case BarWidget::ServerTime:
-            return ServerTimePopup(state.unixMs, settings.serverClockZone);
         case BarWidget::Fps:
             return FpsPopup(state.frames);
         case BarWidget::Job:

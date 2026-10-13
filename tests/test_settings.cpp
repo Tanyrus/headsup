@@ -332,7 +332,7 @@ untargetedOpacity=40.0000
 clockSeconds=true
 serverSeconds=true
 barLatency=true
-barLeft=zone weather vanaTime job party signet serverTime distance
+barLeft=zone weather vanaTime job party signet distance
 barCenter=
 barRight=target gil bags connection fps earthTime
 hideHelpBar=true
@@ -374,7 +374,7 @@ helpBarY=8.0000
         s.barTheme     = BarTheme::UmbraDark;
         s.barSeparators = BarSeparators::None;
         s.barCurrency   = *CurrencyOfKey("allied_notes");
-        s.serverClockZone = ClockZone::UsPacific;
+        s.clockServerTime = true; // the file's Server time widget was on
         s.barTargetDetails = true;
         s.menuFont         = "Tahoma";
         s.menuScale        = 125;
@@ -396,7 +396,6 @@ helpBarY=8.0000
         s.cursorOutline = 60;
         s.untargetedOpacity = 40;
         s.clockSeconds  = true;
-        s.serverSeconds = true;
         s.barLatency = true;
         s.barHeight    = 48;
         s.barTextSize   = 16;
@@ -419,9 +418,10 @@ helpBarY=8.0000
         return s;
     }
 
-    // The keys of kSavedFile that only a file from before the designer carries: the migration reads them, and nothing
-    // writes them.
-    const char* const kOldKeys[] = {"showLabels", "replaceMobNames", "showIcons", "hideInCombat", "hideClaimed", "hideTooWeak",
+    // The keys of kSavedFile that only an older build's file carries: a migration reads them, or nothing does, and
+    // nothing writes them.
+    const char* const kOldKeys[] = {"barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
+        "serverClockZone", "showLabels", "replaceMobNames", "showIcons", "hideInCombat", "hideClaimed", "hideTooWeak",
         "hideWhileEngaged", "markPlaceholders", "fontBold", "nameGlow", "scalePlayerNames",
         "labelFontBold", "showOrnament", "ownGlowColor", "ownOrnamentColor", "labelFontName", "glowSize",
         "ornamentWidth", "ornamentThickness", "nameShadow", "labelShadow", "glowColorR", "glowColorG", "glowColorB",
@@ -789,7 +789,7 @@ TEST(each_theme_and_bar_widget_has_its_own_key)
         CHECK(saved.values["barTheme"] == t.name);
     }
     const char* const widgetKeys[] = {"barZone", "barWeather", "barVanaTime", "barTarget", "barGil", "barBags",
-        "barEarthTime", "barGameHelp", "barServerTime", "barFps", "barJob", "barConnection", "barParty", "barSignet", "barDistance"}; // in BarWidget's order
+        "barEarthTime", "barGameHelp", "barFps", "barJob", "barConnection", "barParty", "barSignet", "barDistance"}; // in BarWidget's order
     static_assert(std::size(widgetKeys) == kBarWidgetCount);
     for (int w = 0; w < kBarWidgetCount; ++w)
     {
@@ -854,7 +854,6 @@ TEST(the_job_layout_and_the_clocks_zone_are_saved_by_name_and_an_unknown_name_ke
     store.values    = {{"jobLayout", "expOnly"}, {"clockZone", "usPacific"}};
     const Settings s = LoadSettings(store);
     CHECK(s.jobLayout == JobLayout::ExpOnly && s.clockZone == ClockZone::UsPacific);
-    CHECK(s.serverClockZone == ClockZone::Japan); // Server time's zone is its own
     MapStore saved;
     SaveSettings(s, saved);
     CHECK(saved.values["jobLayout"] == "expOnly" && saved.values["clockZone"] == "usPacific");
@@ -867,6 +866,25 @@ TEST(the_job_layout_and_the_clocks_zone_are_saved_by_name_and_an_unknown_name_ke
     CHECK(odd.jobLayout == JobLayout::JobsFirst && !odd.clockZone.has_value());
     store.values = {{"jobLayout", "expFirst"}, {"clockZone", "local"}};
     CHECK(LoadSettings(store).jobLayout == JobLayout::ExpFirst && !LoadSettings(store).clockZone.has_value());
+}
+
+TEST(a_file_that_showed_server_time_as_a_widget_of_its_own_has_the_clock_stack_it)
+{
+    MapStore fresh;
+    CHECK(!LoadSettings(fresh).clockServerTime);
+    MapStore shown;
+    shown.values = {{"barServerTime", "true"}};
+    CHECK(LoadSettings(shown).clockServerTime);
+    MapStore hidden;
+    hidden.values = {{"barServerTime", "false"}};
+    CHECK(!LoadSettings(hidden).clockServerTime);
+    MapStore decided; // the option's own key, once saved, is what counts
+    decided.values = {{"barServerTime", "true"}, {"clockServerTime", "false"}};
+    CHECK(!LoadSettings(decided).clockServerTime);
+    MapStore saved;
+    SaveSettings(LoadSettings(shown), saved);
+    CHECK(saved.values["clockServerTime"] == "true" && !saved.values.contains("barServerTime"));
+    CHECK(!saved.values.contains("serverClockZone") && !saved.values.contains("serverSeconds"));
 }
 
 TEST(separators_that_are_not_a_choice_keep_the_themes)
