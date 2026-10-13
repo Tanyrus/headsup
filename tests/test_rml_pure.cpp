@@ -1,6 +1,8 @@
 #include "rml_pure.h"
 #include "test.h"
 
+#include <vector>
+
 using namespace headsup;
 using Rml::Input::KeyIdentifier;
 
@@ -95,4 +97,43 @@ TEST(a_transform_moves_a_point_and_divides_by_its_depth)
     Transformed(deep, x, y);
     CHECK_EQ(x, 2.0f);
     CHECK_EQ(y, 4.0f);
+}
+
+namespace
+{
+    // The corners of a box as the renderer keeps them, at the pixel centers Direct3D samples.
+    std::vector<ScreenVertex> Corners(float left, float top, float right, float bottom)
+    {
+        std::vector<ScreenVertex> corners;
+        for (const float x : {left, right})
+            for (const float y : {top, bottom})
+                corners.push_back(ScreenVertex{x - kPixelCenter, y - kPixelCenter, 0.0f, 1.0f, 0, 0.0f, 0.0f});
+        return corners;
+    }
+}
+
+TEST(a_clip_masks_box_goes_where_its_translation_and_transform_put_it)
+{
+    const std::vector<ScreenVertex> box = Corners(100.0f, 50.0f, 300.0f, 150.0f);
+    CHECK((MaskEdges(box.data(), box.size(), 10.0f, 20.0f, nullptr) == PixelEdges{110, 70, 310, 170}));
+    // A list sliding in from 6 pixels up clips 6 pixels up.
+    const float slide[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -6, 0, 1};
+    CHECK((MaskEdges(box.data(), box.size(), 10.0f, 20.0f, slide) == PixelEdges{110, 64, 310, 164}));
+    // Half the size about the origin, and an edge between two pixels goes to the nearer.
+    const float half[16] = {0.5f, 0, 0, 0, 0, 0.5f, 0, 0, 0, 0, 1, 0, 0, 0.4f, 0, 1};
+    CHECK((MaskEdges(box.data(), box.size(), 10.0f, 20.0f, half) == PixelEdges{55, 35, 155, 85}));
+    // Twice the size: the corners are doubled, not the pixel centers the vertices are kept at.
+    const float twice[16] = {2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+    CHECK((MaskEdges(box.data(), box.size(), 10.0f, 20.0f, twice) == PixelEdges{220, 140, 620, 340}));
+    // A quarter turn: the box around the turned corners, x from -170 to -70 and y from 110 to 310.
+    const float turn[16] = {0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+    CHECK((MaskEdges(box.data(), box.size(), 10.0f, 20.0f, turn) == PixelEdges{-170, 110, -70, 310}));
+}
+
+TEST(two_clips_leave_what_both_cover)
+{
+    CHECK((Shared(PixelEdges{0, 0, 100, 100}, PixelEdges{50, 20, 200, 80}) == PixelEdges{50, 20, 100, 80}));
+    // Apart, they leave no pixel for the scissor to keep.
+    const PixelEdges none = Shared(PixelEdges{0, 0, 10, 10}, PixelEdges{20, 20, 30, 30});
+    CHECK(!ClampedRect(none.left, none.top, none.right, none.bottom, 80, 40));
 }

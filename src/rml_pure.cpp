@@ -3,6 +3,8 @@
 #include "argb.h"
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
 
 namespace headsup
 {
@@ -88,6 +90,30 @@ namespace headsup
         const int x1 = std::min(right, width), y1 = std::min(bottom, height);
         if (x1 <= x0 || y1 <= y0) return std::nullopt;
         return PixelRect{x0, y0, x1 - x0, y1 - y0};
+    }
+
+    PixelEdges MaskEdges(const ScreenVertex* vertices, size_t count, float translateX, float translateY,
+        const float* transform)
+    {
+        if (count == 0) return {};
+        float left = std::numeric_limits<float>::max(), top = left, right = std::numeric_limits<float>::lowest(), bottom = right;
+        for (size_t i = 0; i < count; ++i)
+        {
+            float x = vertices[i].x + kPixelCenter + translateX, y = vertices[i].y + kPixelCenter + translateY;
+            if (transform != nullptr) Transformed(transform, x, y);
+            left   = std::min(left, x);
+            top    = std::min(top, y);
+            right  = std::max(right, x);
+            bottom = std::max(bottom, y);
+        }
+        return PixelEdges{static_cast<int>(std::lround(left)), static_cast<int>(std::lround(top)),
+            static_cast<int>(std::lround(right)), static_cast<int>(std::lround(bottom))};
+    }
+
+    PixelEdges Shared(const PixelEdges& a, const PixelEdges& b)
+    {
+        return PixelEdges{std::max(a.left, b.left), std::max(a.top, b.top), std::min(a.right, b.right),
+            std::min(a.bottom, b.bottom)};
     }
 
     KeyIdentifier KeyOf(uint32_t virtualKey)

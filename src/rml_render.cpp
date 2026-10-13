@@ -22,6 +22,7 @@ namespace headsup
         m_Device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
         m_Textured = true;
         m_Transform.reset();
+        m_Masked = false;
         ApplyScissor();
     }
 
@@ -153,13 +154,35 @@ namespace headsup
             m_Transform.reset();
     }
 
+    void RmlRender::EnableClipMask(bool enable)
+    {
+        m_Masked = enable;
+        ApplyScissor();
+    }
+
+    void RmlRender::RenderToClipMask(Rml::ClipMaskOperation operation, Rml::CompiledGeometryHandle handle,
+        Rml::Vector2f translation)
+    {
+        if (handle == 0) return;
+        const Geometry& geometry = *reinterpret_cast<const Geometry*>(handle);
+        const PixelEdges edges = MaskEdges(geometry.vertices.data(), geometry.vertices.size(), translation.x,
+            translation.y, m_Transform ? m_Transform->data() : nullptr);
+        // What lies outside a shape is no rectangle: that mask clips nothing.
+        if (operation == Rml::ClipMaskOperation::SetInverse)
+            m_Mask = PixelEdges{0, 0, m_Width, m_Height};
+        else
+            m_Mask = operation == Rml::ClipMaskOperation::Intersect ? Shared(m_Mask, edges) : edges;
+        ApplyScissor();
+    }
+
     void RmlRender::ApplyScissor()
     {
         if (m_Device == nullptr) return;
         D3DVIEWPORT8 viewport = m_GameViewport;
-        std::optional<PixelRect> rect =
-            m_Scissor ? ClampedRect(m_Region.Left(), m_Region.Top(), m_Region.Right(), m_Region.Bottom(), m_Width, m_Height)
-                      : PixelRect{0, 0, m_Width, m_Height};
+        PixelEdges edges = m_Scissor ? PixelEdges{m_Region.Left(), m_Region.Top(), m_Region.Right(), m_Region.Bottom()}
+                                     : PixelEdges{0, 0, m_Width, m_Height};
+        if (m_Masked) edges = Shared(edges, m_Mask);
+        const std::optional<PixelRect> rect = ClampedRect(edges.left, edges.top, edges.right, edges.bottom, m_Width, m_Height);
         m_NothingVisible = !rect;
         if (!rect) return;
         viewport.X      = static_cast<DWORD>(rect->x);

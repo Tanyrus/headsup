@@ -40,6 +40,20 @@ namespace headsup
     // The part of a rectangle (right and bottom exclusive) inside a width by height target; nothing when no pixel is.
     std::optional<PixelRect> ClampedRect(int left, int top, int right, int bottom, int width, int height);
 
+    // A rectangle by its edges in whole pixels, right and bottom exclusive; it holds no pixel when they cross.
+    struct PixelEdges
+    {
+        int left = 0, top = 0, right = 0, bottom = 0;
+        bool operator==(const PixelEdges&) const = default;
+    };
+    // The box around a clip mask's vertices as they are drawn: moved by the translation, then by the transform when
+    // there is one. Direct3D 8 gives no stencil to count on, so a mask clips as this rectangle: a moved or scaled
+    // box exactly, a turned one by the box around it, and rounded corners not at all.
+    PixelEdges MaskEdges(const ScreenVertex* vertices, size_t count, float translateX, float translateY,
+        const float* transform);
+    // What two rectangles both cover.
+    PixelEdges Shared(const PixelEdges& a, const PixelEdges& b);
+
     // A Windows virtual key as RmlUi names it; KI_UNKNOWN for one it has no name for. Shift, Control and Menu
     // without a side read as their left keys.
     Rml::Input::KeyIdentifier KeyOf(uint32_t virtualKey);

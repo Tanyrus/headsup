@@ -16,7 +16,7 @@ namespace headsup
 {
     // RmlUi's drawing on the Direct3D 8 device: compiled geometry kept as pretransformed vertices and drawn with its
     // translation added, textures padded to powers of two as the plates' are, premultiplied alpha, and the scissor
-    // as the viewport, which Direct3D 8 clips pretransformed vertices to.
+    // and the clip mask as the viewport, which Direct3D 8 clips pretransformed vertices to.
     class RmlRender : public Rml::RenderInterface
     {
     public:
@@ -41,8 +41,13 @@ namespace headsup
         void EnableScissorRegion(bool enable) override;
         void SetScissorRegion(Rml::Rectanglei region) override;
         // Transforms move the vertices as they are placed: turned, scaled and sliding elements, with nothing more
-        // asked of Direct3D. What a transformed element clips is not clipped.
+        // asked of Direct3D.
         void SetTransform(const Rml::Matrix4f* transform) override;
+        // RmlUi clips what scrolls under a transform by a mask and no longer by the scissor: without these a list
+        // that drops in spills over its box until it lands. The mask is kept as a rectangle (MaskEdges).
+        void EnableClipMask(bool enable) override;
+        void RenderToClipMask(Rml::ClipMaskOperation operation, Rml::CompiledGeometryHandle geometry,
+            Rml::Vector2f translation) override;
 
         // A texture Direct3D refused, once.
         std::string TakeFailure();
@@ -66,7 +71,9 @@ namespace headsup
         int m_Width = 0, m_Height = 0;
         bool m_Scissor = false;
         Rml::Rectanglei m_Region;
-        bool m_NothingVisible = false; // the scissor leaves no pixel: nothing is drawn
+        bool m_Masked = false;
+        PixelEdges m_Mask;
+        bool m_NothingVisible = false; // the scissor and the mask leave no pixel: nothing is drawn
         D3DVIEWPORT8 m_GameViewport{};
         bool m_Textured = true; // the color stage reads the texture; untextured geometry takes its vertex colors
         std::optional<Rml::Matrix4f> m_Transform;
