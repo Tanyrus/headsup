@@ -183,7 +183,7 @@ Nothing tells HeadsUp ahead of time about a picture taken from outside the game,
 Steam's or NVIDIA's. For those, pick a key on the User Interface page's Screenshot Mode card, or run `/hu screenshot`:
 once hides everything, and once more brings it back.
 
-The top panel also hides itself during cutscenes and NPC dialogs.
+During cutscenes and NPC dialogs the top panel hides itself and every nameplate shows its name alone.
 
 ## Mouse pointer
 

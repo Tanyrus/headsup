@@ -151,6 +151,25 @@ TEST(expanding_rows_and_dead_mobs_keep_the_name_alone)
     CHECK_EQ(gone.ornamentAbove, kNoOrnament);
 }
 
+TEST(in_a_cutscene_or_a_dialog_every_plate_keeps_its_name_alone)
+{
+    const Settings s; // the default designs
+    PlayerState watching = kPlayer;
+    watching.inEvent     = true;
+    ActorInfo targeted    = AggressiveMob();
+    targeted.state.target = TargetState::Targeted;
+    CHECK_EQ(ComposePlate(targeted, kPlayer, s, kGame).lines.size(), size_t{3});
+    const ComposedPlate mob = ComposePlate(targeted, watching, s, kGame);
+    CHECK_EQ(mob.lines.size(), size_t{1});
+    CHECK_EQ(Rendered(mob.lines[0]), "Young Quadav");
+    CHECK_EQ(mob.ornamentAbove, kNoOrnament);
+    // A player's icons go with the rest: the linkshell and seeking-party marks beside the name.
+    CHECK(Rendered(ComposePlate(LinkshellPlayer(), kPlayer, s, kGame).lines.back()) != "Chadmage");
+    const ComposedPlate player = ComposePlate(LinkshellPlayer(), watching, s, kGame);
+    CHECK_EQ(player.lines.size(), size_t{1});
+    CHECK_EQ(Rendered(player.lines[0]), "Chadmage");
+}
+
 TEST(a_dead_mobs_name_does_not_glow)
 {
     const Settings s; // the default design: the name glows at full strength

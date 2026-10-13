@@ -21,6 +21,7 @@ namespace headsup
     {
         int level    = 0;     // main job level; 0 while unknown (zoning, logging in)
         bool sitting = false; // resting, /sit or a chair: Phoenix lets Too Weak aggressive mobs aggro then
+        bool inEvent = false; // a cutscene or an NPC's dialog is running
     };
 
     // Phoenix's CZoneEntities::tapMobAggro with its mob data. checkedLevel is the level a /check reported for this

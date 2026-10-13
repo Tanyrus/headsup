@@ -316,7 +316,7 @@ namespace headsup
         if (mode == PlateMode::WhenTargeted && !Targeted(st.target)) return plate;
         const bool deadMob  = st.kind == EntityKind::Mob && !st.alive;
         const bool fought   = s.glowOffWhenFighting && st.kind == EntityKind::Mob && st.claim == ClaimState::Yours;
-        const bool nameOnly = (mode == PlateMode::Expanding && !Targeted(st.target)) || deadMob;
+        const bool nameOnly = (mode == PlateMode::Expanding && !Targeted(st.target)) || deadMob || player.inEvent;
         std::optional<BadgeRules> badgeRules;
         plate.lines.reserve(kPlateLines);
         for (int i = 0; i < kPlateLines; ++i)
