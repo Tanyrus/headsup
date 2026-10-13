@@ -120,12 +120,6 @@ namespace headsup
         return true;
     }
 
-    float GdiText::Measure(const char* text, const char* family, int pixelHeight)
-    {
-        int width = 0, height = 0;
-        return Extent(text, family, pixelHeight, false, width, height) ? static_cast<float>(width) : 0.0f;
-    }
-
     LineInk GdiText::FontInk(const char* family, int pixelHeight, const char* glyphs)
     {
         const auto known = m_Inks.find(std::tuple{std::string_view(family), pixelHeight, std::string_view(glyphs)});

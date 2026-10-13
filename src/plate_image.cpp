@@ -165,81 +165,6 @@ namespace headsup
             float m_Radius, m_CenterX, m_CenterY, m_CoreX, m_CoreY;
         };
 
-        // Box's pixels a row at a time: its outline, the inside of its border and the outer ring's two edges cover a
-        // pixel by how far across and down it is from their cores, so in the columns in line with every core, a row's
-        // pixels are all the same.
-        class BoxPainter
-        {
-        public:
-            BoxPainter(int width, int height, const BoxStyle& style)
-                : m_Style(style), m_Pad(OuterPad(style)),
-                  m_Width(std::max(1, width) + 2 * m_Pad), m_Height(std::max(1, height) + 2 * m_Pad),
-                  m_Edge(static_cast<float>(m_Pad)), m_BoxWidth(static_cast<float>(std::max(1, width))),
-                  m_BoxHeight(static_cast<float>(std::max(1, height))), m_Gap(static_cast<float>(style.outerGap)),
-                  m_Shape(m_Edge, m_Edge, m_BoxWidth, m_BoxHeight, style.radius),
-                  m_Inner(m_Edge + 1.0f, m_Edge + 1.0f, m_BoxWidth - 2.0f, m_BoxHeight - 2.0f, style.radius - 1.0f),
-                  m_RingOut(m_Edge - m_Gap - 1.0f, m_Edge - m_Gap - 1.0f, m_BoxWidth + 2.0f * m_Gap + 2.0f,
-                      m_BoxHeight + 2.0f * m_Gap + 2.0f, style.radius + m_Gap + 1.0f),
-                  m_RingIn(m_Edge - m_Gap, m_Edge - m_Gap, m_BoxWidth + 2.0f * m_Gap, m_BoxHeight + 2.0f * m_Gap,
-                      style.radius + m_Gap)
-            {
-                while (m_Middle < m_Width && !Still(m_Middle))
-                    ++m_Middle;
-                m_MiddleEnd = m_Width;
-                while (m_MiddleEnd > m_Middle && !Still(m_MiddleEnd - 1))
-                    --m_MiddleEnd;
-            }
-
-            int Width() const { return m_Width; }
-            int Height() const { return m_Height; }
-            // The columns from Middle to MiddleEnd (exclusive) are alike in every row; none when they are equal.
-            int Middle() const { return m_Middle; }
-            int MiddleEnd() const { return m_MiddleEnd; }
-
-            void StartRow(int y)
-            {
-                m_Fill        = Mix(m_Style.top, m_Style.bottom, (static_cast<float>(y) - m_Edge + 0.5f) / m_BoxHeight);
-                m_ShapeDown   = m_Shape.Down(y);
-                m_InnerDown   = m_Inner.Down(y);
-                m_RingOutDown = m_RingOut.Down(y);
-                m_RingInDown  = m_RingIn.Down(y);
-            }
-
-            uint32_t Pixel(int x) const
-            {
-                const float shape = m_Shape.Cover(m_Shape.Across(x), m_ShapeDown);
-                const float inner = m_Style.border != 0 ? m_Inner.Cover(m_Inner.Across(x), m_InnerDown) : shape;
-                Paint paint;
-                if (m_Style.outer != 0)
-                {
-                    const float ring = m_RingOut.Cover(m_RingOut.Across(x), m_RingOutDown) -
-                                       m_RingIn.Cover(m_RingIn.Across(x), m_RingInDown);
-                    paint.Add(ring * Channel(m_Style.outer, kAlphaShift) / kFullCoverage, Opaque(m_Style.outer));
-                }
-                paint.Add(inner * Channel(m_Fill, kAlphaShift) / kFullCoverage, Opaque(m_Fill));
-                if (m_Style.border != 0)
-                    paint.Add((shape - inner) * Channel(m_Style.border, kAlphaShift) / kFullCoverage,
-                        Opaque(m_Style.border));
-                return paint.Color();
-            }
-
-        private:
-            bool Still(int x) const
-            {
-                const bool inner = m_Style.border == 0 || m_Inner.InCore(x);
-                const bool ring  = m_Style.outer == 0 || (m_RingOut.InCore(x) && m_RingIn.InCore(x));
-                return m_Shape.InCore(x) && inner && ring;
-            }
-
-            const BoxStyle& m_Style;
-            int m_Pad, m_Width, m_Height;
-            float m_Edge, m_BoxWidth, m_BoxHeight, m_Gap; // the box's left and top in the image, and its size
-            Rounded m_Shape, m_Inner, m_RingOut, m_RingIn;
-            int m_Middle = 0, m_MiddleEnd = 0;
-            uint32_t m_Fill = 0;
-            float m_ShapeDown = 0.0f, m_InnerDown = 0.0f, m_RingOutDown = 0.0f, m_RingInDown = 0.0f;
-        };
-
         // The middle stop of a strip's gradient sits 55% of the way down, as the mockup's CSS has it.
         constexpr float kStripMiddle = 0.55f;
         constexpr float kRimShade    = 0.6f; // a coin's rim, as a share of its color
@@ -399,59 +324,7 @@ namespace headsup
             static_cast<float>(glyphs.top), static_cast<float>(capital.bottom), static_cast<float>(glyphs.bottom)};
     }
 
-    Image Box(int width, int height, const BoxStyle& style)
-    {
-        BoxPainter painter(width, height, style);
-        Image image{painter.Width(), painter.Height(), {}};
-        image.argb.resize(static_cast<size_t>(image.width) * static_cast<size_t>(image.height));
-        for (int y = 0; y < image.height; ++y)
-        {
-            painter.StartRow(y);
-            uint32_t* row = image.argb.data() + static_cast<size_t>(y) * static_cast<size_t>(image.width);
-            for (int x = 0; x < painter.Middle(); ++x)
-                row[x] = painter.Pixel(x);
-            if (painter.Middle() < painter.MiddleEnd())
-                std::fill(row + painter.Middle(), row + painter.MiddleEnd(), painter.Pixel(painter.Middle()));
-            for (int x = painter.MiddleEnd(); x < image.width; ++x)
-                row[x] = painter.Pixel(x);
-        }
-        return image;
-    }
-
     int OuterPad(const BoxStyle& style) { return style.outer != 0 ? style.outerGap + 1 : 0; }
-
-    SlicedBox SliceBox(int width, int height, const BoxStyle& style)
-    {
-        BoxPainter painter(width, height, style);
-        const int left = painter.Middle(), right = painter.Width() - painter.MiddleEnd();
-        // A middle no wider than the copies of one column would be is drawn whole.
-        if (painter.MiddleEnd() - painter.Middle() <= kSliceMiddleColumns)
-            return SlicedBox{Box(width, height, style), painter.Width(), painter.Width(), 0};
-        SlicedBox sliced{Image{left + kSliceMiddleColumns + right, painter.Height(), {}}, painter.Width(), left, right};
-        sliced.image.argb.resize(static_cast<size_t>(sliced.image.width) * static_cast<size_t>(sliced.image.height));
-        for (int y = 0; y < sliced.image.height; ++y)
-        {
-            painter.StartRow(y);
-            uint32_t* row = sliced.image.argb.data() + static_cast<size_t>(y) * static_cast<size_t>(sliced.image.width);
-            for (int x = 0; x < left; ++x)
-                row[x] = painter.Pixel(x);
-            std::fill_n(row + left, kSliceMiddleColumns, painter.Pixel(painter.Middle()));
-            for (int x = 0; x < right; ++x)
-                row[left + kSliceMiddleColumns + x] = painter.Pixel(painter.MiddleEnd() + x);
-        }
-        return sliced;
-    }
-
-    std::vector<SliceSpan> SliceSpans(const SlicedBox& box, float u)
-    {
-        const float column = u / static_cast<float>(box.image.width); // one image column's share of u
-        std::vector<SliceSpan> spans{SliceSpan{0, box.left, 0.0f, static_cast<float>(box.left) * column}};
-        if (box.left + box.right >= box.width) return spans;
-        const float middle = (static_cast<float>(box.left) + 0.5f) * column;
-        spans.push_back(SliceSpan{box.left, box.width - box.left - box.right, middle, middle});
-        spans.push_back(SliceSpan{box.width - box.right, box.right, u - static_cast<float>(box.right) * column, u});
-        return spans;
-    }
 
     Image Diamond(int size, uint32_t color)
     {
@@ -515,15 +388,6 @@ namespace headsup
                 paint.Over(static_cast<float>(covered) / (kStarSamples * kStarSamples), color);
                 image.argb[static_cast<size_t>(y * s + x)] = paint.Color();
             }
-        return image;
-    }
-
-    Image FadingRule(int width, uint32_t color)
-    {
-        const int w = std::max(1, width);
-        Image image{w, 1, {}};
-        for (int x = 0; x < w; ++x)
-            image.argb.push_back(WithAlpha(color, 1.0f - static_cast<float>(x) / static_cast<float>(w)));
         return image;
     }
 

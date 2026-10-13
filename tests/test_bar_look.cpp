@@ -175,15 +175,6 @@ TEST(pills_frame_every_widget_but_zone_and_earth_time_until_lit)
     CHECK(Near(bags->style.radius, look.metrics.pillRadius));
 }
 
-TEST(a_marks_ink_is_centered_in_its_piece)
-{
-    // The ink's columns 2 to 8 and rows 3 to 11 of an image with a 4 px margin around the line box: its center is
-    // 1 px right of and 3 px below the line box's corner.
-    const std::optional<BarPoint> at = CenteredInk(BarRect{10.0f, 20.0f, 6.0f, 6.0f}, InkBox{2, 3, 8, 11}, 4.0f);
-    CHECK(at.has_value() && at->x == 12.0f && at->y == 20.0f);
-    CHECK(!CenteredInk(BarRect{10.0f, 20.0f, 6.0f, 6.0f}, InkBox{}, 4.0f).has_value());
-}
-
 TEST(a_widget_of_figures_draws_its_title_in_the_detail_font_in_every_theme)
 {
     // Marcellus SC's 0 reads as an O and its small caps turn "2d 8h" into capitals: figures take Barlow Condensed at

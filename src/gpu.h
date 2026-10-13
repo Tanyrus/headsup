@@ -44,9 +44,6 @@ namespace headsup
         // The box Rasterize draws the text's letters in, set solid and before its margin, without drawing them; false
         // when GDI cannot measure it.
         bool Extent(const char* text, const char* family, int pixelHeight, bool bold, int& width, int& height);
-        // How wide Rasterize draws the text in the family's regular weight, set solid, in pixels, without drawing it;
-        // 0 when GDI cannot measure it.
-        float Measure(const char* text, const char* family, int pixelHeight);
         // Where the font's ink sits in the line Rasterize draws (without its margin): the top and bottom of the ink of
         // glyphs, and the bottom of an H's. Drawn once for each family, size and glyphs, then kept, past Release too.
         LineInk FontInk(const char* family, int pixelHeight, const char* glyphs);

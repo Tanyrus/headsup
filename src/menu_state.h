@@ -54,14 +54,6 @@ namespace headsup
     std::vector<BarWidget> WidgetTabs();
     // How many tabs go in a row for count of them in rows rows: the rows as even as they come, the first the fuller.
     int TabsPerRow(int count, int rows);
-    // Where a tab goes in a strip of count tabs, perRow to a row, gap apart sideways and between rows: from the
-    // strip's top left, with its width. The tabs of a row are equal and fill the strip, so a last row with fewer has
-    // wider ones.
-    struct TabPlace
-    {
-        float x = 0.0f, y = 0.0f, width = 0.0f;
-    };
-    TabPlace TabAt(int tab, int count, int perRow, float strip, float height, float gap);
 
     // The Clock widget's Time Zone dropdown: the computer's own zone first, as no zone picked, then every ClockZone.
     constexpr int kClockZoneChoices = kClockZoneCount + 1;
@@ -83,13 +75,12 @@ namespace headsup
     // is there already in any case.
     std::optional<std::string> FriendToAdd(const std::vector<std::string>& friends, std::string_view typed);
 
-    // A design line's box between frames: its text while typed in, which ImGui takes back on Escape only from a
-    // buffer that has kept it, and its caret in bytes, where a clicked tag goes (past the text means its end).
+    // A design line's box between frames: whether it is typed in, and its caret in bytes, where a clicked tag goes
+    // (past the text means its end).
     struct LineDraft
     {
-        char text[kMaxTemplate + 1] = {};
-        size_t caret                = kMaxTemplate;
-        bool typing                 = false;
+        size_t caret = kMaxTemplate;
+        bool typing  = false;
     };
 
     // The "Add a key" button's wait for a key: those held when it was pressed do not count.
@@ -107,7 +98,6 @@ namespace headsup
         int line       = 0;
         int styleTab   = 0;
         LineDraft drafts[kPlateLines] = {};
-        char friendName[kMaxCharacterName + 1] = {};
     };
 
     // A font dropdown lists unset first, when it has one, a word that stands for an empty name, then the fonts. A

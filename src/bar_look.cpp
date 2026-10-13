@@ -183,11 +183,4 @@ namespace headsup
             .border = p.panelBorder};
     }
 
-    std::optional<BarPoint> CenteredInk(const BarRect& box, const InkBox& ink, float margin)
-    {
-        if (ink.Empty()) return std::nullopt;
-        const float inkX = static_cast<float>(ink.left + ink.right) / 2.0f - margin;
-        const float inkY = static_cast<float>(ink.top + ink.bottom) / 2.0f - margin;
-        return BarPoint{box.x + box.width / 2.0f - inkX, box.y + box.height / 2.0f - inkY};
-    }
 }

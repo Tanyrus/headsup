@@ -104,7 +104,4 @@ namespace headsup
     {
         float x = 0.0f, y = 0.0f;
     };
-    // The corner of a text's line box that centers its glyphs' ink in box: ink is where the ink is in its image, which
-    // has margin pixels around the line box. Nothing without ink.
-    std::optional<BarPoint> CenteredInk(const BarRect& box, const InkBox& ink, float margin);
 }

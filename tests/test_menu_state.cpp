@@ -307,19 +307,3 @@ TEST(the_widgets_page_has_a_tab_for_every_widget_on_the_bar_in_rows_as_even_as_t
     CHECK_EQ(TabsPerRow(0, 2), 1); // never none, which a row's width is divided by
 }
 
-// 13 tabs, 7 to a row, across 700 px, each 30 px tall and 2 px from the next: (700 - 6 x 2) / 7 wide in the full row,
-// and the six left over share the second, (700 - 5 x 2) / 6 each.
-TEST(tabs_sit_a_gap_apart_each_way_and_every_row_fills_the_strip)
-{
-    const auto near = [](float a, float b) { return std::fabs(a - b) < 0.01f; };
-    const auto at   = [](int tab) { return TabAt(tab, 13, 7, 700.0f, 30.0f, 2.0f); };
-    const float full = 688.0f / 7.0f, rest = 690.0f / 6.0f;
-    CHECK(near(at(0).x, 0.0f) && near(at(0).y, 0.0f) && near(at(0).width, full));
-    CHECK(near(at(1).x - (at(0).x + at(0).width), 2.0f));
-    CHECK(near(at(6).x + at(6).width, 700.0f) && near(at(6).y, 0.0f));
-    CHECK(near(at(7).x, 0.0f) && near(at(7).y, 32.0f) && near(at(7).width, rest)); // the row above, then the gap
-    CHECK(near(at(8).x - (at(7).x + at(7).width), 2.0f));
-    CHECK(near(at(12).x + at(12).width, 700.0f) && near(at(12).y, 32.0f));
-    const TabPlace joined = TabAt(2, 3, 3, 300.0f, 30.0f, 0.0f); // one row, no gap: thirds of the strip
-    CHECK(near(joined.x, 200.0f) && near(joined.width, 100.0f) && near(joined.y, 0.0f));
-}

@@ -90,37 +90,12 @@ namespace headsup
     };
     // How far past the box its outer border reaches: its gap and its own pixel, or nothing without one.
     int OuterPad(const BoxStyle& style);
-    // A rounded box width by height, antialiased. With an outer border the image is OuterPad larger on every side.
-    Image Box(int width, int height, const BoxStyle& style);
-    // A box to draw in three: past its corners every column of a row is alike, so it is its left columns, one middle
-    // column stretched across the rest, and its right columns. The image holds the middle column twice, so filtering
-    // between the two blends it with nothing else.
-    constexpr int kSliceMiddleColumns = 2;
-    struct SlicedBox
-    {
-        Image image;             // the left columns, the middle column twice, the right columns
-        int width = 0;           // Box's image's
-        int left = 0, right = 0; // columns; left is width and right 0 when the box has no middle and image is all of it
-    };
-    SlicedBox SliceBox(int width, int height, const BoxStyle& style);
-    // A part of a sliced box as drawn: width pixels from x in the box, the texture's columns from u0 to u1 stretched
-    // across them.
-    struct SliceSpan
-    {
-        int x = 0, width = 0;
-        float u0 = 0.0f, u1 = 0.0f;
-    };
-    // How a box whose image takes u of its texture's width is drawn: its whole image, or its left columns, its first
-    // middle column's center stretched across the middle, and its right columns.
-    std::vector<SliceSpan> SliceSpans(const SlicedBox& box, float u);
     // A diamond size pixels tall and wide.
     Image Diamond(int size, uint32_t color);
     // Gil's coin: a disc size pixels across with a 1 px rim at 60% of its color's brightness.
     Image Coin(int size, uint32_t color);
     // A five-pointed star with a point straight up, in the circle size pixels across.
     Image Star(int size, uint32_t color);
-    // A 1 px line width long, color at the left fading to clear at the right: an ornate popup's heading rule.
-    Image FadingRule(int width, uint32_t color);
 
     // A size in whole pixels, at least one: what text and images are drawn at.
     int WholePixels(float size);
