@@ -216,6 +216,39 @@ TEST(a_friend_is_named_in_the_list_whatever_the_case)
     CHECK(!IsFriend({}, "Chadmage"));
 }
 
+TEST(the_cursor_takes_its_picks_color_and_the_targeting_color_where_the_pick_has_nothing_to_read)
+{
+    Settings s;
+    const Palette& p = s.palette;
+    EntityState mob;
+    mob.kind   = EntityKind::Mob;
+    mob.nature = Nature::Passive;
+    mob.claim  = ClaimState::Others;
+    mob.target = TargetState::Locked;
+    const uint32_t locked = ToArgb(p.target[static_cast<int>(TargetState::Locked)]);
+    CHECK_EQ(CursorColorOf(ColorPick{ColorSource::Target}, mob, p), locked);
+    CHECK_EQ(CursorColorOf(ColorPick{ColorSource::Aggression}, mob, p), ToArgb(p.aggression[static_cast<int>(Nature::Passive)]));
+    CHECK_EQ(CursorColorOf(ColorPick{ColorSource::Claim}, mob, p), ToArgb(p.claim[static_cast<int>(ClaimState::Others)]));
+    CHECK_EQ(CursorColorOf(ColorPick{ColorSource::Custom, {{0.0f, 0.0f, 1.0f}}}, mob, p), 0xFF0000FFu);
+    // A player has no aggression, toughness or claim to read: the cursor over one is the Targeting color.
+    EntityState player;
+    player.kind   = EntityKind::Player;
+    player.target = TargetState::SubTarget;
+    const uint32_t picking = ToArgb(p.target[static_cast<int>(TargetState::SubTarget)]);
+    for (const ColorSource mobsOnly : {ColorSource::Aggression, ColorSource::Toughness, ColorSource::Claim})
+        CHECK_EQ(CursorColorOf(ColorPick{mobsOnly}, player, p), picking);
+    CHECK_EQ(CursorColorOf(ColorPick{ColorSource::Type}, player, p), ToArgb(p.type[static_cast<int>(TargetType::Player)]));
+    // A pet is a mob in the game's eyes and has its own page, which offers no aggression either.
+    EntityState pet = mob;
+    pet.pet         = true;
+    CHECK_EQ(CursorColorOf(ColorPick{ColorSource::Aggression}, pet, p), locked);
+    // Every source the cursor offers is one it can resolve, and the game's name color is not among them.
+    const std::vector<ColorSource> offered = CursorSources();
+    CHECK(std::ranges::find(offered, ColorSource::Game) == offered.end());
+    CHECK(std::ranges::find(offered, ColorSource::Aggression) != offered.end());
+    CHECK(std::ranges::find(offered, ColorSource::Target) != offered.end());
+}
+
 TEST(a_rows_color_is_what_its_outline_pick_resolves_to)
 {
     Settings s;

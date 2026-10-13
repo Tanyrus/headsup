@@ -358,11 +358,12 @@ helpBarY=8.0000
         s.scaleOwnName      = false;
         s.glowOffWhenFighting = false;
         s.scaleCursor       = true; // apart from the names': a dropped key would take theirs
-        s.replaceCursor = s.cursorFeather = false;
+        s.cursorStyle = CursorStyle::Vanilla; // the cursor was switched off
         s.chocoboPointer = true;
         s.fixPointer     = false;
         s.smoothness     = 12;
-        s.cursorSize     = 31;
+        s.cursorHeight   = 31;
+        s.cursorWidth    = 39; // the arrow it had, 0.8 as tall as wide
         s.nameRaise      = 12;
         s.maxDistance    = 25.0f;
         s.keepPointerKeys = {0x11, 0x1B, 0x51};
@@ -394,7 +395,7 @@ helpBarY=8.0000
         s.stackNames = true;
         s.barTitleFont = "Cinzel";
         s.barSubtitle = SubtitlePlace::Before;
-        s.cursorOutline = 60;
+        s.cursorOutlineThickness = 120; // 60 of before
         s.untargetedOpacity = 40;
         s.clockSeconds  = true;
         s.barLatency = true;
@@ -423,7 +424,7 @@ helpBarY=8.0000
 
     // The keys of kSavedFile that only an older build's file carries: a migration reads them, or nothing does, and
     // nothing writes them.
-    const char* const kOldKeys[] = {"thickness", "barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
+    const char* const kOldKeys[] = {"thickness", "cursorSize", "cursorOutline", "replaceCursor", "cursorFeather", "barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
         "serverClockZone", "showLabels", "replaceMobNames", "showIcons", "hideInCombat", "hideClaimed", "hideTooWeak",
         "hideWhileEngaged", "markPlaceholders", "fontBold", "nameGlow", "scalePlayerNames",
         "labelFontBold", "showOrnament", "ownGlowColor", "ownOrnamentColor", "labelFontName", "glowSize",
@@ -529,11 +530,11 @@ TEST(a_whole_number_too_large_for_an_int_is_clamped_like_any_other)
     store.values["enabled"]    = "true"; // which every build's file holds: without it there is no file to read
     store.values["nameSize"]   = "1e10";
     store.values["labelSize"]  = "-1e10";
-    store.values["cursorSize"] = "3e9";
+    store.values["cursorHeight"] = "3e9";
     const Settings s = LoadSettings(store);
     CHECK_EQ(s.baseSize, kMaxTextSize);
     CHECK_EQ(s.Kind(PlateKind::Mobs).lines[1].textSize, kMinSizePercent); // the smallest size of the largest base
-    CHECK_EQ(s.cursorSize, kMaxTextSize);
+    CHECK_EQ(s.cursorHeight, kMaxCursorSide);
 }
 
 TEST(the_font_list_puts_the_bundled_fonts_first_then_the_installed_ones_sorted_once_each)
@@ -558,7 +559,10 @@ TEST(clamp_bounds_every_field)
     s.outlineThickness = 0;
     s.smoothness  = 99;
     s.maxDistance = 1000.0f;
-    s.cursorSize  = 2;
+    s.cursorHeight = 2;
+    s.cursorWidth  = 900;
+    s.cursorRaise  = -50;
+    s.cursorOutlineThickness = 1;
     s.nameRaise   = 99;
     s.elementWeakRank   = 5;
     s.elementResistRank = -9;
@@ -570,11 +574,15 @@ TEST(clamp_bounds_every_field)
     s.barTheme          = static_cast<BarTheme>(9);
     s.barCurrency       = kCurrencyCount;
     const Color wild{{2.0f, -1.0f, 0.5f}};
-    s.weakBadgeColor = s.resistBadgeColor = s.rankBadgeColor = s.immuneBadgeColor = s.cursorEdgeColor = wild;
+    s.weakBadgeColor = s.resistBadgeColor = s.rankBadgeColor = s.immuneBadgeColor = s.cursorEdgeColor.custom = wild;
+    s.cursorColor     = ColorPick{ColorSource::Game, wild}; // the game's name color is not the cursor's to take
+    s.cursorEdgeColor.source = ColorSource::Game;
     const Settings c = Clamp(s);
     const Color clamped{{1.0f, 0.0f, 0.5f}};
-    for (const Color& each : {c.weakBadgeColor, c.resistBadgeColor, c.rankBadgeColor, c.immuneBadgeColor, c.cursorEdgeColor})
+    for (const Color& each : {c.weakBadgeColor, c.resistBadgeColor, c.rankBadgeColor, c.immuneBadgeColor, c.cursorEdgeColor.custom,
+             c.cursorColor.custom})
         CHECK(each == clamped);
+    CHECK(c.cursorColor.source == ColorSource::Target && c.cursorEdgeColor.source == ColorSource::Custom);
     CHECK_EQ(c.outlineThickness, kMinOutlineThickness);
     CHECK_EQ(c.smoothness, kMaxSmoothness);
     CHECK_EQ(c.maxDistance, kMaxOutlineDistance);
@@ -586,7 +594,10 @@ TEST(clamp_bounds_every_field)
     CHECK_EQ(Clamp(between).smoothness, 8);
     CHECK_EQ(Clamp(between).maxDistance, 15.0f);
     CHECK_EQ(Clamp(between).outlineOpacity, kMinOpacity);
-    CHECK_EQ(c.cursorSize, kMinTextSize);
+    CHECK_EQ(c.cursorHeight, kMinCursorSide);
+    CHECK_EQ(c.cursorWidth, kMaxCursorSide);
+    CHECK_EQ(c.cursorRaise, -kMaxCursorRaise);
+    CHECK_EQ(c.cursorOutlineThickness, kMinCursorEdge);
     CHECK_EQ(c.nameRaise, kMaxNameRaise);
     CHECK(c.elementWeakRank == -1 && c.elementResistRank == 1 && c.maxElements == kElementCount);
     CHECK(c.statusBadges[2] == (StatusBadgeRule{true, -1, kNoResistRank}));
@@ -618,9 +629,10 @@ TEST(nameplates_need_the_master_switch_and_a_part)
 {
     CHECK(NameplatesOn(Settings{}));
     Settings none;
-    none.nameplates = none.replaceCursor = none.phTimers = false;
+    none.nameplates = none.phTimers = false;
+    none.cursorStyle = CursorStyle::Vanilla;
     CHECK(!NameplatesOn(none));
-    for (bool Settings::*part : {&Settings::nameplates, &Settings::replaceCursor, &Settings::phTimers})
+    for (bool Settings::*part : {&Settings::nameplates, &Settings::phTimers})
     {
         Settings s = none;
         s.*part    = true;
@@ -628,9 +640,13 @@ TEST(nameplates_need_the_master_switch_and_a_part)
         s.enabled = false;
         CHECK(!NameplatesOn(s));
     }
-    Settings cursorOnly = none;
-    cursorOnly.replaceCursor = true;
-    CHECK(NameplatesOn(cursorOnly));
+    // Any cursor of HeadsUp's own is drawn by the nameplates' pass.
+    for (const CursorStyle style : {CursorStyle::Triangle, CursorStyle::Feather, CursorStyle::Chocobo, CursorStyle::File})
+    {
+        Settings cursorOnly = none;
+        cursorOnly.cursorStyle = style;
+        CHECK(NameplatesOn(cursorOnly));
+    }
 }
 
 TEST(a_color_from_hex_draws_as_the_same_hex)
@@ -698,10 +714,13 @@ TEST(a_file_from_before_each_kind_had_a_name_size_gives_all_of_them_its_one)
 TEST(a_file_from_before_the_cursor_scaled_on_its_own_scales_it_like_the_names)
 {
     MapStore old;
-    old.values = {{"scaleWithDistance", "false"}};
+    old.values = {{"enabled", "true"}, {"scaleWithDistance", "false"}};
     CHECK(!LoadSettings(old).scaleCursor);
-    old.values = {{"scaleWithDistance", "true"}};
+    old.values = {{"enabled", "true"}, {"scaleWithDistance", "true"}};
     CHECK(LoadSettings(old).scaleCursor);
+    // A new install's cursor stays one size, though its names scale.
+    MapStore none;
+    CHECK(LoadSettings(none).scaleWithDistance && !LoadSettings(none).scaleCursor);
 }
 
 TEST(an_old_install_on_the_old_default_font_takes_the_bundled_one_once)
@@ -1110,7 +1129,10 @@ TEST(every_designer_key_round_trips)
     s.timerPercent = 50;
     s.detectionShown = DetectionBit(DetectionIcon::Aggro) | DetectionBit(DetectionIcon::Blood);
     s.friends    = {"Tanyrus", "Chadmage"};
-    s.cursorEdgeColor = {{0.2f, 0.2f, 0.2f}};
+    s.cursorEdgeColor = ColorPick{ColorSource::Type, {{0.2f, 0.2f, 0.2f}}};
+    s.cursorColor     = ColorPick{ColorSource::Custom, {{0.9f, 0.8f, 0.1f}}};
+    s.cursorStyle     = CursorStyle::File;
+    s.cursorFile      = "My Cursor";
     MapStore store;
     SaveSettings(s, store);
     CHECK(LoadSettings(store) == s);
@@ -1490,7 +1512,7 @@ TEST(the_old_glow_and_shadow_settings_reach_the_mob_lines_and_the_cursor_edge)
     CHECK_EQ(shadow.Kind(PlateKind::Players).lines[2].shadow, 113);
     const Settings outline = Load2({{"textOutlineR", "0.6"}, {"textOutlineG", "0.7"}, {"textOutlineB", "0.8"}});
     const Color edge{{0.6f, 0.7f, 0.8f}};
-    CHECK(outline.cursorEdgeColor == edge);
+    CHECK((outline.cursorEdgeColor == ColorPick{ColorSource::Custom, edge}));
     CHECK(outline.Kind(PlateKind::Mobs).lines[0].shadowColor.custom == edge);
     CHECK(outline.Kind(PlateKind::Mobs).lines[2].shadowColor.custom == edge);
     CHECK(outline.Kind(PlateKind::Pets).lines[1].shadowColor.custom == edge);
@@ -1702,9 +1724,9 @@ TEST(keys_passed_on_are_owed_until_the_file_is_read_back_holding_them)
     CHECK(file.sets.empty());
     // Another change joins it, and a newer text takes the place of the one that waited.
     keys.ReadBack(false);
-    s.cursorSize = 40;
-    s.nameRaise  = 21;
-    CHECK((keys.Save(s) == std::vector<KeyText>{{"nameRaise", "21.0000"}, {"cursorSize", "40.0000"}}));
+    s.cursorHeight = 40;
+    s.nameRaise    = 21;
+    CHECK((keys.Save(s) == std::vector<KeyText>{{"nameRaise", "21.0000"}, {"cursorHeight", "40.0000"}}));
     CHECK(keys.Unwritten());
     keys.ReadBack(true);
     CHECK(!keys.Unwritten());
@@ -1918,6 +1940,90 @@ TEST(a_number_of_before_is_converted_in_a_store_that_adds_what_a_typed_read_miss
     CHECK(loaded.Kind(PlateKind::Npcs).ornament.place == OrnamentPlace::AboveMiddle);
     for (int row = 0; row < kPetRowCount; ++row)
         CHECK(loaded.Kind(PlateKind::Pets).rows[row].plate == PlateMode::Hidden);
+}
+
+TEST(a_cursors_edge_color_of_before_is_its_custom_color_and_its_own_color_follows_the_targeting_colors)
+{
+    // The edge was one color. It is a pick now, whose custom color is under the keys that color had.
+    MapStore file = Version3File(Settings{},
+        {{"cursorEdgeColorR", "0.2500"}, {"cursorEdgeColorG", "0.5000"}, {"cursorEdgeColorB", "0.7500"}},
+        {"cursorEdgeColorSource", "cursorPickSource", "cursorPickR", "cursorPickG", "cursorPickB"});
+    const Settings loaded = LoadSettings(file);
+    CHECK((loaded.cursorEdgeColor == ColorPick{ColorSource::Custom, {{0.25f, 0.5f, 0.75f}}}));
+    CHECK(loaded.cursorColor.source == ColorSource::Target);
+    CHECK((Settings{}.cursorEdgeColor == ColorPick{ColorSource::Custom, {{0.0f, 0.0f, 0.0f}}}));
+}
+
+TEST(the_cursors_two_switches_of_before_become_its_style)
+{
+    // The cursor was on or off, and a feather or an arrow.
+    const auto style = [](const char* replace, const char* feather) {
+        MapStore file = Version3File(Settings{}, {{"replaceCursor", replace}, {"cursorFeather", feather}}, {"cursorStyle", "cursorFile"});
+        file.addsDefaults = true;
+        return LoadSettings(file).cursorStyle;
+    };
+    CHECK(style("true", "true") == CursorStyle::Feather);
+    CHECK(style("true", "false") == CursorStyle::Triangle);
+    CHECK(style("false", "true") == CursorStyle::Vanilla);
+    CHECK(style("false", "false") == CursorStyle::Vanilla);
+    CHECK(Settings{}.cursorStyle == CursorStyle::Feather);
+    // Its own key stands, and the switches are never written again.
+    Settings chocobo;
+    chocobo.cursorStyle = CursorStyle::Chocobo;
+    MapStore file = Version3File(chocobo, {{"replaceCursor", "false"}, {"cursorFeather", "false"}}, {});
+    CHECK(LoadSettings(file).cursorStyle == CursorStyle::Chocobo);
+    SaveSettings(chocobo, file);
+    CHECK(std::ranges::find(file.sets, "replaceCursor") == file.sets.end());
+    CHECK(std::ranges::find(file.sets, "cursorFeather") == file.sets.end());
+}
+
+TEST(a_cursor_file_is_a_name_and_never_a_path)
+{
+    // The name goes into a path under the cursors folder: one that would lead out of it is no name.
+    for (const char* path : {"..\\..\\system32\\x", "a/b", "c:evil", ""})
+    {
+        Settings s;
+        s.cursorStyle = CursorStyle::File;
+        s.cursorFile  = path;
+        const Settings c = Clamp(s);
+        CHECK(c.cursorStyle == CursorStyle::Feather && c.cursorFile.empty());
+    }
+    Settings named;
+    named.cursorStyle = CursorStyle::File;
+    named.cursorFile  = "My Cursor 2";
+    CHECK(Clamp(named) == named);
+    // A style no build knows is the default.
+    Settings wild;
+    wild.cursorStyle = static_cast<CursorStyle>(9);
+    CHECK(Clamp(wild).cursorStyle == CursorStyle::Feather);
+}
+
+TEST(a_cursor_saved_as_one_size_keeps_its_shape_and_its_edge)
+{
+    // The cursor had a height and took its width from its shape. It has both now, and its edge's 100 percent is
+    // what 50 was.
+    const auto loaded = [](const char* feather) {
+        MapStore file = Version3File(Settings{}, {{"cursorSize", "31.0000"}, {"cursorFeather", feather}, {"cursorOutline", "75.0000"}},
+            {"cursorWidth", "cursorHeight", "cursorOutlineThickness", "cursorStyle"});
+        file.addsDefaults = true; // as Ashita's store, which must not get to the new keys before the old are read
+        return LoadSettings(file);
+    };
+    CHECK_EQ(loaded("true").cursorHeight, 31);
+    CHECK_EQ(loaded("true").cursorWidth, 14);  // the feather is 2.155 times as tall as wide
+    CHECK_EQ(loaded("false").cursorWidth, 39); // and the arrow 0.8
+    CHECK_EQ(loaded("true").cursorOutlineThickness, 150);
+    // A new install has the feather at 20 pixels tall, its edge at 100 percent, floating, five pixels up.
+    const Settings fresh;
+    CHECK(fresh.cursorHeight == 20 && fresh.cursorWidth == 9 && fresh.cursorOutlineThickness == 100);
+    CHECK(fresh.cursorFloat && fresh.cursorRaise == 5);
+    // The keys of its own stand, and the size and edge of before are never written again.
+    Settings wide;
+    wide.cursorWidth = 40;
+    MapStore file = Version3File(wide, {{"cursorSize", "31.0000"}, {"cursorOutline", "75.0000"}}, {});
+    CHECK(LoadSettings(file) == wide);
+    SaveSettings(wide, file);
+    CHECK(std::ranges::find(file.sets, "cursorSize") == file.sets.end());
+    CHECK(std::ranges::find(file.sets, "cursorOutline") == file.sets.end());
 }
 
 TEST(an_outlines_thickness_in_pixels_is_left_behind_for_the_percent)

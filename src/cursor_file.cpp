@@ -17,6 +17,7 @@ namespace headsup
         constexpr size_t kRgbSize          = 3; // blue, green, red: a 24-bit pixel, or a palette color without its pad byte
         constexpr size_t kPaletteEntrySize = 4;
         constexpr uint32_t kMaxCursorSide  = 256; // a cursor file's directory gives each side in a byte, 0 meaning 256
+        constexpr uint16_t kDeepBits       = 32;  // a pixel with a byte of alpha
 
         constexpr size_t kDirectoryType  = 2;
         constexpr size_t kDirectoryCount = 4;
@@ -69,7 +70,7 @@ namespace headsup
             const auto bpp        = ReadAt<uint16_t>(dib, kDibBitCount);
             const uint32_t used   = ReadAt<uint32_t>(dib, kDibColorsUsed);
             if (headerSize != kInfoHeaderSize || ReadAt<uint32_t>(dib, kDibCompression) != kUncompressed) return std::nullopt;
-            if (bpp != 1 && bpp != 4 && bpp != 8 && bpp != 24) return std::nullopt;
+            if (bpp != 1 && bpp != 4 && bpp != 8 && bpp != 24 && bpp != kDeepBits) return std::nullopt;
             if (width <= 0 || doubled <= 0) return std::nullopt;
             const auto w = static_cast<uint32_t>(width), h = static_cast<uint32_t>(doubled) / 2;
             const bool paletted = bpp <= 8;
@@ -84,6 +85,7 @@ namespace headsup
 
             CursorFrame frame;
             CursorImage& image = frame.image;
+            bool ownAlpha = false; // a 32-bit frame with alpha in its pixels
             image.width        = w;
             image.height       = h;
             image.hotX         = hotX;
@@ -97,7 +99,7 @@ namespace headsup
                 {
                     uint8_t* out = image.bgra.data() + (static_cast<size_t>(y) * w + x) * kBytesPerPixel;
                     if (!paletted)
-                        std::memcpy(out, row + x * kRgbSize, kRgbSize);
+                        std::memcpy(out, row + x * (bpp / 8), kRgbSize);
                     else
                     {
                         const size_t bit   = static_cast<size_t>(x) * bpp;
@@ -106,8 +108,15 @@ namespace headsup
                         std::memcpy(out, dib + headerSize + index * kPaletteEntrySize, kRgbSize);
                     }
                     out[3] = (mask[x / 8] >> (7 - x % 8) & 1) != 0 ? 0 : 255;
+                    ownAlpha = ownAlpha || (bpp == kDeepBits && row[x * kBytesPerPixel + 3] != 0);
                 }
             }
+            // A 32-bit frame's fourth byte is its alpha, unless every one is 0: then the file has none and its mask
+            // alone cuts it, which is what each pixel already holds.
+            for (uint32_t y = 0; ownAlpha && y < h; ++y)
+                for (uint32_t x = 0; x < w; ++x)
+                    image.bgra[(static_cast<size_t>(y) * w + x) * kBytesPerPixel + 3] =
+                        (dib + pixelsAt + stride * (h - 1 - y))[x * kBytesPerPixel + 3];
             frame.resource.resize(sizeof(hotX) + sizeof(hotY) + length);
             std::memcpy(frame.resource.data(), &hotX, sizeof(hotX));
             std::memcpy(frame.resource.data() + sizeof(hotX), &hotY, sizeof(hotY));

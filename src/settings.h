@@ -42,7 +42,18 @@ namespace headsup
         return on;
     }
 
-    constexpr int kMinCursorOutline = 25, kMaxCursorOutline = 200; // percent
+    // The target cursor: the game's own, one of HeadsUp's shapes or pictures, or a cursor file of the player's.
+    enum class CursorStyle : uint8_t { Vanilla, Triangle, Feather, Chocobo, File };
+    constexpr int kCursorStyleCount = 5;
+    constexpr CursorStyle kDefaultCursorStyle = CursorStyle::Feather;
+    const char* CursorStyleName(CursorStyle style); // as the settings file has it
+    // A picture keeps its own colors; a shape is filled with the cursor's.
+    constexpr bool CursorIsPicture(CursorStyle style) { return style == CursorStyle::Chocobo || style == CursorStyle::File; }
+    constexpr int kMinCursorSide = 4, kMaxCursorSide = 64; // pixels: the target cursor's width and height
+    constexpr int kDefaultCursorHeight = 20;
+    int DefaultCursorWidth(); // the default style's at that height
+    constexpr int kMinCursorEdge = 50, kMaxCursorEdge = 400; // percent
+    constexpr int kMaxCursorRaise = 10; // pixels, up or down
     constexpr int kMinOpacity = 10, kMaxOpacity = 100; // percent
 
     constexpr int kMinMenuScale = 70, kMaxMenuScale = 160; // percent
@@ -111,14 +122,17 @@ namespace headsup
         bool phTimers          = false; // above your name, a respawn timer for each placeholder you see die
         bool scaleWithDistance = true;  // sizes follow how far a name's owner is from you
         bool scaleOwnName      = true;  // your own plate too
-        bool scaleCursor       = true;  // the target cursor's size follows the distance too, apart from the names
+        bool scaleCursor       = false; // the target cursor's size follows the distance too, apart from the names
         std::vector<uint8_t> keepPointerKeys; // keys that set off a command without hiding the game's pointer
-        bool replaceCursor     = true;  // our target cursor above the target's nameplate, instead of the game's
-        bool cursorFeather     = true;  // Phoenix's feather instead of the arrow
+        CursorStyle cursorStyle = kDefaultCursorStyle;
+        std::string cursorFile; // a File cursor's name in the cursors folder, without its extension
         bool chocoboPointer    = false; // PlayOnline's chocobo in place of the game's mouse pointer
         bool fixPointer        = true;  // the game reads the mouse in its true client area and syncs its pointer before clicks
-        int cursorSize         = 20;    // pixels tall
-        int cursorOutline      = 50;    // percent of the outline's first thickness
+        int cursorWidth        = DefaultCursorWidth(); // pixels
+        int cursorHeight       = kDefaultCursorHeight;
+        int cursorOutlineThickness = 100; // percent: its edge, a twentieth of its height at 100
+        bool cursorFloat       = true;  // it bobs up and down
+        int cursorRaise        = 5;     // pixels over its place
         int nameRaise          = 6;     // pixels the names HeadsUp draws sit above the game's, with all above them
         bool stackNames        = false; // names HeadsUp draws that would cover each other rise over one another
         Color weakBadgeColor   = {{0.40f, 1.00f, 0.40f}};
@@ -136,7 +150,8 @@ namespace headsup
         Palette palette = DefaultPalette();
         uint32_t detectionShown = kAllDetection;
         std::vector<std::string> friends;
-        Color cursorEdgeColor = ColorFromRgb(0x000000);
+        ColorPick cursorColor{ColorSource::Target};
+        ColorPick cursorEdgeColor{ColorSource::Custom, ColorFromRgb(0x000000)};
         const KindSettings& Kind(PlateKind k) const { return kinds[static_cast<int>(k)]; }
         KindSettings& Kind(PlateKind k) { return kinds[static_cast<int>(k)]; }
         bool operator==(const Settings&) const = default;

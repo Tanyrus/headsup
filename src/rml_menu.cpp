@@ -81,6 +81,7 @@ namespace headsup
     }
 
     bool RmlMenu::TakeDebugRequest() { return std::exchange(m_State.debugRequested, false); }
+    bool RmlMenu::TakeCursorsRequest() { return std::exchange(m_State.cursorsRequested, false); }
 
     bool RmlMenu::OpenPage(const std::string& name)
     {

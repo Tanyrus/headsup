@@ -47,7 +47,7 @@ TEST(a_target_without_a_name_gets_a_cursor_at_the_games_arrow)
     unknown.anchored      = false; // the menu's size was not known
     CHECK(LoneCursors(unknown, s, {}).empty());
     Settings off = s;
-    off.replaceCursor = false;
+    off.cursorStyle = CursorStyle::Vanilla;
     CHECK(LoneCursors(Anchored(554, 0), off, {}).empty());
 }
 
@@ -116,7 +116,7 @@ TEST(a_cursor_is_drawn_for_your_target_and_the_one_you_are_picking_alone)
     CHECK(!CursorShown(700, s, picking));
     CHECK(!CursorShown(0, s, picking) && !CursorShown(0, s, CursorTargets{})); // index 0 is no entity, target or not
     Settings off;
-    off.replaceCursor = false;
+    off.cursorStyle = CursorStyle::Vanilla;
     CHECK(!CursorShown(1105, off, picking));
     CursorTargets unhooked   = picking;
     unhooked.gameArrowsShown = true; // the game draws its own arrows
@@ -132,6 +132,22 @@ TEST(a_lone_cursor_points_at_its_anchor)
     const CursorSpot spot = CursorAtAnchor(1400.0f, 608.0f, 20.0f, 32.0f, 0.5f);
     CHECK(Near(spot.x, 1390.0f) && Near(spot.y, 576.0f));
     CHECK(Near(CursorAtAnchor(1400.0f, 608.0f, 20.0f, 32.0f, 0.25f).x, 1395.0f));
+    // Raised, it stands that far over the anchor; a raise below nothing lowers it onto it.
+    CHECK(Near(CursorAtAnchor(1400.0f, 608.0f, 20.0f, 32.0f, 0.5f, 5.0f).y, 571.0f));
+    CHECK(Near(CursorAtAnchor(1400.0f, 608.0f, 20.0f, 32.0f, 0.5f, -10.0f).y, 586.0f));
+    CHECK(Near(CursorAtAnchor(1400.0f, 608.0f, 20.0f, 32.0f, 0.5f, 5.0f).x, 1390.0f));
+}
+
+TEST(a_cursors_picture_is_as_wide_for_its_height_as_the_settings_have_it)
+{
+    // Drawn 40 pixels tall where the settings say 9 by 20: 18 wide. An edge of 100 percent is a twentieth of the height.
+    CHECK_EQ(CursorPixelWidth(40, 9, 20), 18);
+    CHECK_EQ(CursorPixelWidth(20, 25, 20), 25);
+    CHECK_EQ(CursorPixelWidth(10, 1, 64), 1); // never nothing
+    CHECK_EQ(CursorEdgePixels(40, 100), 2);
+    CHECK_EQ(CursorEdgePixels(40, 400), 8);
+    CHECK_EQ(CursorEdgePixels(40, 50), 1);
+    CHECK_EQ(CursorEdgePixels(8, 50), 1); // at least a pixel
 }
 
 namespace
@@ -260,10 +276,11 @@ TEST(the_cursor_bobs_up_from_its_place_and_back_again)
     float lowest = 0.0f, highest = -100.0f;
     for (double t = 0.0; t < 3.0; t += 0.01)
     {
-        const float bob = CursorBob(t, 20.0f);
-        CHECK(Near(bob, CursorBob(t + 1.2, 20.0f)));
+        const float bob = CursorBob(t, 20.0f, true);
+        CHECK(Near(bob, CursorBob(t + 1.2, 20.0f, true)));
         lowest  = std::min(lowest, bob);
         highest = std::max(highest, bob);
+        CHECK_EQ(CursorBob(t, 20.0f, false), 0.0f); // one that does not float stays in its place
     }
     CHECK(Near(lowest, -3.0f, 0.05f)); // 15% of 20 px, upward
     CHECK(Near(highest, 0.0f, 0.05f));

@@ -69,6 +69,13 @@ namespace headsup
     // A hard edge grown radius pixels around a shape, for the cursor: the coverage needs a margin of radius.
     Image Outlined(const Coverage& coverage, int radius, uint32_t color, uint32_t outlineColor);
 
+    // A picture at another size: each new pixel is the average of what it covers of the old, weighted by alpha so a
+    // clear pixel's color darkens nothing.
+    Image Resized(const Image& picture, int width, int height);
+    // A picture in its own colors inside a hard edge grown radius pixels around what it covers: the picture's size
+    // and a margin of radius on every side.
+    Image Edged(const Image& picture, int radius, uint32_t edgeColor);
+
     // The ornament between the level line and the name, width by height inside a margin of BlurMargin(shadowBlur): a
     // hairline across its middle that fades in from both ends and lightens toward its center, under a diamond as tall as
     // the ornament, in the lighter color with a dark shadow.
@@ -130,5 +137,8 @@ namespace headsup
     // Where the shape points: the x of its lowest point, from 0 to 1 across its width.
     float ShapeTip(const Shape& shape);
 
-    Coverage ShapeCoverage(const Shape& shape, int pixelHeight, int margin);
+    // How wide the shape is at a height, in whole pixels.
+    int ShapeWidth(const Shape& shape, int pixelHeight);
+    // The shape stretched to a width and a height, inside a margin.
+    Coverage ShapeCoverage(const Shape& shape, int pixelWidth, int pixelHeight, int margin);
 }

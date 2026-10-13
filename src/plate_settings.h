@@ -193,6 +193,8 @@ namespace headsup
     // The color sources a kind's picks offer, in the menu's order: text is true for a text color, which may take the
     // game's own, last.
     std::vector<ColorSource> SourcesFor(PlateKind kind, bool text);
+    // What the target cursor's color and its edge's may follow: every palette, since it sits on anything.
+    std::vector<ColorSource> CursorSources();
     const char* SourceLabel(ColorSource s);
 
     enum class HookAction : uint8_t { Keep, Hide, Replace }; // the game draws the name; nothing draws it; HeadsUp draws

@@ -26,6 +26,7 @@ namespace headsup
         bool sitting = false;
         int barTitlePixels = 0;    // the title size the bar drew last frame, 0 when it is off
         const std::vector<std::string>* seenWindows = nullptr; // the game's windows seen under Game help's bar
+        const std::vector<std::string>* cursorFiles = nullptr; // the cursors folder's files, without their extensions
     };
 
     // The Game Windows card's own state: its filter and whether it lists every window.
@@ -43,6 +44,7 @@ namespace headsup
         int widget         = 0;     // the Widgets page's picked widget, by BarWidget
         bool confirmReset  = false; // the reset button was pressed once and asks for a second press
         bool debugRequested = false;
+        bool cursorsRequested = false; // the Cursor Style list was opened: the cursors folder is to be read again
         KeyCapture keyCapture;      // the Mouse Cursor page's
         KeyCapture shotKeyCapture;  // screenshot mode's
         WindowFilter windows;

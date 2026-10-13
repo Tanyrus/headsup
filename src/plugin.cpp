@@ -7,6 +7,7 @@
 #include "check.h"
 #include "commands.h"
 #include "copy_state.h"
+#include "cursor_picture.h"
 #include "d3d_util.h"
 #include "debug_report.h"
 #include "fonts.h"
@@ -43,6 +44,8 @@
 #include <chrono>
 #include <cstring>
 #include <deque>
+#include <fstream>
+#include <iterator>
 #include <mutex>
 #include <unordered_map>
 #include <cstdio>
@@ -65,6 +68,7 @@ namespace
     constexpr const char* kConfigFolder      = "config";
     constexpr const char* kLogsFolder        = "logs";
     constexpr const char* kFolder            = "headsup"; // inside Ashita's config and logs folders
+    constexpr const char* kCursorsFolder     = "cursors"; // inside HeadsUp's config folder: the player's cursor files
     constexpr const char* kSettingsFile      = "settings.ini";
     constexpr const char* kNewFileSuffix     = ".new";          // after the process id: the file while it is written
     constexpr long kMaxSettingsBytes         = 4 * 1024 * 1024; // past this the file is not HeadsUp's to rewrite
@@ -286,6 +290,8 @@ class HeadsUp final : public IPlugin
     std::optional<std::string> m_WindowLog;   // /hu windowlog's file, while it runs
     std::vector<std::string> m_LastOpen;      // the open windows it wrote last // what the window hook has: the settings' windows and groups
     std::vector<std::string> m_SeenWindows;
+    std::vector<std::string> m_CursorFiles;      // the cursors folder's, as the Cursor Style list offers them
+    std::optional<std::string> m_CursorFileRead; // the File cursor read last, whether or not it was one
     float m_MenuHeight  = 0.0f;
     int m_CaptureLeft   = 0;
     std::string m_CapturePath;
@@ -335,6 +341,7 @@ public:
                 m_LoadedFonts.push_back(handle);
         }
         LoadSettings();
+        ScanCursors();
         g_Gui       = core->GetGuiManager();
         g_BarClicks = &m_BarClicks;
         core->GetInputManager()->GetMouse()->AddCallback(kName, OnMouse);
@@ -653,7 +660,8 @@ public:
         if (g_PresentSlot != nullptr)
             g_AfterGui = [] { if (g_Plugin != nullptr) g_Plugin->DrawOverGui(); };
         m_BarDrawn = false;
-        m_ArrowHook.Hide(m_Settings.enabled && m_Settings.replaceCursor);
+        m_ArrowHook.Hide(m_Settings.enabled && m_Settings.cursorStyle != headsup::CursorStyle::Vanilla);
+        LoadCursorFile();
         // The game's help bar is the only help left while an event hides HeadsUp's bar; a screenshot wants neither.
         const bool helpGone = m_Settings.hideHelpBar && (m_Screenshot || !m_Player.inEvent);
         const headsup::HiddenWindows hidden{.helpBar = m_Settings.enabled && helpGone,
@@ -718,11 +726,13 @@ public:
                 .sitting          = m_Player.sitting,
                 .barTitlePixels   = m_RmlBar.TitlePixels(),
                 .seenWindows      = &m_SeenWindows,
+                .cursorFiles      = &m_CursorFiles,
             };
             if (m_RmlMenu.Update(MenuHostNow(), m_Settings, readings, m_Fonts.Choices(m_Settings.defaultFont),
                     m_AshitaCore->GetGuiManager()->GetFontSize(), kVersion))
                 m_SettingsChangedAt = now;
             if (m_RmlMenu.TakeDebugRequest()) m_DebugPending = true;
+            if (m_RmlMenu.TakeCursorsRequest()) ScanCursors();
         }
         if (headsup::SaveDue(m_SettingsChangedAt, now, m_RmlMenu.open)) SaveSettings();
         UpdatePointer();
@@ -1333,6 +1343,43 @@ private:
         const std::string folder = parent + "\\" + kFolder;
         CreateDirectoryA(folder.c_str(), nullptr);
         return folder;
+    }
+
+    std::string CursorsFolder() { return OwnFolder(kConfigFolder) + "\\" + kCursorsFolder + "\\"; }
+
+    void ScanCursors()
+    {
+        const std::string folder = CursorsFolder();
+        CreateDirectoryA(folder.c_str(), nullptr);
+        std::vector<std::string> entries;
+        WIN32_FIND_DATAA found{};
+        const HANDLE search = FindFirstFileA((folder + "*").c_str(), &found);
+        if (search != INVALID_HANDLE_VALUE)
+        {
+            do
+                if ((found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) entries.emplace_back(found.cFileName);
+            while (FindNextFileA(search, &found) != 0);
+            FindClose(search);
+        }
+        m_CursorFiles = headsup::CursorFileNames(entries);
+    }
+
+    // The File cursor's picture, read when the settings come to name another file.
+    void LoadCursorFile()
+    {
+        const bool wanted = m_Settings.cursorStyle == headsup::CursorStyle::File;
+        if (!wanted || m_CursorFileRead == m_Settings.cursorFile) return;
+        m_CursorFileRead = m_Settings.cursorFile;
+        std::optional<headsup::Image> picture;
+        for (const char* extension : headsup::kCursorExtensions)
+        {
+            std::ifstream in(CursorsFolder() + m_Settings.cursorFile + extension, std::ios::binary);
+            const std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+            picture = headsup::CursorFilePicture(bytes.data(), bytes.size());
+            if (picture) break;
+        }
+        if (!picture) Print("could not read the cursor " + m_Settings.cursorFile + " in " + CursorsFolder() + "; the feather stands in for it");
+        m_Nameplates.SetCursorFile(std::move(picture));
     }
 
     std::FILE* OpenLog(const char* prefix, std::string& path)

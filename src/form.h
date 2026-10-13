@@ -101,6 +101,8 @@ namespace headsup
         // What follows is not shown and takes no clicks, while the feature it belongs to is off: a setting that
         // would do nothing is no setting. A card begun so is left out whole.
         void Fade(bool off) { m_Off = off; }
+        // True in the pass a click opened the list of the dropdown of this name, the card's last so named.
+        bool Opened(std::string_view name) const;
         // How many cards of this pass show, folded or not.
         int CardsShown() const { return m_CardsShown; }
         // The rows that follow stand in from the left: they belong to the row above them.

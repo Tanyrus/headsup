@@ -44,7 +44,7 @@ namespace headsup
     }
 
     PlateLayout LayoutPlate(const ScreenBox& anchor, std::span<const LineInput> lines, float cursorWidth,
-        float cursorHeight, float cursorTip, int timerCount, float timerHeight)
+        float cursorHeight, float cursorTip, int timerCount, float timerHeight, float cursorRaise)
     {
         PlateLayout layout;
         layout.centerX = anchor.CenterX();
@@ -117,7 +117,7 @@ namespace headsup
             layout.timersY = above + kLineGap - static_cast<float>(timerCount) * layout.timerStep;
             cursorY        = layout.timersY - kLineGap;
         }
-        layout.cursor = CursorAtAnchor(layout.centerX, cursorY, cursorWidth, cursorHeight, cursorTip);
+        layout.cursor = CursorAtAnchor(layout.centerX, cursorY, cursorWidth, cursorHeight, cursorTip, cursorRaise);
 
         for (size_t i = 0; i < lines.size(); ++i)
         {

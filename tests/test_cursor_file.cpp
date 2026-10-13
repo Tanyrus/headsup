@@ -93,6 +93,36 @@ namespace
     }
 }
 
+namespace
+{
+    // A 2x1 cursor at 32 bits: blue, green, red and alpha for each pixel, then the mask's row.
+    std::vector<uint8_t> DeepCursor(std::initializer_list<uint8_t> pixels, uint8_t mask)
+    {
+        std::vector<uint8_t> dib = InfoHeader(2, 1, 32, 0);
+        dib.insert(dib.end(), pixels);
+        dib.insert(dib.end(), {mask, 0, 0, 0});
+        return CursorFile(dib, 2, 1, 0, 0);
+    }
+}
+
+TEST(a_32_bit_cursor_takes_its_transparency_from_its_alpha)
+{
+    // Red at full alpha, then green at half: the mask says nothing of either.
+    const std::vector<uint8_t> file = DeepCursor({0, 0, 255, 255, 0, 255, 0, 128}, 0x00);
+    const auto frames = ReadCursorFile(file.data(), file.size());
+    CHECK_EQ(frames.size(), 1u);
+    CHECK(Pixel(frames[0].image, 0, 0) == std::vector<uint8_t>({0, 0, 255, 255}));
+    CHECK(Pixel(frames[0].image, 1, 0) == std::vector<uint8_t>({0, 255, 0, 128}));
+    // One saved with no alpha at all, as some tools do, is cut by its mask as a 24-bit one is.
+    const std::vector<uint8_t> flat = DeepCursor({0, 0, 255, 0, 0, 255, 0, 0}, 0x40);
+    const auto cut = ReadCursorFile(flat.data(), flat.size());
+    CHECK_EQ(cut.size(), 1u);
+    CHECK(Pixel(cut[0].image, 0, 0) == std::vector<uint8_t>({0, 0, 255, 255}));
+    CHECK_EQ(Pixel(cut[0].image, 1, 0)[3], 0);
+    // Cut short of its pixels, it is no cursor.
+    CHECK(ReadCursorFile(file.data(), file.size() - 6).empty());
+}
+
 TEST(a_16_color_cursor_reads_each_pixel_from_its_half_byte)
 {
     const std::vector<uint8_t> file = TinyCursor(4);

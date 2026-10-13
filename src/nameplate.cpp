@@ -12,6 +12,8 @@ namespace headsup
         constexpr float kLettersPerScreen = 180.0f; // the screen is this many typical game letters tall
         constexpr double kBobPeriod       = 1.2;    // seconds
         constexpr float kBobShare         = 0.15f;  // of the cursor's height
+        constexpr float kCursorEdgePerHeight = 0.05f; // the cursor's edge at 100 percent
+        constexpr float kWholePercent        = 100.0f;
         constexpr float kRasterSmallest   = 6.0f;   // pixels
         constexpr float kRasterStep       = 1.25f;
         constexpr float kRasterOverscale  = 1.05f;  // text is scaled up this much before it is redrawn larger
@@ -42,7 +44,7 @@ namespace headsup
 
     bool CursorShown(uint16_t index, const Settings& settings, const CursorTargets& targets)
     {
-        return settings.replaceCursor && !targets.gameArrowsShown && Targeted(TargetStateOf(index, targets));
+        return settings.cursorStyle != CursorStyle::Vanilla && !targets.gameArrowsShown && Targeted(TargetStateOf(index, targets));
     }
 
     std::vector<LoneCursor> LoneCursors(const CursorTargets& targets, const Settings& settings,
@@ -72,9 +74,19 @@ namespace headsup
         return x > 0.0f && y > 0.0f && x < screenWidth && y < screenHeight;
     }
 
-    CursorSpot CursorAtAnchor(float anchorX, float anchorY, float width, float height, float tip)
+    CursorSpot CursorAtAnchor(float anchorX, float anchorY, float width, float height, float tip, float raise)
     {
-        return CursorSpot{anchorX - width * tip, anchorY - height};
+        return CursorSpot{anchorX - width * tip, anchorY - height - raise};
+    }
+
+    int CursorPixelWidth(int pixelHeight, int width, int height)
+    {
+        return WholePixels(static_cast<float>(pixelHeight) * static_cast<float>(width) / static_cast<float>(std::max(1, height)));
+    }
+
+    int CursorEdgePixels(int pixelHeight, int percent)
+    {
+        return WholePixels(static_cast<float>(pixelHeight) * kCursorEdgePerHeight * static_cast<float>(percent) / kWholePercent);
     }
 
     CursorSpot KeepOnScreen(CursorSpot spot, float width, float height, float screenWidth, float screenHeight)
@@ -131,8 +143,9 @@ namespace headsup
         return std::fabs(target - next) < kSettled ? target : next;
     }
 
-    float CursorBob(double seconds, float height)
+    float CursorBob(double seconds, float height, bool floating)
     {
+        if (!floating) return 0.0f;
         const double phase = std::sin(2.0 * std::numbers::pi * seconds / kBobPeriod);
         return -static_cast<float>((phase + 1.0) * 0.5) * height * kBobShare;
     }

@@ -230,4 +230,23 @@ namespace headsup
         const int entry = FontEntry(fonts, unset, font);
         return entry == kNoFontEntry ? font : FontEntryLabel(fonts, unset, entry);
     }
+
+    std::vector<CursorChoice> CursorChoices(const std::vector<std::string>& files, const Settings& settings)
+    {
+        std::vector<CursorChoice> choices;
+        for (int style = 0; style < static_cast<int>(CursorStyle::File); ++style)
+            choices.push_back(CursorChoice{static_cast<CursorStyle>(style), {}});
+        for (const std::string& file : files)
+            choices.push_back(CursorChoice{CursorStyle::File, file});
+        const CursorChoice saved{CursorStyle::File, settings.cursorFile};
+        if (settings.cursorStyle == CursorStyle::File && std::ranges::find(choices, saved) == choices.end()) choices.push_back(saved);
+        return choices;
+    }
+
+    int CursorChoiceOf(const std::vector<CursorChoice>& choices, const Settings& settings)
+    {
+        const CursorChoice saved{settings.cursorStyle, settings.cursorStyle == CursorStyle::File ? settings.cursorFile : std::string()};
+        const auto at = std::ranges::find(choices, saved);
+        return at != choices.end() ? static_cast<int>(at - choices.begin()) : static_cast<int>(Settings{}.cursorStyle);
+    }
 }

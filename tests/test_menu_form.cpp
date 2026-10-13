@@ -205,3 +205,72 @@ TEST(a_page_whose_cards_are_all_switched_off_says_what_switches_them_on)
     CHECK(shown(w.Pass()) != off);
 }
 
+TEST(the_cursor_style_list_has_headsups_styles_then_the_folders_files)
+{
+    Window w;
+    const std::vector<std::string> files{"Gold Arrow", "sword"};
+    w.readings.cursorFiles = &files;
+    const char* list = "entities-target-cursor-cursor-style";
+    const Form open  = w.Pass({{list, kClickEvent, ""}});
+    CHECK(open.popup && w.state.cursorsRequested); // opening it asks for the folder to be read again
+    CHECK(Has(open.popup->rml, ">Vanilla<") && Has(open.popup->rml, ">Phoenix Feather<") && Has(open.popup->rml, ">sword<"));
+    CHECK(ClassOn(open, "entities-target-cursor-cursor-style-o-2", "picked")); // the feather, a new install's
+    w.state.cursorsRequested = false;
+    w.Pass();
+    CHECK(!w.state.cursorsRequested); // once, when it opens: not every pass it stays open
+    // A file is the File style with its name; HeadsUp's own styles have no file.
+    CHECK(w.Pass({{"entities-target-cursor-cursor-style-o-5", kClickEvent, ""}}).changed);
+    CHECK(w.settings.cursorStyle == CursorStyle::File && w.settings.cursorFile == "sword");
+    w.Pass({{list, kClickEvent, ""}});
+    w.Pass({{"entities-target-cursor-cursor-style-o-3", kClickEvent, ""}});
+    CHECK(w.settings.cursorStyle == CursorStyle::Chocobo);
+    // A file the folder no longer has stays chosen, and listed, until another is picked.
+    w.settings.cursorStyle = CursorStyle::File;
+    w.settings.cursorFile  = "gone";
+    const Form kept = w.Pass({{list, kClickEvent, ""}});
+    CHECK(Has(kept.popup->rml, ">gone<") && ClassOn(kept, "entities-target-cursor-cursor-style-o-6", "picked"));
+    CHECK(w.settings.cursorStyle == CursorStyle::File && w.settings.cursorFile == "gone");
+}
+
+TEST(a_style_picked_comes_at_its_own_width_for_the_height_set)
+{
+    // The feather is slender, the triangle wide and a picture square: a style picked would otherwise be squeezed
+    // into the width of the one before.
+    Window w;
+    const char* list = "entities-target-cursor-cursor-style";
+    w.settings.cursorHeight = 40;
+    w.settings.cursorWidth  = 11;
+    const auto pick = [&](int option) {
+        w.Pass({{list, kClickEvent, ""}});
+        w.Pass({{(std::string(list) + "-o-" + std::to_string(option)).c_str(), kClickEvent, ""}});
+        return w.settings.cursorWidth;
+    };
+    CHECK_EQ(pick(1), 50); // the triangle, 0.8 as tall as wide
+    CHECK_EQ(pick(3), 40); // the chocobo
+    CHECK_EQ(pick(2), 19); // the feather, 2.155 times as tall as wide
+    // The width is the player's from there: the same style picked again, or a pass with no pick, leaves it.
+    w.settings.cursorWidth = 30;
+    CHECK_EQ(pick(2), 30);
+    w.Pass();
+    CHECK_EQ(w.settings.cursorWidth, 30);
+    // The game's own cursor has no width to set.
+    CHECK_EQ(pick(0), 30);
+}
+
+TEST(the_games_own_cursor_has_no_settings_and_a_picture_no_color)
+{
+    Window w;
+    const auto hidden = [&](const Form& form, const char* row) { return ClassOn(form, row, "off"); };
+    const Form feather = w.Pass();
+    CHECK(!hidden(feather, "entities-target-cursor-width-label-row") && !hidden(feather, "entities-target-cursor-color-label-row"));
+    w.settings.cursorStyle = CursorStyle::Chocobo;
+    const Form chocobo = w.Pass();
+    CHECK(!hidden(chocobo, "entities-target-cursor-width-label-row") && !hidden(chocobo, "entities-target-cursor-edge-color-label-row"));
+    CHECK(hidden(chocobo, "entities-target-cursor-color-label-row")); // it keeps its own colors
+    w.settings.cursorStyle = CursorStyle::Vanilla;
+    const Form vanilla = w.Pass();
+    for (const char* row : {"entities-target-cursor-width-label-row", "entities-target-cursor-float-label-row",
+             "entities-target-cursor-color-label-row", "entities-target-cursor-edge-color-label-row"})
+        CHECK(hidden(vanilla, row));
+    CHECK(!hidden(vanilla, "entities-target-cursor-cursor-style-label-row")); // the list stays, to pick another
+}

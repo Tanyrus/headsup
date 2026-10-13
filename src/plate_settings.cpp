@@ -163,6 +163,8 @@ namespace headsup
         return sources;
     }
 
+    std::vector<ColorSource> CursorSources() { return SourcesFor(PlateKind::Mobs, false); }
+
     const char* SourceLabel(ColorSource s) { return kSourceLabels[static_cast<int>(s)]; }
     const char* DetectionLabel(DetectionIcon d) { return kDetectionLabels[static_cast<int>(d)]; }
     const char* PlateModeLabel(PlateMode mode) { return kPlateModeLabels[static_cast<int>(mode)]; }

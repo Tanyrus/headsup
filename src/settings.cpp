@@ -1,6 +1,7 @@
 #include "settings.h"
 
 #include "argb.h"
+#include "cursor_picture.h"
 #include "fonts.h"
 #include "pointer_keys.h"
 #include "utf16.h"
@@ -28,15 +29,14 @@ namespace headsup
         };
         constexpr BoolKey kBools[] = {{"enabled", &Settings::enabled}, {"phTimers", &Settings::phTimers},
             {"scaleWithDistance", &Settings::scaleWithDistance}, {"scaleOwnName", &Settings::scaleOwnName},
-            {"glowOffWhenFighting", &Settings::glowOffWhenFighting}, {"replaceCursor", &Settings::replaceCursor},
-            {"cursorFeather", &Settings::cursorFeather}, {"chocoboPointer", &Settings::chocoboPointer},
+            {"glowOffWhenFighting", &Settings::glowOffWhenFighting}, {"chocoboPointer", &Settings::chocoboPointer},
             {"fixPointer", &Settings::fixPointer}, {"showRanks", &Settings::showRanks}, {"showBar", &Settings::showBar},
             {"hideHelpBar", &Settings::hideHelpBar}, {"hideNetstat", &Settings::hideNetstat},
             {"screenshotHidesGame", &Settings::screenshotHidesGame},
             {"clockSeconds", &Settings::clockSeconds},
             {"stackNames", &Settings::stackNames},
             {"nameplates", &Settings::nameplates}, {"outlines", &Settings::outlines},
-            {"outlineFadeIn", &Settings::outlineFadeIn}};
+            {"outlineFadeIn", &Settings::outlineFadeIn}, {"cursorFloat", &Settings::cursorFloat}};
 
         struct IntKey
         {
@@ -47,7 +47,7 @@ namespace headsup
         constexpr IntKey kInts[] = {{"smoothness", &Settings::smoothness, kMinSmoothness, kMaxSmoothness},
             {"outlineThickness", &Settings::outlineThickness, kMinOutlineThickness, kMaxOutlineThickness},
             {"outlineOpacity", &Settings::outlineOpacity, kMinOpacity, kMaxOpacity},
-            {"cursorSize", &Settings::cursorSize, kMinTextSize, kMaxTextSize},
+            {"cursorRaise", &Settings::cursorRaise, -kMaxCursorRaise, kMaxCursorRaise},
             {"nameRaise", &Settings::nameRaise, kMinNameRaise, kMaxNameRaise},
             {"elementWeakRank", &Settings::elementWeakRank, kNoWeakRank, kMaxWeakRank},
             {"elementResistRank", &Settings::elementResistRank, kMinResistRank, kNoResistRank},
@@ -55,7 +55,6 @@ namespace headsup
             {"barHeight", &Settings::barHeight, kMinBarHeight, kMaxBarHeight},
             {"barTextSize", &Settings::barTextSize, kAutoBarTextSize, kMaxBarTextSize},
             {"popupTextSize", &Settings::popupTextSize, kAutoPopupTextSize, kMaxBarTextSize},
-            {"cursorOutline", &Settings::cursorOutline, kMinCursorOutline, kMaxCursorOutline},
             {"untargetedOpacity", &Settings::untargetedOpacity, kMinOpacity, kMaxOpacity},
             {"baseSize", &Settings::baseSize, kMinTextSize, kMaxTextSize},
             {"baseIconSize", &Settings::baseIconSize, kMinTextSize, kMaxTextSize},
@@ -63,6 +62,26 @@ namespace headsup
             {"scaleMax", &Settings::scaleMax, kMinSizePercent, kMaxSizePercent},
             {"timerPercent", &Settings::timerPercent, kMinSizePercent, kMaxSizePercent},
             {"screenshotKey", &Settings::screenshotKey, 0, UINT8_MAX}};
+
+        // Numbers whose meaning changed and whose key changed with it: saved and bounded as the rest, and read through
+        // Rebased, since a typed read of the new key would have Ashita's store hold its default before the old is asked.
+        constexpr IntKey kRebasedInts[] = {{"cursorWidth", &Settings::cursorWidth, kMinCursorSide, kMaxCursorSide},
+            {"cursorHeight", &Settings::cursorHeight, kMinCursorSide, kMaxCursorSide},
+            {"cursorOutlineThickness", &Settings::cursorOutlineThickness, kMinCursorEdge, kMaxCursorEdge}};
+        constexpr const char* kCursorWidthKey  = kRebasedInts[0].key;
+        constexpr const char* kCursorHeightKey = kRebasedInts[1].key;
+        constexpr const char* kCursorEdgeKey   = kRebasedInts[2].key;
+        constexpr const char* kCursorStyleKey = "cursorStyle";
+        constexpr const char* kCursorFileKey  = "cursorFile";
+        const char* const kCursorStyleNames[kCursorStyleCount] = {"vanilla", "triangle", "feather", "chocobo", "file"};
+        // Before it had a style the cursor was on or off, and Phoenix's feather or an arrow.
+        constexpr const char* kOldReplaceCursorKey = "replaceCursor";
+        constexpr const char* kOldCursorFeatherKey = "cursorFeather";
+        constexpr const char* kOldCursorSizeKey    = "cursorSize";    // its height in pixels, its width its shape's
+        constexpr const char* kOldCursorOutlineKey = "cursorOutline"; // percent, of twice the edge
+        constexpr float kCursorEdgeRebase          = 2.0f;
+        constexpr size_t kMaxCursorFileName        = 64;
+        constexpr const char* kPathCharacters      = "\\/:";
 
         struct FloatKey
         {
@@ -79,8 +98,11 @@ namespace headsup
         };
         constexpr ColorKey kColors[] = {{"weakBadgeColor", &Settings::weakBadgeColor},
             {"resistBadgeColor", &Settings::resistBadgeColor}, {"rankBadgeColor", &Settings::rankBadgeColor},
-            {"immuneBadgeColor", &Settings::immuneBadgeColor},
-            {"cursorEdgeColor", &Settings::cursorEdgeColor}};
+            {"immuneBadgeColor", &Settings::immuneBadgeColor}};
+        // The edge's custom color is under the keys the edge's one color had. The cursor's own cannot be under
+        // cursorColor, where a file from before the designer holds the target's color.
+        constexpr const char* kCursorEdgePickKey = "cursorEdgeColor";
+        constexpr const char* kCursorPickKey     = "cursorPick";
 
         constexpr const char* kBadgeFontKey = "badgeFontName";
         constexpr const char* kBarTitleFontKey = "barTitleFont";
@@ -119,6 +141,7 @@ namespace headsup
         // Server time was a widget of its own, with this switch.
         constexpr const char* kServerTimeWidgetKey = "barServerTime";
         constexpr const char* kTrue                = "true";
+        constexpr const char* kAshitaTrue          = "1";
         constexpr const char* kClockZoneKey       = "clockZone"; // the Clock widget's: a kClockZoneNames or kLocalZone
         constexpr const char* kLocalZone          = "local";
         constexpr const char* kJobLayoutKey       = "jobLayout";
@@ -224,6 +247,15 @@ namespace headsup
             char* end              = nullptr;
             const float v          = std::strtof(text.c_str(), &end);
             return text == kNoText || end == text.c_str() || !std::isfinite(v) ? std::nullopt : std::optional<float>(v);
+        }
+
+        // A switch as the store holds it, asked as text for the same reason; nothing for a key it lacks. A build
+        // writes true or false, and Ashita's own default for a key it added is 1 or 0.
+        std::optional<bool> HeldSwitch(SettingsStore& store, const char* key)
+        {
+            const std::string text = store.GetString(key, kNoText);
+            if (text == kNoText) return std::nullopt;
+            return text == kTrue || text == kAshitaTrue;
         }
 
         // A number whose meaning changed: the file's own under its new key, else what the value under its old key
@@ -747,7 +779,7 @@ namespace headsup
             s.palette.target[static_cast<int>(TargetState::Locked)]     = o.lockedCursorColor;
             s.palette.target[static_cast<int>(TargetState::SubTarget)]  = o.subCursorColor;
             s.palette.target[static_cast<int>(TargetState::OutOfRange)] = o.outOfRangeCursorColor;
-            s.cursorEdgeColor = o.textOutline;
+            s.cursorEdgeColor.custom = o.textOutline;
             // Every shadow such a file drew was of the unit before, a line's it never set included.
             auto strength = [](int before) { return Whole(ShadowStrengthOf(static_cast<float>(before))); };
             for (KindSettings& k : s.kinds)
@@ -844,7 +876,7 @@ namespace headsup
 
     bool NameplatesOn(const Settings& s)
     {
-        return s.enabled && (s.nameplates || s.replaceCursor || s.phTimers);
+        return s.enabled && (s.nameplates || s.cursorStyle != CursorStyle::Vanilla || s.phTimers);
     }
 
     void UseHeadsUpWindowDefaults(Settings& s)
@@ -1005,12 +1037,18 @@ namespace headsup
         }
     }
 
+    int DefaultCursorWidth() { return NaturalCursorWidth(kDefaultCursorStyle, kDefaultCursorHeight); }
+
+    const char* CursorStyleName(CursorStyle style) { return kCursorStyleNames[static_cast<int>(style)]; }
+
     Settings Clamp(Settings s)
     {
         const Settings d;
         for (const FloatKey& f : kFloats)
             s.*f.field = ClampFloat(s.*f.field, f.lo, f.hi, d.*f.field);
         for (const IntKey& i : kInts)
+            s.*i.field = std::clamp(s.*i.field, i.lo, i.hi);
+        for (const IntKey& i : kRebasedInts)
             s.*i.field = std::clamp(s.*i.field, i.lo, i.hi);
         s.smoothness = SmoothnessCopies(SmoothnessLevelOf(s.smoothness));
         if (s.badgeFontName.empty() || s.badgeFontName.size() > kMaxFontName) s.badgeFontName = d.badgeFontName;
@@ -1031,6 +1069,14 @@ namespace headsup
         s.helpBarY        = std::clamp(s.helpBarY, -kMaxHelpBarOffset, kMaxHelpBarOffset);
         for (const ColorKey& c : kColors)
             s.*c.field = ClampColor(s.*c.field, d.*c.field);
+        // The file's name goes into a path under the cursors folder: one that would lead out of it is no name.
+        const bool named = !s.cursorFile.empty() && s.cursorFile.size() <= kMaxCursorFileName &&
+                           s.cursorFile.find_first_of(kPathCharacters) == std::string::npos;
+        if (!named) s.cursorFile.clear();
+        if (static_cast<int>(s.cursorStyle) >= kCursorStyleCount || (s.cursorStyle == CursorStyle::File && !named))
+            s.cursorStyle = d.cursorStyle;
+        ClampPick(s.cursorColor, d.cursorColor, CursorSources());
+        ClampPick(s.cursorEdgeColor, d.cursorEdgeColor, CursorSources());
         if (static_cast<int>(s.barTheme) >= kBarThemeCount) s.barTheme = d.barTheme;
         if (s.barCurrency < 0 || s.barCurrency >= kCurrencyCount) s.barCurrency = d.barCurrency;
         if (s.clockZone && static_cast<int>(*s.clockZone) >= kClockZoneCount) s.clockZone = d.clockZone;
@@ -1062,14 +1108,32 @@ namespace headsup
             s.*b.field = store.GetBool(b.key, s.*b.field);
         for (const IntKey& i : kInts)
             s.*i.field = LoadInt(store, i.key, s.*i.field);
+        // The shape a file from before had, which also gave its one size a width.
+        const bool wasArrow = !HeldSwitch(store, kOldCursorFeatherKey).value_or(true);
+        const std::string style = store.GetString(kCursorStyleKey, kNoText);
+        if (style != kNoText)
+            s.cursorStyle = static_cast<CursorStyle>(NameIndex(kCursorStyleNames, kCursorStyleCount, style, static_cast<int>(s.cursorStyle)));
+        else if (!HeldSwitch(store, kOldReplaceCursorKey).value_or(true))
+            s.cursorStyle = CursorStyle::Vanilla;
+        else if (wasArrow)
+            s.cursorStyle = CursorStyle::Triangle;
+        s.cursorFile   = store.GetString(kCursorFileKey, "");
+        s.cursorHeight = Rebased(store, kCursorHeightKey, kOldCursorSizeKey, s.cursorHeight, [](float size) { return size; });
+        s.cursorWidth  = Rebased(store, kCursorWidthKey, kOldCursorSizeKey, s.cursorWidth, [&](float size) {
+            return static_cast<float>(NaturalCursorWidth(wasArrow ? CursorStyle::Triangle : CursorStyle::Feather, Whole(size)));
+        });
+        s.cursorOutlineThickness = Rebased(store, kCursorEdgeKey, kOldCursorOutlineKey, s.cursorOutlineThickness,
+            [](float before) { return before * kCursorEdgeRebase; });
         for (const FloatKey& f : kFloats)
             s.*f.field = store.GetFloat(f.key, s.*f.field);
         for (const ColorKey& c : kColors)
             LoadColor(store, c.key, s.*c.field);
+        LoadPick(store, kCursorPickKey, s.cursorColor);
+        LoadPick(store, kCursorEdgePickKey, s.cursorEdgeColor);
         s.badgeFontName = store.GetString(kBadgeFontKey, kBadgeFont);
         s.barTitleFont  = store.GetString(kBarTitleFontKey, "");
         s.barTextFont   = store.GetString(kBarTextFontKey, "");
-        s.scaleCursor   = store.GetBool(kScaleCursorKey, s.scaleWithDistance);
+        s.scaleCursor   = store.GetBool(kScaleCursorKey, file ? s.scaleWithDistance : s.scaleCursor);
         std::istringstream keys(store.GetString(kKeepPointerKey, ""));
         for (std::string key; keys >> key;)
         {
@@ -1155,10 +1219,16 @@ namespace headsup
             setBool(b.key, s.*b.field);
         for (const IntKey& i : kInts)
             setFloat(i.key, static_cast<float>(s.*i.field));
+        for (const IntKey& i : kRebasedInts)
+            setFloat(i.key, static_cast<float>(s.*i.field));
         for (const FloatKey& f : kFloats)
             setFloat(f.key, s.*f.field);
         for (const ColorKey& c : kColors)
             setColor(c.key, s.*c.field);
+        store.Set(kCursorStyleKey, CursorStyleName(s.cursorStyle));
+        store.Set(kCursorFileKey, s.cursorFile.c_str());
+        SavePick(store, kCursorPickKey, s.cursorColor);
+        SavePick(store, kCursorEdgePickKey, s.cursorEdgeColor);
         store.Set(kBadgeFontKey, s.badgeFontName.c_str());
         store.Set(kBarTitleFontKey, s.barTitleFont.c_str());
         store.Set(kBarTextFontKey, s.barTextFont.c_str());

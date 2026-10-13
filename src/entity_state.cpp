@@ -133,6 +133,13 @@ namespace headsup
         return ToArgb(pick.custom);
     }
 
+    uint32_t CursorColorOf(const ColorPick& pick, const EntityState& state, const Palette& palette)
+    {
+        const std::vector<ColorSource> readable = SourcesFor(PlateKindOf(state), false);
+        const bool reads = std::ranges::find(readable, pick.source) != readable.end();
+        return ResolveColor(reads ? pick : ColorPick{ColorSource::Target}, state, palette, kWhite);
+    }
+
     namespace
     {
         struct Deciding

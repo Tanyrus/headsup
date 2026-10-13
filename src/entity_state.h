@@ -61,6 +61,9 @@ namespace headsup
     TargetState TargetUnderPick(uint16_t index, const CursorTargets& targets);
     // A pick's color for this entity: a custom color, the game's name color, or the palette entry its state picks.
     uint32_t ResolveColor(const ColorPick& pick, const EntityState& state, const Palette& palette, uint32_t gameArgb);
+    // The cursor's color over an entity: the pick's, or the Targeting color where the pick reads what that kind of
+    // entity has none of, as a player's aggression.
+    uint32_t CursorColorOf(const ColorPick& pick, const EntityState& state, const Palette& palette);
     // The mode of the row that decides this entity's outline: its own, or for a mob the first row down the chain from a
     // claim to the Placeholder row to its aggression's row that is not ByNature (Disabled if the chain ends on one).
     OutlineMode OutlineModeOf(const EntityState& state, const Settings& settings);

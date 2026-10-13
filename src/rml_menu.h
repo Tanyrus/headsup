@@ -42,6 +42,8 @@ namespace headsup
         void Close();
         // True once after the Debug page's button was pressed: write the /hu debug report.
         bool TakeDebugRequest();
+        // True once after the Cursor Style list was opened: read the cursors folder again.
+        bool TakeCursorsRequest();
         // Opens the window at the page named, as its sidebar spells it in lower case without spaces ("toppanel");
         // false for a name no page has.
         bool OpenPage(const std::string& name);

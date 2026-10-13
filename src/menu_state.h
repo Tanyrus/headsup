@@ -3,6 +3,7 @@
 #include "bar_placement.h"
 #include "bar_server_time.h"
 #include "plate_settings.h"
+#include "settings.h"
 
 #include <cstdint>
 #include <optional>
@@ -120,4 +121,16 @@ namespace headsup
     int SyncOfEntry(const std::vector<int>& targets, int entry);
     std::string SyncEntryLabel(const std::vector<int>& targets, int entry);
     std::string SyncEntryTip(const std::vector<int>& targets, int entry);
+
+    // One entry of the Cursor Style list: one of HeadsUp's own styles, or a file of the cursors folder.
+    struct CursorChoice
+    {
+        CursorStyle style = CursorStyle::Feather;
+        std::string file; // a File's name
+        bool operator==(const CursorChoice&) const = default;
+    };
+    // The list: HeadsUp's styles, then each file, then the file the settings name when the folder has none such.
+    std::vector<CursorChoice> CursorChoices(const std::vector<std::string>& files, const Settings& settings);
+    // Which entry the settings have picked.
+    int CursorChoiceOf(const std::vector<CursorChoice>& choices, const Settings& settings);
 }

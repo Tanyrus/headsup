@@ -118,6 +118,14 @@ namespace headsup
 
     const char* const kSmoothnessLabels[kSmoothnessLevelCount] = {"Low", "Medium", "High", "Ultra"}; // by SmoothnessLevel
 
+    // By CursorStyle: a File's label is its own name.
+    const char* const kCursorStyleLabels[kCursorStyleCount] = {"Vanilla", "Triangle", "Phoenix Feather", "Chocobo", ""};
+    const char* const kCursorStyleTips[kCursorStyleCount] = {
+        "Uses the vanilla target cursor. WARNING: May have issues if the vanilla target frame is hidden.",
+        "Uses a simple triangle target cursor, that looks similar to the vanilla target cursor.",
+        "Uses a phoenix feather icon as the target cursor.", "Uses the PlayOnline mouse pointer as the target cursor.",
+        "Uses a custom icon as the target cursor."};
+
     // What each option of a dropdown does, which it says under the pointer.
     inline const char* PlateModeTip(PlateMode mode)
     {

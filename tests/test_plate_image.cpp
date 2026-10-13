@@ -72,6 +72,49 @@ TEST(partly_covered_text_blends_over_its_outline)
     CHECK_EQ(Pixel(image, 0, 1), 0x80000000u);
 }
 
+TEST(a_picture_resized_is_the_average_of_what_each_new_pixel_covers)
+{
+    // Four by two, a red half and a clear half: at two by one, a red pixel and a clear one.
+    Image picture{4, 2, std::vector<uint32_t>(8, 0)};
+    for (int y = 0; y < 2; ++y)
+        for (int x = 0; x < 2; ++x)
+            picture.argb[static_cast<size_t>(y * 4 + x)] = 0xFFFF0000u;
+    const Image half = Resized(picture, 2, 1);
+    CHECK(half.width == 2 && half.height == 1);
+    CHECK_EQ(Pixel(half, 0, 0), 0xFFFF0000u);
+    CHECK_EQ(Pixel(half, 1, 0), 0u);
+    // One pixel of it all: half covered, and red, not red darkened by the clear half's black.
+    CHECK_EQ(Pixel(Resized(picture, 1, 1), 0, 0), 0x80FF0000u);
+    // Enlarged, each pixel becomes a block of its own color.
+    const Image twice = Resized(picture, 8, 4);
+    CHECK(twice.width == 8 && twice.height == 4);
+    CHECK_EQ(Pixel(twice, 3, 3), 0xFFFF0000u);
+    CHECK_EQ(Pixel(twice, 4, 0), 0u);
+    // Its own size gives it back.
+    CHECK(Resized(picture, 4, 2).argb == picture.argb);
+}
+
+TEST(a_picture_keeps_its_colors_inside_an_edge_grown_around_it)
+{
+    // One blue pixel beside one green: with an edge of 1, they stand in the middle of an image two pixels larger
+    // each way, and every pixel touching them is the edge's color.
+    Image picture{2, 1, {0xFF0000FFu, 0xFF00FF00u}};
+    const Image edged = Edged(picture, 1, 0xFF101010u);
+    CHECK(edged.width == 4 && edged.height == 3);
+    CHECK_EQ(Pixel(edged, 1, 1), 0xFF0000FFu);
+    CHECK_EQ(Pixel(edged, 2, 1), 0xFF00FF00u);
+    for (const auto& [x, y] : {std::pair{0, 1}, {3, 1}, {1, 0}, {2, 2}, {0, 0}, {3, 2}})
+        CHECK_EQ(Pixel(edged, x, y), 0xFF101010u);
+    // A clear pixel of the picture next to a covered one is edge too; far from any, nothing.
+    Image apart{5, 1, {0xFFFFFFFFu, 0u, 0u, 0u, 0u}};
+    const Image far = Edged(apart, 1, 0xFF101010u);
+    CHECK_EQ(Pixel(far, 2, 1), 0xFF101010u);
+    CHECK_EQ(Pixel(far, 4, 1), 0u);
+    // A half clear pixel shows the edge through it.
+    Image faint{1, 1, {0x80FFFFFFu}};
+    CHECK_EQ(Pixel(Edged(faint, 1, 0xFF000000u), 1, 1), 0xC0AAAAAAu);
+}
+
 TEST(sizes_round_to_whole_pixels_and_never_below_one)
 {
     CHECK_EQ(WholePixels(44.49f), 44);
@@ -100,8 +143,9 @@ TEST(a_texts_texture_is_no_larger_than_the_device_makes_or_the_client_holds_many
 
 TEST(the_arrow_points_down_inside_its_margin)
 {
-    const Coverage arrow = ShapeCoverage(ArrowShape(), 8, 2);
-    CHECK_EQ(arrow.width, 14); // 10 wide: the arrow is 0.8 as tall as it is wide
+    CHECK_EQ(ShapeWidth(ArrowShape(), 8), 10); // the arrow is 0.8 as tall as it is wide
+    const Coverage arrow = ShapeCoverage(ArrowShape(), 10, 8, 2);
+    CHECK_EQ(arrow.width, 14);
     CHECK_EQ(arrow.height, 12);
     CHECK_EQ(At(arrow, 7, 2), 255);                      // the middle of its wide top edge
     CHECK(At(arrow, 2, 2) > 0 && At(arrow, 2, 2) < 255); // its top corners, on the slanted edges
@@ -123,10 +167,35 @@ TEST(each_shape_knows_where_it_points)
 TEST(a_square_fills_every_pixel)
 {
     const ShapePoint square[] = {{0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}};
-    const Coverage c = ShapeCoverage(Shape{square, 4, 1.0f}, 5, 0);
-    CHECK_EQ(c.width, 5);
+    const Coverage c = ShapeCoverage(Shape{square, 4, 1.0f}, 7, 5, 0);
+    CHECK(c.width == 7 && c.height == 5); // stretched to the width and height asked for, whatever its own
     for (const uint8_t a : c.alpha)
         CHECK_EQ(a, 255);
+}
+
+TEST(a_shape_is_stretched_to_the_width_and_height_asked_for)
+{
+    // The arrow twice as wide as it would be at this height: still its wide top edge, its slanted sides and its
+    // point under the middle.
+    const Coverage wide = ShapeCoverage(ArrowShape(), 20, 8, 0);
+    CHECK(wide.width == 20 && wide.height == 8);
+    CHECK_EQ(At(wide, 10, 0), 255);
+    CHECK_EQ(At(wide, 1, 7), 0);
+    CHECK_EQ(At(wide, 18, 7), 0);
+    CHECK(At(wide, 9, 7) > 0 && At(wide, 10, 7) > 0);
+    for (int y = 0; y < wide.height; ++y)
+        for (int x = 0; x < wide.width / 2; ++x)
+            CHECK_EQ(At(wide, x, y), At(wide, wide.width - 1 - x, y));
+    // Narrow and tall, each row is as wide as the same row of the wide one, by their widths.
+    const Coverage narrow = ShapeCoverage(ArrowShape(), 5, 8, 0);
+    const auto rowSum = [](const Coverage& c, int y) {
+        int sum = 0;
+        for (int x = 0; x < c.width; ++x)
+            sum += At(c, x, y);
+        return sum;
+    };
+    for (int y = 0; y < 8; ++y)
+        CHECK(std::abs(rowSum(wide, y) - 4 * rowSum(narrow, y)) <= 8);
 }
 
 TEST(the_feather_is_the_phoenix_icon)
@@ -137,8 +206,8 @@ TEST(the_feather_is_the_phoenix_icon)
     for (size_t i = 0; i < feather.count; ++i)
         CHECK(feather.points[i].x >= 0.0f && feather.points[i].x <= 1.0f && feather.points[i].y >= 0.0f &&
               feather.points[i].y <= 1.0f);
-    const Coverage c = ShapeCoverage(feather, 43, 0);
-    CHECK_EQ(c.width, 20);
+    CHECK_EQ(ShapeWidth(feather, 43), 20);
+    const Coverage c = ShapeCoverage(feather, 20, 43, 0);
     int covered = 0;
     for (const uint8_t a : c.alpha)
         covered += a > 127 ? 1 : 0;

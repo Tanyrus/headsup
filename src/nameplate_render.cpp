@@ -1,6 +1,7 @@
 #include "nameplate_render.h"
 
 #include "argb.h"
+#include "cursor_picture.h"
 #include "entity_state.h"
 #include "plate_compose.h"
 
@@ -15,7 +16,7 @@ namespace headsup
 {
     namespace
     {
-        constexpr float kOutlinePerHeight = 0.1f; // the cursor's and badges' outline width, per pixel of their height
+        constexpr float kOutlinePerHeight = 0.1f; // a badge's outline width, per pixel of its height
         constexpr float kStackGap         = 2.0f; // screen pixels between plates stacked over one another
         constexpr float kPercent          = 100.0f;
         // From the mockup's CSS: a 22 px name's shadows blur 2 and 3 px, 1 px lower, and its glow 14 px.
@@ -23,9 +24,11 @@ namespace headsup
         constexpr float kGlowPerHeight       = 0.64f; // the glow's blur radius, per pixel of name height
         constexpr float kOrnamentShadowPerHeight = 0.3f; // the diamond's shadow blur: 3 px on a 9 px ornament
 
-        uint32_t CursorColor(TargetState target, const Settings& settings)
+        // What a cursor's colors are read from: the entity it is over, as the target it is to you.
+        EntityState CursorState(EntityState of, TargetState target)
         {
-            return ToArgb(settings.palette.target[static_cast<int>(target)]);
+            of.target = target;
+            return of;
         }
 
         LineStyle StyleOf(const LineLook& look)
@@ -180,22 +183,33 @@ namespace headsup
         return true;
     }
 
-    bool NameplateRenderer::PrepareCursor(PlateTexture& t, uint32_t color, int pixelHeight, const Settings& settings)
+    bool NameplateRenderer::PrepareCursor(PlateTexture& t, const EntityState& over, int pixelHeight, const Settings& settings)
     {
-        const LineStyle shape{settings.cursorFeather ? "feather" : "arrow", false, ToArgb(settings.cursorEdgeColor)};
-        // Its width is the outline's share, which a texture of the same height must match too.
-        TextureKey key{"", pixelHeight, settings.cursorOutline, TextLook{shape, color}};
+        const uint32_t color = CursorColorOf(settings.cursorColor, over, settings.palette);
+        const uint32_t edge  = CursorColorOf(settings.cursorEdgeColor, over, settings.palette);
+        const int pixelWidth = CursorPixelWidth(pixelHeight, settings.cursorWidth, settings.cursorHeight);
+        const int radius     = CursorEdgePixels(pixelHeight, settings.cursorOutlineThickness);
+        // Its line's shadow is its edge: the color, and the pixels where a text has its strength.
+        const CursorStyle style = settings.cursorStyle;
+        const LineStyle shape{CursorStyleName(style), 0, edge, static_cast<float>(radius)};
+        if (style == CursorStyle::Chocobo && m_Chocobo.argb.empty()) m_Chocobo = ChocoboPicture();
+        const Image* picture = style == CursorStyle::Chocobo ? &m_Chocobo : style == CursorStyle::File && m_CursorFile ? &*m_CursorFile : nullptr;
+        // A file's picture read again is another picture under the same name.
+        TextureKey key{style == CursorStyle::File ? std::to_string(m_CursorFileSerial) : std::string(), pixelHeight, pixelWidth,
+            TextLook{shape, color}};
         if (t.texture != nullptr && t.key == key) return true;
         if (!RedrawNow(t.texture != nullptr, m_RedrawMs)) return true;
         const Stopwatch stopwatch(m_RedrawMs);
-        const int radius        = std::max(1, WholePixels(static_cast<float>(pixelHeight) * kOutlinePerHeight *
-                                                          static_cast<float>(settings.cursorOutline) / kPercent));
-        const Shape& outline    = settings.cursorFeather ? FeatherShape() : ArrowShape();
-        const Coverage coverage = ShapeCoverage(outline, pixelHeight, radius);
-        if (!Upload(t, Outlined(coverage, radius, color, shape.shadowColor), std::move(key))) return false;
-        const float width = static_cast<float>(coverage.width - 2 * radius);
-        t.tip             = (static_cast<float>(radius) + ShapeTip(outline) * width) / static_cast<float>(coverage.width);
+        const CursorDrawing drawing = DrawCursor(style, picture, pixelWidth, pixelHeight, radius, color, edge);
+        if (!Upload(t, drawing.image, std::move(key))) return false;
+        t.tip = drawing.tip;
         return true;
+    }
+
+    void NameplateRenderer::SetCursorFile(std::optional<Image> picture)
+    {
+        m_CursorFile = std::move(picture);
+        ++m_CursorFileSerial;
     }
 
     bool NameplateRenderer::Upload(PlateTexture& t, const Image& image, TextureKey key)
@@ -305,7 +319,8 @@ namespace headsup
                 const bool scales       = ScalesWithDistance(settings, self);
                 const float scale       = scales ? p.scale : 1.0f;
                 const float timerShown  = timerLook.textSize * scale * toY;
-                const float cursorShown = static_cast<float>(settings.cursorSize) * (settings.scaleCursor ? p.scale : 1.0f) * toY;
+                const float cursorScale = settings.scaleCursor ? p.scale : 1.0f;
+                const float cursorShown = static_cast<float>(settings.cursorHeight) * cursorScale * toY;
                 auto raster             = [&](float shown, int current) {
                     return scales ? RasterHeight(shown, current) : FixedRasterHeight(shown);
                 };
@@ -396,9 +411,9 @@ namespace headsup
                     return true;
                 };
                 if (!measureLines() ||
-                    (showCursor && !PrepareCursor(p.cursor, CursorColor(target, settings), p.cursorRaster, settings)) ||
+                    (showCursor && !PrepareCursor(p.cursor, CursorState(info->state, target), p.cursorRaster, settings)) ||
                     (under != TargetState::None &&
-                        !PrepareCursor(p.cursorUnder, CursorColor(under, settings), p.cursorRaster, settings)))
+                        !PrepareCursor(p.cursorUnder, CursorState(info->state, under), p.cursorRaster, settings)))
                     break;
                 const int ornamentSource =
                     ornamentAt.line != kNoOrnament ? composed.lines[static_cast<size_t>(ornamentAt.line)].source : kNoOrnament;
@@ -437,7 +452,8 @@ namespace headsup
                     anchor.maxY -= raise;
                 }
                 const PlateLayout layout = LayoutPlate(anchor, std::span<const LineInput>(m_Inputs.data(), lineCount),
-                    cursorBox.width, cursorBox.height, p.cursor.tip, timersReady, timerHeight);
+                    cursorBox.width, cursorBox.height, p.cursor.tip, timersReady, timerHeight,
+                    static_cast<float>(settings.cursorRaise) * cursorScale);
                 const float depth      = gameName.depth;
                 const size_t firstQuad = m_Quads.size(), firstCursor = cursorQuads.size();
                 auto addText = [&](const PlateTexture& t, float x, float y, float shown) {
@@ -517,7 +533,7 @@ namespace headsup
                     // Over everything, as the game's own arrow is: at the name's depth, the target's own model, a
                     // door its name sits inside or anything the game has faded out near the camera would hide it.
                     const float fit = FitOf(cursorShown, p.cursor.raster);
-                    float top       = layout.cursor.y + CursorBob(now, cursorBox.height);
+                    float top       = layout.cursor.y + CursorBob(now, cursorBox.height, settings.cursorFloat);
                     auto addCursor  = [&](const PlateTexture& cursor) {
                         const CursorSpot kept = KeepOnScreen(CursorSpot{layout.cursor.x, top}, cursorBox.width, cursorBox.height,
                             screenWidth, screenHeight);
@@ -614,18 +630,19 @@ namespace headsup
         float screenWidth, float screenHeight)
     {
         m_CursorNames.resize(m_PlateCursors);
-        const float shown = static_cast<float>(settings.cursorSize);
+        const float shown = static_cast<float>(settings.cursorHeight);
         std::vector<GpuQuad> quads;
         for (const LoneCursor& cursor : lone)
         {
             PlateTexture& t = cursor.under ? m_LoneCursorUnder : m_LoneCursor;
-            if (!PrepareCursor(t, CursorColor(cursor.target, settings), FixedRasterHeight(shown), settings)) break;
+            // A target with no name is no entity HeadsUp knows: a door, read as the NPC or object it is.
+            if (!PrepareCursor(t, CursorState(EntityState{}, cursor.target), FixedRasterHeight(shown), settings)) break;
             if (t.unfit) continue;
             const float fit       = FitOf(shown, t.raster);
             const float width     = t.width * fit, height = t.height * fit;
-            const CursorSpot at   = CursorAtAnchor(cursor.x, cursor.y, width, height, t.tip);
-            const CursorSpot kept = KeepOnScreen(CursorSpot{at.x, at.y + CursorBob(now, height)}, width, height, screenWidth,
-                screenHeight);
+            const CursorSpot at = CursorAtAnchor(cursor.x, cursor.y, width, height, t.tip, static_cast<float>(settings.cursorRaise));
+            const CursorSpot kept = KeepOnScreen(CursorSpot{at.x, at.y + CursorBob(now, height, settings.cursorFloat)}, width,
+                height, screenWidth, screenHeight);
             const SquareQuad q = PlaceSquarePixels(kept.x, kept.y, t.width, t.height, t.halo, fit, 1.0f, 1.0f);
             quads.push_back(GpuQuad{t.texture, std::round(q.x), std::round(q.y), q.width, q.height, 0.0f, t.u, t.v, 0.0f, kWhite});
             m_CursorNames.push_back(CursorName{cursor.index, ScreenBox{}});

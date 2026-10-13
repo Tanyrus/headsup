@@ -559,14 +559,15 @@ TEST(a_toggles_knob_slides_across_its_track_in_both_themes)
 TEST(a_setting_of_something_switched_off_is_not_shown)
 {
     Window window;
-    const std::string least = "entities-nameplates-min-size", cursor = "entities-target-cursor-size";
+    const std::string least = "entities-nameplates-min-size", cursor = "entities-target-cursor-height";
     CHECK(window.Shows(least) && window.Shows(cursor));
     // Its own switch stays, to turn it back on.
     CHECK(window.Click("entities-nameplates-scale-with-distance"));
     CHECK(!window.settings.scaleWithDistance && !window.Shows(least) && window.Shows("entities-nameplates-scale-with-distance"));
     CHECK(!window.Shows(least + "-label-row")); // its row with it, label and all
-    CHECK(window.Click("entities-target-cursor-on"));
-    CHECK(!window.Shows(cursor) && window.Shows("entities-target-cursor-on"));
+    window.Click("entities-target-cursor-cursor-style");
+    CHECK(window.Click("entities-target-cursor-cursor-style-o-0")); // the game's own cursor
+    CHECK(!window.Shows(cursor) && window.Shows("entities-target-cursor-cursor-style"));
     CHECK(window.Click("entities-nameplates-scale-with-distance"));
     CHECK(window.Shows(least));
     // A card of what is off is gone whole.

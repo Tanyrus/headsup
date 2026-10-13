@@ -22,7 +22,7 @@ namespace headsup
     };
 
     // The frames of a cursor file (.cur, one frame) or an animated cursor (.ani); empty for anything else. Frames are 1,
-    // 4, 8 or 24 bits per pixel, as the game's pointers and the chocobo are.
+    // 4, 8 or 24 bits per pixel, as the game's pointers and the chocobo are, or 32 with alpha, as most others.
     std::vector<CursorFrame> ReadCursorFile(const uint8_t* data, size_t size);
 
     // The frame shown `seconds` after the animation started; it loops.

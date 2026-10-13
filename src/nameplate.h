@@ -45,7 +45,11 @@ namespace headsup
     // Whether the game's own arrow would show at this anchor: only inside the screen. A target behind the camera has
     // its anchor left at the corner, (0,0), and one off to a side far outside.
     bool AnchorOnScreen(float x, float y, float screenWidth, float screenHeight);
-    CursorSpot CursorAtAnchor(float anchorX, float anchorY, float width, float height, float tip);
+    CursorSpot CursorAtAnchor(float anchorX, float anchorY, float width, float height, float tip, float raise = 0.0f);
+    // The width in pixels of a cursor drawn pixelHeight tall, whose settings give it width by height.
+    int CursorPixelWidth(int pixelHeight, int width, int height);
+    // The cursor's edge in pixels, at least one: 100 percent is a twentieth of its height.
+    int CursorEdgePixels(int pixelHeight, int percent);
     // The game's arrow over a candidate sits 10 of its 32 pixels above the one over the target: on a nameplate the
     // candidate's cursor rises this share of its height over the target's own.
     constexpr float kPickedCursorRise = 10.0f / 32.0f;
@@ -89,7 +93,7 @@ namespace headsup
     // there once within half a pixel.
     float EaseRise(float shown, float target, double seconds);
 
-    float CursorBob(double seconds, float height);
+    float CursorBob(double seconds, float height, bool floating);
 
     // Not rounded, so sizes change as smoothly as the game's names; kept within the two limits.
     float DistanceScale(float letterHeight, float screenHeight, float minScale, float maxScale);

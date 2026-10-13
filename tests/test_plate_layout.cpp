@@ -193,6 +193,13 @@ TEST(the_cursor_sinks_into_a_text_top_line_and_your_timers_go_under_it)
     const std::vector<LineInput> iconLine{Icons({{40.0f, 16.0f}})};
     const PlateLayout overIcons = LayoutPlate(Anchor(), iconLine, 20.0f, 32.0f, 0.5f, 0, 0.0f);
     CHECK_EQ(overIcons.cursor.y, overIcons.top - kLineGap - 32.0f);
+    // A raised cursor stands that much higher, over the timers too, and nothing else moves for it.
+    const PlateLayout raised = LayoutPlate(Anchor(), lines, 20.0f, 32.0f, 0.5f, 2, 13.0f, 5.0f);
+    CHECK_EQ(raised.cursor.y, timed.cursor.y - 5.0f);
+    CHECK_EQ(raised.cursor.x, timed.cursor.x);
+    CHECK_EQ(raised.timersY, timed.timersY);
+    CHECK_EQ(raised.lines[0].top, timed.lines[0].top);
+    CHECK_EQ(LayoutPlate(Anchor(), lines, 20.0f, 32.0f, 0.5f, 0, 0.0f, -10.0f).cursor.y, plain.cursor.y + 10.0f);
 }
 
 TEST(a_plate_with_no_lines_puts_the_cursor_on_the_games_name)

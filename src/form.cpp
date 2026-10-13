@@ -236,6 +236,12 @@ namespace headsup
         EndRow();
     }
 
+    bool Form::Opened(std::string_view name) const
+    {
+        const std::string control = Named(name);
+        return m_State.popup == control && Clicked(control);
+    }
+
     void Form::TakeWhole(const std::string& slider, int& value, int lo, int hi)
     {
         const FormEvent* moved = Took(slider, kChangeEvent);

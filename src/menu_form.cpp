@@ -1,6 +1,7 @@
 #include "menu_form.h"
 
 #include "bar_theme.h"
+#include "cursor_picture.h"
 #include "icons.h"
 #include "menu_text.h"
 #include "native_locate.h"
@@ -890,7 +891,8 @@ namespace headsup
             form.EndCard();
         }
 
-        void EntitiesPage(Form& form, Settings& s, const MenuReadings& readings, const std::vector<std::string>& fonts)
+        void EntitiesPage(Form& form, Settings& s, const MenuReadings& readings, MenuFormState& state,
+            const std::vector<std::string>& fonts)
         {
             form.Fade(!s.enabled);
             if (form.BeginCard("Nameplates", &s.nameplates,
@@ -938,17 +940,41 @@ namespace headsup
                 form.EndCard();
             }
             form.Fade(!s.enabled);
-            if (form.BeginCard("Target Cursor", &s.replaceCursor,
-                    "Draws HeadsUp's cursor above the target's nameplate instead of the game's."))
+            if (form.BeginCard("Target Cursor", nullptr, "The cursor above your target's nameplate."))
             {
-                form.Fade(!s.enabled || !s.replaceCursor);
-                form.Switch("Feather", s.cursorFeather, "Phoenix's feather instead of the arrow.");
-                form.SliderInt("Size", s.cursorSize, kMinTextSize, kMaxTextSize, "%d px", nullptr);
-                form.SliderInt("Outline", s.cursorOutline, kMinCursorOutline, kMaxCursorOutline, "%d%%",
-                    "Its dark edge, as a share of the usual thickness.");
+                static const std::vector<std::string> kNoFiles;
+                const std::vector<CursorChoice> choices = CursorChoices(readings.cursorFiles != nullptr ? *readings.cursorFiles : kNoFiles, s);
+                const auto shown = [&](int c) {
+                    const CursorChoice& choice = choices[static_cast<size_t>(c)];
+                    return choice.style == CursorStyle::File ? choice.file : std::string(kCursorStyleLabels[static_cast<int>(choice.style)]);
+                };
+                int picked = CursorChoiceOf(choices, s);
+                form.NumberDropdown("Cursor Style", picked, 0, static_cast<int>(choices.size()) - 1, shown, nullptr, 0.0f, [&](int c) {
+                    return std::string(kCursorStyleTips[static_cast<int>(choices[static_cast<size_t>(c)].style)]);
+                });
+                if (form.Opened("Cursor Style")) state.cursorsRequested = true;
+                const CursorChoice& choice = choices[static_cast<size_t>(picked)];
+                // Another style comes at its own width, or it would be squeezed into the one before's.
+                if (choice.style != s.cursorStyle && choice.style != CursorStyle::Vanilla)
+                    s.cursorWidth = std::clamp(NaturalCursorWidth(choice.style, s.cursorHeight), kMinCursorSide, kMaxCursorSide);
+                s.cursorStyle = choice.style;
+                s.cursorFile  = choice.file;
+                const bool noSettings = !s.enabled || s.cursorStyle == CursorStyle::Vanilla;
+                form.Fade(noSettings);
+                form.SliderInt("Width", s.cursorWidth, kMinCursorSide, kMaxCursorSide, "%d px", nullptr);
+                form.SliderInt("Height", s.cursorHeight, kMinCursorSide, kMaxCursorSide, "%d px", nullptr);
+                form.SliderInt("Outline Thickness", s.cursorOutlineThickness, kMinCursorEdge, kMaxCursorEdge, "%d%%",
+                    "Its dark edge.");
                 form.Switch("Scale", s.scaleCursor, "Larger the nearer your target is.");
-                form.Swatch("Edge Color", s.cursorEdgeColor, "The cursor's dark edge.");
-                form.Note("Its colors are the Targeting colors below.");
+                form.Switch("Float", s.cursorFloat, "It bobs up and down. Off, it stays still.");
+                form.SliderInt("Vertical Offset", s.cursorRaise, -kMaxCursorRaise, kMaxCursorRaise, "%d px",
+                    "How far over its place the cursor sits, or under it.");
+                const std::vector<ColorSource> cursorSources = CursorSources();
+                form.Fade(noSettings || CursorIsPicture(s.cursorStyle));
+                form.ColorPickRow("Color", s.cursorColor, cursorSources,
+                    "The cursor's color. Over anything that has no such color, as a player's aggression, it is the Targeting color.");
+                form.Fade(noSettings);
+                form.ColorPickRow("Edge Color", s.cursorEdgeColor, cursorSources, "The cursor's edge.");
                 form.EndCard();
             }
             form.Fade(!s.enabled);
@@ -1007,7 +1033,7 @@ namespace headsup
         form.pageKey = PageKey(state.page);
         switch (state.page)
         {
-        case Page::Entities: EntitiesPage(form, s, readings, fonts); break;
+        case Page::Entities: EntitiesPage(form, s, readings, state, fonts); break;
         case Page::Mobs:
         case Page::Players:
         case Page::Self:

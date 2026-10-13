@@ -62,7 +62,7 @@ namespace headsup
     // line, its ornament, your timers, the cursor) sinks kNameOverlap into that line's text; a line with icons never
     // sinks into the line below it, as badges hang off its icons.
     PlateLayout LayoutPlate(const ScreenBox& anchor, std::span<const LineInput> lines, float cursorWidth,
-        float cursorHeight, float cursorTip, int timerCount, float timerHeight);
+        float cursorHeight, float cursorTip, int timerCount, float timerHeight, float cursorRaise = 0.0f);
     PlateBox BoxOf(const PlateLayout& layout);
 
     // Where an icon sits right of its row's first: past the before icons ahead of it, iconSize + kIconGap each, and

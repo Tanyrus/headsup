@@ -206,32 +206,90 @@ namespace headsup
         return image;
     }
 
+    namespace
+    {
+        // The outline grown around a coverage, under the color colorAt gives each covered pixel.
+        template <typename ColorAt>
+        Image OutlinedWith(const Coverage& coverage, int radius, uint32_t outlineColor, ColorAt colorAt)
+        {
+            Image image{coverage.width, coverage.height, std::vector<uint32_t>(coverage.alpha.size(), 0)};
+            for (int y = 0; y < coverage.height; ++y)
+            {
+                for (int x = 0; x < coverage.width; ++x)
+                {
+                    uint8_t most = 0;
+                    for (int dy = -radius; dy <= radius && most < kFullAlpha; ++dy)
+                    {
+                        for (int dx = -radius; dx <= radius; ++dx)
+                        {
+                            const int nx = x + dx, ny = y + dy;
+                            if (dx * dx + dy * dy > radius * radius + radius) continue; // a disc, with its diagonals at 1
+                            if (nx < 0 || ny < 0 || nx >= coverage.width || ny >= coverage.height) continue;
+                            most = std::max(most, coverage.alpha[static_cast<size_t>(ny * coverage.width + nx)]);
+                        }
+                    }
+                    const auto i = static_cast<size_t>(y * coverage.width + x);
+                    Paint paint;
+                    paint.Over(static_cast<float>(most) / kFullCoverage, outlineColor);
+                    paint.Over(Cover(coverage, i), colorAt(x, y));
+                    image.argb[i] = paint.Color();
+                }
+            }
+            return image;
+        }
+    }
+
     Image Outlined(const Coverage& coverage, int radius, uint32_t color, uint32_t outlineColor)
     {
-        Image image{coverage.width, coverage.height, std::vector<uint32_t>(coverage.alpha.size(), 0)};
-        for (int y = 0; y < coverage.height; ++y)
+        return OutlinedWith(coverage, radius, outlineColor, [&](int, int) { return color; });
+    }
+
+    Image Resized(const Image& picture, int width, int height)
+    {
+        const int w = std::max(1, width), h = std::max(1, height);
+        Image out{w, h, std::vector<uint32_t>(static_cast<size_t>(w) * static_cast<size_t>(h), 0)};
+        if (picture.width <= 0 || picture.height <= 0) return out;
+        const float stepX = static_cast<float>(picture.width) / static_cast<float>(w);
+        const float stepY = static_cast<float>(picture.height) / static_cast<float>(h);
+        // How much of old pixel `at` lies between from and to.
+        const auto share = [](int at, float from, float to) {
+            return std::max(0.0f, std::min(to, static_cast<float>(at + 1)) - std::max(from, static_cast<float>(at)));
+        };
+        for (int y = 0; y < h; ++y)
         {
-            for (int x = 0; x < coverage.width; ++x)
+            const float top = static_cast<float>(y) * stepY, bottom = top + stepY;
+            for (int x = 0; x < w; ++x)
             {
-                uint8_t most = 0;
-                for (int dy = -radius; dy <= radius && most < kFullAlpha; ++dy)
+                const float left = static_cast<float>(x) * stepX, right = left + stepX;
+                Paint sum;
+                for (int sy = static_cast<int>(top); sy < picture.height && static_cast<float>(sy) < bottom; ++sy)
                 {
-                    for (int dx = -radius; dx <= radius; ++dx)
+                    for (int sx = static_cast<int>(left); sx < picture.width && static_cast<float>(sx) < right; ++sx)
                     {
-                        const int nx = x + dx, ny = y + dy;
-                        if (dx * dx + dy * dy > radius * radius + radius) continue; // a disc, with its diagonals at 1
-                        if (nx < 0 || ny < 0 || nx >= coverage.width || ny >= coverage.height) continue;
-                        most = std::max(most, coverage.alpha[static_cast<size_t>(ny * coverage.width + nx)]);
+                        const uint32_t argb = picture.argb[static_cast<size_t>(sy * picture.width + sx)];
+                        const float area    = share(sx, left, right) * share(sy, top, bottom) / (stepX * stepY);
+                        sum.Add(area * static_cast<float>(Channel(argb, kAlphaShift)) / kFullCoverage, argb);
                     }
                 }
-                const auto i = static_cast<size_t>(y * coverage.width + x);
-                Paint paint;
-                paint.Over(static_cast<float>(most) / kFullCoverage, outlineColor);
-                paint.Over(Cover(coverage, i), color);
-                image.argb[i] = paint.Color();
+                out.argb[static_cast<size_t>(y * w + x)] = sum.Color();
             }
         }
-        return image;
+        return out;
+    }
+
+    Image Edged(const Image& picture, int radius, uint32_t edgeColor)
+    {
+        Coverage covered{picture.width + 2 * radius, picture.height + 2 * radius, {}};
+        covered.alpha.assign(static_cast<size_t>(covered.width) * static_cast<size_t>(covered.height), 0);
+        for (int y = 0; y < picture.height; ++y)
+            for (int x = 0; x < picture.width; ++x)
+                covered.alpha[static_cast<size_t>((y + radius) * covered.width + x + radius)] =
+                    Channel(picture.argb[static_cast<size_t>(y * picture.width + x)], kAlphaShift);
+        // Only a pixel inside the picture is covered, so only there is its color asked for.
+        return OutlinedWith(covered, radius, edgeColor, [&](int x, int y) {
+            const bool inside = x >= radius && y >= radius && x < radius + picture.width && y < radius + picture.height;
+            return inside ? picture.argb[static_cast<size_t>((y - radius) * picture.width + x - radius)] : 0u;
+        });
     }
 
     Image Ornament(int width, int height, float shadowBlur, float shadowStrength, uint32_t color, uint32_t shadowColor)
@@ -456,10 +514,15 @@ namespace headsup
         return count > 0 ? sum / static_cast<float>(count) : 0.5f;
     }
 
-    Coverage ShapeCoverage(const Shape& shape, int pixelHeight, int margin)
+    int ShapeWidth(const Shape& shape, int pixelHeight)
+    {
+        return WholePixels(static_cast<float>(std::max(1, pixelHeight)) / shape.aspect);
+    }
+
+    Coverage ShapeCoverage(const Shape& shape, int pixelWidth, int pixelHeight, int margin)
     {
         const int height = std::max(1, pixelHeight);
-        const int width  = WholePixels(static_cast<float>(height) / shape.aspect);
+        const int width  = std::max(1, pixelWidth);
         std::vector<float> covered(static_cast<size_t>(width) * static_cast<size_t>(height), 0.0f);
         std::vector<std::pair<float, int>> crossings; // x in pixels, and the edge's winding direction
         for (int y = 0; y < height; ++y)
