@@ -288,7 +288,7 @@ TEST(a_short_check_message_leaves_no_message_waiting)
 TEST(the_conquest_standings_are_asked_for_once_after_loading_and_once_per_zone_in)
 {
     GameState game;
-    CHECK(!game.ConquestRequestDue(0.0, false, false)); // the bar not running, neither widget on, or zoning
+    CHECK(!game.ConquestRequestDue(0.0, false, false)); // the bar not running, the Zone widget off, or zoning
     CHECK(game.ConquestRequestDue(0.0, true, false));   // loading counts as a zone-in
     game.ConquestRequested(0.0);
     CHECK(!game.ConquestRequestDue(30.0, true, false)); // once: an answer that never comes is not asked for again
@@ -348,37 +348,30 @@ TEST(the_influence_is_the_last_updates_and_is_forgotten_at_a_zone_in)
     CHECK(!game.Shares().has_value() && game.Owners().has_value());
 }
 
-TEST(a_conquest_update_keeps_your_standing_and_its_bytes_and_a_short_one_keeps_the_last)
+TEST(the_last_conquest_update_is_kept_as_it_came_for_the_debug_report)
 {
     GameState state;
-    CHECK(!state.Standing().has_value() && state.LastConquestPacket().empty());
+    CHECK(state.LastConquestPacket().empty());
     Packet full = Blank(kConquestPacket, 0xB4);
-    full.Put(0x8C, uint8_t{59}).Put(0x90, uint32_t{12345}).Put(0xB0, uint32_t{8210});
-    state.Received(full.id, full.bytes.data(), static_cast<uint32_t>(full.bytes.size()));
-    CHECK(state.Standing() == (ConquestStanding{59, 12345, 8210}));
+    full.Put(0x90, uint32_t{12345}); // your conquest points
+    Feed(state, full);
     CHECK(state.LastConquestPacket() == full.bytes);
     const Packet owners = Blank(kConquestPacket, 0x90); // the owners alone
-    state.Received(owners.id, owners.bytes.data(), static_cast<uint32_t>(owners.bytes.size()));
-    CHECK(state.Standing() == (ConquestStanding{59, 12345, 8210}));
+    Feed(state, owners);
+    CHECK(state.LastConquestPacket() == owners.bytes);
 }
 
-TEST(another_character_forgets_the_last_ones_conquest_points_and_standing_until_the_server_answers)
+TEST(another_character_forgets_the_last_ones_conquest_update_and_keeps_who_holds_each_region)
 {
     constexpr uint32_t kMe = 0x00012345, kAlt = 0x00054321; // server ids, in 0x00A's UniqueNo at 0x04
     GameState state;
     Feed(state, ZoneIn(kRain).Put(0x04, kMe));
-    Packet full = Blank(kConquestPacket, 0xB4);
-    full.Put(0x8C, uint8_t{59}).Put(0x90, uint32_t{12345}).Put(0xB0, uint32_t{8210});
-    Feed(state, full);
-    // Zoning as the same character keeps them, as the server sends them only when asked.
-    Feed(state, ZoneIn(kRain).Put(0x04, kMe));
-    CHECK(state.Standing() == (ConquestStanding{59, 12345, 8210}) && !state.LastConquestPacket().empty());
+    Feed(state, Blank(kConquestPacket, 0xB4).Put(0x90, uint32_t{12345})); // your conquest points
+    Feed(state, ZoneIn(kRain).Put(0x04, kMe));                             // zoning as the same character keeps it
+    CHECK(!state.LastConquestPacket().empty());
     Feed(state, ZoneIn(kRain).Put(0x04, kAlt));
-    CHECK(!state.Standing().has_value() && state.LastConquestPacket().empty());
+    CHECK(state.LastConquestPacket().empty());
     CHECK(state.Owners().has_value()); // who holds each region is the same for everyone
-    full.Put(0x90, uint32_t{500}).Put(0xB0, uint32_t{0});
-    Feed(state, full);
-    CHECK(state.Standing() == (ConquestStanding{59, 500, 0}));
 }
 
 TEST(a_checked_player_shares_your_linkshell_when_their_check_names_one_you_wear)

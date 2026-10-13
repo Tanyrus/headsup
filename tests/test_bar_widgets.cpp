@@ -675,7 +675,6 @@ namespace
             RegionOwners owners{};
             owners[1]     = Nation::Bastok;
             state.owners  = owners;
-            state.standing = ConquestStanding{58, 12345, 8210};
             state.shares =
                 RegionShares{{{Nation::Bastok, 52}, {Nation::SanDoria, 30}, {Nation::Windurst, 10}, {Nation::Beastmen, 8}}};
             state.weather = Weather::DustStorm;
@@ -698,7 +697,6 @@ namespace
         BarState s;
         s.weather = full.weather;
         s.owners  = full.owners;
-        s.standing = full.standing;
         s.shares   = full.shares;
         if (needs.unixTime) s.unixMs = full.unixMs;
         if (needs.localTime)
@@ -1140,24 +1138,6 @@ TEST(a_checked_players_title_shows_its_number_when_the_list_lacks_it_and_not_at_
     state.targetCheck->message.title = 0;
     CHECK(Lines(BarPopupContent(BarWidget::Target, state, settings).sections[0]) ==
           (std::vector<std::string>{"Jobs WAR 75 / NIN 37", "As of your check"}));
-}
-
-TEST(the_conquest_widget_counts_down_to_the_tally_and_shows_your_points)
-{
-    Settings settings;
-    settings.barWidgets[static_cast<int>(BarWidget::Conquest)] = true;
-    BarState state;
-    state.unixMs    = 1791527400000; // Friday 15:30 JST: 203,400 s to Monday 00:00 JST
-    WidgetContent w = BarWidgetContent(BarWidget::Conquest, state, settings);
-    CHECK(w.shown && w.hasPopup && w.figures && Joined(w.title) == "Tally 2d 8h" && Joined(w.subtitle) == "CP -");
-    CHECK(Lines(BarPopupContent(BarWidget::Conquest, state, settings).sections[0]) ==
-          (std::vector<std::string>{"Conquest points -", "Imperial Standing -", "Tally in 2d 8h (Monday 00:00 JST)"}));
-    state.standing = ConquestStanding{59, 12345, 8210}; // 203,400 s is 58.9 Vana'diel days, rounded up
-    w              = BarWidgetContent(BarWidget::Conquest, state, settings);
-    CHECK(Joined(w.subtitle) == "12,345 CP");
-    CHECK(Lines(BarPopupContent(BarWidget::Conquest, state, settings).sections[0]) ==
-          (std::vector<std::string>{"Conquest points 12,345", "Imperial Standing 8,210",
-              "Tally in 2d 8h (Monday 00:00 JST)", "59 Vana'diel days, as the server counts them"}));
 }
 
 TEST(the_signet_widget_shows_only_while_one_is_on_and_says_where_it_works)

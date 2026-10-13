@@ -18,8 +18,8 @@ namespace headsup
     namespace
     {
         const char* const kBarWidgetLabels[] = {"Zone", "Weather", "Vana'diel", "Target", "Gil",
-            "Bags", "Clock", "Game help", "Server time", "FPS", "Job", "Connection", "Party", "Conquest",
-            "Signet", "Distance"};
+            "Bags", "Clock", "Game help", "Server time", "FPS", "Job", "Connection", "Party", "Signet",
+            "Distance"};
         const char* const kBarWidgetTips[] = {
             "The zone, its region and who holds it. Hover for the influence there and the conquest tally.",
             "The weather now and today's chance of it. Hover for the forecast.",
@@ -34,7 +34,6 @@ namespace headsup
             "Jobs, levels and EXP to the next level, with a bar. Hover for EXP per hour.",
             "Bytes sent and received each second; amber or red when data stops. Hover for latency.",
             "Party size and the lowest HP and MP. Hover for each member.",
-            "Time to the conquest tally and your conquest points.",
             "Time left on Signet or Sanction, while one is on.",
             "How far your target is, in yalms."};
         static_assert(std::size(kBarWidgetLabels) == kBarWidgetCount && std::size(kBarWidgetTips) == kBarWidgetCount);

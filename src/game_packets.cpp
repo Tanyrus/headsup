@@ -14,7 +14,6 @@ namespace headsup
     {
         constexpr uint32_t kZoneInWeather = 0x68, kZoneInPlayer = 0x04, kWeatherNumber = 0x08;
         constexpr uint32_t kFirstOwner = 0x1D, kRegionStride = 4;
-        constexpr uint32_t kNextTally = 0x8C, kConquestPoints = 0x90, kImperialStanding = 0xB0;
         constexpr uint32_t kSanDoriaShare = 0x86, kBastokShare = 0x87, kWindurstShare = 0x88, kBeastmenShare = 0x94;
         constexpr unsigned kWholePercent = 100;
         const char* const kNationNames[] = {"", "San d'Oria", "Bastok", "Windurst", "Beastmen"};
@@ -61,14 +60,6 @@ namespace headsup
             owners[r] = owner <= static_cast<uint8_t>(Nation::Beastmen) ? static_cast<Nation>(owner) : Nation::None;
         }
         return owners;
-    }
-
-    std::optional<ConquestStanding> ParseConquestStanding(const uint8_t* data, uint32_t size)
-    {
-        if (data == nullptr || size < kImperialStanding + sizeof(uint32_t)) return std::nullopt;
-        if (data[kNextTally] > kMaxTallyVanaDays) return std::nullopt;
-        return ConquestStanding{data[kNextTally], ReadAt<uint32_t>(data, kConquestPoints),
-            ReadAt<uint32_t>(data, kImperialStanding)};
     }
 
     std::optional<RegionShares> ParseRegionShares(const uint8_t* data, uint32_t size)

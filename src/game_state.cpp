@@ -30,10 +30,9 @@ namespace headsup
             next.zonedIn = true;
             if (const std::optional<uint32_t> player = ParseZoneInPlayer(data, size))
             {
-                // Another character's points and standing are not yours: unknown until the server says.
+                // Another character's points are not yours: unknown until the server says.
                 if (m_Player && *m_Player != *player)
                 {
-                    m_Standing.reset();
                     m_ConquestBytes.clear();
                     m_Currencies = CurrencyValues{};
                 }
@@ -46,7 +45,6 @@ namespace headsup
         case kConquestPacket:
             m_ConquestOwed = false; // whether HeadsUp asked or not
             if (const auto owners = ParseConquest(data, size)) m_Owners = *owners;
-            if (const auto standing = ParseConquestStanding(data, size)) m_Standing = *standing;
             if (const auto shares = ParseRegionShares(data, size)) m_Shares = *shares;
             if (data != nullptr) m_ConquestBytes.assign(data, data + size);
             break;

@@ -524,10 +524,9 @@ public:
         g_BarHidden = m_UiHidden;
         // Opening Region Info asks the server for the conquest standings; HeadsUp asks the same once per zone-in, and
         // again while the Zone popup shows them.
-        const bool wantsConquest = m_Settings.barWidgets[static_cast<int>(headsup::BarWidget::Zone)] ||
-                                   m_Settings.barWidgets[static_cast<int>(headsup::BarWidget::Conquest)];
-        if (m_GameState.ConquestRequestDue(now, g_BarOn && wantsConquest &&
-                                                    m_AshitaCore->GetMemoryManager()->GetPlayer()->GetIsZoning() == 0,
+        if (m_GameState.ConquestRequestDue(now,
+                g_BarOn && m_Settings.barWidgets[static_cast<int>(headsup::BarWidget::Zone)] &&
+                    m_AshitaCore->GetMemoryManager()->GetPlayer()->GetIsZoning() == 0,
                 m_BarInput.Open() == headsup::BarWidget::Zone))
         {
             auto request = headsup::kConquestRequest; // Ashita takes the bytes as non-const
@@ -1265,7 +1264,6 @@ private:
         headsup::BarState s;
         s.weather = WeatherNow();
         s.owners   = m_GameState.Owners();
-        s.standing = m_GameState.Standing();
         s.shares   = m_GameState.Shares();
         if (needs.unixTime || needs.localTime || needs.signet)
         {

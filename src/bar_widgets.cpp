@@ -296,7 +296,6 @@ namespace headsup
         auto shown = [&](BarWidget widget) { return settings.barWidgets[static_cast<int>(widget)]; };
         BarNeeds needs;
         needs.unixTime   = shown(BarWidget::Weather) || shown(BarWidget::VanaTime) || shown(BarWidget::ServerTime) ||
-                           shown(BarWidget::Conquest) ||
                            (shown(BarWidget::Zone) && open == BarWidget::Zone); // the popup counts down to the tally
         needs.localTime  = shown(BarWidget::EarthTime);
         needs.zone       = shown(BarWidget::Zone) || shown(BarWidget::Weather) ||
@@ -459,8 +458,6 @@ namespace headsup
             return ConnectionWidget(state.connection, settings.barLatency);
         case BarWidget::Party:
             return PartyWidget(state.party);
-        case BarWidget::Conquest:
-            return ConquestWidget(state.unixMs, state.standing);
         case BarWidget::Signet:
             return SignetWidget(state.signet);
         case BarWidget::Distance:
@@ -616,8 +613,6 @@ namespace headsup
             return ConnectionPopup(state.connection);
         case BarWidget::Party:
             return PartyPopup(state.party);
-        case BarWidget::Conquest:
-            return ConquestPopup(state.unixMs, state.standing);
         case BarWidget::Signet:
             return SignetPopup(state.signet, state.zone);
         case BarWidget::Distance: break;

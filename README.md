@@ -4,7 +4,7 @@ An Ashita v4 plugin for Final Fantasy XI on PhoenixXI. It outlines nearby monste
 they will attack you, and replaces the game's nameplates with clearer ones: names, level and con, how a monster
 detects you, player status icons and a target cursor. It only reads what the game already shows and the server
 already sends, apart from three requests the game's own menus make, which the top bar sends for you: the one the game
-sends when you open Region Info, while the bar's Zone or Conquest widget is on, and the two it sends when you open the
+sends when you open Region Info, while the bar's Zone widget is on, and the two it sends when you open the
 Currencies menu, while the Gil widget is on ([Top bar](#top-bar) says when). It never targets or checks anything
 itself.
 
@@ -196,7 +196,6 @@ A bar across the top of the screen, on by default, with these widgets from left 
 | Vana'diel | The weekday in its element's color, the time and moon | The date, and when the day and moon change |
 | Job | Your jobs and levels, and the EXP to your next level (your merits at 75), over a bar of it | EXP per hour, the time to level, limit points |
 | Party | How many are in your party, with the lowest HP and MP in your zone | Each member's jobs, levels, HP, MP and TP |
-| Conquest | The time to the weekly tally and your conquest points | Your Imperial Standing and the tally in Vana'diel days |
 | Signet | The time left on Signet or Sanction, only while one is on | What it gives and whether it works where you are |
 | Server time | The time in Japan, which Phoenix keeps, or another time zone's | The time to the daily reset and the conquest tally |
 | Target | A monster's name in its border color, its level and con | Weaknesses, resistances, immunities, tags, spawn, drops at Treasure Hunter 0 and what can be stolen; for a player you checked, their jobs, master level, linkshell and title, as of your check |
@@ -230,15 +229,16 @@ weather the game keeps; if HeadsUp cannot find it, it goes by the server's weath
 weather until one comes. While the Gil widget is on, HeadsUp asks the server for your currencies with the two requests
 the game's Currencies menu sends: once after loading, once per zone and each minute while the widget's popup is open.
 
-Game help's bar, Job, Connection, FPS and Distance start on, and Server time, Party, Conquest and Signet start off. The connection's S and R come from the game's own readout, which
+Game help's bar, Job, Connection, FPS and Distance start on, and Server time, Party and Signet start off. The connection's S and R come from the game's own readout, which
 the bar covers and the "Hide Readout" switch stops the game drawing; they show "-" if HeadsUp
 cannot find them in the game's memory. The latency is HeadsUp's own measure, from a packet sent to the server's next
 reply, rounded to a frame.
 
 After each zone change (and after loading) HeadsUp asks the server for the conquest standings, as opening Region Info
-does, while the Zone or Conquest widget is on, so the zone's owner and your conquest points show without opening that
-menu. It asks again each minute while the Zone widget's popup is open, as the influence changes through the week.
-Whoever holds the largest share when the tally comes takes the region.
+does, while the Zone widget is on, so the zone's owner and the influence in its region show without opening that menu.
+It asks again each minute while the widget's popup is open, as the influence changes through the week. Whoever holds
+the largest share when the tally comes takes the region. Your conquest points and Imperial Standing are among the Gil
+widget's currencies.
 
 The bar stays off until your character is in game, so it does not draw over the login screens.
 

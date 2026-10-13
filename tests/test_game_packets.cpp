@@ -241,18 +241,3 @@ TEST(the_conquest_request_is_a_bare_header_naming_0x05a_and_one_word)
     CHECK(static_cast<size_t>(word >> 9) * 4 == kConquestRequest.size()); // XiPackets: 0x0004 bytes
     CHECK(kConquestRequest[2] == 0 && kConquestRequest[3] == 0);         // the sync word, the game's to fill
 }
-
-TEST(a_conquest_update_carries_the_tally_your_conquest_points_and_imperial_standing)
-{
-    std::vector<uint8_t> packet(0xB4, 0);
-    const uint32_t points = 12345, standing = 8210;
-    packet[0x8C] = 59;
-    std::memcpy(packet.data() + 0x90, &points, sizeof(points));
-    std::memcpy(packet.data() + 0xB0, &standing, sizeof(standing));
-    std::memset(packet.data() + 0xA0, 0xFF, 0x10); // the Besieged words between them
-    CHECK(ParseConquestStanding(packet.data(), 0xB4) == (ConquestStanding{59, 12345, 8210}));
-    CHECK(!ParseConquestStanding(packet.data(), 0xB3).has_value());
-    CHECK(!ParseConquestStanding(nullptr, 0xB4).has_value());
-    packet[0x8C] = 176; // further off than a week: not the layout HeadsUp expects
-    CHECK(!ParseConquestStanding(packet.data(), 0xB4).has_value());
-}
