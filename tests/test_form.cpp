@@ -42,8 +42,10 @@ namespace
         int height    = 45;
         int theme     = 1;
         float thick   = 1.0f;
+        int quality   = 1;
         std::string name;
     };
+    const char* const kQualities[] = {"Low", "Medium", "High", "Ultra"};
     Form Pass(const std::vector<FormEvent>& events, FormState& state, Bound& b, bool faded = false)
     {
         Form form(events, state);
@@ -54,6 +56,7 @@ namespace
             form.Switch("Chocobo", b.chocobo, "The chocobo.");
             form.SliderInt("Height", b.height, 24, 64, "%d px", nullptr);
             form.SliderFloat("Thickness", b.thick, 0.5f, 3.0f, "%.1f px", nullptr);
+            form.SliderNamed("Quality", b.quality, kQualities, 4, nullptr);
             form.NumberDropdown("Theme", b.theme, 0, 2, [](int t) { return "Theme " + std::to_string(t); }, nullptr, 0.0f,
                 [](int t) { return "What theme " + std::to_string(t) + " is."; });
             form.Row("Name", nullptr);
@@ -133,6 +136,14 @@ TEST(a_slider_takes_its_newest_value_within_its_ends)
     // The same value again is no change.
     const Form same = Pass({{"page-mouse-pointer-height", kChangeEvent, "64"}}, state, b);
     CHECK(!same.changed);
+    // A slider of names steps through them and shows the one it is on, never its number.
+    CHECK_EQ(TextOf(same, "page-mouse-pointer-quality-val"), "Medium");
+    const Form named = Pass({{"page-mouse-pointer-quality", kChangeEvent, "3"}}, state, b);
+    CHECK(b.quality == 3 && named.changed);
+    CHECK_EQ(TextOf(named, "page-mouse-pointer-quality-val"), "Ultra");
+    const Form lowest = Pass({{"page-mouse-pointer-quality", kChangeEvent, "-4"}}, state, b);
+    CHECK_EQ(b.quality, 0);
+    CHECK_EQ(TextOf(lowest, "page-mouse-pointer-quality-val"), "Low");
 }
 
 TEST(a_dropdown_opens_a_popup_of_its_rows_and_takes_the_one_clicked)

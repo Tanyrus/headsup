@@ -924,11 +924,16 @@ namespace headsup
                     "Colored borders around mobs, and anything else whose rows ask for one."))
             {
                 form.Fade(!s.enabled || !s.outlines);
-                form.SliderFloat("Thickness", s.thickness, kMinThickness, kMaxThickness, "%.1f px", nullptr);
-                form.SliderInt("Smoothness", s.smoothness, kMinSmoothness, kMaxSmoothness, "%d copies",
-                    "More is rounder and costs a little more.");
+                form.SliderInt("Thickness", s.outlineThickness, kMinOutlineThickness, kMaxOutlineThickness, "%d%%", nullptr);
+                form.SliderInt("Opacity", s.outlineOpacity, kMinOpacity, kMaxOpacity, "%d%%", nullptr);
+                int smoothness = static_cast<int>(SmoothnessLevelOf(s.smoothness));
+                form.SliderNamed("Smoothness", smoothness, kSmoothnessLabels, kSmoothnessLevelCount,
+                    "Higher is rounder and costs a little more.");
+                s.smoothness = SmoothnessCopies(static_cast<SmoothnessLevel>(smoothness));
                 form.SliderFloat("Range", s.maxDistance, kMinOutlineDistance, kMaxOutlineDistance, "%.0f yalms",
                     "Anything farther gets no outline.");
+                form.Switch("Fade In", s.outlineFadeIn,
+                    "Outlines grow fainter with distance: whole within 10 yalms, almost gone at the range.");
                 if (!readings.stencilAvailable) form.Note("Outlines are unavailable: the depth buffer has no stencil bits.");
                 form.EndCard();
             }

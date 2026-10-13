@@ -92,6 +92,7 @@ namespace headsup
                 info.outline    = true;
                 info.stencilRef = static_cast<uint8_t>(m_Outlined % kMaxStencilRef + 1);
                 info.argb       = RowColor(st, settings);
+                info.outlineAlpha = OutlineAlpha(settings.outlineOpacity, a.distance, settings.maxDistance, settings.outlineFadeIn);
                 ++m_Outlined;
             }
             if (a.kind == EntityKind::Player && a.status) info.linkshellArgb = a.status->linkshellArgb;

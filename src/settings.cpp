@@ -35,7 +35,8 @@ namespace headsup
             {"screenshotHidesGame", &Settings::screenshotHidesGame},
             {"clockSeconds", &Settings::clockSeconds},
             {"stackNames", &Settings::stackNames},
-            {"nameplates", &Settings::nameplates}, {"outlines", &Settings::outlines}};
+            {"nameplates", &Settings::nameplates}, {"outlines", &Settings::outlines},
+            {"outlineFadeIn", &Settings::outlineFadeIn}};
 
         struct IntKey
         {
@@ -44,6 +45,8 @@ namespace headsup
             int lo, hi;
         };
         constexpr IntKey kInts[] = {{"smoothness", &Settings::smoothness, kMinSmoothness, kMaxSmoothness},
+            {"outlineThickness", &Settings::outlineThickness, kMinOutlineThickness, kMaxOutlineThickness},
+            {"outlineOpacity", &Settings::outlineOpacity, kMinOpacity, kMaxOpacity},
             {"cursorSize", &Settings::cursorSize, kMinTextSize, kMaxTextSize},
             {"nameRaise", &Settings::nameRaise, kMinNameRaise, kMaxNameRaise},
             {"elementWeakRank", &Settings::elementWeakRank, kNoWeakRank, kMaxWeakRank},
@@ -67,8 +70,7 @@ namespace headsup
             float Settings::*field;
             float lo, hi;
         };
-        constexpr FloatKey kFloats[] = {{"thickness", &Settings::thickness, kMinThickness, kMaxThickness},
-            {"maxDistance", &Settings::maxDistance, kMinOutlineDistance, kMaxOutlineDistance}};
+        constexpr FloatKey kFloats[] = {{"maxDistance", &Settings::maxDistance, kMinOutlineDistance, kMaxOutlineDistance}};
 
         struct ColorKey
         {
@@ -1010,6 +1012,7 @@ namespace headsup
             s.*f.field = ClampFloat(s.*f.field, f.lo, f.hi, d.*f.field);
         for (const IntKey& i : kInts)
             s.*i.field = std::clamp(s.*i.field, i.lo, i.hi);
+        s.smoothness = SmoothnessCopies(SmoothnessLevelOf(s.smoothness));
         if (s.badgeFontName.empty() || s.badgeFontName.size() > kMaxFontName) s.badgeFontName = d.badgeFontName;
         if (s.barTitleFont.size() > kMaxFontName) s.barTitleFont = d.barTitleFont;
         if (s.barTextFont.size() > kMaxFontName) s.barTextFont = d.barTextFont;

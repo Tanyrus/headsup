@@ -276,6 +276,27 @@ TEST(mobs_beyond_max_distance_are_not_outlined)
     CHECK(!t.Find(0x3000)->outline);
 }
 
+TEST(an_outline_is_as_opaque_as_the_setting_and_fainter_with_distance_only_when_it_fades_in)
+{
+    Tracker t;
+    Settings s;
+    const uint32_t color = ToArgb(s.palette.aggression[static_cast<int>(Nature::Aggressive)]);
+    t.Update({BountyHunter(0x2000, 8.0f), BountyHunter(0x3000, 30.0f)}, kLevel20, s, CursorTargets{});
+    CHECK_EQ(t.Find(0x2000)->outlineAlpha, 153); // 60 percent, a new install's
+    CHECK_EQ(t.Find(0x3000)->outlineAlpha, 153);
+    CHECK_EQ(t.Find(0x3000)->argb, color); // the color itself stays whole
+    s.outlineOpacity = 100;
+    s.outlineFadeIn  = true;
+    t.Update({BountyHunter(0x2000, 8.0f), BountyHunter(0x3000, 30.0f), BountyHunter(0x4000, s.maxDistance)}, kLevel20, s,
+        CursorTargets{});
+    CHECK_EQ(t.Find(0x2000)->outlineAlpha, 255);
+    CHECK_EQ(t.Find(0x3000)->outlineAlpha, 129); // half way from 10 yalms to the range of 50
+    CHECK_EQ(t.Find(0x4000)->outlineAlpha, 3);   // a hundredth, at the range
+    s.maxDistance = 30.0f;
+    t.Update({BountyHunter(0x3000, 20.0f)}, kLevel20, s, CursorTargets{});
+    CHECK_EQ(t.Find(0x3000)->outlineAlpha, 129); // the fade ends at the range, wherever that is set
+}
+
 TEST(disabled_outlines_nothing)
 {
     Tracker t;

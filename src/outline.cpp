@@ -1,5 +1,6 @@
 #include "outline.h"
 
+#include "argb.h"
 #include "d3d_util.h"
 #include "outline_math.h"
 
@@ -27,15 +28,17 @@ namespace headsup
 
         const D3DRENDERSTATETYPE kSavedStates[] = {D3DRS_STENCILENABLE, D3DRS_STENCILFUNC, D3DRS_STENCILREF,
             D3DRS_STENCILMASK, D3DRS_STENCILWRITEMASK, D3DRS_STENCILPASS, D3DRS_STENCILFAIL, D3DRS_STENCILZFAIL,
-            D3DRS_ZWRITEENABLE, D3DRS_FOGENABLE, D3DRS_TEXTUREFACTOR};
+            D3DRS_ZWRITEENABLE, D3DRS_FOGENABLE, D3DRS_TEXTUREFACTOR, D3DRS_ALPHABLENDENABLE, D3DRS_SRCBLEND,
+            D3DRS_DESTBLEND, D3DRS_ALPHAREF};
 
         struct StageState
         {
             DWORD stage;
             D3DTEXTURESTAGESTATETYPE type;
         };
+        constexpr size_t kAlphaRefState = std::size(kSavedStates) - 1;
         const StageState kSavedStages[] = {{0, D3DTSS_COLOROP}, {0, D3DTSS_COLORARG1}, {0, D3DTSS_ALPHAOP},
-            {0, D3DTSS_ALPHAARG1}, {1, D3DTSS_COLOROP}, {1, D3DTSS_ALPHAOP}};
+            {0, D3DTSS_ALPHAARG1}, {0, D3DTSS_ALPHAARG2}, {1, D3DTSS_COLOROP}, {1, D3DTSS_ALPHAOP}};
     }
 
     void OutlineRenderer::NewFrame()
@@ -124,22 +127,36 @@ namespace headsup
         m_Device->SetRenderState(D3DRS_COLORWRITEENABLE, 0);
         draw();
 
+        const bool faint = owner.outlineAlpha < kOpaqueAlpha;
         m_Device->SetRenderState(D3DRS_COLORWRITEENABLE, colorWrite);
         m_Device->SetRenderState(D3DRS_STENCILFUNC, D3DCMP_NOTEQUAL);
-        m_Device->SetRenderState(D3DRS_STENCILPASS, D3DSTENCILOP_KEEP);
+        // The copies overlap. A faint outline marks each pixel as it draws it, so the next copy leaves it alone and
+        // the color is blended in once.
+        m_Device->SetRenderState(D3DRS_STENCILPASS, faint ? D3DSTENCILOP_REPLACE : D3DSTENCILOP_KEEP);
         m_Device->SetRenderState(D3DRS_FOGENABLE, FALSE);
-        m_Device->SetRenderState(D3DRS_TEXTUREFACTOR, owner.argb);
+        m_Device->SetRenderState(D3DRS_TEXTUREFACTOR, WithAlpha(Opaque(owner.argb), owner.outlineAlpha));
         m_Device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
         m_Device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TFACTOR);
-        m_Device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1);
         m_Device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE); // keeps alpha-tested cut-outs
+        if (faint)
+        {
+            // The game tests a mesh's alpha against a reference; with the alpha scaled, that goes down with it.
+            m_Device->SetRenderState(D3DRS_ALPHAREF, ScaledAlphaRef(states[kAlphaRefState], owner.outlineAlpha));
+            m_Device->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
+            m_Device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+            m_Device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+            m_Device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+            m_Device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_TFACTOR);
+        }
+        else
+            m_Device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1);
         m_Device->SetTextureStageState(1, D3DTSS_COLOROP, D3DTOP_DISABLE);
         m_Device->SetTextureStageState(1, D3DTSS_ALPHAOP, D3DTOP_DISABLE);
         const Mat4 base = ToMat4(projection);
         for (int tap = 0; tap < settings.smoothness; ++tap)
         {
             float dx = 0.0f, dy = 0.0f;
-            OutlineOffset(tap, settings.smoothness, settings.thickness, static_cast<float>(viewport.Width),
+            OutlineOffset(tap, settings.smoothness, OutlinePixels(settings.outlineThickness), static_cast<float>(viewport.Width),
                 static_cast<float>(viewport.Height), dx, dy);
             const D3DMATRIX shifted = ToD3D(ShiftProjection(base, dx, dy));
             m_Device->SetTransform(D3DTS_PROJECTION, &shifted);

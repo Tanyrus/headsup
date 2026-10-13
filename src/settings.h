@@ -12,6 +12,7 @@
 #include "menu_document.h"
 #include "menu_fonts.h"
 #include "native_locate.h"
+#include "outline_math.h"
 #include "plate_settings.h"
 
 #include <array>
@@ -24,9 +25,9 @@
 
 namespace headsup
 {
-    constexpr float kMinThickness = 1.0f, kMaxThickness = 16.0f;            // render-target pixels
-    constexpr int kMinSmoothness = 4, kMaxSmoothness = 16;                  // shifted copies per mesh
-    constexpr float kMinOutlineDistance = 5.0f, kMaxOutlineDistance = 50.0f; // yalms: the game draws no mob past 50
+    constexpr int kMinOutlineThickness = 25, kMaxOutlineThickness = 400; // percent of kOutlineUnitPx
+    constexpr int kMinSmoothness = SmoothnessCopies(SmoothnessLevel::Low), kMaxSmoothness = SmoothnessCopies(SmoothnessLevel::Ultra);
+    constexpr float kMinOutlineDistance = 15.0f, kMaxOutlineDistance = 50.0f; // yalms: the game draws no mob past 50
     constexpr int kMinTextSize = 8, kMaxTextSize = 48;   // pixels: the base and cursor sizes
     constexpr int kDefaultIconSize = 16;                 // pixels: the base icon size
     constexpr int kMinNameRaise = 0, kMaxNameRaise = 40; // pixels
@@ -52,8 +53,10 @@ namespace headsup
     struct Settings
     {
         bool enabled       = true;
-        float thickness    = 1.0f;  // render-target pixels
-        int smoothness     = 4;     // shifted copies per mesh
+        int outlineThickness = 100; // percent of kOutlineUnitPx
+        int outlineOpacity   = 60;  // percent
+        bool outlineFadeIn   = false; // fainter with distance, down to almost nothing at the range
+        int smoothness     = 4;     // shifted copies per mesh: a SmoothnessLevel's
         float maxDistance  = 50.0f; // yalms
         // Which elements and statuses get badges, as BadgeRules has them.
         int elementWeakRank   = BadgeRules{}.elementWeakRank;

@@ -236,20 +236,30 @@ namespace headsup
         EndRow();
     }
 
+    void Form::TakeWhole(const std::string& slider, int& value, int lo, int hi)
+    {
+        const FormEvent* moved = Took(slider, kChangeEvent);
+        if (moved == nullptr || m_Off) return;
+        const int to = std::clamp(static_cast<int>(std::lround(std::strtof(moved->value.c_str(), nullptr))), lo, hi);
+        if (to == value) return;
+        value   = to;
+        changed = true;
+    }
+
     void Form::SliderInt(const char* label, int& value, int lo, int hi, const char* format, const char* tip)
     {
         const std::string slider = Id(label);
-        if (const FormEvent* moved = Took(slider, kChangeEvent); moved != nullptr && !m_Off)
-        {
-            const int to = std::clamp(static_cast<int>(std::lround(std::strtof(moved->value.c_str(), nullptr))), lo, hi);
-            if (to != value)
-            {
-                value   = to;
-                changed = true;
-            }
-        }
+        TakeWhole(slider, value, lo, hi);
         Slider(slider, label, static_cast<float>(value), static_cast<float>(lo), static_cast<float>(hi), 1.0f,
             Formatted(format, value), tip);
+    }
+
+    void Form::SliderNamed(const char* label, int& value, const char* const* names, int count, const char* tip)
+    {
+        const std::string slider = Id(label);
+        TakeWhole(slider, value, 0, count - 1);
+        Slider(slider, label, static_cast<float>(value), 0.0f, static_cast<float>(count - 1), 1.0f,
+            names[std::clamp(value, 0, count - 1)], tip);
     }
 
     void Form::SliderFloat(const char* label, float& value, float lo, float hi, const char* format, const char* tip)

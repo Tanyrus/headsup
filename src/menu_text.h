@@ -4,6 +4,7 @@
 #include "bar_types.h"
 #include "icons.h"
 #include "native_locate.h"
+#include "outline_math.h"
 #include "plate_settings.h"
 
 #include <algorithm>
@@ -114,6 +115,8 @@ namespace headsup
         "you /check them."}; // by PlayerRow
     const char* const kPetRowTips[kPetRowCount] = {"A pet of yours.", "A pet of someone in your party.",
         "A pet of a friend who is not in your party.", "Anyone else's pet."}; // by PetRow
+
+    const char* const kSmoothnessLabels[kSmoothnessLevelCount] = {"Low", "Medium", "High", "Ultra"}; // by SmoothnessLevel
 
     // What each option of a dropdown does, which it says under the pointer.
     inline const char* PlateModeTip(PlateMode mode)

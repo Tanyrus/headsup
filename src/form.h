@@ -139,6 +139,8 @@ namespace headsup
         }
         void SliderInt(const char* label, int& value, int lo, int hi, const char* format, const char* tip);
         void SliderFloat(const char* label, float& value, float lo, float hi, const char* format, const char* tip);
+        // A slider over a few named steps, the first being 0: it shows the name of the one it is on.
+        void SliderNamed(const char* label, int& value, const char* const* names, int count, const char* tip);
         // A dropdown of the whole numbers from first to last, either way round, each shown as text gives it.
         // option: what each number does, by the number.
         template <typename Name>
@@ -251,6 +253,8 @@ namespace headsup
             const std::string& tip = {});
         // Opens the popup with rows, and tells which of them was clicked.
         bool ListChoice(const std::string& control, std::string rows, int count, int& chosen);
+        // A slider's newest whole value, when it moved.
+        void TakeWhole(const std::string& slider, int& value, int lo, int hi);
         void Slider(const std::string& slider, const char* label, float value, float lo, float hi, float step,
             const std::string& shown, const char* tip);
         // A toggle, and its id.

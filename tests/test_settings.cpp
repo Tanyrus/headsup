@@ -364,7 +364,6 @@ helpBarY=8.0000
         s.smoothness     = 12;
         s.cursorSize     = 31;
         s.nameRaise      = 12;
-        s.thickness      = 6.5f;
         s.maxDistance    = 25.0f;
         s.keepPointerKeys = {0x11, 0x1B, 0x51};
         s.elementWeakRank     = -3;
@@ -424,7 +423,7 @@ helpBarY=8.0000
 
     // The keys of kSavedFile that only an older build's file carries: a migration reads them, or nothing does, and
     // nothing writes them.
-    const char* const kOldKeys[] = {"barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
+    const char* const kOldKeys[] = {"thickness", "barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
         "serverClockZone", "showLabels", "replaceMobNames", "showIcons", "hideInCombat", "hideClaimed", "hideTooWeak",
         "hideWhileEngaged", "markPlaceholders", "fontBold", "nameGlow", "scalePlayerNames",
         "labelFontBold", "showOrnament", "ownGlowColor", "ownOrnamentColor", "labelFontName", "glowSize",
@@ -556,7 +555,7 @@ TEST(clamp_bounds_every_field)
 {
     // The menu relies on Clamp, not on the loader.
     Settings s;
-    s.thickness   = 0.0f;
+    s.outlineThickness = 0;
     s.smoothness  = 99;
     s.maxDistance = 1000.0f;
     s.cursorSize  = 2;
@@ -576,9 +575,17 @@ TEST(clamp_bounds_every_field)
     const Color clamped{{1.0f, 0.0f, 0.5f}};
     for (const Color& each : {c.weakBadgeColor, c.resistBadgeColor, c.rankBadgeColor, c.immuneBadgeColor, c.cursorEdgeColor})
         CHECK(each == clamped);
-    CHECK_EQ(c.thickness, kMinThickness);
+    CHECK_EQ(c.outlineThickness, kMinOutlineThickness);
     CHECK_EQ(c.smoothness, kMaxSmoothness);
     CHECK_EQ(c.maxDistance, kMaxOutlineDistance);
+    // The smoothness is one of the four levels, and an outline's range no nearer than 15 yalms.
+    Settings between;
+    between.smoothness     = 9;
+    between.maxDistance    = 5.0f;
+    between.outlineOpacity = 0;
+    CHECK_EQ(Clamp(between).smoothness, 8);
+    CHECK_EQ(Clamp(between).maxDistance, 15.0f);
+    CHECK_EQ(Clamp(between).outlineOpacity, kMinOpacity);
     CHECK_EQ(c.cursorSize, kMinTextSize);
     CHECK_EQ(c.nameRaise, kMaxNameRaise);
     CHECK(c.elementWeakRank == -1 && c.elementResistRank == 1 && c.maxElements == kElementCount);
@@ -593,6 +600,7 @@ TEST(non_finite_values_fall_back_to_defaults)
 {
     MapStore store;
     store.values["thickness"]   = "nan";
+    store.values["outlineThickness"] = "inf";
     store.values["smoothness"]  = "nan";
     store.values["maxDistance"] = "inf";
     store.values["iconSize"]    = "nan";
@@ -1601,7 +1609,7 @@ TEST(the_first_save_passes_on_what_the_file_holds_otherwise_than_a_save_writes_i
     MapStore file = SavedByThisBuild();
     file.values["scaleMin"] = "300.0000";
     file.values["scaleMax"] = "10.0000";
-    file.values["thickness"] = "6.5"; // typed by hand, as a save does not spell it
+    file.values["maxDistance"] = "25.5"; // typed by hand, as a save does not spell it
     file.values.erase("barHeight");   // and a key taken out
     ChangedKeys keys(file);
     const Settings s = keys.Load();
@@ -1610,7 +1618,7 @@ TEST(the_first_save_passes_on_what_the_file_holds_otherwise_than_a_save_writes_i
     std::map<std::string, std::string> passed;
     for (const KeyText& k : keys.Save(s))
         passed[k.key] = k.text;
-    CHECK((passed == std::map<std::string, std::string>{{"scaleMax", "300.0000"}, {"thickness", "6.5000"},
+    CHECK((passed == std::map<std::string, std::string>{{"scaleMax", "300.0000"}, {"maxDistance", "25.5000"},
                          {"barHeight", "45.0000"}})); // the default height, as the file had none
     CHECK(file.values == WholeSave(s));
 }
@@ -1655,7 +1663,7 @@ TEST(a_file_an_older_or_earlier_build_saved_is_owed_a_save_that_gives_it_the_ver
     CHECK(!OutdatedWhenLoaded(MapStore{}));
     // A value edited by hand waits for a save like any other.
     MapStore edited = SavedByThisBuild();
-    edited.values["thickness"] = "99.0000";
+    edited.values["maxDistance"] = "99.0000";
     CHECK(!OutdatedWhenLoaded(edited));
 }
 
@@ -1732,10 +1740,10 @@ TEST(a_run_of_failed_saves_is_said_once_and_so_is_the_save_that_ends_it)
 TEST(reads_go_straight_through_to_the_store_behind)
 {
     MapStore file = SavedByThisBuild();
-    file.values["thickness"] = "99.0000"; // edited by hand: Load clamps what it returns, not what the store holds
+    file.values["maxDistance"] = "99.0000"; // edited by hand: Load clamps what it returns, not what the store holds
     ChangedKeys keys(file);
-    CHECK_EQ(keys.Load().thickness, kMaxThickness);
-    CHECK_EQ(keys.GetFloat("thickness", 1.0f), 99.0f);
+    CHECK_EQ(keys.Load().maxDistance, kMaxOutlineDistance);
+    CHECK_EQ(keys.GetFloat("maxDistance", 1.0f), 99.0f);
     CHECK(!keys.GetBool("enabled", true)); // kSavedFile's
     CHECK_EQ(keys.GetString("badgeFontName", "none"), "Tahoma");
     CHECK(keys.GetBool("missing", true) && !keys.GetBool("missing", false));
@@ -1892,6 +1900,41 @@ TEST(an_ornament_saved_as_a_switch_and_two_lines_is_where_it_was)
     SaveSettings(top, file);
     CHECK(std::ranges::find(file.sets, "npcsOrnamentOn") == file.sets.end());
     CHECK(std::ranges::find(file.sets, "npcsOrnamentPlace") == file.sets.end());
+}
+
+TEST(a_number_of_before_is_converted_in_a_store_that_adds_what_a_typed_read_misses)
+{
+    // Ashita's typed getters add a key the file lacks with the default they were given. A number with a new key
+    // read through one would then be held as that default, and the look of before under its old key never read.
+    MapStore file = Version3File(Settings{},
+        {{"mobsLine3Shadow", "150.0000"}, {"mobsLine1IconSize", "30.0000"}, {"npcsOrnamentOn", "true"},
+            {"npcsOrnamentPlace", "lines12"}, {"petsRowPetPlate", "hidden"}},
+        {"mobsLine3ShadowStrength", "mobsLine1IconScale", "npcsOrnamentVisibility",
+            "petsRowYourPetPlate", "petsRowPartyPetPlate", "petsRowFriendPetPlate", "petsRowOthersPetPlate"});
+    file.addsDefaults = true;
+    const Settings loaded = LoadSettings(file);
+    CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[2].shadow, 100);
+    CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[0].iconSize, 30 * loaded.baseSize / loaded.baseIconSize);
+    CHECK(loaded.Kind(PlateKind::Npcs).ornament.place == OrnamentPlace::AboveMiddle);
+    for (int row = 0; row < kPetRowCount; ++row)
+        CHECK(loaded.Kind(PlateKind::Pets).rows[row].plate == PlateMode::Hidden);
+}
+
+TEST(an_outlines_thickness_in_pixels_is_left_behind_for_the_percent)
+{
+    // The thickness was pixels, one by default, and is a percent of four pixels now. What a file held in pixels is
+    // not carried over: every file starts at 100 percent, and the pixels are never read or written again.
+    for (const char* pixels : {"1.0000", "6.5000", "16.0000"})
+    {
+        MapStore file = Version3File(Settings{}, {{"thickness", pixels}}, {"outlineThickness"});
+        CHECK_EQ(LoadSettings(file).outlineThickness, 100);
+    }
+    Settings thick;
+    thick.outlineThickness = 250;
+    MapStore file = Version3File(thick, {{"thickness", "1.0000"}}, {});
+    CHECK_EQ(LoadSettings(file).outlineThickness, 250);
+    SaveSettings(thick, file);
+    CHECK(std::ranges::find(file.sets, "thickness") == file.sets.end());
 }
 
 TEST(the_one_pet_row_of_before_becomes_all_four)

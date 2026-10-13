@@ -63,6 +63,7 @@ namespace headsup
         bool outline       = false;
         uint8_t stencilRef = 0;     // 1 to kMaxStencilRef when outlined
         uint32_t argb      = 0;     // the outline's D3DCOLOR
+        uint8_t outlineAlpha = 0xFF; // and how opaque it is drawn
         uint16_t index     = 0;     // entity target index
         uint32_t serverId    = 0;       // the mob data key
         const MobRecord* mob = nullptr; // a mob's Phoenix record, when it has one
