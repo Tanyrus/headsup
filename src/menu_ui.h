@@ -676,7 +676,7 @@ namespace headsup
             char name[80];
             for (int tab = 0; tab < count; ++tab)
             {
-                const TabPlace place       = TabAt(tab, columns, strip, height, gap);
+                const TabPlace place       = TabAt(tab, count, columns, strip, height, gap);
                 const float x = left + place.x, top = first + place.y, width = place.width;
                 const ButtonColors& colors = tab == picked ? kAccentButton : kRaised;
                 // A button rounds all four corners: squares in its color lie under the lower two, as grounds, since a
@@ -689,9 +689,14 @@ namespace headsup
                 }
                 gui->SetCursorPos(ImVec2(x, top));
                 std::snprintf(name, sizeof(name), "%s##%s %d", labels[tab], id, tab);
+                // No padding at the sides: ImGui centers a label only in the room its padding leaves, and starts one
+                // that does not fit there at the left.
+                const float padding  = style.FramePadding.x;
+                style.FramePadding.x = 0.0f;
                 if (WithText(tab == picked ? kText : kMuted,
                         [&] { return Shape(name, ImVec2(width, height), colors, corner); }))
                     chosen = tab;
+                style.FramePadding.x = padding;
             }
             const float tall = static_cast<float>(rows) * height + static_cast<float>(rows - 1) * gap;
             gui->BeginDisabled(true);

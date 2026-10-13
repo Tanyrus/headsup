@@ -53,13 +53,14 @@ namespace headsup
     std::vector<BarWidget> WidgetTabs();
     // How many tabs go in a row for count of them in rows rows: the rows as even as they come, the first the fuller.
     int TabsPerRow(int count, int rows);
-    // Where a tab goes in a strip of equal tabs, perRow to a row, gap apart sideways and between rows: from the
-    // strip's top left, with the width every tab has. A full row ends at the strip's right edge.
+    // Where a tab goes in a strip of count tabs, perRow to a row, gap apart sideways and between rows: from the
+    // strip's top left, with its width. The tabs of a row are equal and fill the strip, so a last row with fewer has
+    // wider ones.
     struct TabPlace
     {
         float x = 0.0f, y = 0.0f, width = 0.0f;
     };
-    TabPlace TabAt(int tab, int perRow, float strip, float height, float gap);
+    TabPlace TabAt(int tab, int count, int perRow, float strip, float height, float gap);
 
     // The Clock widget's Time Zone dropdown: the computer's own zone first, as no zone picked, then every ClockZone.
     constexpr int kClockZoneChoices = kClockZoneCount + 1;

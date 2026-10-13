@@ -91,12 +91,12 @@ namespace headsup
 
     int TabsPerRow(int count, int rows) { return std::max(1, (count + std::max(rows, 1) - 1) / std::max(rows, 1)); }
 
-    TabPlace TabAt(int tab, int perRow, float strip, float height, float gap)
+    TabPlace TabAt(int tab, int count, int perRow, float strip, float height, float gap)
     {
-        const int columns = std::max(perRow, 1);
-        const float width = (strip - gap * static_cast<float>(columns - 1)) / static_cast<float>(columns);
-        return TabPlace{static_cast<float>(tab % columns) * (width + gap),
-            static_cast<float>(tab / columns) * (height + gap), width};
+        const int columns = std::max(perRow, 1), row = tab / columns;
+        const int inRow   = std::clamp(count - row * columns, 1, columns);
+        const float width = (strip - gap * static_cast<float>(inRow - 1)) / static_cast<float>(inRow);
+        return TabPlace{static_cast<float>(tab % columns) * (width + gap), static_cast<float>(row) * (height + gap), width};
     }
 
     int ClockZoneChoice(const std::optional<ClockZone>& zone) { return zone ? static_cast<int>(*zone) + 1 : 0; }
