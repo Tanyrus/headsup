@@ -42,7 +42,7 @@ jobs:
         shell: bash
     steps:
       - name: Install the toolchain
-        run: pacman -Syu --noconfirm --needed git gcc mingw-w64-gcc python
+        run: pacman -Syu --noconfirm --needed git gcc mingw-w64-gcc python cmake ninja curl
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.find.outputs.tag }}
@@ -56,6 +56,8 @@ jobs:
             echo "src/plugin.cpp's kVersion is not $version, the major.minor of tag $TAG" >&2
             exit 1
           fi
+      - name: Build RmlUi and FreeType
+        run: tools/rmlui/build.sh
       - name: Build and test
         run: ./build.sh plugin
       - uses: actions/upload-artifact@v4

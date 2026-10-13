@@ -1,5 +1,7 @@
 #include "gpu.h"
 
+#include "screen_vertex.h"
+
 #include "game_glyphs.h"
 #include "utf16.h"
 
@@ -12,14 +14,7 @@ namespace headsup
 {
     namespace
     {
-        struct QuadVertex
-        {
-            float x, y, z, rhw;
-            DWORD color;
-            float u, v;
-        };
-        constexpr DWORD kQuadFvf     = D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1;
-        constexpr float kPixelCenter = 0.5f; // Direct3D 8 samples pixel centers at half-pixel offsets
+        constexpr DWORD kQuadFvf = D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1;
     }
 
     IDirect3DTexture8* CreateTexture(IDirect3DDevice8* device, const void* bgra, int width, int height, float& u,
@@ -245,10 +240,10 @@ namespace headsup
         const float left = quad.x - kPixelCenter, top = quad.y - kPixelCenter;
         const float right = left + quad.width, bottom = top + quad.height;
         const float z     = depthTest ? quad.depth : 0.0f;
-        const QuadVertex v[kQuadVertices] = {{left, top, z, 1.0f, quad.tint, quad.u0, 0.0f},
+        const ScreenVertex v[kQuadVertices] = {{left, top, z, 1.0f, quad.tint, quad.u0, 0.0f},
             {right, top, z, 1.0f, quad.tint, quad.u1, 0.0f}, {left, bottom, z, 1.0f, quad.tint, quad.u0, quad.v},
             {right, bottom, z, 1.0f, quad.tint, quad.u1, quad.v}};
         device->SetTexture(0, quad.texture);
-        device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, kQuadVertices - 2, v, sizeof(QuadVertex));
+        device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, kQuadVertices - 2, v, sizeof(ScreenVertex));
     }
 }

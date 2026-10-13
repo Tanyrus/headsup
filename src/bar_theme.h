@@ -52,6 +52,7 @@ namespace headsup
         float popupPadding; // 0.36 H, following the popup's text size
         float rowGap;       // 0.11 H between popup rows, following the popup's text size
         float panelRadius;  // ornate 0.11 H, pills 0.28 H, following the popup's text size
+        bool operator==(const BarMetrics&) const = default;
     };
     BarMetrics MetricsFor(int barHeight, BarShape shape, int barText = kAutoBarTextSize,
         int popupText = kAutoPopupTextSize);

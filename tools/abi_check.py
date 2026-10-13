@@ -19,7 +19,7 @@ SDK = ROOT / 'third_party' / 'ashita-sdk'
 SOURCE = ROOT / 'src'
 CALLED_INTERFACES = ['IAshitaCore', 'IMemoryManager', 'IEntity', 'IParty', 'IPlayer', 'IChatManager',
                      'IConfigurationManager', 'IGuiManager', 'ITarget', 'IProperties',
-                     'IInputManager', 'IMouse', 'IInventory',
+                     'IInputManager', 'IMouse', 'IKeyboard', 'IInventory',
                      'IPacketManager', 'IResourceManager', 'IFontManager', 'IPrimitiveManager']
 NOT_CALLED = {'ILogManager'}  # handed to the plugin, never called
 # Calls are matched by name alone: these share a name with a call on another interface and are never made on this one.

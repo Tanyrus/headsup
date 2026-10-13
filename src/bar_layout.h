@@ -37,6 +37,7 @@ namespace headsup
     struct BarRow
     {
         float y = 0.0f, height = 0.0f;
+        bool operator==(const BarRow&) const = default;
     };
     // The row the pills, the ornate target's frame and a hovered ornate widget's tint take: whole pixels, centered in
     // the strip above its bottom line.
@@ -54,6 +55,7 @@ namespace headsup
         bool twoLines = false;               // false: the row is too short for both, and titles show alone
         float titleY = 0.0f, detailY = 0.0f; // the title over the detail line
         float aloneY = 0.0f;                 // a title without one
+        bool operator==(const TextRow&) const = default;
     };
     // Placed by their ink, which ink gives for the title's or the detail's font at a size: the title's top to the
     // detail's bottom, with at least 3 px between the title's descenders and the detail's top, centered in the pill

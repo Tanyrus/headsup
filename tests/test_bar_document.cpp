@@ -1,0 +1,251 @@
+#include "bar_document.h"
+#include "test.h"
+
+#include <string>
+
+using namespace headsup;
+
+namespace
+{
+    BarLook LookOf(BarTheme theme, const Settings& settings)
+    {
+        const BarPalette& p = PaletteOf(theme);
+        const BarMetrics m  = MetricsFor(45, p.shape);
+        return BarLook{p, settings, m, PillRow(m), TextRow{13, 11, true, 10.0f, 24.0f, 12.0f},
+            BarTitleFont(settings, p.shape), p.shape == BarShape::Ornate, BarTextFont(settings)};
+    }
+
+    // Line boxes 16 and 14 px tall, the title's top at row 9 over a detail at row 23, or alone at row 14.
+    BarTextPlace Place()
+    {
+        return BarTextPlace{BarLinePlace{16, 9.0f, 14.0f, 2.0f}, BarLinePlace{17, 8.0f, 13.0f, 1.0f},
+            BarLinePlace{14, 23.0f, 0.0f, 3.0f}};
+    }
+
+    bool Has(const std::string& text, const char* part) { return text.find(part) != std::string::npos; }
+}
+
+TEST(markup_text_is_escaped)
+{
+    CHECK_EQ(EscapedRml("Fish & <Chips> \"here\""), "Fish &amp; &lt;Chips&gt; &quot;here&quot;");
+    CHECK_EQ(EscapedRml("plain"), "plain");
+}
+
+TEST(colors_are_written_with_their_alpha_last)
+{
+    CHECK_EQ(RcssColor(0xFFC9A24Au), "#c9a24aff");
+    CHECK_EQ(RcssColor(0x1AC9A24Au), "#c9a24a1a");
+    CHECK_EQ(RcssColor(0x00000000u), "#00000000");
+}
+
+TEST(image_names_round_trip_to_their_images)
+{
+    CHECK_EQ(IconSource(Icon::Link), "hu:icon/4");
+    CHECK_EQ(StripSource(BarTheme::UmbraDark, 45, 13), "hu:strip/1/45/13");
+    CHECK_EQ(DiamondSource(0xFFC9A24Au, 10), "hu:diamond/ffc9a24a/10");
+    CHECK_EQ(CoinSource(17), "hu:coin/17");
+    const std::optional<Image> icon = HostImage("hu:icon/4");
+    CHECK(icon && icon->width == static_cast<int>(IconImage(Icon::Link).width));
+    const std::optional<Image> strip = HostImage("hu:strip/1/45/13");
+    CHECK(strip && strip->width == 1 && strip->height == 45 + 13);
+    const std::optional<Image> diamond = HostImage("hu:diamond/ffc9a24a/10");
+    CHECK(diamond && diamond->width == 10 && diamond->height == 10);
+    CHECK(diamond->argb[5 * 10 + 5] == 0xFFC9A24Au); // its middle pixel is solid in its color
+    const std::optional<Image> coin = HostImage("hu:coin/17");
+    CHECK(coin && coin->width == 17);
+    CHECK(!HostImage("hu:icon/999") && !HostImage("hu:nothing") && !HostImage("icon.png") && !HostImage("hu:strip/9/45/13"));
+}
+
+TEST(the_document_holds_the_strip_the_caps_the_dividers_and_every_placed_widget)
+{
+    Settings settings;
+    const std::string rml = BarDocument(LookOf(BarTheme::PhoenixGold, settings), BarTheme::PhoenixGold, Place());
+    CHECK(Has(rml, "<rml>") && Has(rml, "</rml>") && Has(rml, "<body class=\"ornate\">"));
+    CHECK(Has(rml, "hu:strip/0/45/13")); // 45 rows and 0.28 H below
+    CHECK(Has(rml, "height:59px")); // those, and the gold theme's line under the strip
+    CHECK(Has(rml, "id=\"w-zone\"") && Has(rml, "id=\"w-target\"") && Has(rml, "id=\"w-earthTime\""));
+    CHECK(!Has(rml, "id=\"w-gameHelp\"")); // never on the bar
+    CHECK(Has(rml, "id=\"d-0\"") && Has(rml, "id=\"d-11\"") && !Has(rml, "id=\"d-12\"")); // 13 placed widgets
+    CHECK(Has(rml, "class=\"widget hidden target\" id=\"w-target\""));
+    CHECK(Has(rml, "font-size:13px") && Has(rml, "font-size:11px"));
+    CHECK(Has(rml, "\"Marcellus SC\"") && Has(rml, "\"Barlow Condensed\""));
+    CHECK(Has(rml, "hu:diamond/ffc9a24a/14")); // the end caps in the accent: 1.4 diamonds of 0.22 H, whole pixels
+    CHECK(Has(rml, "hu:diamond/ff8a6d2c/10")); // the dividers in the divider color
+    // The pill row is 36 px from row 4: content starts at row 5, so a title at row 9 sits 4 px under it, alone 9,
+    // and the detail at row 23 comes 23 - (9 + 16) = -2 px after the title's line.
+    CHECK(Has(rml, ".widget{position:absolute;top:4px;height:36px;"));
+    CHECK(Has(rml, "line-height:16px;margin-top:4px;") && Has(rml, ".title.alone{margin-top:9px;}"));
+    CHECK(Has(rml, "line-height:14px;margin-top:-2px;"));
+    // After a title of figures, whose line is 17 px from row 8: 23 - 25 again.
+    CHECK(Has(rml, ".detail.fig{margin-top:-2px;}"));
+    // The target's frame: the accent around the hover tint, 3 px corners.
+    CHECK(Has(rml, ".ornate .widget.target{border-width:1px;margin:0px;padding:0px 13.85px;"
+                   "background-color:#c9a24a1a;border-color:#c9a24aff;border-radius:3px;}"));
+    CHECK(Has(rml, ".ornate .widget.target.lit{background-color:#c9a24a34;")); // twice the tint
+}
+
+TEST(a_pill_theme_frames_each_widget_and_has_no_caps)
+{
+    Settings settings;
+    const std::string rml = BarDocument(LookOf(BarTheme::UmbraDark, settings), BarTheme::UmbraDark, Place());
+    CHECK(Has(rml, "<body class=\"pills\">") && !Has(rml, "cap-right\" src"));
+    // 0.17 H corners, the pill's fill and edge.
+    CHECK(Has(rml, ".pills .widget{background-color:#222226ff;border-color:#3a3a42ff;border-radius:7.65px;}"));
+    CHECK(Has(rml, ".pills .widget.flat{background-color:transparent;border-color:transparent;}"));
+    CHECK(Has(rml, ".pills .widget.lit{background-color:#2a2a30ff;border-color:#5b8defff;"));
+    CHECK(Has(rml, "class=\"widget hidden flat\" id=\"w-zone\"")); // zone and Earth time show no pill until lit
+    CHECK(Has(rml, "class=\"widget hidden\" id=\"w-weather\""));
+    CHECK(Has(rml, "hu:diamond/ff5b8def/10")); // a pill theme's dividers take the accent
+    CHECK(Has(rml, "height:58px")); // no line under this strip
+}
+
+TEST(a_widgets_markup_has_its_icons_coin_lines_and_progress)
+{
+    Settings settings;
+    const BarLook look = LookOf(BarTheme::PhoenixGold, settings);
+    WidgetContent c;
+    c.shown      = true;
+    c.icons      = {Icon::Sight, Icon::Sound};
+    c.coin       = true;
+    c.title      = {Text("Rolanberry <Fields>"), Colored(" [S]", 0xFF6FE36Fu)};
+    c.subtitle   = {Text("Sandy", Tone::Dim)};
+    c.titleIcons = {Icon::Link};
+    c.progress   = 0.25f;
+    const std::string rml = WidgetRml(c, look);
+    CHECK(Has(rml, "<img class=\"icon\" src=\"hu:icon/5\"/>") && Has(rml, "hu:icon/7"));
+    CHECK(Has(rml, "class=\"coin\"") && Has(rml, "hu:coin/17")); // 0.75 of 0.50 H: 16.875
+    CHECK(Has(rml, "Rolanberry &lt;Fields&gt;") && Has(rml, "#6fe36fff") && Has(rml, "#efe3c6ff"));
+    CHECK(Has(rml, "<span class=\"line-icons\"><img class=\"line-icon\" src=\"hu:icon/4\"/></span>"));
+    CHECK(Has(rml, "<div class=\"title\">") && Has(rml, "class=\"detail\"") && Has(rml, "#a8936dff") && Has(rml, "Sandy"));
+    CHECK(Has(rml, "class=\"progress\"") && Has(rml, "width: 25%"));
+    c.progressBeside = true;
+    CHECK(Has(WidgetRml(c, look), "class=\"beside\"") && !Has(WidgetRml(c, look), "class=\"progress\""));
+    c.progress.reset();
+    c.subtitle.clear();
+    c.coin = false;
+    const std::string bare = WidgetRml(c, look);
+    CHECK(!Has(bare, "progress") && !Has(bare, "detail") && !Has(bare, "coin"));
+}
+
+TEST(a_widget_of_figures_takes_the_detail_font_for_its_title)
+{
+    Settings settings;
+    const BarLook look = LookOf(BarTheme::PhoenixGold, settings);
+    WidgetContent c;
+    c.shown   = true;
+    c.title   = {Text("21:07")};
+    c.figures = true;
+    // No second line: the title alone.
+    CHECK(Has(WidgetRml(c, look), "class=\"title figures alone\""));
+    c.figures = false;
+    CHECK(Has(WidgetRml(c, look), "class=\"title alone\""));
+    c.figures  = true;
+    c.subtitle = {Text("Earth", Tone::Dim)};
+    CHECK(Has(WidgetRml(c, look), "class=\"title figures\"") && Has(WidgetRml(c, look), "class=\"detail fig\""));
+}
+
+TEST(the_bars_text_carries_its_shadow)
+{
+    Settings settings;
+    const std::string rml = BarDocument(LookOf(BarTheme::PhoenixGold, settings), BarTheme::PhoenixGold, Place());
+    // A 13 px title's shadow blurs 0.12 of its height: a Gaussian of 0.78 px, which RmlUi makes from a width of 2.
+    // Once in place and once a pixel down, at 60%.
+    CHECK(Has(rml, "font-effect:glow(0px 2px 0px 1px #00000099),glow(0px 2px 0px 0px #00000099);"));
+}
+
+TEST(the_help_bar_is_its_box_and_its_three_texts_centered_on_the_row)
+{
+    Settings settings;
+    const BarLook look = LookOf(BarTheme::PhoenixGold, settings);
+    HelpBarParts parts;
+    parts.row     = HelpBarRow{BarRect{8.0f, 54.0f, 400.0f, 24.0f}, 23.0f, 120.0f, 180.0f};
+    parts.caption = "Items";
+    parts.bag     = Colored("6/30", 0xFF6FE36Fu);
+    parts.help    = "Use <this>";
+    const std::string rml = HelpBarRml(parts, look, Place());
+    // The panel's gradient and gold edge, 0.11 H corners.
+    CHECK(Has(rml, "<div class=\"help-box\" style=\"left:8px;top:54px;width:400px;height:24px;\"></div>"));
+    // A 16 px line in a 24 px row starts 4 px down; the help's 17 px line, 4 (3.5 rounded).
+    CHECK(Has(rml, "<div class=\"p hc\" style=\"left:23px;top:58px;color:#efe3c6ff;\">Items</div>"));
+    CHECK(Has(rml, "<div class=\"p hc\" style=\"left:120px;top:58px;color:#6fe36fff;\">6/30</div>"));
+    CHECK(Has(rml, "<div class=\"p hh\" style=\"left:180px;top:58px;color:#e4d8bdff;\">Use &lt;this&gt;</div>"));
+    settings.helpBarBackground = false;
+    CHECK(!Has(HelpBarRml(parts, look, Place()), "help-box"));
+    parts.row = HelpBarRow{};
+    CHECK(HelpBarRml(parts, look, Place()).empty());
+    const std::string document = BarDocument(look, BarTheme::PhoenixGold, Place());
+    CHECK(Has(document, "id=\"help\"") && Has(document, ".help-box{"));
+    CHECK(Has(document, "decorator:vertical-gradient(#1c160ff7 #0c0a08f7)"));
+}
+
+TEST(a_popup_is_its_panel_and_each_piece_where_the_layout_put_it)
+{
+    Settings settings;
+    const BarLook look = LookOf(BarTheme::PhoenixGold, settings);
+    PopupLayout layout;
+    layout.width  = 220.0f;
+    layout.height = 120.0f;
+    auto piece = [](PopupPiece::Kind kind, float x, float y, float width, float height) {
+        PopupPiece p;
+        p.kind = kind, p.x = x, p.y = y, p.width = width, p.height = height;
+        return p;
+    };
+    PopupPiece card  = piece(PopupPiece::Kind::Card, 16.0f, 40.4f, 188.0f, 60.0f);
+    PopupPiece title = piece(PopupPiece::Kind::Text, 16.4f, 16.6f, 80.0f, 24.0f);
+    title.span = Text("Zone & <more>");
+    title.font = PopupFont::Title;
+    PopupPiece value = piece(PopupPiece::Kind::Text, 100.0f, 50.0f, 30.0f, 18.0f);
+    value.span = Text("50%", Tone::Weak);
+    PopupPiece icon = piece(PopupPiece::Kind::Icon, 20.0f, 50.0f, 19.3f, 19.3f);
+    icon.icon       = Icon::Link;
+    PopupPiece mark = piece(PopupPiece::Kind::ImmuneMark, 30.0f, 60.0f, 12.0f, 12.0f);
+    mark.span       = Text("x", Tone::Immune);
+    const PopupPiece star = piece(PopupPiece::Kind::Star, 140.0f, 52.0f, 14.9f, 14.9f);
+    const PopupPiece rule = piece(PopupPiece::Kind::Rule, 60.0f, 46.0f, 100.0f, 1.0f);
+    const PopupPiece tag  = piece(PopupPiece::Kind::Tag, 20.0f, 80.0f, 50.0f, 21.0f);
+    layout.pieces         = {card, title, value, icon, mark, star, rule, tag};
+    // The title's line box starts 2 px under where the layout put its line; the text's, at it.
+    const PopupFaces faces = {PopupFace{"Marcellus SC", 24, 29, 0, 2.0f}, PopupFace{"Barlow Condensed", 18, 22, 0, 0.0f},
+        PopupFace{"Marcellus SC", 15, 18, 0, 0.0f}, PopupFace{"Marcellus SC", 15, 18, 0, 0.0f}};
+    const std::string rml = PopupRml(layout, look, faces);
+    // The gold theme's panel has a second border 2 px outside it.
+    CHECK(Has(rml, "<div id=\"outer\" style=\"left:-3px;top:-3px;width:226px;height:126px;\"></div>"));
+    CHECK(Has(rml, "<div id=\"panel\" style=\"width:220px;height:120px;\"></div>"));
+    CHECK(Has(rml, "<div class=\"p card\" style=\"left:16px;top:40px;width:188px;height:60px;\"></div>"));
+    CHECK(Has(rml, "<div class=\"p f0\" style=\"left:16px;top:19px;color:#e4d8bdff;\">Zone &amp; &lt;more&gt;</div>"));
+    CHECK(Has(rml, "<div class=\"p f1\" style=\"left:100px;top:50px;color:#66ff66ff;\">50%</div>")); // the weak badge color
+    CHECK(Has(rml, "<img class=\"p\" src=\"hu:icon/4\" style=\"left:20px;top:50px;width:19.3px;height:19.3px;\"/>"));
+    CHECK(Has(rml, "<div class=\"p f1 mark\" style=\"left:30px;top:60px;width:12px;height:12px;line-height:12px;color:#ff4040ff;\">x</div>"));
+    CHECK(Has(rml, "<img class=\"p\" src=\"hu:star/15\" style=\"left:140px;top:52px;width:15px;height:15px;\"/>"));
+    CHECK(Has(rml, "<div class=\"p rule\" style=\"left:60px;top:46px;width:100px;\"></div>"));
+    CHECK(Has(rml, "<div class=\"p tag\" style=\"left:20px;top:80px;width:50px;height:21px;border-radius:10.5px;\"></div>"));
+    // A pill theme's panel has no outer border.
+    const std::string pills = PopupRml(layout, LookOf(BarTheme::UmbraDark, settings), faces);
+    CHECK(!Has(pills, "id=\"outer\""));
+}
+
+TEST(the_popup_document_styles_its_faces_and_boxes_from_the_look)
+{
+    Settings settings;
+    const BarLook look = LookOf(BarTheme::PhoenixRedPills, settings);
+    const PopupFaces faces = {PopupFace{"Barlow Condensed", 24, 29, 0}, PopupFace{"Barlow Condensed", 18, 22, 0},
+        PopupFace{"Barlow Condensed", 15, 18, 2}, PopupFace{"Barlow Condensed", 15, 18, 0}};
+    const std::string rml = PopupDocument(look, faces);
+    CHECK(Has(rml, "pointer-events:none") && Has(rml, "<div id=\"popup\" class=\"hidden\"></div>"));
+    CHECK(Has(rml, ".f0{font-family:\"Barlow Condensed\";font-size:24px;line-height:29px;letter-spacing:0px;"));
+    CHECK(Has(rml, ".f2{font-family:\"Barlow Condensed\";font-size:15px;line-height:18px;letter-spacing:2px;"));
+    // The panel: one fill top to bottom, the theme's faint edge, 0.28 of the popup's unit rounded.
+    CHECK(Has(rml, "#panel{position:absolute;left:0px;top:0px;box-sizing:border-box;border:1px #d2abab33;"
+                   "border-radius:12.6px;decorator:vertical-gradient(#180e0eff #180e0eff);}"));
+    CHECK(Has(rml, ".card{box-sizing:border-box;border:1px #ffffff1e;border-radius:12.6px;background-color:#ffffff12;}"));
+    CHECK(Has(rml, ".tag{box-sizing:border-box;border:1px transparent;background-color:#321f1fff;}"));
+    CHECK(Has(rml, "hu:star/") == false);
+}
+
+TEST(a_star_is_served_in_the_coins_gold)
+{
+    CHECK_EQ(StarSource(15), "hu:star/15");
+    const std::optional<Image> star = HostImage("hu:star/15");
+    CHECK(star && star->width == 15 && star->height == 15);
+    CHECK(star->argb[7 * 15 + 7] == 0xFFE8C35Au); // its middle
+}

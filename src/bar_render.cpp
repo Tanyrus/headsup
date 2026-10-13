@@ -11,33 +11,9 @@ namespace headsup
 {
     namespace
     {
-        constexpr float kShadowStrength  = 0.6f;
-        constexpr float kCapScale        = 1.4f; // an end cap's diamond, in diamonds
-        constexpr int kOuterGap          = 2; // an ornate popup's outer border
-        constexpr uint32_t kCoinColor    = 0xFFE8C35A;
-        constexpr uint32_t kStarColor    = kCoinColor; // a popup's star, in the coin's gold
         constexpr float kRadiusScale     = 100.0f; // an image key keeps a radius in hundredths
         constexpr float kFitSteps        = 10.0f;  // a fitted text's room is kept in tenths of a pixel
         constexpr int kFewLetters        = 3;      // the least of the target's name worth its room on the bar
-        constexpr float kHelpBarShare    = 0.5f;   // of the screen's width, the widest the help bar gets
-        constexpr float kHelpBarMinWidth = 320.0f; // or this on a narrow screen
-        constexpr float kHelpPadShare    = 0.5f;   // of the gap: clear above and below the help bar's row
-        constexpr uint32_t kCardFill     = 0x12FFFFFF; // a popup's section card: white over the panel, faintly
-        constexpr uint32_t kCardEdge     = 0x1EFFFFFF;
-        constexpr float kCardRadius      = 6.0f;
-        constexpr float kLineIconGap     = 2.0f;  // pixels between the icons after a line's text
-        constexpr float kProgressShare   = 0.05f; // of the bar's height, for a widget's progress bar
-        constexpr float kLeastProgress   = 2.0f;
-        constexpr float kProgressInset   = 2.0f;  // pixels from the pill row's foot, inside its border
-        constexpr float kBesideWidth     = 2.0f;  // a bar beside the text: this many bar heights long
-        constexpr float kBesideShare     = 0.14f; // and this tall, of the bar's height
-        float BesideWidth(const BarMetrics& m) { return std::round(m.height * kBesideWidth); }
-        // What a widget's title and detail line can hold, for how far their ink reaches: capitals, figures (taller
-        // than the capitals in Marcellus, and some descend), a "[S]" zone's brackets, the bags' slash, descenders
-        // (Marcellus's Q and J too) and commas; the detail line's ascenders, descenders and comma. Popup text holds
-        // what a detail line does.
-        constexpr const char* kTitleGlyphs  = "H0123456789[]/gjpqyQJ,";
-        constexpr const char* kDetailGlyphs = "Hl0123456789%gjpqy,";
         enum ImageKind : int
         {
             kStrip,
@@ -52,21 +28,6 @@ namespace headsup
         // text never took a color's.
         uint32_t Colored(uint32_t tint, uint32_t color) { return (tint & kAlphaMask) | (color & ~kAlphaMask); }
 
-        // The row the palette draws under a strip, when it has one.
-        float UnderLine(const BarPalette& p) { return p.underLine != 0 ? 1.0f : 0.0f; }
-        // Where the top bar's strip and its under line end.
-        float BarBottom(const BarPalette& p, const BarMetrics& m) { return m.height + UnderLine(p); }
-        // Where the help bar starts: the bar's gap under the top bar, so the two read as separate bars.
-        float HelpBarTop(const BarPalette& p, const BarMetrics& m) { return BarBottom(p, m) + std::round(m.gap); }
-        // As far from the screen's left edge as from the top bar.
-        float HelpBarLeft(const BarMetrics& m) { return std::round(m.gap); }
-        float HelpBarPad(const BarMetrics& m) { return std::round(m.gap * kHelpPadShare); }
-        // The help's text: the detail font at a widget's title size, so the row is one line of the bar's text.
-        TextFace HelpFace(const BarLook& look) { return TextFace{look.detailFont, static_cast<float>(look.lines.title)}; }
-        float HelpBarWidth(float screenWidth)
-        {
-            return std::min(screenWidth, std::max(kHelpBarMinWidth, std::floor(screenWidth * kHelpBarShare)));
-        }
     }
 
     std::string BarRenderer::TakeFailure() { return std::exchange(m_Failure, std::string()); }
@@ -322,6 +283,15 @@ namespace headsup
         m_Gdi.Sweep();
     }
 
+    void BarRenderer::Off()
+    {
+        Release();
+        m_PopupStart  = 0;
+        m_TitlePixels = 0;
+        m_BarBottom   = 0.0f;
+        m_HelpReach.reset();
+    }
+
     BarLayout BarRenderer::PlaceWidgets(const BarLook& look, const BarState& state, float screenWidth,
         Widgets& widgets)
     {
@@ -465,7 +435,7 @@ namespace headsup
         // centered on the row; filled in the accent from the left.
         const BarPalette& p = look.palette;
         const BarMetrics& m = look.metrics;
-        const float height  = std::max(kLeastProgress, std::round(m.height * (beside ? kBesideShare : kProgressShare)));
+        const float height  = ProgressHeight(m, beside);
         const float width   = beside ? BesideWidth(m) : widget.width - 2.0f * m.padding;
         const float x       = beside ? widget.x + widget.width - m.padding - width : widget.x + m.padding;
         const float y       = beside ? std::round(look.row.y + (look.row.height - height) / 2.0f)
@@ -523,10 +493,7 @@ namespace headsup
             MeasuredSize(caption).width, bagWidth, MeasuredSize(help).width);
         // Without its background, the text alone on the game.
         if (look.settings.helpBarBackground)
-            AddBox(BoxPicture(row.box.width, row.box.height,
-                       BoxStyle{.radius = m.panelRadius, .top = p.panelTop, .bottom = p.panelBottom,
-                           .border = p.panelBorder}),
-                row.box.x, row.box.y);
+            AddBox(BoxPicture(row.box.width, row.box.height, HelpBarPanel(look)), row.box.x, row.box.y);
         const auto add = [&](const Texture* t, float x, uint32_t color) {
             AddText(t, x, row.box.y + (row.box.height - MeasuredSize(t).height) / 2.0f, Colored(kWhite, color));
         };
@@ -545,8 +512,7 @@ namespace headsup
         const BarPalette& p       = look.palette;
         const BarMetrics& m       = look.metrics;
         auto measure = [&](const Span& s, PopupFont f) { return MeasuredSize(Text(s.text, look.FaceOf(f))); };
-        const BoxStyle panel{.radius = m.panelRadius, .top = p.panelTop, .bottom = p.panelBottom,
-            .border = p.panelBorder, .outer = p.panelOuter, .outerGap = kOuterGap};
+        const BoxStyle panel = PopupPanel(look);
         // The ornate panel's outer border and the line under the strip count: the gap is from them. The help bar's
         // popup goes under the help bar's box.
         const auto out        = static_cast<float>(OuterPad(panel));
@@ -600,18 +566,12 @@ namespace headsup
             }
             case PopupPiece::Kind::Card:
             {
-                // A section's ground: a lift on the panel, rounded as a pill theme's panel is.
-                const BoxStyle card{.radius = std::max(m.panelRadius, piece.height > 0.0f ? kCardRadius : 0.0f),
-                    .top = kCardFill, .bottom = kCardFill, .border = kCardEdge};
-                AddBox(BoxPicture(piece.width, piece.height, card), px, py);
+                AddBox(BoxPicture(piece.width, piece.height, PopupCard(look)), px, py);
                 break;
             }
             case PopupPiece::Kind::Tag:
             {
-                // A pill in every theme: the ornate ones keep their gold edge around it.
-                const BoxStyle frame = BoxStyle{.radius = piece.height / 2.0f, .top = p.tagFill, .bottom = p.tagFill,
-                    .border = look.ornate ? p.tagBorder : 0u};
-                AddBox(BoxPicture(piece.width, piece.height, frame), px, py);
+                AddBox(BoxPicture(piece.width, piece.height, PopupTag(look, piece.height)), px, py);
                 break;
             }
             }
