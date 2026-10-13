@@ -44,6 +44,7 @@
 #include <chrono>
 #include <cstring>
 #include <deque>
+#include <mutex>
 #include <unordered_map>
 #include <cstdio>
 #include <ctime>
@@ -248,6 +249,8 @@ class HeadsUp final : public IPlugin
     headsup::PlayerJobs m_OwnJobs;                                // yours as the game has them, this frame
     bool m_DebugPending = false;
     bool m_Screenshot = false;
+    std::mutex m_CommandLock;
+    std::vector<std::string> m_Commands; // /hu lines as they came, until the frame that runs them
     headsup::ShotWatch m_Shot;
     headsup::KeyPress m_ShotKey;
     bool m_SceneCopied      = false; // this frame: the first draw to cover the back buffer came
@@ -399,7 +402,26 @@ public:
         if (command == nullptr) return false;
         const std::vector<std::string> args = headsup::SplitLower(command);
         if (args.empty() || (args[0] != "/headsup" && args[0] != "/hu")) return false;
+        // A queued command (a script's, another plugin's) comes on a thread of Ashita's, not the game's: what it
+        // does waits for the next frame, on the thread everything else here runs on.
+        const std::lock_guard lock(m_CommandLock);
+        m_Commands.emplace_back(command);
+        return true;
+    }
 
+    void RunCommands()
+    {
+        std::vector<std::string> commands;
+        {
+            const std::lock_guard lock(m_CommandLock);
+            commands.swap(m_Commands);
+        }
+        for (const std::string& command : commands)
+            RunCommand(headsup::SplitLower(command.c_str()), command.c_str());
+    }
+
+    void RunCommand(const std::vector<std::string>& args, [[maybe_unused]] const char* command)
+    {
         if (args.size() == 1)
             MenuOpen() = !MenuOpen();
         else if (args[1] == "on" || args[1] == "off")
@@ -521,7 +543,6 @@ public:
             Print("/hu stripdump: write the game's top-strip text, every level, to logs/headsup");
 #endif
         }
-        return true;
     }
 
     // HeadsUp only reads packets: every one still reaches the game.
@@ -564,6 +585,7 @@ public:
         UNREFERENCED_PARAMETER(window);
         UNREFERENCED_PARAMETER(dirty);
         MeasureFrame();
+        RunCommands();
 #ifdef HEADSUP_DEV
         if (m_DrawDump.NextFrame(Now(), m_Names, m_NameHook, m_Tracker, m_Nameplates)) WriteDrawDump();
         if (headsup::NameDumpReady()) WriteNameDump();
