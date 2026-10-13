@@ -199,6 +199,7 @@ namespace headsup
         // Written at Present and read by OnName, both on the render thread, so never at once.
         IDirect3DDevice8* g_Device = nullptr;
         std::vector<NameOwner> g_Owners; // by actor
+        bool g_HideNames = false;        // every name goes, whatever its owner's action: a clean screenshot's frame
         NameFrame g_Drawn[kMaxEntities];
         uint32_t g_DrawnFrame[kMaxEntities] = {};
         uint32_t g_Frame                    = 1;
@@ -330,8 +331,11 @@ namespace headsup
         g_SceneTarget = nullptr;
         g_SceneDepth  = nullptr;
         std::sort(owners.begin(), owners.end(), [](const NameOwner& a, const NameOwner& b) { return a.actor < b.actor; });
-        g_Owners = std::move(owners);
+        g_Owners    = std::move(owners);
+        g_HideNames = false;
     }
+
+    void NameHook::HideAll() { g_HideNames = true; }
 
     const NameFrame* NameHook::Drawn(uint16_t index) const
     {
@@ -377,6 +381,7 @@ namespace headsup
         if (!Running()) return "";
         const CodePatch jump = std::exchange(m_Patch, {});
         g_Owners.clear(); // the gate then resumes the routine for every name
+        g_HideNames = false;
         return KeptLoaded(PutBack({&jump, 1},
             "the game's name routine was changed again after HeadsUp hooked it, so it was left as it is",
             "the game's name routine could not be put back"));
@@ -861,6 +866,11 @@ extern "C" uint32_t HeadsUpOnName(uint32_t frame)
     g_Drawn[owner->index]      = name;
     g_DrawnFrame[owner->index] = g_Frame;
     ++g_Stats.names;
+    if (g_HideNames)
+    {
+        ++g_Stats.hidden;
+        return 1;
+    }
     if (owner->action == HookAction::Keep) return 0;
     if (owner->action == HookAction::Hide) ++g_Stats.hidden;
     else ++g_Stats.replaced;

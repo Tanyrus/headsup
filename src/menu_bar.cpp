@@ -419,9 +419,22 @@ namespace headsup
     }
 
     void DrawUserInterfacePage(Ui& ui, Settings& s, const MenuStatus& status,
-        std::unordered_set<std::string>& collapsed, WindowList& windows)
+        std::unordered_set<std::string>& collapsed, WindowList& windows, KeyCapture& shotKey)
     {
         ui.Fade(false);
+        // First: the cards under it list every window and run long.
+        if (ui.BeginCard("Screenshot Mode", collapsed, nullptr,
+                "Every name, the top panel and every addon window go, as with /hu screenshot. Ashita's /screenshot "
+                "hide turns it on by itself for its picture."))
+        {
+            std::vector<uint8_t> key;
+            if (s.screenshotKey != 0) key.push_back(static_cast<uint8_t>(s.screenshotKey));
+            DrawKeys(ui, "Key", "Turns screenshot mode on and off. The game sees the key too, so pick one it does not use.",
+                key, 1, shotKey);
+            s.screenshotKey = key.empty() ? 0 : key.front();
+            ui.Switch("Hide game windows", s.screenshotHidesGame, "The game's own windows and chat go too.");
+            ui.EndCard();
+        }
         if (ui.BeginCard("Window Groups", collapsed))
         {
             DrawWindowGroups(ui, s);

@@ -56,6 +56,8 @@ namespace headsup
         // At the end of Present, once everything has read the frame's names: forget them, and say whose the next
         // frame's are.
         void NewFrame(std::vector<NameOwner> owners);
+        // From now to the next NewFrame every name the game draws goes, whatever its owner's action.
+        void HideAll();
         NameStats Stats() const;
         // The frame of the name the game drew for this entity this frame, or nullptr.
         const NameFrame* Drawn(uint16_t index) const;

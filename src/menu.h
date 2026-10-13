@@ -58,6 +58,9 @@ namespace headsup
         char friendName[kMaxCharacterName + 1] = {};
     };
 
+    // Whether a key is down now, by its virtual-key code.
+    bool KeyDown(uint8_t vk);
+
     // A font file in Windows' Fonts folder.
     std::string WindowsFontPath(const char* file);
 
@@ -103,7 +106,8 @@ namespace headsup
         std::vector<std::string> m_Installed; // the thread's, read once it has ended
         void* m_FontThread = nullptr;
         bool m_FontsAsked  = false;
-        KeyCapture m_KeyCapture;
+        KeyCapture m_KeyCapture;     // the Mouse Cursor page's
+        KeyCapture m_ShotKeyCapture; // screenshot mode's
         WindowList m_Windows;
         DesignEditor m_Design;
         ImFont* m_TextFont  = nullptr;

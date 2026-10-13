@@ -1,4 +1,6 @@
 #include "copy_state.h"
+
+#include <array>
 #include "test.h"
 
 using namespace headsup;
@@ -72,4 +74,43 @@ TEST(a_viewport_moved_or_resized_is_reported_once)
     CopyState taller      = SceneCopy();
     taller.viewportHeight = 2048;
     CHECK_EQ(StatesNotRestored(SceneCopy(), taller), "viewport");
+}
+
+namespace
+{
+    // A pretransformed vertex as the game's copies carry it: x, y, z, rhw, a color and one texture coordinate.
+    struct QuadVertex
+    {
+        float x, y, z, rhw;
+        uint32_t color;
+        float u, v;
+    };
+    std::array<QuadVertex, 4> Quad(float x0, float y0, float x1, float y1)
+    {
+        return {{{x0, y0, 0, 1, 0, 0, 0}, {x1, y0, 0, 1, 0, 1, 0}, {x0, y1, 0, 1, 0, 0, 1}, {x1, y1, 0, 1, 0, 1, 1}}};
+    }
+    bool Covers(const std::array<QuadVertex, 4>& quad, float width, float height)
+    {
+        return CoversTarget(quad.data(), 4, sizeof(QuadVertex), width, height);
+    }
+}
+
+// From a draw dump of the test client (2026-10-12, a 2560 by 1440 back buffer): the scene's copy is a quad from
+// (-0.5, -0.5) to (2559.5, 1439.5), the interface's over it from (0, 0) to (2560, 1440), and the quad after them 16
+// pixels square at (329.5, 47.5).
+TEST(the_copies_to_the_back_buffer_cover_it_and_smaller_quads_do_not)
+{
+    CHECK(Covers(Quad(-0.5f, -0.5f, 2559.5f, 1439.5f), 2560.0f, 1440.0f));
+    CHECK(Covers(Quad(0.0f, 0.0f, 2560.0f, 1440.0f), 2560.0f, 1440.0f));
+    CHECK(!Covers(Quad(329.5f, 47.5f, 345.5f, 63.5f), 2560.0f, 1440.0f));
+    CHECK(!Covers(Quad(0.0f, 0.0f, 2560.0f, 720.0f), 2560.0f, 1440.0f));  // the upper half
+    CHECK(!Covers(Quad(0.0f, 720.0f, 2560.0f, 1440.0f), 2560.0f, 1440.0f)); // the lower half
+    CHECK(!Covers(Quad(0.0f, 0.0f, 1280.0f, 1440.0f), 2560.0f, 1440.0f));   // the left half
+    CHECK(!Covers(Quad(0.0f, 0.0f, 1920.0f, 1080.0f), 2560.0f, 1440.0f)); // a smaller image's own full quad
+    CHECK(!Covers(Quad(2.0f, 0.0f, 2560.0f, 1440.0f), 2560.0f, 1440.0f)); // two pixels short at the left
+    CHECK(!CoversTarget(nullptr, 4, sizeof(QuadVertex), 2560.0f, 1440.0f));
+    const auto quad = Quad(0.0f, 0.0f, 2560.0f, 1440.0f);
+    CHECK(!CoversTarget(quad.data(), 0, sizeof(QuadVertex), 2560.0f, 1440.0f));
+    CHECK(!CoversTarget(quad.data(), 4, 4, 2560.0f, 1440.0f)); // a stride with no room for x and y
+    CHECK(!Covers(quad, 0.0f, 0.0f));                         // no back buffer known
 }

@@ -8,6 +8,7 @@
 namespace headsup
 {
     // Keys are Windows virtual-key codes, and left and right Ctrl, Shift and Alt are one key each.
+    constexpr uint8_t kFirstKey = 0x08, kLastKey = 0xFE;
     uint8_t NormalizeKey(uint8_t vk);
     bool MouseButton(uint8_t vk);
 
@@ -17,11 +18,25 @@ namespace headsup
 
     std::string KeyName(uint8_t vk);
 
+    // The key a code names once normalized, or 0 when it is no key: a mouse button, or past either end.
+    uint8_t BindableKey(int vk);
+
+    // One chosen key's presses, each counted once. A key just chosen counts as held: choosing it was a press.
+    class KeyPress
+    {
+    public:
+        bool Pressed(uint8_t key, bool down);
+
+    private:
+        uint8_t m_Key = 0;
+        bool m_Down   = false;
+    };
+
     // Every key down, once each and normalized, from a test of one key (GetAsyncKeyState in the plugin).
     template <typename Down>
     std::vector<uint8_t> HeldKeys(Down down)
     {
-        constexpr uint8_t kFirstKey = 0x08, kLastKey = 0xFE, kFirstSided = 0xA0, kLastSided = 0xA5;
+        constexpr uint8_t kFirstSided = 0xA0, kLastSided = 0xA5;
         std::vector<uint8_t> held;
         for (unsigned vk = kFirstKey; vk <= kLastKey; ++vk)
         {

@@ -337,6 +337,8 @@ barCenter=
 barRight=target gil bags connection fps earthTime
 hideHelpBar=true
 hideNetstat=true
+screenshotKey=121.0000
+screenshotHidesGame=false
 movedWindows=equip levmerit
 windowOffsets=equip:10,-20
 windowGroups=Bags:0,30,1:inventor+iteminfo
@@ -402,6 +404,8 @@ helpBarY=8.0000
         s.popupTextSize = 20;
         s.hideHelpBar  = true;
         s.hideNetstat  = true;
+        s.screenshotKey       = 0x79; // F10
+        s.screenshotHidesGame = false;
         s.movedWindows = {"equip", "levmerit"};
         for (int w = 0; w < kBarWidgetCount; ++w)
             s.barWidgets[w] = !kBarWidgetDefaults[w];
@@ -734,6 +738,22 @@ TEST(the_keys_that_keep_the_pointer_are_real_keys_once_each_and_not_too_many)
     MapStore odd;
     odd.values = {{"keepPointerKeys", "11 zz 1B 999"}};
     CHECK(LoadSettings(odd).keepPointerKeys == (std::vector<uint8_t>{0x11, 0x1B}));
+}
+
+TEST(the_screenshot_key_is_one_real_key_or_none)
+{
+    Settings s;
+    CHECK_EQ(s.screenshotKey, 0);
+    CHECK(s.screenshotHidesGame);
+    s.screenshotKey = 0xA3; // right Ctrl
+    CHECK_EQ(Clamp(s).screenshotKey, 0x11);
+    s.screenshotKey = 0x02; // the right mouse button
+    CHECK_EQ(Clamp(s).screenshotKey, 0);
+    s.screenshotKey = 999;
+    CHECK_EQ(Clamp(s).screenshotKey, 0);
+    MapStore odd;
+    odd.values = {{"screenshotKey", "zz"}};
+    CHECK_EQ(LoadSettings(odd).screenshotKey, 0);
 }
 
 TEST(a_file_from_before_the_badge_group_takes_its_defaults)

@@ -92,6 +92,8 @@ namespace headsup
         BarPlacement barSections = DefaultPlacement(); // where each widget sits, by BarSection
         bool hideHelpBar = false; // skip the game's own help bar across the top of the screen
         bool hideNetstat = false; // and its connection readout (S, R and %) at the top right
+        int screenshotKey        = 0;    // the virtual-key code that turns screenshot mode on and off, 0 for none
+        bool screenshotHidesGame = true; // screenshot mode takes the game's own windows and chat too
         // The game's windows moved out from under Game help's bar, by short name (native_locate.h's ShortName).
         std::vector<std::string> movedWindows = DefaultMovedWindows();
         int untargetedOpacity = 100; // percent: other mobs' plates while you have a target
