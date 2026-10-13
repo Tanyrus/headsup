@@ -107,7 +107,7 @@ namespace headsup
         constexpr const char* kDesignsSavedKey = "nameplateDesigns";
         constexpr const char* kBarThemeKey = "barTheme";
         const char* const kBarThemeNames[kBarThemeCount] = {"phoenixGold", "umbraDark", "phoenixRedOrnate",
-            "phoenixRedPills"};
+            "phoenixRedPills", "aurora"};
         constexpr const char* kBarCurrencyKey = "barCurrency";
         constexpr const char* kClockServerTimeKey = "clockServerTime";
         // Server time was a widget of its own, with this switch.
@@ -120,6 +120,10 @@ namespace headsup
         constexpr const char* kTargetDetailsKey = "barTargetDetails";
         constexpr const char* kMenuFontKey      = "menuFont";
         constexpr const char* kMenuScaleKey     = "menuScale";
+        constexpr const char* kMenuThemeKey     = "menuTheme";
+        const char* const kMenuThemeNames[kMenuThemeCount] = {"phoenix", "aurora"};
+        constexpr const char* kMenuXKey = "menuX", *kMenuYKey = "menuY", *kMenuWidthKey = "menuWidth",
+                              *kMenuHeightKey = "menuHeight";
         constexpr const char* kSecondLineSuffix = "Line2";
         constexpr const char* kIconsSuffix      = "Icons";
         constexpr const char* kExpBarKey        = "expBar";
@@ -960,6 +964,9 @@ namespace headsup
         if (static_cast<int>(s.barSubtitle) >= kSubtitlePlaceCount) s.barSubtitle = d.barSubtitle;
         if (MenuFontNamed(s.menuFont) == nullptr) s.menuFont = d.menuFont;
         s.menuScale = std::clamp(s.menuScale, kMinMenuScale, kMaxMenuScale);
+        if (static_cast<int>(s.menuTheme) >= kMenuThemeCount) s.menuTheme = d.menuTheme;
+        for (int* side : {&s.menuX, &s.menuY, &s.menuWidth, &s.menuHeight})
+            *side = std::clamp(*side, 0, kMaxMenuSide);
         if (static_cast<int>(s.barSeparators) >= kBarSeparatorsCount) s.barSeparators = d.barSeparators;
         ClampDesigner(s, d);
         for (StatusBadgeRule& status : s.statusBadges)
@@ -1008,6 +1015,13 @@ namespace headsup
         s.barTargetDetails = store.GetBool(kTargetDetailsKey, s.barTargetDetails);
         s.menuFont         = store.GetString(kMenuFontKey, s.menuFont.c_str());
         s.menuScale        = LoadInt(store, kMenuScaleKey, s.menuScale);
+        const std::string menuTheme = store.GetString(kMenuThemeKey, "");
+        for (int t = 0; t < kMenuThemeCount; ++t)
+            if (menuTheme == kMenuThemeNames[t]) s.menuTheme = static_cast<MenuTheme>(t);
+        s.menuX      = LoadInt(store, kMenuXKey, s.menuX);
+        s.menuY      = LoadInt(store, kMenuYKey, s.menuY);
+        s.menuWidth  = LoadInt(store, kMenuWidthKey, s.menuWidth);
+        s.menuHeight = LoadInt(store, kMenuHeightKey, s.menuHeight);
         const std::string clockZone = store.GetString(kClockZoneKey, "");
         for (int z = 0; z < kClockZoneCount; ++z)
             if (clockZone == kClockZoneNames[z]) s.clockZone = static_cast<ClockZone>(z);
@@ -1093,6 +1107,11 @@ namespace headsup
         setBool(kTargetDetailsKey, s.barTargetDetails);
         store.Set(kMenuFontKey, s.menuFont.c_str());
         setFloat(kMenuScaleKey, static_cast<float>(s.menuScale));
+        store.Set(kMenuThemeKey, kMenuThemeNames[static_cast<int>(s.menuTheme)]);
+        setFloat(kMenuXKey, static_cast<float>(s.menuX));
+        setFloat(kMenuYKey, static_cast<float>(s.menuY));
+        setFloat(kMenuWidthKey, static_cast<float>(s.menuWidth));
+        setFloat(kMenuHeightKey, static_cast<float>(s.menuHeight));
         for (int w = 0; w < kBarWidgetCount; ++w)
         {
             const std::string key = kBarWidgetKeys[w];

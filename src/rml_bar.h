@@ -195,7 +195,7 @@ namespace headsup
         PopupDocumentKey m_PopupDocumentKey;
         Rml::Element* m_Popup = nullptr;
         bool m_PopupMarked    = false; // its markup is the layout's
-        Px m_PopupLeft, m_PopupTop;
+        Px m_PopupLeft, m_PopupTop, m_PopupWidth, m_PopupHeight;
         Memo<PopupKey, PopupLayout> m_PopupLayout;
         PopupFaces m_PopupFaces;
         std::vector<FaceLine> m_FaceLines;

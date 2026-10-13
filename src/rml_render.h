@@ -40,6 +40,9 @@ namespace headsup
         void ReleaseTexture(Rml::TextureHandle texture) override;
         void EnableScissorRegion(bool enable) override;
         void SetScissorRegion(Rml::Rectanglei region) override;
+        // Transforms move the vertices as they are placed: turned, scaled and sliding elements, with nothing more
+        // asked of Direct3D. What a transformed element clips is not clipped.
+        void SetTransform(const Rml::Matrix4f* transform) override;
 
         // A texture Direct3D refused, once.
         std::string TakeFailure();
@@ -66,6 +69,7 @@ namespace headsup
         bool m_NothingVisible = false; // the scissor leaves no pixel: nothing is drawn
         D3DVIEWPORT8 m_GameViewport{};
         bool m_Textured = true; // the color stage reads the texture; untextured geometry takes its vertex colors
+        std::optional<Rml::Matrix4f> m_Transform;
         std::vector<ScreenVertex> m_Placed;
         std::vector<uint32_t> m_Pixels;
         std::string m_Failure;

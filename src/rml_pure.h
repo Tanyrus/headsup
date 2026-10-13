@@ -16,6 +16,10 @@ namespace headsup
     ScreenVertex PlacedVertex(float x, float y, uint8_t r, uint8_t g, uint8_t b, uint8_t a, float u, float v,
         float translateX, float translateY, float shareU, float shareV);
 
+    // A point as a transform moves it: the matrix is RmlUi's, sixteen floats column by column, and the point is
+    // divided by the depth it comes out at, as a perspective needs.
+    void Transformed(const float* matrix, float& x, float& y);
+
     // RmlUi's RGBA bytes as the ARGB words an A8R8G8B8 texture holds.
     void ArgbFromRgba(const uint8_t* rgba, size_t pixels, uint32_t* argb);
 

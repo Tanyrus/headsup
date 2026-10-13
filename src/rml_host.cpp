@@ -118,6 +118,17 @@ namespace headsup
         return loaded;
     }
 
+    bool RmlHost::EnsureFontFile(const std::string& name, const std::string& path)
+    {
+        if (!Running() || name.empty()) return false;
+        const std::string key = Rml::StringUtilities::ToLower(name);
+        if (const auto known = m_Fonts.find(key); known != m_Fonts.end()) return known->second;
+        const bool loaded = GetFileAttributesA(path.c_str()) != INVALID_FILE_ATTRIBUTES &&
+                            Rml::LoadFontFace(path, name, Rml::Style::FontStyle::Normal);
+        m_Fonts[key] = loaded;
+        return loaded;
+    }
+
     float RmlHost::TextWidth(const std::string& text, const std::string& family, int pixels, float tracking)
     {
         if (!Running() || text.empty()) return 0.0f;

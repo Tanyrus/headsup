@@ -6,6 +6,7 @@
 #include "bar_theme.h"
 #include "bar_types.h"
 #include "icons.h"
+#include "markup.h"
 #include "plate_image.h"
 #include "popup_layout.h"
 
@@ -17,11 +18,6 @@
 
 namespace headsup
 {
-    // Text as markup takes it: the characters it reads specially become entities.
-    std::string EscapedRml(std::string_view text);
-    // A color as RCSS reads it: #rrggbbaa.
-    std::string RcssColor(uint32_t argb);
-
     // The images the bar's documents name, drawn by the bar's own image code when RmlUi asks for them: an icon by
     // its number, a theme's strip column (its rows and the rows fading below), a diamond or a coin by its pixels.
     constexpr std::string_view kHostSource = "hu:";
@@ -88,7 +84,8 @@ namespace headsup
     constexpr int kPopupFontCount = static_cast<int>(PopupFont::Pin) + 1;
     using PopupFaces = std::array<PopupFace, kPopupFontCount>;
     // The popups' document: an empty popup over the whole screen that takes no clicks, styled from the look.
-    std::string PopupDocument(const BarLook& look, const PopupFaces& faces);
+    std::string PopupDocument(const BarLook& look, const PopupFaces& faces, BarTheme theme);
+    constexpr const char* kOpenClass = "open"; // on a popup while it shows, so what it does as it opens plays each time
     constexpr const char* kPopupId = "popup";
     // A laid out popup's markup, from its top left corner: its panel, then each piece where the layout put it.
     std::string PopupRml(const PopupLayout& layout, const BarLook& look, const PopupFaces& faces);

@@ -40,7 +40,7 @@ namespace headsup
         m_PopupDocument = nullptr;
         m_Popup         = nullptr;
         m_PopupMarked   = false;
-        m_PopupLeft = m_PopupTop = Px{};
+        m_PopupLeft = m_PopupTop = m_PopupWidth = m_PopupHeight = Px{};
     }
 
     const RmlBar::FaceLine& RmlBar::FaceLineOf(RmlHost& host, const char* family, int pixels)
@@ -328,7 +328,8 @@ namespace headsup
             const FaceLine& line = FaceLineOf(host, face.family, pixels);
             m_PopupFaces[f]      = PopupFace{face.family, pixels, line.rmlHeight, face.tracking, line.drop};
         }
-        m_PopupDocument = host.Overlay()->LoadDocumentFromMemory(PopupDocument(look, m_PopupFaces), kPopupDocumentName);
+        m_PopupDocument =
+            host.Overlay()->LoadDocumentFromMemory(PopupDocument(look, m_PopupFaces, theme), kPopupDocumentName);
         if (m_PopupDocument == nullptr) return false;
         m_PopupDocumentKey = std::move(key);
         m_Popup            = m_PopupDocument->GetElementById(kPopupId);
@@ -343,7 +344,11 @@ namespace headsup
         const BarRect* anchor               = open ? RectOf(layout, *open) : nullptr;
         if (anchor == nullptr)
         {
-            if (m_Popup != nullptr) m_Popup->SetClass(kHiddenClass, true);
+            if (m_Popup != nullptr)
+            {
+                m_Popup->SetClass(kHiddenClass, true);
+                m_Popup->SetClass(kOpenClass, false);
+            }
             return BarRect{};
         }
         if (!PopupDocumentFor(host, look, theme)) return BarRect{};
@@ -376,7 +381,10 @@ namespace headsup
         }
         Set(m_Popup, Rml::PropertyId::Left, m_PopupLeft.value, std::round(rect.x));
         Set(m_Popup, Rml::PropertyId::Top, m_PopupTop.value, std::round(rect.y));
+        Set(m_Popup, Rml::PropertyId::Width, m_PopupWidth.value, rect.width);
+        Set(m_Popup, Rml::PropertyId::Height, m_PopupHeight.value, rect.height);
         m_Popup->SetClass(kHiddenClass, hidden);
+        m_Popup->SetClass(kOpenClass, !hidden);
         return rect;
     }
 

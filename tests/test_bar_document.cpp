@@ -230,7 +230,7 @@ TEST(the_popup_document_styles_its_faces_and_boxes_from_the_look)
     const BarLook look = LookOf(BarTheme::PhoenixRedPills, settings);
     const PopupFaces faces = {PopupFace{"Barlow Condensed", 24, 29, 0}, PopupFace{"Barlow Condensed", 18, 22, 0},
         PopupFace{"Barlow Condensed", 15, 18, 2}, PopupFace{"Barlow Condensed", 15, 18, 0}};
-    const std::string rml = PopupDocument(look, faces);
+    const std::string rml = PopupDocument(look, faces, BarTheme::PhoenixRedPills);
     CHECK(Has(rml, "pointer-events:none") && Has(rml, "<div id=\"popup\" class=\"hidden\"></div>"));
     CHECK(Has(rml, ".f0{font-family:\"Barlow Condensed\";font-size:24px;line-height:29px;letter-spacing:0px;"));
     CHECK(Has(rml, ".f2{font-family:\"Barlow Condensed\";font-size:15px;line-height:18px;letter-spacing:2px;"));
@@ -248,4 +248,30 @@ TEST(a_star_is_served_in_the_coins_gold)
     const std::optional<Image> star = HostImage("hu:star/15");
     CHECK(star && star->width == 15 && star->height == 15);
     CHECK(star->argb[7 * 15 + 7] == 0xFFE8C35Au); // its middle
+}
+
+TEST(aurora_adds_light_and_motion_to_the_bar_and_its_popups)
+{
+    Settings settings;
+    const BarLook aurora  = LookOf(BarTheme::Aurora, settings);
+    const std::string rml = BarDocument(aurora, BarTheme::Aurora, Place());
+    // The strip's foot: a line of light, cyan to violet, fading out to both sides.
+    CHECK(Has(rml, "<div class=\"glint a\"></div><div class=\"glint b\"></div><div class=\"glint c\"></div>"));
+    CHECK(Has(rml, ".glint.a{left:0%;width:30%;decorator:horizontal-gradient(#5ee6ff00 #5ee6ffff);}"));
+    CHECK(Has(rml, ".glint.c{left:70%;width:30%;decorator:horizontal-gradient(#b48cffff #b48cff00);}"));
+    // Widgets ease into their lit look, the target's frame breathes, and progress is a gradient.
+    CHECK(Has(rml, "transition:background-color 0.2s cubic-out,border-color 0.2s cubic-out;"));
+    CHECK(Has(rml, "@keyframes aurora-breathe{from{border-color:#5ee6ff59;}to{border-color:#b48cffcc;}}"));
+    CHECK(Has(rml, ".fill{decorator:horizontal-gradient(#5ee6ffff #b48cffff);"));
+    const PopupFaces faces = {PopupFace{"Barlow Condensed", 24, 29, 0}, PopupFace{"Barlow Condensed", 18, 22, 0},
+        PopupFace{"Barlow Condensed", 15, 18, 2}, PopupFace{"Barlow Condensed", 15, 18, 0}};
+    const std::string popup = PopupDocument(aurora, faces, BarTheme::Aurora);
+    CHECK(Has(popup, "@keyframes aurora-drop{from{opacity:0;transform:translateY(-10px) scale(0.96);}"));
+    CHECK(Has(popup, "#popup.open{animation:0.2s cubic-out aurora-drop;}"));
+    // The panel is glass, lighter at its top, in a frame of the accent at a quarter.
+    CHECK(Has(popup, "#panel{background-color:transparent;decorator:vertical-gradient(#1b2740f2 #0c1220f2);border-color:#5ee6ff40;}"));
+    // The other themes have none of it.
+    const std::string gold = BarDocument(LookOf(BarTheme::PhoenixGold, settings), BarTheme::PhoenixGold, Place());
+    CHECK(!Has(gold, "glint") && !Has(gold, "transition") && !Has(gold, "@keyframes"));
+    CHECK(!Has(PopupDocument(LookOf(BarTheme::UmbraDark, settings), faces, BarTheme::UmbraDark), "aurora"));
 }

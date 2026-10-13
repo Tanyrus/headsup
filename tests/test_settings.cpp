@@ -799,7 +799,7 @@ TEST(each_theme_and_bar_widget_has_its_own_key)
     };
     for (const Named& t : {Named{"phoenixGold", BarTheme::PhoenixGold}, Named{"umbraDark", BarTheme::UmbraDark},
              Named{"phoenixRedOrnate", BarTheme::PhoenixRedOrnate},
-             Named{"phoenixRedPills", BarTheme::PhoenixRedPills}})
+             Named{"phoenixRedPills", BarTheme::PhoenixRedPills}, Named{"aurora", BarTheme::Aurora}})
     {
         MapStore store;
         store.values["barTheme"] = t.name;
@@ -928,6 +928,32 @@ TEST(text_sizes_start_at_auto_and_clamp_to_their_range)
     store.values["popupTextSize"] = "10";
     CHECK_EQ(LoadSettings(store).popupTextSize, 10);
     CHECK_EQ(kAutoPopupTextSize + 1, 10);
+}
+
+TEST(the_settings_window_keeps_its_theme_and_its_place)
+{
+    MapStore store;
+    store.values["menuTheme"]  = "aurora";
+    store.values["menuX"]      = "120";
+    store.values["menuY"]      = "80";
+    store.values["menuWidth"]  = "900";
+    store.values["menuHeight"] = "700";
+    const Settings s           = LoadSettings(store);
+    CHECK(s.menuTheme == MenuTheme::Aurora && s.menuX == 120 && s.menuY == 80 && s.menuWidth == 900 && s.menuHeight == 700);
+    MapStore saved;
+    SaveSettings(s, saved);
+    CHECK(saved.values["menuTheme"] == "aurora" && saved.values["menuWidth"] == "900.0000" &&
+          saved.values["menuY"] == "80.0000");
+    // A theme the list lacks keeps the default, and a size of nonsense is no place at all.
+    store.values["menuTheme"]  = "neon";
+    store.values["menuWidth"]  = "-5";
+    store.values["menuHeight"] = "1e9";
+    const Settings odd         = LoadSettings(store);
+    CHECK(odd.menuTheme == MenuTheme::Phoenix && odd.menuWidth == 0 && odd.menuHeight == kMaxMenuSide);
+    // A new file has neither: the window opens in the screen's middle, in the Phoenix look.
+    MapStore empty;
+    const Settings fresh = LoadSettings(empty);
+    CHECK(fresh.menuTheme == MenuTheme::Phoenix && fresh.menuWidth == 0 && fresh.menuHeight == 0);
 }
 
 TEST(a_menu_font_the_list_lacks_or_a_size_past_its_ends_keeps_the_defaults)

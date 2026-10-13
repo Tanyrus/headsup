@@ -21,6 +21,7 @@ namespace headsup
         // RmlUi's colors and textures carry premultiplied alpha.
         m_Device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
         m_Textured = true;
+        m_Transform.reset();
         ApplyScissor();
     }
 
@@ -59,6 +60,15 @@ namespace headsup
         {
             v.x += translation.x;
             v.y += translation.y;
+            if (m_Transform)
+            {
+                // The transform is of pixels' corners; the vertices are kept at their centers.
+                v.x += kPixelCenter;
+                v.y += kPixelCenter;
+                Transformed(m_Transform->data(), v.x, v.y);
+                v.x -= kPixelCenter;
+                v.y -= kPixelCenter;
+            }
             v.u *= shareU;
             v.v *= shareV;
         }
@@ -133,6 +143,14 @@ namespace headsup
     {
         m_Region = region;
         if (m_Scissor) ApplyScissor();
+    }
+
+    void RmlRender::SetTransform(const Rml::Matrix4f* transform)
+    {
+        if (transform != nullptr)
+            m_Transform = *transform;
+        else
+            m_Transform.reset();
     }
 
     void RmlRender::ApplyScissor()

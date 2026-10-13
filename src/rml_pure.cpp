@@ -65,6 +65,17 @@ namespace headsup
             u * shareU, v * shareV};
     }
 
+    void Transformed(const float* m, float& x, float& y)
+    {
+        constexpr int kColumn = 4; // floats in a column
+        const float outX = m[0] * x + m[kColumn] * y + m[3 * kColumn];
+        const float outY = m[1] * x + m[kColumn + 1] * y + m[3 * kColumn + 1];
+        const float outW = m[3] * x + m[kColumn + 3] * y + m[3 * kColumn + 3];
+        const float over = outW != 0.0f ? 1.0f / outW : 1.0f;
+        x = outX * over;
+        y = outY * over;
+    }
+
     void ArgbFromRgba(const uint8_t* rgba, size_t pixels, uint32_t* argb)
     {
         for (size_t i = 0; i < pixels; ++i, rgba += 4)

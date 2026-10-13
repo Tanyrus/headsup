@@ -11,8 +11,9 @@ namespace headsup
         UmbraDark,
         PhoenixRedOrnate,
         PhoenixRedPills,
+        Aurora, // what RmlUi adds: glass, gradients and motion. The quads draw it as plain pills.
     };
-    constexpr int kBarThemeCount = static_cast<int>(BarTheme::PhoenixRedPills) + 1;
+    constexpr int kBarThemeCount = static_cast<int>(BarTheme::Aurora) + 1;
 
     // What divides neighbouring widgets: the theme's own (ornate diamonds, pills none), or the player's pick.
     enum class BarSeparators : uint8_t

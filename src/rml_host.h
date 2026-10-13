@@ -33,6 +33,8 @@ namespace headsup
         // Makes a font family known to RmlUi: the bundled ones are from the start, an installed one is read from
         // Windows by its name. False for a family Windows does not have.
         bool EnsureFont(const std::string& family);
+        // The same for a font in a file, known by the name given.
+        bool EnsureFontFile(const std::string& name, const std::string& path);
         // A text's width and a font's measures as RmlUi lays them out, in pixels; nothing for an unknown family.
         float TextWidth(const std::string& text, const std::string& family, int pixels, float tracking = 0.0f);
         Rml::FontMetrics Metrics(const std::string& family, int pixels);

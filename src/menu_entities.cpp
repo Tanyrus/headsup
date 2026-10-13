@@ -2,6 +2,7 @@
 
 #include "icons.h"
 #include "menu_state.h"
+#include "menu_text.h"
 #include "plate_settings.h"
 #include "plate_template.h"
 
@@ -18,56 +19,6 @@ namespace headsup
 {
     namespace
     {
-        constexpr const char* kDefaultFontChoice = "Default"; // a line's font: the one on the Entities page
-
-        const char* const kMobRowTips[kCategoryCount] = {
-            "Would attack you at your level. Too Weak mobs only attack while you sit or rest.",
-            "Passive, or aggressive but Too Weak for you.",
-            "Not in the Phoenix data.",
-            "Notorious monsters that would attack you.",
-            "Notorious monsters that would leave you alone.",
-            "Lottery placeholders, whose death can pop an NM, while nobody has claimed them.",
-            "Claimed by you or your party, whatever else it is.",
-            "Claimed by anyone outside your party, whatever else it is."}; // by Category
-        const char* const kPlayerRowTips[kPlayerRowCount] = {
-            "Every player the rows below do not cover.",
-            "In your party.",
-            "Named in the Friends card below, and not in your party.",
-            "In your linkshell, and neither in your party nor a friend. The game tells a player's linkshell only when "
-            "you /check them."}; // by PlayerRow
-        constexpr const char* kPlateModesTip =
-            "Hidden: no name at all. Shown: HeadsUp's nameplate. When Targeted: the nameplate while it is your target, "
-            "and no name otherwise. Expanding: its name alone, and the whole nameplate while it is your target. Vanilla: "
-            "the game's own name.";
-        constexpr const char* kOutlineModesTip =
-            "Disabled: no outline. Shown: an outline. When Targeted: an outline while it is your target.";
-        constexpr const char* kByNatureOfClaimTip       = " By Nature: the outline it would have unclaimed.";
-        constexpr const char* kByNatureOfPlaceholderTip = " By Nature: the outline its aggression gives it, as any other "
-                                                          "mob's.";
-
-        const char* RowTip(PlateKind kind, int row)
-        {
-            switch (kind)
-            {
-            case PlateKind::Mobs: return kMobRowTips[row];
-            case PlateKind::Players: return kPlayerRowTips[row];
-            case PlateKind::Pets: return "Any player's pet.";
-            default: return nullptr;
-            }
-        }
-
-        // A cutoff as its dropdown shows it: the rank as badges read it, or Off past the end.
-        std::string CutoffText(int rank, bool ranks)
-        {
-            return rank == kNoWeakRank || rank == kNoResistRank ? "Off" : RankText(rank, ranks);
-        }
-
-        std::string ElementCountText(int count)
-        {
-            if (count == 0) return "None";
-            return count == kElementCount ? "All" : std::to_string(count);
-        }
-
         // entryTip, when given, says for an entry when it applies.
         template <typename Entry>
         void DrawPalette(Ui& ui, const char* title, const char* tip, std::unordered_set<std::string>& collapsed,

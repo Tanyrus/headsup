@@ -34,9 +34,15 @@ namespace headsup
                 .panelTop = 0xFF180E0E, .panelBottom = 0xFF180E0E, .panelBorder = 0x33D2ABAB, .panelOuter = 0,
                 .text = 0xFFFFF8F8, .heading = 0xFFD2ABAB, .tagFill = 0xFF321F1F, .tagBorder = 0, .tagText = 0xFFE8C9C9,
                 .highlight = 0xFF3A2525},
+            {.shape = BarShape::Pills, .stripTop = 0xE6131C2B, .stripMiddle = 0xE60E1522, .stripBottom = 0xE60A0F18,
+                .bottomLine = 0xFF1B2636, .underLine = 0, .below = 0x595EE6FF, .accent = 0xFF5EE6FF,
+                .pill = 0x1AFFFFFF, .pillBorder = 0x24B8D8FF, .title = 0xFFEAF2FF, .subtitle = 0xFF8FA3BF, .divider = 0,
+                .panelTop = 0xF2131C2B, .panelBottom = 0xF20A0F18, .panelBorder = 0x595EE6FF, .panelOuter = 0,
+                .text = 0xFFE3ECFA, .heading = 0xFF5EE6FF, .tagFill = 0x265EE6FF, .tagBorder = 0, .tagText = 0xFFCFE9FF,
+                .highlight = 0x335EE6FF},
         };
         const char* const kNames[kBarThemeCount] = {
-            "Phoenix Gold", "Umbra Dark", "Phoenix Red, Ornate", "Phoenix Red, Pills"};
+            "Phoenix Gold", "Umbra Dark", "Phoenix Red, Ornate", "Phoenix Red, Pills", "Aurora"};
     }
 
     const BarPalette& PaletteOf(BarTheme theme)

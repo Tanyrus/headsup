@@ -1,0 +1,82 @@
+#pragma once
+
+#include "fonts.h"
+
+#include <RmlUi/Core.h>
+
+#include <cstdint>
+#include <string>
+#include <vector>
+
+namespace test
+{
+    // RmlUi asks for geometry and textures and is given handles that draw nothing.
+    class NoRender : public Rml::RenderInterface
+    {
+    public:
+        Rml::CompiledGeometryHandle CompileGeometry(Rml::Span<const Rml::Vertex>, Rml::Span<const int>) override { return ++m_Next; }
+        void RenderGeometry(Rml::CompiledGeometryHandle, Rml::Vector2f, Rml::TextureHandle) override {}
+        void ReleaseGeometry(Rml::CompiledGeometryHandle) override {}
+        Rml::TextureHandle LoadTexture(Rml::Vector2i& dimensions, const Rml::String&) override
+        {
+            dimensions = Rml::Vector2i(kImageSide, kImageSide);
+            return ++m_Next;
+        }
+        Rml::TextureHandle GenerateTexture(Rml::Span<const Rml::byte>, Rml::Vector2i) override { return ++m_Next; }
+        void ReleaseTexture(Rml::TextureHandle) override {}
+        void EnableScissorRegion(bool) override {}
+        void SetScissorRegion(Rml::Rectanglei) override {}
+        void SetTransform(const Rml::Matrix4f*) override {}
+
+    private:
+        static constexpr int kImageSide = 16;
+        uintptr_t m_Next                = 0;
+    };
+
+    // Keeps what RmlUi warns of: markup it could not read, a property it does not know, a font it lacks.
+    class Complaints : public Rml::SystemInterface
+    {
+    public:
+        std::vector<std::string> said;
+        bool LogMessage(Rml::Log::Type type, const Rml::String& message) override
+        {
+            if (type <= Rml::Log::LT_WARNING) said.push_back(message);
+            return true;
+        }
+    };
+
+    // RmlUi running with the bundled fonts and one context, for as long as this lives.
+    class RmlSession
+    {
+    public:
+        static constexpr int kWidth = 1920, kHeight = 1080;
+        Complaints complaints;
+        Rml::Context* context = nullptr;
+
+        RmlSession()
+        {
+            Rml::SetSystemInterface(&complaints);
+            Rml::SetRenderInterface(&m_Render);
+            Rml::Initialise();
+            size_t count = 0;
+            for (const headsup::BundledFont* font = headsup::BundledFonts(count); count-- > 0; ++font)
+                Rml::LoadFontFace(Rml::Span<const Rml::byte>(font->data, font->bytes), font->family, Rml::Style::FontStyle::Normal);
+            context = Rml::CreateContext("overlay", Rml::Vector2i(kWidth, kHeight));
+        }
+        ~RmlSession() { Rml::Shutdown(); }
+        RmlSession(const RmlSession&)            = delete;
+        RmlSession& operator=(const RmlSession&) = delete;
+
+        // Every complaint on a line of its own; empty when RmlUi had none.
+        std::string Said() const
+        {
+            std::string all;
+            for (const std::string& line : complaints.said)
+                all += line + "\n";
+            return all;
+        }
+
+    private:
+        NoRender m_Render;
+    };
+}

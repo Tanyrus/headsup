@@ -26,6 +26,7 @@
 #include "pointer_swap.h"
 #include "rml_bar.h"
 #include "rml_host.h"
+#include "rml_menu.h"
 #include "settings.h"
 #include "shot_watch.h"
 #include "tracker.h"
@@ -206,6 +207,8 @@ class HeadsUp final : public IPlugin
     headsup::RmlHost m_Rml;
     headsup::RmlBar m_RmlBar;
     bool m_RmlBarOn                  = true; // RmlUi draws the top panel; /hu rml bar gives it back to the quads
+    headsup::RmlMenu m_RmlMenu;
+    bool m_RmlMenuOn                 = true; // RmlUi draws the settings window; /hu rml menu gives it back to ImGui
     bool m_RmlTried                  = false;
     headsup::BarClicks m_BarClicks{m_BarInput};
     bool m_BarDrawn = false; // this frame
@@ -364,6 +367,7 @@ public:
         g_Plugin = nullptr;
         m_Bar.Release();
         m_RmlBar.Release();
+        m_RmlMenu.Close();
         m_Rml.Stop();
         // After the renderers, which hold fonts made from these until they release.
         for (HANDLE handle : m_LoadedFonts)
@@ -397,7 +401,7 @@ public:
         if (args.empty() || (args[0] != "/headsup" && args[0] != "/hu")) return false;
 
         if (args.size() == 1)
-            m_Menu.open = !m_Menu.open;
+            MenuOpen() = !MenuOpen();
         else if (args[1] == "on" || args[1] == "off")
         {
             m_Settings.enabled = args[1] == "on";
@@ -419,8 +423,18 @@ public:
                 m_RmlBarOn = !m_RmlBarOn;
                 Print(m_RmlBarOn ? "RmlUi draws the top panel." : "The quads draw the top panel.");
             }
+            else if (args.size() > 2 && args[2] == "menu")
+            {
+                // The window stays open, or closed, across the switch.
+                const bool open  = MenuOpen();
+                MenuOpen()       = false;
+                m_RmlMenuOn      = !m_RmlMenuOn;
+                MenuOpen()       = open;
+                Print(m_RmlMenuOn ? "RmlUi draws the settings window." : "ImGui draws the settings window.");
+            }
             else
-                Print("/hu rml bar switches the top panel between RmlUi and the quads; /hu rml debug opens RmlUi's debugger.");
+                Print("/hu rml bar and /hu rml menu switch the top panel and the settings window between RmlUi and what "
+                      "drew them before; /hu rml debug opens RmlUi's debugger.");
         }
         else if (args[1] == "popup" && args.size() > 2)
         {
@@ -455,13 +469,19 @@ public:
         }
         else if (args[1] == "menu" && args.size() > 2)
         {
-            if (!m_Menu.OpenPage(args[2]))
+            if (!(RmlDrawsMenu() ? m_RmlMenu.OpenPage(args[2]) : m_Menu.OpenPage(args[2])))
                 Print("/hu menu: no page is named " + args[2] + ".");
 #ifdef HEADSUP_DEV
             // A number last scrolls the page that many pixels down.
             char* end          = nullptr;
             const float pixels = std::strtof(args.back().c_str(), &end);
-            if (args.size() > 3 && end != args.back().c_str() && *end == '\0') m_Menu.ScrollTo(pixels);
+            if (args.size() > 3 && end != args.back().c_str() && *end == '\0')
+            {
+                if (RmlDrawsMenu())
+                    m_RmlMenu.ScrollTo(pixels);
+                else
+                    m_Menu.ScrollTo(pixels);
+            }
 #endif
         }
 #ifdef HEADSUP_DEV
@@ -712,10 +732,38 @@ public:
             .barTitlePixels   = RmlDrawsBar() ? m_RmlBar.TitlePixels() : m_Bar.TitlePixels(),
             .seenWindows      = &m_SeenWindows,
         };
-        if (m_Menu.open) ApplyMenuFont();
-        if (!m_Screenshot && m_Menu.Draw(m_AshitaCore->GetGuiManager(), m_Settings, status)) m_SettingsChangedAt = now;
-        if (headsup::SaveDue(m_SettingsChangedAt, now, m_Menu.open)) SaveSettings();
-        if (m_Menu.TakeDebugRequest()) m_DebugPending = true;
+        if (RmlDrawsMenu())
+        {
+            const headsup::MenuReadings readings{
+                .outlinedMobs     = status.outlinedMobs,
+                .meshes           = status.meshes,
+                .nameplates       = status.nameplates,
+                .frameMs          = status.frameMs,
+                .lastSaveMs       = status.lastSaveMs,
+                .lastSaveKeys     = status.lastSaveKeys,
+                .stencilAvailable = status.stencilAvailable,
+                .drewInScene      = status.drewInScene,
+                .hooked           = status.hooked,
+                .names            = status.names.names,
+                .replaced         = status.names.replaced,
+                .hidden           = status.names.hidden,
+                .level            = status.player.level,
+                .sitting          = status.player.sitting,
+                .barTitlePixels   = status.barTitlePixels,
+                .seenWindows      = status.seenWindows,
+            };
+            if (m_RmlMenu.Update(MenuHostNow(), m_Settings, readings, m_Menu.Fonts(m_Settings.defaultFont),
+                    m_AshitaCore->GetGuiManager()->GetFontSize(), kVersion))
+                m_SettingsChangedAt = now;
+            if (m_RmlMenu.TakeDebugRequest()) m_DebugPending = true;
+        }
+        else
+        {
+            if (m_Menu.open) ApplyMenuFont();
+            if (!m_Screenshot && m_Menu.Draw(m_AshitaCore->GetGuiManager(), m_Settings, status)) m_SettingsChangedAt = now;
+            if (m_Menu.TakeDebugRequest()) m_DebugPending = true;
+        }
+        if (headsup::SaveDue(m_SettingsChangedAt, now, MenuOpen())) SaveSettings();
         UpdatePointer();
         m_NameHook.NewFrame(NameOwners());
     }
@@ -1233,6 +1281,22 @@ private:
     }
 
     bool RmlDrawsBar() const { return m_RmlBarOn && m_Rml.Running(); }
+    bool RmlDrawsMenu() const { return m_RmlMenuOn && m_Rml.Running(); }
+
+    // What the RmlUi settings window runs on: the window's own font, or a bundled one where Windows lacks it.
+    headsup::MenuHost MenuHostNow()
+    {
+        headsup::MenuHost host{m_Rml.Overlay(), headsup::kBarlowCondensed, {}, headsup::KeyDown};
+        const headsup::MenuFont* font = headsup::MenuFontNamed(m_Settings.menuFont);
+        if (font != nullptr && (font->file == nullptr ? m_Rml.EnsureFont(font->name)
+                                                      : m_Rml.EnsureFontFile(font->name, headsup::WindowsFontPath(font->file))))
+            host.textFont = font->name;
+        for (const headsup::MenuFont& choice : headsup::kMenuFonts)
+            if (headsup::MenuFontInstalled(choice)) host.menuFonts.emplace_back(choice.name);
+        return host;
+    }
+    // Whether the settings window is open, in whichever of the two draws it.
+    bool& MenuOpen() { return RmlDrawsMenu() ? m_RmlMenu.open : m_Menu.open; }
 
 #ifdef HEADSUP_DEV
     // /hu play click X Y [right] | move X Y | drag X Y TOX TOY | wheel X Y NOTCHES | key NAME | type TEXT
@@ -1252,20 +1316,37 @@ private:
         auto mouse = [&](uint32_t message, float x, float y, WPARAM wParam = 0) {
             m_Played.push_back(PlayedInput{false, message, wParam, at(x, y)});
         };
-        const std::string what = args.size() > 2 ? args[2] : "";
-        const float x = number(3), y = number(4);
+        std::string what = args.size() > 2 ? args[2] : "";
+        float x = number(3), y = number(4);
+        float toX = number(5), toY = number(6);
+        // id NAME clicks the settings window's control of that id, and id NAME NAME drags the first onto the second.
+        if (what == "id" && args.size() > 3)
+        {
+            // Both ends scrolled into view before either is placed: the second scroll would move the first.
+            if (args.size() > 4) m_RmlMenu.CenterOf(args[4]);
+            m_RmlMenu.CenterOf(args[3]);
+            const std::optional<Rml::Vector2f> from = m_RmlMenu.CenterOf(args[3], false);
+            const std::optional<Rml::Vector2f> to   = args.size() > 4 ? m_RmlMenu.CenterOf(args[4], false) : std::nullopt;
+            if (!from || (args.size() > 4 && !to))
+            {
+                Print("/hu play id: the settings window has no such control.");
+                return;
+            }
+            what = to ? "drag" : "click";
+            x = from->x, y = from->y;
+            if (to) toX = to->x, toY = to->y;
+        }
         if (what == "move")
             mouse(WM_MOUSEMOVE, x, y);
         else if (what == "click")
         {
-            const bool right = args.size() > 5 && args[5] == "right";
+            const bool right = args.size() > 5 && args[5] == "right" && args[2] == "click";
             mouse(WM_MOUSEMOVE, x, y);
             mouse(right ? WM_RBUTTONDOWN : WM_LBUTTONDOWN, x, y, right ? MK_RBUTTON : MK_LBUTTON);
             mouse(right ? WM_RBUTTONUP : WM_LBUTTONUP, x, y);
         }
         else if (what == "drag")
         {
-            const float toX = number(5), toY = number(6);
             mouse(WM_MOUSEMOVE, x, y);
             mouse(WM_LBUTTONDOWN, x, y, MK_LBUTTON);
             for (int step = 1; step <= kDragSteps; ++step)
@@ -1305,7 +1386,7 @@ private:
             if (text != nullptr) m_Rml.Overlay()->ProcessTextInput(Rml::String(text + std::strlen(" type ")));
         }
         else
-            Print("/hu play: click X Y [right], move X Y, drag X Y TOX TOY, wheel X Y NOTCHES, key NAME, type TEXT.");
+            Print("/hu play: click X Y [right], move X Y, drag X Y TOX TOY, wheel X Y NOTCHES, key NAME, type TEXT, id NAME [NAME].");
     }
 #endif
 

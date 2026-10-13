@@ -74,3 +74,25 @@ TEST(wheel_deltas_become_notches_toward_the_user)
     CHECK_EQ(WheelNotches(-240), 2.0f);
     CHECK_EQ(WheelNotches(60), -0.5f);
 }
+
+TEST(a_transform_moves_a_point_and_divides_by_its_depth)
+{
+    // Column by column: twice as wide, three times as tall, moved 10 right and 20 down.
+    const float scaleAndMove[16] = {2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 1, 0, 10, 20, 0, 1};
+    float x = 5.0f, y = 7.0f;
+    Transformed(scaleAndMove, x, y);
+    CHECK_EQ(x, 20.0f);
+    CHECK_EQ(y, 41.0f);
+    // A quarter turn: (1, 0) goes to (0, 1).
+    const float turn[16] = {0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+    x = 1.0f, y = 0.0f;
+    Transformed(turn, x, y);
+    CHECK_EQ(x, 0.0f);
+    CHECK_EQ(y, 1.0f);
+    // A perspective that doubles the depth at x = 4 halves the point.
+    const float deep[16] = {1, 0, 0, 0.25f, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+    x = 4.0f, y = 8.0f;
+    Transformed(deep, x, y);
+    CHECK_EQ(x, 2.0f);
+    CHECK_EQ(y, 4.0f);
+}

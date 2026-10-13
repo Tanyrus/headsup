@@ -3,6 +3,7 @@
 #include "argb.h"
 #include "bar_layout.h"
 #include "bar_placement.h"
+#include "markup.h"
 
 #include <charconv>
 #include <cmath>
@@ -21,25 +22,16 @@ namespace headsup
         constexpr float kGlowSigmaPerWidth = 0.4f;
         constexpr float kSigmaPerRadius    = 0.5f;
         constexpr int kShadowDrop          = 1; // pixels down
+        constexpr uint32_t kAuroraViolet   = 0xFFB48CFF; // what Aurora's cyan runs into
+        constexpr float kGlint             = 2.0f;       // the line of light at the foot of Aurora's strip, in pixels
+        constexpr uint32_t kAuroraGlassTop = 0xF21B2740, kAuroraGlassFoot = 0xF20C1220; // a popup's panel, down its height
+        constexpr uint32_t kAuroraFrame    = 0x40;       // the accent's alpha in a popup's frame
         constexpr char kSeparator      = '/';
         constexpr int kHexBase         = 16;
         constexpr float kPercentWhole  = 100.0f;
         constexpr float kBoxBorder     = 1.0f; // a pill's or frame's, inside its edge
         // The widgets' content starts a pixel under the pill row's top in every shape, bordered or not.
         constexpr float kContentInset  = 1.0f;
-
-        // A number as RCSS reads it: two decimals at most, none it does not need.
-        std::string Num(float value)
-        {
-            char text[32];
-            std::snprintf(text, sizeof(text), "%.2f", static_cast<double>(value));
-            std::string out = text;
-            while (out.back() == '0')
-                out.pop_back();
-            if (out.back() == '.') out.pop_back();
-            return out == "-0" ? "0" : out;
-        }
-        std::string Px(float value) { return Num(value) + "px"; }
 
         std::string Hex(uint32_t value)
         {
@@ -154,30 +146,6 @@ namespace headsup
         }
     }
 
-    std::string EscapedRml(std::string_view text)
-    {
-        std::string out;
-        out.reserve(text.size());
-        for (const char c : text)
-            switch (c)
-            {
-            case '&': out += "&amp;"; break;
-            case '<': out += "&lt;"; break;
-            case '>': out += "&gt;"; break;
-            case '"': out += "&quot;"; break;
-            default: out += c;
-            }
-        return out;
-    }
-
-    std::string RcssColor(uint32_t argb)
-    {
-        char text[16];
-        std::snprintf(text, sizeof(text), "#%02x%02x%02x%02x", Channel(argb, kRedShift), Channel(argb, kGreenShift),
-            Channel(argb, kBlueShift), Channel(argb, kAlphaShift));
-        return text;
-    }
-
     std::string IconSource(Icon icon)
     {
         return std::string(kHostSource) + std::string(kIconKind) + kSeparator + std::to_string(static_cast<int>(icon));
@@ -249,6 +217,40 @@ namespace headsup
 
     std::string WidgetId(BarWidget widget) { return std::string("w-") + BarWidgetName(widget); }
     std::string DividerId(int divider) { return "d-" + std::to_string(divider); }
+
+    namespace
+    {
+        // A color with another alpha.
+        uint32_t Faded(uint32_t argb, uint32_t alpha) { return (argb & ~kAlphaMask) | alpha << kAlphaShift; }
+
+        // What Aurora adds to the pills: a line of light under the strip, widgets that ease into their lit look, a
+        // target's frame that breathes between the two colors, and progress as a gradient that pulses.
+        std::string AuroraBarRules(const BarLook& look)
+        {
+            const uint32_t cyan = look.palette.accent, violet = kAuroraViolet;
+            const std::string c = RcssColor(cyan), v = RcssColor(violet);
+            std::string css;
+            css += ".glint{position:absolute;top:" + Px(look.metrics.height - kGlint) + ";height:" + Px(kGlint) + ";}";
+            css += ".glint.a{left:0%;width:30%;decorator:horizontal-gradient(" + RcssColor(Faded(cyan, 0)) + " " + c + ");}";
+            css += ".glint.b{left:30%;width:40%;decorator:horizontal-gradient(" + c + " " + v + ");}";
+            css += ".glint.c{left:70%;width:30%;decorator:horizontal-gradient(" + v + " " + RcssColor(Faded(violet, 0)) + ");}";
+            css += ".pills .widget,.pills .widget.flat{border-radius:" + Px(look.row.height / 2.0f) +
+                   ";background-color:transparent;border-color:transparent;"
+                   "transition:background-color 0.2s cubic-out,border-color 0.2s cubic-out;}";
+            css += ".pills .widget.target{background-color:" + RcssColor(Faded(cyan, 0x14)) +
+                   ";animation:2.4s sine-in-out infinite alternate aurora-breathe;}";
+            css += "@keyframes aurora-breathe{from{border-color:" + RcssColor(Faded(cyan, 0x59)) + ";}to{border-color:" +
+                   RcssColor(Faded(violet, 0xCC)) + ";}}";
+            css += ".pills .widget.lit{background-color:" + RcssColor(Faded(cyan, 0x2E)) + ";border-color:" +
+                   RcssColor(Faded(cyan, 0xB3)) + ";animation:none;}";
+            css += ".widget.lit .title{font-effect:glow(0px 3px 0px 0px " + RcssColor(Faded(cyan, 0x80)) + ");}";
+            css += ".progress,.beside{background-color:#ffffff1f;}";
+            css += ".fill{decorator:horizontal-gradient(" + c + " " + v + ");animation:1.8s sine-in-out infinite alternate "
+                   "aurora-pulse;}";
+            css += "@keyframes aurora-pulse{from{opacity:0.65;}to{opacity:1;}}";
+            return css;
+        }
+    }
 
     std::string BarDocument(const BarLook& look, BarTheme theme, const BarTextPlace& place)
     {
@@ -342,9 +344,11 @@ namespace headsup
         css += ".help-box{position:absolute;" + PanelRules(HelpBarPanel(look)) + "}";
         css += ".hc{" + FaceRules(look.titleFont, lines.title, place.title.height) + ShadowEffect(lines.title) + "}";
         css += ".hh{" + FaceRules(look.detailFont, lines.title, place.figures.height) + ShadowEffect(lines.title) + "}";
+        if (theme == BarTheme::Aurora) css += AuroraBarRules(look);
 
         std::string rml = "<rml><head><style>" + css + "</style></head><body class=\"" + shape.substr(1) + "\">";
         rml += std::string("<div id=\"") + kStripId + "\"></div>";
+        if (theme == BarTheme::Aurora) rml += "<div class=\"glint a\"></div><div class=\"glint b\"></div><div class=\"glint c\"></div>";
         if (look.ornate)
             rml += "<img class=\"cap\" id=\"cap-left\" src=\"" + capSource + "\"/><img class=\"cap\" id=\"" + kRightCapId +
                    "\" src=\"" + capSource + "\"/>";
@@ -379,7 +383,7 @@ namespace headsup
         return rml;
     }
 
-    std::string PopupDocument(const BarLook& look, const PopupFaces& faces)
+    std::string PopupDocument(const BarLook& look, const PopupFaces& faces, BarTheme theme)
     {
         const BoxStyle panel = PopupPanel(look);
         std::string css = "body{display:block;width:100%;height:100%;pointer-events:none;z-index:10;}";
@@ -399,6 +403,18 @@ namespace headsup
         css += ".rule{height:1px;decorator:horizontal-gradient(" + RcssColor(look.palette.divider) + " " +
                RcssColor(look.palette.divider & ~kAlphaMask) + ");}";
         css += ".mark{text-align:center;}";
+        if (theme == BarTheme::Aurora)
+        {
+            // A popup drops in from its widget, and its cards are glass.
+            css += std::string("#") + kPopupId + "{transform-origin:50% 0%;}";
+            css += std::string("#") + kPopupId + "." + kOpenClass + "{animation:0.2s cubic-out aurora-drop;}";
+            css += "@keyframes aurora-drop{from{opacity:0;transform:translateY(-10px) scale(0.96);}to{opacity:1;"
+                   "transform:translateY(0px) scale(1);}}";
+            css += ".card{decorator:vertical-gradient(#ffffff17 #ffffff08);background-color:transparent;border-color:" +
+                   RcssColor(Faded(look.palette.accent, 0x33)) + ";}";
+            css += "#panel{background-color:transparent;decorator:vertical-gradient(" + RcssColor(kAuroraGlassTop) + " " +
+                   RcssColor(kAuroraGlassFoot) + ");border-color:" + RcssColor(Faded(look.palette.accent, kAuroraFrame)) + ";}";
+        }
         return "<rml><head><style>" + css + "</style></head><body><div id=\"" + kPopupId + "\" class=\"" + kHiddenClass +
                "\"></div></body></rml>";
     }
@@ -475,7 +491,7 @@ namespace headsup
         {
             const float done = std::clamp(*content.progress, 0.0f, 1.0f) * kPercentWhole;
             rml += std::string("<div class=\"") + (content.progressBeside ? "beside" : "progress") +
-                   "\"><div class=\"fill\" style=\"width: " + Num(done) + "%\"></div></div>";
+                   "\"><div class=\"fill\" style=\"width: " + RcssNumber(done) + "%\"></div></div>";
         }
         return rml + "</div>";
     }
