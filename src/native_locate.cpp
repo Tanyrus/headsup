@@ -530,6 +530,11 @@ namespace headsup
         return false;
     }
 
+    bool TitleWindow(const WindowKey& key)
+    {
+        return std::memcmp(key.data(), kTitleWindow + kMenuPrefixLength, kWindowKeyLength) == 0;
+    }
+
     bool MovableWindow(const WindowKey& key)
     {
         for (const char* strip : {kHelpWindow, kTitleWindow, kNetstatWindow})
@@ -755,8 +760,38 @@ namespace headsup
         return std::max(0, under - stripBottom);
     }
 
+    void WindowPlacements::SetFrame(uint32_t frame)
+    {
+        // Found afresh from the windows that went down in their own right, so two pushed ones that lie over each
+        // other never hold each other down once those are gone.
+        const auto drew = [&](const Placed& p) { return p.mcd != 0 && p.frame == m_Frame; };
+        const auto over = [](const Placed& upper, const Placed& lower) {
+            const WindowSpot at = upper.root ? upper.to : WindowSpot{upper.from.left, upper.from.top + upper.shift};
+            return at.left < lower.from.left + lower.width && lower.from.left < at.left + upper.width &&
+                   at.top < lower.from.top + lower.height && lower.from.top < at.top + upper.height;
+        };
+        for (Placed& p : m_Placed)
+            p.pushed = false;
+        for (bool grew = true; grew;)
+        {
+            grew = false;
+            for (Placed& lower : m_Placed)
+            {
+                if (!drew(lower) || lower.root || lower.pushed) continue;
+                for (const Placed& upper : m_Placed)
+                    if (drew(upper) && (upper.root || upper.pushed) && over(upper, lower))
+                    {
+                        lower.pushed = true;
+                        grew         = true;
+                        break;
+                    }
+            }
+        }
+        m_Frame = frame;
+    }
+
     std::optional<WindowSpot> WindowPlacements::PlaceFor(uint32_t mcd, const WindowKey& key, WindowSpot now, int width,
-        int height, int dx, int dy, int shift, int shiftAbove, int screenRight, int screenBottom)
+        int height, int dx, int dy, int shift, int shiftAbove, int screenRight, int screenBottom, bool follow)
     {
         Placed* placed = nullptr;
         for (Placed& p : m_Placed)
@@ -779,7 +814,11 @@ namespace headsup
         }
         placed->frame = m_Frame;
         const WindowSpot from = placed->from;
-        if (from.top >= shiftAbove) shift = 0;
+        placed->width  = width;
+        placed->height = height;
+        placed->shift  = shift;
+        placed->root   = shift != 0 && from.top < shiftAbove;
+        if (!placed->root && !(follow && placed->pushed)) shift = 0;
         int left = from.left;
         if (dx != 0) left = std::clamp(from.left + dx, 0, std::max(0, screenRight - width));
         int top = std::min(from.top + shift + dy, screenBottom - height);
@@ -787,6 +826,16 @@ namespace headsup
         placed->to = WindowSpot{left, top};
         return placed->to != now ? std::optional<WindowSpot>(placed->to) : std::nullopt;
     }
+
+    WindowSpot PlacedText::Follow(WindowSpot seen, WindowSpot origin, WindowSpot at)
+    {
+        if (!m_Moved || seen != m_Given) m_Natural = seen;
+        m_Given = WindowSpot{m_Natural.left + at.left - origin.left, m_Natural.top + at.top - origin.top};
+        m_Moved = true;
+        return m_Given;
+    }
+
+    WindowSpot PlacedText::Natural(WindowSpot seen) const { return m_Moved && seen == m_Given ? m_Natural : seen; }
 
     WindowSpot MovedNumber(WindowSpot number, WindowSpot at, int width, int height, WindowSpot to)
     {

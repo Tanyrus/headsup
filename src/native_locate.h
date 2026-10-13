@@ -267,6 +267,8 @@ namespace headsup
     };
     // The game's own help bar's windows: its title and help.
     bool HelpStripWindow(const WindowKey& key);
+    // The title alone.
+    bool TitleWindow(const WindowKey& key);
     // How far the moved windows go down: from under the game's own strip, whose bottom is stripBottom, to under band,
     // or under the strip itself once it moved down under the top bar.
     int WindowShift(const HelpBand& band, int stripBottom);
@@ -276,6 +278,22 @@ namespace headsup
         int left = 0, top = 0;
         bool operator==(const WindowSpot&) const = default;
     };
+    // A text the game places once, where its window then was, kept with a window HeadsUp moves: the strip's title,
+    // whose text object holds where it is drawn (kStripTextX) and is not told when its window moves.
+    class PlacedText
+    {
+    public:
+        // Where the text belongs now. seen: where it is; origin: where the game put its window; at: where the window
+        // is. A place other than the one last given back is the game's own, placed for the window at origin.
+        WindowSpot Follow(WindowSpot seen, WindowSpot origin, WindowSpot at);
+        // Where the game had it, for putting it back: seen itself unless it is where Follow last put it.
+        WindowSpot Natural(WindowSpot seen) const;
+
+    private:
+        WindowSpot m_Natural{}, m_Given{};
+        bool m_Moved = false;
+    };
+
     // The equipment window's owner (ctor RVA 0x131940, draw 0x132F60) places its figures once, as number objects of
     // kNumberStride bytes with an int16 x at +4 and y at +6: Attack, Defense and the 8 resistances at +0x88, and the
     // 16 slots' counts at +0x1CC. Its layout is the base one, so a move leaves them where they were.
@@ -298,13 +316,15 @@ namespace headsup
         // Where to move the window at mcd, now at now and width by height, or none when it is where it should be:
         // down by shift and over by dx, dy from where the game put it, kept on the screen. A window moved down only
         // never goes up, however tall it is.
-        // The shift applies only to a window the game put above shiftAbove.
+        // The shift applies only to a window the game put above shiftAbove, and with follow to one that such a window,
+        // gone down, would lie over (the gil box under the status window), and so on down from it.
         std::optional<WindowSpot> PlaceFor(uint32_t mcd, const WindowKey& key, WindowSpot now, int width, int height,
-            int dx, int dy, int shift, int shiftAbove, int screenRight, int screenBottom);
+            int dx, int dy, int shift, int shiftAbove, int screenRight, int screenBottom, bool follow = false);
         // Where the game put the window at mcd, now at now: where HeadsUp moved it from, or now when it is not.
         WindowSpot OriginOf(uint32_t mcd, const WindowKey& key, WindowSpot now) const;
-        // The frame PlaceFor stamps the windows it sees with from now on.
-        void SetFrame(uint32_t frame) { m_Frame = frame; }
+        // The frame PlaceFor stamps the windows it sees with from now on. The frame that ends says which windows
+        // follow another down in the next.
+        void SetFrame(uint32_t frame);
         // Whether this window's owner places it itself: it was back where the game had it right after HeadsUp moved
         // it, kBounces times with at most kBounceFrames between, as no page change or relayout does. HeadsUp's move
         // of such a window must leave kMcdAsked as the owner set it, or the two move it back and forth for good.
@@ -317,6 +337,10 @@ namespace headsup
             uint32_t mcd = 0;
             WindowKey key{};
             WindowSpot from{}, to{};
+            int width = 0, height = 0;
+            int shift    = 0;     // what PlaceFor last offered it
+            bool root   = false; // it went down in its own right: above shiftAbove
+            bool pushed = false; // one that went down in the frame before would lie over where the game put it
             uint32_t frame = 0; // the last frame PlaceFor saw it
             uint32_t undone = 0; // the last frame it was found back where the game had it
             int bounces     = 0; // how many times running
@@ -335,6 +359,9 @@ namespace headsup
     // the highest non-empty one shown. kStripShown points into the shown buffer, 0 while nothing is shown; kStripBusy is
     // non-zero while the help window shows its busy shape instead of text; kStripLevel is the shown level.
     constexpr uint32_t kStripShown = 0x48, kStripBusy = 0x64, kStripLevel = 0x70;
+    // Where the text is drawn, in the menu's resolution: two int32s, x then y. The help line's follows its window; the
+    // title's is set without regard to where its window is (seen 2026-10-12: at 20, 24 with the window moved down).
+    constexpr uint32_t kStripTextSpot = 0x58;
     constexpr uint32_t kStripBuffers = 0x74, kStripStride = 0xCB, kStripBufferBytes = 0xCA, kStripLevels = 4;
     constexpr uint32_t kStripObjectBytes = kStripBuffers + kStripLevels * kStripStride; // where the scroll state starts
 

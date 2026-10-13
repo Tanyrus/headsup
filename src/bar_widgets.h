@@ -33,7 +33,8 @@ namespace headsup
     std::optional<uint32_t> GilOf(uint16_t item, uint32_t count);
     // A container as Ashita counts it: nullopt for one the character has no room in (locked, or not bought).
     std::optional<BagCount> BagOf(uint32_t used, uint32_t max);
-    // The container whose name, as the Bags popup gives it, the caption is: the game's caption for a bag list.
+    // The container whose name, as the Bags popup gives it, the caption is: the game's caption for a bag list, or
+    // "Items" for the inventory as that menu opens.
     std::optional<int> ContainerNamed(const std::string& caption);
 
     // What the widgets show, gathered by the plugin each frame.
