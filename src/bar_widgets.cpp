@@ -19,6 +19,7 @@ namespace headsup
         const char* const kContainerNames[kContainerCount] = {"Inventory", "Mog Safe", "Storage", "Temporary",
             "Mog Locker", "Mog Satchel", "Mog Sack", "Mog Case", "Mog Wardrobe", "Mog Safe 2", "Mog Wardrobe 2",
             "Mog Wardrobe 3", "Mog Wardrobe 4", "Mog Wardrobe 5", "Mog Wardrobe 6", "Mog Wardrobe 7", "Mog Wardrobe 8"};
+        constexpr const char* kItemsMenu = "Items";
         constexpr uint32_t kElementColors[kElementCount] = {0xFFFF8A3C, 0xFF8FD8FF, kBarGreen, 0xFFD8B25A, 0xFFC58CFF,
             0xFF5B9DFF, 0xFFFFFFFF, 0xFF9A8AA8};
         constexpr int kDamageColumns = 4, kElementColumns = 4, kStatusColumns = 5, kBagColumns = 2;
@@ -288,6 +289,8 @@ namespace headsup
     {
         for (int c = 0; c < kContainerCount; ++c)
             if (caption == kContainerNames[c]) return c;
+        // The Items menu opens on the inventory under its own name.
+        if (caption == kItemsMenu) return static_cast<int>(kInventory);
         return std::nullopt;
     }
 

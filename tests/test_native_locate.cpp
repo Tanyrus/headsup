@@ -925,3 +925,102 @@ TEST(a_window_the_game_moved_back_now_and_then_does_not_place_itself)
     }
     CHECK(!placements.PutsItselfBack(cast));
 }
+
+// The title window as the test client had it with the Items menu open (2026-10-12): the game puts the window at
+// (16, 17) and its text at (20, 24), in the menu's 1920 by 1080; HeadsUp moved the window down 40 and the text stayed.
+TEST(a_text_the_game_places_once_follows_the_window_headsup_moves)
+{
+    const WindowSpot origin{16, 17}, moved{16, 57};
+    PlacedText title;
+    CHECK(title.Follow({20, 24}, origin, origin) == (WindowSpot{20, 24})); // nothing moved: where the game has it
+    CHECK(title.Follow({20, 24}, origin, moved) == (WindowSpot{20, 64}));  // down with its window
+    CHECK(title.Follow({20, 64}, origin, moved) == (WindowSpot{20, 64}));  // and it stays, frame after frame
+    CHECK(title.Natural({20, 64}) == (WindowSpot{20, 24}));                // where to put it back
+    // The game places it again, as for a new caption: it goes with the window again, from there.
+    CHECK(title.Follow({22, 24}, origin, moved) == (WindowSpot{22, 64}));
+    // The window moves on, as when the bar's height changes: from where the game had the text, not from the last.
+    CHECK(title.Follow({22, 64}, origin, {16, 70}) == (WindowSpot{22, 77}));
+    CHECK(title.Follow({22, 77}, origin, origin) == (WindowSpot{22, 24})); // and home with it
+    CHECK(title.Natural({22, 24}) == (WindowSpot{22, 24}));
+}
+
+// A short bar moves the window less than its own height, so the moved text is still inside where the window was: it
+// must not be taken for one the game just placed and moved again.
+TEST(a_text_moved_less_than_its_windows_height_is_not_moved_twice)
+{
+    const WindowSpot origin{16, 17}, moved{16, 37};
+    PlacedText title;
+    CHECK(title.Follow({20, 24}, origin, moved) == (WindowSpot{20, 44}));
+    for (int frame = 0; frame < 3; ++frame)
+        CHECK(title.Follow({20, 44}, origin, moved) == (WindowSpot{20, 44}));
+    PlacedText fresh; // a text HeadsUp never moved is its own natural place
+    CHECK(fresh.Natural({20, 24}) == (WindowSpot{20, 24}));
+}
+
+namespace
+{
+    // The Equipment menu on the test client with only Every Window on (2026-10-12), in the menu's 1920 by 1080: the
+    // status window opens under the bar's line and goes down 40; the gil box right under it does not open there.
+    constexpr int kPushShift = 40, kBarLine = 80;
+    std::optional<WindowSpot> Pushable(WindowPlacements& placements, uint32_t mcd, const char* name, WindowSpot now,
+        int width, int height, bool follow = true)
+    {
+        return placements.PlaceFor(mcd, *KeyFromShortName(name), now, width, height, 0, 0, kPushShift, kBarLine, 1920,
+            1080, follow);
+    }
+}
+
+TEST(a_window_a_moved_one_would_cover_goes_down_with_it_when_every_window_goes)
+{
+    WindowPlacements placements;
+    placements.SetFrame(1);
+    CHECK(Pushable(placements, 0x1000, "statcom", {16, 47}, 150, 250) == (WindowSpot{16, 87}));
+    CHECK(!Pushable(placements, 0x2000, "money", {16, 297}, 150, 40));    // not known to be covered until a frame ends
+    CHECK(!Pushable(placements, 0x3000, "moneyctr", {16, 337}, 150, 30)); // under the gil box
+    CHECK(!Pushable(placements, 0x4000, "equip", {400, 297}, 150, 40));   // beside them: the status window never reaches it
+    CHECK(!Pushable(placements, 0x5000, "logwindo", {16, 800}, 600, 200)); // far below
+    placements.SetFrame(2);
+    CHECK(!Pushable(placements, 0x1000, "statcom", {16, 87}, 150, 250)); // where it was put
+    CHECK(Pushable(placements, 0x2000, "money", {16, 297}, 150, 40) == (WindowSpot{16, 337}));
+    CHECK(Pushable(placements, 0x3000, "moneyctr", {16, 337}, 150, 30) == (WindowSpot{16, 377})); // pushed by the box
+    CHECK(!Pushable(placements, 0x4000, "equip", {400, 297}, 150, 40));
+    CHECK(!Pushable(placements, 0x5000, "logwindo", {16, 800}, 600, 200));
+    placements.SetFrame(3); // all in place: nothing more to do, frame after frame
+    CHECK(!Pushable(placements, 0x1000, "statcom", {16, 87}, 150, 250));
+    CHECK(!Pushable(placements, 0x2000, "money", {16, 337}, 150, 40));
+    CHECK(!Pushable(placements, 0x3000, "moneyctr", {16, 377}, 150, 30));
+    // The status window closes: what it pushed goes back, each one frame after nothing moved covers it.
+    placements.SetFrame(4);
+    CHECK(!Pushable(placements, 0x2000, "money", {16, 337}, 150, 40));
+    CHECK(!Pushable(placements, 0x3000, "moneyctr", {16, 377}, 150, 30));
+    placements.SetFrame(5);
+    CHECK(Pushable(placements, 0x2000, "money", {16, 337}, 150, 40) == (WindowSpot{16, 297}));
+    CHECK(Pushable(placements, 0x3000, "moneyctr", {16, 377}, 150, 30) == (WindowSpot{16, 337}));
+}
+
+TEST(only_every_window_pushes_and_two_pushed_windows_do_not_hold_each_other_down)
+{
+    WindowPlacements picked; // windows picked one by one: a window under a moved one stays
+    picked.SetFrame(1);
+    CHECK(Pushable(picked, 0x1000, "statcom", {16, 47}, 150, 250, false) == (WindowSpot{16, 87}));
+    CHECK(!Pushable(picked, 0x2000, "money", {16, 297}, 150, 40, false));
+    picked.SetFrame(2);
+    CHECK(!Pushable(picked, 0x2000, "money", {16, 297}, 150, 40, false));
+
+    // Two windows that lie over each other, both pushed by a third: once it closes, neither keeps the other moved.
+    WindowPlacements placements;
+    placements.SetFrame(1);
+    Pushable(placements, 0x1000, "statcom", {16, 47}, 150, 250);
+    Pushable(placements, 0x2000, "money", {16, 200}, 150, 200);
+    Pushable(placements, 0x3000, "moneyctr", {16, 220}, 150, 200);
+    placements.SetFrame(2);
+    CHECK(Pushable(placements, 0x1000, "statcom", {16, 87}, 150, 250) == std::nullopt);
+    CHECK(Pushable(placements, 0x2000, "money", {16, 200}, 150, 200) == (WindowSpot{16, 240}));
+    CHECK(Pushable(placements, 0x3000, "moneyctr", {16, 220}, 150, 200) == (WindowSpot{16, 260}));
+    placements.SetFrame(3); // the status window is gone from here on
+    Pushable(placements, 0x2000, "money", {16, 240}, 150, 200);
+    Pushable(placements, 0x3000, "moneyctr", {16, 260}, 150, 200);
+    placements.SetFrame(4);
+    CHECK(Pushable(placements, 0x2000, "money", {16, 240}, 150, 200) == (WindowSpot{16, 200}));
+    CHECK(Pushable(placements, 0x3000, "moneyctr", {16, 260}, 150, 200) == (WindowSpot{16, 220}));
+}

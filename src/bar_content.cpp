@@ -47,6 +47,27 @@ namespace headsup
         return out;
     }
 
+    std::string SteadyFigures(std::string_view text, char digit)
+    {
+        std::string steady(text);
+        for (char& c : steady)
+            if (c >= '0' && c <= '9') c = digit;
+        return steady;
+    }
+
+    char WidestDigit(FunctionRef<float(char)> measure)
+    {
+        char widest = '0';
+        float most  = measure(widest);
+        for (char digit = '1'; digit <= '9'; ++digit)
+            if (const float width = measure(digit); width > most)
+            {
+                widest = digit;
+                most   = width;
+            }
+        return widest;
+    }
+
     std::string SpanText(double seconds)
     {
         const auto total = static_cast<long long>(std::ceil(std::max(0.0, seconds)));

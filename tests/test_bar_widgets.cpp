@@ -810,6 +810,7 @@ TEST(the_other_bags_are_gathered_only_while_their_popup_is_open)
 TEST(a_caption_names_a_bag_only_when_it_is_that_bags_name)
 {
     CHECK(ContainerNamed("Inventory") == 0 && ContainerNamed("Mog Wardrobe 8") == 16);
+    CHECK(ContainerNamed("Items") == 0); // the Items menu as it opens: its list is the inventory's
     CHECK(!ContainerNamed("Inventory 1/30").has_value()); // the game's own count, if it is there, stays the game's
     CHECK(!ContainerNamed("Commands").has_value() && !ContainerNamed("").has_value());
 }

@@ -206,8 +206,8 @@ A bar of widgets across the top of the screen, on by default, with these widgets
 | Distance | How far your target is, in yalms | Nothing |
 
 Under the bar at the screen's left, Game help has a thin bordered box of its own while the game has help to show, all
-on one line: the open menu's name, a bag's slots beside a bag's name, then the selected entry's help, a target prompt
-or a checked player's jobs. The box is as wide as its text, up to half the screen. Help longer than that ends in
+on one line: the open menu's name, a bag's slots beside a bag's name (the inventory's beside Items), then the selected
+entry's help, a target prompt or a checked player's jobs. The box is as wide as its text, up to half the screen. Help longer than that ends in
 "...", and hovering it shows all of it. Its switch is the Help Bar card's own, on the Top Panel page, and "Hide Game
 Help" in that card hides the game's own copy.
 
@@ -216,8 +216,10 @@ all by the same amount, from under the game's own help bar to under HeadsUp's, s
 together. The Game Windows card on the User Interface page lists the windows HeadsUp has a name for and any other that
 has opened since it loaded, each with an Under Bar switch and an X and Y offset, in the game's menu resolution, that
 moves it from where the game puts it; the equipment window and those that open with it start under the bar. The Window
-Groups card above it moves several windows together by one offset. The help bar has an X and Y offset of its own, in
-screen pixels, in its card. Unloading HeadsUp puts every open window it moved back where the game put it.
+Groups card above it moves several windows together by one offset. With Every Window on, a window that opens under
+the bar goes below it, and so does any window it would then lie over, such as the gil box under the status window,
+and so on down from there. With Game Help on, the game's own help bar goes under the top panel with its title. The
+help bar has an X and Y offset of its own, in screen pixels, in its card. Unloading HeadsUp puts every open window it moved back where the game put it.
 
 Hover a widget to open its details. Click it to keep them open; click it again to let them close once the pointer leaves
 the widget and its popup. Left and right clicks on the bar or an open popup never reach the game in windowed modes.

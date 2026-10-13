@@ -150,6 +150,8 @@ namespace headsup
         bool g_HideArrows       = false;
         HiddenWindows g_HiddenWindows;
         std::optional<HelpBand> g_HelpBand; // windows are moved out from under it while it is set
+        uint32_t g_TitleText = 0;           // the strip title's text object in its owner; 0 when it was not found
+        PlacedText g_TitlePlace;
         WindowKeyList g_MovedWindows;       // those the player picked
         WindowKeyList g_SeenWindows;        // those that opened since HeadsUp loaded
         struct KeyOffset
@@ -439,6 +441,10 @@ namespace headsup
         if (!FindSection(base, kCodeSection, text)) return kCodeNotRead;
         const WindowDraw found = LocateWindowDraw(text);
         if (found.problem != LocateProblem::None) return Describe(found.problem);
+        // Without the strip's text objects its title stays where the game draws it when its window moves.
+        ImageSection data{};
+        const StripSites strip = FindSection(base, kDataSection, data) ? LocateStripText(text, data) : StripSites{};
+        g_TitleText            = strip.problem == LocateProblem::None ? strip.titleText : 0;
         uint8_t* site       = base + found.call;
         CodePatch call      = Retarget(site, Address(site), Address(&HeadsUpWindowGate));
         g_HeadsUpWindowDraw = Address(base) + found.draw;
@@ -464,6 +470,7 @@ namespace headsup
             for (const WindowPlacements::Placed& placed : g_Placements.MovedSince(g_WindowFrame > 0 ? g_WindowFrame - 1 : 0))
                 PutWindowBack(placed);
         g_Placements         = {};
+        g_TitlePlace         = {};
         const CodePatch call = std::exchange(m_Call, {});
         g_HiddenWindows      = {};
         g_HelpBand.reset();
@@ -749,6 +756,26 @@ namespace headsup
             if (now != placed.to) return; // moved since, by the game or the player
             reinterpret_cast<WindowMoveToFn>(g_WindowMoveTo)(placed.mcd, placed.from.left, placed.from.top);
             if (placed.key == g_EquipKey) MoveEquipNumbers(owner, now, edge(2) - edge(0), edge(3) - edge(1), placed.from);
+            if (TitleWindow(placed.key) && g_TitleText != 0 &&
+                Readable(reinterpret_cast<const uint8_t*>(owner) + g_TitleText + kStripTextSpot, 2 * sizeof(int32_t)))
+            {
+                auto* spot = reinterpret_cast<int32_t*>(owner + g_TitleText + kStripTextSpot);
+                const WindowSpot home = g_TitlePlace.Natural(WindowSpot{spot[0], spot[1]});
+                spot[0] = home.left;
+                spot[1] = home.top;
+            }
+        }
+
+        // The strip's title is drawn where its text object says, and the game sets that as if the window were where
+        // it put it: the text goes where the window went.
+        void FollowTitle(uint32_t owner, WindowSpot origin, WindowSpot at)
+        {
+            if (owner == 0 || g_TitleText == 0) return;
+            auto* spot = reinterpret_cast<int32_t*>(owner + g_TitleText + kStripTextSpot);
+            const WindowSpot seen{spot[0], spot[1]}, want = g_TitlePlace.Follow(seen, origin, at);
+            if (want == seen) return;
+            spot[0] = want.left;
+            spot[1] = want.top;
         }
 
         void MoveFromHelpBar(uint32_t mcd, const WindowKey& key)
@@ -766,10 +793,15 @@ namespace headsup
                 // The strip's bottom where the game put it; its help and title go under the top bar when asked.
                 const WindowSpot origin = g_Placements.OriginOf(mcd, key, now);
                 g_StripBottom           = std::max(g_StripBottom, origin.top + (bottom - top));
+                WindowSpot at           = now;
                 if (band.moveGameHelp && band.topBar != 0 && HelpStripWindow(key))
                     if (const std::optional<WindowSpot> to = g_Placements.PlaceFor(mcd, key, now, right - left,
                             bottom - top, 0, 0, band.topBar, INT_MAX, band.screenRight, band.screenBottom))
+                    {
                         MoveWindow(mcd, key, *to);
+                        at = *to;
+                    }
+                if (TitleWindow(key)) FollowTitle(ReadAt<uint32_t>(field(kMcdOwner), 0), origin, at);
                 return;
             }
             g_SeenWindows.Add(key);
@@ -779,14 +811,15 @@ namespace headsup
                 if (g_Offsets[i].key == key) offset = &g_Offsets[i];
             // Down from under the game's strip once its windows were seen, so there is a shift to go by: a window
             // picked (or in a group that goes) wherever it opens, any other that opens under the bar when every window
-            // goes. A window whose area only reaches up there, as the chat log's, starts below it and stays.
+            // goes, and with it those it would then lie over. A window whose area only reaches up there, as the chat
+            // log's, starts below it and stays.
             const bool picked = g_MovedWindows.Has(key);
             const bool down   = (picked || band.allUnderBar) && g_StripBottom != 0 && band.bottom != 0;
             if (!down && offset == nullptr) return;
             if (const std::optional<WindowSpot> to = g_Placements.PlaceFor(mcd, key, now, right - left, bottom - top,
                     offset != nullptr ? offset->x : 0, offset != nullptr ? offset->y : 0,
                     down ? WindowShift(band, g_StripBottom) : 0, picked ? INT_MAX : band.bottom,
-                    band.screenRight, band.screenBottom))
+                    band.screenRight, band.screenBottom, band.allUnderBar))
             {
                 MoveWindow(mcd, key, *to);
                 if (key == g_EquipKey) MoveEquipNumbers(ReadAt<uint32_t>(field(kMcdOwner), 0), now, right - left,
