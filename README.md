@@ -191,7 +191,7 @@ A bar across the top of the screen, on by default, with these widgets from left 
 
 | Widget | Shows | Hover for |
 |---|---|---|
-| Zone | The zone's name, its region and who holds it | The region, who holds it and the zone's ID; in a conquest region, each nation's and the beastmen's share of this week's influence there, the largest first, and the time to the tally |
+| Zone | The zone's name, its region and who holds it | The zone's ID and region; in a conquest region, each nation's and the beastmen's share of this week's influence there, the largest first, with a mark on whoever holds it, and the time to the tally |
 | Weather | The weather now, with its element, and today's chance of it | A five-day forecast, starting today |
 | Vana'diel | The weekday in its element's color, the time and moon | The date, and when the day and moon change |
 | Job | Your jobs and levels, and the EXP to your next level (your merits at 75), over a bar of it | EXP per hour, the time to level, limit points |

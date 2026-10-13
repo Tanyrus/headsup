@@ -137,8 +137,8 @@ namespace headsup
     PopupRow LineOf(std::string text, Tone tone = Tone::Normal);
     // "Label value", the label dim and the value at the right edge.
     PopupRow Labeled(std::string label, Span value);
-    // The same with the label in its own tone or color.
-    PopupRow Labeled(Span label, Span value);
+    // The same with the label in spans of their own tones and colors.
+    PopupRow Labeled(std::vector<Span> label, Span value);
     PopupRow Grid(int columns, size_t cells);
     // 1,234,567
     std::string Grouped(uint32_t value);

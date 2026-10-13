@@ -483,33 +483,21 @@ namespace headsup
             const ZoneRecord* zone = KnownZone(state.zone);
             const std::string_view region = ZoneRegion(zone);
             popup.title = ListOf(Text(ZoneTitle(state.zone)));
-            PopupSection rows;
+            // A zone past the data has its number for a title already.
+            if (zone != nullptr) popup.title.push_back(Text(" " + std::to_string(state.zone), Tone::Dim));
             if (!region.empty())
-                rows.rows.push_back(Line(Cell(ListOf(Text("Region ", Tone::Dim), Text(std::string(region))))));
-            if (InConquest(zone))
-            {
-                if (state.owners)
-                {
-                    const Nation owner = OwnerOf(zone, state);
-                    Span holder =
-                        owner != Nation::None ? Colored(NationName(owner), NationColor(owner)) : Text("no one");
-                    rows.rows.push_back(Line(Cell(ListOf(Text("Held by ", Tone::Dim), std::move(holder)))));
-                }
-                else
-                    rows.rows.push_back(LineOf("Held by: known at the next conquest update", Tone::Dim));
-            }
-            rows.rows.push_back(Line(Cell(ListOf(Text("Zone ", Tone::Dim), Text(std::to_string(state.zone))))));
-            popup.sections = ListOf(std::move(rows));
+                popup.sections.push_back(PopupSection{
+                    "", ListOf(Line(Cell(ListOf(Text("Region ", Tone::Dim), Text(std::string(region))))))});
             if (InConquest(zone) && state.shares)
             {
                 PopupSection influence{"Influence", {}};
-                // The largest share is first.
-                if (state.shares->front().percent == 0)
-                    influence.rows.push_back(LineOf("No influence yet", Tone::Dim));
-                else
-                    for (const RegionShare& share : *state.shares)
-                        influence.rows.push_back(Labeled(Colored(NationName(share.nation), NationColor(share.nation)),
-                            Text(std::to_string(share.percent) + "%")));
+                const Nation owner = OwnerOf(zone, state);
+                for (const RegionShare& share : *state.shares)
+                {
+                    std::vector<Span> name = ListOf(Colored(NationName(share.nation), NationColor(share.nation)));
+                    if (share.nation == owner) name.push_back(Text(std::string(kDot) + "holds it", Tone::Dim));
+                    influence.rows.push_back(Labeled(std::move(name), Text(std::to_string(share.percent) + "%")));
+                }
                 influence.rows.push_back(Labeled("Tally in", Text(SpanText(SecondsToTally(state.unixMs)))));
                 popup.sections.push_back(std::move(influence));
             }

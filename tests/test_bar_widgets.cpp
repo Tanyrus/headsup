@@ -567,36 +567,32 @@ TEST(the_zone_says_who_holds_its_region_once_known)
     const WidgetContent w = BarWidgetContent(BarWidget::Zone, state, settings);
     CHECK(Joined(w.subtitle) == "Zulkheim \xC2\xB7 Bastok");
     CHECK(w.subtitle.back() == (Span{"Bastok", Tone::Own, NationColor(Nation::Bastok)}));
-    const PopupContent popup = BarPopupContent(BarWidget::Zone, state, settings); // named: the loop reads its rows
-    std::string all;
-    for (const PopupRow& row : popup.sections[0].rows)
-        for (const PopupCell& cell : row.cells)
-            all += Joined(cell.text) + "|";
-    CHECK(all.find("Held by Bastok") != std::string::npos);
     state.zone = 230; // Southern San d'Oria: a city region, not in the conquest packet
     CHECK(Joined(BarWidgetContent(BarWidget::Zone, state, settings).subtitle) == "San d'Oria");
 }
 
-TEST(the_zone_popup_says_when_no_one_holds_the_region_or_it_is_not_known_yet)
+TEST(the_zone_popup_has_the_zones_number_beside_its_name_over_its_region)
 {
     Settings settings;
     BarState state;
-    state.zone = 103; // Valkurm Dunes, Zulkheim
-    const PopupContent before = BarPopupContent(BarWidget::Zone, state, settings);
-    CHECK(Lines(before.sections[0]) ==
-          (std::vector<std::string>{"Region Zulkheim", "Held by: known at the next conquest update", "Zone 103"}));
-    state.owners = RegionOwners{}; // every region None
-    const PopupContent neutral = BarPopupContent(BarWidget::Zone, state, settings);
-    CHECK(Lines(neutral.sections[0]) == (std::vector<std::string>{"Region Zulkheim", "Held by no one", "Zone 103"}));
-    state.zone = 230; // Southern San d'Oria: a city region, not in the conquest packet
+    state.zone = 103; // Valkurm Dunes, Zulkheim (region 1)
+    const PopupContent dunes = BarPopupContent(BarWidget::Zone, state, settings);
+    CHECK(dunes.title == ListOf(Text("Valkurm Dunes"), Text(" 103", Tone::Dim)));
+    CHECK(dunes.sections.size() == 1 && Lines(dunes.sections[0]) == (std::vector<std::string>{"Region Zulkheim"}));
+    RegionOwners owners{};
+    owners[1]    = Nation::Bastok;
+    state.owners = owners; // who holds it is on the bar, and in the popup only beside its share
+    CHECK(BarPopupContent(BarWidget::Zone, state, settings) == dunes);
+    state.zone = 230; // Southern San d'Oria: a city region, outside the conquest
     const PopupContent city = BarPopupContent(BarWidget::Zone, state, settings);
-    CHECK(Lines(city.sections[0]) == (std::vector<std::string>{"Region San d'Oria", "Zone 230"}));
-    state.owners.reset();
-    const PopupContent cityBefore = BarPopupContent(BarWidget::Zone, state, settings);
-    CHECK(Lines(cityBefore.sections[0]) == (std::vector<std::string>{"Region San d'Oria", "Zone 230"}));
+    CHECK(Joined(city.title) == "Southern San d'Oria 230");
+    CHECK(city.sections.size() == 1 && Lines(city.sections[0]) == (std::vector<std::string>{"Region San d'Oria"}));
+    state.zone = 999; // past the data: its number is its title already, and it has no region
+    const PopupContent unknown = BarPopupContent(BarWidget::Zone, state, settings);
+    CHECK(Joined(unknown.title) == "Zone 999" && unknown.sections.empty());
 }
 
-TEST(the_zone_popup_ranks_the_influence_in_its_region_over_the_time_to_the_tally)
+TEST(the_zone_popup_ranks_the_influence_in_its_region_and_marks_who_holds_it)
 {
     Settings settings;
     BarState state;
@@ -611,16 +607,27 @@ TEST(the_zone_popup_ranks_the_influence_in_its_region_over_the_time_to_the_tally
     const PopupContent popup       = BarPopupContent(BarWidget::Zone, state, settings);
     const PopupSection* influence = Section(popup, "Influence");
     CHECK(influence != nullptr);
-    CHECK(Lines(popup.sections[0]) == (std::vector<std::string>{"Region Ronfaure", "Held by San d'Oria", "Zone 100"}));
-    CHECK(Lines(*influence) == (std::vector<std::string>{"San d'Oria 61%", "Bastok 21%", "Windurst 11%", "Beastmen 5%",
-                                   "Tally in 2d 8h"}));
+    CHECK(Lines(popup.sections[0]) == (std::vector<std::string>{"Region Ronfaure"}));
+    CHECK(Lines(*influence) == (std::vector<std::string>{"San d'Oria \xC2\xB7 holds it 61%", "Bastok 21%", "Windurst 11%",
+                                   "Beastmen 5%", "Tally in 2d 8h"}));
     for (const PopupRow& row : influence->rows)
         CHECK(row.kind == RowKind::Pair); // each figure at the right edge
+    CHECK(influence->rows[0].cells[0].text ==
+          ListOf(Colored("San d'Oria", NationColor(Nation::SanDoria)), Text(" \xC2\xB7 holds it ", Tone::Dim)));
     CHECK(influence->rows[1].cells[0].text == ListOf(Colored("Bastok ", NationColor(Nation::Bastok))));
+    (*state.owners)[0] = Nation::Beastmen; // a holder behind in the race keeps its place in it
+    CHECK(Lines(*Section(BarPopupContent(BarWidget::Zone, state, settings), "Influence")) ==
+          (std::vector<std::string>{"San d'Oria 61%", "Bastok 21%", "Windurst 11%", "Beastmen \xC2\xB7 holds it 5%",
+              "Tally in 2d 8h"}));
+    (*state.owners)[0] = Nation::None; // no one holds it: no line says so
+    CHECK(Lines(*Section(BarPopupContent(BarWidget::Zone, state, settings), "Influence")) ==
+          (std::vector<std::string>{"San d'Oria 61%", "Bastok 21%", "Windurst 11%", "Beastmen 5%", "Tally in 2d 8h"}));
+    (*state.owners)[0] = Nation::Windurst; // a new week: no influence yet, in the nations' order
     state.shares =
         RegionShares{{{Nation::SanDoria, 0}, {Nation::Bastok, 0}, {Nation::Windurst, 0}, {Nation::Beastmen, 0}}};
-    const PopupContent quiet = BarPopupContent(BarWidget::Zone, state, settings);
-    CHECK(Lines(*Section(quiet, "Influence")) == (std::vector<std::string>{"No influence yet", "Tally in 2d 8h"}));
+    CHECK(Lines(*Section(BarPopupContent(BarWidget::Zone, state, settings), "Influence")) ==
+          (std::vector<std::string>{"San d'Oria 0%", "Bastok 0%", "Windurst \xC2\xB7 holds it 0%", "Beastmen 0%",
+              "Tally in 2d 8h"}));
     state.zone = 230; // Southern San d'Oria: a city region, outside the conquest
     CHECK(Section(BarPopupContent(BarWidget::Zone, state, settings), "Influence") == nullptr);
 }
