@@ -10,8 +10,9 @@ FREETYPE_VERSION=2.15.0
 FREETYPE_SHA256=93cd47eb719c325107f2d3cf087d06299e944c3b48a40b55537302304dea1dd5
 RMLUI_VERSION=6.3
 RMLUI_SHA256=d977298bb6147610e5984d5db85ddf284020d655a8713913f6982074f1dbdede
-# The plugin's own code generation flags, so the libraries share its stack alignment and SSE math.
-MINGW_FLAGS="-O2 -msse2 -mfpmath=sse -mincoming-stack-boundary=2"
+# The plugin's own code generation flags, so the libraries share its stack alignment and SSE math. -g: the plugin's
+# build strips the DLL and keeps the symbols beside it, where a crash's addresses are read.
+MINGW_FLAGS="-g -O2 -msse2 -mfpmath=sse -mincoming-stack-boundary=2"
 # 32-bit Windows' malloc aligns to 8 bytes, where GCC takes plain new to give 16: without this, RmlUi's layout pool
 # (16-aligned chunks from plain new) faults on its first aligned store.
 MINGW_CXX_FLAGS="$MINGW_FLAGS -faligned-new=8"
@@ -55,6 +56,11 @@ fetch "RmlUi-$RMLUI_VERSION.tar.gz" "https://github.com/mikke89/RmlUi/archive/re
     "$RMLUI_SHA256"
 unpack "freetype-$FREETYPE_VERSION.tar.xz" "freetype-$FREETYPE_VERSION"
 unpack "RmlUi-$RMLUI_VERSION.tar.gz" "RmlUi-$RMLUI_VERSION"
+# RmlUi 6.3 compares a transform's text with each keyword over the keyword's length, past the end of a shorter
+# text (PropertyParserTransform::Scan): the patch stops at the text's end. Applied once.
+if ! patch -d "$DIR/src/RmlUi-$RMLUI_VERSION" -p1 -R -s -f --dry-run < "$TOOLS/transform-scan.patch" > /dev/null 2>&1; then
+    patch -d "$DIR/src/RmlUi-$RMLUI_VERSION" -p1 -s < "$TOOLS/transform-scan.patch"
+fi
 
 case "${1:-all}" in
     mingw) build mingw "-DCMAKE_TOOLCHAIN_FILE=$TOOLS/mingw-i686.cmake" "-DCMAKE_C_FLAGS=$MINGW_FLAGS" \

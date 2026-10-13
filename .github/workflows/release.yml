@@ -42,7 +42,7 @@ jobs:
         shell: bash
     steps:
       - name: Install the toolchain
-        run: pacman -Syu --noconfirm --needed git gcc mingw-w64-gcc python cmake ninja curl
+        run: pacman -Syu --noconfirm --needed git gcc mingw-w64-gcc python cmake ninja curl patch
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.find.outputs.tag }}
