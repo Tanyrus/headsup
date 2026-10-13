@@ -298,8 +298,10 @@ namespace headsup
 
         // Left, Center and Right as trays sunk into the card, each holding its widgets as raised chips in bar order:
         // a chip drags to another place or tray, and a click picks it, which opens its tab. A lit dot says it is on.
-        void DrawTrays(Ui& ui, Settings& s, int& picked, std::optional<Drop>& drop)
+        // Returns whether a chip was clicked.
+        bool DrawTrays(Ui& ui, Settings& s, int& picked, std::optional<Drop>& drop)
         {
+            bool clicked = false;
             const float gap   = ui.Em(0.6f);
             const float trayW = (ui.cardWidth - 2.0f * ui.Em(kCardPad) - 2.0f * gap) / kBarSectionCount;
             const float chipH = ui.Em(kChipHeight), inset = ui.Em(0.45f), head = ui.Em(1.7f), step = chipH + ui.Em(0.3f);
@@ -329,7 +331,10 @@ namespace headsup
                     ui.gui->SetNextItemAllowOverlap();
                     if (ui.Shape(id, ImVec2(trayW - 2.0f * inset, chipH), kRaised, chipH / 2.0f,
                             w == picked ? kAccent : kRaisedEdge))
-                        picked = w;
+                    {
+                        picked  = w;
+                        clicked = true;
+                    }
                     if (!ui.gui->IsItemActive()) ui.Tip(kBarWidgetTips[w]);
                     if (ui.gui->BeginDragDropSource(0))
                     {
@@ -357,6 +362,7 @@ namespace headsup
                 ui.DropTarget(here, widgets.size(), drop);
             }
             ui.EndRowAt(ui.cardX, top, trayH + ui.Em(0.3f));
+            return clicked;
         }
 
         // One widget's options: its switch, its section, what it shows and its own settings.
@@ -493,24 +499,10 @@ namespace headsup
 
     void DrawWidgetsPage(Ui& ui, Settings& s, std::unordered_set<std::string>& collapsed, int& picked)
     {
-        ui.Fade(!BarOn(s));
-        if (ui.BeginCard("Layout", collapsed, nullptr, "Drag a chip to move it; click it to open its tab below."))
-        {
-            std::optional<Drop> drop; // applied after drawing, so no list changes under its own loop
-            DrawTrays(ui, s, picked, drop);
-            if (drop) ui.changed |= MoveWidget(s.barSections, drop->from, drop->index, drop->to, drop->at);
-            if (ui.Action("Reset Layout", "Puts every widget back in its first place. Switches stay.") &&
-                s.barSections != DefaultPlacement())
-            {
-                s.barSections = DefaultPlacement();
-                ui.changed    = true;
-            }
-            ui.EndCard();
-        }
+        // The tabs come first, so a tab's options show without scrolling past the trays.
         ui.Fade(!BarOn(s));
         if (ui.BeginCard("Widgets", collapsed, nullptr, "A tab for each widget, with its options."))
         {
-            // Read after the trays, where a click picks: the open tab is the clicked chip's in the same frame.
             const std::vector<BarWidget> tabs = WidgetTabs();
             std::vector<std::string> names;
             std::vector<const char*> labels;
@@ -523,6 +515,21 @@ namespace headsup
                 labels.data(), count, TabsPerRow(count, kWidgetTabRows));
             picked          = static_cast<int>(tabs[static_cast<size_t>(tab)]);
             DrawWidgetOptions(ui, s, tabs[static_cast<size_t>(tab)]);
+            ui.EndCard();
+        }
+        ui.Fade(!BarOn(s));
+        if (ui.BeginCard("Layout", collapsed, nullptr, "Drag a chip to move it; click it to open its tab above."))
+        {
+            std::optional<Drop> drop; // applied after drawing, so no list changes under its own loop
+            // A clicked chip's tab is at the page's top, which the trays may have scrolled out of view.
+            if (DrawTrays(ui, s, picked, drop)) ui.gui->SetScrollY(0.0f);
+            if (drop) ui.changed |= MoveWidget(s.barSections, drop->from, drop->index, drop->to, drop->at);
+            if (ui.Action("Reset Layout", "Puts every widget back in its first place. Switches stay.") &&
+                s.barSections != DefaultPlacement())
+            {
+                s.barSections = DefaultPlacement();
+                ui.changed    = true;
+            }
             ui.EndCard();
         }
         ui.Fade(false);

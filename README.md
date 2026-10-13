@@ -246,22 +246,23 @@ A bar under 36 px is too short for two lines of text. There each widget's second
 in "27/30 Bags"; One Line can put it before the title instead, or leave it off.
 
 The Top Panel page of the settings (`/hu menu toppanel`) has two cards, Top Panel and Help Bar, and the Widgets page
-under it (`/hu menu widgets`) has two more, Layout and Widgets.
+under it (`/hu menu widgets`) has two more, Widgets and Layout.
 
 The Top Panel card has the bar's switch, a theme, a separators choice, a title font and a text font (the theme's own by
 default), a height from 24 to 64 px (45 by default), a text size, One Line, a popup size, and "Hide Readout", which
 hides the game's connection readout. The Help Bar card has Game help's switch, "Hide Game Help", the help bar's
 position and whether it has a background.
 
-In the Layout card, Left, Center and Right are trays side by side, each holding its widgets as chips in bar order,
-with a lit dot on each one that is on. A chip drags to another place in its tray or into another tray, an empty one
-too, and "Reset Layout" puts every widget back in its first place.
+The Widgets card, at the top of its page, has a tab for each widget, in two rows. A tab holds the widget's options:
+Enabled, its section, its second line and icons where it has them, and its own. Those are Target's details, Gil's
+currency, the Clock's and Server time's time zones with their 24-hour and seconds switches, Connection's latency, and
+for Job its layout (jobs first, EXP first or EXP only), its EXP bar under or beside the text or off, and its job
+names.
 
-The Widgets card has a tab for each widget, in two rows, and a click on a chip in the trays opens that widget's tab. A
-tab holds the widget's options: Enabled, its section, its second line and icons where it has them, and its own. Those
-are Target's details, Gil's currency, the Clock's and Server time's time zones with their 24-hour and seconds switches,
-Connection's latency, and for Job its layout (jobs first, EXP first or EXP only), its EXP bar under or beside the text
-or off, and its job names.
+In the Layout card under it, Left, Center and Right are trays side by side, each holding its widgets as chips in bar
+order, with a lit dot on each one that is on. A chip drags to another place in its tray or into another tray, an empty
+one too, and "Reset Layout" puts every widget back in its first place. A click on a chip opens that widget's tab and
+takes the page back up to it.
 
 Separators picks diamonds or none between neighbouring widgets in any theme, and starts at the theme's own. "Text Size"
 and "Popup Size" set those sizes in pixels or leave them on Auto, which follows the bar height; a bar size too large for
