@@ -17,7 +17,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SDK = ROOT / 'third_party' / 'ashita-sdk'
 SOURCE = ROOT / 'src'
-CALLED_INTERFACES = ['IAshitaCore', 'IMemoryManager', 'IEntity', 'IParty', 'IPlayer', 'IChatManager',
+CALLED_INTERFACES = ['IAshitaCore', 'IMemoryManager', 'IEntity', 'IParty', 'IPlayer', 'IRecast', 'IChatManager',
                      'IConfigurationManager', 'IGuiManager', 'ITarget', 'IProperties',
                      'IInputManager', 'IMouse', 'IInventory',
                      'IPacketManager', 'IResourceManager', 'IFontManager', 'IPrimitiveManager']
