@@ -20,6 +20,7 @@ namespace headsup
         uint32_t stripTop, stripMiddle, stripBottom; // the strip's gradient: top, 55% down, bottom
         uint32_t bottomLine, underLine, below;       // the strip's last row, one row under it, and what fades below
         uint32_t accent;                             // diamonds, frames, the pin mark, the target's border
+        uint32_t accentEnd;                          // what the accent runs into where it is a gradient
         uint32_t pill, pillBorder;
         uint32_t title, subtitle, divider;
         uint32_t panelTop, panelBottom, panelBorder, panelOuter;

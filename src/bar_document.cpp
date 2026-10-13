@@ -22,7 +22,8 @@ namespace headsup
         constexpr float kGlowSigmaPerWidth = 0.4f;
         constexpr float kSigmaPerRadius    = 0.5f;
         constexpr int kShadowDrop          = 1; // pixels down
-        constexpr uint32_t kAuroraViolet   = 0xFFB48CFF; // what Aurora's cyan runs into
+        // The accent's alpha in the target's frame as it breathes, from and to, and in a lit title's glow.
+        constexpr uint32_t kBreatheLow = 0x59, kBreatheHigh = 0xCC, kLitGlow = 0x80;
         constexpr float kGlint             = 2.0f;       // the line of light at the foot of Aurora's strip, in pixels
         constexpr uint32_t kAuroraGlassTop = 0xF21B2740, kAuroraGlassFoot = 0xF20C1220; // a popup's panel, down its height
         constexpr uint32_t kAuroraFrame    = 0x40;       // the accent's alpha in a popup's frame
@@ -223,11 +224,10 @@ namespace headsup
         // A color with another alpha.
         uint32_t Faded(uint32_t argb, uint32_t alpha) { return (argb & ~kAlphaMask) | alpha << kAlphaShift; }
 
-        // What Aurora adds to the pills: a line of light under the strip, widgets that ease into their lit look, a
-        // target's frame that breathes between the two colors, and progress as a gradient that pulses.
+        // What is Aurora's alone: a line of light under the strip, and widgets that show no pill until they are lit.
         std::string AuroraBarRules(const BarLook& look)
         {
-            const uint32_t cyan = look.palette.accent, violet = kAuroraViolet;
+            const uint32_t cyan = look.palette.accent, violet = look.palette.accentEnd;
             const std::string c = RcssColor(cyan), v = RcssColor(violet);
             std::string css;
             css += ".glint{position:absolute;top:" + Px(look.metrics.height - kGlint) + ";height:" + Px(kGlint) + ";}";
@@ -235,19 +235,11 @@ namespace headsup
             css += ".glint.b{left:30%;width:40%;decorator:horizontal-gradient(" + c + " " + v + ");}";
             css += ".glint.c{left:70%;width:30%;decorator:horizontal-gradient(" + v + " " + RcssColor(Faded(violet, 0)) + ");}";
             css += ".pills .widget,.pills .widget.flat{border-radius:" + Px(look.row.height / 2.0f) +
-                   ";background-color:transparent;border-color:transparent;"
-                   "transition:background-color 0.2s cubic-out,border-color 0.2s cubic-out;}";
-            css += ".pills .widget.target{background-color:" + RcssColor(Faded(cyan, 0x14)) +
-                   ";animation:2.4s sine-in-out infinite alternate aurora-breathe;}";
-            css += "@keyframes aurora-breathe{from{border-color:" + RcssColor(Faded(cyan, 0x59)) + ";}to{border-color:" +
-                   RcssColor(Faded(violet, 0xCC)) + ";}}";
+                   ";background-color:transparent;border-color:transparent;}";
+            css += ".pills .widget.target{background-color:" + RcssColor(Faded(cyan, 0x14)) + ";}";
             css += ".pills .widget.lit{background-color:" + RcssColor(Faded(cyan, 0x2E)) + ";border-color:" +
-                   RcssColor(Faded(cyan, 0xB3)) + ";animation:none;}";
-            css += ".widget.lit .title{font-effect:glow(0px 3px 0px 0px " + RcssColor(Faded(cyan, 0x80)) + ");}";
+                   RcssColor(Faded(cyan, 0xB3)) + ";}";
             css += ".progress,.beside{background-color:#ffffff1f;}";
-            css += ".fill{decorator:horizontal-gradient(" + c + " " + v + ");animation:1.8s sine-in-out infinite alternate "
-                   "aurora-pulse;}";
-            css += "@keyframes aurora-pulse{from{opacity:0.65;}to{opacity:1;}}";
             return css;
         }
     }
@@ -289,7 +281,8 @@ namespace headsup
         // keeps the divider's clear space either side as margin, so its tint ends short of the diamonds.
         css += ".widget{position:absolute;top:" + Px(row.y) + ";height:" + Px(row.height) +
                ";box-sizing:border-box;white-space:nowrap;border-width:" + Px(kBoxBorder) + ";padding:0px " +
-               Px(m.padding - kBoxBorder) + ";" + BoxRules(std::nullopt) + "}";
+               Px(m.padding - kBoxBorder) + ";" + BoxRules(std::nullopt) +
+               "transition:background-color 0.2s cubic-out,border-color 0.2s cubic-out;}";
         if (look.ornate)
         {
             css += ".ornate .widget{border-width:0px;margin:0px " + Px(clear) + ";padding:" + Px(kContentInset) + " " +
@@ -306,6 +299,14 @@ namespace headsup
             css += ".pills .widget.target{" + BoxRules(boxOf(BarWidget::Target, false)) + "}";
             css += ".pills .widget.lit{" + BoxRules(boxOf(BarWidget::Weather, true)) + "}";
         }
+        // A widget eases into its lit look (above) and its title glows there; the target's frame breathes from the
+        // accent into what it runs into until it is lit.
+        css += ".widget.target{animation:2.4s sine-in-out infinite alternate breathe;}";
+        css += "@keyframes breathe{from{border-color:" + RcssColor(Faded(p.accent, kBreatheLow)) + ";}to{border-color:" +
+               RcssColor(Faded(p.accentEnd, kBreatheHigh)) + ";}}";
+        css += std::string(".widget.") + kLitClass + "{animation:none;}";
+        css += std::string(".widget.") + kLitClass + " .title{font-effect:glow(0px 3px 0px 0px " +
+               RcssColor(Faded(p.accent, kLitGlow)) + ");}";
 
         css += ".content{position:relative;height:100%;}";
         css += ".icon,.coin,.text,.beside,.line-icons,.line-icon,.t{display:inline-block;vertical-align:top;}";
@@ -337,7 +338,10 @@ namespace headsup
         css += ".beside{margin-left:" + Px(m.gap) + ";width:" + Px(BesideWidth(m)) + ";height:" + Px(besideHeight) +
                ";margin-top:" + Px(std::round(row.y + (row.height - besideHeight) / 2.0f) - rowTop) +
                ";background-color:" + RcssColor(p.divider) + ";}";
-        css += ".fill{height:100%;background-color:" + RcssColor(p.accent) + ";}";
+        // Progress is a gradient that pulses.
+        css += ".fill{height:100%;decorator:horizontal-gradient(" + RcssColor(p.accent) + " " + RcssColor(p.accentEnd) +
+               ");animation:1.8s sine-in-out infinite alternate pulse;}";
+        css += "@keyframes pulse{from{opacity:0.65;}to{opacity:1;}}";
         // Game help's bar: its pieces are placed in the screen's own pixels.
         css += std::string("#") + kHelpId + "{position:absolute;left:0px;top:0px;width:0px;height:0px;}";
         css += ".p{position:absolute;white-space:pre;}";
@@ -389,7 +393,11 @@ namespace headsup
         std::string css = "body{display:block;width:100%;height:100%;pointer-events:none;z-index:10;}";
         css += "div{display:block;}";
         css += std::string(".") + kHiddenClass + "{display:none;}";
-        css += std::string("#") + kPopupId + "{position:absolute;}";
+        // A popup drops in from its widget.
+        css += std::string("#") + kPopupId + "{position:absolute;transform-origin:50% 0%;}";
+        css += std::string("#") + kPopupId + "." + kOpenClass + "{animation:0.2s cubic-out drop-in;}";
+        css += "@keyframes drop-in{from{opacity:0;transform:translateY(-10px) scale(0.96);}to{opacity:1;"
+               "transform:translateY(0px) scale(1);}}";
         css += ".p{position:absolute;white-space:pre;}";
         for (int f = 0; f < kPopupFontCount; ++f)
             css += ".f" + std::to_string(f) + "{" + FaceRules(faces[f].family, faces[f].pixels, faces[f].line) +
@@ -405,11 +413,7 @@ namespace headsup
         css += ".mark{text-align:center;}";
         if (theme == BarTheme::Aurora)
         {
-            // A popup drops in from its widget, and its cards are glass.
-            css += std::string("#") + kPopupId + "{transform-origin:50% 0%;}";
-            css += std::string("#") + kPopupId + "." + kOpenClass + "{animation:0.2s cubic-out aurora-drop;}";
-            css += "@keyframes aurora-drop{from{opacity:0;transform:translateY(-10px) scale(0.96);}to{opacity:1;"
-                   "transform:translateY(0px) scale(1);}}";
+            // Its panel and cards are glass.
             css += ".card{decorator:vertical-gradient(#ffffff17 #ffffff08);background-color:transparent;border-color:" +
                    RcssColor(Faded(look.palette.accent, 0x33)) + ";}";
             css += "#panel{background-color:transparent;decorator:vertical-gradient(" + RcssColor(kAuroraGlassTop) + " " +

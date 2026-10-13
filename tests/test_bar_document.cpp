@@ -250,7 +250,46 @@ TEST(a_star_is_served_in_the_coins_gold)
     CHECK(star->argb[7 * 15 + 7] == 0xFFE8C35Au); // its middle
 }
 
-TEST(aurora_adds_light_and_motion_to_the_bar_and_its_popups)
+TEST(every_theme_eases_breathes_and_pulses_in_its_own_colors)
+{
+    Settings settings;
+    const PopupFaces faces = {PopupFace{"Barlow Condensed", 24, 29, 0}, PopupFace{"Barlow Condensed", 18, 22, 0},
+        PopupFace{"Barlow Condensed", 15, 18, 2}, PopupFace{"Barlow Condensed", 15, 18, 0}};
+    struct Lit
+    {
+        BarTheme theme;
+        const char* breathe;
+        const char* fill;
+    };
+    // The accent at about a third, into what it runs into at four fifths: gold into pale gold, blue into light
+    // blue, the royal red into the ember, cyan into violet.
+    for (const Lit& lit : {Lit{BarTheme::PhoenixGold, "from{border-color:#c9a24a59;}to{border-color:#efe3c6cc;}", "#c9a24aff #efe3c6ff"},
+             Lit{BarTheme::UmbraDark, "from{border-color:#5b8def59;}to{border-color:#9cc2ffcc;}", "#5b8defff #9cc2ffff"},
+             Lit{BarTheme::PhoenixRedOrnate, "from{border-color:#c5515159;}to{border-color:#e06f5ecc;}", "#c55151ff #e06f5eff"},
+             Lit{BarTheme::PhoenixRedPills, "from{border-color:#c5515159;}to{border-color:#e06f5ecc;}", "#c55151ff #e06f5eff"},
+             Lit{BarTheme::Aurora, "from{border-color:#5ee6ff59;}to{border-color:#b48cffcc;}", "#5ee6ffff #b48cffff"}})
+    {
+        const BarLook look    = LookOf(lit.theme, settings);
+        const std::string rml = BarDocument(look, lit.theme, Place());
+        // Widgets ease into their lit look, the target's frame breathes until it is lit, and progress is a
+        // gradient that pulses.
+        CHECK(Has(rml, "transition:background-color 0.2s cubic-out,border-color 0.2s cubic-out;"));
+        CHECK(Has(rml, ".widget.target{animation:2.4s sine-in-out infinite alternate breathe;}"));
+        CHECK(Has(rml, (std::string("@keyframes breathe{") + lit.breathe + "}").c_str()));
+        CHECK(Has(rml, ".widget.lit{animation:none;}"));
+        CHECK(Has(rml, (std::string("decorator:horizontal-gradient(") + lit.fill +
+                           ");animation:1.8s sine-in-out infinite alternate pulse;}").c_str()));
+        CHECK(Has(rml, "@keyframes pulse{from{opacity:0.65;}to{opacity:1;}}"));
+        // A popup drops in from its widget.
+        const std::string popup = PopupDocument(look, faces, lit.theme);
+        CHECK(Has(popup, "#popup{position:absolute;transform-origin:50% 0%;}"));
+        CHECK(Has(popup, "#popup.open{animation:0.2s cubic-out drop-in;}"));
+        CHECK(Has(popup, "@keyframes drop-in{from{opacity:0;transform:translateY(-10px) scale(0.96);}to{opacity:1;"
+                         "transform:translateY(0px) scale(1);}}"));
+    }
+}
+
+TEST(the_line_of_light_and_the_glass_are_auroras_alone)
 {
     Settings settings;
     const BarLook aurora  = LookOf(BarTheme::Aurora, settings);
@@ -259,19 +298,14 @@ TEST(aurora_adds_light_and_motion_to_the_bar_and_its_popups)
     CHECK(Has(rml, "<div class=\"glint a\"></div><div class=\"glint b\"></div><div class=\"glint c\"></div>"));
     CHECK(Has(rml, ".glint.a{left:0%;width:30%;decorator:horizontal-gradient(#5ee6ff00 #5ee6ffff);}"));
     CHECK(Has(rml, ".glint.c{left:70%;width:30%;decorator:horizontal-gradient(#b48cffff #b48cff00);}"));
-    // Widgets ease into their lit look, the target's frame breathes, and progress is a gradient.
-    CHECK(Has(rml, "transition:background-color 0.2s cubic-out,border-color 0.2s cubic-out;"));
-    CHECK(Has(rml, "@keyframes aurora-breathe{from{border-color:#5ee6ff59;}to{border-color:#b48cffcc;}}"));
-    CHECK(Has(rml, ".fill{decorator:horizontal-gradient(#5ee6ffff #b48cffff);"));
     const PopupFaces faces = {PopupFace{"Barlow Condensed", 24, 29, 0}, PopupFace{"Barlow Condensed", 18, 22, 0},
         PopupFace{"Barlow Condensed", 15, 18, 2}, PopupFace{"Barlow Condensed", 15, 18, 0}};
-    const std::string popup = PopupDocument(aurora, faces, BarTheme::Aurora);
-    CHECK(Has(popup, "@keyframes aurora-drop{from{opacity:0;transform:translateY(-10px) scale(0.96);}"));
-    CHECK(Has(popup, "#popup.open{animation:0.2s cubic-out aurora-drop;}"));
     // The panel is glass, lighter at its top, in a frame of the accent at a quarter.
-    CHECK(Has(popup, "#panel{background-color:transparent;decorator:vertical-gradient(#1b2740f2 #0c1220f2);border-color:#5ee6ff40;}"));
-    // The other themes have none of it.
-    const std::string gold = BarDocument(LookOf(BarTheme::PhoenixGold, settings), BarTheme::PhoenixGold, Place());
-    CHECK(!Has(gold, "glint") && !Has(gold, "transition") && !Has(gold, "@keyframes"));
-    CHECK(!Has(PopupDocument(LookOf(BarTheme::UmbraDark, settings), faces, BarTheme::UmbraDark), "aurora"));
+    CHECK(Has(PopupDocument(aurora, faces, BarTheme::Aurora),
+        "#panel{background-color:transparent;decorator:vertical-gradient(#1b2740f2 #0c1220f2);border-color:#5ee6ff40;}"));
+    // The others keep their strips and panels.
+    const BarLook gold = LookOf(BarTheme::PhoenixGold, settings);
+    CHECK(!Has(BarDocument(gold, BarTheme::PhoenixGold, Place()), "glint"));
+    CHECK(!Has(PopupDocument(gold, faces, BarTheme::PhoenixGold), "background-color:transparent;decorator:vertical-gradient(#1b2740f2"));
+    CHECK(Has(PopupDocument(gold, faces, BarTheme::PhoenixGold), "decorator:vertical-gradient(#1c160ff7 #0c0a08f7);"));
 }

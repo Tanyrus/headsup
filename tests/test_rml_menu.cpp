@@ -7,6 +7,7 @@
 
 #include <RmlUi/Core.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -412,21 +413,54 @@ TEST(every_control_of_every_page_takes_a_click_and_the_window_stands)
     }
 }
 
-TEST(auroras_lists_drop_in_and_phoenixs_are_there_at_once)
+TEST(a_list_drops_in_in_both_themes)
 {
-    const std::string list = "mobs-line-style-color-mobs0";
+    for (const MenuTheme theme : {MenuTheme::Phoenix, MenuTheme::Aurora})
     {
-        Window window(MenuTheme::Phoenix);
+        Window window(theme);
         window.Page("mobs");
-        window.Click(list);
+        window.Click("mobs-line-style-color-mobs0");
+        // A tenth of a second after the click it is still fading in, and a second later it is whole.
+        const float early = window.Find("popup")->GetComputedValues().opacity();
+        CHECK(early > 0.0f && early < 1.0f);
+        window.Frames(30);
         CHECK_EQ(window.Find("popup")->GetComputedValues().opacity(), 1.0f);
     }
+}
+
+TEST(a_checkboxs_mark_grows_from_its_middle_and_auroras_knob_slides_across)
+{
+    const std::string box = "entities-nameplate-style-stack-names";
+    auto near  = [](float value, float wanted) { return value > wanted - 0.5f && value < wanted + 0.5f; };
+    auto size  = [](Rml::Element* element) { return element->GetBox().GetSize(Rml::BoxArea::Border); };
+    auto left  = [](Rml::Element* mark) {
+        return mark->GetAbsoluteOffset(Rml::BoxArea::Border).x - mark->GetParentNode()->GetAbsoluteOffset(Rml::BoxArea::Border).x;
+    };
+    {
+        // Phoenix: no mark while off; on, it is half the box wide, a quarter in from its left.
+        Window window(MenuTheme::Phoenix);
+        const float side = size(window.Find(box)).x;
+        CHECK_EQ(size(window.Find(box)->GetChild(0)).x, 0.0f);
+        CHECK(window.Click(box));
+        // On its way it grows a little past its size and comes back.
+        float most = 0.0f;
+        for (int frame = 0; frame < 8; ++frame)
+        {
+            most = std::max(most, size(window.Find(box)->GetChild(0)).x);
+            window.Frames();
+        }
+        CHECK(most > side / 2.0f + 0.5f);
+        Rml::Element* mark = window.Find(box)->GetChild(0);
+        CHECK(near(size(mark).x, side / 2.0f) && near(size(mark).y, side / 2.0f) && near(left(mark), side / 4.0f));
+    }
+    // Aurora: a track 2.6 em long and a knob of 1 em, 0.15 em from the track's left while off and 1.45 em while on.
     Window window(MenuTheme::Aurora);
-    window.Page("mobs");
-    window.Click(list);
-    // A tenth of a second after the click it is still fading in, and a second later it is whole.
-    const float early = window.Find("popup")->GetComputedValues().opacity();
-    CHECK(early > 0.0f && early < 1.0f);
+    const float em = size(window.Find(box)).x / 2.6f;
+    CHECK(near(size(window.Find(box)->GetChild(0)).x, em) && near(left(window.Find(box)->GetChild(0)), 0.15f * em));
+    CHECK(window.Click(box));
+    const float early = left(window.Find(box)->GetChild(0));
+    CHECK(early > 0.15f * em + 0.5f && early < 1.45f * em - 0.5f);
     window.Frames(30);
-    CHECK_EQ(window.Find("popup")->GetComputedValues().opacity(), 1.0f);
+    Rml::Element* knob = window.Find(box)->GetChild(0);
+    CHECK(near(size(knob).x, em) && near(size(knob).y, em) && near(left(knob), 1.45f * em));
 }

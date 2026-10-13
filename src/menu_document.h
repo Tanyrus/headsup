@@ -5,7 +5,7 @@
 
 namespace headsup
 {
-    // The settings window's looks: Phoenix's own, and Aurora, which leans on what RmlUi adds.
+    // The settings window's looks: Phoenix's own, and Aurora's glass and switches. Both move alike.
     enum class MenuTheme : uint8_t
     {
         Phoenix,
@@ -22,14 +22,15 @@ namespace headsup
         uint32_t border, raisedEdge; // a card's edge, and a chip's, lighter
         uint32_t text, heading, label, muted;
         uint32_t accent, accentHover, accentSoft; // accentSoft: the picked page, a hovered row
+        uint32_t accentEnd;                       // what the accent runs into where it is a gradient
     };
-    // The Phoenix palette of phoenix-xi.com, which the bar's Phoenix themes share.
+    // The Phoenix palette of phoenix-xi.com, which the bar's Phoenix themes share: its red runs into its ember.
     constexpr MenuColors kPhoenixMenuColors{0xF7150C0C, 0xFF24181A, 0xFF352325, 0xFF452D2F, 0xFF0F0808, 0x24D2ABAB,
-        0x3DD2ABAB, 0xFFFFF4F0, 0xFFE7C9A9, 0xFFD9C2BE, 0xFF8C7270, 0xFFC55151, 0xFFE06F5E, 0x47C55151};
+        0x3DD2ABAB, 0xFFFFF4F0, 0xFFE7C9A9, 0xFFD9C2BE, 0xFF8C7270, 0xFFC55151, 0xFFE06F5E, 0x47C55151, 0xFFE06F5E};
 
-    // Aurora: slate glass with a cyan accent, as the bar's theme of that name.
+    // Aurora: slate glass with a cyan accent that runs into violet, as the bar's theme of that name.
     constexpr MenuColors kAuroraMenuColors{0xEB0B111B, 0xB3162031, 0xFF1F2B40, 0xFF2A3A55, 0xFF080C13, 0x2EB8D8FF,
-        0x4DB8D8FF, 0xFFEAF2FF, 0xFFEAF2FF, 0xFFC2D0E6, 0xFF7F92AE, 0xFF5EE6FF, 0xFF9AF0FF, 0x385EE6FF};
+        0x4DB8D8FF, 0xFFEAF2FF, 0xFFEAF2FF, 0xFFC2D0E6, 0xFF7F92AE, 0xFF5EE6FF, 0xFF9AF0FF, 0x385EE6FF, 0xFFB48CFF};
 
     struct MenuLook
     {

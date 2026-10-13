@@ -19,6 +19,7 @@ namespace headsup
         constexpr float kNavHeight    = 2.0f;
         constexpr float kMark         = 0.8f;  // a checked box's mark
         constexpr float kArrow        = 0.35f; // half an arrow's base
+        constexpr float kKnob         = 0.35f; // a slider's knob: a bright bar as tall as its track
     }
 
     const char* MenuThemeName(MenuTheme theme)
@@ -29,70 +30,36 @@ namespace headsup
 
     namespace
     {
-        constexpr uint32_t kAuroraViolet = 0xFFB48CFF; // what Aurora's cyan runs into
+        // The accent's alpha where it is light and no fill: a slider's filled part and a hovered card's edge, the
+        // title's glow, the line under it, a text box that has the keyboard, and the picked page from end to end.
+        constexpr uint32_t kWash = 0x59, kGlow = 0x66, kLine = 0xB3, kFocus = 0x99, kPickedStart = 0x47, kPickedEnd = 0x14;
+        constexpr uint32_t kAuroraFrame = 0x40, kAuroraPopupFrame = 0x66; // the accent's alpha in Aurora's edges
+        constexpr float kHeadLineGap = 0.2f; // from the title row down to the line of light under it
+        constexpr const char* kEase  = " 0.16s cubic-out"; // a control between two of its looks
+        constexpr const char* kSlide = " 0.18s cubic-out"; // a switch's knob and its track
+        constexpr const char* kPop   = " 0.18s back-out";  // a box's mark, a little past its size and back
 
         uint32_t Faded(uint32_t argb, uint32_t alpha) { return (argb & 0x00FFFFFF) | alpha << 24; }
 
-        // What Aurora adds: glass in place of flat fills, gradients from cyan to violet, and every change of state
-        // eased: switches whose knobs slide, pages that slide under the pointer, a window and popups that drop in.
+        // What is Aurora's alone: glass in place of flat fills, switches whose knobs slide, and dark text on the
+        // picked choice's bright gradient.
         std::string AuroraMenuRules(const MenuColors& c)
         {
-            const uint32_t cyan = c.accent, violet = kAuroraViolet;
-            const std::string a = RcssColor(cyan), v = RcssColor(violet), dark = RcssColor(c.inset | 0xFF000000);
-            const std::string wash = "horizontal-gradient(" + RcssColor(Faded(cyan, 0x59)) + " " + RcssColor(Faded(violet, 0x59)) + ")";
-            const std::string bright = "horizontal-gradient(" + a + " " + v + ")";
-            const char* ease = " 0.16s cubic-out";
+            const std::string a = RcssColor(c.accent);
             std::string css;
             css += "body{decorator:vertical-gradient(#111b2cf2 #090e17f2);background-color:transparent;border-color:" +
-                   RcssColor(Faded(cyan, 0x40)) + ";}";
-            css += "body.open{animation:0.22s cubic-out aurora-window;}";
-            css += "@keyframes aurora-window{from{opacity:0;transform:scale(0.97);}to{opacity:1;transform:scale(1);}}";
-            css += "#title{font-effect:glow(0px 4px 0px 0px " + RcssColor(Faded(cyan, 0x66)) + ");}";
-            css += "#head-line{display:block;position:absolute;left:1em;right:1em;top:3.25em;height:1px;decorator:"
-                   "horizontal-gradient(" + RcssColor(Faded(cyan, 0xB3)) + " " + RcssColor(Faded(violet, 0)) + ");}";
-            // The pages: a bar grows beside the picked one, and each slides a little under the pointer.
-            css += std::string(".nav{transition:background-color") + ease + ",color" + ease + ",padding-left" + ease + ";}";
-            css += ".nav:hover{padding-left:1.35em;}";
-            css += ".nav.picked{background-color:transparent;decorator:horizontal-gradient(" + RcssColor(Faded(cyan, 0x47)) +
-                   " " + RcssColor(Faded(violet, 0x14)) + ");}";
-            css += ".nav-mark{display:block;left:0.35em;top:1em;width:0.2em;height:0em;border-radius:0.1em;"
-                   "transition:height 0.2s back-out,top 0.2s back-out;}";
-            css += ".nav.picked .nav-mark{top:0.45em;height:1.1em;}";
-            // Cards of glass; a card's arrow turns into place and its rows fade in when it opens.
-            css += ".card{background-color:transparent;decorator:vertical-gradient(#1c283cb8 #131b2ab8);"
-                   "transition:border-color 0.2s cubic-out;}";
-            css += ".card:hover{border-color:" + RcssColor(Faded(cyan, 0x59)) + ";}";
-            css += std::string(".card-title{transition:color") + ease + ";}";
-            css += ".card-head:hover .card-title{color:" + a + ";}";
-            css += ".arrow.open{animation:0.18s cubic-out aurora-turn;}";
-            css += "@keyframes aurora-turn{from{transform:rotate(-90deg);}to{transform:rotate(0deg);}}";
-            css += ".card-body{animation:0.2s cubic-out aurora-fade;}";
-            css += "@keyframes aurora-fade{from{opacity:0;}to{opacity:1;}}";
-            // A switch: its knob slides and its track takes the accent.
-            css += ".check{width:2.6em;height:1.3em;border-radius:0.65em;transition:background-color 0.18s cubic-out;}";
-            css += ".check.on{background-color:" + RcssColor(Faded(cyan, 0x59)) + ";}";
-            css += ".mark{display:block;left:0.15em;top:0.15em;width:1em;height:1em;border-radius:0.5em;background-color:" +
-                   RcssColor(c.muted) + ";transition:left 0.18s cubic-out,background-color 0.18s cubic-out;}";
-            css += ".check.on .mark{left:1.45em;background-color:" + a + ";}";
+                   RcssColor(Faded(c.accent, kAuroraFrame)) + ";}";
+            css += ".card{background-color:transparent;decorator:vertical-gradient(#1c283cb8 #131b2ab8);}";
+            css += ".check{width:2.6em;height:1.3em;border-radius:0.65em;}";
+            css += ".check.on{background-color:" + RcssColor(Faded(c.accent, kWash)) + ";}";
+            css += ".mark{left:0.15em;top:0.15em;width:1em;height:1em;border-radius:0.5em;background-color:" +
+                   RcssColor(c.muted) + ";transition:left" + kSlide + ",background-color" + kSlide + ";}";
+            // The shared rule for a checked box places and sizes its mark: the knob says its own again.
+            css += ".check.on .mark{left:1.45em;top:0.15em;width:1em;height:1em;background-color:" + a + ";}";
             css += ".check.card-on{top:0.55em;}.switch-room{width:2.6em;}";
-            // Choices, tabs and buttons ease between their looks; the picked one is the gradient.
-            css += std::string(".seg,.tab,.btn,.dd,.opt,.wchip{transition:background-color") + ease + ",border-color" + ease +
-                   ",color" + ease + ";}";
-            css += ".seg.picked,.tab.picked,.btn.accent{decorator:" + bright + ";color:" + dark + ";}";
-            css += ".tab-rule{background-color:transparent;decorator:horizontal-gradient(" + a + " " +
-                   RcssColor(Faded(violet, 0)) + ");}";
-            css += ".wchip.picked{border-color:" + a + ";}";
-            // A slider's filled part is a wash of the gradient, and its knob a bright bar.
-            css += "input.range sliderprogress{height:1.6em;border-radius:0.4em;decorator:" + wash + ";}";
-            css += "input.range sliderbar{width:0.35em;height:1.6em;margin-top:0em;border-radius:0.175em;background-color:" +
-                   RcssColor(c.text) + ";}";
-            css += std::string("input.text{border:1px transparent;transition:border-color") + ease + ";}";
-            css += "input.text:focus{border-color:" + RcssColor(Faded(cyan, 0x99)) + ";}";
-            css += "scrollbarvertical sliderbar{background-color:" + RcssColor(Faded(cyan, 0x40)) + ";}";
-            // The popup drops in under its control.
-            css += std::string("#") + kMenuPopupId + ".open{animation:0.16s cubic-out aurora-drop;}";
-            css += "@keyframes aurora-drop{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0px);}}";
-            css += std::string("#") + kMenuPopupId + ",#" + kMenuTipId + "{border-color:" + RcssColor(Faded(cyan, 0x66)) + ";}";
+            css += ".seg.picked,.tab.picked,.btn.accent{color:" + RcssColor(c.inset | 0xFF000000) + ";}";
+            css += "scrollbarvertical sliderbar{background-color:" + RcssColor(Faded(c.accent, kAuroraFrame)) + ";}";
+            css += std::string("#") + kMenuPopupId + ",#" + kMenuTipId + "{border-color:" + RcssColor(Faded(c.accent, kAuroraPopupFrame)) + ";}";
             return css;
         }
     }
@@ -110,11 +77,16 @@ namespace headsup
         const std::string frame = Em(kFrame), radius = Em(kRadius), control = Em(kControlWidth);
         const float top    = kGutter + kHeadHeight + 0.5f; // where the sidebar and the page start
         const float mainX  = kGutter + kSidebarWidth + kGutter;
+        const std::string wash = "horizontal-gradient(" + color(Faded(c.accent, kWash)) + " " + color(Faded(c.accentEnd, kWash)) + ")";
+        const std::string fadingOut = " " + color(Faded(c.accentEnd, 0)) + ")";
         std::string css;
         css += "body{position:absolute;display:block;box-sizing:border-box;width:" + Em(kWindowWidth) + ";height:" +
                Em(kWindowHeight) + ";min-width:" + Em(kMinWindowWidth) + ";min-height:" + Em(kMinWindowHeight) +
                ";background-color:" + color(c.background) + ";border:1px " + color(c.border) + ";border-radius:" +
                Em(kCardRadius * 1.5f) + ";color:" + color(c.text) + ";font-family:\"" + look.textFont + "\";z-index:5;}";
+        // The window comes in a little small and grows to its size.
+        css += "body.open{animation:0.22s cubic-out window-in;}";
+        css += "@keyframes window-in{from{opacity:0;transform:scale(0.97);}to{opacity:1;transform:scale(1);}}";
         css += "div{display:block;}handle{display:block;}";
         css += ".hidden{display:none;}";
         css += ".off{opacity:" + RcssNumber(kOffAlpha) + ";pointer-events:none;}.label.off,.card-head.off{pointer-events:auto;}";
@@ -122,28 +94,31 @@ namespace headsup
         css += "#head{position:absolute;left:" + Em(kGutter) + ";right:" + Em(kGutter + kFrame + 0.5f) + ";top:" +
                Em(kGutter) + ";height:" + Em(kHeadHeight) + ";}";
         css += "#title{display:inline-block;font-family:\"" + look.titleFont + "\";font-size:" + Em(kTitleScale) +
-               ";color:" + color(c.heading) + ";}";
+               ";color:" + color(c.heading) + ";font-effect:glow(0px 4px 0px 0px " + color(Faded(c.accent, kGlow)) + ");}";
         css += std::string("#") + kMenuVersionId + "{display:inline-block;margin-left:0.5em;color:" + color(c.muted) + ";}";
         css += std::string("#") + kMenuCloseId + "{position:absolute;right:" + Em(kGutter) + ";top:" + Em(kGutter) +
                ";width:" + frame + ";height:" + frame + ";line-height:" + frame + ";text-align:center;border-radius:" +
                Em(kFrame / 2.0f) + ";background-color:" + color(c.control) + ";color:" + color(c.muted) + ";}";
         css += std::string("#") + kMenuCloseId + ":hover{background-color:" + color(c.hover) + ";}";
-        css += "#head-line{display:none;}";
+        css += "#head-line{position:absolute;left:" + Em(kGutter) + ";right:" + Em(kGutter) + ";top:" +
+               Em(kGutter + kHeadHeight + kHeadLineGap) + ";height:1px;decorator:horizontal-gradient(" +
+               color(Faded(c.accent, kLine)) + fadingOut + ";}";
         css += "#resize{position:absolute;right:0px;bottom:0px;width:1.2em;height:1.2em;}";
         css += "#resize-mark{position:absolute;right:0.3em;bottom:0.3em;width:0px;height:0px;border-left:0.5em transparent;"
                "border-bottom:0.5em " + color(c.raisedEdge) + ";}";
-        // The pages, as pills.
+        // The pages, as pills: each slides a little under the pointer, and a bar grows beside the picked one.
         css += std::string("#") + kMenuSidebarId + "{position:absolute;left:" + Em(kGutter) + ";top:" + Em(top) +
                ";width:" + Em(kSidebarWidth) + ";bottom:" + Em(kGutter) + ";}";
         css += ".nav{position:relative;height:" + Em(kNavHeight) + ";line-height:" + Em(kNavHeight) + ";padding-left:" +
                Em(kGutter) + ";border-radius:" + Em(kNavHeight / 2.0f) + ";margin-bottom:" + Em(kSpacing) + ";color:" +
-               color(c.label) + ";}";
+               color(c.label) + ";transition:background-color" + kEase + ",color" + kEase + ",padding-left" + kEase + ";}";
         css += ".nav.child{margin-left:" + Em(kGutter) + ";}";
-        css += ".nav:hover{background-color:" + color(c.accentSoft) + ";}";
-        css += ".nav.picked{background-color:" + color(c.accentSoft) + ";color:" + color(c.text) + ";}";
-        css += ".nav-mark{display:none;position:absolute;left:0.4em;top:0.825em;width:0.35em;height:0.35em;"
-               "border-radius:0.175em;background-color:" + color(c.accent) + ";}";
-        css += ".nav.picked .nav-mark{display:block;}";
+        css += ".nav:hover{background-color:" + color(c.accentSoft) + ";padding-left:1.35em;}";
+        css += ".nav.picked{background-color:transparent;decorator:horizontal-gradient(" + color(Faded(c.accent, kPickedStart)) +
+               " " + color(Faded(c.accentEnd, kPickedEnd)) + ");color:" + color(c.text) + ";}";
+        css += ".nav-mark{position:absolute;left:0.35em;top:" + Em(kNavHeight / 2.0f) + ";width:0.2em;height:0em;"
+               "border-radius:0.1em;background-color:" + color(c.accent) + ";transition:height 0.2s back-out,top 0.2s back-out;}";
+        css += ".nav.picked .nav-mark{top:0.45em;height:1.1em;}";
         // The page: its title stays put and its cards scroll.
         css += "#main{position:absolute;left:" + Em(mainX) + ";right:" + Em(kGutter) + ";top:" + Em(top) + ";bottom:" +
                Em(kGutter) + ";}";
@@ -156,23 +131,29 @@ namespace headsup
         css += "scrollbarvertical sliderbar:hover{background-color:" + color(c.hover) + ";}";
         css += "scrollbarvertical sliderbar:active{background-color:" + color(c.accent) + ";}";
         css += "scrollbarvertical sliderarrowdec,scrollbarvertical sliderarrowinc{width:0px;height:0px;}";
-        // Cards.
+        // Cards: the edge lights under the pointer, the arrow turns into place and the rows fade in as one opens.
         css += std::string(".") + kMenuCardClass + "{background-color:" + color(c.card) + ";border:1px " + color(c.border) +
                ";border-radius:" + Em(kCardRadius) + ";margin-bottom:" + Em(kGutter * 0.7f) + ";margin-right:" +
-               Em(kScrollbar + 0.3f) + ";}";
+               Em(kScrollbar + 0.3f) + ";transition:border-color 0.2s cubic-out;}";
+        css += std::string(".") + kMenuCardClass + ":hover{border-color:" + color(Faded(c.accent, kWash)) + ";}";
         css += ".card-head{position:relative;height:" + Em(kHeaderRow) + ";}";
         css += ".arrow{position:absolute;left:0.95em;top:" + Em(kHeaderRow / 2.0f - kArrow) + ";width:0px;height:0px;"
                "border-top:" + Em(kArrow) + " transparent;border-bottom:" + Em(kArrow) + " transparent;border-left:0.5em " +
                color(c.muted) + ";}";
         css += ".arrow.open{left:0.85em;top:" + Em(kHeaderRow / 2.0f - 0.2f) + ";border-top:0.5em " + color(c.muted) +
                ";border-bottom-width:0px;border-left:" + Em(kArrow) + " transparent;border-right:" + Em(kArrow) +
-               " transparent;}";
+               " transparent;animation:0.18s cubic-out turn;}";
+        css += "@keyframes turn{from{transform:rotate(-90deg);}to{transform:rotate(0deg);}}";
         css += ".card-head:hover .arrow{border-left-color:" + color(c.text) + ";}";
         css += ".card-head:hover .arrow.open{border-left-color:transparent;border-top-color:" + color(c.text) + ";}";
         css += ".card-title{position:absolute;left:2.1em;top:0px;line-height:" + Em(kHeaderRow / kCardTitleScale) +
-               ";font-family:\"" + look.titleFont + "\";font-size:" + Em(kCardTitleScale) + ";color:" + color(c.heading) + ";}";
+               ";font-family:\"" + look.titleFont + "\";font-size:" + Em(kCardTitleScale) + ";color:" + color(c.heading) +
+               ";transition:color" + kEase + ";}";
+        css += ".card-head:hover .card-title{color:" + color(c.accent) + ";}";
         css += ".check.card-on{position:absolute;right:" + Em(kCardPad) + ";top:" + Em((kHeaderRow - kFrame) / 2.0f) + ";}";
-        css += ".card-body{padding:0px " + Em(kCardPad) + " " + Em(kCardPad * 0.6f) + " " + Em(kCardPad) + ";}";
+        css += ".card-body{padding:0px " + Em(kCardPad) + " " + Em(kCardPad * 0.6f) + " " + Em(kCardPad) +
+               ";animation:0.2s cubic-out fade-in;}";
+        css += "@keyframes fade-in{from{opacity:0;}to{opacity:1;}}";
         // Rows: the label at the left, its controls at the right.
         css += ".row{display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between;"
                "min-height:" + frame + ";margin-bottom:" + Em(kSpacing) + ";}";
@@ -189,15 +170,19 @@ namespace headsup
         css += ".line-name{color:" + color(c.label) + ";margin-bottom:0.15em;}";
         css += ".reading{width:" + control + ";line-height:" + frame + ";}";
         css += ".switch-room{display:flex;flex-direction:row;justify-content:flex-end;width:" + Em(kSwitchWidth) + ";}";
-        // A checkbox, its mark shown while it is on.
+        // A checkbox: its mark grows from the middle as it is checked.
         css += ".check{position:relative;width:" + frame + ";height:" + frame + ";border-radius:" + radius +
-               ";background-color:" + color(c.control) + ";}";
+               ";background-color:" + color(c.control) + ";transition:background-color" + kSlide + ";}";
         css += ".check:hover{background-color:" + color(c.hover) + ";}";
-        css += ".mark{display:none;position:absolute;left:" + Em((kFrame - kMark) / 2.0f) + ";top:" +
-               Em((kFrame - kMark) / 2.0f) + ";width:" + Em(kMark) + ";height:" + Em(kMark) + ";border-radius:0.2em;"
-               "background-color:" + color(c.accent) + ";}";
-        css += ".check.on .mark{display:block;}";
-        // Joined choices.
+        css += ".mark{position:absolute;left:" + Em(kFrame / 2.0f) + ";top:" + Em(kFrame / 2.0f) +
+               ";width:0em;height:0em;border-radius:0.2em;background-color:" + color(c.accent) +
+               ";transition:left" + kPop + ",top" + kPop + ",width" + kPop + ",height" + kPop + ";}";
+        css += ".check.on .mark{left:" + Em((kFrame - kMark) / 2.0f) + ";top:" + Em((kFrame - kMark) / 2.0f) + ";width:" +
+               Em(kMark) + ";height:" + Em(kMark) + ";}";
+        // Joined choices. These, tabs, buttons and lists ease between their looks, and the picked one is the gradient.
+        css += std::string(".seg,.tab,.btn,.dd,.opt,.wchip{transition:background-color") + kEase + ",border-color" + kEase +
+               ",color" + kEase + ";}";
+        css += ".seg.picked,.tab.picked,.btn.accent{decorator:horizontal-gradient(" + color(c.accent) + " " + color(c.accentEnd) + ");}";
         css += ".segs{display:flex;flex-direction:row;}";
         css += ".seg{height:" + frame + ";line-height:" + frame + ";text-align:center;background-color:" + color(c.control) +
                ";color:" + color(c.muted) + ";}";
@@ -209,16 +194,19 @@ namespace headsup
         css += "input.range slidertrack{height:" + frame + ";border-radius:" + radius + ";background-color:" +
                color(c.control) + ";}";
         css += "input.range:hover slidertrack{background-color:" + color(c.hover) + ";}";
-        css += "input.range sliderbar{width:0.9em;height:1.2em;margin-top:0.2em;border-radius:0.45em;background-color:" +
-               color(c.accent) + ";}";
+        css += "input.range sliderprogress{height:" + frame + ";border-radius:" + radius + ";decorator:" + wash + ";}";
+        css += "input.range sliderbar{width:" + Em(kKnob) + ";height:" + frame + ";margin-top:0em;border-radius:" +
+               Em(kKnob / 2.0f) + ";background-color:" + color(c.text) + ";}";
         css += "input.range sliderbar:hover,input.range sliderbar:active{background-color:" + color(c.accentHover) + ";}";
         css += "input.range sliderarrowdec,input.range sliderarrowinc{width:0px;height:0px;}";
         css += ".val{position:absolute;left:0px;top:0px;width:100%;line-height:" + frame + ";text-align:center;"
                "pointer-events:none;}";
-        // Text boxes.
+        // Text boxes: the edge lights while one has the keyboard.
         css += "input.text{box-sizing:border-box;height:" + frame + ";padding:0.2em " + Em(kPadX) + ";border-radius:" +
-               radius + ";background-color:" + color(c.control) + ";color:" + color(c.text) + ";}";
+               radius + ";border:1px transparent;background-color:" + color(c.control) + ";color:" + color(c.text) +
+               ";transition:border-color" + kEase + ";}";
         css += "input.text:hover,input.text:focus{background-color:" + color(c.hover) + ";}";
+        css += "input.text:focus{border-color:" + color(Faded(c.accent, kFocus)) + ";}";
         css += "input.text:placeholder-shown{color:" + color(c.muted) + ";}";
         css += "input.text selection{background-color:" + color(c.accentSoft) + ";}";
         css += "input.num{width:" + Em(kNumberWidth) + ";}";
@@ -237,6 +225,9 @@ namespace headsup
         css += std::string("#") + kMenuPopupId + "{position:absolute;z-index:50;box-sizing:border-box;padding:0.2em;"
                "background-color:" + color(c.card | 0xFF000000) + ";border:1px " + color(c.raisedEdge) + ";border-radius:" +
                radius + ";}";
+        // The popup drops in under its control.
+        css += std::string("#") + kMenuPopupId + ".open{animation:0.16s cubic-out drop-in;}";
+        css += "@keyframes drop-in{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0px);}}";
         css += ".list{max-height:" + Em(kPopupTall) + ";overflow-y:auto;}";
         css += ".opt{height:" + frame + ";line-height:" + frame + ";padding:0px " + Em(kPadX) + ";border-radius:" + radius +
                ";white-space:nowrap;}";
@@ -280,7 +271,7 @@ namespace headsup
         css += ".tab:hover{background-color:" + color(c.hover) + ";}";
         css += ".tab.picked{background-color:" + color(c.accent) + ";color:" + color(c.text) + ";}";
         css += ".tab-rule{height:" + Em(kTabRule) + ";margin-top:-" + Em(kTabGap) + ";margin-bottom:" + Em(kSpacing) +
-               ";background-color:" + color(c.accent) + ";}";
+               ";decorator:horizontal-gradient(" + color(c.accent) + fadingOut + ";}";
         // The widgets' trays.
         css += ".line.trays{align-items:stretch;flex-wrap:nowrap;}";
         css += ".line.trays > *{margin-right:0.6em;}";

@@ -119,7 +119,7 @@ namespace headsup
                 int theme = static_cast<int>(s.menuTheme);
                 form.NumberDropdown("Theme", theme, 0, kMenuThemeCount - 1,
                     [](int t) { return std::string(MenuThemeName(static_cast<MenuTheme>(t))); },
-                    "Phoenix's own look, or Aurora's glass and motion.");
+                    "Phoenix's own look, or Aurora's glass and switches.");
                 s.menuTheme = static_cast<MenuTheme>(theme);
                 form.FontDropdown("Font", s.menuFont, menuFonts, "Titles stay in the bar's font.");
                 form.SliderInt("Size", s.menuScale, kMinMenuScale, kMaxMenuScale, "%d%%",

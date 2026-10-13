@@ -11,7 +11,7 @@ namespace headsup
         UmbraDark,
         PhoenixRedOrnate,
         PhoenixRedPills,
-        Aurora, // what RmlUi adds: glass, gradients and motion. The quads draw it as plain pills.
+        Aurora, // glass, and a line of light under the strip. The quads draw it as plain pills.
     };
     constexpr int kBarThemeCount = static_cast<int>(BarTheme::Aurora) + 1;
 
