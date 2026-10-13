@@ -51,6 +51,30 @@ TEST(a_target_without_a_name_gets_a_cursor_at_the_games_arrow)
     CHECK(LoneCursors(Anchored(554, 0), off, {}).empty());
 }
 
+// The Mog House's door on the test client (2026-10-12): the window's anchor at (1706,418) of a 1920x1080 menu, which
+// the debug report gave as (2274.7,557.3) on the 2560x1440 back buffer, and no nameplate anywhere for it.
+TEST(a_targeted_door_gets_the_cursor_at_the_games_anchor)
+{
+    constexpr uint32_t kEntities = 2304;
+    constexpr float kReportRounding = 0.05f; // the report prints one decimal
+    const Settings s;
+    // Slot 0 was active with index 0 and the model flag, slot 1 neither.
+    const uint16_t empty = SlotTarget(0, false, false, kEntities);
+    CursorTargets door   = TargetsFromSlots(false, SlotTarget(0, true, true, kEntities), empty, false);
+    PlaceAnchors(door, CursorWindow{1706.0f, 418.0f, 0.0f, 0.0f}, 1920.0f, 1080.0f, 2560.0f, 1440.0f);
+    const auto lone = LoneCursors(door, s, {1024}); // your own nameplate is the only one
+    CHECK_EQ(lone.size(), 1u);
+    if (lone.empty()) return;
+    CHECK(lone[0].target == TargetState::Targeted && Near(lone[0].x, 2274.7f, kReportRounding) &&
+          Near(lone[0].y, 557.3f, kReportRounding));
+    door.locked = true;
+    CHECK(LoneCursors(door, s, {})[0].target == TargetState::Locked);
+    // Untargeted, the window keeps its last anchor and the slot is not active: nothing is drawn there.
+    CursorTargets none = TargetsFromSlots(false, empty, empty, false);
+    PlaceAnchors(none, CursorWindow{1706.0f, 418.0f, 0.0f, 0.0f}, 1920.0f, 1080.0f, 2560.0f, 1440.0f);
+    CHECK(LoneCursors(none, s, {}).empty());
+}
+
 TEST(while_picking_the_candidate_takes_the_sub_anchor_and_the_target_the_main_one)
 {
     const Settings s;

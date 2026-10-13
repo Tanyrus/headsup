@@ -16,6 +16,7 @@ namespace headsup
     namespace
     {
         constexpr int kCapturedPlatesPerFrame = 16;
+        constexpr uint32_t kTargetSlots       = 2;
     }
 
     const char* EntityName(IEntity* entity, uint32_t index)
@@ -78,12 +79,23 @@ namespace headsup
         {
             // Where the target cursor went: on a nameplate, at the game's own arrow anchor, or nowhere.
             const CursorTargets& c = s.cursor;
-            std::fprintf(out, "cursor: target #%u sub #%u%s%s, menu %.0fx%.0f, anchors %s (%.1f,%.1f) sub (%.1f,%.1f); drawn:",
-                c.target, c.subTarget, c.locked ? " locked" : "", c.gameArrowsShown ? ", the game's arrows (not hooked)" : "",
-                s.menuWidth, s.menuHeight, c.anchored ? "at" : "unknown", c.anchorX, c.anchorY, c.subAnchorX, c.subAnchorY);
+            const auto held        = [](uint16_t index) {
+                return index == kModelTarget ? std::string("no entity") : "#" + std::to_string(index);
+            };
+            std::fprintf(out, "cursor: target %s sub %s%s%s, menu %.0fx%.0f, anchors %s (%.1f,%.1f) sub (%.1f,%.1f); drawn:",
+                held(c.target).c_str(), held(c.subTarget).c_str(), c.locked ? " locked" : "",
+                c.gameArrowsShown ? ", the game's arrows (not hooked)" : "", s.menuWidth, s.menuHeight,
+                c.anchored ? "at" : "unknown", c.anchorX, c.anchorY, c.subAnchorX, c.subAnchorY);
             for (const CursorName& name : s.plates.CursorNames())
-                std::fprintf(out, " #%u %s", name.index, name.name.valid ? "on its nameplate" : "at its anchor");
+                std::fprintf(out, " %s %s", held(name.index).c_str(), name.name.valid ? "on its nameplate" : "at its anchor");
             std::fprintf(out, "%s\n", s.plates.CursorNames().empty() ? " none" : "");
+            // The game's own two slots, as it holds them: a target need not be an entity.
+            ITarget* target = s.core->GetMemoryManager()->GetTarget();
+            for (uint32_t slot = 0; slot < kTargetSlots; ++slot)
+                std::fprintf(out, "target slot %u: #%u id %u, active %u, model %u, free arrow %u at (%.1f,%.1f,%.1f)\n", slot,
+                    target->GetTargetIndex(slot), target->GetServerId(slot), target->GetIsActive(slot),
+                    target->GetIsModelActor(slot), target->GetIsArrowActive(slot), target->GetArrowPositionX(slot),
+                    target->GetArrowPositionZ(slot), target->GetArrowPositionY(slot));
         }
         if (const ActorInfo* t = s.tracker.FindIndex(s.cursor.target); t != nullptr)
             if (const PlayerCheck* c = s.state.PlayerCheckOf(t->serverId))

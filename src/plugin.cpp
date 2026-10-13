@@ -1410,17 +1410,20 @@ private:
         ITarget* target = m_AshitaCore->GetMemoryManager()->GetTarget();
         IEntity* entity = m_AshitaCore->GetMemoryManager()->GetEntity();
         const Ashita::FFXI::targetwindow_t* window = target->GetRawStructureWindow();
-        const uint32_t slot0                       = target->GetTargetIndex(0);
+        const auto held = [&](uint32_t slot) {
+            return headsup::SlotTarget(target->GetTargetIndex(slot), target->GetIsActive(slot) != 0,
+                target->GetIsModelActor(slot) != 0, entity->GetEntityMapSize());
+        };
+        const uint16_t slot0 = held(0);
         const bool picking =
             headsup::Picking(target->GetIsSubTargetActive() != 0, window != nullptr && window->m_Sub != 0, slot0);
-        m_CursorTargets = headsup::TargetsFromSlots(picking, slot0, target->GetTargetIndex(1),
-            (target->GetLockedOnFlags() & kLockedOn) != 0, entity->GetEntityMapSize());
+        m_CursorTargets = headsup::TargetsFromSlots(picking, slot0, held(1), (target->GetLockedOnFlags() & kLockedOn) != 0);
         if (!picking) m_ArrowHook.ForgetPicked();
         uint32_t color = 0;
         if (picking)
             color = m_ArrowHook.CandidateColor(window,
                 entity->GetActorPointer(m_AshitaCore->GetMemoryManager()->GetParty()->GetMemberTargetIndex(0)),
-                entity->GetActorPointer(m_CursorTargets.subTarget));
+                m_CursorTargets.subTarget == headsup::kModelTarget ? 0 : entity->GetActorPointer(m_CursorTargets.subTarget));
         if (color == 0) color = m_ArrowHook.PickedColor();
         m_CursorTargets.outOfRange      = picking && headsup::PickedOutOfRange(color).value_or(false);
         m_CursorTargets.gameArrowsShown = !m_ArrowHook.Running();

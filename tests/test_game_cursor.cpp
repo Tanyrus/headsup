@@ -7,14 +7,35 @@ using test::Box;
 
 TEST(the_cursor_targets_come_from_the_target_slots)
 {
-    const CursorTargets plain = TargetsFromSlots(false, 1105, 0, true, 2304);
+    const CursorTargets plain = TargetsFromSlots(false, 1105, 0, true);
     CHECK_EQ(plain.target, 1105);
     CHECK_EQ(plain.subTarget, 0);
     CHECK(plain.locked);
-    const CursorTargets picking = TargetsFromSlots(true, 0x220, 1105, false, 2304); // slot 1 is the target while picking
+    const CursorTargets picking = TargetsFromSlots(true, 0x220, 1105, false); // slot 1 is the target while picking
     CHECK_EQ(picking.target, 1105);
     CHECK_EQ(picking.subTarget, 0x220);
-    CHECK_EQ(TargetsFromSlots(false, 5000, 0, false, 2304).target, 0); // past the entity map
+}
+
+// Slot 0 in a Mog House, from three debug reports on the test client (2026-10-12): nothing targeted (index 0, not
+// active), the Moogle (index 141, active), and the door, which is no entity (index 0, active, the model flag set).
+TEST(a_target_that_is_no_entity_is_still_a_target)
+{
+    constexpr uint32_t kEntities = 2304;
+    const uint16_t nothing = SlotTarget(0, false, false, kEntities), door = SlotTarget(0, true, true, kEntities);
+    CHECK_EQ(nothing, 0);
+    CHECK_EQ(SlotTarget(141, true, false, kEntities), 141);
+    CHECK_EQ(door, kModelTarget);
+    CHECK_EQ(SlotTarget(5000, true, false, kEntities), 0); // past the entity map
+    CHECK(kModelTarget >= kEntities);                     // never an entity's own index
+    // Not seen in game, so not taken for a target: either flag alone with no index.
+    CHECK_EQ(SlotTarget(0, true, false, kEntities), 0);
+    CHECK_EQ(SlotTarget(0, false, true, kEntities), 0);
+    const CursorTargets targets = TargetsFromSlots(false, door, nothing, false);
+    CHECK_EQ(targets.target, kModelTarget);
+    CHECK_EQ(targets.subTarget, 0);
+    // The same door as the candidate of a pick started with no target.
+    CHECK(Picking(false, true, door));
+    CHECK(!Picking(false, true, nothing));
 }
 
 TEST(a_pick_started_with_no_target_is_still_a_pick)
@@ -25,7 +46,7 @@ TEST(a_pick_started_with_no_target_is_still_a_pick)
     CHECK(Picking(false, true, 6));
     CHECK(!Picking(false, false, 13));
     CHECK(!Picking(false, true, 0));
-    const CursorTargets alone = TargetsFromSlots(Picking(false, true, 6), 6, 0, false, 2304);
+    const CursorTargets alone = TargetsFromSlots(Picking(false, true, 6), 6, 0, false);
     CHECK_EQ(alone.target, 0);
     CHECK_EQ(alone.subTarget, 6);
 }

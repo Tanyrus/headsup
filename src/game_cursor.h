@@ -29,8 +29,13 @@ namespace headsup
     // Whether a sub-target is being picked. ITarget's own flag is off for a pick started with no target (an <stnpc>
     // macro), where only the target window's flag tells; that one stays set afterwards while nothing is targeted.
     bool Picking(bool subTargetActive, bool windowPicking, uint32_t slot0);
+    // A target that is no entity and so has no index: a door or another piece of the zone the game lets you target,
+    // as the Mog House's door.
+    constexpr uint16_t kModelTarget = UINT16_MAX;
+    // What one of ITarget's slots holds: an entity's index, kModelTarget (active and a model actor, with index 0), or 0.
+    uint16_t SlotTarget(uint32_t index, bool active, bool model, uint32_t entityCount);
     // While a sub-target is being picked, ITarget's slot 1 holds the target and slot 0 the candidate.
-    CursorTargets TargetsFromSlots(bool picking, uint32_t slot0, uint32_t slot1, bool locked, uint32_t entityCount);
+    CursorTargets TargetsFromSlots(bool picking, uint16_t slot0, uint16_t slot1, bool locked);
 
     // The target window's anchors, in the menu's pixels.
     struct CursorWindow

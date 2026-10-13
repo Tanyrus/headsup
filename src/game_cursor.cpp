@@ -21,10 +21,15 @@ namespace headsup
         return subTargetActive || (windowPicking && slot0 != 0);
     }
 
-    CursorTargets TargetsFromSlots(bool picking, uint32_t slot0, uint32_t slot1, bool locked, uint32_t entityCount)
+    uint16_t SlotTarget(uint32_t index, bool active, bool model, uint32_t entityCount)
     {
-        auto index = [&](uint32_t slot) { return slot < entityCount ? static_cast<uint16_t>(slot) : uint16_t{0}; };
-        return picking ? CursorTargets{index(slot1), index(slot0), locked} : CursorTargets{index(slot0), 0, locked};
+        if (index == 0) return active && model ? kModelTarget : uint16_t{0};
+        return index < entityCount ? static_cast<uint16_t>(index) : uint16_t{0};
+    }
+
+    CursorTargets TargetsFromSlots(bool picking, uint16_t slot0, uint16_t slot1, bool locked)
+    {
+        return picking ? CursorTargets{slot1, slot0, locked} : CursorTargets{slot0, 0, locked};
     }
 
     MenuSize MenuSizeOf(float registryWidth, float registryHeight, float backBufferWidth, float backBufferHeight)
