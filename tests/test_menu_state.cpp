@@ -3,6 +3,7 @@
 #include "test.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <string>
 #include <string_view>
@@ -304,4 +305,19 @@ TEST(the_widgets_page_has_a_tab_for_every_widget_on_the_bar_in_rows_as_even_as_t
     CHECK_EQ(TabsPerRow(3, 1), 3);
     CHECK_EQ(TabsPerRow(2, 3), 1); // more rows than tabs: one each
     CHECK_EQ(TabsPerRow(0, 2), 1); // never none, which a row's width is divided by
+}
+
+// 14 tabs, 7 to a row, across 700 px, each 30 px tall and 2 px from the next: (700 - 6 x 2) / 7 wide.
+TEST(tabs_sit_a_gap_apart_each_way_and_a_full_row_ends_at_the_strips_edge)
+{
+    const auto near = [](float a, float b) { return std::fabs(a - b) < 0.01f; };
+    const auto at   = [](int tab) { return TabAt(tab, 7, 700.0f, 30.0f, 2.0f); };
+    const float width = 688.0f / 7.0f;
+    CHECK(near(at(0).x, 0.0f) && near(at(0).y, 0.0f) && near(at(0).width, width));
+    CHECK(near(at(1).x - (at(0).x + at(0).width), 2.0f));
+    CHECK(near(at(6).x + at(6).width, 700.0f) && near(at(6).y, 0.0f));
+    CHECK(near(at(7).x, 0.0f) && near(at(7).y, 32.0f)); // the row above, then the gap
+    CHECK(near(at(13).x + at(13).width, 700.0f) && near(at(13).y, 32.0f) && near(at(13).width, width));
+    const TabPlace joined = TabAt(2, 3, 300.0f, 30.0f, 0.0f); // no gap: thirds of the strip
+    CHECK(near(joined.x, 200.0f) && near(joined.width, 100.0f) && near(joined.y, 0.0f));
 }
