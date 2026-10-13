@@ -48,6 +48,10 @@ namespace headsup
         for (size_t i = 0; i < conquest.size(); ++i)
             std::fprintf(out, "%s%02X", i % 16 == 0 ? "\n  " : " ", conquest[i]);
         std::fprintf(out, "\n");
+        // Your own statuses as the game holds them: which of them an event sets depends on how it began.
+        const uint32_t self = s.core->GetMemoryManager()->GetParty()->GetMemberTargetIndex(0);
+        std::fprintf(out, "you: status %u, server status %u, event status %u, event %08X\n", entity->GetStatus(self),
+            entity->GetStatusServer(self), entity->GetStatusEvent(self), static_cast<unsigned>(entity->GetEventPointer(self)));
         IPlayer* player       = s.core->GetMemoryManager()->GetPlayer();
         const int16_t* icons  = player->GetStatusIcons();
         const uint32_t* times = player->GetStatusTimers();

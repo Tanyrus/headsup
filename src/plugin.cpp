@@ -230,7 +230,6 @@ class HeadsUp final : public IPlugin
     bool m_SceneCopied      = false; // this frame: the first draw to cover the back buffer came
     bool m_LoneCursorsDrawn = false; // this frame
     bool m_UiHidden = false;
-    uint32_t m_OwnStatus = 0;
     float m_GuiAlpha = 1.0f;
     int m_GuiFlags = 0;
     bool m_FontsWereVisible = true, m_PrimitivesWereVisible = true;
@@ -527,7 +526,7 @@ public:
         const uint8_t loginStatus = m_AshitaCore->GetMemoryManager()->GetPlayer()->GetLoginStatus();
         // A popup left open at logout would come back with the next character.
         if (loginStatus != headsup::kLoginInGame) m_BarInput.Reset();
-        m_UiHidden = m_Screenshot || headsup::IsEventStatus(m_OwnStatus);
+        m_UiHidden = m_Screenshot || m_Player.inEvent;
         g_BarOn = headsup::BarRuns(m_Settings, loginStatus) && !m_Bar.Failed();
         g_BarHidden = m_UiHidden;
         // Opening Region Info asks the server for the conquest standings; HeadsUp asks the same once per zone-in, and
@@ -579,7 +578,7 @@ public:
         m_BarDrawn = false;
         m_ArrowHook.Hide(m_Settings.enabled && m_Settings.replaceCursor);
         // The game's help bar is the only help left while an event hides HeadsUp's bar; a screenshot wants neither.
-        const bool helpGone = m_Settings.hideHelpBar && (m_Screenshot || !headsup::IsEventStatus(m_OwnStatus));
+        const bool helpGone = m_Settings.hideHelpBar && (m_Screenshot || !m_Player.inEvent);
         const headsup::HiddenWindows hidden{.helpBar = m_Settings.enabled && helpGone,
             .netstat = m_Settings.enabled && m_Settings.hideNetstat};
         const std::optional<headsup::HelpBand> band = HelpBandNow();
@@ -1580,10 +1579,11 @@ private:
                 input.pet       = true;
                 input.ownerName = headsup::EntityName(entity, owner->second);
             }
-        const uint32_t ownStatus = entity->GetStatus(m_SelfIndex);
-        m_OwnStatus              = ownStatus;
-        m_Player.level           = player->GetMainJobLevel();
-        m_Player.sitting         = headsup::IsSittingStatus(ownStatus);
+        m_Player.level   = player->GetMainJobLevel();
+        m_Player.sitting = headsup::IsSittingStatus(entity->GetStatus(m_SelfIndex));
+        // The status the server gave you says an event runs: your own stayed 0 through an NPC's dialog, a cutscene
+        // and one begun at zone-in.
+        m_Player.inEvent = headsup::IsEventStatus(entity->GetStatusServer(m_SelfIndex));
         m_Tracker.Update(inputs, m_Player, m_Settings, m_CursorTargets);
         // With timers off no sightings are passed, so turning them on never takes a placeholder that died meanwhile for
         // one seen dying.
