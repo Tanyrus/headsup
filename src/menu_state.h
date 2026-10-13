@@ -3,6 +3,7 @@
 #include "bar_placement.h"
 #include "bar_server_time.h"
 #include "plate_settings.h"
+#include "plate_template.h"
 #include "settings.h"
 
 #include <cstdint>
@@ -75,12 +76,11 @@ namespace headsup
     // is there already in any case.
     std::optional<std::string> FriendToAdd(const std::vector<std::string>& friends, std::string_view typed);
 
-    // A design line's box between frames: whether it is typed in, and its caret in bytes, where a clicked tag goes
-    // (past the text means its end).
+    // A design line's box between frames: whether it is typed in, and its caret, where a clicked tag goes.
     struct LineDraft
     {
-        size_t caret = kMaxTemplate;
-        bool typing  = false;
+        RunCaret caret;
+        bool typing = false;
     };
 
     // The "Add a key" button's wait for a key: those held when it was pressed do not count.

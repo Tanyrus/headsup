@@ -67,35 +67,87 @@ TEST(each_kind_offers_its_own_tags)
     CHECK((TagsFor(PlateKind::Pets) == std::vector<Tag>{Tag::Name, Tag::Owner}));
 }
 
-TEST(a_tag_is_put_in_at_the_caret_or_the_end)
+TEST(a_design_is_its_stretches_of_text_as_typed_and_the_tags_between_them)
 {
-    CHECK_EQ(InsertTag("Lv  EP", Tag::Level, 3), "Lv $level EP");
-    CHECK_EQ(InsertTag("Lv", Tag::Level, 99), "Lv$level");
-    CHECK_EQ(InsertTag("", Tag::Name, 0), "$name");
-    const std::string full(kMaxTemplate - 2, 'x');
-    CHECK_EQ(InsertTag(full, Tag::Name, 0), full); // half a tag is a design nobody wrote: the insert is refused
-    CHECK_EQ(InsertTag(std::string(kMaxTemplate - 5, 'x'), Tag::Name, 0).size(), kMaxTemplate);
+    // One stretch more than tags: before the first, between each two and after the last, empty or not.
+    CHECK((RunsOf("Lv $level $con") == TemplateRuns{{"Lv ", " ", ""}, {Tag::Level, Tag::Con}}));
+    CHECK((RunsOf("$name") == TemplateRuns{{"", ""}, {Tag::Name}}));
+    CHECK((RunsOf("$id$serverid") == TemplateRuns{{"", "", ""}, {Tag::Id, Tag::ServerId}}));
+    CHECK((RunsOf("") == TemplateRuns{{""}, {}}));
+    // What is no tag stays as it was typed, its marks too.
+    CHECK((RunsOf("$$5 $nope $namex") == TemplateRuns{{"$$5 $nope $namex"}, {}}));
+    // Joined again it is the same text.
+    for (const char* text : {"Lv $level $con", "$name", "", "$$5 $nope $namex", "$id$serverid", "a $name (b) $job/$level",
+             "\xC3\x97$name\xC3\x97"})
+        CHECK_EQ(JoinRuns(RunsOf(text)), text);
 }
 
-TEST(a_tag_put_at_the_caret_moves_the_caret_past_it)
+TEST(a_tag_a_letter_follows_is_written_in_braces_so_that_its_name_ends)
+{
+    // "$names" would be no tag at all: the name is set in braces where a small letter comes straight after it.
+    const TemplateRuns plural{{"", "s"}, {Tag::Name}};
+    CHECK_EQ(JoinRuns(plural), "${name}s");
+    CHECK(RunsOf("${name}s") == plural);
+    CHECK((ParseTemplate("${name}s") == std::vector<Atom>{Of(Tag::Name), Text("s")}));
+    CHECK_EQ(JoinRuns(TemplateRuns{{"", "S", " x"}, {Tag::Name, Tag::Job}}), "$nameS$job x"); // only a small letter would join it
+    // Braces around no tag, or left open, are text.
+    CHECK((ParseTemplate("${nope} ${name") == std::vector<Atom>{Text("${nope} ${name")}));
+    CHECK((RunsOf("${nope}") == TemplateRuns{{"${nope}"}, {}}));
+    // A stretch that ends in a lone mark would swallow the tag after it: the mark is doubled.
+    CHECK_EQ(JoinRuns(TemplateRuns{{"a$", ""}, {Tag::Name}}), "a$$$name");
+    CHECK((ParseTemplate("a$$$name") == std::vector<Atom>{Text("a$"), Of(Tag::Name)}));
+    CHECK_EQ(JoinRuns(TemplateRuns{{"a$$", ""}, {Tag::Name}}), "a$$$name"); // a doubled one already is one mark
+}
+
+TEST(a_tag_goes_in_at_the_caret_which_then_stands_after_it)
 {
     std::string text = "Lv  EP";
-    size_t caret     = 3;
+    RunCaret caret{0, 3};
     CHECK(PutTag(text, caret, Tag::Level));
     CHECK_EQ(text, "Lv $level EP");
-    CHECK_EQ(caret, size_t{9});
+    CHECK((caret == RunCaret{1, 0}));
     CHECK(PutTag(text, caret, Tag::Con)); // the next chip clicked lands after the first
     CHECK_EQ(text, "Lv $level$con EP");
-    CHECK_EQ(caret, size_t{13});
-    caret = 99; // a caret left past the end of a text that has since shortened
-    CHECK(PutTag(text, caret, Tag::Ph));
+    CHECK((caret == RunCaret{2, 0}));
+    // Between two letters, the tag's name is closed off from the one after it.
+    std::string word = "ab";
+    RunCaret middle{0, 1};
+    CHECK(PutTag(word, middle, Tag::Name));
+    CHECK_EQ(word, "a${name}b");
+    // A caret never set, or left past a text that has since shortened, is the end.
+    RunCaret unset;
+    CHECK(PutTag(text, unset, Tag::Ph));
     CHECK_EQ(text, "Lv $level$con EP$ph");
-    CHECK_EQ(caret, text.size());
+    CHECK((unset == RunCaret{3, 0}));
+    RunCaret past{9, 99};
+    CHECK(PutTag(text, past, Tag::Id));
+    CHECK_EQ(text, "Lv $level$con EP$ph$id");
+    // Half a tag is a design nobody wrote: one that will not fit is refused, and the caret stays.
     std::string full(kMaxTemplate - 2, 'x');
-    caret = kMaxTemplate + 5; // a refused tag leaves even a caret past the end where it was
-    CHECK(!PutTag(full, caret, Tag::Name));
+    RunCaret at{0, 0};
+    CHECK(!PutTag(full, at, Tag::Name));
     CHECK_EQ(full, std::string(kMaxTemplate - 2, 'x'));
-    CHECK_EQ(caret, kMaxTemplate + 5);
+    CHECK((at == RunCaret{0, 0}));
+    std::string room(kMaxTemplate - 5, 'X');
+    CHECK(PutTag(room, at, Tag::Name) && room.size() == kMaxTemplate);
+}
+
+TEST(a_tag_taken_out_joins_the_text_either_side_of_it_and_a_stretch_can_be_typed_anew)
+{
+    RunCaret caret;
+    CHECK_EQ(WithoutTag("Lv $level end $con", 0, caret), "Lv  end $con");
+    CHECK((caret == RunCaret{0, 3})); // where the two stretches met
+    CHECK_EQ(WithoutTag("Lv $level end $con", 1, caret), "Lv $level end ");
+    CHECK((caret == RunCaret{1, 5}));
+    CHECK_EQ(WithoutTag("$name", 0, caret), "");
+    CHECK_EQ(WithoutTag("$name", 4, caret), "$name"); // no such tag: nothing changes
+    // A stretch typed anew may hold tags of its own.
+    CHECK_EQ(WithRun("Lv $level", 0, "Level "), "Level $level");
+    CHECK_EQ(WithRun("Lv $level", 1, " $con"), "Lv $level $con");
+    CHECK_EQ(WithRun("Lv $level", 1, "s"), "Lv ${level}s");
+    CHECK_EQ(WithRun("Lv $level", 7, "x"), "Lv $level"); // no such stretch
+    // What would pass the longest a design may be is cut to fit.
+    CHECK_EQ(WithRun("$name", 1, std::string(kMaxTemplate, 'y')).size(), kMaxTemplate);
 }
 
 TEST(a_design_uses_a_tag_when_any_line_holds_it)

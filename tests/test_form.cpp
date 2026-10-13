@@ -357,29 +357,100 @@ TEST(a_list_of_checks_stays_open_and_a_condition_unchecked_under_always_turns_al
     CHECK_EQ(TextOf(one, "p-c-show-val"), std::to_string(conditions.size() - 1) + " Conditions");
 }
 
-TEST(a_line_box_takes_typing_a_dropped_tag_and_its_caret)
+namespace
 {
-    FormState state;
-    std::string text = "$name";
-    LineDraft draft;
-    const auto pass = [&](const std::vector<FormEvent>& events) {
-        Form form(events, state);
-        form.pageKey = "p";
-        form.BeginCard("C");
-        const bool edited = form.LineBox("line", text, draft);
-        const bool chip   = form.TagChip(Tag::Level);
-        form.EndCard();
-        return std::pair{form.changed, edited || chip};
+    // A card with a design line's box and one tag chip under it.
+    struct BoxCard
+    {
+        FormState state;
+        std::string text;
+        LineDraft draft;
+        bool edited = false, chip = false;
+
+        Form Pass(const std::vector<FormEvent>& events)
+        {
+            Form form(events, state);
+            form.pageKey = "p";
+            form.BeginCard("C");
+            edited = form.LineBox("line", text, draft);
+            chip   = form.TagChip(Tag::Con);
+            form.EndCard();
+            return form;
+        }
     };
-    const auto focused = pass({{"p-c-line", kFocusEvent, ""}});
-    CHECK(!focused.first && draft.typing);
-    const auto typed = pass({{"p-c-line", kCaretEvent, "2"}, {"p-c-line", kCommitEvent, "Lv $level"}});
-    CHECK(typed.first && text == "Lv $level" && draft.caret == 2 && !draft.typing);
-    // A tag chip dropped on the box goes at its end, as typed there.
-    const auto dropped = pass({{"p-c-line", kDropEvent, "tag-" + std::to_string(static_cast<int>(Tag::Name))}});
-    CHECK(dropped.first);
-    CHECK_EQ(text, "Lv $level$name");
-    CHECK_EQ(draft.caret, text.size());
-    const auto clicked = pass({{"tag-" + std::to_string(static_cast<int>(Tag::Level)), kClickEvent, ""}});
-    CHECK(clicked.second);
+    const std::string kConChip = "tag-" + std::to_string(static_cast<int>(Tag::Con));
 }
+
+TEST(a_line_box_is_its_stretches_of_text_with_its_tags_as_chips_between_them)
+{
+    BoxCard card;
+    card.text = "Lv $level end";
+    const Form first = card.Pass({});
+    const std::string& rml = first.blocks[0].rml;
+    // A stretch to type in either side of the tag, and the tag as the chip dragged in, with no mark before its name.
+    const size_t before = rml.find("<input type=\"text\" class=\"run\" id=\"p-c-line-t-0\"/>");
+    const size_t chip   = rml.find("id=\"p-c-line-c-0\"");
+    const size_t after  = rml.find("<input type=\"text\" class=\"run\" id=\"p-c-line-t-1\"/>");
+    CHECK(before != std::string::npos && chip != std::string::npos && after != std::string::npos);
+    CHECK(before < chip && chip < after);
+    CHECK(Has(rml, ">Level</div>") && !Has(rml, "$level"));
+    CHECK_EQ(ValueText(first, "p-c-line-t-0"), "Lv ");
+    CHECK_EQ(ValueText(first, "p-c-line-t-1"), " end");
+    CHECK(!first.changed && !card.edited);
+
+    // Typed in and left, a stretch is the design's; its caret is kept for a chip clicked after.
+    card.Pass({{"p-c-line-t-1", kFocusEvent, ""}});
+    CHECK(card.draft.typing);
+    const Form typed = card.Pass({{"p-c-line-t-1", kCaretEvent, "2"}, {"p-c-line-t-1", kCommitEvent, " ends"}});
+    CHECK(typed.changed && card.edited && card.text == "Lv $level ends");
+    CHECK((card.draft.caret == RunCaret{1, 2}) && !card.draft.typing);
+    // A tag typed by its name becomes a chip of its own.
+    const Form tagged = card.Pass({{"p-c-line-t-0", kCommitEvent, "Lv $name "}});
+    CHECK_EQ(card.text, "Lv $name $level ends");
+    CHECK(Has(tagged.blocks[0].rml, "id=\"p-c-line-c-1\"") && Has(tagged.blocks[0].rml, "id=\"p-c-line-t-2\""));
+}
+
+TEST(backspace_or_delete_beside_a_tag_takes_the_whole_tag_out)
+{
+    BoxCard card;
+    card.text = "Lv $name $level ends";
+    // Backspace at the start of the stretch after Level, with what is typed there kept: the stretches either side
+    // join, and the keyboard goes to where they met.
+    const Form back = card.Pass({{"p-c-line-t-2", kKillEvent, std::string(1, kKillBack) + " ends!"}});
+    CHECK(back.changed && card.edited);
+    CHECK_EQ(card.text, "Lv $name  ends!");
+    CHECK((back.focus == FormFocus{"p-c-line-t-1", 1}));
+    CHECK((card.draft.caret == RunCaret{1, 1}));
+    // Delete at the end of the stretch before Name.
+    const Form forward = card.Pass({{"p-c-line-t-0", kKillEvent, std::string(1, kKillForward) + "Lv "}});
+    CHECK_EQ(card.text, "Lv   ends!");
+    CHECK((forward.focus == FormFocus{"p-c-line-t-0", 3}));
+    // With no tag on that side, the key is the stretch's own: nothing is taken out and the keyboard stays.
+    card.text = "$name end";
+    const Form none = card.Pass({{"p-c-line-t-0", kKillEvent, std::string(1, kKillBack)}});
+    CHECK(!none.changed && card.text == "$name end" && !none.focus);
+    const Form last = card.Pass({{"p-c-line-t-1", kKillEvent, std::string(1, kKillForward) + " end"}});
+    CHECK(!last.changed && card.text == "$name end" && !last.focus);
+}
+
+TEST(a_tag_chip_dropped_in_a_line_box_goes_after_what_it_is_dropped_on)
+{
+    BoxCard card;
+    card.text = "Lv $level end";
+    card.Pass({{"p-c-line", kDropEvent, kConChip}}); // on the box itself: at its end
+    CHECK_EQ(card.text, "Lv $level end$con");
+    CHECK((card.draft.caret == RunCaret{2, 0})); // and a chip clicked next lands after it
+    card.text = "Lv $level end";
+    card.Pass({{"p-c-line-t-0", kDropEvent, kConChip}}); // on a stretch: after it
+    CHECK_EQ(card.text, "Lv $con$level end");
+    card.text = "Lv $level end";
+    const Form onChip = card.Pass({{"p-c-line-c-0", kDropEvent, kConChip}}); // on a tag: after that
+    CHECK_EQ(card.text, "Lv $level$con end");
+    CHECK(onChip.changed && card.edited);
+    // Anything else dropped is nothing, and a click on the chip under the box is the page's to place.
+    card.Pass({{"p-c-line", kDropEvent, "page-title"}});
+    CHECK_EQ(card.text, "Lv $level$con end");
+    card.Pass({{kConChip, kClickEvent, ""}});
+    CHECK(card.chip && card.text == "Lv $level$con end");
+}
+

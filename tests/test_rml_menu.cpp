@@ -322,8 +322,10 @@ TEST(a_line_box_keeps_what_is_typed_once_it_is_left)
     window.Page("players");
     const std::string box = "players-nameplate-design-design-players-2";
     const std::string was = window.settings.Kind(PlateKind::Players).lines[2].text;
-    window.Click(box);
-    window.Key(Rml::Input::KI_END);
+    // Its tags stand in it as chips, and the stretch after the last of them is typed in.
+    const size_t tags = RunsOf(was).tags.size();
+    CHECK(tags > 0 && window.Shows(box + "-c-0"));
+    window.Click(box + "-t-" + std::to_string(tags));
     window.Type(" hi");
     // Nothing is saved while the box is typed in.
     CHECK_EQ(window.settings.Kind(PlateKind::Players).lines[2].text, was);
@@ -331,7 +333,7 @@ TEST(a_line_box_keeps_what_is_typed_once_it_is_left)
     CHECK_EQ(window.settings.Kind(PlateKind::Players).lines[2].text, was + " hi");
 }
 
-TEST(a_tag_chip_goes_in_at_the_caret_by_click_and_at_the_end_by_drag)
+TEST(a_tag_chip_goes_in_at_the_caret_by_click_and_after_what_it_is_dropped_on_by_drag)
 {
     Window window;
     window.Page("players");
@@ -339,13 +341,84 @@ TEST(a_tag_chip_goes_in_at_the_caret_by_click_and_at_the_end_by_drag)
     std::string& text     = window.settings.Kind(PlateKind::Players).lines[1].text;
     text                  = "ab";
     window.Frames(2);
-    window.Click(box);
+    window.Click(box + "-t-0");
     window.Key(Rml::Input::KI_HOME);
     window.Key(Rml::Input::KI_RIGHT);
     CHECK(window.Click("tag-1"));
-    CHECK_EQ(text, std::string("a") + TagName(Tag::Level) + "b");
-    CHECK(window.Drag("tag-0", box));
-    CHECK_EQ(text, std::string("a") + TagName(Tag::Level) + "b" + TagName(Tag::Name));
+    CHECK_EQ(text, "a${level}b"); // the name closed off from the letter after it
+    CHECK(window.Shows(box + "-c-0") && window.Shows(box + "-t-1"));
+    CHECK(window.Drag("tag-0", box + "-t-1"));
+    CHECK_EQ(text, "a${level}b$name");
+    CHECK(window.Drag("tag-19", box + "-c-0"));
+    CHECK_EQ(text, "a$level${job}b$name");
+}
+
+TEST(backspace_and_delete_beside_a_tag_take_it_out_and_the_arrows_step_past_it)
+{
+    Window window;
+    window.Page("players");
+    const std::string box = "players-nameplate-design-design-players-1";
+    std::string& text     = window.settings.Kind(PlateKind::Players).lines[1].text;
+    text                  = "ab $level cd";
+    window.Frames(2);
+    // Backspace at the start of the stretch after the tag: the tag goes, and typing goes on where it stood.
+    window.Click(box + "-t-1");
+    window.Key(Rml::Input::KI_HOME);
+    CHECK(window.Key(Rml::Input::KI_BACK));
+    CHECK_EQ(text, "ab  cd");
+    CHECK(!window.Shows(box + "-c-0"));
+    window.Type("X");
+    window.Click("page-title");
+    CHECK_EQ(text, "ab X cd");
+    // Delete at the end of the stretch before it does the same from the other side.
+    text = "ab $level cd";
+    window.Frames(2);
+    window.Click(box + "-t-0");
+    window.Key(Rml::Input::KI_END);
+    CHECK(window.Key(Rml::Input::KI_DELETE));
+    CHECK_EQ(text, "ab  cd");
+    window.Click("page-title");
+    // Inside a stretch they are the stretch's own keys.
+    text = "ab $level cd";
+    window.Frames(2);
+    window.Click(box + "-t-1");
+    window.Key(Rml::Input::KI_END);
+    window.Key(Rml::Input::KI_BACK);
+    window.Click("page-title");
+    CHECK_EQ(text, "ab $level c");
+    // Right at a stretch's end goes on into the next one, and Left at its start back into the one before.
+    window.Click(box + "-t-0");
+    window.Key(Rml::Input::KI_END);
+    window.Key(Rml::Input::KI_RIGHT);
+    window.Type("Y");
+    window.Key(Rml::Input::KI_LEFT);
+    window.Key(Rml::Input::KI_LEFT);
+    window.Type("Z");
+    window.Click("page-title");
+    CHECK_EQ(text, "ab Z$levelY c");
+}
+
+TEST(a_stretch_is_as_wide_as_its_text_and_the_last_takes_the_rest_of_the_box)
+{
+    Window window;
+    window.Page("players");
+    const std::string box = "players-nameplate-design-design-players-1";
+    window.settings.Kind(PlateKind::Players).lines[1].text = "ab $level";
+    window.Frames(3);
+    auto width = [&](const std::string& id) { return window.Find(id)->GetBox().GetSize(Rml::BoxArea::Border).x; };
+    auto left  = [&](const std::string& id) { return window.Find(id)->GetAbsoluteOffset(Rml::BoxArea::Border).x; };
+    // Three letters wide and no more, so the chip sits against them; the empty stretch after it runs to the box's end.
+    CHECK(width(box + "-t-0") > kEm && width(box + "-t-0") < 3.0f * kEm);
+    CHECK(left(box + "-c-0") - (left(box + "-t-0") + width(box + "-t-0")) < kEm);
+    CHECK(width(box + "-t-1") > 5.0f * kEm);
+    CHECK(left(box + "-t-1") + width(box + "-t-1") > left(box) + width(box) - 2.0f * kEm);
+    // Typed in, it grows with what is typed before it is ever left.
+    const float before = width(box + "-t-0");
+    window.Click(box + "-t-0");
+    window.Type("wwwwwwww");
+    window.Frames(2);
+    CHECK(width(box + "-t-0") > before + 4.0f * kEm);
+    CHECK_EQ(window.Said(), "");
 }
 
 TEST(a_friend_is_added_with_enter_and_removed_by_a_click_on_the_name)

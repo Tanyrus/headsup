@@ -11,6 +11,7 @@ namespace headsup
     namespace
     {
         constexpr float kFrame        = 1.6f;  // a control's height: a line of text and its padding above and below
+        constexpr float kRunInset     = 0.3f;  // how much shorter a line box's stretches and chips are than the box
         constexpr float kSpacing      = 0.45f; // between rows
         constexpr float kControlGap   = 0.5f;  // between a row's controls
         constexpr float kPadX         = 0.6f;  // a control's text from its sides
@@ -233,7 +234,19 @@ namespace headsup
         css += "input.text selection{background-color:" + color(c.accentSoft) + ";}";
         css += "input.num{width:" + Em(kNumberWidth) + ";}";
         css += ".num-name{width:" + Em(kNumberName) + ";text-align:right;color:" + color(c.muted) + ";line-height:" + frame + ";}";
-        css += "input.linebox{flex:1 1 0px;min-width:0px;margin-right:0px;}";
+        // A design line's box looks a text box, and holds stretches of text to type in with tags as chips between
+        // them. It wraps, and its last stretch takes what is left of its row, so a click past the text lands in it.
+        css += ".linebox{box-sizing:border-box;flex:1 1 0px;min-width:0px;display:flex;flex-direction:row;flex-wrap:wrap;"
+               "align-items:center;min-height:" + frame + ";padding:0px " + Em(kPadX) + ";border-radius:" + radius +
+               ";border:1px transparent;background-color:" + color(c.control) + ";transition:border-color" + kEase + ";}";
+        css += ".linebox:hover,.linebox.typing{background-color:" + color(c.hover) + ";}";
+        css += ".linebox.typing{border-color:" + color(Faded(c.accent, kFocus)) + ";}";
+        css += ".linebox input.run{flex:0 0 auto;height:" + Em(kFrame - kRunInset) + ";padding:0.1em 0px;border-width:0px;"
+               "border-radius:0px;background-color:transparent;}";
+        css += ".linebox input.run:hover,.linebox input.run:focus{background-color:transparent;}";
+        css += ".linebox input.run:last-child{flex:1 1 auto;}";
+        css += ".linebox .chip{flex:0 0 auto;height:" + Em(kFrame - kRunInset) + ";line-height:" + Em(kFrame - kRunInset - 0.1f) +
+               ";padding:0px 0.5em;margin:0.1em 0.1em;}";
         css += "input.hex{width:6em;}";
         // A dropdown's closed control; its list is the popup.
         css += ".dd{position:relative;box-sizing:border-box;height:" + frame + ";line-height:" + frame + ";padding:0px " +

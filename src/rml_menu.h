@@ -73,6 +73,8 @@ namespace headsup
         // player moves and sizes it. True when they changed.
         bool Place(const MenuHost& host, Settings& settings, float pixels);
         void ApplyOpacity();
+        void RunKey(Rml::ElementFormControlInput* input, const std::string& id, Rml::Input::KeyIdentifier key);
+        void FitRuns();
         void ApplyBlocks(const std::vector<FormBlock>& blocks);
         void ApplyValues(const std::vector<FormValue>& values);
         void ApplyPopup(const std::optional<FormPopup>& popup);

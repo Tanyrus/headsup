@@ -31,6 +31,13 @@ namespace headsup
     constexpr const char* kFocusEvent  = "focus";
     constexpr const char* kCaretEvent  = "caret"; // a text box's caret as it loses the keyboard
     constexpr const char* kDropEvent   = "drop";
+    // A tag beside a stretch of a line box is to go: Backspace at the stretch's start, or Delete at its end. Its
+    // value is which (kKillBack or kKillForward) and then the stretch as it is typed.
+    constexpr const char* kKillEvent   = "kill";
+    constexpr char kKillBack = 'b', kKillForward = 'f';
+    // The ids of a line box's parts, after the box's own: a stretch of text and a tag, each with its number.
+    constexpr const char* kRunIdInfix  = "-t-";
+    constexpr const char* kChipIdInfix = "-c-";
 
     // What an element shows that is no part of the markup: set on the element when it changes, so a slider being
     // dragged or a row fading replaces nothing.
@@ -58,6 +65,14 @@ namespace headsup
         bool operator==(const FormBlock&) const = default;
     };
     constexpr const char* kSidebarBlock = "sidebar";
+
+    // A text box to give the keyboard, with its caret at this byte: where a tag was just taken out beside it.
+    struct FormFocus
+    {
+        std::string id;
+        size_t caret = 0;
+        bool operator==(const FormFocus&) const = default;
+    };
 
     // The one open popup, shown under the control it belongs to: a dropdown's list, a color's sliders.
     struct FormPopup
@@ -97,6 +112,7 @@ namespace headsup
         std::vector<FormBlock> blocks;
         std::vector<FormValue> values;
         std::optional<FormPopup> popup;
+        std::optional<FormFocus> focus;
         std::function<bool(uint8_t)> keyDown;
 
         // What follows is not shown and takes no clicks, while the feature it belongs to is off: a setting that
@@ -225,8 +241,10 @@ namespace headsup
         // text then holds. Live: true whenever a key changed it.
         bool TextAt(const char* id, std::string& text, const char* hint, float width, bool live = false,
             size_t most = 0);
-        // A design line's box across the card. True when its text changed: typed and then left, or a tag chip
-        // dropped onto it, which goes at its end. draft keeps its caret, and whether it has the keyboard.
+        // A design line's box across the card: its stretches of text to type in, and its tags as chips between
+        // them. True when its text changed: a stretch typed and then left, a tag taken out with Backspace or Delete
+        // beside it, or a tag chip dropped in, which goes after what it is dropped on, or at the end. draft keeps
+        // its caret, and whether it has the keyboard.
         bool LineBox(const char* id, std::string& text, LineDraft& draft);
         // A tag as a chip that reads its name, after its icon when it draws one. True when clicked; dragged, it drops
         // onto a line's box.

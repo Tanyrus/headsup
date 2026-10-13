@@ -1,5 +1,7 @@
 #include "plate_template.h"
 
+#include "utf16.h"
+
 #include <algorithm>
 #include <iterator>
 #include <utility>
@@ -57,6 +59,8 @@ namespace headsup
             return *std::ranges::find(kTags, tag, &TagEntry::tag);
         }
 
+        constexpr char kNameOpen = '{', kNameClose = '}'; // around a tag's name, where a letter follows it
+
         bool IsLower(char c) { return c >= 'a' && c <= 'z'; }
 
         // The tag whose name past its mark is the letters, if any.
@@ -88,44 +92,112 @@ namespace headsup
         }
     }
 
+    namespace
+    {
+        // A piece of a line's text: a tag, or text with what it shows (a doubled mark is one) beside what was typed.
+        struct Token
+        {
+            bool isTag = false;
+            Tag tag    = Tag::Name;
+            std::string typed, shown;
+        };
+
+        std::vector<Token> Tokens(std::string_view text)
+        {
+            std::vector<Token> tokens;
+            const auto literal = [&](std::string_view typed, std::string_view shown) {
+                if (tokens.empty() || tokens.back().isTag) tokens.push_back(Token{});
+                tokens.back().typed += typed;
+                tokens.back().shown += shown;
+            };
+            for (size_t i = 0; i < text.size();)
+            {
+                if (text[i] != kTagMark)
+                {
+                    literal(text.substr(i, 1), text.substr(i, 1));
+                    ++i;
+                    continue;
+                }
+                if (i + 1 < text.size() && text[i + 1] == kTagMark)
+                {
+                    literal(text.substr(i, 2), text.substr(i, 1));
+                    i += 2;
+                    continue;
+                }
+                // The name straight after the mark, or in braces after it.
+                const bool braced = i + 1 < text.size() && text[i + 1] == kNameOpen;
+                const size_t name = i + (braced ? 2 : 1);
+                size_t end        = name;
+                while (end < text.size() && IsLower(text[end])) ++end;
+                const bool closed     = !braced || (end < text.size() && text[end] == kNameClose);
+                const TagEntry* entry = closed ? FindTag(text.substr(name, end - name)) : nullptr;
+                const size_t past     = entry != nullptr && braced ? end + 1 : end;
+                if (entry != nullptr)
+                    tokens.push_back(Token{true, entry->tag, {}, {}});
+                else
+                    literal(text.substr(i, past - i), text.substr(i, past - i));
+                i = past;
+            }
+            return tokens;
+        }
+
+        bool OddMarksAtEnd(std::string_view text)
+        {
+            size_t marks = 0;
+            while (marks < text.size() && text[text.size() - 1 - marks] == kTagMark) ++marks;
+            return marks % 2 != 0;
+        }
+
+        // The stretch and the byte in it that a caret stands for in these runs.
+        RunCaret Placed(const TemplateRuns& runs, RunCaret caret)
+        {
+            const int last = static_cast<int>(runs.texts.size()) - 1;
+            if (caret.run < 0 || caret.run > last) return RunCaret{last, runs.texts.back().size()};
+            return RunCaret{caret.run, std::min(caret.at, runs.texts[static_cast<size_t>(caret.run)].size())};
+        }
+    }
+
     std::vector<Atom> ParseTemplate(std::string_view text)
     {
         std::vector<Atom> atoms;
-        std::string run;
-        const auto closeRun = [&]
-        {
-            if (!run.empty()) atoms.push_back(Atom{false, Tag::Name, std::move(run)});
-            run.clear();
-        };
-        for (size_t i = 0; i < text.size();)
-        {
-            if (text[i] != kTagMark)
-            {
-                run += text[i++];
-                continue;
-            }
-            if (i + 1 < text.size() && text[i + 1] == kTagMark)
-            {
-                run += kTagMark;
-                i += 2;
-                continue;
-            }
-            size_t end = i + 1;
-            while (end < text.size() && IsLower(text[end])) ++end;
-            const TagEntry* entry = FindTag(text.substr(i + 1, end - i - 1));
-            if (!entry)
-            {
-                run.append(text.substr(i, end - i));
-            }
-            else
-            {
-                closeRun();
-                atoms.push_back(Atom{true, entry->tag, ""});
-            }
-            i = end;
-        }
-        closeRun();
+        for (Token& token : Tokens(text))
+            atoms.push_back(Atom{token.isTag, token.tag, std::move(token.shown)});
         return atoms;
+    }
+
+    TemplateRuns RunsOf(std::string_view text)
+    {
+        TemplateRuns runs{{std::string()}, {}};
+        for (Token& token : Tokens(text))
+        {
+            if (!token.isTag)
+            {
+                runs.texts.back() = std::move(token.typed);
+                continue;
+            }
+            runs.tags.push_back(token.tag);
+            runs.texts.emplace_back();
+        }
+        return runs;
+    }
+
+    std::string JoinRuns(const TemplateRuns& runs)
+    {
+        std::string text;
+        for (size_t i = 0; i < runs.texts.size(); ++i)
+        {
+            text += runs.texts[i];
+            if (i >= runs.tags.size()) break;
+            if (OddMarksAtEnd(runs.texts[i])) text += kTagMark;
+            const std::string_view name = TagName(runs.tags[i]) + 1;
+            const std::string& next     = runs.texts[i + 1];
+            // A small letter straight after the name would be read as more of it.
+            if (!next.empty() && IsLower(next.front()))
+                text.append(1, kTagMark).append(1, kNameOpen).append(name).append(1, kNameClose);
+            else
+                text.append(1, kTagMark).append(name);
+        }
+        return text;
     }
 
     std::vector<Tag> TagsFor(PlateKind kind)
@@ -136,22 +208,50 @@ namespace headsup
         return tags;
     }
 
-    std::string InsertTag(std::string text, Tag tag, size_t caret)
+    bool PutTag(std::string& text, RunCaret& caret, Tag tag)
     {
-        const std::string_view name = TagName(tag);
-        if (text.size() + name.size() > kMaxTemplate) return text;
-        text.insert(std::min(caret, text.size()), name);
-        return text;
+        TemplateRuns runs  = RunsOf(text);
+        const RunCaret at  = Placed(runs, caret);
+        const auto run     = static_cast<size_t>(at.run);
+        const std::string after = runs.texts[run].substr(at.at);
+        runs.texts[run].resize(at.at);
+        runs.texts.insert(runs.texts.begin() + at.run + 1, after);
+        runs.tags.insert(runs.tags.begin() + at.run, tag);
+        std::string put = JoinRuns(runs);
+        if (put.size() > kMaxTemplate) return false;
+        text  = std::move(put);
+        caret = RunCaret{at.run + 1, 0};
+        return true;
     }
 
-    bool PutTag(std::string& text, size_t& caret, Tag tag)
+    std::string WithoutTag(std::string_view text, int tag, RunCaret& caret)
     {
-        const size_t at  = std::min(caret, text.size());
-        const size_t was = text.size();
-        text             = InsertTag(std::move(text), tag, at);
-        if (text.size() == was) return false;
-        caret = at + (text.size() - was);
-        return true;
+        TemplateRuns runs = RunsOf(text);
+        if (tag < 0 || tag >= static_cast<int>(runs.tags.size())) return std::string(text);
+        const auto at = static_cast<size_t>(tag);
+        caret         = RunCaret{tag, runs.texts[at].size()};
+        runs.texts[at] += runs.texts[at + 1];
+        runs.texts.erase(runs.texts.begin() + tag + 1);
+        runs.tags.erase(runs.tags.begin() + tag);
+        return JoinRuns(runs);
+    }
+
+    std::string WithRun(std::string_view text, int run, std::string_view typed)
+    {
+        TemplateRuns runs = RunsOf(text);
+        if (run < 0 || run >= static_cast<int>(runs.texts.size())) return std::string(text);
+        std::string& stretch = runs.texts[static_cast<size_t>(run)];
+        stretch              = typed;
+        std::string joined   = JoinRuns(runs);
+        // Too long, the stretch typed loses what is over, a whole character at a time.
+        while (joined.size() > kMaxTemplate && !stretch.empty())
+        {
+            size_t end = stretch.size() - std::min(stretch.size(), joined.size() - kMaxTemplate);
+            while (end > 0 && ContinuesCharacter(stretch[end])) --end;
+            stretch.resize(end);
+            joined = JoinRuns(runs);
+        }
+        return joined;
     }
 
     std::string UnusedTagsNote(const KindSettings& kind, std::initializer_list<Tag> tags, const char* ending)
