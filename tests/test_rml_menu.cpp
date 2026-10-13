@@ -18,6 +18,7 @@ namespace
     constexpr float kEm       = 18.0f; // the window's text, in pixels
     constexpr double kVersion = 0.65;
     constexpr int kLeftButton = 0;
+    constexpr double kFrameSeconds = 1.0 / 30.0; // the game's frame
 
     // The settings window on a screen of its own, worked as a player works it: by where its controls are.
     class Window
@@ -46,6 +47,7 @@ namespace
             bool changed = false;
             for (int i = 0; i < count; ++i)
             {
+                m_Rml.complaints.seconds += kFrameSeconds;
                 changed = menu.Update(m_Host, settings, m_Readings, m_Fonts, kEm, kVersion) || changed;
                 m_Host.context->Update();
                 m_Host.context->Render();
@@ -408,4 +410,23 @@ TEST(every_control_of_every_page_takes_a_click_and_the_window_stands)
             CHECK_EQ(window.Said(), "");
         }
     }
+}
+
+TEST(auroras_lists_drop_in_and_phoenixs_are_there_at_once)
+{
+    const std::string list = "mobs-line-style-color-mobs0";
+    {
+        Window window(MenuTheme::Phoenix);
+        window.Page("mobs");
+        window.Click(list);
+        CHECK_EQ(window.Find("popup")->GetComputedValues().opacity(), 1.0f);
+    }
+    Window window(MenuTheme::Aurora);
+    window.Page("mobs");
+    window.Click(list);
+    // A tenth of a second after the click it is still fading in, and a second later it is whole.
+    const float early = window.Find("popup")->GetComputedValues().opacity();
+    CHECK(early > 0.0f && early < 1.0f);
+    window.Frames(30);
+    CHECK_EQ(window.Find("popup")->GetComputedValues().opacity(), 1.0f);
 }

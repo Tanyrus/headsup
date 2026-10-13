@@ -33,11 +33,14 @@ namespace test
         uintptr_t m_Next                = 0;
     };
 
-    // Keeps what RmlUi warns of: markup it could not read, a property it does not know, a font it lacks.
+    // Keeps what RmlUi warns of: markup it could not read, a property it does not know, a font it lacks. Its clock
+    // stands still until a test moves it, so what takes time takes the same time in every run.
     class Complaints : public Rml::SystemInterface
     {
     public:
         std::vector<std::string> said;
+        double seconds = 0.0;
+        double GetElapsedTime() override { return seconds; }
         bool LogMessage(Rml::Log::Type type, const Rml::String& message) override
         {
             if (type <= Rml::Log::LT_WARNING) said.push_back(message);
