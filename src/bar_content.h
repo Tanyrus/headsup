@@ -1,6 +1,7 @@
 #pragma once
 
 #include "bar_types.h"
+#include "function_ref.h"
 #include "icons.h"
 
 #include <cstddef>
@@ -8,6 +9,7 @@
 #include <cstdio>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -143,4 +145,9 @@ namespace headsup
     PopupRow Grid(int columns, size_t cells);
     // 1,234,567
     std::string Grouped(uint32_t value);
+    // text with each of its digits replaced by digit. A line's room is measured from this, with its font's widest
+    // digit, so figures that tick never change the room it takes.
+    std::string SteadyFigures(std::string_view text, char digit);
+    // The digit that measures widest, the lowest of those that tie.
+    char WidestDigit(FunctionRef<float(char)> measure);
 }

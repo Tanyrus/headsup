@@ -234,6 +234,29 @@ namespace headsup
         return SpansWidth(spans, face) + kLineIconGap * 2.0f + n * std::round(face.size) + (n - 1.0f) * kLineIconGap;
     }
 
+    char BarRenderer::WidestDigitOf(const TextFace& face)
+    {
+        const int pixels = WholePixels(face.size);
+        for (const FaceDigit& known : m_WidestDigits)
+            if (known.pixels == pixels && known.family == face.family) return known.digit;
+        const char digit = WidestDigit([&](char d) {
+            const char text[] = {d, '\0'};
+            return m_Gdi.Measure(text, face.family, pixels);
+        });
+        m_WidestDigits.push_back(FaceDigit{face.family, pixels, digit});
+        return digit;
+    }
+
+    float BarRenderer::SteadyWidth(std::vector<Span> spans, const std::vector<Icon>& icons, const TextFace& face)
+    {
+        // Never less than the line as it reads now, should a pair of its real figures kern wider.
+        const float shown = LineWidth(spans, icons, face);
+        const char digit  = WidestDigitOf(face);
+        for (Span& s : spans)
+            s.text = SteadyFigures(s.text, digit);
+        return std::max(shown, LineWidth(spans, icons, face));
+    }
+
     void BarRenderer::Update(const BarState& state, const Settings& settings, float screenWidth, float screenHeight,
         BarInput& input, bool hidden)
     {
@@ -312,8 +335,8 @@ namespace headsup
             if (!look.lines.twoLines) OneLine(c, look.settings.barSubtitle);
             widgets.hasPopup[i] = c.hasPopup;
             natural[i]          = 2.0f * m.padding + look.Leading(c) +
-                         std::max(LineWidth(c.title, c.titleIcons, look.TitleFace(c)),
-                             look.lines.twoLines ? LineWidth(c.subtitle, c.subtitleIcons, look.DetailFace()) : 0.0f) +
+                         std::max(SteadyWidth(c.title, c.titleIcons, look.TitleFace(c)),
+                             look.lines.twoLines ? SteadyWidth(c.subtitle, c.subtitleIcons, look.DetailFace()) : 0.0f) +
                          (c.progress && c.progressBeside ? m.gap + BesideWidth(m) : 0.0f);
         }
         // The target goes when its room cannot hold its padding, its icons and the start of its name.

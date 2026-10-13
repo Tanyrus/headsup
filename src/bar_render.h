@@ -174,6 +174,10 @@ namespace headsup
         float SpansWidth(const std::vector<Span>& spans, const TextFace& face);
         // A line's text and the icons after it.
         float LineWidth(const std::vector<Span>& spans, const std::vector<Icon>& icons, const TextFace& face);
+        // The room a widget's line takes: its width with every figure as wide as the font's widest, so a clock or a
+        // counter ticking does not move the widgets beside it.
+        float SteadyWidth(std::vector<Span> spans, const std::vector<Icon>& icons, const TextFace& face);
+        char WidestDigitOf(const TextFace& face);
         const TextRow& Lines(const BarMetrics& metrics, BarShape shape, int barText, const char* titleFont,
             const char* detailFont);
         const std::string& Fitted(Memo<FitKey, std::string>& memo, std::string text, const TextFace& face, float room);
@@ -205,6 +209,14 @@ namespace headsup
         // Apart, or one evicts the other each frame.
         Memo<FitKey, std::string> m_TitleFit, m_SubtitleFit;
         Memo<ShortestKey, float> m_Shortest;
+        // Each font and size's widest digit, measured once.
+        struct FaceDigit
+        {
+            std::string family;
+            int pixels = 0;
+            char digit = '0';
+        };
+        std::vector<FaceDigit> m_WidestDigits;
         Memo<HelpBarKey, HelpBarText> m_HelpBar;
         Memo<LinesKey, TextRow> m_Lines;
         Memo<PopupKey, PopupLayout> m_Popup;
