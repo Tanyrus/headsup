@@ -50,3 +50,51 @@ TEST(the_keys_held_are_each_key_down_once_without_mouse_buttons)
     CHECK(HeldKeys(down) == (std::vector<uint8_t>{0x11, 0x51}));
     CHECK(HeldKeys([](uint8_t) { return false; }).empty());
 }
+
+namespace
+{
+    constexpr uint8_t kF10 = 0x79, kF11 = 0x7A;
+}
+
+TEST(a_key_counts_once_per_press)
+{
+    KeyPress press;
+    CHECK(!press.Pressed(kF10, false)); // the key the settings held at load, up
+    CHECK(press.Pressed(kF10, true));
+    CHECK(!press.Pressed(kF10, true)); // held
+    CHECK(!press.Pressed(kF10, false));
+    CHECK(press.Pressed(kF10, true));
+}
+
+// The settings window takes the next key pressed, so the key is down in the frame it becomes the one to watch.
+TEST(the_press_that_chose_a_key_is_not_a_press_of_it)
+{
+    KeyPress press;
+    CHECK(!press.Pressed(0, false));
+    CHECK(!press.Pressed(kF10, true)); // chosen
+    CHECK(!press.Pressed(kF10, true));
+    CHECK(!press.Pressed(kF10, false));
+    CHECK(press.Pressed(kF10, true));
+    CHECK(!press.Pressed(kF11, true)); // another chosen while the first is still down
+    CHECK(!press.Pressed(kF11, false));
+    CHECK(press.Pressed(kF11, true));
+}
+
+TEST(no_key_is_never_pressed)
+{
+    KeyPress press;
+    CHECK(!press.Pressed(0, true));
+    CHECK(!press.Pressed(0, false));
+    CHECK(!press.Pressed(0, true));
+}
+
+TEST(a_key_to_press_is_a_real_key_with_its_sides_as_one_or_none)
+{
+    CHECK_EQ(BindableKey(kF10), kF10);
+    CHECK_EQ(BindableKey(0xA3), 0x11); // right Ctrl
+    CHECK_EQ(BindableKey(0x02), 0);    // the right mouse button
+    CHECK_EQ(BindableKey(0), 0);
+    CHECK_EQ(BindableKey(0xFF), 0);    // past the last key
+    CHECK_EQ(BindableKey(999), 0);
+    CHECK_EQ(BindableKey(-1), 0);
+}

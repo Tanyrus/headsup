@@ -46,6 +46,25 @@ namespace headsup
         return !held.empty() && std::ranges::all_of(held, [&](uint8_t vk) { return std::ranges::find(keep, vk) != keep.end(); });
     }
 
+    uint8_t BindableKey(int vk)
+    {
+        if (vk < kFirstKey || vk > kLastKey) return 0;
+        const uint8_t key = NormalizeKey(static_cast<uint8_t>(vk));
+        return MouseButton(key) ? 0 : key;
+    }
+
+    bool KeyPress::Pressed(uint8_t key, bool down)
+    {
+        if (key != m_Key)
+        {
+            m_Key  = key;
+            m_Down = true;
+        }
+        const bool was = m_Down;
+        m_Down         = down;
+        return key != 0 && down && !was;
+    }
+
     std::string KeyName(uint8_t vk)
     {
         char name[16];

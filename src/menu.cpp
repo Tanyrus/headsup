@@ -109,51 +109,6 @@ namespace headsup
             DrawReset(ui, s, collapsed, confirm);
         }
 
-        bool KeyDown(uint8_t vk) { return (GetAsyncKeyState(vk) & 0x8000) != 0; }
-
-        // The keys that keep the game's pointer, each a chip that a click removes, and a chip that takes the next
-        // key pressed that was not already held.
-        void DrawKeptKeys(Ui& ui, Settings& s, KeyCapture& capture)
-        {
-            const float y = ui.Row("Keep pointer", "The game hides its pointer when a key runs a command. While only "
-                                                   "these keys are held, it stays.", 0.0f);
-            ui.EndRowAt(ui.cardX, y, ui.gui->GetFrameHeight());
-            ui.gui->SetCursorPosX(ui.cardX + ui.Em(kCardPad));
-            for (size_t i = 0; i < s.keepPointerKeys.size(); ++i)
-            {
-                char chip[48];
-                std::snprintf(chip, sizeof(chip), "%s  x##key%zu", KeyName(s.keepPointerKeys[i]).c_str(), i);
-                if (i > 0) ui.gui->SameLine();
-                if (ui.Shape(chip, ImVec2(0.0f, 0.0f), kRaised, ui.gui->GetFrameHeight() / 2.0f, kRaisedEdge))
-                {
-                    s.keepPointerKeys.erase(s.keepPointerKeys.begin() + static_cast<std::ptrdiff_t>(i));
-                    ui.changed = true;
-                    break;
-                }
-            }
-            if (!s.keepPointerKeys.empty()) ui.gui->SameLine();
-            if (!capture.on)
-            {
-                if (s.keepPointerKeys.size() < kMaxKeptKeys &&
-                    ui.Shape("+ Add Key", ImVec2(0.0f, 0.0f), kFlat, ui.gui->GetFrameHeight() / 2.0f, kRaisedEdge))
-                    capture = KeyCapture{true, HeldKeys(KeyDown)};
-                return;
-            }
-            if (ui.WithText(kMuted, [&] {
-                    return ui.Shape("Press a Key...##cancel", ImVec2(0.0f, 0.0f), kFlat, ui.gui->GetFrameHeight() / 2.0f,
-                        kAccent);
-                }))
-                capture.on = false;
-            for (const uint8_t key : HeldKeys(KeyDown))
-            {
-                if (std::ranges::find(capture.held, key) != capture.held.end()) continue;
-                if (std::ranges::find(s.keepPointerKeys, key) == s.keepPointerKeys.end()) s.keepPointerKeys.push_back(key);
-                ui.changed = true;
-                capture.on = false;
-                break;
-            }
-        }
-
         void DrawMouseCursorPage(Ui& ui, Settings& s, std::unordered_set<std::string>& collapsed, KeyCapture& capture)
         {
             ui.Fade(!s.enabled);
@@ -163,7 +118,9 @@ namespace headsup
                 ui.Switch("Pointer fix", s.fixPointer,
                     "Keeps the game's pointer under yours after a resize, and clicks where you click. It also shows the "
                     "pointer again over Ashita's windows.");
-                DrawKeptKeys(ui, s, capture);
+                DrawKeys(ui, "Keep pointer",
+                    "The game hides its pointer when a key runs a command. While only these keys are held, it stays.",
+                    s.keepPointerKeys, kMaxKeptKeys, capture);
                 ui.EndCard();
             }
             ui.Fade(false);
@@ -240,6 +197,48 @@ namespace headsup
         {
             *static_cast<std::vector<std::string>*>(into) = InstalledFontFamilies();
             return 0;
+        }
+    }
+
+    bool KeyDown(uint8_t vk) { return (GetAsyncKeyState(vk) & 0x8000) != 0; }
+
+    void DrawKeys(Ui& ui, const char* label, const char* tip, std::vector<uint8_t>& keys, size_t most, KeyCapture& capture)
+    {
+        const float y = ui.Row(label, tip, 0.0f);
+        ui.EndRowAt(ui.cardX, y, ui.gui->GetFrameHeight());
+        ui.gui->SetCursorPosX(ui.cardX + ui.Em(kCardPad));
+        for (size_t i = 0; i < keys.size(); ++i)
+        {
+            char chip[48];
+            std::snprintf(chip, sizeof(chip), "%s  x##key%zu", KeyName(keys[i]).c_str(), i);
+            if (i > 0) ui.gui->SameLine();
+            if (ui.Shape(chip, ImVec2(0.0f, 0.0f), kRaised, ui.gui->GetFrameHeight() / 2.0f, kRaisedEdge))
+            {
+                keys.erase(keys.begin() + static_cast<std::ptrdiff_t>(i));
+                ui.changed = true;
+                break;
+            }
+        }
+        if (!capture.on && keys.size() >= most) return; // nothing follows the chips: the next row starts a new line
+        if (!keys.empty()) ui.gui->SameLine();
+        if (!capture.on)
+        {
+            if (ui.Shape("+ Add Key", ImVec2(0.0f, 0.0f), kFlat, ui.gui->GetFrameHeight() / 2.0f, kRaisedEdge))
+                capture = KeyCapture{true, HeldKeys(KeyDown)};
+            return;
+        }
+        if (ui.WithText(kMuted, [&] {
+                return ui.Shape("Press a Key...##cancel", ImVec2(0.0f, 0.0f), kFlat, ui.gui->GetFrameHeight() / 2.0f,
+                    kAccent);
+            }))
+            capture.on = false;
+        for (const uint8_t key : HeldKeys(KeyDown))
+        {
+            if (std::ranges::find(capture.held, key) != capture.held.end()) continue;
+            if (std::ranges::find(keys, key) == keys.end()) keys.push_back(key);
+            ui.changed = true;
+            capture.on = false;
+            break;
         }
     }
 
@@ -366,7 +365,9 @@ namespace headsup
                 case Page::Self:
                 case Page::Npcs:
                 case Page::Pets: DrawKindPage(ui, s, *KindOfPage(m_Page), m_Collapsed, m_Fonts, m_Design); break;
-                case Page::UserInterface: DrawUserInterfacePage(ui, s, status, m_Collapsed, m_Windows); break;
+                case Page::UserInterface:
+                    DrawUserInterfacePage(ui, s, status, m_Collapsed, m_Windows, m_ShotKeyCapture);
+                    break;
                 case Page::TopPanel: DrawTopPanelPage(ui, s, status, m_Collapsed, m_Fonts); break;
                 case Page::Widgets: DrawWidgetsPage(ui, s, m_Collapsed, m_Widget); break;
                 case Page::MouseCursor: DrawMouseCursorPage(ui, s, m_Collapsed, m_KeyCapture); break;

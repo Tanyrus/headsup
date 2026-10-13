@@ -6,6 +6,7 @@
 #include "bar_render.h"
 #include "check.h"
 #include "commands.h"
+#include "copy_state.h"
 #include "d3d_util.h"
 #include "debug_report.h"
 #include "fonts.h"
@@ -20,8 +21,10 @@
 #include "outline.h"
 #include "ph_timers.h"
 #include "player_status.h"
+#include "pointer_keys.h"
 #include "pointer_swap.h"
 #include "settings.h"
+#include "shot_watch.h"
 #include "tracker.h"
 #ifdef HEADSUP_DEV
 #include "codedump.h"
@@ -222,6 +225,9 @@ class HeadsUp final : public IPlugin
     headsup::PlayerJobs m_OwnJobs;                                // yours as the game has them, this frame
     bool m_DebugPending = false;
     bool m_Screenshot = false;
+    headsup::ShotWatch m_Shot;
+    headsup::KeyPress m_ShotKey;
+    bool m_SceneCopied = false; // this frame, while a screenshot hides the game's interface
     bool m_UiHidden = false;
     uint32_t m_OwnStatus = 0;
     float m_GuiAlpha = 1.0f;
@@ -516,6 +522,7 @@ public:
         UpdateCursorTargets();
         UpdateTracker(now);
         g_GameWindow = m_AshitaCore->GetProperties()->GetFinalFantasyHwnd();
+        if (m_ShotKey.Pressed(static_cast<uint8_t>(m_Settings.screenshotKey), ShotKeyDown())) SetScreenshot(!m_Screenshot);
         const uint8_t loginStatus = m_AshitaCore->GetMemoryManager()->GetPlayer()->GetLoginStatus();
         // A popup left open at logout would come back with the next character.
         if (loginStatus != headsup::kLoginInGame) m_BarInput.Reset();
@@ -584,6 +591,8 @@ public:
             if (const std::string failure = m_WindowHook.TakeMoveProblem(); !failure.empty())
                 Print("the game's windows stay under the help bar: " + failure + ".");
         }
+        m_Shot.EndFrame();
+        m_SceneCopied = false;
         m_WindowHook.Hide(hidden);
         m_WindowHook.NewFrame();
         m_WindowHook.MoveFrom(band);
@@ -639,6 +648,7 @@ public:
     // Unless they were drawn into the scene, our nameplates go on top here, in the same frame as the game's names.
     void Direct3DBeginScene(bool isRenderingBackBuffer) override
     {
+        if (!Ours()) WatchForShot();
         if (!Ours()) RecordDraw(isRenderingBackBuffer ? 'B' : 'b', D3DPT_POINTLIST, 0u, nullptr, 0u, 0u, 0u);
     }
 
@@ -652,7 +662,7 @@ public:
             m_Names.UseScene(m_NameHook.SceneTarget(), m_NameHook.SceneDepth());
             plates = m_Names.NamesThisFrame();
         }
-        const bool bar = g_BarOn && !g_BarHidden && !std::exchange(m_BarDrawn, true);
+        const bool bar = g_BarOn && !g_BarHidden && !m_Shot.Hiding() && !std::exchange(m_BarDrawn, true);
         if (plates)
         {
             m_Names.FinishText();
@@ -700,7 +710,9 @@ public:
         RecordDraw('U', type, primCount, vertices, stride, 0u, headsup::VertexCount(type, primCount));
         DrawNameplatesBeforeSceneCopy();
         m_Names.OnDrawUP(m_Tracker, m_Settings);
-        return false;
+        if (!InterfaceCopy(type, primCount, vertices, stride)) return false;
+        MarkHidden();
+        return true;
     }
 
     bool Direct3DDrawIndexedPrimitiveUP(D3DPRIMITIVETYPE type, UINT minIndex, UINT numVertices, UINT primCount,
@@ -828,10 +840,44 @@ private:
     void PlatesNotDrawn() { NotDrawn("nameplates are", m_PlatesUnsaved); }
     void BarNotDrawn() { NotDrawn("the top panel is", m_BarUnsaved); }
 
+    // Ashita's screenshot plugin, asked to hide, takes its fonts away for the frame it captures (shot_watch.h): that
+    // frame is drawn as screenshot mode draws. HeadsUp's own hiding of the fonts is not a screenshot.
+    void WatchForShot()
+    {
+        if (!m_Settings.enabled) return;
+        const bool was = m_Shot.Hiding();
+        if (m_Shot.Seen(m_Screenshot || m_AshitaCore->GetFontManager()->GetVisible()) && !was) m_NameHook.HideAll();
+    }
+    bool Unseen() const { return m_Screenshot || m_Shot.Hiding(); }
+
+    // The game draws its interface, every window, the chat and its own pointer, into one image and lays that over
+    // the scene's copy: the second draw of a frame to cover the back buffer. A screenshot that hides the game's
+    // windows blocks it, which leaves the scene.
+    bool InterfaceCopy(D3DPRIMITIVETYPE type, UINT primCount, const void* vertices, UINT stride)
+    {
+        if (!Unseen() || !m_Settings.screenshotHidesGame) return false;
+        if (!headsup::CoversTarget(vertices, headsup::VertexCount(type, primCount), stride, m_Names.BackBufferWidth(),
+                m_Names.BackBufferHeight()))
+            return false;
+        DWORD fvf = 0;
+        if (!headsup::BoundFvf(m_Device, fvf) || (fvf & D3DFVF_XYZRHW) == 0 || !m_Names.DrawingToBackBuffer())
+            return false;
+        return std::exchange(m_SceneCopied, true);
+    }
+
+    // The key is the player's own while they type; in screenshot mode it always answers, so nothing keeps it on.
+    bool ShotKeyDown() const
+    {
+        if (m_Settings.screenshotKey == 0 || GetForegroundWindow() != g_GameWindow) return false;
+        const bool typing = m_AshitaCore->GetChatManager()->IsInputOpen() != 0 ||
+                            m_AshitaCore->GetGuiManager()->GetIO().WantTextInput;
+        return (m_Screenshot || !typing) && headsup::KeyDown(static_cast<uint8_t>(m_Settings.screenshotKey));
+    }
+
     // toX and toY: the bound render target's pixels per back-buffer pixel.
     void DrawNameplates(float toX, float toY, bool depthTest)
     {
-        if (m_Screenshot)
+        if (Unseen())
         {
             m_Nameplates.Clear();
             m_PlatesPlaced = true;
@@ -848,7 +894,7 @@ private:
     void DrawNameplatesBeforeSceneCopy()
     {
         if (!headsup::NameplatesOn(m_Settings)) return;
-        if (m_Screenshot)
+        if (Unseen())
         {
             m_Nameplates.Clear();
             m_PlatesPlaced = true;
@@ -866,7 +912,7 @@ private:
     }
 
     // Every name, HeadsUp's bar and menu, and every addon's ImGui, font and primitive drawing go, and come back when it
-    // is run again or HeadsUp unloads. Outlines and the game's own windows stay.
+    // is run again or HeadsUp unloads. Outlines stay, and the game's own windows unless the settings take them too.
     void SetScreenshot(bool on)
     {
         if (on == m_Screenshot) return;

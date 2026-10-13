@@ -170,12 +170,18 @@ sub-target is out of range.
 
 ### Screenshot mode
 
-`/hu screenshot` hides every name, the top panel, HeadsUp's menu and every addon window, until you run it again. Bind it
-to a key with Ashita's `/bind`, for example:
+Screenshot mode hides every name, the top panel, HeadsUp's menu and every addon window, so a picture shows the game
+alone. With Hide Game Windows on, as it is at first, the game's own windows and chat go too and only the scene is left.
+
+Ashita's own `/screenshot hide` turns it on by itself, for just the picture it takes:
 
 ```
-/bind F12 /hu screenshot
+/bind SYSRQ /screenshot hide
 ```
+
+Nothing tells HeadsUp ahead of time about a picture taken from outside the game, such as your desktop's screenshot key,
+Steam's or NVIDIA's. For those, pick a key on the User Interface page's Screenshot Mode card, or run `/hu screenshot`:
+once hides everything, and once more brings it back.
 
 The top panel also hides itself during cutscenes and NPC dialogs.
 

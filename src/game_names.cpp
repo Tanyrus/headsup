@@ -85,14 +85,18 @@ namespace headsup
         m_NamesThisFrame = true;
     }
 
+    bool GameNames::DrawingToBackBuffer() const
+    {
+        IDirect3DSurface8* target = nullptr;
+        if (m_Device == nullptr || FAILED(m_Device->GetRenderTarget(&target)) || target == nullptr) return false;
+        const bool back = reinterpret_cast<uintptr_t>(target) == m_BackBuffer;
+        target->Release();
+        return back;
+    }
+
     bool GameNames::SceneCopyStarting()
     {
-        if (!TextPending() || m_Scene.surface == 0 || m_Scene.surface == m_BackBuffer) return false;
-        IDirect3DSurface8* target = nullptr;
-        if (FAILED(m_Device->GetRenderTarget(&target)) || target == nullptr) return false;
-        const bool copying = reinterpret_cast<uintptr_t>(target) == m_BackBuffer;
-        target->Release();
-        return copying;
+        return TextPending() && m_Scene.surface != 0 && m_Scene.surface != m_BackBuffer && DrawingToBackBuffer();
     }
 
     void GameNames::OnDrawUP(const Tracker& tracker, const Settings& settings)

@@ -32,6 +32,7 @@ namespace headsup
             {"cursorFeather", &Settings::cursorFeather}, {"chocoboPointer", &Settings::chocoboPointer},
             {"fixPointer", &Settings::fixPointer}, {"showRanks", &Settings::showRanks}, {"showBar", &Settings::showBar},
             {"hideHelpBar", &Settings::hideHelpBar}, {"hideNetstat", &Settings::hideNetstat},
+            {"screenshotHidesGame", &Settings::screenshotHidesGame},
             {"clockSeconds", &Settings::clockSeconds},
             {"stackNames", &Settings::stackNames},
             {"nameplates", &Settings::nameplates}, {"outlines", &Settings::outlines}};
@@ -56,7 +57,8 @@ namespace headsup
             {"baseSize", &Settings::baseSize, kMinTextSize, kMaxTextSize},
             {"scaleMin", &Settings::scaleMin, kMinSizePercent, kMaxSizePercent},
             {"scaleMax", &Settings::scaleMax, kMinSizePercent, kMaxSizePercent},
-            {"timerPercent", &Settings::timerPercent, kMinSizePercent, kMaxSizePercent}};
+            {"timerPercent", &Settings::timerPercent, kMinSizePercent, kMaxSizePercent},
+            {"screenshotKey", &Settings::screenshotKey, 0, UINT8_MAX}};
 
         struct FloatKey
         {
@@ -938,11 +940,11 @@ namespace headsup
         std::vector<uint8_t> keys;
         for (const uint8_t vk : s.keepPointerKeys)
         {
-            const uint8_t key = NormalizeKey(vk);
-            if (key != 0 && !MouseButton(key) && std::ranges::find(keys, key) == keys.end() && keys.size() < kMaxKeptKeys)
-                keys.push_back(key);
+            const uint8_t key = BindableKey(vk);
+            if (key != 0 && std::ranges::find(keys, key) == keys.end() && keys.size() < kMaxKeptKeys) keys.push_back(key);
         }
         s.keepPointerKeys = std::move(keys);
+        s.screenshotKey   = BindableKey(s.screenshotKey);
         s.movedWindows    = MovedWindowsFrom(MovedWindowNames(s.movedWindows));
         s.windowOffsets   = WindowOffsetsFrom(WindowOffsetText(s.windowOffsets));
         s.windowGroups    = WindowGroupsFrom(WindowGroupsText(s.windowGroups));

@@ -39,6 +39,7 @@ namespace headsup
 
         // The game is about to copy its scene image, names included, to the back buffer: the last moment to draw into it.
         bool SceneCopyStarting();
+        bool DrawingToBackBuffer() const;
         IDirect3DSurface8* SceneTarget() const { return reinterpret_cast<IDirect3DSurface8*>(m_Scene.surface); }
         IDirect3DSurface8* SceneDepth() const { return reinterpret_cast<IDirect3DSurface8*>(m_SceneDepth); }
         float TargetScaleX() const { return m_Scene.x; }

@@ -18,4 +18,9 @@ namespace headsup
 
     // The names of the states that differ, comma separated; empty when every one came back.
     std::string StatesNotRestored(const CopyState& before, const CopyState& after);
+
+    // Whether pretransformed vertices (each begins with its x and y as floats, stride bytes apart) reach every edge of
+    // a width by height target to within a pixel: the scene's copy to the back buffer does, and so does the game's
+    // interface laid over it.
+    bool CoversTarget(const void* vertices, uint32_t count, uint32_t stride, float width, float height);
 }
