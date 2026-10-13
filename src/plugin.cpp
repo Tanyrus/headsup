@@ -227,7 +227,8 @@ class HeadsUp final : public IPlugin
     bool m_Screenshot = false;
     headsup::ShotWatch m_Shot;
     headsup::KeyPress m_ShotKey;
-    bool m_SceneCopied = false; // this frame, while a screenshot hides the game's interface
+    bool m_SceneCopied      = false; // this frame: the first draw to cover the back buffer came
+    bool m_LoneCursorsDrawn = false; // this frame
     bool m_UiHidden = false;
     uint32_t m_OwnStatus = 0;
     float m_GuiAlpha = 1.0f;
@@ -592,7 +593,8 @@ public:
                 Print("the game's windows stay under the help bar: " + failure + ".");
         }
         m_Shot.EndFrame();
-        m_SceneCopied = false;
+        m_SceneCopied      = false;
+        m_LoneCursorsDrawn = false;
         m_WindowHook.Hide(hidden);
         m_WindowHook.NewFrame();
         m_WindowHook.MoveFrom(band);
@@ -656,6 +658,7 @@ public:
     {
         if (!Ours()) RecordDraw(isRenderingBackBuffer ? 'E' : 'e', D3DPT_POINTLIST, 0u, nullptr, 0u, 0u, 0u);
         if (Ours() || !isRenderingBackBuffer) return;
+        DrawLoneCursors();
         bool plates = false;
         if (!m_PlatesPlaced)
         {
@@ -711,6 +714,8 @@ public:
         DrawNameplatesBeforeSceneCopy();
         m_Names.OnDrawUP(m_Tracker, m_Settings);
         if (!InterfaceCopy(type, primCount, vertices, stride)) return false;
+        DrawLoneCursors();
+        if (!Unseen() || !m_Settings.screenshotHidesGame) return false;
         MarkHidden();
         return true;
     }
@@ -851,12 +856,13 @@ private:
     bool Unseen() const { return m_Screenshot || m_Shot.Hiding(); }
 
     // The game draws its interface, every window, the chat and its own pointer, into one image and lays that over
-    // the scene's copy: the second draw of a frame to cover the back buffer. A screenshot that hides the game's
-    // windows blocks it, which leaves the scene.
+    // the scene's copy: the second draw of a frame to cover the back buffer, each a single quad. A screenshot that
+    // hides the game's windows blocks it, which leaves the scene.
     bool InterfaceCopy(D3DPRIMITIVETYPE type, UINT primCount, const void* vertices, UINT stride)
     {
-        if (!Unseen() || !m_Settings.screenshotHidesGame) return false;
-        if (!headsup::CoversTarget(vertices, headsup::VertexCount(type, primCount), stride, m_Names.BackBufferWidth(),
+        constexpr UINT kQuadTriangles = 2;
+        if (primCount != kQuadTriangles ||
+            !headsup::CoversTarget(vertices, headsup::VertexCount(type, primCount), stride, m_Names.BackBufferWidth(),
                 m_Names.BackBufferHeight()))
             return false;
         DWORD fvf = 0;
@@ -1427,15 +1433,33 @@ private:
         if (color == 0) color = m_ArrowHook.PickedColor();
         m_CursorTargets.outOfRange      = picking && headsup::PickedOutOfRange(color).value_or(false);
         m_CursorTargets.gameArrowsShown = !m_ArrowHook.Running();
-        if (window != nullptr)
-        {
-            const headsup::MenuSize size = headsup::MenuSizeOf(
-                m_MenuWidth, m_MenuHeight, m_Names.BackBufferWidth(), m_Names.BackBufferHeight());
-            headsup::PlaceAnchors(m_CursorTargets,
-                headsup::CursorWindow{static_cast<float>(window->m_AnkX), static_cast<float>(window->m_AnkY),
-                    static_cast<float>(window->m_SubAnkX), static_cast<float>(window->m_SubAnkY)},
-                size.width, size.height, m_Names.BackBufferWidth(), m_Names.BackBufferHeight());
-        }
+        PlaceCursorAnchors();
+    }
+
+    void PlaceCursorAnchors()
+    {
+        const Ashita::FFXI::targetwindow_t* window = m_AshitaCore->GetMemoryManager()->GetTarget()->GetRawStructureWindow();
+        if (window == nullptr) return;
+        const headsup::MenuSize size =
+            headsup::MenuSizeOf(m_MenuWidth, m_MenuHeight, m_Names.BackBufferWidth(), m_Names.BackBufferHeight());
+        headsup::PlaceAnchors(m_CursorTargets,
+            headsup::CursorWindow{static_cast<float>(window->m_AnkX), static_cast<float>(window->m_AnkY),
+                static_cast<float>(window->m_SubAnkX), static_cast<float>(window->m_SubAnkY)},
+            size.width, size.height, m_Names.BackBufferWidth(), m_Names.BackBufferHeight());
+    }
+
+    // The cursor of a target without a nameplate sits on the target window's anchor, which the game moves only once
+    // its scene is copied: read any earlier it is the frame before's, and the cursor trailed a moving camera. So it
+    // is drawn under the game's interface, where the game's own arrow is, or at the scene's end where no interface
+    // was laid over.
+    void DrawLoneCursors()
+    {
+        if (std::exchange(m_LoneCursorsDrawn, true) || Unseen() || m_Device == nullptr) return;
+        PlaceCursorAnchors();
+        const float width = m_Names.BackBufferWidth(), height = m_Names.BackBufferHeight();
+        const std::vector<headsup::LoneCursor> lone = m_Nameplates.LoneCursorsDue(m_Settings, m_CursorTargets, width, height);
+        if (lone.empty()) return;
+        if (!WithSavedState([&] { m_Nameplates.DrawLoneCursors(lone, m_Settings, Now(), width, height); })) PlatesNotDrawn();
     }
 
     void UpdateParty(IParty* party, IPlayer* player)

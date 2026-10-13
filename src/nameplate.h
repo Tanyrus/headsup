@@ -42,6 +42,9 @@ namespace headsup
     {
         float x, y;
     };
+    // Whether the game's own arrow would show at this anchor: only inside the screen. A target behind the camera has
+    // its anchor left at the corner, (0,0), and one off to a side far outside.
+    bool AnchorOnScreen(float x, float y, float screenWidth, float screenHeight);
     CursorSpot CursorAtAnchor(float anchorX, float anchorY, float width, float height, float tip);
     // The game's arrow over a candidate sits 10 of its 32 pixels above the one over the target: on a nameplate the
     // candidate's cursor rises this share of its height over the target's own.

@@ -53,6 +53,14 @@ namespace headsup
         void ReleasePlates();
         // Changes render states.
         void Draw(bool depthTest);
+        // The cursors of targets whose nameplate carries none, at the target window's anchors, as far as those are on
+        // screen. Read the anchors when these are drawn: the game moves them only after it has copied its scene.
+        std::vector<LoneCursor> LoneCursorsDue(const Settings& settings, const CursorTargets& targets, float screenWidth,
+            float screenHeight) const;
+        // In the back buffer's own pixels, at exactly the cursor's size and on top: there is no name to scale by or to
+        // sit behind walls with. Changes render states.
+        void DrawLoneCursors(const std::vector<LoneCursor>& lone, const Settings& settings, double now, float screenWidth,
+            float screenHeight);
         void Release();
 
         const std::vector<Shown>& LastShown() const { return m_Shown; }
@@ -158,6 +166,9 @@ namespace headsup
         std::vector<Quad> m_Quads;
         std::vector<Shown> m_Shown;
         std::vector<CursorName> m_CursorNames;
+        size_t m_PlateCursors = 0; // how many of them, the first ones, sit on a nameplate
+        PlateTexture m_LoneCursor;
+        PlateTexture m_LoneCursorUnder; // the target's own, while it is also the candidate being picked
         // Kept from plate to plate so measuring one allocates nothing: its lines as the layout takes them, the text
         // boxes of the line being measured, a badge for each of its icons (null without one) and which texts are left out.
         std::array<LineInput, kPlateLines> m_Inputs;

@@ -75,6 +75,20 @@ TEST(a_targeted_door_gets_the_cursor_at_the_games_anchor)
     CHECK(LoneCursors(none, s, {}).empty());
 }
 
+// The same door's anchor on the 2560 by 1440 back buffer, from debug reports on the test client: in view, off the
+// screen's left edge with the camera turned, and behind the camera, where the game leaves it at the corner. With
+// HeadsUp unloaded the game drew its own arrow in the first case only.
+TEST(a_cursor_without_a_nameplate_shows_only_while_its_anchor_is_on_screen)
+{
+    constexpr float kWidth = 2560.0f, kHeight = 1440.0f;
+    CHECK(AnchorOnScreen(2274.7f, 557.3f, kWidth, kHeight));
+    CHECK(!AnchorOnScreen(-353.3f, 588.0f, kWidth, kHeight));
+    CHECK(!AnchorOnScreen(0.0f, 0.0f, kWidth, kHeight));
+    CHECK(!AnchorOnScreen(2600.0f, 588.0f, kWidth, kHeight));  // past the right edge
+    CHECK(!AnchorOnScreen(1200.0f, -40.0f, kWidth, kHeight));  // above
+    CHECK(!AnchorOnScreen(1200.0f, 1500.0f, kWidth, kHeight)); // below
+}
+
 TEST(while_picking_the_candidate_takes_the_sub_anchor_and_the_target_the_main_one)
 {
     const Settings s;
