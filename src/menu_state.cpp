@@ -29,7 +29,8 @@ namespace headsup
         {Page::Npcs, "NPCs", true},
         {Page::Pets, "Pets", true},
         {Page::UserInterface, "User Interface", false},
-        {Page::TopBar, "Top Bar", true},
+        {Page::TopPanel, "Top Panel", true},
+        {Page::Widgets, "Widgets", true},
         {Page::MouseCursor, "Mouse Cursor", false},
         {Page::ConfigMenu, "Config Menu", false},
         {Page::Debug, "Debug", false},
@@ -79,6 +80,16 @@ namespace headsup
         }
         return result;
     }
+
+    std::vector<BarWidget> WidgetTabs()
+    {
+        std::vector<BarWidget> tabs;
+        for (int w = 0; w < kBarWidgetCount; ++w)
+            if (OnTheBar(static_cast<BarWidget>(w))) tabs.push_back(static_cast<BarWidget>(w));
+        return tabs;
+    }
+
+    int TabsPerRow(int count, int rows) { return std::max(1, (count + std::max(rows, 1) - 1) / std::max(rows, 1)); }
 
     int ClockZoneChoice(const std::optional<ClockZone>& zone) { return zone ? static_cast<int>(*zone) + 1 : 0; }
 

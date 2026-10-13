@@ -3,14 +3,14 @@
 An Ashita v4 plugin for Final Fantasy XI on PhoenixXI. It outlines nearby monsters in a color that tells you whether
 they will attack you, and replaces the game's nameplates with clearer ones: names, level and con, how a monster
 detects you, player status icons and a target cursor. It only reads what the game already shows and the server
-already sends, apart from three requests the game's own menus make, which the top bar sends for you: the one the game
-sends when you open Region Info, while the bar's Zone widget is on, and the two it sends when you open the
-Currencies menu, while the Gil widget is on ([Top bar](#top-bar) says when). It never targets or checks anything
+already sends, apart from three requests the game's own menus make, which the top panel sends for you: the one the game
+sends when you open Region Info, while the panel's Zone widget is on, and the two it sends when you open the
+Currencies menu, while the Gil widget is on ([Top panel](#top-panel) says when). It never targets or checks anything
 itself.
 
 Download `headsup.dll` from the latest release on the [Releases](https://github.com/Tanyrus/headsup/releases) page and
 put it in Ashita's `plugins` folder. Load it with `/load headsup`; `/hu` opens its settings, and `/hu menu <page>`
-opens them at a page, such as `/hu menu entities`, `/hu menu mobs` or `/hu menu topbar`.
+opens them at a page, such as `/hu menu entities`, `/hu menu mobs` or `/hu menu toppanel`.
 
 > **About the data:** HeadsUp's monster data (levels, aggression, links and detection) is built from Phoenix's own
 > server code: the map server is compiled from Phoenix's public source and records every monster it loads. The top
@@ -23,12 +23,12 @@ opens them at a page, such as `/hu menu entities`, `/hu menu mobs` or `/hu menu 
 ## Settings
 
 `/hu` opens the settings window. `/hu menu <page>` opens it at a page: `entities`, `mobs`, `players`, `self`, `npcs`,
-`pets`, `userinterface`, `topbar`, `mousecursor`, `configmenu` or `debug`. The pages, in the order of the window's list:
+`pets`, `userinterface`, `toppanel`, `widgets`, `mousecursor`, `configmenu` or `debug`. The pages, in the order of the window's list:
 
 | Page | Holds |
 |---|---|
 | Entities | What every kind shares: the nameplate and outline styles, the target cursor and the five color palettes. Under it, a page for each kind: Mobs, Players, Self, NPCs and Pets |
-| User Interface | The Window Groups and Game Windows cards, which move the game's windows. Under it, the Top Bar page |
+| User Interface | The Window Groups and Game Windows cards, which move the game's windows. Under it, the Top Panel page and the Widgets page |
 | Mouse Cursor | The chocobo pointer and the pointer fixes |
 | Config Menu | The settings window's own font and size, and the button that puts every setting back to its default |
 | Debug | Switches HeadsUp off as a whole, and writes a report for bug reports |
@@ -170,14 +170,14 @@ sub-target is out of range.
 
 ### Screenshot mode
 
-`/hu screenshot` hides every name, the top bar, HeadsUp's menu and every addon window, until you run it again. Bind it
+`/hu screenshot` hides every name, the top panel, HeadsUp's menu and every addon window, until you run it again. Bind it
 to a key with Ashita's `/bind`, for example:
 
 ```
 /bind F12 /hu screenshot
 ```
 
-The top bar also hides itself during cutscenes and NPC dialogs.
+The top panel also hides itself during cutscenes and NPC dialogs.
 
 ## Mouse pointer
 
@@ -185,9 +185,9 @@ The Mouse Cursor page puts PlayOnline's chocobo back as your mouse pointer, the 
 holds a fix for the game's pointer after a resize and over Ashita's windows, and the keys that do not make the game hide
 its pointer.
 
-## Top bar
+## Top panel
 
-A bar across the top of the screen, on by default, with these widgets from left to right in its default layout:
+A bar of widgets across the top of the screen, on by default, with these widgets from left to right in its default layout:
 
 | Widget | Shows | Hover for |
 |---|---|---|
@@ -209,7 +209,7 @@ A bar across the top of the screen, on by default, with these widgets from left 
 Under the bar at the screen's left, Game help has a thin bordered box of its own while the game has help to show, all
 on one line: the open menu's name, a bag's slots beside a bag's name, then the selected entry's help, a target prompt
 or a checked player's jobs. The box is as wide as its text, up to half the screen. Help longer than that ends in
-"...", and hovering it shows all of it. Its switch is the Help Bar card's own, on the Top Bar page, and "Hide Game
+"...", and hovering it shows all of it. Its switch is the Help Bar card's own, on the Top Panel page, and "Hide Game
 Help" in that card hides the game's own copy.
 
 Game windows like the equipment window are moved straight down through the game's own move, so the mouse follows them:
@@ -245,19 +245,23 @@ The bar stays off until your character is in game, so it does not draw over the 
 A bar under 36 px is too short for two lines of text. There each widget's second line goes after its title, dimmed, as
 in "27/30 Bags"; One Line can put it before the title instead, or leave it off.
 
-The Top Bar page of the settings (`/hu menu topbar`) has three cards: Top Bar, Help Bar and Widgets.
+The Top Panel page of the settings (`/hu menu toppanel`) has two cards, Top Panel and Help Bar, and the Widgets page
+under it (`/hu menu widgets`) has two more, Layout and Widgets.
 
-The Top Bar card has the bar's switch, a theme, a separators choice, a title font and a text font (the theme's own by
+The Top Panel card has the bar's switch, a theme, a separators choice, a title font and a text font (the theme's own by
 default), a height from 24 to 64 px (45 by default), a text size, One Line, a popup size, and "Hide Readout", which
 hides the game's connection readout. The Help Bar card has Game help's switch, "Hide Game Help", the help bar's
 position and whether it has a background.
 
-In the Widgets card, Left, Center and Right are trays side by side, each holding its widgets as chips in bar order,
+In the Layout card, Left, Center and Right are trays side by side, each holding its widgets as chips in bar order,
 with a lit dot on each one that is on. A chip drags to another place in its tray or into another tray, an empty one
-too, and "Reset Layout" puts every widget back in its first place. A click on a chip shows that widget's options below
-the trays: Enabled, its section, its second line and icons where it has them, and its own options (Target's details,
-Gil's currency, the clocks' time zones and 24-hour and seconds switches, Job's layout, its EXP bar under or beside the
-text or off and its job names, Connection's latency).
+too, and "Reset Layout" puts every widget back in its first place.
+
+The Widgets card has a tab for each widget, in two rows, and a click on a chip in the trays opens that widget's tab. A
+tab holds the widget's options: Enabled, its section, its second line and icons where it has them, and its own. Those
+are Target's details, Gil's currency, the Clock's and Server time's time zones with their 24-hour and seconds switches,
+Connection's latency, and for Job its layout (jobs first, EXP first or EXP only), its EXP bar under or beside the text
+or off, and its job names.
 
 Separators picks diamonds or none between neighbouring widgets in any theme, and starts at the theme's own. "Text Size"
 and "Popup Size" set those sizes in pixels or leave them on Auto, which follows the bar height; a bar size too large for

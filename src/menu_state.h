@@ -1,5 +1,6 @@
 #pragma once
 
+#include "bar_placement.h"
 #include "bar_server_time.h"
 #include "plate_settings.h"
 
@@ -15,7 +16,21 @@ namespace headsup
     // a slider being dragged writes no file, or the window is closed, where nothing more can come.
     bool SaveDue(std::optional<double> changedAt, double now, bool windowOpen);
 
-    enum class Page : int { Entities, Mobs, Players, Self, Npcs, Pets, UserInterface, TopBar, MouseCursor, ConfigMenu, Debug };
+    enum class Page : int
+    {
+        Entities,
+        Mobs,
+        Players,
+        Self,
+        Npcs,
+        Pets,
+        UserInterface,
+        TopPanel,
+        Widgets,
+        MouseCursor,
+        ConfigMenu,
+        Debug,
+    };
     constexpr int kPageCount = static_cast<int>(Page::Debug) + 1;
     struct PageInfo
     {
@@ -33,6 +48,11 @@ namespace headsup
     // A label with each word capitalized after a space or a hyphen ("Sub-Target"), but for the small words inside it
     // ("Hide Level and Icons"); letters already capital stay.
     std::string TitleCaseText(std::string_view text);
+
+    // The Widgets page's tabs: every widget on the bar, in BarWidget's order.
+    std::vector<BarWidget> WidgetTabs();
+    // How many tabs go in a row for count of them in rows rows: the rows as even as they come, the first the fuller.
+    int TabsPerRow(int count, int rows);
 
     // The Clock widget's Time Zone dropdown: the computer's own zone first, as no zone picked, then every ClockZone.
     constexpr int kClockZoneChoices = kClockZoneCount + 1;

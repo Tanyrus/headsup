@@ -27,8 +27,8 @@ namespace headsup
             "Your target's name, level and con. Hover a mob for its details.",
             "Gil, or another currency. Hover for every currency.",
             "How full your inventory is. Hover for every bag.",
-            "Your computer's time.",
-            "The game's help text, in a bar of its own under the top bar.",
+            "Your computer's time, or another time zone's.",
+            "The game's help text, in a bar of its own under the top panel.",
             "The server's time, or another zone's. Hover for the daily reset and conquest tally.",
             "Frames per second. Hover for frame times.",
             "Jobs, levels and EXP to the next level, with a bar. Hover for EXP per hour.",
@@ -40,6 +40,7 @@ namespace headsup
         const char* const kBarSectionLabels[] = {"Left", "Center", "Right"};
         static_assert(std::size(kBarSectionLabels) == kBarSectionCount);
         constexpr const char* kThemeFont = "Theme's"; // a bar font left to its theme
+        constexpr int kWidgetTabRows     = 2;
 
         // Which widgets have a second line, or icons, for their options to offer switching off.
         bool HasSecondLine(BarWidget w)
@@ -68,7 +69,7 @@ namespace headsup
             ui.Switch("Every Window", s.allUnderBar, "Every window that opens under the bar goes below it, not only those "
                                                      "switched on or grouped.");
             ui.Switch("Game Help", s.moveGameHelp,
-                "The game's own help bar goes under the top bar, and the windows under it. Off while it is hidden.");
+                "The game's own help bar goes under the top panel, and the windows under it. Off while it is hidden.");
             {
                 const float y = ui.gui->GetCursorPosY();
                 if (ui.Action("HeadsUp Defaults", "Every window under the bar, the game's help too, in the groups the game "
@@ -296,7 +297,7 @@ namespace headsup
         }
 
         // Left, Center and Right as trays sunk into the card, each holding its widgets as raised chips in bar order:
-        // a chip drags to another place or tray, and a click picks it for its options below. A lit dot says it is on.
+        // a chip drags to another place or tray, and a click picks it, which opens its tab. A lit dot says it is on.
         void DrawTrays(Ui& ui, Settings& s, int& picked, std::optional<Drop>& drop)
         {
             const float gap   = ui.Em(0.6f);
@@ -358,11 +359,12 @@ namespace headsup
             ui.EndRowAt(ui.cardX, top, trayH + ui.Em(0.3f));
         }
 
-        // One widget's options: its section, what it shows and its own settings.
+        // One widget's options: its switch, its section, what it shows and its own settings.
         void DrawWidgetOptions(Ui& ui, Settings& s, BarWidget widget)
         {
             const int w = static_cast<int>(widget);
             ui.Note(kBarWidgetTips[w]);
+            ui.Switch("Enabled", s.barWidgets[w], nullptr);
             ui.Fade(!BarOn(s) || !s.barWidgets[w]);
             auto [section, index] = PlaceOf(s.barSections, widget);
             int moved             = section;
@@ -437,12 +439,12 @@ namespace headsup
         ui.Fade(false);
     }
 
-    void DrawTopBarPage(Ui& ui, Settings& s, const MenuStatus& status, std::unordered_set<std::string>& collapsed,
-        const std::vector<std::string>& fonts, int& picked)
+    void DrawTopPanelPage(Ui& ui, Settings& s, const MenuStatus& status, std::unordered_set<std::string>& collapsed,
+        const std::vector<std::string>& fonts)
     {
         ui.Fade(!s.enabled);
-        if (ui.BeginCard("Top Bar", collapsed, &s.showBar,
-                "Hover a widget for details; click it to keep them open."))
+        if (ui.BeginCard("Top Panel", collapsed, &s.showBar,
+                "Hover a widget for details; click it to keep them open. The Widgets page has each one's options."))
         {
             ui.Fade(!BarOn(s));
             int theme = static_cast<int>(s.barTheme);
@@ -479,21 +481,23 @@ namespace headsup
         if (ui.BeginCard("Help Bar", collapsed, &s.barWidgets[help], kBarWidgetTips[help]))
         {
             ui.Fade(!s.enabled);
-            ui.Switch("Hide game help", s.hideHelpBar, "The game's own help bar, which the top bar covers.");
+            ui.Switch("Hide game help", s.hideHelpBar, "The game's own help bar, which the top panel covers.");
             ui.Fade(!BarOn(s) || !s.barWidgets[help]);
             ui.Offset("Position", s.helpBarX, s.helpBarY, kMaxHelpBarOffset,
-                "Pixels from its place under the top bar.");
+                "Pixels from its place under the top panel.");
             ui.Switch("Background", s.helpBarBackground, "Off, the help text alone, with no bar behind it.");
             ui.EndCard();
         }
+        ui.Fade(false);
+    }
+
+    void DrawWidgetsPage(Ui& ui, Settings& s, std::unordered_set<std::string>& collapsed, int& picked)
+    {
         ui.Fade(!BarOn(s));
-        if (ui.BeginCard("Widgets", collapsed, nullptr, "Drag a chip to move it; click it for its options."))
+        if (ui.BeginCard("Layout", collapsed, nullptr, "Drag a chip to move it; click it to open its tab below."))
         {
             std::optional<Drop> drop; // applied after drawing, so no list changes under its own loop
             DrawTrays(ui, s, picked, drop);
-            // Read after the trays, where a click picks: the options are the clicked chip's in the same frame.
-            if (picked == static_cast<int>(BarWidget::GameHelp) || picked < 0 || picked >= kBarWidgetCount) picked = 0;
-            const int w = picked;
             if (drop) ui.changed |= MoveWidget(s.barSections, drop->from, drop->index, drop->to, drop->at);
             if (ui.Action("Reset Layout", "Puts every widget back in its first place. Switches stay.") &&
                 s.barSections != DefaultPlacement())
@@ -501,9 +505,24 @@ namespace headsup
                 s.barSections = DefaultPlacement();
                 ui.changed    = true;
             }
-            ui.Note(("Options for " + TitleCase(kBarWidgetLabels[w])).c_str());
-            ui.Switch("Enabled", s.barWidgets[w], nullptr);
-            DrawWidgetOptions(ui, s, static_cast<BarWidget>(w));
+            ui.EndCard();
+        }
+        ui.Fade(!BarOn(s));
+        if (ui.BeginCard("Widgets", collapsed, nullptr, "A tab for each widget, with its options."))
+        {
+            // Read after the trays, where a click picks: the open tab is the clicked chip's in the same frame.
+            const std::vector<BarWidget> tabs = WidgetTabs();
+            std::vector<std::string> names;
+            std::vector<const char*> labels;
+            names.reserve(tabs.size()); // the labels point into it
+            for (const BarWidget widget : tabs)
+                labels.push_back(names.emplace_back(TitleCase(kBarWidgetLabels[static_cast<int>(widget)])).c_str());
+            const auto open = std::ranges::find(tabs, static_cast<BarWidget>(picked));
+            const int count = static_cast<int>(tabs.size());
+            const int tab   = ui.Tabs("widget", open != tabs.end() ? static_cast<int>(open - tabs.begin()) : 0,
+                labels.data(), count, TabsPerRow(count, kWidgetTabRows));
+            picked          = static_cast<int>(tabs[static_cast<size_t>(tab)]);
+            DrawWidgetOptions(ui, s, tabs[static_cast<size_t>(tab)]);
             ui.EndCard();
         }
         ui.Fade(false);

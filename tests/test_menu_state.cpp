@@ -2,6 +2,7 @@
 #include "settings.h"
 #include "test.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <string>
 #include <string_view>
@@ -49,16 +50,18 @@ TEST(a_change_waiting_when_the_window_is_closed_saves_at_once)
 
 TEST(the_sidebar_has_the_five_major_pages_with_their_children_under_them)
 {
-    CHECK_EQ(kPageCount, 11);
+    CHECK_EQ(kPageCount, 12);
     CHECK(kPages[0].page == Page::Entities && !kPages[0].child);
     for (int i = 1; i <= 5; ++i)
         CHECK(kPages[i].child);
     CHECK(kPages[6].page == Page::UserInterface && !kPages[6].child);
-    CHECK(kPages[7].page == Page::TopBar && kPages[7].child);
-    CHECK(kPages[8].page == Page::MouseCursor && !kPages[8].child);
-    CHECK(kPages[9].page == Page::ConfigMenu && !kPages[9].child);
-    CHECK(kPages[10].page == Page::Debug && !kPages[10].child);
+    CHECK(kPages[7].page == Page::TopPanel && kPages[7].child);
+    CHECK(kPages[8].page == Page::Widgets && kPages[8].child);
+    CHECK(kPages[9].page == Page::MouseCursor && !kPages[9].child);
+    CHECK(kPages[10].page == Page::ConfigMenu && !kPages[10].child);
+    CHECK(kPages[11].page == Page::Debug && !kPages[11].child);
     CHECK(std::string_view(kPages[6].label) == "User Interface");
+    CHECK(std::string_view(kPages[7].label) == "Top Panel" && std::string_view(kPages[8].label) == "Widgets");
 }
 
 TEST(every_page_is_found_by_its_key_and_nothing_else)
@@ -66,9 +69,9 @@ TEST(every_page_is_found_by_its_key_and_nothing_else)
     for (const PageInfo& info : kPages)
         CHECK(PageNamed(PageKey(info.page)) == info.page);
     CHECK(PageKey(Page::UserInterface) == "userinterface");
-    CHECK(PageKey(Page::TopBar) == "topbar");
+    CHECK(PageKey(Page::TopPanel) == "toppanel" && PageKey(Page::Widgets) == "widgets");
     CHECK(!PageNamed("global"));
-    CHECK(!PageNamed("widgets"));
+    CHECK(!PageNamed("topbar")); // the Top Panel page's name before
     CHECK(!PageNamed(""));
 }
 
@@ -84,7 +87,8 @@ TEST(the_kind_pages_know_their_kind)
         {Page::Self, PlateKind::Self}, {Page::Npcs, PlateKind::Npcs}, {Page::Pets, PlateKind::Pets}};
     for (const auto& [page, kind] : kinds)
         CHECK(KindOfPage(page) == kind);
-    for (const Page page : {Page::Entities, Page::UserInterface, Page::TopBar, Page::MouseCursor, Page::ConfigMenu, Page::Debug})
+    for (const Page page : {Page::Entities, Page::UserInterface, Page::TopPanel, Page::Widgets, Page::MouseCursor,
+             Page::ConfigMenu, Page::Debug})
         CHECK(!KindOfPage(page));
 }
 
@@ -283,4 +287,21 @@ TEST(the_clocks_zone_dropdown_lists_local_first_and_then_every_zone)
         CHECK(ClockZoneOfChoice(ClockZoneChoice(zone)) == zone);
         CHECK(ClockZoneChoiceName(ClockZoneChoice(zone)) == ClockZoneName(zone));
     }
+}
+
+TEST(the_widgets_page_has_a_tab_for_every_widget_on_the_bar_in_rows_as_even_as_they_come)
+{
+    const std::vector<BarWidget> tabs = WidgetTabs();
+    CHECK_EQ(tabs.size(), static_cast<size_t>(kPlacedWidgetCount));
+    for (int w = 0; w < kBarWidgetCount; ++w)
+    {
+        const auto widget = static_cast<BarWidget>(w);
+        CHECK_EQ(std::ranges::count(tabs, widget), OnTheBar(widget) ? 1 : 0); // Game help has a card of its own
+    }
+    CHECK(tabs.front() == BarWidget::Zone && tabs.back() == BarWidget::Distance);
+    CHECK_EQ(TabsPerRow(14, 2), 7);
+    CHECK_EQ(TabsPerRow(15, 2), 8); // an odd one out goes in the first row
+    CHECK_EQ(TabsPerRow(3, 1), 3);
+    CHECK_EQ(TabsPerRow(2, 3), 1); // more rows than tabs: one each
+    CHECK_EQ(TabsPerRow(0, 2), 1); // never none, which a row's width is divided by
 }

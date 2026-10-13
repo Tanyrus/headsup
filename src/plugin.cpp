@@ -427,10 +427,10 @@ public:
         else
         {
             Print("/headsup or /hu: open or close the settings window");
-            Print("/hu on | /hu off: turn all of HeadsUp (outlines, nameplates, the top bar and the rest) on or off");
+            Print("/hu on | /hu off: turn all of HeadsUp (outlines, nameplates, the top panel and the rest) on or off");
             Print("/hu screenshot: hide every name, HeadsUp's bar and menu and every addon window until it is run again; bind it with /bind");
             Print("/hu debug: write what every outline and nameplate show to logs/headsup");
-            Print("/hu menu <page>: open the settings at a page, such as entities, mobs or topbar");
+            Print("/hu menu <page>: open the settings at a page, such as entities, mobs or toppanel");
             Print("/hu popup <widget> | off: pin a widget's popup open, such as zone or vanatime");
             Print("/hu windowlog [stop]: write which game windows are open, as it changes, to logs/headsup/windows.log");
 #ifdef HEADSUP_DEV
@@ -562,7 +562,7 @@ public:
         m_Bar.Update(g_BarOn ? BarStateNow(now) : headsup::BarState{}, m_Settings, m_Names.BackBufferWidth(),
             m_Names.BackBufferHeight(), m_BarInput, m_UiHidden);
         if (const std::string failure = m_Bar.TakeFailure(); !failure.empty())
-            Print("the top bar is off until HeadsUp reloads: " + failure + ".");
+            Print("the top panel is off until HeadsUp reloads: " + failure + ".");
         // Over ImGui from Present; through ImGui, under addons that draw over its windows, when Present is not hooked.
         if (g_PresentSlot != nullptr)
             g_AfterGui = [] { if (g_Plugin != nullptr) g_Plugin->DrawOverGui(); };
@@ -826,7 +826,7 @@ private:
             Print(std::string(what) + " not drawn: Direct3D could not save the game's render states.");
     }
     void PlatesNotDrawn() { NotDrawn("nameplates are", m_PlatesUnsaved); }
-    void BarNotDrawn() { NotDrawn("the top bar is", m_BarUnsaved); }
+    void BarNotDrawn() { NotDrawn("the top panel is", m_BarUnsaved); }
 
     // toX and toY: the bound render target's pixels per back-buffer pixel.
     void DrawNameplates(float toX, float toY, bool depthTest)
@@ -1080,7 +1080,7 @@ private:
         g_RealPresent = reinterpret_cast<PresentFn>(*slot);
         if (!WriteSlot(slot, reinterpret_cast<void*>(&HookedPresent)))
         {
-            Print("the top bar's popups draw under other addons' windows: Present could not be hooked.");
+            Print("the top panel's popups draw under other addons' windows: Present could not be hooked.");
             return;
         }
         g_PresentSlot = slot;

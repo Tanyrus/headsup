@@ -15,9 +15,11 @@ namespace headsup
     void DrawKindPage(Ui& ui, Settings& s, PlateKind kind, std::unordered_set<std::string>& collapsed,
         const std::vector<std::string>& fonts, DesignEditor& editor);
 
-    // The pages of menu_bar.cpp: the windows HeadsUp moves, and the top bar with its help bar and widgets.
+    // The pages of menu_bar.cpp: the windows HeadsUp moves, the top panel with its help bar, and the panel's widgets.
     void DrawUserInterfacePage(Ui& ui, Settings& s, const MenuStatus& status, std::unordered_set<std::string>& collapsed,
         WindowList& windows);
-    void DrawTopBarPage(Ui& ui, Settings& s, const MenuStatus& status, std::unordered_set<std::string>& collapsed,
-        const std::vector<std::string>& fonts, int& picked);
+    void DrawTopPanelPage(Ui& ui, Settings& s, const MenuStatus& status, std::unordered_set<std::string>& collapsed,
+        const std::vector<std::string>& fonts);
+    // picked: the widget whose tab is open, by BarWidget.
+    void DrawWidgetsPage(Ui& ui, Settings& s, std::unordered_set<std::string>& collapsed, int& picked);
 }

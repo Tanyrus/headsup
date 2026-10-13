@@ -662,17 +662,20 @@ namespace headsup
         }
 
         // A strip of equal tabs across the card, the open one filled, rounded at the top and square where they stand
-        // on their rule. Returns the tab clicked, or picked: which tab is open is the window's state, not a setting.
-        int Tabs(const char* id, int picked, const char* const* labels, int count)
+        // on their rule; perRow to a row when given, the rule under the last row. Returns the tab clicked, or picked:
+        // which tab is open is the window's state, not a setting.
+        int Tabs(const char* id, int picked, const char* const* labels, int count, int perRow = 0)
         {
-            const float left = cardX + Em(kCardPad), top = gui->GetCursorPosY();
-            const float width  = (cardWidth - 2.0f * Em(kCardPad)) / static_cast<float>(count);
+            const int columns  = perRow > 0 ? perRow : count, rows = (count + columns - 1) / columns;
+            const float left = cardX + Em(kCardPad), first = gui->GetCursorPosY();
+            const float width  = (cardWidth - 2.0f * Em(kCardPad)) / static_cast<float>(columns);
             const float height = Em(kTabHeight), corner = Em(kRadius);
             int chosen         = picked;
             char name[80];
             for (int tab = 0; tab < count; ++tab)
             {
-                const float x              = left + static_cast<float>(tab) * width;
+                const float x              = left + static_cast<float>(tab % columns) * width;
+                const float top            = first + static_cast<float>(tab / columns) * height;
                 const ButtonColors& colors = tab == picked ? kAccentButton : kRaised;
                 // A button rounds all four corners: squares in its color lie under the lower two, as grounds, since a
                 // disabled item drawn first would take the tab's clicks there.
@@ -688,13 +691,14 @@ namespace headsup
                         [&] { return Shape(name, ImVec2(width, height), colors, corner); }))
                     chosen = tab;
             }
+            const float tall = static_cast<float>(rows) * height;
             gui->BeginDisabled(true);
-            gui->SetCursorPos(ImVec2(left, top + height));
+            gui->SetCursorPos(ImVec2(left, first + tall));
             std::snprintf(name, sizeof(name), "##%s rule", id);
-            Shape(name, ImVec2(static_cast<float>(count) * width, Em(kTabRule)), ButtonColors{kAccent, kAccent, kAccent},
+            Shape(name, ImVec2(static_cast<float>(columns) * width, Em(kTabRule)), ButtonColors{kAccent, kAccent, kAccent},
                 0.0f);
             gui->EndDisabled();
-            EndRowAt(cardX, top, height + Em(kTabRule));
+            EndRowAt(cardX, first, tall + Em(kTabRule));
             return chosen;
         }
 
