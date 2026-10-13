@@ -39,7 +39,6 @@ namespace headsup
         PlateLayout layout;
         layout.centerX = anchor.CenterX();
         layout.lines.resize(lines.size());
-        float widest = 0.0f;
         for (size_t i = 0; i < lines.size(); ++i)
         {
             LinePlace& place = layout.lines[i];
@@ -48,16 +47,17 @@ namespace headsup
                 place.width += (j > 0 ? kItemGap : 0.0f) + lines[i].items[j].width;
                 place.height = std::max(place.height, lines[i].items[j].height);
             }
-            widest = std::max(widest, place.width);
         }
+        // The bottom line stays centered on the game's name, and the others are set against its two ends.
+        const float against = lines.empty() ? 0.0f : layout.lines.back().width;
         for (size_t i = 0; i < lines.size(); ++i)
         {
             LinePlace& place = layout.lines[i];
             switch (lines[i].align)
             {
-            case Align::Left: place.left = layout.centerX - widest / 2.0f; break;
+            case Align::Left: place.left = layout.centerX - against / 2.0f; break;
             case Align::Center: place.left = layout.centerX - place.width / 2.0f; break;
-            case Align::Right: place.left = layout.centerX + widest / 2.0f - place.width; break;
+            case Align::Right: place.left = layout.centerX + against / 2.0f - place.width; break;
             }
         }
 

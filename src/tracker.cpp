@@ -6,12 +6,6 @@
 
 namespace headsup
 {
-    namespace
-    {
-        constexpr int kClaimedShift         = 16;
-        constexpr uint32_t kClaimerIdBits   = 0xFFFF;
-    }
-
     Category Classify(const MobRecord* mob, int checkedLevel, const PlayerState& player)
     {
         if (mob == nullptr) return Category::Unknown;
@@ -29,13 +23,11 @@ namespace headsup
         return player.sitting ? attack : ignore;
     }
 
-    bool IsClaimed(uint32_t claimStatus) { return (claimStatus >> kClaimedShift) != 0; }
+    bool IsClaimed(uint32_t claimStatus) { return claimStatus != 0; }
 
     bool ClaimedByParty(uint32_t claimStatus, const std::vector<uint32_t>& partyServerIds)
     {
-        if (!IsClaimed(claimStatus)) return false;
-        return std::any_of(partyServerIds.begin(), partyServerIds.end(),
-            [&](uint32_t id) { return (id & kClaimerIdBits) == (claimStatus & kClaimerIdBits); });
+        return IsClaimed(claimStatus) && std::ranges::find(partyServerIds, claimStatus) != partyServerIds.end();
     }
 
     void Tracker::Update(const std::vector<ActorInput>& actors, const PlayerState& player, const Settings& settings,

@@ -381,13 +381,15 @@ TEST(squared_distance_becomes_yalms_and_keeps_nan)
 
 TEST(a_claim_by_you_or_your_party_is_told_from_anyone_elses)
 {
-    // A mob's claim: the claimer's server ID in its low 16 bits, and 1 in its high 16 while it is claimed.
-    const std::vector<uint32_t> party{0x00012345, 0x01098ABC};
-    CHECK(ClaimedByParty(0x00012345, party));  // you
-    CHECK(ClaimedByParty(0x00018ABC, party));  // a party member, by the low half of their ID
-    CHECK(!ClaimedByParty(0x00002345, party)); // the claim ended; the last claimer stays
-    CHECK(!ClaimedByParty(0x00011111, party)); // someone else's
-    CHECK(!ClaimedByParty(0x00012345, {}));
+    // A mob's claim is its claimer's whole server ID, and 0 while nobody holds it: 65001 while the test character
+    // fought a Land Crab, 0 four seconds after it stopped.
+    const std::vector<uint32_t> party{65001, 0x01098ABC};
+    CHECK(IsClaimed(65001) && IsClaimed(0x01098ABC) && !IsClaimed(0));
+    CHECK(ClaimedByParty(65001, party));       // you, with an ID that fits in 16 bits
+    CHECK(ClaimedByParty(0x01098ABC, party));  // a party member
+    CHECK(!ClaimedByParty(0x00008ABC, party)); // someone whose ID only ends as a member's does
+    CHECK(!ClaimedByParty(0, party));
+    CHECK(!ClaimedByParty(65001, {}));
 }
 
 TEST(a_mob_carries_its_server_id_record_and_level_line_and_is_found_by_target_index)

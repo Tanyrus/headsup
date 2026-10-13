@@ -16,8 +16,8 @@ TEST(the_window_has_its_frame_and_the_parts_its_owner_fills)
     CHECK(Has(rml, "<handle id=\"head\" move_target=\"#document\">") && Has(rml, "size_target=\"#document\""));
     for (const char* id : {kMenuSidebarId, kMenuPageId, kMenuPageTitleId, kMenuVersionId, kMenuCloseId, kMenuPopupId, kMenuTipId})
         CHECK(Has(rml, (std::string("id=\"") + id + "\"").c_str()));
-    // 46 by 36 ems, the page's dark red at 97% and the fonts it was given.
-    CHECK(Has(rml, "width:46em;height:36em;min-width:34em;min-height:16em;background-color:#150c0cf7;"));
+    // 50 by 36 ems, the page's dark red at 97% and the fonts it was given.
+    CHECK(Has(rml, "width:50em;height:36em;min-width:38em;min-height:16em;background-color:#150c0cf7;"));
     CHECK(Has(rml, "font-family:\"Segoe UI\"") && Has(rml, "font-family:\"Marcellus SC\""));
     CHECK(Has(rml, ".seg.picked{background-color:#c55151ff;"));
 }

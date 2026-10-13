@@ -177,6 +177,33 @@ namespace
             Rml::Element* element = Find(id);
             return element != nullptr ? element->GetInnerRML() : std::string();
         }
+        // Closes the window and opens it at this place and size, as one the player moved and sized comes back.
+        void OpenAt(int x, int y, int width, int height)
+        {
+            menu.Close();
+            settings.menuX      = x;
+            settings.menuY      = y;
+            settings.menuWidth  = width;
+            settings.menuHeight = height;
+            menu.open           = true;
+            Frames(2);
+        }
+        // The page's elements of a class.
+        std::vector<Rml::Element*> OfClass(const char* name)
+        {
+            std::vector<Rml::Element*> found;
+            std::vector<Rml::Element*> left{Find("page")};
+            while (!left.empty())
+            {
+                Rml::Element* element = left.back();
+                left.pop_back();
+                if (element == nullptr) continue;
+                if (element->IsClassSet(name)) found.push_back(element);
+                for (int i = 0; i < element->GetNumChildren(); ++i)
+                    left.push_back(element->GetChild(i));
+            }
+            return found;
+        }
 
     private:
         static constexpr int kDragSteps    = 6;
@@ -194,6 +221,28 @@ TEST(the_window_opens_on_its_first_page_and_the_sidebar_opens_the_others)
     CHECK(window.Shows("nav-entities") && window.Shows("close"));
     window.Click("nav-mobs");
     CHECK(window.Shows("mobs-line-style-head"));
+    window.Click("close");
+    CHECK(!window.menu.open);
+}
+
+TEST(the_close_buttons_cross_is_two_turned_bars_in_the_middle_of_its_circle)
+{
+    auto middle = [](Rml::Element* element) {
+        return element->GetAbsoluteOffset(Rml::BoxArea::Border) + element->GetBox().GetSize(Rml::BoxArea::Border) / 2.0f;
+    };
+    Window window;
+    window.Frames(10); // past its coming in, during which it is drawn a little small
+    Rml::Element* close = window.Find("close");
+    CHECK(close != nullptr && close->GetNumChildren() == 2);
+    for (int bar = 0; bar < 2; ++bar)
+    {
+        Rml::Element* line       = close->GetChild(bar);
+        const Rml::Vector2f off  = middle(line) - middle(close);
+        const Rml::Vector2f size = line->GetBox().GetSize(Rml::BoxArea::Border);
+        CHECK(off.x > -0.5f && off.x < 0.5f && off.y > -0.5f && off.y < 0.5f);
+        CHECK(size.x > 4.0f * size.y && size.y >= 1.0f);
+        CHECK(line->GetProperty(Rml::PropertyId::Transform)->Get<Rml::TransformPtr>() != nullptr);
+    }
     window.Click("close");
     CHECK(!window.menu.open);
 }
@@ -368,6 +417,32 @@ TEST(the_window_is_kept_where_it_is_dragged_by_its_title)
     CHECK_EQ(now.y - was.y, 40.0f);
     CHECK(window.settings.menuWidth > 0 && window.settings.menuHeight > 0);
     CHECK_EQ(window.settings.menuX, static_cast<int>((test::RmlSession::kWidth - window.settings.menuWidth) / 2) - 120);
+}
+
+TEST(a_narrow_window_cuts_a_rows_label_and_keeps_its_controls_beside_it)
+{
+    auto top    = [](Rml::Element* element) { return element->GetAbsoluteOffset(Rml::BoxArea::Border).y; };
+    auto right  = [](Rml::Element* element) {
+        return element->GetAbsoluteOffset(Rml::BoxArea::Border).x + element->GetBox().GetSize(Rml::BoxArea::Border).x;
+    };
+    auto height = [](Rml::Element* element) { return element->GetBox().GetSize(Rml::BoxArea::Border).y; };
+    Window window;
+    // Asked narrower than it goes, so it opens at its least width.
+    window.OpenAt(0, 0, 100, 900);
+    for (const char* page : {"mobs", "players"})
+    {
+        window.Page(page);
+        const std::vector<Rml::Element*> rows = window.OfClass("row");
+        CHECK(rows.size() > 4u);
+        for (Rml::Element* row : rows)
+        {
+            Rml::Element* label = row->GetChild(0);
+            Rml::Element* controls = row->GetChild(1);
+            CHECK(top(controls) < top(label) + height(label)); // beside the label, not under it
+            CHECK(height(label) < 1.5f * height(controls));    // on one line, cut where it ends
+            CHECK(right(controls) <= right(row) + 0.5f);
+        }
+    }
 }
 
 TEST(a_tip_stays_on_the_screen_and_off_the_pointer)

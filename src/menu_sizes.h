@@ -7,9 +7,9 @@ namespace headsup
     constexpr float kTitleScale     = 1.55f; // the window's name
     constexpr float kPageTitleScale = 1.4f;
     constexpr float kCardTitleScale = 1.12f;
-    constexpr float kWindowWidth    = 46.0f;
+    constexpr float kWindowWidth    = 50.0f;
     constexpr float kWindowHeight   = 36.0f;
-    constexpr float kMinWindowWidth  = 34.0f;
+    constexpr float kMinWindowWidth  = 38.0f; // a row of two mode dropdowns and a few letters of its label
     constexpr float kMinWindowHeight = 16.0f;
     constexpr float kSidebarWidth   = 8.5f;
     constexpr float kGutter         = 1.0f;  // around the window's parts and between cards

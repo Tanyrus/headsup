@@ -163,3 +163,20 @@ TEST(a_key_row_takes_the_next_key_pressed_that_was_not_held)
     CHECK(changed && !w.state.keyCapture.on && w.settings.keepPointerKeys.size() == before + 1);
     CHECK_EQ(w.settings.keepPointerKeys.back(), uint8_t{0x70});
 }
+
+TEST(only_the_lines_above_the_bottom_one_have_an_alignment)
+{
+    // The bottom line stays centered on the game's name and the others are set against it.
+    Window w;
+    w.state.page = Page::Mobs;
+    for (int tab = 0; tab < kPlateLines; ++tab)
+    {
+        w.state.design.kind     = PlateKind::Mobs;
+        w.state.design.styleTab = tab;
+        w.settings.Kind(PlateKind::Mobs).lines[tab].syncWith = kNoSync;
+        const Form form       = w.Pass();
+        const FormBlock* card = Block(form, "mobs-line-style");
+        CHECK(card != nullptr && Has(card->rml, ">Text Size<"));
+        CHECK_EQ(Has(card->rml, ">Alignment<"), tab < kPlateLines - 1);
+    }
+}

@@ -20,6 +20,8 @@ namespace headsup
         constexpr float kMark         = 0.8f;  // a checked box's mark
         constexpr float kArrow        = 0.35f; // half an arrow's base
         constexpr float kKnob         = 0.35f; // a slider's knob: a bright bar as tall as its track
+        constexpr float kCrossLength  = 0.85f; // the close button's cross: each of its two bars
+        constexpr float kCrossBar     = 0.12f;
     }
 
     const char* MenuThemeName(MenuTheme theme)
@@ -97,9 +99,15 @@ namespace headsup
                ";color:" + color(c.heading) + ";font-effect:glow(0px 4px 0px 0px " + color(Faded(c.accent, kGlow)) + ");}";
         css += std::string("#") + kMenuVersionId + "{display:inline-block;margin-left:0.5em;color:" + color(c.muted) + ";}";
         css += std::string("#") + kMenuCloseId + "{position:absolute;right:" + Em(kGutter) + ";top:" + Em(kGutter) +
-               ";width:" + frame + ";height:" + frame + ";line-height:" + frame + ";text-align:center;border-radius:" +
-               Em(kFrame / 2.0f) + ";background-color:" + color(c.control) + ";color:" + color(c.muted) + ";}";
+               ";width:" + frame + ";height:" + frame + ";border-radius:" + Em(kFrame / 2.0f) + ";background-color:" +
+               color(c.control) + ";}";
         css += std::string("#") + kMenuCloseId + ":hover{background-color:" + color(c.hover) + ";}";
+        // Its cross is drawn, two bars turned about the circle's middle: a letter x sits low in its line.
+        css += ".cross{position:absolute;left:50%;top:50%;width:" + Em(kCrossLength) + ";height:" + Em(kCrossBar) +
+               ";margin-left:" + Em(-kCrossLength / 2.0f) + ";margin-top:" + Em(-kCrossBar / 2.0f) + ";background-color:" +
+               color(c.muted) + ";transform:rotate(45deg);}";
+        css += ".cross.back{transform:rotate(-45deg);}";
+        css += std::string("#") + kMenuCloseId + ":hover .cross{background-color:" + color(c.text) + ";}";
         css += "#head-line{position:absolute;left:" + Em(kGutter) + ";right:" + Em(kGutter) + ";top:" +
                Em(kGutter + kHeadHeight + kHeadLineGap) + ";height:1px;decorator:horizontal-gradient(" +
                color(Faded(c.accent, kLine)) + fadingOut + ";}";
@@ -154,10 +162,11 @@ namespace headsup
         css += ".card-body{padding:0px " + Em(kCardPad) + " " + Em(kCardPad * 0.6f) + " " + Em(kCardPad) +
                ";animation:0.2s cubic-out fade-in;}";
         css += "@keyframes fade-in{from{opacity:0;}to{opacity:1;}}";
-        // Rows: the label at the left, its controls at the right.
-        css += ".row{display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between;"
+        // Rows: the label at the left, its controls at the right. A label too long for what they leave it is cut.
+        css += ".row{display:flex;flex-direction:row;align-items:center;justify-content:space-between;"
                "min-height:" + frame + ";margin-bottom:" + Em(kSpacing) + ";}";
-        css += ".label{flex:1 1 auto;line-height:" + frame + ";color:" + color(c.label) + ";}";
+        css += ".label{flex:1 1 0px;min-width:0px;overflow:hidden;white-space:nowrap;line-height:" + frame + ";color:" +
+               color(c.label) + ";}";
         css += ".ctl{position:relative;display:flex;flex-direction:row;align-items:center;justify-content:flex-end;flex:0 0 auto;}";
         css += ".ctl > *{margin-left:" + Em(kControlGap) + ";}";
         css += ".line{display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;margin-bottom:" + Em(kSpacing) + ";}";
@@ -293,7 +302,8 @@ namespace headsup
 
         return "<rml><head><style>" + css + "</style></head><body>"
                "<handle id=\"head\" move_target=\"#document\"><div id=\"title\">HeadsUp</div><div id=\"" +
-               kMenuVersionId + "\"></div></handle><div id=\"head-line\"></div><div id=\"" + kMenuCloseId + "\">x</div><div id=\"" + kMenuSidebarId +
+               kMenuVersionId + "\"></div></handle><div id=\"head-line\"></div><div id=\"" + kMenuCloseId +
+               "\"><div class=\"cross\"></div><div class=\"cross back\"></div></div><div id=\"" + kMenuSidebarId +
                "\"></div><div id=\"main\"><div id=\"" + kMenuPageTitleId + "\"></div><div id=\"" + kMenuPageId +
                "\"></div></div><div id=\"" + kMenuPopupId + "\" class=\"hidden\"></div><div id=\"" + kMenuTipId +
                "\" class=\"hidden\"></div><handle id=\"resize\" size_target=\"#document\"><div id=\"resize-mark\"></div>"

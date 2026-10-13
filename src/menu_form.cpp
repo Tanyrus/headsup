@@ -678,8 +678,11 @@ namespace headsup
             const std::vector<ColorSource> sources = SourcesFor(kind, true);
             form.ChecksDropdown(label("Show").c_str(), line.show, ConditionsFor(kind),
                 "When this line shows: always, or when any checked condition holds.");
-            form.Segments(label("Alignment").c_str(), line.align, kAlignLabels, kAlignCount,
-                "Where the line sits against the plate's widest line.", kControlWidth / kAlignCount);
+            // The bottom line is what the others are set against.
+            if (n < kPlateLines - 1)
+                form.Segments(label("Alignment").c_str(), line.align, kAlignLabels, kAlignCount,
+                    "Where the line sits against the bottom line. A line wider than it hangs past its other end.",
+                    kControlWidth / kAlignCount);
             form.FontDropdown(label("Font").c_str(), line.font, fonts,
                 "The line's font. Default is the font on the Entities page.", kDefaultFontChoice, &line.bold);
             form.SliderInt(label("Text Size").c_str(), line.textSize, kMinSizePercent, kMaxSizePercent,

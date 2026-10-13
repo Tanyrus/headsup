@@ -79,8 +79,8 @@ namespace headsup
         char ownerName[32] = {};
     };
 
-    // Whether a mob's claim (IEntity's ClaimStatus: the claimer's server ID in the low 16 bits, and 1 in the high 16
-    // while it is claimed) is held by anyone.
+    // Whether a mob's claim (IEntity's ClaimStatus: the claimer's whole server ID, and 0 once the claim has ended) is
+    // held by anyone. Phoenix's IDs can fit in 16 bits, so the high half says nothing.
     bool IsClaimed(uint32_t claimStatus);
     // Held by you or a member of your party or alliance.
     bool ClaimedByParty(uint32_t claimStatus, const std::vector<uint32_t>& partyServerIds);

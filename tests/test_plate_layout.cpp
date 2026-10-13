@@ -106,13 +106,20 @@ TEST(items_sit_left_to_right_with_the_gap_and_center_on_the_line)
     CHECK_EQ(line.items[2].y, line.top + 2.0f); // (16 - 12) / 2
 }
 
-TEST(lines_align_against_the_widest_line)
+TEST(lines_align_against_the_bottom_line)
 {
-    const std::vector<LineInput> lines{Text({{40.0f, 10.0f}}, Align::Left), Text({{100.0f, 10.0f}}), Text({{40.0f, 10.0f}}, Align::Right)};
+    // The bottom line is 60 wide and centered on the name at 100, so it runs from 70 to 130 whatever its own
+    // alignment says. A wider line set left starts with it and hangs past its right; a narrower one set right ends
+    // with it.
+    const std::vector<LineInput> lines{Text({{100.0f, 10.0f}}, Align::Left), Text({{40.0f, 10.0f}}, Align::Right),
+        Text({{60.0f, 10.0f}}, Align::Left)};
     const PlateLayout l = LayoutPlate(Anchor(), lines, 0.0f, 0.0f, 0.5f, 0, 0.0f);
-    CHECK_EQ(l.lines[1].left, 50.0f);
-    CHECK_EQ(l.lines[0].left, 50.0f);
-    CHECK_EQ(l.lines[2].left, 150.0f - 40.0f);
+    CHECK_EQ(l.lines[2].left, 70.0f);
+    CHECK_EQ(l.lines[0].left, 70.0f);
+    CHECK_EQ(l.lines[1].left, 130.0f - 40.0f);
+    // The widest line set right hangs past the bottom line's left.
+    const std::vector<LineInput> wide{Text({{100.0f, 10.0f}}, Align::Right), Text({{60.0f, 10.0f}})};
+    CHECK_EQ(LayoutPlate(Anchor(), wide, 0.0f, 0.0f, 0.5f, 0, 0.0f).lines[0].left, 130.0f - 100.0f);
 }
 
 TEST(the_ornament_sits_between_its_line_and_the_one_above)
