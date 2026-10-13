@@ -9,19 +9,20 @@ namespace headsup
     constexpr float kCardTitleScale = 1.12f;
     constexpr float kWindowWidth    = 50.0f;
     constexpr float kWindowHeight   = 36.0f;
-    constexpr float kMinWindowWidth  = 38.0f; // a row of two mode dropdowns and a few letters of its label
+    constexpr float kMinWindowWidth  = 42.0f; // a row of two mode dropdowns and a few letters of its label
     constexpr float kMinWindowHeight = 16.0f;
     constexpr float kSidebarWidth   = 8.5f;
     constexpr float kGutter         = 1.0f;  // around the window's parts and between cards
     constexpr float kCardPad        = 0.9f;  // a card's content from its edges
     constexpr float kCardRadius     = 0.6f;
     constexpr float kRadius         = 0.4f;  // controls
-    constexpr float kSwitchWidth    = 2.3f;
+    constexpr float kToggleWidth    = 3.2f;  // a yes or no: a track twice as wide as it is tall, and its knob
+    constexpr float kToggleHeight   = 1.4f;
     constexpr float kSegmentWidth   = 4.6f;
-    constexpr float kControlWidth   = 12.0f; // sliders and dropdowns
+    constexpr float kControlWidth   = 15.0f; // sliders and dropdowns
     constexpr float kCutoffWidth    = 5.2f;  // a status badge's cutoff dropdowns
-    // A mode's dropdown, so "When Targeted" shows whole: 13 letters, the frame's padding and its arrow.
-    constexpr float kModeWidth      = 9.4f;
+    // A mode's dropdown, so "Vanilla Nameplate" shows whole: 17 letters, the frame's padding and its arrow.
+    constexpr float kModeWidth      = 11.2f;
     constexpr float kNumberWidth    = 4.2f;  // a number to type
     constexpr float kNumberName     = 1.1f;  // the X or Y before it
     constexpr float kFilterWidth    = 12.0f;
@@ -33,6 +34,6 @@ namespace headsup
     constexpr float kTabRule        = 0.12f; // the line a strip of tabs stands on
     constexpr float kTabGap         = 0.12f; // between two tabs, and two rows of them: a couple of pixels
     constexpr float kTipWidth       = 20.0f;
-    constexpr float kOffAlpha       = 0.42f; // the settings of a feature that is off are drawn this faint
     constexpr float kHeaderRow      = 2.4f;  // a card's title row
+    constexpr float kLineNameWidth  = 6.6f;  // "Middle Line", before its design box
 }

@@ -31,7 +31,7 @@ namespace headsup
             return text;
         }
 
-        // The pages as pills, the picked one filled with a mark at its left; a child page is indented.
+        // The pages as pills, the picked one filled; a child page is indented.
         void Sidebar(Form& form, MenuFormState& state)
         {
             form.BeginBlock(kSidebarBlock);
@@ -43,8 +43,8 @@ namespace headsup
                     state.page       = info.page;
                     form.scrollToTop = true;
                 }
-                form.Raw(std::string("<div class=\"nav") + (info.child ? " child" : "") + "\" id=\"" + id +
-                         "\"><div class=\"nav-mark\"></div>" + EscapedRml(info.label) + "</div>");
+                form.Raw(std::string("<div class=\"nav") + (info.child ? " child" : "") + "\" id=\"" + id + "\">" +
+                         EscapedRml(info.label) + "</div>");
             }
             for (const PageInfo& info : kPages)
                 form.Set(kNavStart + PageKey(info.page), FormValueKind::Class, "picked", {}, info.page == state.page);
@@ -119,7 +119,7 @@ namespace headsup
                 int theme = static_cast<int>(s.menuTheme);
                 form.NumberDropdown("Theme", theme, 0, kMenuThemeCount - 1,
                     [](int t) { return std::string(MenuThemeName(static_cast<MenuTheme>(t))); },
-                    "Phoenix's own look, or Aurora's glass and switches.");
+                    "The window's colors and light.", 0.0f, [](int t) { return std::string(MenuThemeTip(static_cast<MenuTheme>(t))); });
                 s.menuTheme = static_cast<MenuTheme>(theme);
                 form.FontDropdown("Font", s.menuFont, menuFonts, "Titles stay in the bar's font.");
                 form.SliderInt("Size", s.menuScale, kMinMenuScale, kMaxMenuScale, "%d%%",
@@ -364,7 +364,8 @@ namespace headsup
                 form.Fade(!BarOn(s));
                 int theme = static_cast<int>(s.barTheme);
                 form.NumberDropdown("Theme", theme, 0, kBarThemeCount - 1,
-                    [](int t) { return std::string(BarThemeName(static_cast<BarTheme>(t))); }, nullptr);
+                    [](int t) { return std::string(BarThemeName(static_cast<BarTheme>(t))); }, nullptr, 0.0f,
+                    [](int t) { return std::string(BarThemeTip(static_cast<BarTheme>(t))); });
                 s.barTheme = static_cast<BarTheme>(theme);
                 const char* const separators[kBarSeparatorsCount] = {"Theme's", "Diamonds", "None"};
                 form.Segments("Separators", s.barSeparators, separators, kBarSeparatorsCount, nullptr, kWideSegmentWidth);
@@ -557,12 +558,17 @@ namespace headsup
             const char* (*entryTip)(Entry) = nullptr)
         {
             if (!form.BeginCard(title, nullptr, tip)) return;
+            // Two columns, the first the longer.
+            const int first = (count + 1) / 2;
+            form.Raw("<div class=\"columns\"><div class=\"column\">");
             for (int i = 0; i < count; ++i)
             {
+                if (i == first) form.Raw("</div><div class=\"column second\">");
                 const auto entry = static_cast<Entry>(i);
                 form.Swatch((std::string(label(entry)) + "##" + title).c_str(), colors[i],
                     entryTip != nullptr ? entryTip(entry) : nullptr);
             }
+            form.Raw("</div></div>");
             form.EndCard();
         }
 
@@ -575,9 +581,9 @@ namespace headsup
                 return;
             form.Row("##visibility heads", nullptr);
             form.Fade(!plates);
-            form.Caption("Nameplates", "caption", kModeWidth);
+            form.Caption("Nameplates", "head", kModeWidth);
             form.Fade(!outlines);
-            form.Caption("Outlines", "caption", kModeWidth);
+            form.Caption("Outlines", "head", kModeWidth);
             form.EndRow();
             for (int i = 0; i < rows; ++i)
             {
@@ -588,15 +594,15 @@ namespace headsup
                 form.Fade(!plates);
                 int plate = static_cast<int>(row.plate);
                 form.DropdownAt((std::string("plate ") + RowKey(kind, r)).c_str(), plate, 0, kPlateModeCount - 1,
-                    [](int m) { return std::string(PlateModeLabel(static_cast<PlateMode>(m))); }, kModeWidth, kPlateModesTip);
+                    [](int m) { return std::string(PlateModeLabel(static_cast<PlateMode>(m))); }, kModeWidth, nullptr,
+                    [](int m) { return std::string(PlateModeTip(static_cast<PlateMode>(m))); });
                 row.plate = static_cast<PlateMode>(plate);
                 form.Fade(!outlines);
-                int outline     = static_cast<int>(row.outline);
-                std::string tip = kOutlineModesTip;
-                if (CanOutlineByNature(kind, r))
-                    tip += IsClaimRow(static_cast<Category>(r)) ? kByNatureOfClaimTip : kByNatureOfPlaceholderTip;
+                int outline         = static_cast<int>(row.outline);
+                const bool claimRow = kind == PlateKind::Mobs && IsClaimRow(static_cast<Category>(r));
                 form.DropdownAt((std::string("outline ") + RowKey(kind, r)).c_str(), outline, 0, OutlineModesFor(kind, r) - 1,
-                    [](int m) { return std::string(OutlineModeLabel(static_cast<OutlineMode>(m))); }, kModeWidth, tip.c_str());
+                    [](int m) { return std::string(OutlineModeLabel(static_cast<OutlineMode>(m))); }, kModeWidth, nullptr,
+                    [claimRow](int m) { return std::string(OutlineModeTip(static_cast<OutlineMode>(m), claimRow)); });
                 row.outline = static_cast<OutlineMode>(outline);
                 form.EndRow();
             }
@@ -626,15 +632,17 @@ namespace headsup
             KindSettings& k = s.Kind(kind);
             form.Fade(!s.enabled || !s.nameplates);
             if (!form.BeginCard("Nameplate Design", nullptr,
-                    "Three lines of text with tags. Click a tag to put it where you last typed, or drag it onto a line."))
+                    "Design this entity's nameplate by writing in the text box and by dragging and dropping tags from below."))
                 return;
             for (int i = 0; i < kPlateLines; ++i)
             {
+                form.Line("line design");
                 form.Caption(kLineLabels[i], "line-name");
                 if (form.LineBox((std::string("design ") + KindKey(kind) + " " + std::to_string(i)).c_str(), k.lines[i].text,
                         editor.drafts[i]) ||
                     editor.drafts[i].typing)
                     editor.line = i;
+                form.EndLine();
             }
             form.Line("line chips");
             for (const Tag tag : TagsFor(kind))
@@ -667,16 +675,17 @@ namespace headsup
             form.NumberDropdown(label("Sync Line Style").c_str(), sync, 0, static_cast<int>(targets.size()),
                 [&targets](int entry) { return SyncEntryLabel(targets, entry); },
                 "Borrows every setting below from another line, so the two always match. A line that borrows from this "
-                "one is not offered.");
+                "one is not offered.",
+                0.0f, [&targets](int entry) { return SyncEntryTip(targets, entry); });
             if (sync != synced) line.syncWith = SyncOfEntry(targets, sync);
             if (line.syncWith != kNoSync)
             {
-                form.Note((std::string("Uses ") + kLineLabels[line.syncWith] + "'s style.").c_str());
+                form.Note((std::string("Uses the ") + kLineLabels[line.syncWith] + "'s style.").c_str());
                 form.EndCard();
                 return;
             }
             const std::vector<ColorSource> sources = SourcesFor(kind, true);
-            form.ChecksDropdown(label("Show").c_str(), line.show, ConditionsFor(kind),
+            form.ChecksDropdown(label("Line Visibility").c_str(), line.show, ConditionsFor(kind),
                 "When this line shows: always, or when any checked condition holds.");
             // The bottom line is what the others are set against.
             if (n < kPlateLines - 1)
@@ -685,16 +694,18 @@ namespace headsup
                     kControlWidth / kAlignCount);
             form.FontDropdown(label("Font").c_str(), line.font, fonts,
                 "The line's font. Default is the font on the Entities page.", kDefaultFontChoice, &line.bold);
-            form.SliderInt(label("Text Size").c_str(), line.textSize, kMinSizePercent, kMaxSizePercent,
-                SizeFormat(s, line.textSize).c_str(), "Of the base font size on the Entities page.");
-            form.SliderInt(label("Icon Size").c_str(), line.iconSize, kMinSizePercent, kMaxSizePercent,
-                SizeFormat(s, line.iconSize).c_str(), "Every icon on this line, of the base font size.");
-            form.ColorPickRow(label("Color").c_str(), line.color, sources,
+            form.SliderInt(label("Text Size").c_str(), line.textSize, kMinSizePercent, kMaxSizePercent, "%d%%",
+                "Of the base font size on the Entities page.");
+            form.SliderInt(label("Icon Size").c_str(), line.iconSize, kMinSizePercent, kMaxSizePercent, "%d%%",
+                "Every icon on this line, of the base font size.");
+            form.ColorPickRow(label("Text Color").c_str(), line.color, sources,
                 "The text's color: your own, the game's, or a palette by the entity's state.");
-            form.SliderInt(label("Shadow").c_str(), line.shadow, kMinShadow, kMaxShadow, "%d%%",
+            form.SliderInt(label("Shadow Strength").c_str(), line.shadow, kMinShadow, kMaxShadow, "%d%%",
                 "The dark, soft shadow behind the letters that keeps them readable over bright ground. 0 is none.");
+            form.Fade(off || line.shadow == 0);
             form.ColorPickRow(label("Shadow Color").c_str(), line.shadowColor, sources, "The shadow's color; black as a rule.");
-            form.SliderInt(label("Glow").c_str(), line.glow, kMinGlow, kMaxGlow, "%d%%",
+            form.Fade(off);
+            form.SliderInt(label("Glow Strength").c_str(), line.glow, kMinGlow, kMaxGlow, "%d%%",
                 "A colored halo around the letters, as a mob's name glows in its outline color. 0 is none.");
             form.Fade(off || line.glow == 0);
             form.SliderInt(label("Glow Size").c_str(), line.glowSize, kMinGlowSize, kMaxGlowSize, "%d%%",
@@ -740,56 +751,67 @@ namespace headsup
                     "No glow on a mob's lines once you or your party has claimed it.");
                 form.EndCard();
             }
-            if (form.BeginCard("Detection", nullptr,
-                    "Which icons $detect shows: aggro, linking and how it detects you, in MobDB's icons."))
+            if (form.BeginCard("Detection Icons", nullptr,
+                    "Which icons the Detection tag shows: aggression, linking and how it senses you, in MobDB's icons."))
             {
                 form.Fade(off || !shown({Tag::Detect}));
                 for (int d = 0; d < kDetectionIconCount; ++d)
                 {
+                    // Aggression and links first; the rest is what the mob senses you by.
+                    if (static_cast<DetectionIcon>(d) == DetectionIcon::Sight)
+                    {
+                        form.Caption("Senses:", "line-name");
+                        form.Indent(true);
+                    }
                     const uint32_t bit = DetectionBit(static_cast<DetectionIcon>(d));
                     bool on            = (s.detectionShown & bit) != 0;
-                    form.Switch(DetectionLabel(static_cast<DetectionIcon>(d)), on, nullptr);
+                    form.Switch(DetectionLabel(static_cast<DetectionIcon>(d)), on, nullptr, "Hide", "Show");
                     s.detectionShown = on ? s.detectionShown | bit : s.detectionShown & ~bit;
                 }
+                form.Indent(false);
                 form.EndCard();
             }
             // The Target widget's popup reads the ranks switch and these colors too, whatever the nameplates do or hold.
             form.Fade(!s.enabled);
             if (form.BeginCard("Badges", nullptr,
-                    "The small text on the icons of $weak, $resist, $status and $immune. The Target widget's popup takes "
-                    "its ranks and colors from here too."))
+                    "The small text on the icons of the Weaknesses, Resistances, Statuses and Immunities tags. The Target "
+                    "widget's popup takes its ranks and colors from here too."))
             {
                 shown({Tag::Weak, Tag::Resist, Tag::Status, Tag::Immune});
                 form.FontDropdown("Badge Font", s.badgeFontName, fonts);
-                form.Switch("Ranks", s.showRanks, "Phoenix's ranks, -3 to 11, instead of percents. -3 is +50% and 4 is -50%.");
-                form.Swatch("Weak", s.weakBadgeColor, nullptr);
-                form.Swatch("Resist", s.resistBadgeColor, nullptr);
-                form.Swatch("Status Resist", s.rankBadgeColor, nullptr);
-                form.Swatch("Immune", s.immuneBadgeColor, nullptr);
+                form.Switch("Use Rank System", s.showRanks,
+                    "Phoenix's ranks, -3 to 11, instead of percents. -3 is +50% and 4 is -50%.");
+                form.Swatch("Weak Color", s.weakBadgeColor, nullptr);
+                form.Swatch("Resist Color", s.resistBadgeColor, nullptr);
+                form.Swatch("Status Resist Color", s.rankBadgeColor, nullptr);
+                form.Swatch("Immune Color", s.immuneBadgeColor, nullptr);
                 form.EndCard();
             }
-            const auto cutoff = [&s](int rank) { return CutoffText(rank, s.showRanks); };
+            const auto cutoff    = [&s](int rank) { return CutoffText(rank, s.showRanks); };
+            const auto weakTip   = [&s](int rank) { return CutoffTip(rank, s.showRanks, true); };
+            const auto resistTip = [&s](int rank) { return CutoffTip(rank, s.showRanks, false); };
             form.Fade(off);
-            if (form.BeginCard("Weaknesses", nullptr, "Which elements $weak and $resist show beside the damage types."))
+            if (form.BeginCard("Weaknesses", nullptr,
+                    "Which elements the Weaknesses and Resistances tags show beside the damage types."))
             {
                 form.Fade(off || !shown({Tag::Weak, Tag::Resist}));
                 form.NumberDropdown("Weak From", s.elementWeakRank, kMaxWeakRank, kNoWeakRank, cutoff,
-                    "The least element weakness that gets a badge.");
+                    "The least element weakness that gets a badge.", 0.0f, weakTip);
                 form.NumberDropdown("Resist From", s.elementResistRank, kMinResistRank, kNoResistRank, cutoff,
-                    "The least element resistance that gets a badge.");
+                    "The least element resistance that gets a badge.", 0.0f, resistTip);
                 form.NumberDropdown("Max Elements", s.maxElements, kElementCount, 0, ElementCountText,
-                    "Past this many, those nearest neutral are left off.");
+                    "Past this many, those nearest neutral are left off.", 0.0f, ElementCountTip);
                 form.EndCard();
             }
             form.Fade(off);
-            if (form.BeginCard("Statuses", nullptr, "Which statuses $status shows, weak or resisted."))
+            if (form.BeginCard("Statuses", nullptr, "Which statuses the Statuses tag shows, weak or resisted."))
             {
                 const bool dim = off || !shown({Tag::Status});
                 form.Fade(dim);
                 form.Row("##status heads", nullptr);
-                form.Caption("", "caption", kSwitchWidth);
-                form.Caption("Weak", "caption", kCutoffWidth);
-                form.Caption("Resist", "caption", kCutoffWidth);
+                form.Caption("", "head", kToggleWidth);
+                form.Caption("Weak", "head", kCutoffWidth);
+                form.Caption("Resist", "head", kCutoffWidth);
                 form.EndRow();
                 for (int i = 0; i < kStatusRankCount; ++i)
                 {
@@ -797,13 +819,14 @@ namespace headsup
                     const std::string status = StatusRankLabel(static_cast<StatusRank>(i));
                     form.Fade(dim);
                     form.Row(status.c_str(), nullptr);
-                    form.Raw("<div class=\"switch-room\">");
+                    form.Raw("<div class=\"switch-cell\">");
                     form.CheckAt(("status " + status).c_str(), rule.show);
                     form.Raw("</div>");
                     form.Fade(dim || !rule.show);
-                    form.DropdownAt(("weak " + status).c_str(), rule.weakRank, kMaxWeakRank, kNoWeakRank, cutoff, kCutoffWidth);
+                    form.DropdownAt(("weak " + status).c_str(), rule.weakRank, kMaxWeakRank, kNoWeakRank, cutoff, kCutoffWidth,
+                        nullptr, weakTip);
                     form.DropdownAt(("resist " + status).c_str(), rule.resistRank, kMinResistRank, kNoResistRank, cutoff,
-                        kCutoffWidth);
+                        kCutoffWidth, nullptr, resistTip);
                     form.EndRow();
                 }
                 form.EndCard();
@@ -814,7 +837,7 @@ namespace headsup
         {
             form.Fade(!s.enabled);
             if (!form.BeginCard("Friends", nullptr,
-                    "Players named here are Friends, in the rows above and in the Target Type colors. Click a name to "
+                    "Players named here are Friends, in the rows above and in the Entity Type colors. Click a name to "
                     "remove it."))
                 return;
             form.Line("line chips");
@@ -854,32 +877,36 @@ namespace headsup
                 "Above your name, a countdown for each placeholder you see die, as Bigmouth Billy [11A] 3:15. It reads "
                 "\"up\" when due.");
             form.Fade(!s.enabled || !s.phTimers);
-            form.SliderInt("Timer Size", s.timerPercent, kMinSizePercent, kMaxSizePercent,
-                SizeFormat(s, s.timerPercent).c_str(), "Of the base font size on the Entities page.");
+            form.SliderInt("Timer Size", s.timerPercent, kMinSizePercent, kMaxSizePercent, "%d%%",
+                "Of the base font size on the Entities page.");
             form.EndCard();
         }
 
         void EntitiesPage(Form& form, Settings& s, const MenuReadings& readings, const std::vector<std::string>& fonts)
         {
             form.Fade(!s.enabled);
-            if (form.BeginCard("Nameplate Style", &s.nameplates,
+            if (form.BeginCard("Nameplates", &s.nameplates,
                     "HeadsUp's nameplates: names, levels, icons and the rest, as each kind's page designs them."))
             {
                 form.Fade(!s.enabled || !s.nameplates);
-                form.SliderInt("Vertical Offset", s.nameRaise, kMinNameRaise, kMaxNameRaise, "%d px",
-                    "How far above the game's own spot names sit.");
-                form.Switch("Stack Names", s.stackNames,
-                    "Names that would cover each other rise one over another. Your target's keeps its place.");
                 form.SliderInt("Base Font Size", s.baseSize, kMinTextSize, kMaxTextSize, "%d px",
                     "Every line's text and icon size is a percent of this.");
                 form.FontDropdown("Default Font", s.defaultFont, fonts, "The font of every line whose own font is Default.");
                 form.Switch("Scale with Distance", s.scaleWithDistance, "Sizes follow how far a name's owner is from you.");
                 form.Fade(!s.enabled || !s.nameplates || !s.scaleWithDistance);
+                form.Indent(true);
                 form.SliderInt("Min Size", s.scaleMin, kMinSizePercent, kMaxSizePercent, "%d%%",
                     "The smallest a far name shrinks to.");
                 form.SliderInt("Max Size", s.scaleMax, kMinSizePercent, kMaxSizePercent, "%d%%",
                     "The largest a near name grows to.");
-                form.Switch("Scale Your Own Name", s.scaleOwnName, "Off, your own nameplate stays one size.");
+                form.Switch("Scale Your Own Name", s.scaleOwnName,
+                    "Off, your own nameplate keeps one size as the camera zooms.");
+                form.Indent(false);
+                form.Fade(!s.enabled || !s.nameplates);
+                form.SliderInt("Vertical Offset", s.nameRaise, kMinNameRaise, kMaxNameRaise, "%d px",
+                    "How far above the game's own spot names sit.");
+                form.Switch("Stack Names", s.stackNames,
+                    "Names that would cover each other rise one over another. Your target's keeps its place.");
                 form.EndCard();
             }
             form.Fade(!s.enabled);
@@ -906,21 +933,18 @@ namespace headsup
                     "Its dark edge, as a share of the usual thickness.");
                 form.Switch("Scale", s.scaleCursor, "Larger the nearer your target is.");
                 form.Swatch("Edge Color", s.cursorEdgeColor, "The cursor's dark edge.");
-                form.Note("Its colors are the Target Status palette below.");
+                form.Note("Its colors are the Targeting colors below.");
                 form.EndCard();
             }
             form.Fade(!s.enabled);
-            PaletteCard(form, "Colors: Aggression",
-                "By whether a mob would attack you, for ordinary mobs, notorious monsters and their placeholders.",
-                s.palette.aggression, kNatureCount, NatureLabel);
+            PaletteCard(form, "Colors: Aggression", kAggressionColorsTip, s.palette.aggression, kNatureCount, NatureLabel);
             PaletteCard(form, "Colors: Toughness",
-                "By how a mob cons to you. Easy Prey covers Incredibly Easy Prey, and Very Tough covers Incredibly Tough.",
+                (std::string(kToughnessColorsTip) + " Easy Prey covers Incredibly Easy Prey, and Very Tough covers Incredibly Tough.").c_str(),
                 s.palette.toughness, kLabelShadeCount, ToughnessLabel);
-            PaletteCard(form, "Colors: Claim", "By who has claimed a mob.", s.palette.claim, kClaimStateCount, ClaimLabel);
-            PaletteCard(form, "Colors: Target Status", "By whether it is your target. The target cursor takes these too.",
+            PaletteCard(form, "Colors: Claim Status", kClaimColorsTip, s.palette.claim, kClaimStateCount, ClaimLabel);
+            PaletteCard(form, "Colors: Targeting", (std::string(kTargetingColorsTip) + " The target cursor takes these too.").c_str(),
                 s.palette.target, kTargetStateCount, TargetStateLabel, TargetStateTip);
-            PaletteCard(form, "Colors: Target Type", "By what kind of entity it is.", s.palette.type, kTargetTypeCount,
-                TargetTypeLabel);
+            PaletteCard(form, "Colors: Entity Type", kEntityTypeColorsTip, s.palette.type, kTargetTypeCount, TargetTypeLabel);
             form.Fade(false);
         }
 
@@ -982,6 +1006,13 @@ namespace headsup
         case Page::Debug: DebugPage(form, s, readings, state); break;
         }
         form.Fade(false);
+        // A page whose every card is switched off says what switches them on.
+        if (form.CardsShown() == 0 && form.BeginCard("Switched Off"))
+        {
+            form.Note(s.enabled ? "These settings are the top panel's, which is off: the Top Panel page switches it on."
+                                : "HeadsUp is off: the Debug page switches it on.");
+            form.EndCard();
+        }
         s = Clamp(s);
     }
 }

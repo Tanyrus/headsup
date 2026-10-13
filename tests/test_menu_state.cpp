@@ -49,7 +49,7 @@ TEST(a_change_waiting_when_the_window_is_closed_saves_at_once)
     CHECK(SaveDue(10.0, 10.25, false));
 }
 
-TEST(the_sidebar_has_the_five_major_pages_with_their_children_under_them)
+TEST(the_sidebar_has_the_four_major_pages_with_their_children_under_them)
 {
     CHECK_EQ(kPageCount, 12);
     CHECK(kPages[0].page == Page::Entities && !kPages[0].child);
@@ -58,7 +58,7 @@ TEST(the_sidebar_has_the_five_major_pages_with_their_children_under_them)
     CHECK(kPages[6].page == Page::UserInterface && !kPages[6].child);
     CHECK(kPages[7].page == Page::TopPanel && kPages[7].child);
     CHECK(kPages[8].page == Page::Widgets && kPages[8].child);
-    CHECK(kPages[9].page == Page::MouseCursor && !kPages[9].child);
+    CHECK(kPages[9].page == Page::MouseCursor && kPages[9].child); // under User Interface
     CHECK(kPages[10].page == Page::ConfigMenu && !kPages[10].child);
     CHECK(kPages[11].page == Page::Debug && !kPages[11].child);
     CHECK(std::string_view(kPages[6].label) == "User Interface");
@@ -102,38 +102,12 @@ TEST(labels_are_title_case_with_small_words_left_alone_inside)
     CHECK(TitleCaseText("Scale with distance") == "Scale with Distance");
     CHECK(TitleCaseText("of the sea") == "Of the Sea");
     CHECK(TitleCaseText("NPC or object") == "NPC or Object");
+    CHECK(TitleCaseText("color by toughness") == "Color by Toughness");
     CHECK(TitleCaseText("sub-target") == "Sub-Target");
     CHECK(TitleCaseText("HP") == "HP");
     CHECK(TitleCaseText("ID (0x1F)") == "ID (0x1F)");
     CHECK(TitleCaseText("word") == "Word");
     CHECK(TitleCaseText("") == "");
-}
-
-namespace
-{
-    // What a slider shows for a value, given its format.
-    std::string Shown(const std::string& format, int value)
-    {
-        char text[64];
-        std::snprintf(text, sizeof(text), format.c_str(), value);
-        return text;
-    }
-}
-
-TEST(a_size_slider_shows_its_percent_and_the_pixels_it_is_drawn_at)
-{
-    Settings s;
-    s.baseSize = 15;
-    CHECK_EQ(Shown(SizeFormat(s, 87), 87), "87% (13 px)");   // 13.05
-    CHECK_EQ(Shown(SizeFormat(s, 107), 107), "107% (16 px)"); // 16.05
-    CHECK_EQ(Shown(SizeFormat(s, 90), 90), "90% (14 px)");   // 13.5 is drawn at 14
-    CHECK_EQ(Shown(SizeFormat(s, 100), 100), "100% (15 px)");
-    s.baseSize = 20;
-    CHECK_EQ(Shown(SizeFormat(s, 87), 87), "87% (17 px)"); // 17.4
-    s.baseSize = kMaxTextSize;
-    CHECK_EQ(Shown(SizeFormat(s, kMaxSizePercent), kMaxSizePercent), "400% (192 px)");
-    s.baseSize = kMinTextSize;
-    CHECK_EQ(Shown(SizeFormat(s, kMinSizePercent), kMinSizePercent), "25% (2 px)");
 }
 
 TEST(the_show_dropdown_reads_always_one_condition_how_many_or_never)
@@ -144,15 +118,15 @@ TEST(the_show_dropdown_reads_always_one_condition_how_many_or_never)
     show.when = ConditionBit(ShowCondition::YourClaim);
     CHECK_EQ(ShowSummary(show, mobs), "Always"); // Always wins over what is checked under it
     show.always = false;
-    CHECK_EQ(ShowSummary(show, mobs), "Your Claim");
+    CHECK_EQ(ShowSummary(show, mobs), "When Claimed by You");
     show.when |= ConditionBit(ShowCondition::Targeted) | ConditionBit(ShowCondition::TooWeak);
     CHECK_EQ(ShowSummary(show, mobs), "3 Conditions");
     show.when = 0;
     CHECK_EQ(ShowSummary(show, mobs), "Never");
     // A condition the kind's list does not offer cannot be seen or unchecked there, so it is not counted.
     show.when = ConditionBit(ShowCondition::Friend) | ConditionBit(ShowCondition::Unclaimed);
-    CHECK_EQ(ShowSummary(show, mobs), "Unclaimed");
-    CHECK_EQ(ShowSummary(show, ConditionsFor(PlateKind::Players)), "Friend");
+    CHECK_EQ(ShowSummary(show, mobs), "When Unclaimed");
+    CHECK_EQ(ShowSummary(show, ConditionsFor(PlateKind::Players)), "When Friend");
     CHECK_EQ(ShowSummary(show, ConditionsFor(PlateKind::Npcs)), "Never");
 }
 
@@ -258,6 +232,29 @@ TEST(a_line_may_sync_with_any_other_line_that_does_not_borrow_from_it)
         }
 }
 
+TEST(unchecking_a_condition_under_always_turns_always_off_and_keeps_the_rest)
+{
+    const std::vector<ShowCondition> offered = ConditionsFor(PlateKind::Players);
+    const uint32_t all = ConditionBit(ShowCondition::Targeted) | ConditionBit(ShowCondition::PartyMember) |
+                         ConditionBit(ShowCondition::Friend) | ConditionBit(ShowCondition::LinkshellMember);
+    LineShow show; // Always, nothing checked under it
+    CHECK(ToggleCondition(show, offered, 2)); // the list's third row: Party Member
+    CHECK(!show.always);
+    CHECK_EQ(show.when, all & ~ConditionBit(ShowCondition::PartyMember));
+    CHECK(ToggleCondition(show, offered, 2)); // checked again: every condition, and still not Always
+    CHECK(!show.always && show.when == all);
+    CHECK(ToggleCondition(show, offered, 0));
+    CHECK(show.always && show.when == all);
+    CHECK(ToggleCondition(show, offered, 0)); // Always off leaves what was checked
+    CHECK(!show.always && show.when == all);
+    CHECK(!ToggleCondition(show, offered, 5) && !ToggleCondition(show, offered, -1)); // no such row
+    CHECK(!show.always && show.when == all);
+    // A condition another kind's lines have, saved in the file, is not carried into what Always leaves checked.
+    LineShow stray{true, ConditionBit(ShowCondition::Aggressive)};
+    ToggleCondition(stray, offered, 1);
+    CHECK_EQ(stray.when, all & ~ConditionBit(ShowCondition::Targeted));
+}
+
 TEST(the_sync_dropdown_lists_no_then_its_targets)
 {
     const std::vector<int> targets{0, 2}; // line 2's, with nothing synced
@@ -270,9 +267,9 @@ TEST(the_sync_dropdown_lists_no_then_its_targets)
     CHECK_EQ(SyncOfEntry(targets, 2), 2);
     CHECK_EQ(SyncOfEntry(targets, 3), kNoSync);
     CHECK_EQ(SyncOfEntry({}, 0), kNoSync);
-    CHECK_EQ(SyncEntryLabel(targets, 0), "No");
-    CHECK_EQ(SyncEntryLabel(targets, 1), "Line 1");
-    CHECK_EQ(SyncEntryLabel(targets, 2), "Line 3");
+    CHECK_EQ(SyncEntryLabel(targets, 0), "Do Not Sync");
+    CHECK_EQ(SyncEntryLabel(targets, 1), "Sync with Top Line");
+    CHECK_EQ(SyncEntryLabel(targets, 2), "Sync with Bottom Line");
 }
 
 TEST(the_clocks_zone_dropdown_lists_local_first_and_then_every_zone)

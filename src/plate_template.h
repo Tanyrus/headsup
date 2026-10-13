@@ -1,10 +1,12 @@
 #pragma once
 
+#include "icons.h"
 #include "plate_settings.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -29,16 +31,20 @@ namespace headsup
 
     // Text and tags in order; a doubled mark is one mark, and a mark that starts no known tag stays text.
     std::vector<Atom> ParseTemplate(std::string_view text);
-    const char* TagName(Tag tag); // "$name"
-    const char* TagTip(Tag tag);  // what it renders, for the chip's tooltip
+    const char* TagName(Tag tag);  // "$name", as a line's text holds it
+    const char* TagLabel(Tag tag); // "Name", as its chip reads
+    const char* TagTip(Tag tag);   // what it renders, for the chip's tooltip
+    // The icon a player's status tag draws, which its chip shows too; nothing for a tag that is text or whose icons
+    // depend on the mob.
+    std::optional<Icon> TagIcon(Tag tag);
     // The chips a kind's page offers, in order.
     std::vector<Tag> TagsFor(PlateKind kind);
     // The text with the tag's name put in at byte caret, clamped to the text's end; unchanged when it would pass kMaxTemplate.
     std::string InsertTag(std::string text, Tag tag, size_t caret);
     // InsertTag at the caret, which then sits past the tag; false, with nothing changed, when the insert is refused.
     bool PutTag(std::string& text, size_t& caret, Tag tag);
-    // What a card says while no line of the design holds any of its tags: "Put $weak or $resist on a line of the
-    // design", then the ending, which says what that would show. Empty when a line holds one of them.
+    // What a card says while no line of the design holds any of its tags: "Put the Weaknesses or Resistances tag on a
+    // line of the design", then the ending, which says what that would show. Empty when a line holds one of them.
     std::string UnusedTagsNote(const KindSettings& kind, std::initializer_list<Tag> tags, const char* ending);
     constexpr const char* kShowsTheseEnding = " to show these on a nameplate."; // a card of settings the tags show
     constexpr const char* kShowsNameEnding  = " to show a name: the game's own is hidden where HeadsUp draws the "

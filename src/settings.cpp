@@ -153,7 +153,9 @@ namespace headsup
         const char* const kLabelShadeKeys[kLabelShadeCount] = {"labelUnknown", "labelTooWeak", "labelEasyPrey",
             "labelDecentChallenge", "labelEvenMatch", "labelTough", "labelVeryTough"};
 
-        const char* const kPlateModeNames[kPlateModeCount]       = {"hidden", "shown", "whenTargeted", "expanding", "vanilla"};
+        const char* const kPlateModeNames[kPlateModeCount]       = {"hidden", "shown", "whenTargeted", "vanilla"};
+        // A mode that is gone: its name alone, and the whole nameplate for a target. Such a row is Shown.
+        constexpr const char* kExpandingName = "expanding";
         const char* const kOutlineModeNames[kOutlineModeCount]   = {"disabled", "shown", "whenTargeted", "byNature"};
         const char* const kSourceNames[kColorSourceCount]        = {"custom", "game", "aggression", "toughness", "claim", "target", "type"};
         const char* const kAlignNames[kAlignCount]               = {"left", "center", "right"};
@@ -161,7 +163,7 @@ namespace headsup
         const char* const kNatureKeys[kNatureCount] = {"passive", "aggressive", "passiveNm", "aggressiveNm", "placeholder", "noData"};
         const char* const kClaimKeys[kClaimStateCount]   = {"unclaimed", "others", "yours"};
         const char* const kTargetKeys[kTargetStateCount] = {"none", "targeted", "locked", "subTarget", "outOfRange"};
-        const char* const kTypeKeys[kTargetTypeCount]    = {"mob", "npc", "pet", "player", "friend", "partyMember", "linkshell"};
+        const char* const kTypeKeys[kTargetTypeCount]    = {"mob", "player", "friend", "partyMember", "linkshell", "npc", "pet"};
         const char* const kPaletteKeys[]                 = {"paletteAggression", "paletteToughness", "paletteClaim", "paletteTarget", "paletteType"};
         constexpr const char* kLabelShadePrefix = "label"; // kLabelShadeKeys' prefix, which the palette's toughness keys drop
         constexpr const char* kRowInfix         = "Row";
@@ -336,7 +338,9 @@ namespace headsup
             {
                 const std::string base = RowBase(kind, r);
                 RowSettings& row       = k.rows[r];
-                row.plate = static_cast<PlateMode>(NameIndex(kPlateModeNames, kPlateModeCount, store.GetString((base + "Plate").c_str(), ""), static_cast<int>(row.plate)));
+                const std::string plate = store.GetString((base + "Plate").c_str(), "");
+                row.plate = plate == kExpandingName ? PlateMode::Shown
+                                                    : static_cast<PlateMode>(NameIndex(kPlateModeNames, kPlateModeCount, plate, static_cast<int>(row.plate)));
                 row.outline = static_cast<OutlineMode>(NameIndex(kOutlineModeNames, kOutlineModeCount, store.GetString((base + "Outline").c_str(), ""), static_cast<int>(row.outline)));
                 LoadPick(store, base + "Color", row.outlineColor);
             }

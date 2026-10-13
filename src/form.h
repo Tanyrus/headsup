@@ -72,6 +72,9 @@ namespace headsup
         std::string popup;                         // the control whose popup is open, or none
     };
 
+    // What an option of a dropdown does, by its place in the list: its tooltip. None says nothing.
+    using OptionTip = std::function<std::string(int)>;
+
     // The classes a button takes for its look.
     constexpr const char* kRaisedPill = "btn raised";
     constexpr const char* kFlatPill   = "btn flat";
@@ -95,15 +98,20 @@ namespace headsup
         std::optional<FormPopup> popup;
         std::function<bool(uint8_t)> keyDown;
 
-        // What follows is faint and takes no clicks, while the feature it belongs to is off; tips still show.
+        // What follows is not shown and takes no clicks, while the feature it belongs to is off: a setting that
+        // would do nothing is no setting. A card begun so is left out whole.
         void Fade(bool off) { m_Off = off; }
+        // How many cards of this pass show, folded or not.
+        int CardsShown() const { return m_CardsShown; }
+        // The rows that follow stand in from the left: they belong to the row above them.
+        void Indent(bool in) { m_Indent = in; }
 
         // Any element by id, to write markup into with Raw: the sidebar.
         void BeginBlock(const char* id);
         void EndBlock() {}
-        // A card, its title row folding it; an enabled checkbox sits at the title's right. False when it is folded,
-        // with nothing more to do; true, with EndCard to call.
-        bool BeginCard(const char* title, bool* enabled = nullptr, const char* tip = nullptr);
+        // A card, its title row folding it; an enabled checkbox sits at the title's right, and what the card is for
+        // is written under the title. False when it is folded, with nothing more to do; true, with EndCard to call.
+        bool BeginCard(const char* title, bool* enabled = nullptr, const char* about = nullptr);
         void EndCard();
 
         // A row: its label at the left, with its tip, and the controls that follow at the right, until EndRow.
@@ -114,7 +122,10 @@ namespace headsup
         void Line(const char* classes = "line");
         void EndLine();
 
-        void Switch(const char* label, bool& on, const char* tip);
+        // A yes or no, in the middle of the controls' column. offWord and onWord, when given, say beside it which
+        // of the two it is at.
+        void Switch(const char* label, bool& on, const char* tip, const char* offWord = nullptr,
+            const char* onWord = nullptr);
         // Options as joined buttons, the picked one filled.
         template <typename Enum>
         void Segments(const char* label, Enum& value, const char* const* options, int count, const char* tip,
@@ -129,12 +140,13 @@ namespace headsup
         void SliderInt(const char* label, int& value, int lo, int hi, const char* format, const char* tip);
         void SliderFloat(const char* label, float& value, float lo, float hi, const char* format, const char* tip);
         // A dropdown of the whole numbers from first to last, either way round, each shown as text gives it.
+        // option: what each number does, by the number.
         template <typename Name>
         void NumberDropdown(const char* label, int& value, int first, int last, Name text, const char* tip,
-            float width = 0.0f)
+            float width = 0.0f, const OptionTip& option = {})
         {
             Row(label, tip);
-            DropdownAt(label, value, first, last, text, width);
+            DropdownAt(label, value, first, last, text, width, nullptr, option);
             EndRow();
         }
         // A dropdown of fonts between two arrows that step to the font before and after. unset, when given, is a
@@ -144,7 +156,8 @@ namespace headsup
         void Swatch(const char* label, Color& color, const char* tip);
         // A color pick: the dropdown of its source, then the swatch of a custom color.
         void ColorPickRow(const char* label, ColorPick& pick, const std::vector<ColorSource>& sources, const char* tip);
-        // When a line shows, as a dropdown of checks: Always, which checks and locks the rest, then each condition.
+        // When a line shows, as a dropdown of checks: Always, under which every condition reads checked, then each
+        // condition.
         void ChecksDropdown(const char* label, LineShow& show, const std::vector<ShowCondition>& conditions,
             const char* tip);
         // An X and a Y to type, side by side.
@@ -161,28 +174,31 @@ namespace headsup
         // Controls for inside a row or a line. Each id is the control's own within its card.
         void CheckAt(const char* id, bool& on, const char* tip = nullptr);
         void SegmentsAt(const char* id, int& value, const char* const* options, int count, float segment = 0.0f);
-        // A dropdown whose list is a popup of rows, the picked one marked. True when another row was chosen.
+        // A dropdown whose list is a popup of rows, the picked one marked. True when another row was chosen. The
+        // closed control's tip is tip, or what option says of the row picked.
         template <typename Name>
         bool ListAt(const char* id, const std::string& shown, float width, int count, Name name, int picked, int& chosen,
-            const char* tip = nullptr)
+            const char* tip = nullptr, const OptionTip& option = {})
         {
             const std::string control = Id(id);
-            const bool open           = ListControl(control, shown, width, tip);
+            const bool listed         = picked >= 0 && picked < count;
+            const bool open = ListControl(control, shown, width, tip != nullptr ? tip : option && listed ? option(picked) : std::string());
             if (!open) return false;
             std::string rml;
             for (int i = 0; i < count; ++i)
-                rml += ListRow(control, i, name(i), i == picked);
+                rml += ListRow(control, i, name(i), i == picked, option ? option(i) : std::string());
             return ListChoice(control, std::move(rml), count, chosen) && chosen != picked;
         }
         template <typename Name>
         void DropdownAt(const char* id, int& value, int first, int last, Name text, float width = 0.0f,
-            const char* tip = nullptr)
+            const char* tip = nullptr, const OptionTip& option = {})
         {
             const int step  = first <= last ? 1 : -1;
             const int count = (last - first) * step + 1;
             int chosen      = 0;
+            const OptionTip byNumber = option ? OptionTip([&](int i) { return option(first + i * step); }) : OptionTip();
             if (ListAt(id, text(value), width, count, [&](int i) { return text(first + i * step); },
-                    (value - first) * step, chosen, tip))
+                    (value - first) * step, chosen, tip, byNumber))
             {
                 value   = first + chosen * step;
                 changed = true;
@@ -200,7 +216,8 @@ namespace headsup
         // A design line's box across the card. True when its text changed: typed and then left, or a tag chip
         // dropped onto it, which goes at its end. draft keeps its caret, and whether it has the keyboard.
         bool LineBox(const char* id, std::string& text, LineDraft& draft);
-        // A tag as a chip that reads as the tag is typed. True when clicked; dragged, it drops onto a line's box.
+        // A tag as a chip that reads its name, after its icon when it draws one. True when clicked; dragged, it drops
+        // onto a line's box.
         bool TagChip(Tag tag);
         // Muted or plain text among a row's controls.
         void Caption(const char* text, const char* classes = "caption", float width = 0.0f);
@@ -215,7 +232,7 @@ namespace headsup
         // What the player did to a control since the last pass: the newest event of the kind, or nothing.
         const FormEvent* Took(std::string_view id, const char* type) const;
         bool Clicked(std::string_view id) const { return Took(id, kClickEvent) != nullptr; }
-        // The classes of what is emitted now: " off" while faded.
+        // The classes of what is emitted now: " off", which hides it, while faded.
         const char* OffClass() const { return m_Off ? " off" : ""; }
         bool Off() const { return m_Off; }
         const std::string& CardId() const { return m_CardId; }
@@ -226,18 +243,23 @@ namespace headsup
         // The label a row shows: what is before "##", each word capitalized.
         static std::string Shown(const char* label);
         // A dropdown's closed control: what it shows and its arrow. True while its popup is open.
-        bool ListControl(const std::string& control, const std::string& shown, float width, const char* tip = nullptr);
-        std::string ListRow(const std::string& control, int index, const std::string& name, bool picked);
+        bool ListControl(const std::string& control, const std::string& shown, float width, const std::string& tip = {});
+        std::string ListRow(const std::string& control, int index, const std::string& name, bool picked,
+            const std::string& tip = {});
         // Opens the popup with rows, and tells which of them was clicked.
         bool ListChoice(const std::string& control, std::string rows, int count, int& chosen);
         void Slider(const std::string& slider, const char* label, float value, float lo, float hi, float step,
             const std::string& shown, const char* tip);
+        // A toggle, and its id.
+        std::string Check(const char* id, bool& on, const char* tip);
         // A button of any markup inside. True when clicked.
         bool Pressable(const std::string& inside, const char* id, const char* classes, const char* tip);
 
         std::vector<FormEvent> m_Events;
         FormState& m_State;
-        bool m_Off = false;
+        bool m_Off       = false;
+        bool m_Indent    = false;
+        int m_CardsShown = 0;
         std::string m_CardId;
         std::unordered_set<std::string> m_Ids; // this pass's, to keep them apart
     };

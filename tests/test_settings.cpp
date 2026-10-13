@@ -1037,13 +1037,38 @@ TEST(the_palettes_keep_todays_colors)
     CHECK(p.target[static_cast<int>(TargetState::OutOfRange)] == (Color{{1.00f, 0.25f, 0.25f}}));
     CHECK(p.claim[static_cast<int>(ClaimState::Yours)] == (Color{{0.30f, 0.65f, 1.00f}}));
     CHECK(p.claim[static_cast<int>(ClaimState::Others)] == (Color{{0.55f, 0.45f, 0.40f}}));
+    CHECK(p.type[static_cast<int>(TargetType::Pet)] == (Color{{0.70f, 0.95f, 0.80f}}));
+    CHECK(p.type[static_cast<int>(TargetType::Friend)] == (Color{{1.00f, 0.90f, 0.55f}}));
+    CHECK(p.type[static_cast<int>(TargetType::PartyMember)] == (Color{{0.55f, 0.80f, 1.00f}}));
+    CHECK(p.type[static_cast<int>(TargetType::LinkshellMember)] == (Color{{0.70f, 1.00f, 0.70f}}));
+    CHECK(p.type[static_cast<int>(TargetType::Npc)] == (Color{{1.00f, 1.00f, 1.00f}}));
+}
+
+TEST(an_entity_types_color_is_saved_under_its_own_name)
+{
+    // The menu's order for the types changed; a saved file's keys are by name and read as before.
+    MapStore file;
+    SaveSettings(Settings{}, file);
+    file.values["paletteTypePetR"]         = "0.1250";
+    file.values["paletteTypeNpcG"]         = "0.2500";
+    file.values["paletteTypeLinkshellB"]   = "0.3750";
+    file.values["paletteTypePartyMemberR"] = "0.5000";
+    file.values["paletteTypeFriendG"]      = "0.6250";
+    file.values["paletteTypePlayerB"]      = "0.7500";
+    const Palette p = LoadSettings(file).palette;
+    CHECK_EQ(p.type[static_cast<int>(TargetType::Pet)].v[0], 0.125f);
+    CHECK_EQ(p.type[static_cast<int>(TargetType::Npc)].v[1], 0.25f);
+    CHECK_EQ(p.type[static_cast<int>(TargetType::LinkshellMember)].v[2], 0.375f);
+    CHECK_EQ(p.type[static_cast<int>(TargetType::PartyMember)].v[0], 0.5f);
+    CHECK_EQ(p.type[static_cast<int>(TargetType::Friend)].v[1], 0.625f);
+    CHECK_EQ(p.type[static_cast<int>(TargetType::Player)].v[2], 0.75f);
 }
 
 TEST(every_designer_key_round_trips)
 {
     Settings s;
     KindSettings& mobs = s.Kind(PlateKind::Mobs);
-    mobs.rows[CategoryIndex(Category::WontAttack)].plate   = PlateMode::Expanding;
+    mobs.rows[CategoryIndex(Category::WontAttack)].plate   = PlateMode::WhenTargeted;
     mobs.rows[CategoryIndex(Category::WontAttack)].outline = OutlineMode::WhenTargeted;
     mobs.rows[CategoryIndex(Category::WontAttack)].outlineColor = ColorPick{ColorSource::Custom, {{0.1f, 0.2f, 0.3f}}};
     LineDesign& line = mobs.lines[1];
@@ -1077,7 +1102,7 @@ TEST(every_designer_key_round_trips)
     MapStore store;
     SaveSettings(s, store);
     CHECK(LoadSettings(store) == s);
-    CHECK_EQ(store.values.at("mobsRowPassivePlate"), "expanding");
+    CHECK_EQ(store.values.at("mobsRowPassivePlate"), "whenTargeted");
     CHECK_EQ(store.values.at("mobsLine2Text"), "Lv $level $con $$ $id");
     CHECK_EQ(store.values.at("mobsLine2When"), "5");
     CHECK_EQ(store.values.at("petsLine1Text"), "$owner's $name");
@@ -1720,7 +1745,7 @@ namespace
     // Designs no migration of kSavedFile's old keys would give.
     Settings WithOwnDesigns(Settings s)
     {
-        s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WontAttack)].plate = PlateMode::Expanding;
+        s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WontAttack)].plate = PlateMode::WhenTargeted;
         s.Kind(PlateKind::Mobs).lines[1].text      = "$name ($level)";
         s.Kind(PlateKind::Mobs).lines[2].font      = "Cinzel";
         s.Kind(PlateKind::Pets).lines[1].text      = "($owner)";
@@ -1762,6 +1787,20 @@ TEST(a_version_3_file_from_before_the_marker_loads_its_designs)
     file.values.erase("nameplateDesigns");
     CHECK_EQ(file.values.at("settingsVersion"), "3.0000");
     CHECK(LoadSettings(file) == designed);
+}
+
+TEST(a_row_saved_as_expanding_shows_its_nameplate)
+{
+    // The Expanding mode is gone: its row drew a nameplate, whole for a target, so it is Shown.
+    Settings hidden;
+    hidden.Kind(PlateKind::Npcs).rows[0].plate = PlateMode::Hidden;
+    MapStore file;
+    SaveSettings(hidden, file);
+    CHECK(LoadSettings(file).Kind(PlateKind::Npcs).rows[0].plate == PlateMode::Hidden);
+    file.values["npcsRowNpcPlate"] = "expanding";
+    CHECK(LoadSettings(file).Kind(PlateKind::Npcs).rows[0].plate == PlateMode::Shown);
+    file.values["npcsRowNpcPlate"] = "vanilla";
+    CHECK(LoadSettings(file).Kind(PlateKind::Npcs).rows[0].plate == PlateMode::Vanilla);
 }
 
 TEST(pets_migrate_as_the_mobs_they_were_drawn_as)

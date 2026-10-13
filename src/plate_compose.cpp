@@ -120,22 +120,6 @@ namespace headsup
             }
         }
 
-        std::optional<Icon> PlayerIconImage(Tag tag)
-        {
-            switch (tag)
-            {
-            case Tag::Gm: return Icon::Gm;
-            case Tag::Mentor: return Icon::Mentor;
-            case Tag::New: return Icon::NewAdventurer;
-            case Tag::Sync: return Icon::LevelSync;
-            case Tag::Away: return Icon::Away;
-            case Tag::Linkshell: return Icon::Linkshell;
-            case Tag::Bazaar: return Icon::Bazaar;
-            case Tag::Seeking: return Icon::Invite;
-            default: return std::nullopt;
-            }
-        }
-
         bool PlayerHas(Tag tag, const PlayerStatus& status)
         {
             switch (tag)
@@ -205,7 +189,7 @@ namespace headsup
             default:
                 break;
             }
-            const std::optional<Icon> icon = PlayerIconImage(tag);
+            const std::optional<Icon> icon = TagIcon(tag);
             if (!icon || info.state.kind != EntityKind::Player || !info.status || !PlayerHas(tag, *info.status)) return out;
             out.push_back(DrawOf(*icon, tag == Tag::Linkshell ? info.linkshellArgb : kWhite));
             return out;
@@ -316,7 +300,7 @@ namespace headsup
         if (mode == PlateMode::WhenTargeted && !Targeted(st.target)) return plate;
         const bool deadMob  = st.kind == EntityKind::Mob && !st.alive;
         const bool fought   = s.glowOffWhenFighting && st.kind == EntityKind::Mob && st.claim == ClaimState::Yours;
-        const bool nameOnly = (mode == PlateMode::Expanding && !Targeted(st.target)) || deadMob || player.inEvent;
+        const bool nameOnly = deadMob || player.inEvent;
         std::optional<BadgeRules> badgeRules;
         plate.lines.reserve(kPlateLines);
         for (int i = 0; i < kPlateLines; ++i)

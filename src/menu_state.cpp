@@ -31,7 +31,7 @@ namespace headsup
         {Page::UserInterface, "User Interface", false},
         {Page::TopPanel, "Top Panel", true},
         {Page::Widgets, "Widgets", true},
-        {Page::MouseCursor, "Mouse Cursor", false},
+        {Page::MouseCursor, "Mouse Cursor", true},
         {Page::ConfigMenu, "Config Menu", false},
         {Page::Debug, "Debug", false},
     };
@@ -66,7 +66,7 @@ namespace headsup
 
     std::string TitleCaseText(std::string_view text)
     {
-        constexpr std::array<std::string_view, 8> kSmallWords = {"and", "or", "of", "the", "to", "in", "on", "with"};
+        constexpr std::array<std::string_view, 9> kSmallWords = {"and", "or", "of", "the", "to", "in", "on", "with", "by"};
         std::string result(text);
         for (size_t at = 0; at < result.size();)
         {
@@ -105,11 +105,6 @@ namespace headsup
         return zone ? ClockZoneName(*zone) : kLocalZoneLabel;
     }
 
-    std::string SizeFormat(const Settings& settings, int percent)
-    {
-        return "%d%% (" + std::to_string(FixedRasterHeight(BasePixels(settings, percent))) + " px)";
-    }
-
     std::string ShowSummary(const LineShow& show, const std::vector<ShowCondition>& offered)
     {
         constexpr const char* kNever = "Never";
@@ -124,6 +119,26 @@ namespace headsup
             only = ConditionLabel(condition);
         }
         return checked > 1 ? std::to_string(checked) + kMany : only;
+    }
+
+    bool ToggleCondition(LineShow& show, const std::vector<ShowCondition>& offered, int row)
+    {
+        if (row < 0 || row > static_cast<int>(offered.size())) return false;
+        if (row == 0)
+        {
+            show.always = !show.always;
+            return true;
+        }
+        const uint32_t bit = ConditionBit(offered[static_cast<size_t>(row) - 1]);
+        if (show.always)
+        {
+            show.always = false;
+            show.when   = 0;
+            for (const ShowCondition condition : offered)
+                show.when |= ConditionBit(condition);
+        }
+        show.when ^= bit;
+        return true;
     }
 
     std::optional<std::string> FriendToAdd(const std::vector<std::string>& friends, std::string_view typed)
@@ -161,9 +176,17 @@ namespace headsup
 
     std::string SyncEntryLabel(const std::vector<int>& targets, int entry)
     {
-        constexpr const char* kNoSyncLabel = "No";
+        constexpr const char* kNoSyncLabel = "Do Not Sync";
+        constexpr const char* kSyncWith    = "Sync with ";
         const int line = SyncOfEntry(targets, entry);
-        return line == kNoSync ? kNoSyncLabel : kLineLabels[line];
+        return line == kNoSync ? kNoSyncLabel : kSyncWith + std::string(kLineLabels[line]);
+    }
+
+    std::string SyncEntryTip(const std::vector<int>& targets, int entry)
+    {
+        const int line = SyncOfEntry(targets, entry);
+        if (line == kNoSync) return "This line keeps a style of its own.";
+        return std::string("Every setting below is the ") + kLineLabels[line] + "'s, so the two always match.";
     }
 
     namespace

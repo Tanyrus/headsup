@@ -112,15 +112,15 @@ TEST(a_card_of_tags_no_line_holds_says_which_tag_would_show_it)
     kind.lines[0].text = "$detect";
     kind.lines[2].text = "$name";
     CHECK_EQ(UnusedTagsNote(kind, {Tag::Detect}, kShowsTheseEnding), "");
-    CHECK_EQ(UnusedTagsNote(kind, {Tag::Status}, kShowsTheseEnding), "Put $status on a line of the design to show these on a nameplate.");
+    CHECK_EQ(UnusedTagsNote(kind, {Tag::Status}, kShowsTheseEnding), "Put the Statuses tag on a line of the design to show these on a nameplate.");
     CHECK_EQ(UnusedTagsNote(kind, {Tag::Weak, Tag::Resist}, kShowsTheseEnding),
-        "Put $weak or $resist on a line of the design to show these on a nameplate.");
+        "Put the Weaknesses or Resistances tag on a line of the design to show these on a nameplate.");
     CHECK_EQ(UnusedTagsNote(kind, {Tag::Weak, Tag::Resist, Tag::Status, Tag::Immune}, kShowsTheseEnding),
-        "Put $weak, $resist, $status or $immune on a line of the design to show these on a nameplate.");
+        "Put the Weaknesses, Resistances, Statuses or Immunities tag on a line of the design to show these on a nameplate.");
     kind.lines[1].text = "Lv $level $resist";
     CHECK_EQ(UnusedTagsNote(kind, {Tag::Weak, Tag::Resist}, kShowsTheseEnding), ""); // one of a card's tags is enough
     CHECK_EQ(UnusedTagsNote(kind, {Tag::Weak, Tag::Resist, Tag::Status, Tag::Immune}, kShowsTheseEnding), "");
-    CHECK_EQ(UnusedTagsNote(kind, {Tag::Weak}, kShowsTheseEnding), "Put $weak on a line of the design to show these on a nameplate.");
+    CHECK_EQ(UnusedTagsNote(kind, {Tag::Weak}, kShowsTheseEnding), "Put the Weaknesses tag on a line of the design to show these on a nameplate.");
     kind.lines[1].text = "$$resist"; // a doubled mark is a dollar sign, not the tag
     CHECK(!UnusedTagsNote(kind, {Tag::Resist}, kShowsTheseEnding).empty());
 }
@@ -130,7 +130,7 @@ TEST(a_design_without_the_name_tag_says_why_no_name_shows)
     KindSettings kind;
     kind.lines[1].text = "Lv $level";
     CHECK_EQ(UnusedTagsNote(kind, {Tag::Name}, kShowsNameEnding),
-        "Put $name on a line of the design to show a name: the game's own is hidden where HeadsUp draws the nameplate.");
+        "Put the Name tag on a line of the design to show a name: the game's own is hidden where HeadsUp draws the nameplate.");
     kind.lines[0].text = "<$name>";
     CHECK_EQ(UnusedTagsNote(kind, {Tag::Name}, kShowsNameEnding), "");
     CHECK(!UnusedTagsNote(KindSettings{}, {Tag::Name}, kShowsNameEnding).empty()); // three empty lines

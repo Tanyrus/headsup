@@ -68,53 +68,55 @@ namespace
 TEST(every_label_names_its_own_enumerator)
 {
     CheckOrder(kPlateModeCount, [](int i) { return PlateModeLabel(static_cast<PlateMode>(i)); },
-        {"Hidden", "Shown", "When Targeted", "Expanding", "Vanilla"});
-    CHECK_EQ(PlateModeLabel(PlateMode::Hidden), "Hidden");
-    CHECK_EQ(PlateModeLabel(PlateMode::Vanilla), "Vanilla");
+        {"Hide Nameplate", "Show Nameplate", "When Targeted", "Vanilla Nameplate"});
+    CHECK_EQ(PlateModeLabel(PlateMode::Hidden), "Hide Nameplate");
+    CHECK_EQ(PlateModeLabel(PlateMode::Vanilla), "Vanilla Nameplate");
     CheckOrder(kOutlineModeCount, [](int i) { return OutlineModeLabel(static_cast<OutlineMode>(i)); },
-        {"Disabled", "Shown", "When Targeted", "By Nature"});
-    CHECK_EQ(OutlineModeLabel(OutlineMode::ByNature), "By Nature");
+        {"No Outline", "Show Outline", "When Targeted", "Inherit"});
+    CHECK_EQ(OutlineModeLabel(OutlineMode::ByNature), "Inherit");
     CheckOrder(kNatureCount, [](int i) { return NatureLabel(static_cast<Nature>(i)); },
-        {"Passive", "Aggressive", "Passive NM", "Aggressive NM", "NM Placeholder", "No Data"});
+        {"Passive", "Aggressive", "NM (Passive)", "NM (Aggressive)", "NM (Placeholder)", "No Data"});
     CHECK_EQ(NatureLabel(Nature::Aggressive), "Aggressive");
     CHECK_EQ(NatureLabel(Nature::NoData), "No Data");
     CheckOrder(kLabelShadeCount, [](int i) { return ToughnessLabel(static_cast<LabelShade>(i)); },
         {"Unknown Level", "Too Weak", "Easy Prey", "Decent Challenge", "Even Match", "Tough", "Very Tough"});
     CHECK_EQ(ToughnessLabel(LabelShade::VeryTough), "Very Tough");
     CheckOrder(kClaimStateCount, [](int i) { return ClaimLabel(static_cast<ClaimState>(i)); },
-        {"Unclaimed", "Others' Claim", "Your Claim"});
-    CHECK_EQ(ClaimLabel(ClaimState::Yours), "Your Claim");
+        {"Unclaimed", "Claimed (Others')", "Claimed (Yours)"});
+    CHECK_EQ(ClaimLabel(ClaimState::Yours), "Claimed (Yours)");
     CheckOrder(kTargetStateCount, [](int i) { return TargetStateLabel(static_cast<TargetState>(i)); },
         {"Not Targeted", "Targeted", "Locked On", "Sub-Target", "Out of Range"});
     CHECK_EQ(TargetStateLabel(TargetState::Locked), "Locked On");
     CHECK_EQ(TargetStateLabel(TargetState::OutOfRange), "Out of Range");
     CheckOrder(kTargetTypeCount, [](int i) { return TargetTypeLabel(static_cast<TargetType>(i)); },
-        {"Mob", "NPC or Object", "Pet", "Player", "Friend", "Party Member", "Linkshell Co-Member"});
-    CHECK_EQ(TargetTypeLabel(TargetType::LinkshellMember), "Linkshell Co-Member");
+        {"Mob", "Player", "Friend", "Party Member", "Linkshell Member", "NPC or Object", "Pet"});
+    CHECK_EQ(TargetTypeLabel(TargetType::LinkshellMember), "Linkshell Member");
     CheckOrder(kOrnamentPlaceCount, [](int i) { return kOrnamentPlaceLabels[i]; }, {"Lines 1-2", "Lines 2-3"});
     CHECK_EQ(kOrnamentPlaceLabels[static_cast<int>(OrnamentPlace::BetweenLines2And3)], "Lines 2-3");
     CheckOrder(kAlignCount, [](int i) { return kAlignLabels[i]; }, {"Left", "Center", "Right"});
     CHECK_EQ(kAlignLabels[static_cast<int>(Align::Right)], "Right");
-    CheckOrder(kPlateLines, [](int i) { return kLineLabels[i]; }, {"Line 1", "Line 2", "Line 3"});
+    CheckOrder(kPlateLines, [](int i) { return kLineLabels[i]; }, {"Top Line", "Middle Line", "Bottom Line"});
     CheckOrder(kShowConditionCount, [](int i) { return ConditionLabel(static_cast<ShowCondition>(i)); },
-        {"When Targeted", "Unclaimed", "Your Claim", "Others' Claim", "Engaged in Combat", "Too Weak", "Aggressive",
-            "Passive", "Party Member", "Friend", "Linkshell Co-Member"});
-    CHECK_EQ(ConditionLabel(ShowCondition::LinkshellMember), "Linkshell Co-Member");
+        {"When Targeted", "When Unclaimed", "When Claimed by You", "When Claimed by Others", "When Engaged in Combat",
+            "When Too Weak", "When Aggressive", "When Passive", "When Party Member", "When Friend", "When Linkshell Member"});
+    CHECK_EQ(ConditionLabel(ShowCondition::LinkshellMember), "When Linkshell Member");
     CheckOrder(kColorSourceCount, [](int i) { return SourceLabel(static_cast<ColorSource>(i)); },
-        {"Custom", "Game's", "Aggression", "Toughness", "Claim", "Target Status", "Target Type"});
-    CHECK_EQ(SourceLabel(ColorSource::Type), "Target Type");
+        {"Custom", "Vanilla Color", "Color by Aggression", "Color by Toughness", "Color by Claim Status", "Color by Targeting",
+            "Color by Entity Type"});
+    CHECK_EQ(SourceLabel(ColorSource::Type), "Color by Entity Type");
     CheckOrder(kDetectionIconCount, [](int i) { return DetectionLabel(static_cast<DetectionIcon>(i)); },
-        {"Aggressive or Passive", "Links", "Sight", "True Sight", "Sound", "Scent", "Magic", "Job Abilities", "Low HP"});
-    CHECK_EQ(DetectionLabel(DetectionIcon::Blood), "Low HP");
+        {"Aggression", "Links", "Sight", "True Sight", "Sound", "Scent", "Use of Spells", "Use of Abilities", "Low Player HP"});
+    CHECK_EQ(DetectionLabel(DetectionIcon::Blood), "Low Player HP");
     CheckOrder(kStatusRankCount, [](int i) { return StatusRankLabel(static_cast<StatusRank>(i)); },
         {"Paralyze", "Bind", "Silence", "Slow", "Poison", "Light Sleep", "Dark Sleep", "Blind", "Stun", "Gravity"});
     CHECK_EQ(StatusRankLabel(StatusRank::Gravity), "Gravity");
     CheckOrder(kCategoryCount, [](int i) { return RowLabel(PlateKind::Mobs, i); },
-        {"Aggressive", "Passive", "No Data", "Aggressive NM", "Passive NM", "NM Placeholder", "Party Claim", "Others' Claim"});
-    CHECK_EQ(RowLabel(PlateKind::Mobs, CategoryIndex(Category::OtherClaim)), "Others' Claim");
+        {"Aggressive", "Passive", "No Data", "NM (Aggressive)", "NM (Passive)", "NM (Placeholder)", "Claimed (Yours)",
+            "Claimed (Others')"});
+    CHECK_EQ(RowLabel(PlateKind::Mobs, CategoryIndex(Category::OtherClaim)), "Claimed (Others')");
     CheckOrder(kPlayerRowCount, [](int i) { return RowLabel(PlateKind::Players, i); },
-        {"Players", "Party Members", "Friends", "Linkshell Co-Members"});
-    CHECK_EQ(RowLabel(PlateKind::Players, static_cast<int>(PlayerRow::LinkshellMember)), "Linkshell Co-Members");
+        {"Players", "Party Members", "Friends", "Linkshell Members"});
+    CHECK_EQ(RowLabel(PlateKind::Players, static_cast<int>(PlayerRow::LinkshellMember)), "Linkshell Members");
     CheckOrder(kPlateKindCount, [](int i) { return KindLabel(static_cast<PlateKind>(i)); },
         {"Mobs", "Players", "Self", "NPCs", "Pets"});
     CHECK_EQ(KindLabel(PlateKind::Pets), "Pets");
@@ -205,6 +207,5 @@ TEST(only_a_drawn_outline_has_a_color_to_pick_and_only_headsups_plates_a_design)
     CHECK(!DrawsPlate(PlateMode::Hidden));
     CHECK(DrawsPlate(PlateMode::Shown));
     CHECK(DrawsPlate(PlateMode::WhenTargeted));
-    CHECK(DrawsPlate(PlateMode::Expanding));
     CHECK(!DrawsPlate(PlateMode::Vanilla));
 }

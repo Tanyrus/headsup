@@ -84,6 +84,18 @@ namespace headsup
 
     constexpr const char* kDefaultFontChoice = "Default"; // a line's font: the one on the Entities page
 
+    // What each palette's colors tell, under its card's title and on the color source that takes them.
+    constexpr const char* kAggressionColorsTip =
+        "Colors indicating whether an enemy will attack you, or not, and if they are a notorious monster.";
+    constexpr const char* kToughnessColorsTip =
+        "Colors indicating how dangerous an enemy is to you at your current level.";
+    constexpr const char* kClaimColorsTip =
+        "Colors indicating whether or not the mob is claimed, and who is the owner of the claim.";
+    constexpr const char* kTargetingColorsTip =
+        "Colors indicating whether you are targeting the entity, locked onto it, sub-targeting, etc.";
+    constexpr const char* kEntityTypeColorsTip =
+        "Colors indicating what type of entity the target is, or what their relation is to you.";
+
     const char* const kMobRowTips[kCategoryCount] = {
         "Would attack you at your level. Too Weak mobs only attack while you sit or rest.",
         "Passive, or aggressive but Too Weak for you.",
@@ -99,15 +111,41 @@ namespace headsup
         "Named in the Friends card below, and not in your party.",
         "In your linkshell, and neither in your party nor a friend. The game tells a player's linkshell only when "
         "you /check them."}; // by PlayerRow
-    constexpr const char* kPlateModesTip =
-        "Hidden: no name at all. Shown: HeadsUp's nameplate. When Targeted: the nameplate while it is your target, "
-        "and no name otherwise. Expanding: its name alone, and the whole nameplate while it is your target. Vanilla: "
-        "the game's own name.";
-    constexpr const char* kOutlineModesTip =
-        "Disabled: no outline. Shown: an outline. When Targeted: an outline while it is your target.";
-    constexpr const char* kByNatureOfClaimTip       = " By Nature: the outline it would have unclaimed.";
-    constexpr const char* kByNatureOfPlaceholderTip = " By Nature: the outline its aggression gives it, as any other "
-                                                      "mob's.";
+    // What each option of a dropdown does, which it says under the pointer.
+    inline const char* PlateModeTip(PlateMode mode)
+    {
+        static const char* const kTips[kPlateModeCount] = {"No name at all.", "HeadsUp's nameplate.",
+            "The nameplate while it is your target, and no name otherwise.", "The game's own name, and nothing of HeadsUp's."};
+        return kTips[static_cast<int>(mode)];
+    }
+    // claimRow: whether the row that would inherit is a claim's; the other that can is the placeholders'.
+    inline const char* OutlineModeTip(OutlineMode mode, bool claimRow)
+    {
+        switch (mode)
+        {
+        case OutlineMode::Disabled: return "No outline.";
+        case OutlineMode::Shown: return "An outline whenever it is in range.";
+        case OutlineMode::WhenTargeted: return "An outline while it is your target.";
+        case OutlineMode::ByNature: break;
+        }
+        return claimRow ? "The outline it would have unclaimed." : "The outline its aggression gives it, as any other mob's.";
+    }
+    inline const char* SourceTip(ColorSource source)
+    {
+        static const char* const kTips[kColorSourceCount] = {"A color of your own.", "The color the game gives the name.",
+            kAggressionColorsTip, kToughnessColorsTip, kClaimColorsTip, kTargetingColorsTip, kEntityTypeColorsTip};
+        return kTips[static_cast<int>(source)];
+    }
+    constexpr const char* kShowAlwaysTip = "The line shows whatever else holds.";
+    inline const char* ConditionTip(ShowCondition condition)
+    {
+        static const char* const kTips[kShowConditionCount] = {"While it is your target.", "While nobody has claimed the mob.",
+            "While you or your party has claimed the mob.", "While someone outside your party has claimed the mob.",
+            "While it is fighting.", "While the mob is too weak to be worth experience.", "While the mob would attack you.",
+            "While the mob would leave you alone.", "While the player is in your party.", "While the player is a friend.",
+            "While the player is in your linkshell."};
+        return kTips[static_cast<int>(condition)];
+    }
 
     inline const char* RowTip(PlateKind kind, int row)
     {
@@ -126,9 +164,24 @@ namespace headsup
         return rank == kNoWeakRank || rank == kNoResistRank ? "Off" : RankText(rank, ranks);
     }
 
+    // weak: the cutoff is a weakness's; a resistance's otherwise.
+    inline std::string CutoffTip(int rank, bool ranks, bool weak)
+    {
+        const char* what = weak ? "weaknesses" : "resistances";
+        if (rank == kNoWeakRank || rank == kNoResistRank) return std::string("No badges for ") + what + ".";
+        return std::string("A badge for ") + what + " of " + RankText(rank, ranks) + " and stronger.";
+    }
+
     inline std::string ElementCountText(int count)
     {
         if (count == 0) return "None";
         return count == kElementCount ? "All" : std::to_string(count);
+    }
+
+    inline std::string ElementCountTip(int count)
+    {
+        if (count == 0) return "No element badges.";
+        if (count == kElementCount) return "Every element past the cutoffs.";
+        return "The " + std::to_string(count) + " elements farthest from neutral.";
     }
 }

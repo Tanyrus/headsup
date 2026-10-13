@@ -1,4 +1,5 @@
 #include "form.h"
+#include "menu_text.h"
 #include "test.h"
 
 #include <algorithm>
@@ -53,7 +54,8 @@ namespace
             form.Switch("Chocobo", b.chocobo, "The chocobo.");
             form.SliderInt("Height", b.height, 24, 64, "%d px", nullptr);
             form.SliderFloat("Thickness", b.thick, 0.5f, 3.0f, "%.1f px", nullptr);
-            form.NumberDropdown("Theme", b.theme, 0, 2, [](int t) { return "Theme " + std::to_string(t); }, nullptr);
+            form.NumberDropdown("Theme", b.theme, 0, 2, [](int t) { return "Theme " + std::to_string(t); }, nullptr, 0.0f,
+                [](int t) { return "What theme " + std::to_string(t) + " is."; });
             form.Row("Name", nullptr);
             form.TextAt("Name", b.name, "A Name", 9.0f);
             form.EndRow();
@@ -72,7 +74,9 @@ TEST(a_card_holds_its_rows_and_what_they_show)
     CHECK_EQ(form.blocks.size(), size_t{1});
     CHECK_EQ(form.blocks[0].id, "page-mouse-pointer");
     const std::string& rml = form.blocks[0].rml;
-    CHECK(Has(rml, "<div class=\"card-head\" id=\"page-mouse-pointer-head\" tip=\"A &lt;tip&gt;\">"));
+    // What the card is for is written under its title, first in its body, and is no tooltip.
+    CHECK(Has(rml, "<div class=\"card-head\" id=\"page-mouse-pointer-head\">"));
+    CHECK(Has(rml, "<div class=\"card-body\"><div class=\"note\">A &lt;tip&gt;</div>"));
     CHECK(Has(rml, "<div class=\"arrow open\"></div><div class=\"card-title\">Mouse Pointer</div>"));
     CHECK(Has(rml, "<div class=\"label\" id=\"page-mouse-pointer-chocobo-label\" tip=\"The chocobo.\">Chocobo</div>"));
     CHECK(Has(rml, "<div class=\"check\" id=\"page-mouse-pointer-chocobo\"><div class=\"mark\"></div></div>"));
@@ -108,6 +112,7 @@ TEST(a_click_on_a_cards_title_folds_it)
     const Form folded = Pass({{"page-mouse-pointer-head", kClickEvent, ""}}, state, b);
     CHECK(state.collapsed.contains("page-mouse-pointer"));
     CHECK(!Has(folded.blocks[0].rml, "card-body") && !Has(folded.blocks[0].rml, "chocobo"));
+    CHECK(!Has(folded.blocks[0].rml, "tip&gt;")); // folded, it is its title alone
     CHECK(Has(folded.blocks[0].rml, "<div class=\"arrow\"></div>") && !folded.changed);
     const Form open = Pass({{"page-mouse-pointer-head", kClickEvent, ""}}, state, b);
     CHECK(state.collapsed.empty() && Has(open.blocks[0].rml, "card-body"));
@@ -137,7 +142,9 @@ TEST(a_dropdown_opens_a_popup_of_its_rows_and_takes_the_one_clicked)
     const Form open = Pass({{"page-mouse-pointer-theme", kClickEvent, ""}}, state, b);
     CHECK_EQ(state.popup, "page-mouse-pointer-theme");
     CHECK(open.popup && open.popup->anchor == "page-mouse-pointer-theme");
-    CHECK(Has(open.popup->rml, "<div class=\"opt\" id=\"page-mouse-pointer-theme-o-2\">Theme 2</div>"));
+    // Each row says what it does under the pointer, and the closed control says it of the one picked.
+    CHECK(Has(open.popup->rml, "<div class=\"opt\" id=\"page-mouse-pointer-theme-o-2\" tip=\"What theme 2 is.\">Theme 2</div>"));
+    CHECK(Has(open.blocks[0].rml, "<div class=\"dd\" id=\"page-mouse-pointer-theme\" tip=\"What theme 1 is.\""));
     CHECK(ClassOn(open, "page-mouse-pointer-theme-o-1", "picked") && !ClassOn(open, "page-mouse-pointer-theme-o-2", "picked"));
     CHECK(ClassOn(open, "page-mouse-pointer-theme", "open") && !open.changed);
     const Form chose = Pass({{"page-mouse-pointer-theme-o-2", kClickEvent, ""}}, state, b);
@@ -182,12 +189,34 @@ TEST(what_is_faded_is_marked_off_and_takes_no_clicks)
                                {"page-mouse-pointer-height", kChangeEvent, "30"}},
         state, b, true);
     CHECK(!b.chocobo && b.height == 45 && !form.changed);
-    CHECK(ClassOn(form, "page-mouse-pointer-chocobo", "off") && ClassOn(form, "page-mouse-pointer-chocobo-label", "off"));
-    CHECK(ClassOn(form, "page-mouse-pointer-height-box", "off"));
+    CHECK(ClassOn(form, "page-mouse-pointer-chocobo", "off") && ClassOn(form, "page-mouse-pointer-chocobo-label-row", "off"));
+    CHECK(ClassOn(form, "page-mouse-pointer-height-box", "off") && ClassOn(form, "page-mouse-pointer-height-label-row", "off"));
+    // The card itself was begun before the fade: it shows.
+    CHECK(!ClassOn(form, "page-mouse-pointer", "off"));
     // The card's title was written before the fade began.
     CHECK(!ClassOn(form, "page-mouse-pointer-head", "off"));
     const Form plain = Pass({}, state, b);
     CHECK_EQ(plain.blocks[0].rml, form.blocks[0].rml); // fading replaces no markup
+}
+
+TEST(a_card_begun_while_faded_is_off_whole_and_has_no_rows)
+{
+    FormState state;
+    bool on = false, enabled = true;
+    Form form({{"p-c-on", kClickEvent, ""}, {"p-c-head", kClickEvent, ""}}, state);
+    form.pageKey = "p";
+    form.Fade(true);
+    CHECK(!form.BeginCard("C", &enabled, "What it is for."));
+    CHECK(ClassOn(form, "p-c", "off"));
+    CHECK(enabled && !form.changed && state.collapsed.empty()); // and takes no clicks
+    CHECK(!Has(form.blocks[0].rml, "card-body"));
+    CHECK_EQ(form.CardsShown(), 0);
+    form.Fade(false);
+    CHECK(form.BeginCard("D"));
+    form.Switch("S", on, nullptr);
+    form.EndCard();
+    CHECK(!ClassOn(form, "p-d", "off"));
+    CHECK_EQ(form.CardsShown(), 1);
 }
 
 TEST(two_controls_of_one_name_get_ids_of_their_own)
@@ -262,7 +291,7 @@ TEST(a_swatch_opens_three_sliders_and_the_color_as_written)
     CHECK(color == ColorFromRgb(0x102030));
 }
 
-TEST(a_list_of_checks_stays_open_and_always_locks_the_rest)
+TEST(a_list_of_checks_stays_open_and_a_condition_unchecked_under_always_turns_always_off)
 {
     FormState state;
     LineShow show;
@@ -279,14 +308,19 @@ TEST(a_list_of_checks_stays_open_and_always_locks_the_rest)
     pass({{"p-c-show", kClickEvent, ""}});
     const Form checked = pass({{"p-c-show-o-1", kClickEvent, ""}});
     CHECK(show.when == ConditionBit(conditions[0]) && checked.changed && checked.popup);
-    CHECK(ClassOn(checked, "p-c-show-o-1", "on") && !ClassOn(checked, "p-c-show-o-1", "locked"));
+    CHECK(ClassOn(checked, "p-c-show-o-1", "on") && !ClassOn(checked, "p-c-show-o-2", "on"));
+    // Each row says when it holds.
+    CHECK(Has(checked.popup->rml, (std::string("id=\"p-c-show-o-1\" tip=\"") + ConditionTip(conditions[0]) + "\"").c_str()));
+    CHECK(Has(checked.popup->rml, (std::string("id=\"p-c-show-o-0\" tip=\"") + kShowAlwaysTip + "\"").c_str()));
+    // Under Always every condition reads checked.
     const Form always = pass({{"p-c-show-o-0", kClickEvent, ""}});
-    CHECK(show.always && ClassOn(always, "p-c-show-o-0", "on") && ClassOn(always, "p-c-show-o-2", "locked"));
+    CHECK(show.always && ClassOn(always, "p-c-show-o-0", "on") && ClassOn(always, "p-c-show-o-2", "on"));
     CHECK_EQ(TextOf(always, "p-c-show-val"), kShowAlways);
-    // Locked: a click on a condition changes nothing while Always is checked.
-    const uint32_t was = show.when;
-    const Form locked = pass({{"p-c-show-o-2", kClickEvent, ""}});
-    CHECK(!locked.changed && show.when == was);
+    // Unchecking one of them turns Always off and leaves the others checked.
+    const Form one = pass({{"p-c-show-o-2", kClickEvent, ""}});
+    CHECK(one.changed && !show.always && one.popup);
+    CHECK(!ClassOn(one, "p-c-show-o-0", "on") && !ClassOn(one, "p-c-show-o-2", "on") && ClassOn(one, "p-c-show-o-3", "on"));
+    CHECK_EQ(TextOf(one, "p-c-show-val"), std::to_string(conditions.size() - 1) + " Conditions");
 }
 
 TEST(a_line_box_takes_typing_a_dropped_tag_and_its_caret)

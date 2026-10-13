@@ -131,18 +131,11 @@ TEST(hidden_vanilla_and_untargeted_when_targeted_rows_compose_nothing)
     CHECK_EQ(ComposePlate(targeted, kPlayer, s, kGame).lines.size(), size_t{3});
 }
 
-TEST(expanding_rows_and_dead_mobs_keep_the_name_alone)
+TEST(a_dead_mob_keeps_its_name_alone)
 {
-    Settings s;
-    s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WillAttack)].plate = PlateMode::Expanding;
-    s.Kind(PlateKind::Mobs).lines[2].text = "$name ($level)";
-    const ComposedPlate untargeted = ComposePlate(AggressiveMob(), kPlayer, s, kGame);
-    CHECK_EQ(untargeted.lines.size(), size_t{1});
-    CHECK_EQ(Rendered(untargeted.lines[0]), "Young Quadav");
-    ActorInfo targeted    = AggressiveMob();
-    targeted.state.target = TargetState::Targeted;
-    CHECK_EQ(ComposePlate(targeted, kPlayer, s, kGame).lines.size(), size_t{3});
     Settings d;
+    d.Kind(PlateKind::Mobs).lines[2].text = "$name ($level)";
+    CHECK_EQ(ComposePlate(AggressiveMob(), kPlayer, d, kGame).lines.size(), size_t{3});
     ActorInfo dead  = AggressiveMob();
     dead.state.alive = false;
     const ComposedPlate gone = ComposePlate(dead, kPlayer, d, kGame);
@@ -180,10 +173,7 @@ TEST(a_dead_mobs_name_does_not_glow)
     CHECK_EQ(gone.lines.size(), size_t{1});
     CHECK_EQ(gone.lines[0].look.glow, 0.0f);
     CHECK_EQ(gone.lines[0].look.shadow, 1.0f); // the rest of its look stays
-    // A living mob's name alone keeps its glow, and so does a dead player's.
-    Settings expanding;
-    expanding.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WillAttack)].plate = PlateMode::Expanding;
-    CHECK_EQ(ComposePlate(AggressiveMob(), kPlayer, expanding, kGame).lines[0].look.glow, 1.0f);
+    // A dead player's name keeps its glow.
     Settings glowing;
     glowing.Kind(PlateKind::Players).lines[2].glow = 150;
     ActorInfo player   = LinkshellPlayer();
@@ -318,11 +308,8 @@ TEST(a_name_headsup_cannot_draw_goes_back_to_the_game_and_a_hidden_one_stays_hid
     const EntityState mob = AggressiveMob().state;
     EntityState targeted  = mob;
     targeted.target       = TargetState::Targeted;
-    for (const PlateMode drawn : {PlateMode::Shown, PlateMode::Expanding})
-    {
-        row = drawn;
-        CHECK(HookActionFor(mob, s, false, true) == HookAction::Keep);
-    }
+    row = PlateMode::Shown;
+    CHECK(HookActionFor(mob, s, false, true) == HookAction::Keep);
     row = PlateMode::WhenTargeted;
     CHECK(HookActionFor(targeted, s, false, true) == HookAction::Keep);
     CHECK(HookActionFor(mob, s, false, true) == HookAction::Hide); // hidden while it is not your target

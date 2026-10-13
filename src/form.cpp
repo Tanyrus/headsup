@@ -1,6 +1,8 @@
 #include "form.h"
 
 #include "argb.h"
+#include "bar_document.h"
+#include "menu_text.h"
 #include "settings.h"
 
 #include <algorithm>
@@ -39,10 +41,11 @@ namespace headsup
             return out;
         }
 
-        std::string TipAttribute(const char* tip)
+        std::string TipAttribute(std::string_view tip)
         {
-            return tip != nullptr && *tip != '\0' ? " tip=\"" + EscapedRml(tip) + "\"" : std::string();
+            return tip.empty() ? std::string() : " tip=\"" + EscapedRml(tip) + "\"";
         }
+        std::string TipAttribute(const char* tip) { return TipAttribute(std::string_view(tip != nullptr ? tip : "")); }
 
         std::string Formatted(const char* format, double value)
         {
@@ -123,16 +126,17 @@ namespace headsup
         m_CardId = id;
     }
 
-    bool Form::BeginCard(const char* title, bool* enabled, const char* tip)
+    bool Form::BeginCard(const char* title, bool* enabled, const char* about)
     {
         m_CardId = Slug(pageKey + "/" + title);
         blocks.push_back(FormBlock{m_CardId, {}});
+        Set(m_CardId, FormValueKind::Class, "off", {}, m_Off);
+        if (!m_Off) ++m_CardsShown;
         const std::string head = m_CardId + "-head";
-        if (Clicked(head) && !m_State.collapsed.erase(m_CardId)) m_State.collapsed.insert(m_CardId);
-        const bool open = !m_State.collapsed.contains(m_CardId);
-        Out() += "<div class=\"card-head\" id=\"" + head + "\"" + TipAttribute(tip) + "><div class=\"arrow" +
-                 (open ? " open" : "") + "\"></div><div class=\"card-title\">" + EscapedRml(title) + "</div>";
-        Set(head, FormValueKind::Class, "off", {}, m_Off);
+        if (!m_Off && Clicked(head) && !m_State.collapsed.erase(m_CardId)) m_State.collapsed.insert(m_CardId);
+        const bool open = !m_Off && !m_State.collapsed.contains(m_CardId);
+        Out() += "<div class=\"card-head\" id=\"" + head + "\"><div class=\"arrow" + (open ? " open" : "") +
+                 "\"></div><div class=\"card-title\">" + EscapedRml(title) + "</div>";
         if (enabled != nullptr)
         {
             const std::string check = m_CardId + "-on";
@@ -145,8 +149,10 @@ namespace headsup
             Set(check, FormValueKind::Class, "on", {}, *enabled);
         }
         Out() += "</div>";
-        if (open) Out() += "<div class=\"card-body\">";
-        return open;
+        if (!open) return false;
+        Out() += "<div class=\"card-body\">";
+        if (about != nullptr && *about != '\0') Out() += "<div class=\"note\">" + EscapedRml(about) + "</div>";
+        return true;
     }
 
     void Form::EndCard() { Out() += "</div>"; }
@@ -154,9 +160,10 @@ namespace headsup
     void Form::Row(const char* label, const char* tip)
     {
         const std::string id = Id(std::string(label) + " label");
-        Out() += "<div class=\"row\"><div class=\"label\" id=\"" + id + "\"" + TipAttribute(tip) + ">" +
-                 EscapedRml(Shown(label)) + "</div><div class=\"ctl\">";
-        Set(id, FormValueKind::Class, "off", {}, m_Off);
+        const std::string row = id + "-row";
+        Out() += std::string("<div class=\"row") + (m_Indent ? " indent" : "") + "\" id=\"" + row + "\"><div class=\"label\" id=\"" +
+                 id + "\"" + TipAttribute(tip) + ">" + EscapedRml(Shown(label)) + "</div><div class=\"ctl\">";
+        Set(row, FormValueKind::Class, "off", {}, m_Off);
     }
 
     void Form::EndRow() { Out() += "</div></div>"; }
@@ -164,7 +171,7 @@ namespace headsup
     void Form::Line(const char* classes) { Out() += std::string("<div class=\"") + classes + "\">"; }
     void Form::EndLine() { Out() += "</div>"; }
 
-    void Form::CheckAt(const char* id, bool& on, const char* tip)
+    std::string Form::Check(const char* id, bool& on, const char* tip)
     {
         const std::string check = Id(id);
         if (!m_Off && Clicked(check))
@@ -175,12 +182,22 @@ namespace headsup
         Out() += "<div class=\"check\" id=\"" + check + "\"" + TipAttribute(tip) + "><div class=\"mark\"></div></div>";
         Set(check, FormValueKind::Class, "on", {}, on);
         Set(check, FormValueKind::Class, "off", {}, m_Off);
+        return check;
     }
 
-    void Form::Switch(const char* label, bool& on, const char* tip)
+    void Form::CheckAt(const char* id, bool& on, const char* tip) { Check(id, on, tip); }
+
+    void Form::Switch(const char* label, bool& on, const char* tip, const char* offWord, const char* onWord)
     {
         Row(label, tip);
-        CheckAt(label, on);
+        Out() += "<div class=\"switch-room\">";
+        const std::string check = Check(label, on, nullptr);
+        if (offWord != nullptr && onWord != nullptr)
+        {
+            Out() += "<div class=\"state\" id=\"" + check + "-state\"></div>";
+            Set(check + "-state", FormValueKind::Text, {}, on ? onWord : offWord);
+        }
+        Out() += "</div>";
         EndRow();
     }
 
@@ -250,7 +267,7 @@ namespace headsup
         Slider(slider, label, value, lo, hi, StepOf(format), Formatted(format, static_cast<double>(value)), tip);
     }
 
-    bool Form::ListControl(const std::string& control, const std::string& shown, float width, const char* tip)
+    bool Form::ListControl(const std::string& control, const std::string& shown, float width, const std::string& tip)
     {
         if (!m_Off && Clicked(control))
         {
@@ -269,11 +286,12 @@ namespace headsup
         return open;
     }
 
-    std::string Form::ListRow(const std::string& control, int index, const std::string& name, bool picked)
+    std::string Form::ListRow(const std::string& control, int index, const std::string& name, bool picked,
+        const std::string& tip)
     {
         const std::string row = control + "-o-" + std::to_string(index);
         Set(row, FormValueKind::Class, "picked", {}, picked);
-        return "<div class=\"opt\" id=\"" + row + "\">" + EscapedRml(name) + "</div>";
+        return "<div class=\"opt\" id=\"" + row + "\"" + TipAttribute(tip) + ">" + EscapedRml(name) + "</div>";
     }
 
     bool Form::ListChoice(const std::string& control, std::string rows, int count, int& chosen)
@@ -305,8 +323,11 @@ namespace headsup
         int listed = 0;
         // The arrows and the checkbox take their room from the dropdown, so the row ends where a slider's does.
         const float step = 1.6f + 0.5f;
-        if (ListAt(label, FontShown(choices, unset, font), kControlWidth - 2.0f * step - (bold != nullptr ? step : 0.0f),
-                count, [&](int entry) { return FontEntryLabel(choices, unset, entry); }, picked, listed))
+        // A long family's name is cut in the list and in the closed control: both say it whole under the pointer.
+        const std::string shown = FontShown(choices, unset, font);
+        if (ListAt(label, shown, kControlWidth - 2.0f * step - (bold != nullptr ? step : 0.0f), count,
+                [&](int entry) { return FontEntryLabel(choices, unset, entry); }, picked, listed, shown.c_str(),
+                [&](int entry) { return FontEntryLabel(choices, unset, entry); }))
             chosen = listed;
         if (Pressable("<div class=\"tri right\"></div>", (name + " next").c_str(), "btn step", nullptr))
             chosen = StepFontEntry(count, picked, 1);
@@ -389,7 +410,8 @@ namespace headsup
         const float swatch = 1.6f + 0.5f;
         if (ListAt(label, SourceLabel(pick.source), kControlWidth - swatch, static_cast<int>(sources.size()),
                 [&](int i) { return std::string(SourceLabel(sources[static_cast<size_t>(i)])); },
-                at != sources.end() ? static_cast<int>(at - sources.begin()) : -1, chosen))
+                at != sources.end() ? static_cast<int>(at - sources.begin()) : -1, chosen, nullptr,
+                [&](int i) { return std::string(SourceTip(sources[static_cast<size_t>(i)])); }))
         {
             pick.source = sources[static_cast<size_t>(chosen)];
             changed     = true;
@@ -412,28 +434,21 @@ namespace headsup
             for (const FormEvent& event : m_Events)
             {
                 if (event.type != kClickEvent || event.id.compare(0, start.size(), start) != 0) continue;
-                const int row = std::atoi(event.id.c_str() + start.size());
-                if (row == 0)
-                    show.always = !show.always;
-                else if (!show.always && row <= static_cast<int>(conditions.size()))
-                    show.when ^= ConditionBit(conditions[static_cast<size_t>(row) - 1]);
-                else
-                    continue;
-                changed = true;
+                changed |= ToggleCondition(show, conditions, std::atoi(event.id.c_str() + start.size()));
             }
         if (ListControl(control, ShowSummary(show, conditions), kControlWidth))
         {
             std::string rml = "<div class=\"list\">";
-            const auto row  = [&](int index, const char* name, bool on, bool locked) {
+            const auto row  = [&](int index, const char* name, const char* tip, bool on) {
                 const std::string id = start + std::to_string(index);
-                rml += "<div class=\"opt chk\" id=\"" + id + "\"><div class=\"dot\"></div>" + EscapedRml(name) + "</div>";
+                rml += "<div class=\"opt chk\" id=\"" + id + "\"" + TipAttribute(tip) + "><div class=\"dot\"></div>" +
+                       EscapedRml(name) + "</div>";
                 Set(id, FormValueKind::Class, "on", {}, on);
-                Set(id, FormValueKind::Class, "locked", {}, locked);
             };
-            row(0, kShowAlways, show.always, false);
+            row(0, kShowAlways, kShowAlwaysTip, show.always);
             for (size_t i = 0; i < conditions.size(); ++i)
-                row(static_cast<int>(i) + 1, ConditionLabel(conditions[i]),
-                    show.always || (show.when & ConditionBit(conditions[i])) != 0, show.always);
+                row(static_cast<int>(i) + 1, ConditionLabel(conditions[i]), ConditionTip(conditions[i]),
+                    show.always || (show.when & ConditionBit(conditions[i])) != 0);
             popup = FormPopup{control, rml + "</div>"};
         }
         EndRow();
@@ -577,8 +592,9 @@ namespace headsup
     bool Form::TagChip(Tag tag)
     {
         const std::string chip = kTagIdStart + std::to_string(static_cast<int>(tag));
-        Out() += "<div class=\"btn raised chip drag\" id=\"" + chip + "\"" + TipAttribute(TagTip(tag)) + ">" +
-                 EscapedRml(TagName(tag)) + "</div>";
+        const std::optional<Icon> icon = TagIcon(tag);
+        Out() += "<div class=\"btn accent chip drag\" id=\"" + chip + "\"" + TipAttribute(TagTip(tag)) + ">" +
+                 (icon ? "<img src=\"" + IconSource(*icon) + "\"/>" : std::string()) + EscapedRml(TagLabel(tag)) + "</div>";
         Set(chip, FormValueKind::Class, "off", {}, m_Off);
         return !m_Off && Clicked(chip);
     }

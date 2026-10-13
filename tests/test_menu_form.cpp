@@ -47,7 +47,7 @@ TEST(the_window_is_its_sidebar_and_the_open_pages_cards)
     CHECK(Has(form.blocks.front().rml, "<div class=\"nav\" id=\"nav-entities\">") &&
           Has(form.blocks.front().rml, "<div class=\"nav child\" id=\"nav-mobs\">"));
     CHECK(ClassOn(form, "nav-entities", "picked") && !ClassOn(form, "nav-mobs", "picked"));
-    CHECK(Block(form, "entities-nameplate-style") != nullptr && Block(form, "entities-colors-target-type") != nullptr);
+    CHECK(Block(form, "entities-nameplates") != nullptr && Block(form, "entities-colors-entity-type") != nullptr);
 }
 
 TEST(a_click_in_the_sidebar_opens_that_page_at_its_top)
@@ -55,7 +55,7 @@ TEST(a_click_in_the_sidebar_opens_that_page_at_its_top)
     Window w;
     const Form form = w.Pass({{"nav-toppanel", kClickEvent, ""}});
     CHECK(w.state.page == Page::TopPanel && form.scrollToTop);
-    CHECK(Block(form, "toppanel-top-panel") != nullptr && Block(form, "entities-nameplate-style") == nullptr);
+    CHECK(Block(form, "toppanel-top-panel") != nullptr && Block(form, "entities-nameplates") == nullptr);
     CHECK(ClassOn(form, "nav-toppanel", "picked"));
 }
 
@@ -180,3 +180,28 @@ TEST(only_the_lines_above_the_bottom_one_have_an_alignment)
         CHECK_EQ(Has(card->rml, ">Alignment<"), tab < kPlateLines - 1);
     }
 }
+
+TEST(a_page_whose_cards_are_all_switched_off_says_what_switches_them_on)
+{
+    const auto shown = [](const Form& form) {
+        std::vector<std::string> ids;
+        for (const FormBlock& block : form.blocks)
+            if (block.id != kSidebarBlock && !ClassOn(form, block.id.c_str(), "off")) ids.push_back(block.id);
+        return ids;
+    };
+    Window w;
+    CHECK(shown(w.Pass()).size() > 3u);
+    w.settings.enabled = false;
+    const std::vector<std::string> off = shown(w.Pass());
+    CHECK_EQ(off.size(), size_t{1}); // the one card that says HeadsUp is off
+    // The Debug page, which switches HeadsUp on, keeps its cards.
+    w.state.page = Page::Debug;
+    const Form debug = w.Pass({{"debug-headsup-on", kClickEvent, ""}});
+    CHECK(w.settings.enabled && debug.changed);
+    // With the top panel off, its widgets' page has nothing to set either.
+    w.settings.showBar = false;
+    w.state.page       = Page::Widgets;
+    CHECK_EQ(shown(w.Pass()).size(), size_t{1});
+    CHECK(shown(w.Pass()) != off);
+}
+

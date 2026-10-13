@@ -33,8 +33,8 @@ namespace headsup
 
     enum class PlateKind : uint8_t { Mobs, Players, Self, Npcs, Pets };
     constexpr int kPlateKindCount = 5;
-    enum class PlateMode : uint8_t { Hidden, Shown, WhenTargeted, Expanding, Vanilla };
-    constexpr int kPlateModeCount = 5;
+    enum class PlateMode : uint8_t { Hidden, Shown, WhenTargeted, Vanilla };
+    constexpr int kPlateModeCount = 4;
     // ByNature, on the Placeholder and claim rows of mobs only, steps aside for the row under it.
     enum class OutlineMode : uint8_t { Disabled, Shown, WhenTargeted, ByNature };
     constexpr int kOutlineModeCount = 4;
@@ -58,7 +58,7 @@ namespace headsup
     constexpr int kClaimStateCount = 3;
     enum class TargetState : uint8_t { None, Targeted, Locked, SubTarget, OutOfRange };
     constexpr int kTargetStateCount = 5;
-    enum class TargetType : uint8_t { Mob, Npc, Pet, Player, Friend, PartyMember, LinkshellMember };
+    enum class TargetType : uint8_t { Mob, Player, Friend, PartyMember, LinkshellMember, Npc, Pet }; // the menu's order
     constexpr int kTargetTypeCount = 7;
     enum class PlayerRow : uint8_t { Player, PartyMember, Friend, LinkshellMember };
     constexpr int kPlayerRowCount = 4;
@@ -175,7 +175,8 @@ namespace headsup
     // The conditions a kind's lines may be shown by, in the menu's order.
     std::vector<ShowCondition> ConditionsFor(PlateKind kind);
     const char* ConditionLabel(ShowCondition c);
-    // The color sources a kind's picks offer, in the menu's order: text is true for a text color (Game's is offered).
+    // The color sources a kind's picks offer, in the menu's order: text is true for a text color, which may take the
+    // game's own, last.
     std::vector<ColorSource> SourcesFor(PlateKind kind, bool text);
     const char* SourceLabel(ColorSource s);
 

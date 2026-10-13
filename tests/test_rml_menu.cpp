@@ -20,6 +20,7 @@ namespace
     constexpr double kVersion = 0.65;
     constexpr int kLeftButton = 0;
     constexpr double kFrameSeconds = 1.0 / 30.0; // the game's frame
+    constexpr const char* kLongFont = "Franklin Gothic Demi Condensed"; // a family too long for its dropdown
 
     // The settings window on a screen of its own, worked as a player works it: by where its controls are.
     class Window
@@ -211,7 +212,7 @@ namespace
         test::RmlSession m_Rml; // before the menu: its document is closed while RmlUi still runs
         MenuHost m_Host;
         MenuReadings m_Readings;
-        std::vector<std::string> m_Fonts = {"Arial", kBarlowCondensed, kMarcellusSC};
+        std::vector<std::string> m_Fonts = {"Arial", kBarlowCondensed, kMarcellusSC, kLongFont};
     };
 }
 
@@ -252,12 +253,12 @@ TEST(a_dropdown_lists_its_choices_under_it_and_a_pick_sets_the_setting)
     Window window;
     window.Page("mobs");
     window.Click("mobs-line-style-line-style-t-1");
-    CHECK(!window.Shows("mobs-line-style-color-mobs1-o-0"));
-    window.Click("mobs-line-style-color-mobs1");
-    CHECK(window.Shows("mobs-line-style-color-mobs1-o-0"));
-    CHECK(window.Click("mobs-line-style-color-mobs1-o-0"));
+    CHECK(!window.Shows("mobs-line-style-text-color-mobs1-o-0"));
+    window.Click("mobs-line-style-text-color-mobs1");
+    CHECK(window.Shows("mobs-line-style-text-color-mobs1-o-0"));
+    CHECK(window.Click("mobs-line-style-text-color-mobs1-o-0"));
     CHECK(window.settings.Kind(PlateKind::Mobs).lines[1].color.source == ColorSource::Custom);
-    CHECK(!window.Shows("mobs-line-style-color-mobs1-o-0"));
+    CHECK(!window.Shows("mobs-line-style-text-color-mobs1-o-0"));
 }
 
 TEST(a_list_of_checks_stays_open_while_its_rows_are_checked)
@@ -265,13 +266,13 @@ TEST(a_list_of_checks_stays_open_while_its_rows_are_checked)
     Window window;
     window.Page("mobs");
     window.Click("mobs-line-style-line-style-t-1");
-    window.Click("mobs-line-style-show-mobs1");
-    CHECK(window.Click("mobs-line-style-show-mobs1-o-0"));
+    window.Click("mobs-line-style-line-visibility-mobs1");
+    CHECK(window.Click("mobs-line-style-line-visibility-mobs1-o-0"));
     CHECK(!window.settings.Kind(PlateKind::Mobs).lines[1].show.always);
-    CHECK(window.Click("mobs-line-style-show-mobs1-o-1"));
-    CHECK(window.Shows("mobs-line-style-show-mobs1-o-1"));
-    window.Click("mobs-line-style-show-mobs1");
-    CHECK(!window.Shows("mobs-line-style-show-mobs1-o-1"));
+    CHECK(window.Click("mobs-line-style-line-visibility-mobs1-o-1"));
+    CHECK(window.Shows("mobs-line-style-line-visibility-mobs1-o-1"));
+    window.Click("mobs-line-style-line-visibility-mobs1");
+    CHECK(!window.Shows("mobs-line-style-line-visibility-mobs1-o-1"));
 }
 
 TEST(a_swatch_opens_the_color_picker_and_closes_it)
@@ -279,13 +280,13 @@ TEST(a_swatch_opens_the_color_picker_and_closes_it)
     Window window;
     window.Page("mobs");
     window.Click("mobs-line-style-line-style-t-1");
-    window.Click("mobs-line-style-color-mobs1");
-    window.Click("mobs-line-style-color-mobs1-o-0");
-    window.Click("mobs-line-style-color-mobs1-swatch");
-    CHECK(window.Shows("mobs-line-style-color-mobs1-swatch-p-hex"));
+    window.Click("mobs-line-style-text-color-mobs1");
+    window.Click("mobs-line-style-text-color-mobs1-o-0");
+    window.Click("mobs-line-style-text-color-mobs1-swatch");
+    CHECK(window.Shows("mobs-line-style-text-color-mobs1-swatch-p-hex"));
     window.Frames(60);
-    window.Click("mobs-line-style-color-mobs1-swatch");
-    CHECK(!window.Shows("mobs-line-style-color-mobs1-swatch-p-hex"));
+    window.Click("mobs-line-style-text-color-mobs1-swatch");
+    CHECK(!window.Shows("mobs-line-style-text-color-mobs1-swatch-p-hex"));
 }
 
 TEST(rmlui_reads_every_page_of_both_themes_without_a_complaint)
@@ -306,12 +307,12 @@ TEST(auroras_window_works_as_phoenixs_does)
     Window window(MenuTheme::Aurora);
     window.Page("mobs");
     window.Click("mobs-line-style-line-style-t-1");
-    window.Click("mobs-line-style-color-mobs1");
-    CHECK(window.Click("mobs-line-style-color-mobs1-o-0"));
-    window.Click("mobs-line-style-color-mobs1-swatch");
-    CHECK(window.Shows("mobs-line-style-color-mobs1-swatch-p-hex"));
-    window.Click("mobs-line-style-color-mobs1-swatch");
-    CHECK(!window.Shows("mobs-line-style-color-mobs1-swatch-p-hex"));
+    window.Click("mobs-line-style-text-color-mobs1");
+    CHECK(window.Click("mobs-line-style-text-color-mobs1-o-0"));
+    window.Click("mobs-line-style-text-color-mobs1-swatch");
+    CHECK(window.Shows("mobs-line-style-text-color-mobs1-swatch-p-hex"));
+    window.Click("mobs-line-style-text-color-mobs1-swatch");
+    CHECK(!window.Shows("mobs-line-style-text-color-mobs1-swatch-p-hex"));
     CHECK_EQ(window.Said(), "");
 }
 
@@ -372,21 +373,21 @@ TEST(the_font_arrows_step_through_the_fonts_and_a_slider_follows_the_pointer)
 
     window.Page("entities");
     const int was = window.settings.nameRaise;
-    CHECK(window.Drag("entities-nameplate-style-vertical-offset", Rml::Vector2f(60.0f, 0.0f)));
+    CHECK(window.Drag("entities-nameplates-vertical-offset", Rml::Vector2f(60.0f, 0.0f)));
     CHECK(window.settings.nameRaise > was);
-    CHECK_EQ(window.TextOf("entities-nameplate-style-vertical-offset-val"), std::to_string(window.settings.nameRaise) + " px");
+    CHECK_EQ(window.TextOf("entities-nameplates-vertical-offset-val"), std::to_string(window.settings.nameRaise) + " px");
 }
 
 TEST(a_card_folds_on_its_title_and_a_switch_takes_a_click)
 {
     Window window;
-    CHECK(window.Shows("entities-nameplate-style-stack-names"));
-    CHECK(window.Click("entities-nameplate-style-stack-names"));
+    CHECK(window.Shows("entities-nameplates-stack-names"));
+    CHECK(window.Click("entities-nameplates-stack-names"));
     CHECK(window.settings.stackNames);
-    window.Click("entities-nameplate-style-head");
-    CHECK(!window.Shows("entities-nameplate-style-stack-names"));
-    window.Click("entities-nameplate-style-head");
-    CHECK(window.Shows("entities-nameplate-style-stack-names"));
+    window.Click("entities-nameplates-head");
+    CHECK(!window.Shows("entities-nameplates-stack-names"));
+    window.Click("entities-nameplates-head");
+    CHECK(window.Shows("entities-nameplates-stack-names"));
 }
 
 TEST(a_color_is_typed_into_the_pickers_hex_box)
@@ -396,8 +397,8 @@ TEST(a_color_is_typed_into_the_pickers_hex_box)
     ColorPick& pick = window.settings.Kind(PlateKind::Players).lines[0].color;
     pick            = ColorPick{ColorSource::Custom, ColorFromRgb(0xFFFFFF)};
     window.Frames(2);
-    window.Click("players-line-style-color-players0-swatch");
-    const std::string hex = "players-line-style-color-players0-swatch-p-hex";
+    window.Click("players-line-style-text-color-players0-swatch");
+    const std::string hex = "players-line-style-text-color-players0-swatch-p-hex";
     window.Click(hex);
     window.Key(Rml::Input::KI_END);
     window.Key(Rml::Input::KI_BACK, 6);
@@ -436,6 +437,7 @@ TEST(a_narrow_window_cuts_a_rows_label_and_keeps_its_controls_beside_it)
         CHECK(rows.size() > 4u);
         for (Rml::Element* row : rows)
         {
+            if (!row->IsVisible(true)) continue; // a setting of something switched off
             Rml::Element* label = row->GetChild(0);
             Rml::Element* controls = row->GetChild(1);
             CHECK(top(controls) < top(label) + height(label)); // beside the label, not under it
@@ -443,6 +445,26 @@ TEST(a_narrow_window_cuts_a_rows_label_and_keeps_its_controls_beside_it)
             CHECK(right(controls) <= right(row) + 0.5f);
         }
     }
+}
+
+TEST(a_font_list_holds_its_longest_name_whole_and_says_each_name_under_the_pointer)
+{
+    auto width = [](Rml::Element* element) { return element->GetBox().GetSize(Rml::BoxArea::Border).x; };
+    Window window;
+    window.settings.defaultFont = kLongFont;
+    window.Frames(2);
+    const std::string control = "entities-nameplates-default-font";
+    // The closed control cuts the name, and says it whole.
+    CHECK_EQ(window.Find(control)->GetAttribute<Rml::String>("tip", ""), kLongFont);
+    window.Click(control);
+    window.Frames(10);
+    Rml::Element* row = window.Find(control + "-o-3");
+    CHECK(row != nullptr && row->IsVisible(true));
+    CHECK_EQ(row->GetAttribute<Rml::String>("tip", ""), kLongFont);
+    CHECK_EQ(window.Find(control + "-o-0")->GetAttribute<Rml::String>("tip", ""), "Arial");
+    // The list is wider than its control, as wide as the name needs.
+    CHECK(width(window.Find("popup")) > width(window.Find(control)) + 20.0f);
+    CHECK(row->GetScrollWidth() <= row->GetClientWidth() + 0.5f);
 }
 
 TEST(a_tip_stays_on_the_screen_and_off_the_pointer)
@@ -494,7 +516,7 @@ TEST(a_list_drops_in_in_both_themes)
     {
         Window window(theme);
         window.Page("mobs");
-        window.Click("mobs-line-style-color-mobs0");
+        window.Click("mobs-line-style-text-color-mobs0");
         // A tenth of a second after the click it is still fading in, and a second later it is whole.
         const float early = window.Find("popup")->GetComputedValues().opacity();
         CHECK(early > 0.0f && early < 1.0f);
@@ -503,39 +525,53 @@ TEST(a_list_drops_in_in_both_themes)
     }
 }
 
-TEST(a_checkboxs_mark_grows_from_its_middle_and_auroras_knob_slides_across)
+TEST(a_toggles_knob_slides_across_its_track_in_both_themes)
 {
-    const std::string box = "entities-nameplate-style-stack-names";
-    auto near  = [](float value, float wanted) { return value > wanted - 0.5f && value < wanted + 0.5f; };
-    auto size  = [](Rml::Element* element) { return element->GetBox().GetSize(Rml::BoxArea::Border); };
-    auto left  = [](Rml::Element* mark) {
+    const std::string box = "entities-nameplates-stack-names";
+    auto size = [](Rml::Element* element) { return element->GetBox().GetSize(Rml::BoxArea::Border); };
+    auto left = [](Rml::Element* mark) {
         return mark->GetAbsoluteOffset(Rml::BoxArea::Border).x - mark->GetParentNode()->GetAbsoluteOffset(Rml::BoxArea::Border).x;
     };
+    for (const MenuTheme theme : {MenuTheme::Phoenix, MenuTheme::Aurora})
     {
-        // Phoenix: no mark while off; on, it is half the box wide, a quarter in from its left.
-        Window window(MenuTheme::Phoenix);
-        const float side = size(window.Find(box)).x;
-        CHECK_EQ(size(window.Find(box)->GetChild(0)).x, 0.0f);
+        Window window(theme);
+        Rml::Element* track = window.Find(box);
+        // Much wider than tall, with its knob at the left end while off.
+        const float width = size(track).x, height = size(track).y, knob = size(track->GetChild(0)).x;
+        CHECK(width > 2.0f * height && knob > 0.0f && knob < height);
+        const float inset = left(track->GetChild(0));
+        CHECK(inset > 0.0f && inset < knob);
         CHECK(window.Click(box));
-        // On its way it grows a little past its size and comes back.
-        float most = 0.0f;
-        for (int frame = 0; frame < 8; ++frame)
-        {
-            most = std::max(most, size(window.Find(box)->GetChild(0)).x);
-            window.Frames();
-        }
-        CHECK(most > side / 2.0f + 0.5f);
-        Rml::Element* mark = window.Find(box)->GetChild(0);
-        CHECK(near(size(mark).x, side / 2.0f) && near(size(mark).y, side / 2.0f) && near(left(mark), side / 4.0f));
+        const float early = left(window.Find(box)->GetChild(0));
+        CHECK(early > inset + 0.5f && early < width - knob - inset - 0.5f); // on its way
+        window.Frames(30);
+        const float end = left(window.Find(box)->GetChild(0));
+        CHECK(end > width - knob - inset - 0.5f && end < width - knob - inset + 0.5f);
+        // It stands in the middle of the controls' column: under the middle of the slider above it.
+        auto middle = [](Rml::Element* element) {
+            return element->GetAbsoluteOffset(Rml::BoxArea::Border).x + element->GetBox().GetSize(Rml::BoxArea::Border).x / 2.0f;
+        };
+        const float off = middle(window.Find(box)) - middle(window.Find("entities-nameplates-vertical-offset"));
+        CHECK(off > -1.0f && off < 1.0f);
     }
-    // Aurora: a track 2.6 em long and a knob of 1 em, 0.15 em from the track's left while off and 1.45 em while on.
-    Window window(MenuTheme::Aurora);
-    const float em = size(window.Find(box)).x / 2.6f;
-    CHECK(near(size(window.Find(box)->GetChild(0)).x, em) && near(left(window.Find(box)->GetChild(0)), 0.15f * em));
-    CHECK(window.Click(box));
-    const float early = left(window.Find(box)->GetChild(0));
-    CHECK(early > 0.15f * em + 0.5f && early < 1.45f * em - 0.5f);
-    window.Frames(30);
-    Rml::Element* knob = window.Find(box)->GetChild(0);
-    CHECK(near(size(knob).x, em) && near(size(knob).y, em) && near(left(knob), 1.45f * em));
+}
+
+TEST(a_setting_of_something_switched_off_is_not_shown)
+{
+    Window window;
+    const std::string least = "entities-nameplates-min-size", cursor = "entities-target-cursor-size";
+    CHECK(window.Shows(least) && window.Shows(cursor));
+    // Its own switch stays, to turn it back on.
+    CHECK(window.Click("entities-nameplates-scale-with-distance"));
+    CHECK(!window.settings.scaleWithDistance && !window.Shows(least) && window.Shows("entities-nameplates-scale-with-distance"));
+    CHECK(!window.Shows(least + "-label-row")); // its row with it, label and all
+    CHECK(window.Click("entities-target-cursor-on"));
+    CHECK(!window.Shows(cursor) && window.Shows("entities-target-cursor-on"));
+    CHECK(window.Click("entities-nameplates-scale-with-distance"));
+    CHECK(window.Shows(least));
+    // A card of what is off is gone whole.
+    CHECK(window.Shows("entities-colors-aggression-head"));
+    window.settings.enabled = false;
+    window.Frames(2);
+    CHECK(!window.Shows("entities-colors-aggression-head") && !window.Shows(least));
 }

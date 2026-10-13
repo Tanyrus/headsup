@@ -61,15 +61,14 @@ namespace headsup
     std::optional<ClockZone> ClockZoneOfChoice(int choice);
     std::string ClockZoneChoiceName(int choice);
 
-    struct Settings;
-    // A size slider's format: its percent, then the pixels that percent of the base size is drawn at before the
-    // distance scale, as "%d%% (13 px)".
-    std::string SizeFormat(const Settings& settings, int percent);
-
     constexpr const char* kShowAlways = "Always";
     // What the Show dropdown reads when closed: Always, the one condition checked, how many are, or Never. Only the
     // conditions the kind is offered count.
     std::string ShowSummary(const LineShow& show, const std::vector<ShowCondition>& offered);
+    // A click on the Line Visibility list's row: 0 is Always, then the conditions offered. Under Always every
+    // condition reads checked, so unchecking one turns Always off and leaves the others checked. False for no such
+    // row.
+    bool ToggleCondition(LineShow& show, const std::vector<ShowCondition>& offered, int row);
 
     // A name typed into the Friends card as it joins the list: trimmed. Nothing when it is no character's name or
     // is there already in any case.
@@ -120,4 +119,5 @@ namespace headsup
     int SyncEntry(const std::vector<int>& targets, int syncWith);
     int SyncOfEntry(const std::vector<int>& targets, int entry);
     std::string SyncEntryLabel(const std::vector<int>& targets, int entry);
+    std::string SyncEntryTip(const std::vector<int>& targets, int entry);
 }
