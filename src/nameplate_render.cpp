@@ -576,30 +576,7 @@ namespace headsup
                 shown.lines[line].y -= p.rise;
         }
 
-        // A lone cursor is drawn at exactly its own size and on top: there is no name to scale by or to sit behind walls with.
-        if (NameplatesOn(settings) && !m_NamesFailed && m_Device != nullptr)
-        {
-            std::vector<uint16_t> withNameplateCursor;
-            for (const CursorName& c : m_CursorNames)
-                withNameplateCursor.push_back(c.index);
-            for (const LoneCursor& lone : LoneCursors(targets, settings, withNameplateCursor))
-            {
-                Plate& p                = m_Plates[lone.index];
-                p.frame                 = m_Frame;
-                const float cursorShown = static_cast<float>(settings.cursorSize) * toY;
-                p.cursorRaster          = FixedRasterHeight(cursorShown);
-                PlateTexture& cursor = lone.under ? p.cursorUnder : p.cursor;
-                if (!PrepareCursor(cursor, CursorColor(lone.target, settings), p.cursorRaster, settings)) break;
-                const float fit     = FitOf(cursorShown, cursor.raster);
-                const float height  = cursor.height * fit / toY;
-                const CursorSpot at = CursorAtAnchor(lone.x, lone.y, cursor.width * fit / toY, height, cursor.tip);
-                const CursorSpot kept = KeepOnScreen(CursorSpot{at.x, at.y + CursorBob(now, height)},
-                    cursor.width * fit / toY, height, screenWidth, screenHeight);
-                addSquare(cursorQuads, cursor, kept.x, kept.y, fit, 0.0f);
-                m_CursorNames.push_back(CursorName{lone.index, ScreenBox{}});
-            }
-        }
-
+        m_PlateCursors = m_CursorNames.size();
         std::stable_sort(m_Quads.begin(), m_Quads.end(),
             [](const Quad& a, const Quad& b) { return DrawnBefore(a.rank, a.gpu.depth, b.rank, b.gpu.depth); });
         m_Quads.insert(m_Quads.end(), cursorQuads.begin(), cursorQuads.end());
@@ -617,6 +594,45 @@ namespace headsup
         for (PlateTexture& badge : m_Badges.TakeIdle(m_Frame, kIdleFrames))
             ReleaseTexture(badge.texture);
         m_Gdi.Sweep();
+    }
+
+    std::vector<LoneCursor> NameplateRenderer::LoneCursorsDue(const Settings& settings, const CursorTargets& targets,
+        float screenWidth, float screenHeight) const
+    {
+        if (!NameplatesOn(settings) || m_NamesFailed || m_Device == nullptr) return {};
+        std::vector<uint16_t> withNameplateCursor;
+        for (size_t i = 0; i < m_PlateCursors; ++i)
+            withNameplateCursor.push_back(m_CursorNames[i].index);
+        std::vector<LoneCursor> lone = LoneCursors(targets, settings, withNameplateCursor);
+        std::erase_if(lone, [&](const LoneCursor& c) { return !AnchorOnScreen(c.x, c.y, screenWidth, screenHeight); });
+        return lone;
+    }
+
+    void NameplateRenderer::DrawLoneCursors(const std::vector<LoneCursor>& lone, const Settings& settings, double now,
+        float screenWidth, float screenHeight)
+    {
+        m_CursorNames.resize(m_PlateCursors);
+        const float shown = static_cast<float>(settings.cursorSize);
+        std::vector<GpuQuad> quads;
+        for (const LoneCursor& cursor : lone)
+        {
+            PlateTexture& t = cursor.under ? m_LoneCursorUnder : m_LoneCursor;
+            if (!PrepareCursor(t, CursorColor(cursor.target, settings), FixedRasterHeight(shown), settings)) break;
+            if (t.unfit) continue;
+            const float fit       = FitOf(shown, t.raster);
+            const float width     = t.width * fit, height = t.height * fit;
+            const CursorSpot at   = CursorAtAnchor(cursor.x, cursor.y, width, height, t.tip);
+            const CursorSpot kept = KeepOnScreen(CursorSpot{at.x, at.y + CursorBob(now, height)}, width, height, screenWidth,
+                screenHeight);
+            const SquareQuad q = PlaceSquarePixels(kept.x, kept.y, t.width, t.height, t.halo, fit, 1.0f, 1.0f);
+            quads.push_back(GpuQuad{t.texture, std::round(q.x), std::round(q.y), q.width, q.height, 0.0f, t.u, t.v, 0.0f, kWhite});
+            m_CursorNames.push_back(CursorName{cursor.index, ScreenBox{}});
+        }
+        if (quads.empty()) return;
+        SetQuadStates(m_Device, false);
+        for (const GpuQuad& quad : quads)
+            DrawQuad(m_Device, quad, false);
+        m_Device->SetTexture(0, nullptr);
     }
 
     void NameplateRenderer::ReleaseLine(LineTextures& line)
@@ -645,6 +661,7 @@ namespace headsup
         m_Quads.clear();
         m_Shown.clear();
         m_CursorNames.clear();
+        m_PlateCursors = 0;
     }
 
     void NameplateRenderer::ReleasePlates()
@@ -652,6 +669,8 @@ namespace headsup
         for (auto& [index, plate] : m_Plates)
             ReleasePlate(plate);
         m_Plates.clear();
+        ReleaseTexture(m_LoneCursor.texture);
+        ReleaseTexture(m_LoneCursorUnder.texture);
         for (PlateTexture& badge : m_Badges.TakeAll())
             ReleaseTexture(badge.texture);
         m_Gdi.Release();

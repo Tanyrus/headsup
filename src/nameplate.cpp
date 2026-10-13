@@ -67,6 +67,11 @@ namespace headsup
         return lone;
     }
 
+    bool AnchorOnScreen(float x, float y, float screenWidth, float screenHeight)
+    {
+        return x > 0.0f && y > 0.0f && x < screenWidth && y < screenHeight;
+    }
+
     CursorSpot CursorAtAnchor(float anchorX, float anchorY, float width, float height, float tip)
     {
         return CursorSpot{anchorX - width * tip, anchorY - height};
