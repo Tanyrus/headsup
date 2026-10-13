@@ -31,6 +31,8 @@ namespace headsup
         // under it keep their places, but drawn and clicked as nothing.
         void Update(const BarState& state, const Settings& settings, float screenWidth, float screenHeight,
             BarInput& input, bool hidden);
+        // Lets go of everything it made and draws nothing, leaving input alone: while another renderer draws the bar.
+        void Off();
         // The bar on the back buffer, after the nameplates. Changes render states.
         void Draw();
         // The open popup, as an ImGui window in its tooltip layer: Ashita draws ImGui after every plugin has drawn, and

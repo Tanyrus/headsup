@@ -4,6 +4,7 @@
 #include "bar_server_time.h"
 #include "plate_settings.h"
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -89,6 +90,24 @@ namespace headsup
         char text[kMaxTemplate + 1] = {};
         size_t caret                = kMaxTemplate;
         bool typing                 = false;
+    };
+
+    // The "Add a key" button's wait for a key: those held when it was pressed do not count.
+    struct KeyCapture
+    {
+        bool on = false;
+        std::vector<uint8_t> held;
+    };
+
+    // A kind page's own state, begun anew when another kind's page opens: the line last typed in, which takes a
+    // clicked tag, the three lines' boxes, the Line Style tab that is open and the name being typed for Friends.
+    struct DesignEditor
+    {
+        PlateKind kind = PlateKind::Mobs;
+        int line       = 0;
+        int styleTab   = 0;
+        LineDraft drafts[kPlateLines] = {};
+        char friendName[kMaxCharacterName + 1] = {};
     };
 
     // A font dropdown lists unset first, when it has one, a word that stands for an empty name, then the fonts. A

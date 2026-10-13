@@ -10,11 +10,6 @@ namespace headsup
     }
     std::string TitleCase(const char* text) { return TitleCase(text, text + std::strlen(text)); }
 
-    bool MenuFontInstalled(const MenuFont& font)
-    {
-        return font.file == nullptr || GetFileAttributesA(WindowsFontPath(font.file).c_str()) != INVALID_FILE_ATTRIBUTES;
-    }
-
     void ApplyPhoenixStyle(ImGuiStyle& s, float em)
     {
         ImVec4* c                        = s.Colors;

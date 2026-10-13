@@ -9,6 +9,7 @@
 #include "fonts.h"
 #include "icons.h"
 #include "ini_text.h"
+#include "menu_document.h"
 #include "menu_fonts.h"
 #include "native_locate.h"
 #include "plate_settings.h"
@@ -43,6 +44,7 @@ namespace headsup
     constexpr int kMinOpacity = 10, kMaxOpacity = 100; // percent
 
     constexpr int kMinMenuScale = 70, kMaxMenuScale = 160; // percent
+    constexpr int kMaxMenuSide  = 16384; // pixels: more than any screen is across
 
     constexpr int kMaxHelpBarOffset = 4000; // pixels either way
 
@@ -78,6 +80,10 @@ namespace headsup
         bool helpBarBackground = true;           // off, the help text alone
         std::string menuFont = kDefaultMenuFont; // the settings window's text, by its kMenuFonts name
         int menuScale        = 100;              // percent: the settings window's text and everything sized by it
+        MenuTheme menuTheme  = MenuTheme::Phoenix;
+        // Where the player left the settings window, in pixels; no width for one never moved, which opens in the
+        // screen's middle.
+        int menuX = 0, menuY = 0, menuWidth = 0, menuHeight = 0;
         bool barTargetDetails = false; // a mob's icons after its name and its weaknesses after its level
         std::array<bool, kBarWidgetCount> barSecondLine = AllOn(); // by BarWidget: its second line
         std::array<bool, kBarWidgetCount> barIcons      = AllOn(); // by BarWidget: its icons and gil's coin

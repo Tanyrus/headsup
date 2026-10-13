@@ -276,6 +276,11 @@ namespace headsup
         return std::string(windows, length < MAX_PATH ? length : 0) + "\\Fonts\\" + file;
     }
 
+    bool MenuFontInstalled(const MenuFont& font)
+    {
+        return font.file == nullptr || GetFileAttributesA(WindowsFontPath(font.file).c_str()) != INVALID_FILE_ATTRIBUTES;
+    }
+
     bool Menu::OpenPage(const std::string& name)
     {
         const std::optional<Page> page = PageNamed(name);

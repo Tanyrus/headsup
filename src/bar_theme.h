@@ -20,6 +20,7 @@ namespace headsup
         uint32_t stripTop, stripMiddle, stripBottom; // the strip's gradient: top, 55% down, bottom
         uint32_t bottomLine, underLine, below;       // the strip's last row, one row under it, and what fades below
         uint32_t accent;                             // diamonds, frames, the pin mark, the target's border
+        uint32_t accentEnd;                          // what the accent runs into where it is a gradient
         uint32_t pill, pillBorder;
         uint32_t title, subtitle, divider;
         uint32_t panelTop, panelBottom, panelBorder, panelOuter;
@@ -52,6 +53,7 @@ namespace headsup
         float popupPadding; // 0.36 H, following the popup's text size
         float rowGap;       // 0.11 H between popup rows, following the popup's text size
         float panelRadius;  // ornate 0.11 H, pills 0.28 H, following the popup's text size
+        bool operator==(const BarMetrics&) const = default;
     };
     BarMetrics MetricsFor(int barHeight, BarShape shape, int barText = kAutoBarTextSize,
         int popupText = kAutoPopupTextSize);

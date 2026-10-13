@@ -16,6 +16,17 @@ namespace headsup
         constexpr float kCoinScale       = 0.75f; // gil's coin, in icons
         constexpr float kFrameRadius     = 3.0f;  // the ornate target frame and hover tint
         constexpr int kLitTarget         = 2;     // a hovered ornate target's tint, in hover tints' alpha
+        constexpr float kProgressShare   = 0.05f; // of the bar's height, for a widget's progress bar
+        constexpr float kLeastProgress   = 2.0f;
+        constexpr float kBesideWidth     = 2.0f;  // a bar beside the text: this many bar heights long
+        constexpr float kBesideShare     = 0.14f; // and this tall, of the bar's height
+        constexpr float kHelpBarShare    = 0.5f;   // of the screen's width, the widest the help bar gets
+        constexpr float kHelpBarMinWidth = 320.0f; // or this on a narrow screen
+        constexpr float kHelpPadShare    = 0.5f;   // of the gap: clear above and below the help bar's row
+        constexpr int kOuterGap          = 2;          // an ornate popup's outer border
+        constexpr uint32_t kCardFill     = 0x12FFFFFF; // a popup's section card: white over the panel, faintly
+        constexpr uint32_t kCardEdge     = 0x1EFFFFFF;
+        constexpr float kCardRadius      = 6.0f;
         // The pills' section headings' letter-spacing, in their size: the approved mockup's 1.2 px at 10.5 px.
         constexpr float kHeadingTracking = 1.2f / 10.5f;
 
@@ -123,6 +134,54 @@ namespace headsup
     }
 
     int CoinPixels(const BarMetrics& metrics) { return WholePixels(metrics.icon * kCoinScale); }
+
+    float ProgressHeight(const BarMetrics& metrics, bool beside)
+    {
+        return std::max(kLeastProgress, std::round(metrics.height * (beside ? kBesideShare : kProgressShare)));
+    }
+
+    float BesideWidth(const BarMetrics& metrics) { return std::round(metrics.height * kBesideWidth); }
+
+    float UnderLine(const BarPalette& palette) { return palette.underLine != 0 ? 1.0f : 0.0f; }
+    float BarBottom(const BarPalette& palette, const BarMetrics& metrics) { return metrics.height + UnderLine(palette); }
+    float HelpBarTop(const BarPalette& palette, const BarMetrics& metrics)
+    {
+        return BarBottom(palette, metrics) + std::round(metrics.gap);
+    }
+    float HelpBarLeft(const BarMetrics& metrics) { return std::round(metrics.gap); }
+    float HelpBarPad(const BarMetrics& metrics) { return std::round(metrics.gap * kHelpPadShare); }
+    TextFace HelpFace(const BarLook& look) { return TextFace{look.detailFont, static_cast<float>(look.lines.title)}; }
+    float HelpBarWidth(float screenWidth)
+    {
+        return std::min(screenWidth, std::max(kHelpBarMinWidth, std::floor(screenWidth * kHelpBarShare)));
+    }
+
+    BoxStyle PopupPanel(const BarLook& look)
+    {
+        const BarPalette& p = look.palette;
+        return BoxStyle{.radius = look.metrics.panelRadius, .top = p.panelTop, .bottom = p.panelBottom,
+            .border = p.panelBorder, .outer = p.panelOuter, .outerGap = kOuterGap};
+    }
+
+    BoxStyle PopupCard(const BarLook& look)
+    {
+        return BoxStyle{.radius = std::max(look.metrics.panelRadius, kCardRadius), .top = kCardFill, .bottom = kCardFill,
+            .border = kCardEdge};
+    }
+
+    BoxStyle PopupTag(const BarLook& look, float height)
+    {
+        const BarPalette& p = look.palette;
+        return BoxStyle{.radius = height / 2.0f, .top = p.tagFill, .bottom = p.tagFill,
+            .border = look.ornate ? p.tagBorder : 0u};
+    }
+
+    BoxStyle HelpBarPanel(const BarLook& look)
+    {
+        const BarPalette& p = look.palette;
+        return BoxStyle{.radius = look.metrics.panelRadius, .top = p.panelTop, .bottom = p.panelBottom,
+            .border = p.panelBorder};
+    }
 
     std::optional<BarPoint> CenteredInk(const BarRect& box, const InkBox& ink, float margin)
     {

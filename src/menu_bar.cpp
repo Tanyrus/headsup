@@ -2,6 +2,7 @@
 
 #include "bar_theme.h"
 #include "menu_state.h"
+#include "menu_text.h"
 #include "menu_ui.h"
 #include "native_locate.h"
 
@@ -17,52 +18,6 @@ namespace headsup
 {
     namespace
     {
-        const char* const kBarWidgetLabels[] = {"Zone", "Weather", "Vana'diel", "Target", "Gil",
-            "Bags", "Clock", "Game help", "FPS", "Job", "Connection", "Party", "Signet", "Distance"};
-        const char* const kBarWidgetTips[] = {
-            "The zone, its region and who holds it. Hover for the influence there and the conquest tally.",
-            "The weather now and today's chance of it. Hover for the forecast.",
-            "The Vana'diel day, time and moon.",
-            "Your target's name, level and con. Hover a mob for its details.",
-            "Gil, or another currency. Hover for every currency.",
-            "How full your inventory is. Hover for every bag.",
-            "Your computer's time, or another time zone's, over the server's if you like. Hover for the daily reset and "
-            "conquest tally.",
-            "The game's help text, in a bar of its own under the top panel.",
-            "Frames per second. Hover for frame times.",
-            "Jobs, levels and EXP to the next level, with a bar. Hover for EXP per hour.",
-            "Bytes sent and received each second; amber or red when data stops. Hover for latency.",
-            "Party size and the lowest HP and MP. Hover for each member.",
-            "Time left on Signet or Sanction, while one is on.",
-            "How far your target is, in yalms."};
-        static_assert(std::size(kBarWidgetLabels) == kBarWidgetCount && std::size(kBarWidgetTips) == kBarWidgetCount);
-        const char* const kBarSectionLabels[] = {"Left", "Center", "Right"};
-        static_assert(std::size(kBarSectionLabels) == kBarSectionCount);
-        constexpr const char* kThemeFont = "Theme's"; // a bar font left to its theme
-        constexpr int kWidgetTabRows     = 2;
-
-        // Which widgets have a second line, or icons, for their options to offer switching off.
-        bool HasSecondLine(BarWidget w)
-        {
-            return w != BarWidget::EarthTime && w != BarWidget::Fps && w != BarWidget::Connection &&
-                   w != BarWidget::Distance && w != BarWidget::GameHelp;
-        }
-        bool HasIcons(BarWidget w) { return w == BarWidget::Weather || w == BarWidget::Target || w == BarWidget::Gil; }
-
-        // The game's windows HeadsUp moves out from under the help bar, and those it has seen there.
-        // Whether text holds part, in any case.
-        bool Matches(std::string_view text, const char* part)
-        {
-            const std::string_view p(part);
-            if (p.empty()) return true;
-            const auto lower = [](char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); };
-            for (size_t at = 0; at + p.size() <= text.size(); ++at)
-                if (std::equal(p.begin(), p.end(), text.begin() + static_cast<std::ptrdiff_t>(at),
-                        [&](char a, char b) { return lower(a) == lower(b); }))
-                    return true;
-            return false;
-        }
-
         void DrawMovedWindows(Ui& ui, Settings& s, const MenuStatus& status, WindowList& list)
         {
             ui.Switch("Every Window", s.allUnderBar, "Every window that opens under the bar goes below it, not only those "
@@ -181,13 +136,6 @@ namespace headsup
             }
         }
 
-        // A window as the menu names it: HeadsUp's name for it, or the game's.
-        std::string WindowName(const std::string& window)
-        {
-            const char* label = WindowLabel(window);
-            return label != nullptr ? label : window;
-        }
-
         // Each group: its name to type, its Under Bar switch and offset, a remove button, then its windows as chips a
         // click takes out and a dropdown that adds one no group has.
         void DrawWindowGroups(Ui& ui, Settings& s)
@@ -281,18 +229,6 @@ namespace headsup
                     WindowGroup{"Group " + std::to_string(s.windowGroups.size() + 1), 0, 0, false, {}});
                 ui.changed = true;
             }
-        }
-
-        // The section a widget is in, and where.
-        std::pair<int, size_t> PlaceOf(const BarPlacement& placement, BarWidget widget)
-        {
-            for (int section = 0; section < kBarSectionCount; ++section)
-            {
-                const std::vector<BarWidget>& list = placement[section];
-                if (const auto at = std::ranges::find(list, widget); at != list.end())
-                    return {section, static_cast<size_t>(at - list.begin())};
-            }
-            return {0, 0};
         }
 
         // Left, Center and Right as trays sunk into the card, each holding its widgets as raised chips in bar order:

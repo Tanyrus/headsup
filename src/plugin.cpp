@@ -1,6 +1,7 @@
 #include "Ashita.h"
 
 #include "bar_connection.h"
+#include "bar_document.h"
 #include "bar_fps.h"
 #include "bar_job.h"
 #include "bar_render.h"
@@ -23,6 +24,9 @@
 #include "player_status.h"
 #include "pointer_keys.h"
 #include "pointer_swap.h"
+#include "rml_bar.h"
+#include "rml_host.h"
+#include "rml_menu.h"
 #include "settings.h"
 #include "shot_watch.h"
 #include "tracker.h"
@@ -39,6 +43,8 @@
 #include <cctype>
 #include <chrono>
 #include <cstring>
+#include <deque>
+#include <mutex>
 #include <unordered_map>
 #include <cstdio>
 #include <ctime>
@@ -107,6 +113,7 @@ namespace
     float g_BarScaleX               = 1.0f; // back-buffer pixels per client pixel
     float g_BarScaleY               = 1.0f;
     IResourceManager* g_Resources   = nullptr; // for the target popup's drops, from Initialize to Release
+    headsup::RmlHost* g_Rml         = nullptr; // for OnMouse and OnKeyboard, from Initialize to Release
 
     // The device Ashita gives plugins is Direct3D's own, under Ashita's wrapper: its Present runs after Ashita has
     // drawn ImGui, every addon's windows included, so what HeadsUp draws there is over all of them.
@@ -142,15 +149,18 @@ namespace
 
     BOOL __stdcall OnMouse(uint32_t message, WPARAM wParam, LPARAM lParam, bool blocked)
     {
+        const float x = static_cast<float>(static_cast<int16_t>(LOWORD(lParam))) * g_BarScaleX;
+        const float y = static_cast<float>(static_cast<int16_t>(HIWORD(lParam))) * g_BarScaleY;
+        // RmlUi's overlay lies over every window: what it takes, nothing under it sees.
+        const bool overRml = !blocked && g_Rml != nullptr && g_Rml->Running() &&
+                             g_Rml->Mouse(message, x, y, static_cast<int16_t>(HIWORD(wParam)));
         // An Ashita window takes the mouse. Asked only when read: the bar ignores it while off or for blocked messages.
-        const bool overGui =
-            ((g_BarOn && !g_BarHidden && !blocked) || g_SyncClicks) && g_Gui != nullptr && g_Gui->GetIO().WantCaptureMouse;
-        if (g_BarClicks != nullptr)
-        {
-            const float x = static_cast<float>(static_cast<int16_t>(LOWORD(lParam))) * g_BarScaleX;
-            const float y = static_cast<float>(static_cast<int16_t>(HIWORD(lParam))) * g_BarScaleY;
-            if (g_BarClicks->Take(message, static_cast<uint32_t>(wParam), x, y, g_BarOn && !g_BarHidden, overGui, blocked)) return TRUE;
-        }
+        const bool overGui = overRml || (((g_BarOn && !g_BarHidden && !blocked) || g_SyncClicks) && g_Gui != nullptr &&
+                                            g_Gui->GetIO().WantCaptureMouse);
+        if (g_BarClicks != nullptr &&
+            g_BarClicks->Take(message, static_cast<uint32_t>(wParam), x, y, g_BarOn && !g_BarHidden, overGui, blocked))
+            return TRUE;
+        if (overRml) return TRUE;
         if (!g_SyncClicks) return FALSE;
         // The game takes a click where its pointer last was, which is somewhere else after the mouse moved over another
         // window: a mouse move to the click's place goes first.
@@ -159,6 +169,14 @@ namespace
         // The game hides its pointer for typing until it sees the mouse move, which it never does over an Ashita window.
         if (message == WM_MOUSEMOVE && overGui) headsup::PointerFix::RevealUnderWindow();
         return FALSE;
+    }
+
+    // Ashita's keyboard hook: wParam the virtual key, lParam the message's flags, whose top bit says the key went up.
+    constexpr uint32_t kKeyUpFlag = 0x80000000;
+    BOOL __stdcall OnKeyboard(WPARAM wParam, LPARAM lParam, bool blocked)
+    {
+        if (blocked || g_Rml == nullptr || !g_Rml->Running()) return FALSE;
+        return g_Rml->Key(static_cast<uint32_t>(wParam), (static_cast<uint32_t>(lParam) & kKeyUpFlag) == 0) ? TRUE : FALSE;
     }
 }
 
@@ -187,6 +205,12 @@ class HeadsUp final : public IPlugin
     headsup::NameplateRenderer m_Nameplates;
     headsup::BarRenderer m_Bar;
     headsup::BarInput m_BarInput;
+    headsup::RmlHost m_Rml;
+    headsup::RmlBar m_RmlBar;
+    bool m_RmlBarOn                  = true; // RmlUi draws the top panel; /hu rml bar gives it back to the quads
+    headsup::RmlMenu m_RmlMenu;
+    bool m_RmlMenuOn                 = true; // RmlUi draws the settings window; /hu rml menu gives it back to ImGui
+    bool m_RmlTried                  = false;
     headsup::BarClicks m_BarClicks{m_BarInput};
     bool m_BarDrawn = false; // this frame
     headsup::PointerSwap m_Pointer;
@@ -225,6 +249,8 @@ class HeadsUp final : public IPlugin
     headsup::PlayerJobs m_OwnJobs;                                // yours as the game has them, this frame
     bool m_DebugPending = false;
     bool m_Screenshot = false;
+    std::mutex m_CommandLock;
+    std::vector<std::string> m_Commands; // /hu lines as they came, until the frame that runs them
     headsup::ShotWatch m_Shot;
     headsup::KeyPress m_ShotKey;
     bool m_SceneCopied      = false; // this frame: the first draw to cover the back buffer came
@@ -238,6 +264,16 @@ class HeadsUp final : public IPlugin
 #ifdef HEADSUP_DEV
     headsup::DrawDump m_DrawDump;
     headsup::PointerWatch m_PointerWatch;
+    // Input played into HeadsUp's own mouse and keyboard handlers as Ashita would hand it over, a step a frame:
+    // what /hu play queued, for trying the windows where no real pointer is.
+    struct PlayedInput
+    {
+        bool key;
+        uint32_t message;
+        WPARAM wParam;
+        LPARAM lParam;
+    };
+    std::deque<PlayedInput> m_Played;
 #endif
     bool m_Drawing      = false; // drawing nameplates: our own draws come back through the hooks
     bool m_DrewInScene  = false; // this frame
@@ -307,6 +343,8 @@ public:
         g_Gui       = core->GetGuiManager();
         g_BarClicks = &m_BarClicks;
         core->GetInputManager()->GetMouse()->AddCallback(kName, OnMouse);
+        core->GetInputManager()->GetKeyboard()->AddCallback(kName, nullptr, nullptr, OnKeyboard);
+        g_Rml = &m_Rml;
         return true;
     }
 
@@ -315,6 +353,8 @@ public:
         if (m_SettingsChangedAt || m_SavedKeys.Unwritten()) SaveSettings();
         SetScreenshot(false);
         m_AshitaCore->GetInputManager()->GetMouse()->RemoveCallback(kName);
+        m_AshitaCore->GetInputManager()->GetKeyboard()->RemoveCallback(kName);
+        g_Rml = nullptr;
         g_SyncClicks = false;
         g_Gui        = nullptr;
         g_Resources  = nullptr;
@@ -328,6 +368,9 @@ public:
         UnhookPresent();
         g_Plugin = nullptr;
         m_Bar.Release();
+        m_RmlBar.Release();
+        m_RmlMenu.Close();
+        m_Rml.Stop();
         // After the renderers, which hold fonts made from these until they release.
         for (HANDLE handle : m_LoadedFonts)
             RemoveFontMemResourceEx(handle);
@@ -358,9 +401,28 @@ public:
         if (command == nullptr) return false;
         const std::vector<std::string> args = headsup::SplitLower(command);
         if (args.empty() || (args[0] != "/headsup" && args[0] != "/hu")) return false;
+        // A queued command (a script's, another plugin's) comes on a thread of Ashita's, not the game's: what it
+        // does waits for the next frame, on the thread everything else here runs on.
+        const std::lock_guard lock(m_CommandLock);
+        m_Commands.emplace_back(command);
+        return true;
+    }
 
+    void RunCommands()
+    {
+        std::vector<std::string> commands;
+        {
+            const std::lock_guard lock(m_CommandLock);
+            commands.swap(m_Commands);
+        }
+        for (const std::string& command : commands)
+            RunCommand(headsup::SplitLower(command.c_str()), command.c_str());
+    }
+
+    void RunCommand(const std::vector<std::string>& args, [[maybe_unused]] const char* command)
+    {
         if (args.size() == 1)
-            m_Menu.open = !m_Menu.open;
+            MenuOpen() = !MenuOpen();
         else if (args[1] == "on" || args[1] == "off")
         {
             m_Settings.enabled = args[1] == "on";
@@ -371,6 +433,30 @@ public:
             SetScreenshot(!m_Screenshot);
         else if (args[1] == "debug")
             m_DebugPending = true;
+        else if (args[1] == "rml")
+        {
+            if (!m_Rml.Running())
+                Print("RmlUi is not running.");
+            else if (args.size() > 2 && args[2] == "debug")
+                m_Rml.SetDebugger(!m_Rml.DebuggerVisible());
+            else if (args.size() > 2 && args[2] == "bar")
+            {
+                m_RmlBarOn = !m_RmlBarOn;
+                Print(m_RmlBarOn ? "RmlUi draws the top panel." : "The quads draw the top panel.");
+            }
+            else if (args.size() > 2 && args[2] == "menu")
+            {
+                // The window stays open, or closed, across the switch.
+                const bool open  = MenuOpen();
+                MenuOpen()       = false;
+                m_RmlMenuOn      = !m_RmlMenuOn;
+                MenuOpen()       = open;
+                Print(m_RmlMenuOn ? "RmlUi draws the settings window." : "ImGui draws the settings window.");
+            }
+            else
+                Print("/hu rml bar and /hu rml menu switch the top panel and the settings window between RmlUi and what "
+                      "drew them before; /hu rml debug opens RmlUi's debugger.");
+        }
         else if (args[1] == "popup" && args.size() > 2)
         {
             // Pins a widget's popup by the name the settings file gives it, in lower case, or none.
@@ -404,16 +490,24 @@ public:
         }
         else if (args[1] == "menu" && args.size() > 2)
         {
-            if (!m_Menu.OpenPage(args[2]))
+            if (!(RmlDrawsMenu() ? m_RmlMenu.OpenPage(args[2]) : m_Menu.OpenPage(args[2])))
                 Print("/hu menu: no page is named " + args[2] + ".");
 #ifdef HEADSUP_DEV
             // A number last scrolls the page that many pixels down.
             char* end          = nullptr;
             const float pixels = std::strtof(args.back().c_str(), &end);
-            if (args.size() > 3 && end != args.back().c_str() && *end == '\0') m_Menu.ScrollTo(pixels);
+            if (args.size() > 3 && end != args.back().c_str() && *end == '\0')
+            {
+                if (RmlDrawsMenu())
+                    m_RmlMenu.ScrollTo(pixels);
+                else
+                    m_Menu.ScrollTo(pixels);
+            }
 #endif
         }
 #ifdef HEADSUP_DEV
+        else if (args[1] == "play")
+            Play(args, command);
         else if (args[1] == "drawdump")
             Print(m_DrawDump.Start(args.size() > 2 ? args[2] : "", Now(), m_AshitaCore, OwnFolder(kLogsFolder)));
         else if (args[1] == "codedump")
@@ -448,7 +542,6 @@ public:
             Print("/hu stripdump: write the game's top-strip text, every level, to logs/headsup");
 #endif
         }
-        return true;
     }
 
     // HeadsUp only reads packets: every one still reaches the game.
@@ -491,11 +584,21 @@ public:
         UNREFERENCED_PARAMETER(window);
         UNREFERENCED_PARAMETER(dirty);
         MeasureFrame();
+        RunCommands();
 #ifdef HEADSUP_DEV
         if (m_DrawDump.NextFrame(Now(), m_Names, m_NameHook, m_Tracker, m_Nameplates)) WriteDrawDump();
         if (headsup::NameDumpReady()) WriteNameDump();
         if (headsup::StackDumpReady()) WriteStackDump();
         m_PointerWatch.Frame(m_AshitaCore, Now());
+        if (!m_Played.empty())
+        {
+            const PlayedInput step = m_Played.front();
+            m_Played.pop_front();
+            if (step.key)
+                OnKeyboard(step.wParam, step.lParam, false);
+            else
+                OnMouse(step.message, step.wParam, step.lParam, false);
+        }
 #endif
         StartHooks();
         m_Outline.NewFrame();
@@ -529,6 +632,7 @@ public:
         m_UiHidden = m_Screenshot || m_Player.inEvent;
         g_BarOn = headsup::BarRuns(m_Settings, loginStatus) && !m_Bar.Failed();
         g_BarHidden = m_UiHidden;
+        StartRml();
         // Opening Region Info asks the server for the conquest standings; HeadsUp asks the same once per zone-in, and
         // again while the Zone popup shows them.
         if (m_GameState.ConquestRequestDue(now,
@@ -566,8 +670,20 @@ public:
                 m_BarInput.Leave();
         }
         // Off, the bar is given nothing to show, and releases what it made.
-        m_Bar.Update(g_BarOn ? BarStateNow(now) : headsup::BarState{}, m_Settings, m_Names.BackBufferWidth(),
-            m_Names.BackBufferHeight(), m_BarInput, m_UiHidden);
+        // One of the two draws the bar; the other lets go of everything it made.
+        const headsup::BarState barState = g_BarOn ? BarStateNow(now) : headsup::BarState{};
+        if (RmlDrawsBar())
+        {
+            m_Bar.Off();
+            m_RmlBar.Update(m_Rml, barState, m_Settings, m_Names.BackBufferWidth(), m_Names.BackBufferHeight(),
+                m_BarInput, m_UiHidden);
+        }
+        else
+        {
+            m_RmlBar.Close();
+            m_Bar.Update(barState, m_Settings, m_Names.BackBufferWidth(), m_Names.BackBufferHeight(), m_BarInput,
+                m_UiHidden);
+        }
         if (const std::string failure = m_Bar.TakeFailure(); !failure.empty())
             Print("the top panel is off until HeadsUp reloads: " + failure + ".");
         // Over ImGui from Present; through ImGui, under addons that draw over its windows, when Present is not hooked.
@@ -634,13 +750,41 @@ public:
             .names            = m_NameHook.Stats(),
             .player           = m_Player,
             .version          = kVersion,
-            .barTitlePixels   = m_Bar.TitlePixels(),
+            .barTitlePixels   = RmlDrawsBar() ? m_RmlBar.TitlePixels() : m_Bar.TitlePixels(),
             .seenWindows      = &m_SeenWindows,
         };
-        if (m_Menu.open) ApplyMenuFont();
-        if (!m_Screenshot && m_Menu.Draw(m_AshitaCore->GetGuiManager(), m_Settings, status)) m_SettingsChangedAt = now;
-        if (headsup::SaveDue(m_SettingsChangedAt, now, m_Menu.open)) SaveSettings();
-        if (m_Menu.TakeDebugRequest()) m_DebugPending = true;
+        if (RmlDrawsMenu())
+        {
+            const headsup::MenuReadings readings{
+                .outlinedMobs     = status.outlinedMobs,
+                .meshes           = status.meshes,
+                .nameplates       = status.nameplates,
+                .frameMs          = status.frameMs,
+                .lastSaveMs       = status.lastSaveMs,
+                .lastSaveKeys     = status.lastSaveKeys,
+                .stencilAvailable = status.stencilAvailable,
+                .drewInScene      = status.drewInScene,
+                .hooked           = status.hooked,
+                .names            = status.names.names,
+                .replaced         = status.names.replaced,
+                .hidden           = status.names.hidden,
+                .level            = status.player.level,
+                .sitting          = status.player.sitting,
+                .barTitlePixels   = status.barTitlePixels,
+                .seenWindows      = status.seenWindows,
+            };
+            if (m_RmlMenu.Update(MenuHostNow(), m_Settings, readings, m_Menu.Fonts(m_Settings.defaultFont),
+                    m_AshitaCore->GetGuiManager()->GetFontSize(), kVersion))
+                m_SettingsChangedAt = now;
+            if (m_RmlMenu.TakeDebugRequest()) m_DebugPending = true;
+        }
+        else
+        {
+            if (m_Menu.open) ApplyMenuFont();
+            if (!m_Screenshot && m_Menu.Draw(m_AshitaCore->GetGuiManager(), m_Settings, status)) m_SettingsChangedAt = now;
+            if (m_Menu.TakeDebugRequest()) m_DebugPending = true;
+        }
+        if (headsup::SaveDue(m_SettingsChangedAt, now, MenuOpen())) SaveSettings();
         UpdatePointer();
         m_NameHook.NewFrame(NameOwners());
     }
@@ -670,12 +814,12 @@ public:
             m_Names.FinishText();
             const bool saved = WithSavedState([&] {
                 DrawNameplates(1.0f, 1.0f, false);
-                if (bar) m_Bar.Draw();
+                if (bar) DrawBar();
             });
             if (!saved) PlatesNotDrawn();
             if (!saved && bar) BarNotDrawn();
         }
-        else if (bar && !WithQuadStates([&] { m_Bar.Draw(); }))
+        else if (bar && !WithQuadStates([&] { DrawBar(); }))
             BarNotDrawn();
     }
 
@@ -735,13 +879,14 @@ private:
     std::optional<headsup::HelpBand> HelpBandNow() const
     {
         // The screen in the game's menu resolution, and the help bar's bottom in it while the bar shows it.
-        const std::optional<headsup::BarRect> reach = g_BarOn ? m_Bar.HelpBarReach() : std::nullopt;
+        const std::optional<headsup::BarRect> reach =
+            !g_BarOn ? std::nullopt : RmlDrawsBar() ? m_RmlBar.HelpBarReach() : m_Bar.HelpBarReach();
         const float height = m_Names.BackBufferHeight();
         if (m_MenuHeight <= 0.0f || m_MenuWidth <= 0.0f || height <= 0.0f) return std::nullopt;
         const float down = m_MenuHeight / height;
         // In menu units: the game's menu resolution over the back buffer's. Without the help bar, windows go under
         // the top bar itself.
-        const float barBottom = g_BarOn ? m_Bar.BarBottomNow() : 0.0f;
+        const float barBottom = !g_BarOn ? 0.0f : RmlDrawsBar() ? m_RmlBar.BarBottomNow() : m_Bar.BarBottomNow();
         const auto menuUnits  = [&](float pixels) {
             return pixels > 0.0f ? static_cast<int>(std::ceil((pixels + kWindowClearance) * down)) : 0;
         };
@@ -1150,10 +1295,151 @@ private:
     // The open popup, over every ImGui window: in a scene of its own, with the bar's quad states.
     void DrawOverGui()
     {
-        if (!g_BarOn || g_BarHidden || m_Device == nullptr || FAILED(m_Device->BeginScene())) return;
-        WithQuadStates([&] { m_Bar.DrawPopupQuads(); });
+        if (m_Device == nullptr || FAILED(m_Device->BeginScene())) return;
+        if (g_BarOn && !g_BarHidden) WithQuadStates([&] { m_Bar.DrawPopupQuads(); });
+        if (m_Rml.Running() && !m_Screenshot) WithQuadStates([&] { m_Rml.RenderOverlay(); });
         m_Device->EndScene();
     }
+
+    bool RmlDrawsBar() const { return m_RmlBarOn && m_Rml.Running(); }
+    bool RmlDrawsMenu() const { return m_RmlMenuOn && m_Rml.Running(); }
+
+    // What the RmlUi settings window runs on: the window's own font, or a bundled one where Windows lacks it.
+    headsup::MenuHost MenuHostNow()
+    {
+        headsup::MenuHost host{m_Rml.Overlay(), headsup::kBarlowCondensed, {}, headsup::KeyDown};
+        const headsup::MenuFont* font = headsup::MenuFontNamed(m_Settings.menuFont);
+        if (font != nullptr && (font->file == nullptr ? m_Rml.EnsureFont(font->name)
+                                                      : m_Rml.EnsureFontFile(font->name, headsup::WindowsFontPath(font->file))))
+            host.textFont = font->name;
+        for (const headsup::MenuFont& choice : headsup::kMenuFonts)
+            if (headsup::MenuFontInstalled(choice)) host.menuFonts.emplace_back(choice.name);
+        return host;
+    }
+    // Whether the settings window is open, in whichever of the two draws it.
+    bool& MenuOpen() { return RmlDrawsMenu() ? m_RmlMenu.open : m_Menu.open; }
+
+#ifdef HEADSUP_DEV
+    // /hu play click X Y [right] | move X Y | drag X Y TOX TOY | wheel X Y NOTCHES | key NAME | type TEXT
+    // Points are the back buffer's pixels; a wheel turns toward the user for positive notches.
+    void Play(const std::vector<std::string>& args, const char* command)
+    {
+        constexpr int kDragSteps  = 6;
+        constexpr int kWheelDelta = 120;
+        constexpr uint32_t kUp    = 0xC0000001; // a key message's flags as the key goes up
+        static const std::unordered_map<std::string, uint32_t> kKeys = {{"enter", VK_RETURN}, {"escape", VK_ESCAPE},
+            {"tab", VK_TAB}, {"backspace", VK_BACK}, {"delete", VK_DELETE}, {"left", VK_LEFT}, {"right", VK_RIGHT},
+            {"up", VK_UP}, {"down", VK_DOWN}, {"home", VK_HOME}, {"end", VK_END}, {"space", VK_SPACE}, {"a", 'A'}};
+        auto number = [&](size_t at) { return at < args.size() ? std::strtof(args[at].c_str(), nullptr) : 0.0f; };
+        auto at = [&](float x, float y) {
+            return MAKELPARAM(static_cast<int>(x / g_BarScaleX), static_cast<int>(y / g_BarScaleY));
+        };
+        auto mouse = [&](uint32_t message, float x, float y, WPARAM wParam = 0) {
+            m_Played.push_back(PlayedInput{false, message, wParam, at(x, y)});
+        };
+        std::string what = args.size() > 2 ? args[2] : "";
+        float x = number(3), y = number(4);
+        float toX = number(5), toY = number(6);
+        // id NAME clicks the settings window's control of that id, and id NAME NAME drags the first onto the second.
+        if (what == "id" && args.size() > 3)
+        {
+            // Both ends scrolled into view before either is placed: the second scroll would move the first.
+            if (args.size() > 4) m_RmlMenu.CenterOf(args[4]);
+            m_RmlMenu.CenterOf(args[3]);
+            const std::optional<Rml::Vector2f> from = m_RmlMenu.CenterOf(args[3], false);
+            const std::optional<Rml::Vector2f> to   = args.size() > 4 ? m_RmlMenu.CenterOf(args[4], false) : std::nullopt;
+            if (!from || (args.size() > 4 && !to))
+            {
+                Print("/hu play id: the settings window has no such control.");
+                return;
+            }
+            what = to ? "drag" : "click";
+            x = from->x, y = from->y;
+            if (to) toX = to->x, toY = to->y;
+        }
+        if (what == "move")
+            mouse(WM_MOUSEMOVE, x, y);
+        else if (what == "click")
+        {
+            const bool right = args.size() > 5 && args[5] == "right" && args[2] == "click";
+            mouse(WM_MOUSEMOVE, x, y);
+            mouse(right ? WM_RBUTTONDOWN : WM_LBUTTONDOWN, x, y, right ? MK_RBUTTON : MK_LBUTTON);
+            mouse(right ? WM_RBUTTONUP : WM_LBUTTONUP, x, y);
+        }
+        else if (what == "drag")
+        {
+            mouse(WM_MOUSEMOVE, x, y);
+            mouse(WM_LBUTTONDOWN, x, y, MK_LBUTTON);
+            for (int step = 1; step <= kDragSteps; ++step)
+            {
+                const float share = static_cast<float>(step) / kDragSteps;
+                mouse(WM_MOUSEMOVE, x + (toX - x) * share, y + (toY - y) * share, MK_LBUTTON);
+            }
+            mouse(WM_LBUTTONUP, toX, toY);
+        }
+        else if (what == "wheel")
+        {
+            mouse(WM_MOUSEMOVE, x, y);
+            mouse(WM_MOUSEWHEEL, x, y, MAKEWPARAM(0, static_cast<int16_t>(-number(5) * kWheelDelta)));
+        }
+        else if (what == "key" && args.size() > 3 && kKeys.count(args[3]) != 0)
+        {
+            m_Played.push_back(PlayedInput{true, 0, kKeys.at(args[3]), 1});
+            m_Played.push_back(PlayedInput{true, 0, kKeys.at(args[3]), static_cast<LPARAM>(kUp)});
+        }
+        else if (what == "theme" || what == "height" || what == "seps" || what == "text" || what == "popuptext")
+        {
+            // A bar setting by number, saved as a change in the window is.
+            const int value = static_cast<int>(number(3));
+            if (what == "theme") m_Settings.barTheme = static_cast<headsup::BarTheme>(value);
+            if (what == "height") m_Settings.barHeight = value;
+            if (what == "seps") m_Settings.barSeparators = static_cast<headsup::BarSeparators>(value);
+            if (what == "text") m_Settings.barTextSize = value;
+            if (what == "popuptext") m_Settings.popupTextSize = value;
+            m_Settings          = headsup::Clamp(m_Settings);
+            m_SettingsChangedAt = Now();
+        }
+        else if (what == "type" && m_Rml.Running())
+        {
+            // The text as typed, which the lower-cased arguments have lost.
+            const char* text = std::strstr(command, " type ");
+            if (text == nullptr) text = std::strstr(command, " TYPE ");
+            if (text != nullptr) m_Rml.Overlay()->ProcessTextInput(Rml::String(text + std::strlen(" type ")));
+        }
+        else
+            Print("/hu play: click X Y [right], move X Y, drag X Y TOX TOY, wheel X Y NOTCHES, key NAME, type TEXT, id NAME [NAME].");
+    }
+#endif
+
+    void DrawBar()
+    {
+        if (RmlDrawsBar())
+            m_Rml.RenderBar();
+        else
+            m_Bar.Draw();
+        // Without Present hooked nothing draws over ImGui: the overlay goes under it, with the bar.
+        if (g_PresentSlot == nullptr && m_Rml.Running()) m_Rml.RenderOverlay();
+    }
+
+    // RmlUi starts once the back buffer's size is known, and follows it after.
+    void StartRml()
+    {
+        const int width  = static_cast<int>(m_Names.BackBufferWidth());
+        const int height = static_cast<int>(m_Names.BackBufferHeight());
+        if (width <= 0 || height <= 0 || m_Device == nullptr) return;
+        if (m_Rml.Running())
+        {
+            m_Rml.Resize(width, height);
+            if (const std::string failure = m_Rml.TakeFailure(); !failure.empty()) Print("RmlUi: " + failure + ".");
+            return;
+        }
+        if (std::exchange(m_RmlTried, true)) return;
+        const bool started = m_Rml.Start(m_Device, width, height,
+            [this](const std::string& line) { Print("RmlUi: " + line); },
+            [](const std::string& name) { return headsup::HostImage(name); });
+        if (!started) Print("RmlUi did not start.");
+    }
+
 
     std::string OwnFolder(const char* ashitaFolder)
     {
@@ -1176,8 +1462,22 @@ private:
     }
 
     // Ashita's configuration manager takes the settings file's path inside its config folder.
-    std::string SettingsPath() const { return std::string(kFolder) + "/" + kSettingsFile; }
-    std::string SettingsFile() { return OwnFolder(kConfigFolder) + "\\" + kSettingsFile; }
+    // The settings file's name. A developer's build takes another from HEADSUP_SETTINGS in the game's environment, so
+    // a test client changes a copy and not the file the player's own game reads.
+    static const char* SettingsName()
+    {
+#ifdef HEADSUP_DEV
+        static const std::string named = [] {
+            const char* name = std::getenv("HEADSUP_SETTINGS");
+            return std::string(name != nullptr && *name != '\0' ? name : kSettingsFile);
+        }();
+        return named.c_str();
+#else
+        return kSettingsFile;
+#endif
+    }
+    std::string SettingsPath() const { return std::string(kFolder) + "/" + SettingsName(); }
+    std::string SettingsFile() { return OwnFolder(kConfigFolder) + "\\" + SettingsName(); }
 
     void LoadSettings()
     {

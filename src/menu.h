@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Ashita.h"
+#include "menu_fonts.h"
 #include "menu_state.h"
 #include "native_hook.h"
 #include "settings.h"
@@ -40,29 +41,13 @@ namespace headsup
         bool all        = false;
     };
 
-    // The "Add a key" button's wait for a key: those held when it was pressed do not count.
-    struct KeyCapture
-    {
-        bool on = false;
-        std::vector<uint8_t> held;
-    };
-
-    // A kind page's own state, begun anew when another kind's page opens: the line last typed in, which takes a
-    // clicked tag, the three lines' boxes, the Line Style tab that is open and the name being typed for Friends.
-    struct DesignEditor
-    {
-        PlateKind kind = PlateKind::Mobs;
-        int line       = 0;
-        int styleTab   = 0;
-        LineDraft drafts[kPlateLines] = {};
-        char friendName[kMaxCharacterName + 1] = {};
-    };
-
     // Whether a key is down now, by its virtual-key code.
     bool KeyDown(uint8_t vk);
 
     // A font file in Windows' Fonts folder.
     std::string WindowsFontPath(const char* file);
+    // Bundled fonts are always there; Windows' are where its Fonts folder has their file.
+    bool MenuFontInstalled(const MenuFont& font);
 
     // The /headsup settings window. Uses only IGuiManager functions that are safe across the MinGW/MSVC ABI
     // boundary (see tools/abi_check.py).
@@ -83,6 +68,12 @@ namespace headsup
         // Ashita's.
         void SetFonts(ImFont* text, ImFont* title, float textScale);
         bool HasFonts() const { return m_TextFont != nullptr; }
+        // The fonts to offer, as FontChoices gives them: the bundled ones and the one in use until Windows' are listed.
+        const std::vector<std::string>& Fonts(const std::string& current)
+        {
+            ListFonts(current);
+            return m_Fonts;
+        }
         // Opens the window at the page named, as its sidebar spells it in lower case without spaces ("toppanel");
         // false for a name no page has.
         bool OpenPage(const std::string& name);
