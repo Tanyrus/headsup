@@ -56,6 +56,7 @@ namespace headsup
         std::optional<Icon> icon;
         bool immune = false; // the icon carries a × in the immunity color
         std::vector<Span> text;
+        bool star = false; // a star after the text: who holds what the cell's row is about
         bool operator==(const PopupCell&) const = default;
     };
 
@@ -137,6 +138,8 @@ namespace headsup
     PopupRow LineOf(std::string text, Tone tone = Tone::Normal);
     // "Label value", the label dim and the value at the right edge.
     PopupRow Labeled(std::string label, Span value);
+    // The same with the label in its own tone or color.
+    PopupRow Labeled(Span label, Span value);
     PopupRow Grid(int columns, size_t cells);
     // 1,234,567
     std::string Grouped(uint32_t value);

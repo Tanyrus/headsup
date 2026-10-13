@@ -12,6 +12,7 @@ namespace headsup
         constexpr float kCellIcon    = 1.1f;
         constexpr float kMark        = 0.7f;  // the box an immune mark's ink is centered in
         constexpr float kIconGap     = 0.3f;
+        constexpr float kStar        = 0.85f; // a starred cell's star, about as tall as a capital
         constexpr float kCellGap     = 0.6f;  // between cells of a line
         constexpr float kColumnGap   = 0.8f;
         constexpr float kPairGap     = 1.2f;  // the least between a pair's label and its value
@@ -47,6 +48,7 @@ namespace headsup
                 size.inkBottom = inked ? std::max(size.inkBottom, t.inkBottom) : t.inkBottom;
                 inked          = true;
             }
+            if (cell.star) size.width += unit * (kIconGap + kStar);
             return size;
         }
 
@@ -156,6 +158,13 @@ namespace headsup
                         const TextSize t = measure(text, PopupFont::Text);
                         b.pieces.push_back(PopupPiece{PopupPiece::Kind::Text, cx, cy, t.width, t.height, text});
                         cx += t.width;
+                    }
+                    if (cell.star)
+                    {
+                        const float s = unit * kStar;
+                        cx += unit * kIconGap;
+                        b.pieces.push_back(PopupPiece{PopupPiece::Kind::Star, cx, cy + cells[i].inkTop, s, s, {}});
+                        cx += s;
                     }
                     if (pair && i == 1) b.values.push_back(Block::Value{first, b.pieces.size(), cx});
                     lineHeight = std::max(lineHeight, size.height);

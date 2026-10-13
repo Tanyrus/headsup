@@ -80,7 +80,7 @@ namespace headsup
         // Ashita's.
         void SetFonts(ImFont* text, ImFont* title, float textScale);
         bool HasFonts() const { return m_TextFont != nullptr; }
-        // Opens the window at the page named, as its sidebar spells it in lower case without spaces ("topbar");
+        // Opens the window at the page named, as its sidebar spells it in lower case without spaces ("toppanel");
         // false for a name no page has.
         bool OpenPage(const std::string& name);
         // Scrolls the page this far down when it is next drawn: to its top when the page changes, and where a

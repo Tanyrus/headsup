@@ -25,12 +25,18 @@ namespace headsup
             const int64_t doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
             return era * 146097 + doe - 719468;
         }
-        int64_t YearOf(int64_t days)
+        struct Date
+        {
+            int64_t year;
+            int month, day;
+        };
+        Date DateOf(int64_t days)
         {
             const int64_t z = days + 719468, era = FloorDiv(z, 146097), doe = z - era * 146097;
             const int64_t yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
             const int64_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100), mp = (5 * doy + 2) / 153;
-            return yoe + era * 400 + (mp >= 10 ? 1 : 0);
+            return Date{yoe + era * 400 + (mp >= 10 ? 1 : 0), static_cast<int>(mp < 10 ? mp + 3 : mp - 9),
+                static_cast<int>(doy - (153 * mp + 2) / 5 + 1)};
         }
         int WeekdayOf(int64_t days) { return static_cast<int>(((days + kEpochWeekday) % kDaysPerWeek + kDaysPerWeek) % kDaysPerWeek); }
         constexpr int kSunday = 6;
@@ -81,7 +87,7 @@ namespace headsup
         bool Daylight(const ZoneRule& z, int64_t unixMs)
         {
             const int64_t standardMs = static_cast<int64_t>(z.standardMinutes) * kMsPerMinute;
-            const int64_t year       = YearOf(FloorDiv(unixMs + standardMs, kMsPerDay));
+            const int64_t year       = DateOf(FloorDiv(unixMs + standardMs, kMsPerDay)).year;
             const auto at            = [&](int64_t day, int hour, int64_t offsetMs) {
                 return day * kMsPerDay + hour * kMsPerHour - offsetMs;
             };
@@ -124,9 +130,10 @@ namespace headsup
         const int64_t local   = unixMs + (static_cast<int64_t>(z.standardMinutes) + (daylight ? kHourMinutes : 0)) * kMsPerMinute;
         const int64_t day     = FloorDiv(local, kMsPerDay);
         const int64_t inDay   = local - day * kMsPerDay;
+        const Date date       = DateOf(day);
         return ZoneTime{WeekdayOf(day), static_cast<int>(inDay / kMsPerHour),
             static_cast<int>(inDay % kMsPerHour / kMsPerMinute), daylight ? z.daylight : z.standard,
-            static_cast<int>(inDay % kMsPerMinute / kMsPerSecond)};
+            static_cast<int>(inDay % kMsPerMinute / kMsPerSecond), static_cast<int>(date.year), date.month, date.day};
     }
 
     const char* JstWeekdayName(int weekday) { return kWeekdays[((weekday % kDaysPerWeek) + kDaysPerWeek) % kDaysPerWeek]; }
@@ -138,34 +145,19 @@ namespace headsup
         return SecondsTo(JstDay(unixMs) + kDaysPerWeek - JstAt(unixMs).weekday, unixMs);
     }
 
-    WidgetContent ServerTimeWidget(int64_t unixMs, ClockZone zone, bool twentyFour, bool seconds)
+    std::string ZoneClockText(const ZoneTime& t, bool twentyFour, bool seconds)
     {
-        const ZoneTime t = ZoneAt(zone, unixMs);
-        WidgetContent w;
-        w.shown    = true;
-        w.title    = ListOf(Text(std::string(t.abbreviation) + " " +
-                                 ClockText(t.hour, t.minute, twentyFour, seconds ? t.second : -1)));
-        w.subtitle = ListOf(Text(JstWeekdayName(t.weekday), Tone::Dim));
-        w.hasPopup = true;
-        w.figures  = true;
-        return w;
+        return std::string(t.abbreviation) + " " + ClockText(t.hour, t.minute, twentyFour, seconds ? t.second : -1);
     }
 
-    PopupContent ServerTimePopup(int64_t unixMs, ClockZone zone)
+    PopupSection ServerTimeRows(int64_t unixMs)
     {
-        PopupContent popup;
-        popup.title = ListOf(Text("Server time"));
+        const ZoneTime t = ZoneAt(ClockZone::Japan, unixMs);
         PopupSection rows;
-        const auto line = [&](ClockZone z) {
-            const ZoneTime t = ZoneAt(z, unixMs);
-            rows.rows.push_back(LineOf(std::string(JstWeekdayName(t.weekday)) + " " + HourMinute(t.hour, t.minute) +
-                                       " " + t.abbreviation));
-        };
-        line(zone);
-        if (zone != ClockZone::Japan) line(ClockZone::Japan); // the server's, which the resets go by
+        rows.rows.push_back(Labeled("Server time", Text(std::string(JstWeekdayName(t.weekday)) + " " +
+                                                        HourMinute(t.hour, t.minute) + " " + t.abbreviation)));
         rows.rows.push_back(Labeled("Daily reset in", Text(SpanText(SecondsToDailyReset(unixMs)))));
         rows.rows.push_back(Labeled("Conquest tally in", Text(SpanText(SecondsToTally(unixMs)))));
-        popup.sections = ListOf(std::move(rows));
-        return popup;
+        return rows;
     }
 }

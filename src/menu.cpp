@@ -367,7 +367,8 @@ namespace headsup
                 case Page::Npcs:
                 case Page::Pets: DrawKindPage(ui, s, *KindOfPage(m_Page), m_Collapsed, m_Fonts, m_Design); break;
                 case Page::UserInterface: DrawUserInterfacePage(ui, s, status, m_Collapsed, m_Windows); break;
-                case Page::TopBar: DrawTopBarPage(ui, s, status, m_Collapsed, m_Fonts, m_Widget); break;
+                case Page::TopPanel: DrawTopPanelPage(ui, s, status, m_Collapsed, m_Fonts); break;
+                case Page::Widgets: DrawWidgetsPage(ui, s, m_Collapsed, m_Widget); break;
                 case Page::MouseCursor: DrawMouseCursorPage(ui, s, m_Collapsed, m_KeyCapture); break;
                 case Page::ConfigMenu: DrawConfigMenuPage(ui, s, m_Collapsed, m_ConfirmReset); break;
                 case Page::Debug: DrawDebugPage(ui, s, status, m_Collapsed, m_DebugRequested); break;

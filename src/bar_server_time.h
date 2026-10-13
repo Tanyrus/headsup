@@ -24,7 +24,7 @@ namespace headsup
     // a week.
     double SecondsToTally(int64_t unixMs);
 
-    // The zones the Server time widget can show its clock in, with their daylight saving rules as of 2026.
+    // The zones the Clock widget can show its clock in, with their daylight saving rules as of 2026.
     enum class ClockZone : uint8_t
     {
         Japan, // the server's, which the resets go by
@@ -50,7 +50,8 @@ namespace headsup
         int weekday = 0; // 0 Monday to 6 Sunday
         int hour = 0, minute = 0;
         const char* abbreviation = ""; // "JST", "EDT", "AEST"
-        int second               = 0;  // left out of ==
+        int second               = 0;  // left out of ==, as the date is
+        int year = 0, month = 0, day = 0;
         bool operator==(const ZoneTime& o) const
         {
             return weekday == o.weekday && hour == o.hour && minute == o.minute &&
@@ -58,9 +59,10 @@ namespace headsup
         }
     };
     ZoneTime ZoneAt(ClockZone zone, int64_t unixMs);
+    // A zone's clock as a widget titles it: "JST 15:30", "PDT 11:30:42 PM".
+    std::string ZoneClockText(const ZoneTime& t, bool twentyFour, bool seconds);
 
-    // The clock in zone; the popup gives the time in Japan too when zone is another, and the resets, which go by it.
-    WidgetContent ServerTimeWidget(int64_t unixMs, ClockZone zone = ClockZone::Japan, bool twentyFour = true,
-        bool seconds = false);
-    PopupContent ServerTimePopup(int64_t unixMs, ClockZone zone = ClockZone::Japan);
+    // What the Clock's popup lists: the server's clock, "Server time Friday 15:30 JST", and the time to the daily reset
+    // and to the conquest tally, which go by it.
+    PopupSection ServerTimeRows(int64_t unixMs);
 }

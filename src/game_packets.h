@@ -41,18 +41,22 @@ namespace headsup
     using RegionOwners                 = std::array<Nation, kConquestRegionCount>;
     // Phoenix's s2c 0x05E: region i's owner byte at 0x1D + 4i, 0 none, 1 San d'Oria, 2 Bastok, 3 Windurst, 4 beastmen.
     std::optional<RegionOwners> ParseConquest(const uint8_t* data, uint32_t size);
-    // Phoenix's s2c 0x05E past the owners (0x05e_conquest.h): NextTally at 0x8C, Vana'diel days to the tally rounded
-    // up; ConquestPoints u32 at 0x90; ImperialStanding u32 at 0xB0; 0xB4 bytes in all.
-    struct ConquestStanding
+    // Phoenix's s2c 0x05E past the owners (0x05e_conquest.h): each contender's share of the influence in the region
+    // you are in, in whole percents rounded down: San d'Oria at 0x86, Bastok at 0x87, Windurst at 0x88, the beastmen
+    // at 0x94. The packet does not name the region. At the tally a region goes to whoever is ahead of all three
+    // others (updateWeekConquest).
+    struct RegionShare
     {
-        uint8_t tallyVanaDays     = 0;
-        uint32_t conquestPoints   = 0;
-        uint32_t imperialStanding = 0;
-        bool operator==(const ConquestStanding&) const = default;
+        Nation nation   = Nation::None;
+        uint8_t percent = 0;
+        bool operator==(const RegionShare&) const = default;
     };
-    constexpr uint8_t kMaxTallyVanaDays = 175; // an Earth week of Vana'diel days
-    // Nothing for a short packet, or a tally further off than a week, which a layout other than Phoenix's would give.
-    std::optional<ConquestStanding> ParseConquestStanding(const uint8_t* data, uint32_t size);
+    constexpr int kContenderCount = 4; // the three nations and the beastmen
+    // The largest share first, equal shares in Nation's order.
+    using RegionShares = std::array<RegionShare, kContenderCount>;
+    // Nothing for a short packet, or for shares of more than 100 in all, which a layout other than Phoenix's would
+    // give.
+    std::optional<RegionShares> ParseRegionShares(const uint8_t* data, uint32_t size);
     const char* NationName(Nation nation); // "San d'Oria", ...; "" for none
     uint32_t NationColor(Nation nation);
 

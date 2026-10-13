@@ -152,6 +152,32 @@ TEST(each_heading_gets_a_card_holding_its_rows_and_goes_uppercase_as_pills)
     }
 }
 
+TEST(a_starred_cell_has_a_star_after_its_text_from_the_top_of_the_texts_ink)
+{
+    const BarMetrics m = MetricsFor(36, BarShape::Pills);
+    const auto laid = [&](bool starred) {
+        PopupRow held = Labeled(Text("San d'Oria and its two allies"), Text("61%"));
+        held.cells[0].star = starred;
+        PopupContent c;
+        c.title = {{"Zone", Tone::Normal}};
+        c.sections.push_back(PopupSection{"Influence", {held, Labeled(Text("Bastok"), Text("21%"))}});
+        return LayoutPopup(c, m, BarShape::Pills, false, Fake);
+    };
+    const PopupLayout l = laid(true), bare = laid(false);
+    CHECK(Of(bare, PopupPiece::Kind::Star).empty());
+    const std::vector<const PopupPiece*> stars = Of(l, PopupPiece::Kind::Star);
+    CHECK_EQ(stars.size(), 1u);
+    if (stars.empty()) return;
+    const PopupPiece& star = *stars.front(), &name = *Find(l, "San d'Oria and its two allies ");
+    CHECK(Near(star.width, star.height) && star.width > 0.5f * m.popupText && star.width <= m.popupText);
+    const float gap = star.x - (name.x + name.width);
+    CHECK(gap > 0.0f && gap < m.popupText);
+    CHECK(Near(star.y, name.y + 0.3f * 14.0f)); // Fake's ink starts 30% down its 14 px line
+    CHECK(star.line == name.line && star.x + star.width < Find(l, "61%")->x);
+    CHECK(Near(l.width - bare.width, gap + star.width)); // the widest row is as much wider
+    CHECK(Near(Find(l, "61%")->x + Find(l, "61%")->width, Find(l, "21%")->x + Find(l, "21%")->width));
+}
+
 TEST(a_pairs_value_ends_at_its_cards_right_edge_and_its_label_at_the_left)
 {
     const BarMetrics m = MetricsFor(36, BarShape::Pills);

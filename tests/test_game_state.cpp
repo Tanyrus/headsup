@@ -288,23 +288,23 @@ TEST(a_short_check_message_leaves_no_message_waiting)
 TEST(the_conquest_standings_are_asked_for_once_after_loading_and_once_per_zone_in)
 {
     GameState game;
-    CHECK(!game.ConquestRequestDue(0.0, false)); // the bar not running, neither widget on, or zoning
-    CHECK(game.ConquestRequestDue(0.0, true));   // loading counts as a zone-in
+    CHECK(!game.ConquestRequestDue(0.0, false, false)); // the bar not running, the Zone widget off, or zoning
+    CHECK(game.ConquestRequestDue(0.0, true, false));   // loading counts as a zone-in
     game.ConquestRequested(0.0);
-    CHECK(!game.ConquestRequestDue(30.0, true)); // once: an answer that never comes is not asked for again
+    CHECK(!game.ConquestRequestDue(30.0, true, false)); // once: an answer that never comes is not asked for again
     Feed(game, ZoneIn(kRain));
-    CHECK(game.ConquestRequestDue(30.0, true) && !game.ConquestRequestDue(30.0, false));
+    CHECK(game.ConquestRequestDue(30.0, true, false) && !game.ConquestRequestDue(30.0, false, false));
 }
 
 TEST(no_request_goes_once_a_conquest_update_has_come_since_the_zone_in)
 {
     GameState game;
     Feed(game, Conquest({{0, kSanDoria}})); // the server sent it unasked, as at the tally
-    CHECK(!game.ConquestRequestDue(0.0, true));
+    CHECK(!game.ConquestRequestDue(0.0, true, false));
     Feed(game, ZoneIn(kRain));
-    CHECK(game.ConquestRequestDue(1.0, true));
+    CHECK(game.ConquestRequestDue(1.0, true, false));
     Feed(game, Cut(Conquest({{0, kSanDoria}}), 0x20)); // any 0x05E answers, even one too short to read
-    CHECK(!game.ConquestRequestDue(1.0, true));
+    CHECK(!game.ConquestRequestDue(1.0, true, false));
 }
 
 TEST(two_conquest_requests_are_never_within_five_seconds)
@@ -312,41 +312,66 @@ TEST(two_conquest_requests_are_never_within_five_seconds)
     GameState game;
     game.ConquestRequested(100.0);
     Feed(game, ZoneIn(kRain)); // a zone line crossed straight back
-    CHECK(!game.ConquestRequestDue(104.9, true));
-    CHECK(game.ConquestRequestDue(100.0 + kConquestAskGap, true));
+    CHECK(!game.ConquestRequestDue(104.9, true, false));
+    CHECK(game.ConquestRequestDue(100.0 + kConquestAskGap, true, false));
 }
 
-TEST(a_conquest_update_keeps_your_standing_and_its_bytes_and_a_short_one_keeps_the_last)
+TEST(the_standings_are_asked_for_again_each_minute_while_the_zone_popup_is_open)
+{
+    GameState game;
+    game.ConquestRequested(0.0);
+    CHECK(!game.ConquestRequestDue(59.0, true, true));
+    CHECK(game.ConquestRequestDue(kPopupRefresh, true, true));
+    CHECK(!game.ConquestRequestDue(kPopupRefresh, true, false)); // the popup closed
+    CHECK(!game.ConquestRequestDue(kPopupRefresh, false, true)); // the bar not running, or zoning
+    game.ConquestRequested(kPopupRefresh);
+    CHECK(!game.ConquestRequestDue(kPopupRefresh + 59.0, true, true));
+    GameState unasked;
+    Feed(unasked, Conquest({{0, kSanDoria}})); // the server's own update, of an age HeadsUp does not know
+    CHECK(unasked.ConquestRequestDue(0.0, true, true) && !unasked.ConquestRequestDue(0.0, true, false));
+}
+
+// The shares are of the region the character was in when the server answered, and the packet does not name it.
+TEST(the_influence_is_the_last_updates_and_is_forgotten_at_a_zone_in)
+{
+    GameState game;
+    CHECK(!game.Shares().has_value());
+    Feed(game, Conquest({{0, kSanDoria}}).Put(0x86, uint8_t{61}).Put(0x87, uint8_t{21}).Put(0x88, uint8_t{11})
+                   .Put(0x94, uint8_t{5}));
+    CHECK(game.Shares() ==
+          (RegionShares{{{Nation::SanDoria, 61}, {Nation::Bastok, 21}, {Nation::Windurst, 11}, {Nation::Beastmen, 5}}}));
+    Feed(game, Cut(Conquest({{0, kSanDoria}}), 0x90)); // too short for the beastmen's share: the last stays
+    CHECK(game.Shares().has_value() && (*game.Shares())[0].percent == 61);
+    Feed(game, Conquest({{0, kSanDoria}}).Put(0x87, uint8_t{40}));
+    CHECK(game.Shares().has_value() && (*game.Shares())[0] == (RegionShare{Nation::Bastok, 40}));
+    Feed(game, ZoneIn(kRain));
+    CHECK(!game.Shares().has_value() && game.Owners().has_value());
+}
+
+TEST(the_last_conquest_update_is_kept_as_it_came_for_the_debug_report)
 {
     GameState state;
-    CHECK(!state.Standing().has_value() && state.LastConquestPacket().empty());
+    CHECK(state.LastConquestPacket().empty());
     Packet full = Blank(kConquestPacket, 0xB4);
-    full.Put(0x8C, uint8_t{59}).Put(0x90, uint32_t{12345}).Put(0xB0, uint32_t{8210});
-    state.Received(full.id, full.bytes.data(), static_cast<uint32_t>(full.bytes.size()));
-    CHECK(state.Standing() == (ConquestStanding{59, 12345, 8210}));
+    full.Put(0x90, uint32_t{12345}); // your conquest points
+    Feed(state, full);
     CHECK(state.LastConquestPacket() == full.bytes);
     const Packet owners = Blank(kConquestPacket, 0x90); // the owners alone
-    state.Received(owners.id, owners.bytes.data(), static_cast<uint32_t>(owners.bytes.size()));
-    CHECK(state.Standing() == (ConquestStanding{59, 12345, 8210}));
+    Feed(state, owners);
+    CHECK(state.LastConquestPacket() == owners.bytes);
 }
 
-TEST(another_character_forgets_the_last_ones_conquest_points_and_standing_until_the_server_answers)
+TEST(another_character_forgets_the_last_ones_conquest_update_and_keeps_who_holds_each_region)
 {
     constexpr uint32_t kMe = 0x00012345, kAlt = 0x00054321; // server ids, in 0x00A's UniqueNo at 0x04
     GameState state;
     Feed(state, ZoneIn(kRain).Put(0x04, kMe));
-    Packet full = Blank(kConquestPacket, 0xB4);
-    full.Put(0x8C, uint8_t{59}).Put(0x90, uint32_t{12345}).Put(0xB0, uint32_t{8210});
-    Feed(state, full);
-    // Zoning as the same character keeps them, as the server sends them only when asked.
-    Feed(state, ZoneIn(kRain).Put(0x04, kMe));
-    CHECK(state.Standing() == (ConquestStanding{59, 12345, 8210}) && !state.LastConquestPacket().empty());
+    Feed(state, Blank(kConquestPacket, 0xB4).Put(0x90, uint32_t{12345})); // your conquest points
+    Feed(state, ZoneIn(kRain).Put(0x04, kMe));                             // zoning as the same character keeps it
+    CHECK(!state.LastConquestPacket().empty());
     Feed(state, ZoneIn(kRain).Put(0x04, kAlt));
-    CHECK(!state.Standing().has_value() && state.LastConquestPacket().empty());
+    CHECK(state.LastConquestPacket().empty());
     CHECK(state.Owners().has_value()); // who holds each region is the same for everyone
-    full.Put(0x90, uint32_t{500}).Put(0xB0, uint32_t{0});
-    Feed(state, full);
-    CHECK(state.Standing() == (ConquestStanding{59, 500, 0}));
 }
 
 TEST(a_checked_player_shares_your_linkshell_when_their_check_names_one_you_wear)

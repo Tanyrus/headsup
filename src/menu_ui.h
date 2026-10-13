@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cfloat>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <optional>
@@ -87,6 +88,7 @@ namespace headsup
     constexpr float kCheckIndent    = 1.3f;  // a checked list's text from its row's left edge, past its dot
     constexpr float kTabHeight      = 2.0f;
     constexpr float kTabRule        = 0.12f; // the line a strip of tabs stands on
+    constexpr float kTabGap         = 0.12f; // between two tabs, and two rows of them: a couple of pixels
     constexpr int kLineBoxLines     = 2;     // the text lines a design line's box is tall
     constexpr float kTipWidth       = 20.0f;
     constexpr float kOffAlpha       = 0.42f; // the settings of a feature that is off are drawn this faint
@@ -661,18 +663,21 @@ namespace headsup
             EndRowAt(cardX, y, gui->GetFrameHeight());
         }
 
-        // A strip of equal tabs across the card, the open one filled, rounded at the top and square where they stand
-        // on their rule. Returns the tab clicked, or picked: which tab is open is the window's state, not a setting.
-        int Tabs(const char* id, int picked, const char* const* labels, int count)
+        // A strip of equal tabs across the card, a gap apart, the open one filled, rounded at the top and square at the
+        // foot, where the last row stands on the rule; perRow to a row when given. Returns the tab clicked, or picked:
+        // which tab is open is the window's state, not a setting.
+        int Tabs(const char* id, int picked, const char* const* labels, int count, int perRow = 0)
         {
-            const float left = cardX + Em(kCardPad), top = gui->GetCursorPosY();
-            const float width  = (cardWidth - 2.0f * Em(kCardPad)) / static_cast<float>(count);
-            const float height = Em(kTabHeight), corner = Em(kRadius);
+            const int columns  = perRow > 0 ? perRow : count, rows = (count + columns - 1) / columns;
+            const float left = cardX + Em(kCardPad), first = gui->GetCursorPosY();
+            const float strip  = cardWidth - 2.0f * Em(kCardPad);
+            const float height = Em(kTabHeight), corner = Em(kRadius), gap = std::round(Em(kTabGap));
             int chosen         = picked;
             char name[80];
             for (int tab = 0; tab < count; ++tab)
             {
-                const float x              = left + static_cast<float>(tab) * width;
+                const TabPlace place       = TabAt(tab, count, columns, strip, height, gap);
+                const float x = left + place.x, top = first + place.y, width = place.width;
                 const ButtonColors& colors = tab == picked ? kAccentButton : kRaised;
                 // A button rounds all four corners: squares in its color lie under the lower two, as grounds, since a
                 // disabled item drawn first would take the tab's clicks there.
@@ -684,17 +689,22 @@ namespace headsup
                 }
                 gui->SetCursorPos(ImVec2(x, top));
                 std::snprintf(name, sizeof(name), "%s##%s %d", labels[tab], id, tab);
+                // No padding at the sides: ImGui centers a label only in the room its padding leaves, and starts one
+                // that does not fit there at the left.
+                const float padding  = style.FramePadding.x;
+                style.FramePadding.x = 0.0f;
                 if (WithText(tab == picked ? kText : kMuted,
                         [&] { return Shape(name, ImVec2(width, height), colors, corner); }))
                     chosen = tab;
+                style.FramePadding.x = padding;
             }
+            const float tall = static_cast<float>(rows) * height + static_cast<float>(rows - 1) * gap;
             gui->BeginDisabled(true);
-            gui->SetCursorPos(ImVec2(left, top + height));
+            gui->SetCursorPos(ImVec2(left, first + tall));
             std::snprintf(name, sizeof(name), "##%s rule", id);
-            Shape(name, ImVec2(static_cast<float>(count) * width, Em(kTabRule)), ButtonColors{kAccent, kAccent, kAccent},
-                0.0f);
+            Shape(name, ImVec2(strip, Em(kTabRule)), ButtonColors{kAccent, kAccent, kAccent}, 0.0f);
             gui->EndDisabled();
-            EndRowAt(cardX, top, height + Em(kTabRule));
+            EndRowAt(cardX, first, tall + Em(kTabRule));
             return chosen;
         }
 

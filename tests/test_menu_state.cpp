@@ -2,6 +2,8 @@
 #include "settings.h"
 #include "test.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <string>
 #include <string_view>
@@ -49,16 +51,18 @@ TEST(a_change_waiting_when_the_window_is_closed_saves_at_once)
 
 TEST(the_sidebar_has_the_five_major_pages_with_their_children_under_them)
 {
-    CHECK_EQ(kPageCount, 11);
+    CHECK_EQ(kPageCount, 12);
     CHECK(kPages[0].page == Page::Entities && !kPages[0].child);
     for (int i = 1; i <= 5; ++i)
         CHECK(kPages[i].child);
     CHECK(kPages[6].page == Page::UserInterface && !kPages[6].child);
-    CHECK(kPages[7].page == Page::TopBar && kPages[7].child);
-    CHECK(kPages[8].page == Page::MouseCursor && !kPages[8].child);
-    CHECK(kPages[9].page == Page::ConfigMenu && !kPages[9].child);
-    CHECK(kPages[10].page == Page::Debug && !kPages[10].child);
+    CHECK(kPages[7].page == Page::TopPanel && kPages[7].child);
+    CHECK(kPages[8].page == Page::Widgets && kPages[8].child);
+    CHECK(kPages[9].page == Page::MouseCursor && !kPages[9].child);
+    CHECK(kPages[10].page == Page::ConfigMenu && !kPages[10].child);
+    CHECK(kPages[11].page == Page::Debug && !kPages[11].child);
     CHECK(std::string_view(kPages[6].label) == "User Interface");
+    CHECK(std::string_view(kPages[7].label) == "Top Panel" && std::string_view(kPages[8].label) == "Widgets");
 }
 
 TEST(every_page_is_found_by_its_key_and_nothing_else)
@@ -66,9 +70,9 @@ TEST(every_page_is_found_by_its_key_and_nothing_else)
     for (const PageInfo& info : kPages)
         CHECK(PageNamed(PageKey(info.page)) == info.page);
     CHECK(PageKey(Page::UserInterface) == "userinterface");
-    CHECK(PageKey(Page::TopBar) == "topbar");
+    CHECK(PageKey(Page::TopPanel) == "toppanel" && PageKey(Page::Widgets) == "widgets");
     CHECK(!PageNamed("global"));
-    CHECK(!PageNamed("widgets"));
+    CHECK(!PageNamed("topbar")); // the Top Panel page's name before
     CHECK(!PageNamed(""));
 }
 
@@ -84,7 +88,8 @@ TEST(the_kind_pages_know_their_kind)
         {Page::Self, PlateKind::Self}, {Page::Npcs, PlateKind::Npcs}, {Page::Pets, PlateKind::Pets}};
     for (const auto& [page, kind] : kinds)
         CHECK(KindOfPage(page) == kind);
-    for (const Page page : {Page::Entities, Page::UserInterface, Page::TopBar, Page::MouseCursor, Page::ConfigMenu, Page::Debug})
+    for (const Page page : {Page::Entities, Page::UserInterface, Page::TopPanel, Page::Widgets, Page::MouseCursor,
+             Page::ConfigMenu, Page::Debug})
         CHECK(!KindOfPage(page));
 }
 
@@ -268,4 +273,53 @@ TEST(the_sync_dropdown_lists_no_then_its_targets)
     CHECK_EQ(SyncEntryLabel(targets, 0), "No");
     CHECK_EQ(SyncEntryLabel(targets, 1), "Line 1");
     CHECK_EQ(SyncEntryLabel(targets, 2), "Line 3");
+}
+
+TEST(the_clocks_zone_dropdown_lists_local_first_and_then_every_zone)
+{
+    CHECK_EQ(kClockZoneChoices, kClockZoneCount + 1);
+    CHECK(ClockZoneChoiceName(0) == "Local" && ClockZoneChoiceName(1) == "Japan (JST)");
+    CHECK(ClockZoneChoiceName(kClockZoneChoices - 1) == "Australia Eastern (AET)");
+    CHECK(ClockZoneChoice(std::nullopt) == 0 && !ClockZoneOfChoice(0).has_value());
+    CHECK(!ClockZoneOfChoice(-1).has_value() && !ClockZoneOfChoice(kClockZoneChoices).has_value());
+    for (int z = 0; z < kClockZoneCount; ++z)
+    {
+        const auto zone = static_cast<ClockZone>(z);
+        CHECK(ClockZoneOfChoice(ClockZoneChoice(zone)) == zone);
+        CHECK(ClockZoneChoiceName(ClockZoneChoice(zone)) == ClockZoneName(zone));
+    }
+}
+
+TEST(the_widgets_page_has_a_tab_for_every_widget_on_the_bar_in_rows_as_even_as_they_come)
+{
+    const std::vector<BarWidget> tabs = WidgetTabs();
+    CHECK_EQ(tabs.size(), static_cast<size_t>(kPlacedWidgetCount));
+    for (int w = 0; w < kBarWidgetCount; ++w)
+    {
+        const auto widget = static_cast<BarWidget>(w);
+        CHECK_EQ(std::ranges::count(tabs, widget), OnTheBar(widget) ? 1 : 0); // Game help has a card of its own
+    }
+    CHECK(tabs.front() == BarWidget::Zone && tabs.back() == BarWidget::Distance);
+    CHECK_EQ(TabsPerRow(14, 2), 7);
+    CHECK_EQ(TabsPerRow(13, 2), 7); // an odd one out goes in the first row
+    CHECK_EQ(TabsPerRow(3, 1), 3);
+    CHECK_EQ(TabsPerRow(2, 3), 1); // more rows than tabs: one each
+    CHECK_EQ(TabsPerRow(0, 2), 1); // never none, which a row's width is divided by
+}
+
+// 13 tabs, 7 to a row, across 700 px, each 30 px tall and 2 px from the next: (700 - 6 x 2) / 7 wide in the full row,
+// and the six left over share the second, (700 - 5 x 2) / 6 each.
+TEST(tabs_sit_a_gap_apart_each_way_and_every_row_fills_the_strip)
+{
+    const auto near = [](float a, float b) { return std::fabs(a - b) < 0.01f; };
+    const auto at   = [](int tab) { return TabAt(tab, 13, 7, 700.0f, 30.0f, 2.0f); };
+    const float full = 688.0f / 7.0f, rest = 690.0f / 6.0f;
+    CHECK(near(at(0).x, 0.0f) && near(at(0).y, 0.0f) && near(at(0).width, full));
+    CHECK(near(at(1).x - (at(0).x + at(0).width), 2.0f));
+    CHECK(near(at(6).x + at(6).width, 700.0f) && near(at(6).y, 0.0f));
+    CHECK(near(at(7).x, 0.0f) && near(at(7).y, 32.0f) && near(at(7).width, rest)); // the row above, then the gap
+    CHECK(near(at(8).x - (at(7).x + at(7).width), 2.0f));
+    CHECK(near(at(12).x + at(12).width, 700.0f) && near(at(12).y, 32.0f));
+    const TabPlace joined = TabAt(2, 3, 3, 300.0f, 30.0f, 0.0f); // one row, no gap: thirds of the strip
+    CHECK(near(joined.x, 200.0f) && near(joined.width, 100.0f) && near(joined.y, 0.0f));
 }

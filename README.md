@@ -3,14 +3,14 @@
 An Ashita v4 plugin for Final Fantasy XI on PhoenixXI. It outlines nearby monsters in a color that tells you whether
 they will attack you, and replaces the game's nameplates with clearer ones: names, level and con, how a monster
 detects you, player status icons and a target cursor. It only reads what the game already shows and the server
-already sends, apart from three requests the game's own menus make, which the top bar sends for you: the one the game
-sends when you open Region Info, while the bar's Zone or Conquest widget is on, and the two it sends when you open the
-Currencies menu, while the Gil widget is on ([Top bar](#top-bar) says when). It never targets or checks anything
+already sends, apart from three requests the game's own menus make, which the top panel sends for you: the one the game
+sends when you open Region Info, while the panel's Zone widget is on, and the two it sends when you open the
+Currencies menu, while the Gil widget is on ([Top panel](#top-panel) says when). It never targets or checks anything
 itself.
 
 Download `headsup.dll` from the latest release on the [Releases](https://github.com/Tanyrus/headsup/releases) page and
 put it in Ashita's `plugins` folder. Load it with `/load headsup`; `/hu` opens its settings, and `/hu menu <page>`
-opens them at a page, such as `/hu menu entities`, `/hu menu mobs` or `/hu menu topbar`.
+opens them at a page, such as `/hu menu entities`, `/hu menu mobs` or `/hu menu toppanel`.
 
 > **About the data:** HeadsUp's monster data (levels, aggression, links and detection) is built from Phoenix's own
 > server code: the map server is compiled from Phoenix's public source and records every monster it loads. The top
@@ -23,12 +23,12 @@ opens them at a page, such as `/hu menu entities`, `/hu menu mobs` or `/hu menu 
 ## Settings
 
 `/hu` opens the settings window. `/hu menu <page>` opens it at a page: `entities`, `mobs`, `players`, `self`, `npcs`,
-`pets`, `userinterface`, `topbar`, `mousecursor`, `configmenu` or `debug`. The pages, in the order of the window's list:
+`pets`, `userinterface`, `toppanel`, `widgets`, `mousecursor`, `configmenu` or `debug`. The pages, in the order of the window's list:
 
 | Page | Holds |
 |---|---|
 | Entities | What every kind shares: the nameplate and outline styles, the target cursor and the five color palettes. Under it, a page for each kind: Mobs, Players, Self, NPCs and Pets |
-| User Interface | The Window Groups and Game Windows cards, which move the game's windows. Under it, the Top Bar page |
+| User Interface | The Window Groups and Game Windows cards, which move the game's windows. Under it, the Top Panel page and the Widgets page |
 | Mouse Cursor | The chocobo pointer and the pointer fixes |
 | Config Menu | The settings window's own font and size, and the button that puts every setting back to its default |
 | Debug | Switches HeadsUp off as a whole, and writes a report for bug reports |
@@ -170,14 +170,14 @@ sub-target is out of range.
 
 ### Screenshot mode
 
-`/hu screenshot` hides every name, the top bar, HeadsUp's menu and every addon window, until you run it again. Bind it
+`/hu screenshot` hides every name, the top panel, HeadsUp's menu and every addon window, until you run it again. Bind it
 to a key with Ashita's `/bind`, for example:
 
 ```
 /bind F12 /hu screenshot
 ```
 
-The top bar also hides itself during cutscenes and NPC dialogs.
+The top panel also hides itself during cutscenes and NPC dialogs.
 
 ## Mouse pointer
 
@@ -185,32 +185,30 @@ The Mouse Cursor page puts PlayOnline's chocobo back as your mouse pointer, the 
 holds a fix for the game's pointer after a resize and over Ashita's windows, and the keys that do not make the game hide
 its pointer.
 
-## Top bar
+## Top panel
 
-A bar across the top of the screen, on by default, with these widgets from left to right in its default layout:
+A bar of widgets across the top of the screen, on by default, with these widgets from left to right in its default layout:
 
 | Widget | Shows | Hover for |
 |---|---|---|
-| Zone | The zone's name, its region and who holds it | The region, who holds it and the zone's ID |
+| Zone | The zone's name, its region and who holds it | The zone's ID and region; in a conquest region, each nation's and the beastmen's share of this week's influence there, the largest first, with a star beside whoever holds it, and the time to the tally |
 | Weather | The weather now, with its element, and today's chance of it | A five-day forecast, starting today |
 | Vana'diel | The weekday in its element's color, the time and moon | The date, and when the day and moon change |
-| Job | Your jobs and levels, and the EXP to your next level (your merits at 75), over a bar of it | EXP per hour, the time to level, limit points |
+| Job | Your jobs and levels, and the EXP to your next level (your merits at 75), over a bar of it; its Layout can put the EXP first, as the larger line, or show the EXP alone | EXP per hour, the time to level, limit points |
 | Party | How many are in your party, with the lowest HP and MP in your zone | Each member's jobs, levels, HP, MP and TP |
-| Conquest | The time to the weekly tally and your conquest points | Your Imperial Standing and the tally in Vana'diel days |
 | Signet | The time left on Signet or Sanction, only while one is on | What it gives and whether it works where you are |
-| Server time | The time in Japan, which Phoenix keeps, or another time zone's | The time to the daily reset and the conquest tally |
 | Target | A monster's name in its border color, its level and con | Weaknesses, resistances, immunities, tags, spawn, drops at Treasure Hunter 0 and what can be stolen; for a player you checked, their jobs, master level, linkshell and title, as of your check |
 | Gil | Your gil, or the currency picked in its section | Gil and every currency you have |
 | Bags | Your inventory's used and maximum space | Every bag you have |
 | Connection | The game's own S and R, bytes sent and received a second; amber when no data arrives, red once the game's meter drops, with the latency if switched on | Latency, the last server data, this session's totals |
 | FPS | Frames per second | The frame time and the slowest recent frame |
-| Clock | The time on your computer | The date |
+| Clock | The time on your computer, or in a time zone you pick, with the zone before it; with Server Time on, Japan's time, which Phoenix keeps, on a second line under it | The date there, the server's time, and the time to the daily reset and the conquest tally |
 | Distance | How far your target is, in yalms | Nothing |
 
 Under the bar at the screen's left, Game help has a thin bordered box of its own while the game has help to show, all
 on one line: the open menu's name, a bag's slots beside a bag's name, then the selected entry's help, a target prompt
 or a checked player's jobs. The box is as wide as its text, up to half the screen. Help longer than that ends in
-"...", and hovering it shows all of it. Its switch is the Help Bar card's own, on the Top Bar page, and "Hide Game
+"...", and hovering it shows all of it. Its switch is the Help Bar card's own, on the Top Panel page, and "Hide Game
 Help" in that card hides the game's own copy.
 
 Game windows like the equipment window are moved straight down through the game's own move, so the mouse follows them:
@@ -230,33 +228,40 @@ weather the game keeps; if HeadsUp cannot find it, it goes by the server's weath
 weather until one comes. While the Gil widget is on, HeadsUp asks the server for your currencies with the two requests
 the game's Currencies menu sends: once after loading, once per zone and each minute while the widget's popup is open.
 
-Game help's bar, Job, Connection, FPS and Distance start on, and Server time, Party, Conquest and Signet start off. The connection's S and R come from the game's own readout, which
+Game help's bar, Job, Connection, FPS and Distance start on, and Party and Signet start off. The connection's S and R come from the game's own readout, which
 the bar covers and the "Hide Readout" switch stops the game drawing; they show "-" if HeadsUp
 cannot find them in the game's memory. The latency is HeadsUp's own measure, from a packet sent to the server's next
 reply, rounded to a frame.
 
 After each zone change (and after loading) HeadsUp asks the server for the conquest standings, as opening Region Info
-does, while the Zone or Conquest widget is on, so the zone's owner and your conquest points show without opening that
-menu.
+does, while the Zone widget is on, so the zone's owner and the influence in its region show without opening that menu.
+It asks again each minute while the widget's popup is open, as the influence changes through the week. Whoever holds
+the largest share when the tally comes takes the region. Your conquest points and Imperial Standing are among the Gil
+widget's currencies.
 
 The bar stays off until your character is in game, so it does not draw over the login screens.
 
 A bar under 36 px is too short for two lines of text. There each widget's second line goes after its title, dimmed, as
 in "27/30 Bags"; One Line can put it before the title instead, or leave it off.
 
-The Top Bar page of the settings (`/hu menu topbar`) has three cards: Top Bar, Help Bar and Widgets.
+The Top Panel page of the settings (`/hu menu toppanel`) has two cards, Top Panel and Help Bar, and the Widgets page
+under it (`/hu menu widgets`) has two more, Widgets and Layout.
 
-The Top Bar card has the bar's switch, a theme, a separators choice, a title font and a text font (the theme's own by
+The Top Panel card has the bar's switch, a theme, a separators choice, a title font and a text font (the theme's own by
 default), a height from 24 to 64 px (45 by default), a text size, One Line, a popup size, and "Hide Readout", which
 hides the game's connection readout. The Help Bar card has Game help's switch, "Hide Game Help", the help bar's
 position and whether it has a background.
 
-In the Widgets card, Left, Center and Right are trays side by side, each holding its widgets as chips in bar order,
-with a lit dot on each one that is on. A chip drags to another place in its tray or into another tray, an empty one
-too, and "Reset Layout" puts every widget back in its first place. A click on a chip shows that widget's options below
-the trays: Enabled, its section, its second line and icons where it has them, and its own options (Target's details,
-Gil's currency, the clocks' 24-hour and seconds switches and Server time's time zone, Job's EXP bar under or beside the
-text or off and its job names, Connection's latency).
+The Widgets card, at the top of its page, has a tab for each widget, in two rows. A tab holds the widget's options:
+Enabled, its section, its second line and icons where it has them, and its own. Those are Target's details, Gil's
+currency, the Clock's time zone, its Server Time line and its 24-hour and seconds switches, Connection's latency, and
+for Job its layout (jobs first, EXP first or EXP only), its EXP bar under or beside the text or off, and its job
+names.
+
+In the Layout card under it, Left, Center and Right are trays side by side, each holding its widgets as chips in bar
+order, with a lit dot on each one that is on. A chip drags to another place in its tray or into another tray, an empty
+one too, and "Reset Layout" puts every widget back in its first place. A click on a chip opens that widget's tab and
+takes the page back up to it.
 
 Separators picks diamonds or none between neighbouring widgets in any theme, and starts at the theme's own. "Text Size"
 and "Popup Size" set those sizes in pixels or leave them on Auto, which follows the bar height; a bar size too large for

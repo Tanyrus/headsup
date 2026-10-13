@@ -567,33 +567,73 @@ TEST(the_zone_says_who_holds_its_region_once_known)
     const WidgetContent w = BarWidgetContent(BarWidget::Zone, state, settings);
     CHECK(Joined(w.subtitle) == "Zulkheim \xC2\xB7 Bastok");
     CHECK(w.subtitle.back() == (Span{"Bastok", Tone::Own, NationColor(Nation::Bastok)}));
-    const PopupContent popup = BarPopupContent(BarWidget::Zone, state, settings); // named: the loop reads its rows
-    std::string all;
-    for (const PopupRow& row : popup.sections[0].rows)
-        for (const PopupCell& cell : row.cells)
-            all += Joined(cell.text) + "|";
-    CHECK(all.find("Held by Bastok") != std::string::npos);
     state.zone = 230; // Southern San d'Oria: a city region, not in the conquest packet
     CHECK(Joined(BarWidgetContent(BarWidget::Zone, state, settings).subtitle) == "San d'Oria");
 }
 
-TEST(the_zone_popup_says_when_no_one_holds_the_region_or_it_is_not_known_yet)
+TEST(the_zone_popup_has_the_zones_number_beside_its_name_over_its_region)
 {
     Settings settings;
     BarState state;
-    state.zone = 103; // Valkurm Dunes, Zulkheim
-    const PopupContent before = BarPopupContent(BarWidget::Zone, state, settings);
-    CHECK(Lines(before.sections[0]) ==
-          (std::vector<std::string>{"Region Zulkheim", "Held by: known at the next conquest update", "Zone 103"}));
-    state.owners = RegionOwners{}; // every region None
-    const PopupContent neutral = BarPopupContent(BarWidget::Zone, state, settings);
-    CHECK(Lines(neutral.sections[0]) == (std::vector<std::string>{"Region Zulkheim", "Held by no one", "Zone 103"}));
-    state.zone = 230; // Southern San d'Oria: a city region, not in the conquest packet
+    state.zone = 103; // Valkurm Dunes, Zulkheim (region 1)
+    const PopupContent dunes = BarPopupContent(BarWidget::Zone, state, settings);
+    CHECK(dunes.title == ListOf(Text("Valkurm Dunes"), Text(" 103", Tone::Dim)));
+    CHECK(dunes.sections.size() == 1 && Lines(dunes.sections[0]) == (std::vector<std::string>{"Region Zulkheim"}));
+    RegionOwners owners{};
+    owners[1]    = Nation::Bastok;
+    state.owners = owners; // who holds it is on the bar, and in the popup only beside its share
+    CHECK(BarPopupContent(BarWidget::Zone, state, settings) == dunes);
+    state.zone = 230; // Southern San d'Oria: a city region, outside the conquest
     const PopupContent city = BarPopupContent(BarWidget::Zone, state, settings);
-    CHECK(Lines(city.sections[0]) == (std::vector<std::string>{"Region San d'Oria", "Zone 230"}));
-    state.owners.reset();
-    const PopupContent cityBefore = BarPopupContent(BarWidget::Zone, state, settings);
-    CHECK(Lines(cityBefore.sections[0]) == (std::vector<std::string>{"Region San d'Oria", "Zone 230"}));
+    CHECK(Joined(city.title) == "Southern San d'Oria 230");
+    CHECK(city.sections.size() == 1 && Lines(city.sections[0]) == (std::vector<std::string>{"Region San d'Oria"}));
+    state.zone = 999; // past the data: its number is its title already, and it has no region
+    const PopupContent unknown = BarPopupContent(BarWidget::Zone, state, settings);
+    CHECK(Joined(unknown.title) == "Zone 999" && unknown.sections.empty());
+}
+
+TEST(the_zone_popup_ranks_the_influence_in_its_region_and_stars_who_holds_it)
+{
+    Settings settings;
+    BarState state;
+    state.zone   = 100;           // West Ronfaure, Ronfaure (region 0)
+    state.unixMs = 1791527400000; // Friday 15:30 JST: 203,400 s to Monday 00:00 JST
+    RegionOwners owners{};
+    owners[0]    = Nation::SanDoria;
+    state.owners = owners;
+    CHECK(Section(BarPopupContent(BarWidget::Zone, state, settings), "Influence") == nullptr); // not known yet
+    state.shares =
+        RegionShares{{{Nation::SanDoria, 61}, {Nation::Bastok, 21}, {Nation::Windurst, 11}, {Nation::Beastmen, 5}}};
+    const PopupContent popup       = BarPopupContent(BarWidget::Zone, state, settings);
+    const PopupSection* influence = Section(popup, "Influence");
+    CHECK(influence != nullptr);
+    CHECK(Lines(popup.sections[0]) == (std::vector<std::string>{"Region Ronfaure"}));
+    CHECK(Lines(*influence) == (std::vector<std::string>{"San d'Oria 61%", "Bastok 21%", "Windurst 11%", "Beastmen 5%",
+                                   "Tally in 2d 8h"}));
+    for (const PopupRow& row : influence->rows)
+        CHECK(row.kind == RowKind::Pair); // each figure at the right edge
+    CHECK(influence->rows[1].cells[0].text == ListOf(Colored("Bastok ", NationColor(Nation::Bastok))));
+    // Which lines carry the holder's star, top to bottom.
+    const auto starred = [&] {
+        std::vector<bool> stars;
+        const PopupContent now = BarPopupContent(BarWidget::Zone, state, settings); // named: the loop reads its rows
+        for (const PopupRow& row : Section(now, "Influence")->rows)
+            stars.push_back(row.cells[0].star);
+        return stars;
+    };
+    CHECK(starred() == (std::vector<bool>{true, false, false, false, false}));
+    (*state.owners)[0] = Nation::Beastmen; // a holder behind in the race keeps its place in it
+    CHECK(starred() == (std::vector<bool>{false, false, false, true, false}));
+    (*state.owners)[0] = Nation::None; // no one holds it
+    CHECK(starred() == (std::vector<bool>{false, false, false, false, false}));
+    (*state.owners)[0] = Nation::Windurst; // a new week: no influence yet, in the nations' order
+    state.shares =
+        RegionShares{{{Nation::SanDoria, 0}, {Nation::Bastok, 0}, {Nation::Windurst, 0}, {Nation::Beastmen, 0}}};
+    CHECK(Lines(*Section(BarPopupContent(BarWidget::Zone, state, settings), "Influence")) ==
+          (std::vector<std::string>{"San d'Oria 0%", "Bastok 0%", "Windurst 0%", "Beastmen 0%", "Tally in 2d 8h"}));
+    CHECK(starred() == (std::vector<bool>{false, false, true, false, false}));
+    state.zone = 230; // Southern San d'Oria: a city region, outside the conquest
+    CHECK(Section(BarPopupContent(BarWidget::Zone, state, settings), "Influence") == nullptr);
 }
 
 namespace
@@ -646,7 +686,8 @@ namespace
             RegionOwners owners{};
             owners[1]     = Nation::Bastok;
             state.owners  = owners;
-            state.standing = ConquestStanding{58, 12345, 8210};
+            state.shares =
+                RegionShares{{{Nation::Bastok, 52}, {Nation::SanDoria, 30}, {Nation::Windurst, 10}, {Nation::Beastmen, 8}}};
             state.weather = Weather::DustStorm;
             state.strip    = StripText{"Mog Wardrobe 8", "Help on the selected item"};
             state.stripBag = BagCount{3, 80};
@@ -667,7 +708,7 @@ namespace
         BarState s;
         s.weather = full.weather;
         s.owners  = full.owners;
-        s.standing = full.standing;
+        s.shares   = full.shares;
         if (needs.unixTime) s.unixMs = full.unixMs;
         if (needs.localTime)
         {
@@ -810,24 +851,34 @@ TEST(a_help_line_without_a_caption_wraps_in_the_popup_under_a_fixed_title)
     CHECK(lines[0] + " " + lines[1] == help);
 }
 
-TEST(the_server_time_widget_shows_japans_time_and_its_popup_the_resets)
+TEST(the_clock_can_stack_the_servers_time_under_its_own_and_its_popup_has_the_resets)
 {
     Settings settings;
-    settings.barWidgets[static_cast<int>(BarWidget::ServerTime)] = true;
     BarState state;
-    state.unixMs = 1791527400000; // Friday 15:30 JST
-    const WidgetContent w = BarWidgetContent(BarWidget::ServerTime, state, settings);
-    CHECK(w.shown && w.hasPopup && w.figures && Joined(w.title) == "JST 15:30" && Joined(w.subtitle) == "Friday");
-    const PopupContent p = BarPopupContent(BarWidget::ServerTime, state, settings);
-    CHECK(Joined(p.title) == "Server time");
-    CHECK(Lines(p.sections[0]) ==
-          (std::vector<std::string>{"Friday 15:30 JST", "Daily reset in 8h 30m", "Conquest tally in 2d 8h"}));
-    CHECK(!BarWidgetContent(BarWidget::ServerTime, state, Settings{}).shown); // off by default
-    settings.serverClockZone = ClockZone::UsPacific;
-    CHECK(Joined(BarWidgetContent(BarWidget::ServerTime, state, settings).title) == "PDT 23:30");
-    CHECK(Lines(BarPopupContent(BarWidget::ServerTime, state, settings).sections[0]) ==
-          (std::vector<std::string>{"Thursday 23:30 PDT", "Friday 15:30 JST", "Daily reset in 8h 30m",
-              "Conquest tally in 2d 8h"}));
+    state.unixMs    = 1791527400000 + 42000; // Friday 15:30:42 JST, Thursday 23:30:42 on the US Pacific coast
+    state.earthYear = 2026, state.earthMonth = 10, state.earthDay = 9; // the computer's own: 08:30:42 in Berlin
+    state.earthHour = 8, state.earthMinute = 30, state.earthSecond = 42;
+    WidgetContent w = BarWidgetContent(BarWidget::EarthTime, state, settings);
+    CHECK(w.shown && w.hasPopup && Joined(w.title) == "08:30" && w.subtitle.empty()); // not stacked unless asked
+    settings.clockServerTime = true;
+    w                        = BarWidgetContent(BarWidget::EarthTime, state, settings);
+    CHECK(Joined(w.title) == "08:30" && w.subtitle == ListOf(Text("JST 15:30", Tone::Dim)));
+    settings.clockSeconds = true; // the seconds are the upper line's
+    settings.clock24      = false;
+    w                     = BarWidgetContent(BarWidget::EarthTime, state, settings);
+    CHECK(Joined(w.title) == "8:30:42 AM" && Joined(w.subtitle) == "JST 3:30 PM");
+    settings.clockZone = ClockZone::UsPacific;
+    w                  = BarWidgetContent(BarWidget::EarthTime, state, settings);
+    CHECK(Joined(w.title) == "PDT 11:30:42 PM" && Joined(w.subtitle) == "JST 3:30 PM");
+    // The popup has the server's clock and its resets whether stacked or not: 8h 29m 18s to Saturday 00:00 JST.
+    for (const bool stacked : {true, false})
+    {
+        settings.clockServerTime = stacked;
+        const PopupContent p     = BarPopupContent(BarWidget::EarthTime, state, settings);
+        CHECK(Joined(p.title) == "2026-10-08"); // the Pacific coast's date
+        CHECK(p.sections.size() == 1 && Lines(p.sections[0]) == (std::vector<std::string>{"Server time Friday 15:30 JST",
+                                                                    "Daily reset in 8h 29m", "Conquest tally in 2d 8h"}));
+    }
 }
 
 TEST(the_fps_widget_shows_frames_a_second_and_its_popup_the_frame_times)
@@ -1110,24 +1161,6 @@ TEST(a_checked_players_title_shows_its_number_when_the_list_lacks_it_and_not_at_
           (std::vector<std::string>{"Jobs WAR 75 / NIN 37", "As of your check"}));
 }
 
-TEST(the_conquest_widget_counts_down_to_the_tally_and_shows_your_points)
-{
-    Settings settings;
-    settings.barWidgets[static_cast<int>(BarWidget::Conquest)] = true;
-    BarState state;
-    state.unixMs    = 1791527400000; // Friday 15:30 JST: 203,400 s to Monday 00:00 JST
-    WidgetContent w = BarWidgetContent(BarWidget::Conquest, state, settings);
-    CHECK(w.shown && w.hasPopup && w.figures && Joined(w.title) == "Tally 2d 8h" && Joined(w.subtitle) == "CP -");
-    CHECK(Lines(BarPopupContent(BarWidget::Conquest, state, settings).sections[0]) ==
-          (std::vector<std::string>{"Conquest points -", "Imperial Standing -", "Tally in 2d 8h (Monday 00:00 JST)"}));
-    state.standing = ConquestStanding{59, 12345, 8210}; // 203,400 s is 58.9 Vana'diel days, rounded up
-    w              = BarWidgetContent(BarWidget::Conquest, state, settings);
-    CHECK(Joined(w.subtitle) == "12,345 CP");
-    CHECK(Lines(BarPopupContent(BarWidget::Conquest, state, settings).sections[0]) ==
-          (std::vector<std::string>{"Conquest points 12,345", "Imperial Standing 8,210",
-              "Tally in 2d 8h (Monday 00:00 JST)", "59 Vana'diel days, as the server counts them"}));
-}
-
 TEST(the_signet_widget_shows_only_while_one_is_on_and_says_where_it_works)
 {
     Settings settings;
@@ -1225,6 +1258,75 @@ TEST(the_job_widget_puts_its_exp_bar_under_beside_or_nowhere_and_can_show_levels
     CHECK(Joined(BarWidgetContent(BarWidget::Job, state, settings).title) == "Lv 30");
 }
 
+TEST(the_job_widget_can_put_its_exp_first_or_show_it_alone)
+{
+    Settings settings;
+    BarState state;
+    JobSample s;
+    s.mainJob = 1, s.mainLevel = 30, s.subJob = 13, s.subLevel = 15;
+    s.exp = 4140, s.expNeeded = 7600;
+    state.job          = JobReport{s, std::nullopt};
+    settings.jobLayout = JobLayout::ExpFirst;
+    WidgetContent w    = BarWidgetContent(BarWidget::Job, state, settings);
+    CHECK(w.title == ListOf(Text("3,460 EXP to next"))); // the larger line, in the title's own tone
+    CHECK(w.subtitle == ListOf(Text("WAR 30 / NIN 15", Tone::Dim)));
+    CHECK(w.figures && w.hasPopup && w.progress && std::fabs(*w.progress - 4140.0f / 7600.0f) < 1e-6f);
+    settings.jobNames = false;
+    CHECK(Joined(BarWidgetContent(BarWidget::Job, state, settings).subtitle) == "Lv 30 / 15");
+    settings.jobLayout = JobLayout::ExpOnly;
+    w                  = BarWidgetContent(BarWidget::Job, state, settings);
+    CHECK(Joined(w.title) == "3,460 EXP to next" && w.subtitle.empty() && w.progress.has_value());
+    s.mainLevel = 75, s.subLevel = 37, s.merits = 7, s.meritsMax = 10, s.limitPoints = 4210;
+    state.job = JobReport{s, std::nullopt};
+    w         = BarWidgetContent(BarWidget::Job, state, settings);
+    CHECK(w.title == ListOf(Text("7 merits")) && w.subtitle.empty() && w.progress == 0.421f);
+    state.job.reset(); // the title screen
+    w = BarWidgetContent(BarWidget::Job, state, settings);
+    CHECK(Joined(w.title) == "-" && w.subtitle.empty());
+}
+
+// 2026-10-09 06:30:42 UTC is Friday 15:30:42 in Japan and still Thursday 23:30:42 on the US Pacific coast, on daylight
+// time.
+TEST(the_clock_reads_in_the_zone_picked_for_it_with_that_zones_date_in_its_popup)
+{
+    Settings settings;
+    BarState state;
+    state.unixMs    = 1791527400000 + 42000;
+    state.earthYear = 2026, state.earthMonth = 10, state.earthDay = 9; // the computer's own: 08:30:42 in Berlin
+    state.earthHour = 8, state.earthMinute = 30, state.earthSecond = 42;
+    CHECK(!settings.clockZone.has_value());
+    CHECK(Joined(BarWidgetContent(BarWidget::EarthTime, state, settings).title) == "08:30");
+    CHECK(Joined(BarPopupContent(BarWidget::EarthTime, state, settings).title) == "2026-10-09");
+    settings.clockZone = ClockZone::UsPacific;
+    CHECK(Joined(BarWidgetContent(BarWidget::EarthTime, state, settings).title) == "PDT 23:30");
+    CHECK(Joined(BarPopupContent(BarWidget::EarthTime, state, settings).title) == "2026-10-08");
+    settings.clockZone    = ClockZone::Japan;
+    settings.clock24      = false;
+    settings.clockSeconds = true;
+    CHECK(Joined(BarWidgetContent(BarWidget::EarthTime, state, settings).title) == "JST 3:30:42 PM");
+    CHECK(Joined(BarPopupContent(BarWidget::EarthTime, state, settings).title) == "2026-10-09");
+}
+
+TEST(a_clock_in_a_picked_zone_is_read_from_the_time_alone_and_the_computers_from_its_own)
+{
+    Settings settings;
+    for (bool& on : settings.barWidgets)
+        on = false;
+    settings.barWidgets[static_cast<int>(BarWidget::EarthTime)] = true;
+    const BarNeeds own = NeedsOf(settings, std::nullopt);
+    CHECK(own.localTime && !own.unixTime);
+    settings.clockZone   = ClockZone::Utc;
+    const BarNeeds zoned = NeedsOf(settings, std::nullopt);
+    CHECK(zoned.unixTime && !zoned.localTime);
+    settings.clockZone.reset();
+    settings.clockServerTime = true; // the server's line goes by the time, the computer's by its own
+    const BarNeeds stacked   = NeedsOf(settings, std::nullopt);
+    CHECK(stacked.unixTime && stacked.localTime);
+    settings.clockServerTime = false;
+    const BarNeeds opened    = NeedsOf(settings, BarWidget::EarthTime); // the popup counts down to the resets
+    CHECK(opened.unixTime && opened.localTime);
+}
+
 TEST(the_clocks_read_on_a_twelve_hour_clock_when_asked)
 {
     CHECK(ClockText(21, 7, true) == "21:07" && ClockText(21, 7, false) == "9:07 PM");
@@ -1234,9 +1336,6 @@ TEST(the_clocks_read_on_a_twelve_hour_clock_when_asked)
     BarState state;
     state.earthHour = 9, state.earthMinute = 30;
     CHECK(Joined(BarWidgetContent(BarWidget::EarthTime, state, settings).title) == "9:30 AM");
-    settings.barWidgets[static_cast<int>(BarWidget::ServerTime)] = true;
-    state.unixMs = 1791527400000; // Friday 15:30 JST
-    CHECK(Joined(BarWidgetContent(BarWidget::ServerTime, state, settings).title) == "JST 3:30 PM");
 }
 
 TEST(the_clocks_add_seconds_when_asked)
@@ -1248,11 +1347,6 @@ TEST(the_clocks_add_seconds_when_asked)
     CHECK(Joined(BarWidgetContent(BarWidget::EarthTime, state, settings).title) == "09:30");
     settings.clockSeconds = true;
     CHECK(Joined(BarWidgetContent(BarWidget::EarthTime, state, settings).title) == "09:30:07");
-    settings.barWidgets[static_cast<int>(BarWidget::ServerTime)] = true;
-    state.unixMs = 1791527400000 + 42000; // Friday 15:30:42 JST
-    CHECK(Joined(BarWidgetContent(BarWidget::ServerTime, state, settings).title) == "JST 15:30");
-    settings.serverSeconds = true;
-    CHECK(Joined(BarWidgetContent(BarWidget::ServerTime, state, settings).title) == "JST 15:30:42");
 }
 
 TEST(the_connection_widget_adds_its_latency_when_asked)

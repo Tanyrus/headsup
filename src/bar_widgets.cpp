@@ -295,9 +295,13 @@ namespace headsup
     {
         auto shown = [&](BarWidget widget) { return settings.barWidgets[static_cast<int>(widget)]; };
         BarNeeds needs;
-        needs.unixTime   = shown(BarWidget::Weather) || shown(BarWidget::VanaTime) || shown(BarWidget::ServerTime) ||
-                           shown(BarWidget::Conquest);
-        needs.localTime  = shown(BarWidget::EarthTime);
+        // The Clock in a zone of its own goes by the time alone, as its server line and its popup's resets do; in the
+        // computer's zone, by what Windows makes of the time.
+        const bool clock = shown(BarWidget::EarthTime), zonedClock = clock && settings.clockZone.has_value();
+        needs.unixTime   = shown(BarWidget::Weather) || shown(BarWidget::VanaTime) || zonedClock ||
+                           (clock && (settings.clockServerTime || open == BarWidget::EarthTime)) ||
+                           (shown(BarWidget::Zone) && open == BarWidget::Zone); // the popup counts down to the tally
+        needs.localTime  = clock && !zonedClock;
         needs.zone       = shown(BarWidget::Zone) || shown(BarWidget::Weather) ||
                      (shown(BarWidget::Signet) && open == BarWidget::Signet); // the popup says where it works
         needs.target     = shown(BarWidget::Target) || shown(BarWidget::Distance);
@@ -442,24 +446,25 @@ namespace headsup
             w.hasPopup = true;
             break;
         case BarWidget::EarthTime:
-            w.title    = ListOf(Text(ClockText(state.earthHour, state.earthMinute, settings.clock24,
-                settings.clockSeconds ? state.earthSecond : -1)));
+            w.title    = ListOf(Text(settings.clockZone
+                    ? ZoneClockText(ZoneAt(*settings.clockZone, state.unixMs), settings.clock24, settings.clockSeconds)
+                    : ClockText(state.earthHour, state.earthMinute, settings.clock24,
+                          settings.clockSeconds ? state.earthSecond : -1)));
+            if (settings.clockServerTime)
+                w.subtitle = ListOf(Text(
+                    ZoneClockText(ZoneAt(ClockZone::Japan, state.unixMs), settings.clock24, false), Tone::Dim));
             w.hasPopup = true;
             break;
         case BarWidget::GameHelp:
             return WidgetContent{};
-        case BarWidget::ServerTime:
-            return ServerTimeWidget(state.unixMs, settings.serverClockZone, settings.clock24, settings.serverSeconds);
         case BarWidget::Fps:
             return FpsWidget(state.frames);
         case BarWidget::Job:
-            return JobWidget(state.job, settings.expBar, settings.jobNames);
+            return JobWidget(state.job, settings.expBar, settings.jobNames, settings.jobLayout);
         case BarWidget::Connection:
             return ConnectionWidget(state.connection, settings.barLatency);
         case BarWidget::Party:
             return PartyWidget(state.party);
-        case BarWidget::Conquest:
-            return ConquestWidget(state.unixMs, state.standing);
         case BarWidget::Signet:
             return SignetWidget(state.signet);
         case BarWidget::Distance:
@@ -485,23 +490,25 @@ namespace headsup
             const ZoneRecord* zone = KnownZone(state.zone);
             const std::string_view region = ZoneRegion(zone);
             popup.title = ListOf(Text(ZoneTitle(state.zone)));
-            PopupSection rows;
+            // A zone past the data has its number for a title already.
+            if (zone != nullptr) popup.title.push_back(Text(" " + std::to_string(state.zone), Tone::Dim));
             if (!region.empty())
-                rows.rows.push_back(Line(Cell(ListOf(Text("Region ", Tone::Dim), Text(std::string(region))))));
-            if (InConquest(zone))
+                popup.sections.push_back(PopupSection{
+                    "", ListOf(Line(Cell(ListOf(Text("Region ", Tone::Dim), Text(std::string(region))))))});
+            if (InConquest(zone) && state.shares)
             {
-                if (state.owners)
+                PopupSection influence{"Influence", {}};
+                const Nation owner = OwnerOf(zone, state);
+                for (const RegionShare& share : *state.shares)
                 {
-                    const Nation owner = OwnerOf(zone, state);
-                    Span holder =
-                        owner != Nation::None ? Colored(NationName(owner), NationColor(owner)) : Text("no one");
-                    rows.rows.push_back(Line(Cell(ListOf(Text("Held by ", Tone::Dim), std::move(holder)))));
+                    PopupRow row = Labeled(Colored(NationName(share.nation), NationColor(share.nation)),
+                        Text(std::to_string(share.percent) + "%"));
+                    row.cells[0].star = share.nation == owner;
+                    influence.rows.push_back(std::move(row));
                 }
-                else
-                    rows.rows.push_back(LineOf("Held by: known at the next conquest update", Tone::Dim));
+                influence.rows.push_back(Labeled("Tally in", Text(SpanText(SecondsToTally(state.unixMs)))));
+                popup.sections.push_back(std::move(influence));
             }
-            rows.rows.push_back(Line(Cell(ListOf(Text("Zone ", Tone::Dim), Text(std::to_string(state.zone))))));
-            popup.sections = ListOf(std::move(rows));
             break;
         }
         case BarWidget::Weather:
@@ -587,13 +594,20 @@ namespace headsup
             break;
         }
         case BarWidget::EarthTime:
-            popup.title = ListOf(Text(
-                std::to_string(state.earthYear) + "-" + Printed("%02d", state.earthMonth) + "-" + Printed("%02d", state.earthDay)));
+        {
+            int year = state.earthYear, month = state.earthMonth, day = state.earthDay;
+            if (settings.clockZone)
+            {
+                const ZoneTime there = ZoneAt(*settings.clockZone, state.unixMs);
+                year = there.year, month = there.month, day = there.day;
+            }
+            popup.title =
+                ListOf(Text(std::to_string(year) + "-" + Printed("%02d", month) + "-" + Printed("%02d", day)));
+            popup.sections = ListOf(ServerTimeRows(state.unixMs));
             break;
+        }
         case BarWidget::GameHelp:
             return GameHelpPopup(state.strip, StripBagFill(state));
-        case BarWidget::ServerTime:
-            return ServerTimePopup(state.unixMs, settings.serverClockZone);
         case BarWidget::Fps:
             return FpsPopup(state.frames);
         case BarWidget::Job:
@@ -602,8 +616,6 @@ namespace headsup
             return ConnectionPopup(state.connection);
         case BarWidget::Party:
             return PartyPopup(state.party);
-        case BarWidget::Conquest:
-            return ConquestPopup(state.unixMs, state.standing);
         case BarWidget::Signet:
             return SignetPopup(state.signet, state.zone);
         case BarWidget::Distance: break;

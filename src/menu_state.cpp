@@ -16,6 +16,11 @@ namespace headsup
         return changedAt && (!windowOpen || now - *changedAt >= kSaveSettleSeconds);
     }
 
+    namespace
+    {
+        constexpr const char* kLocalZoneLabel = "Local";
+    }
+
     const PageInfo kPages[kPageCount] = {
         {Page::Entities, "Entities", false},
         {Page::Mobs, "Mobs", true},
@@ -24,7 +29,8 @@ namespace headsup
         {Page::Npcs, "NPCs", true},
         {Page::Pets, "Pets", true},
         {Page::UserInterface, "User Interface", false},
-        {Page::TopBar, "Top Bar", true},
+        {Page::TopPanel, "Top Panel", true},
+        {Page::Widgets, "Widgets", true},
         {Page::MouseCursor, "Mouse Cursor", false},
         {Page::ConfigMenu, "Config Menu", false},
         {Page::Debug, "Debug", false},
@@ -73,6 +79,38 @@ namespace headsup
             at = end < result.size() ? end + 1 : end;
         }
         return result;
+    }
+
+    std::vector<BarWidget> WidgetTabs()
+    {
+        std::vector<BarWidget> tabs;
+        for (int w = 0; w < kBarWidgetCount; ++w)
+            if (OnTheBar(static_cast<BarWidget>(w))) tabs.push_back(static_cast<BarWidget>(w));
+        return tabs;
+    }
+
+    int TabsPerRow(int count, int rows) { return std::max(1, (count + std::max(rows, 1) - 1) / std::max(rows, 1)); }
+
+    TabPlace TabAt(int tab, int count, int perRow, float strip, float height, float gap)
+    {
+        const int columns = std::max(perRow, 1), row = tab / columns;
+        const int inRow   = std::clamp(count - row * columns, 1, columns);
+        const float width = (strip - gap * static_cast<float>(inRow - 1)) / static_cast<float>(inRow);
+        return TabPlace{static_cast<float>(tab % columns) * (width + gap), static_cast<float>(row) * (height + gap), width};
+    }
+
+    int ClockZoneChoice(const std::optional<ClockZone>& zone) { return zone ? static_cast<int>(*zone) + 1 : 0; }
+
+    std::optional<ClockZone> ClockZoneOfChoice(int choice)
+    {
+        if (choice < 1 || choice >= kClockZoneChoices) return std::nullopt;
+        return static_cast<ClockZone>(choice - 1);
+    }
+
+    std::string ClockZoneChoiceName(int choice)
+    {
+        const std::optional<ClockZone> zone = ClockZoneOfChoice(choice);
+        return zone ? ClockZoneName(*zone) : kLocalZoneLabel;
     }
 
     std::string SizeFormat(const Settings& settings, int percent)

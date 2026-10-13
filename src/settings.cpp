@@ -32,7 +32,7 @@ namespace headsup
             {"cursorFeather", &Settings::cursorFeather}, {"chocoboPointer", &Settings::chocoboPointer},
             {"fixPointer", &Settings::fixPointer}, {"showRanks", &Settings::showRanks}, {"showBar", &Settings::showBar},
             {"hideHelpBar", &Settings::hideHelpBar}, {"hideNetstat", &Settings::hideNetstat},
-            {"clockSeconds", &Settings::clockSeconds}, {"serverSeconds", &Settings::serverSeconds},
+            {"clockSeconds", &Settings::clockSeconds},
             {"stackNames", &Settings::stackNames},
             {"nameplates", &Settings::nameplates}, {"outlines", &Settings::outlines}};
 
@@ -107,7 +107,14 @@ namespace headsup
         const char* const kBarThemeNames[kBarThemeCount] = {"phoenixGold", "umbraDark", "phoenixRedOrnate",
             "phoenixRedPills"};
         constexpr const char* kBarCurrencyKey = "barCurrency";
-        constexpr const char* kClockZoneKey   = "serverClockZone";
+        constexpr const char* kClockServerTimeKey = "clockServerTime";
+        // Server time was a widget of its own, with this switch.
+        constexpr const char* kServerTimeWidgetKey = "barServerTime";
+        constexpr const char* kTrue                = "true";
+        constexpr const char* kClockZoneKey       = "clockZone"; // the Clock widget's: a kClockZoneNames or kLocalZone
+        constexpr const char* kLocalZone          = "local";
+        constexpr const char* kJobLayoutKey       = "jobLayout";
+        const char* const kJobLayoutNames[kJobLayoutCount] = {"jobsFirst", "expFirst", "expOnly"};
         constexpr const char* kTargetDetailsKey = "barTargetDetails";
         constexpr const char* kMenuFontKey      = "menuFont";
         constexpr const char* kMenuScaleKey     = "menuScale";
@@ -126,7 +133,7 @@ namespace headsup
         constexpr const char* kBarSeparatorsKey                    = "barSeparators";
         const char* const kBarSeparatorsNames[kBarSeparatorsCount] = {"theme", "diamonds", "none"};
         const char* const kBarWidgetKeys[] = {"barZone", "barWeather", "barVanaTime", "barTarget", "barGil", "barBags",
-            "barEarthTime", "barGameHelp", "barServerTime", "barFps", "barJob", "barConnection", "barParty", "barConquest", "barSignet", "barDistance"};
+            "barEarthTime", "barGameHelp", "barFps", "barJob", "barConnection", "barParty", "barSignet", "barDistance"};
         static_assert(std::size(kBarWidgetKeys) == kBarWidgetCount);
         const char* const kBarSectionKeys[] = {"barLeft", "barCenter", "barRight"};
         static_assert(std::size(kBarSectionKeys) == kBarSectionCount);
@@ -215,7 +222,7 @@ namespace headsup
                 StoreFloat(store, base + kChannelKeys[i], c.v[i]);
         }
 
-        void StoreBool(SettingsStore& store, const std::string& key, bool v) { store.Set(key.c_str(), v ? "true" : "false"); }
+        void StoreBool(SettingsStore& store, const std::string& key, bool v) { store.Set(key.c_str(), v ? kTrue : "false"); }
 
         uint32_t LoadHex(SettingsStore& store, const std::string& key, uint32_t fallback)
         {
@@ -945,8 +952,9 @@ namespace headsup
             s.*c.field = ClampColor(s.*c.field, d.*c.field);
         if (static_cast<int>(s.barTheme) >= kBarThemeCount) s.barTheme = d.barTheme;
         if (s.barCurrency < 0 || s.barCurrency >= kCurrencyCount) s.barCurrency = d.barCurrency;
-        if (static_cast<int>(s.serverClockZone) >= kClockZoneCount) s.serverClockZone = d.serverClockZone;
+        if (s.clockZone && static_cast<int>(*s.clockZone) >= kClockZoneCount) s.clockZone = d.clockZone;
         if (static_cast<int>(s.expBar) >= kExpBarPlaceCount) s.expBar = d.expBar;
+        if (static_cast<int>(s.jobLayout) >= kJobLayoutCount) s.jobLayout = d.jobLayout;
         if (static_cast<int>(s.barSubtitle) >= kSubtitlePlaceCount) s.barSubtitle = d.barSubtitle;
         if (MenuFontNamed(s.menuFont) == nullptr) s.menuFont = d.menuFont;
         s.menuScale = std::clamp(s.menuScale, kMinMenuScale, kMaxMenuScale);
@@ -1000,7 +1008,10 @@ namespace headsup
         s.menuScale        = LoadInt(store, kMenuScaleKey, s.menuScale);
         const std::string clockZone = store.GetString(kClockZoneKey, "");
         for (int z = 0; z < kClockZoneCount; ++z)
-            if (clockZone == kClockZoneNames[z]) s.serverClockZone = static_cast<ClockZone>(z);
+            if (clockZone == kClockZoneNames[z]) s.clockZone = static_cast<ClockZone>(z);
+        // A file from when Server time was a widget, and shown, has the Clock stack it.
+        s.clockServerTime =
+            store.GetBool(kClockServerTimeKey, store.GetString(kServerTimeWidgetKey, "") == kTrue);
         const std::string separators = store.GetString(kBarSeparatorsKey, "");
         for (int t = 0; t < kBarSeparatorsCount; ++t)
             if (separators == kBarSeparatorsNames[t]) s.barSeparators = static_cast<BarSeparators>(t);
@@ -1014,6 +1025,9 @@ namespace headsup
         const std::string expBar = store.GetString(kExpBarKey, "");
         for (int e = 0; e < kExpBarPlaceCount; ++e)
             if (expBar == kExpBarNames[e]) s.expBar = static_cast<ExpBarPlace>(e);
+        const std::string jobLayout = store.GetString(kJobLayoutKey, "");
+        for (int l = 0; l < kJobLayoutCount; ++l)
+            if (jobLayout == kJobLayoutNames[l]) s.jobLayout = static_cast<JobLayout>(l);
         s.jobNames   = store.GetBool(kJobNamesKey, s.jobNames);
         const std::string subtitle = store.GetString(kSubtitleKey, "");
         for (int i = 0; i < kSubtitlePlaceCount; ++i)
@@ -1073,7 +1087,7 @@ namespace headsup
         store.Set(kBarThemeKey, kBarThemeNames[static_cast<int>(s.barTheme)]);
         store.Set(kBarSeparatorsKey, kBarSeparatorsNames[static_cast<int>(s.barSeparators)]);
         store.Set(kBarCurrencyKey, kCurrencyTable[s.barCurrency].key);
-        store.Set(kClockZoneKey, kClockZoneNames[static_cast<int>(s.serverClockZone)]);
+        store.Set(kClockZoneKey, s.clockZone ? kClockZoneNames[static_cast<int>(*s.clockZone)] : kLocalZone);
         setBool(kTargetDetailsKey, s.barTargetDetails);
         store.Set(kMenuFontKey, s.menuFont.c_str());
         setFloat(kMenuScaleKey, static_cast<float>(s.menuScale));
@@ -1085,9 +1099,11 @@ namespace headsup
             setBool(key + kIconsSuffix, s.barIcons[w]);
         }
         store.Set(kExpBarKey, kExpBarNames[static_cast<int>(s.expBar)]);
+        store.Set(kJobLayoutKey, kJobLayoutNames[static_cast<int>(s.jobLayout)]);
         setBool(kJobNamesKey, s.jobNames);
         store.Set(kSubtitleKey, kSubtitleNames[static_cast<int>(s.barSubtitle)]);
         setBool(kClock24Key, s.clock24);
+        setBool(kClockServerTimeKey, s.clockServerTime);
         setBool(kLatencyKey, s.barLatency);
         for (int i = 0; i < kBarSectionCount; ++i)
             store.Set(kBarSectionKeys[i], PlacementNames(s.barSections[i]).c_str());

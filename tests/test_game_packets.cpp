@@ -53,6 +53,33 @@ TEST(a_conquest_update_names_each_regions_owner)
     CHECK(std::string(NationName(Nation::SanDoria)) == "San d'Oria" && std::string(NationName(Nation::None)).empty());
 }
 
+// West Ronfaure's update of 2026-10-10 as /hu debug wrote it: 3D 15 0B at 0x86 and 05 at 0x94, with San d'Oria
+// first of the three nations in Ronfaure's ranking byte (39 at 0x1A).
+TEST(a_conquest_update_ranks_the_influence_in_your_region)
+{
+    std::vector<uint8_t> data(0xB4, 0);
+    data[0x86] = 0x3D, data[0x87] = 0x15, data[0x88] = 0x0B, data[0x94] = 0x05;
+    data[0x89] = 0x40, data[0x8A] = 0x17, data[0x8B] = 0x0B; // the nations' shares without the beastmen, unread
+    CHECK(ParseRegionShares(data.data(), 0xB4) ==
+          (RegionShares{{{Nation::SanDoria, 61}, {Nation::Bastok, 21}, {Nation::Windurst, 11}, {Nation::Beastmen, 5}}}));
+    CHECK(ParseRegionShares(data.data(), 0x95).has_value()); // through the beastmen's byte
+    CHECK(!ParseRegionShares(data.data(), 0x94).has_value());
+    CHECK(!ParseRegionShares(nullptr, 0xB4).has_value());
+}
+
+TEST(the_largest_share_of_influence_comes_first_and_equal_shares_stay_in_the_nations_order)
+{
+    std::vector<uint8_t> data(0xB4, 0);
+    data[0x86] = 3, data[0x87] = 4, data[0x88] = 3, data[0x94] = 89;
+    CHECK(ParseRegionShares(data.data(), 0xB4) ==
+          (RegionShares{{{Nation::Beastmen, 89}, {Nation::Bastok, 4}, {Nation::SanDoria, 3}, {Nation::Windurst, 3}}}));
+    data[0x94] = 91; // 101 in all: not shares, so not the layout HeadsUp expects
+    CHECK(!ParseRegionShares(data.data(), 0xB4).has_value());
+    data = std::vector<uint8_t>(0xB4, 0); // a week with no influence yet, or a zone outside the conquest
+    CHECK(ParseRegionShares(data.data(), 0xB4) ==
+          (RegionShares{{{Nation::SanDoria, 0}, {Nation::Bastok, 0}, {Nation::Windurst, 0}, {Nation::Beastmen, 0}}}));
+}
+
 // The weather ids are whole 16-bit words, which a set high byte takes past every weather; each packet is read up to
 // its last byte and no further; and no packet reads as nothing.
 TEST(packets_are_read_as_whole_words_up_to_their_last_byte_and_never_from_nothing)
@@ -213,19 +240,4 @@ TEST(the_conquest_request_is_a_bare_header_naming_0x05a_and_one_word)
     CHECK((word & 0x1FF) == kConquestRequestPacket);
     CHECK(static_cast<size_t>(word >> 9) * 4 == kConquestRequest.size()); // XiPackets: 0x0004 bytes
     CHECK(kConquestRequest[2] == 0 && kConquestRequest[3] == 0);         // the sync word, the game's to fill
-}
-
-TEST(a_conquest_update_carries_the_tally_your_conquest_points_and_imperial_standing)
-{
-    std::vector<uint8_t> packet(0xB4, 0);
-    const uint32_t points = 12345, standing = 8210;
-    packet[0x8C] = 59;
-    std::memcpy(packet.data() + 0x90, &points, sizeof(points));
-    std::memcpy(packet.data() + 0xB0, &standing, sizeof(standing));
-    std::memset(packet.data() + 0xA0, 0xFF, 0x10); // the Besieged words between them
-    CHECK(ParseConquestStanding(packet.data(), 0xB4) == (ConquestStanding{59, 12345, 8210}));
-    CHECK(!ParseConquestStanding(packet.data(), 0xB3).has_value());
-    CHECK(!ParseConquestStanding(nullptr, 0xB4).has_value());
-    packet[0x8C] = 176; // further off than a week: not the layout HeadsUp expects
-    CHECK(!ParseConquestStanding(packet.data(), 0xB4).has_value());
 }

@@ -35,12 +35,10 @@ namespace headsup
         Bags,
         EarthTime,
         GameHelp,
-        ServerTime,
         Fps,
         Job,
         Connection,
         Party,
-        Conquest,
         Signet,
         Distance,
     };
@@ -48,7 +46,7 @@ namespace headsup
     // Which widgets a new settings file shows, by BarWidget. to_array takes its size from the list, so a widget added
     // to BarWidget without a default here fails the assert.
     constexpr auto kBarWidgetDefaults =
-        std::to_array<bool>({true, true, true, true, true, true, true, true, false, true, true, true, false, false, false, true});
+        std::to_array<bool>({true, true, true, true, true, true, true, true, true, true, true, false, false, true});
     static_assert(kBarWidgetDefaults.size() == kBarWidgetCount);
 
     // Where a widget's second line goes when the bar is too short for two: nowhere, or beside its title.
@@ -68,6 +66,15 @@ namespace headsup
         Off,
     };
     constexpr int kExpBarPlaceCount = static_cast<int>(ExpBarPlace::Off) + 1;
+
+    // What the Job widget shows larger: its jobs and levels over its EXP, the EXP over them, or the EXP alone.
+    enum class JobLayout : uint8_t
+    {
+        JobsFirst,
+        ExpFirst,
+        ExpOnly,
+    };
+    constexpr int kJobLayoutCount = static_cast<int>(JobLayout::ExpOnly) + 1;
 
     constexpr int kMinBarHeight = 24, kMaxBarHeight = 64; // pixels
     // A bar or popup text size setting's leftmost position, Auto: the size follows the bar height. Set sizes run from

@@ -4,6 +4,17 @@
 
 namespace headsup
 {
+    namespace
+    {
+        // What a zone-in owes goes at once, though never within kConquestAskGap of the last ask; after that, every
+        // kPopupRefresh while refresh.
+        bool RequestDue(double now, bool owed, const std::optional<double>& asked, bool refresh)
+        {
+            if (owed) return !asked || now - *asked >= kConquestAskGap;
+            return refresh && (!asked || now - *asked >= kPopupRefresh);
+        }
+    }
+
     PacketFollowUp GameState::Received(uint16_t id, const uint8_t* data, uint32_t size)
     {
         PacketFollowUp next;
@@ -14,14 +25,14 @@ namespace headsup
             m_LevelSynced.clear();
             m_ConquestOwed   = true;
             m_CurrenciesOwed = true;
+            m_Shares.reset();
             m_Weather    = ParseZoneInWeather(data, size);
             next.zonedIn = true;
             if (const std::optional<uint32_t> player = ParseZoneInPlayer(data, size))
             {
-                // Another character's points and standing are not yours: unknown until the server says.
+                // Another character's points are not yours: unknown until the server says.
                 if (m_Player && *m_Player != *player)
                 {
-                    m_Standing.reset();
                     m_ConquestBytes.clear();
                     m_Currencies = CurrencyValues{};
                 }
@@ -34,7 +45,7 @@ namespace headsup
         case kConquestPacket:
             m_ConquestOwed = false; // whether HeadsUp asked or not
             if (const auto owners = ParseConquest(data, size)) m_Owners = *owners;
-            if (const auto standing = ParseConquestStanding(data, size)) m_Standing = *standing;
+            if (const auto shares = ParseRegionShares(data, size)) m_Shares = *shares;
             if (data != nullptr) m_ConquestBytes.assign(data, data + size);
             break;
         case kCurrencies1Packet:
@@ -94,9 +105,9 @@ namespace headsup
         return m_LevelSynced.count(index) != 0;
     }
 
-    bool GameState::ConquestRequestDue(double now, bool open) const
+    bool GameState::ConquestRequestDue(double now, bool open, bool refresh) const
     {
-        return open && m_ConquestOwed && (!m_ConquestAsked || now - *m_ConquestAsked >= kConquestAskGap);
+        return open && RequestDue(now, m_ConquestOwed, m_ConquestAsked, refresh);
     }
 
     void GameState::ConquestRequested(double now)
@@ -107,9 +118,7 @@ namespace headsup
 
     bool GameState::CurrencyRequestDue(double now, bool open, bool refresh) const
     {
-        if (!open) return false;
-        if (m_CurrenciesOwed) return !m_CurrenciesAsked || now - *m_CurrenciesAsked >= kConquestAskGap;
-        return refresh && (!m_CurrenciesAsked || now - *m_CurrenciesAsked >= kCurrencyRefresh);
+        return open && RequestDue(now, m_CurrenciesOwed, m_CurrenciesAsked, refresh);
     }
 
     void GameState::CurrencyRequested(double now)
