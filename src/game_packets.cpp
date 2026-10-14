@@ -28,6 +28,9 @@ namespace headsup
         constexpr size_t kItemLinkshell = 0x09, kItemLinkshellBytes = 15;
         constexpr uint32_t kInspectName = 0x80, kInspectTitle = 0x90, kInspectMessageBytes = 0x94;
         constexpr size_t kNameBytes             = 16;
+        constexpr uint32_t kEntityIndex = 0x08, kEntitySends = 0x0A, kEntityFlags = 0x21;
+        constexpr uint8_t kSendsFlags = 0x04, kSendsDespawn = 0x20; // UPDATE_HP and UPDATE_DESPAWN
+        constexpr uint32_t kUntargetableFlag = 0x800;                // EntityFlags::Untargetable
         constexpr unsigned kCodeBits = 6, kLetters = 26, kDigits = 10, kEndCode = 63, kByteBits = 8;
         constexpr size_t kMostLinkshellLetters = 20;
     }
@@ -121,6 +124,15 @@ namespace headsup
         return InspectGeneral{ReadAt<uint32_t>(data, kInspectId), ReadAt<uint16_t>(data, kInspectIndex),
             LinkshellName(data + kInspectLinkshell, kLinkshellBytes), data[kInspectJobs], data[kInspectJobs + 1],
             data[kInspectLevels], data[kInspectLevels + 1], data[kInspectMasterLevel]};
+    }
+
+    std::optional<EntityUpdate> ParseEntityUpdate(const uint8_t* data, uint32_t size)
+    {
+        if (data == nullptr || size < kEntityFlags + sizeof(uint32_t)) return std::nullopt;
+        const uint8_t sends = data[kEntitySends];
+        EntityUpdate update{ReadAt<uint16_t>(data, kEntityIndex), (sends & kSendsDespawn) != 0, std::nullopt};
+        if ((sends & kSendsFlags) != 0) update.untargetable = (ReadAt<uint32_t>(data, kEntityFlags) & kUntargetableFlag) != 0;
+        return update;
     }
 
     std::optional<InspectMessage> ParseInspectMessage(const uint8_t* data, uint32_t size)

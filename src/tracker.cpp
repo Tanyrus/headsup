@@ -86,8 +86,9 @@ namespace headsup
             }
             const OutlineMode mode = OutlineModeOf(st, settings);
             const bool wanted = mode == OutlineMode::Shown || (mode == OutlineMode::WhenTargeted && Targeted(st.target));
-            // A dead mob's row decides for it; nothing else dead is outlined, and a pet goes by the pets' rows.
-            const bool outlinable = a.alive || PlateKindOf(st) == PlateKind::Mobs;
+            // A dead mob's row decides for it; nothing else dead is outlined, and a pet goes by the pets' rows. Nothing
+            // the player cannot target is outlined, as a Chigoe until it engages.
+            const bool outlinable = (a.alive || PlateKindOf(st) == PlateKind::Mobs) && !a.untargetable;
             if (settings.enabled && settings.outlines && wanted && outlinable && a.distance <= settings.maxDistance)
             {
                 info.outline    = true;

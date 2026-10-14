@@ -52,6 +52,7 @@ namespace headsup
         bool isFriend       = false;
         bool linkshell      = false;
         bool engaged        = false;
+        bool untargetable   = false; // the server says it cannot be targeted, as a Chigoe until it engages
         bool self           = false;
         std::optional<PlayerJobs> jobs = std::nullopt;
         const char* ownerName          = "";
