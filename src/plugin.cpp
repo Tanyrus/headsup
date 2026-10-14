@@ -1868,6 +1868,7 @@ private:
                 .isFriend       = isPlayer && headsup::IsFriend(m_Friends, serverId),
                 .linkshell      = isPlayer && headsup::SharesLinkshell(m_GameState.PlayerCheckOf(serverId), m_Linkshells),
                 .engaged        = state == kEngagedStatus,
+                .untargetable   = m_GameState.Untargetable(index),
                 .self           = self,
                 .jobs           = isPlayer ? JobsOf(index, serverId) : std::nullopt,
                 .title          = isPlayer ? TitleOf(self, serverId, player) : 0,

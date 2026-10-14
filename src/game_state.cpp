@@ -23,6 +23,7 @@ namespace headsup
         case kZoneInPacket:
             m_PlayerStatus.clear(); // target indexes are reused in the next zone
             m_LevelSynced.clear();
+            m_Untargetable.clear();
             m_ConquestOwed   = true;
             m_CurrenciesOwed = true;
             m_Shares.reset();
@@ -62,6 +63,15 @@ namespace headsup
                 }
                 else if (update->status)
                     m_PlayerStatus[update->index] = *update->status;
+            }
+            break;
+        case kEntityUpdatePacket:
+            if (const auto update = ParseEntityUpdate(data, size))
+            {
+                if (update->despawn || update->untargetable == false)
+                    m_Untargetable.erase(update->index);
+                else if (update->untargetable == true)
+                    m_Untargetable.insert(update->index);
             }
             break;
         case kCharSyncPacket:
@@ -106,6 +116,8 @@ namespace headsup
     {
         return m_LevelSynced.count(index) != 0;
     }
+
+    bool GameState::Untargetable(uint16_t index) const { return m_Untargetable.count(index) != 0; }
 
     bool GameState::ConquestRequestDue(double now, bool open, bool refresh) const
     {
