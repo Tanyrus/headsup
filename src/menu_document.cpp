@@ -295,6 +295,8 @@ namespace headsup
         css += ".btn.step{position:relative;width:" + frame + ";padding:0px;border-radius:" + radius + ";background-color:" +
                color(c.control) + ";}";
         css += ".btn.step:hover{background-color:" + color(c.hover) + ";}";
+        css += ".stepval{margin:0px " + Em(kControlGap) + ";line-height:" + frame + ";text-align:center;border-radius:" + radius +
+               ";background-color:" + color(c.control) + ";}";
         css += ".tri{position:absolute;top:" + Em(kFrame / 2.0f - kArrow) + ";width:0px;height:0px;border-top:" + Em(kArrow) +
                " transparent;border-bottom:" + Em(kArrow) + " transparent;}";
         css += ".tri.left{left:0.5em;border-right:0.45em " + color(c.text) + ";}";

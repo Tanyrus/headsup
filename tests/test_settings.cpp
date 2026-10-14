@@ -379,7 +379,7 @@ helpBarY=8.0000
         s.clockServerTime = true; // the file's Server time widget was on
         s.barTargetDetails = true;
         s.menuFont         = "Tahoma";
-        s.menuScale        = 125;
+        s.menuFontSize     = 21; // 125 percent of Ashita's 18 pixels, in Tahoma, which was drawn at 0.95 of its size
         s.windowOffsets    = {WindowOffset{"equip", 10, -20}};
         s.windowGroups     = {WindowGroup{"Bags", 0, 30, true, {"inventor", "iteminfo"}}};
         s.allUnderBar      = true;
@@ -423,7 +423,7 @@ helpBarY=8.0000
 
     // The keys of kSavedFile that only an older build's file carries: a migration reads them, or nothing does, and
     // nothing writes them.
-    const char* const kOldKeys[] = {"chocoboPointer", "untargetedOpacity", "glowOffWhenFighting", "thickness", "cursorSize", "cursorOutline", "replaceCursor", "cursorFeather", "barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
+    const char* const kOldKeys[] = {"menuScale", "chocoboPointer", "untargetedOpacity", "glowOffWhenFighting", "thickness", "cursorSize", "cursorOutline", "replaceCursor", "cursorFeather", "barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
         "serverClockZone", "showLabels", "replaceMobNames", "showIcons", "hideInCombat", "hideClaimed", "hideTooWeak",
         "hideWhileEngaged", "markPlaceholders", "fontBold", "nameGlow", "scalePlayerNames",
         "labelFontBold", "showOrnament", "ownGlowColor", "ownOrnamentColor", "labelFontName", "glowSize",
@@ -1019,10 +1019,32 @@ TEST(a_menu_font_the_list_lacks_or_a_size_past_its_ends_keeps_the_defaults)
 {
     MapStore store;
     store.values["menuFont"]  = "Comic Sans";
-    store.values["menuScale"] = "400";
-    const Settings s          = LoadSettings(store);
-    CHECK(s.menuFont == kDefaultMenuFont && s.menuScale == kMaxMenuScale);
+    store.values["menuFontSize"] = "400";
+    const Settings s             = LoadSettings(store);
+    CHECK(s.menuFont == kDefaultMenuFont && s.menuFontSize == kMaxMenuFontSize);
     CHECK(MenuFontNamed("Segoe UI") != nullptr && MenuFontNamed("Barlow Condensed")->file == nullptr);
+}
+
+TEST(the_windows_font_size_is_pixels_and_an_old_percent_becomes_the_pixels_it_drew)
+{
+    // A percent of Ashita's own font size, 18 pixels, times the font's own scale for faces that run small.
+    const auto loaded = [](std::initializer_list<std::pair<const char*, const char*>> keys) {
+        MapStore file = ReleaseFile(keys);
+        return LoadSettings(file).menuFontSize;
+    };
+    CHECK_EQ(loaded({{"menuFont", "Segoe UI"}, {"menuScale", "125.0000"}}), 23);
+    CHECK_EQ(loaded({{"menuFont", "Barlow Condensed"}, {"menuScale", "125.0000"}}), 26);
+    CHECK_EQ(loaded({{"menuFont", "Segoe UI"}, {"menuScale", "100.0000"}}), 18);
+    // Its own key wins, and the percent is never written again.
+    CHECK_EQ(loaded({{"menuScale", "150.0000"}, {"menuFontSize", "20.0000"}}), 20);
+    MapStore fresh;
+    CHECK_EQ(LoadSettings(fresh).menuFontSize, 18);
+    Settings s;
+    s.menuFontSize = 30;
+    MapStore file  = OwnFileWith(s, {{"menuScale", "80.0000"}});
+    CHECK_EQ(LoadSettings(file).menuFontSize, 30);
+    SaveSettings(s, file);
+    CHECK(std::ranges::find(file.sets, "menuScale") == file.sets.end());
 }
 
 TEST(the_window_defaults_set_every_window_under_the_bar_or_leave_them_all_to_the_game)

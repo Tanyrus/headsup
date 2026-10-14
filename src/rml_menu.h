@@ -35,10 +35,9 @@ namespace headsup
     public:
         bool open = false;
 
-        // True when a setting changed and should be saved. em: the size of the window's text in pixels, before the
-        // window's own scale. fonts: FontChoices for the nameplates' and the bar's fonts.
+        // True when a setting changed and should be saved. fonts: FontChoices for the nameplates' and the bar's fonts.
         bool Update(const MenuHost& host, Settings& settings, const MenuReadings& readings,
-            const std::vector<std::string>& fonts, float em, double version);
+            const std::vector<std::string>& fonts, double version);
         // Closes the window's document; before the host stops.
         void Close();
         // True once after the Debug Report button was pressed: write the /hu debug report.

@@ -754,8 +754,7 @@ public:
                 .seenWindows      = &m_SeenWindows,
                 .cursorFiles      = &m_CursorFiles,
             };
-            if (m_RmlMenu.Update(MenuHostNow(), m_Settings, readings, m_Fonts.Choices(m_Settings.defaultFont),
-                    m_AshitaCore->GetGuiManager()->GetFontSize(), kVersion))
+            if (m_RmlMenu.Update(MenuHostNow(), m_Settings, readings, m_Fonts.Choices(m_Settings.defaultFont), kVersion))
                 m_SettingsChangedAt = now;
             if (m_RmlMenu.TakeDebugRequest()) m_DebugPending = true;
             if (m_RmlMenu.TakeCursorsRequest()) ScanCursors();

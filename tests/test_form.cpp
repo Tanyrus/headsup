@@ -69,6 +69,33 @@ namespace
     }
 }
 
+TEST(a_stepper_moves_one_a_click_between_its_ends_and_shows_its_value)
+{
+    FormState state;
+    int size        = 18;
+    const auto pass = [&](const std::vector<FormEvent>& events) {
+        Form form(events, state);
+        form.pageKey = "p";
+        form.BeginCard("C");
+        form.Stepper("Size", size, 10, 20, "%d px", nullptr);
+        form.EndCard();
+        return form;
+    };
+    const Form first = pass({});
+    CHECK(!first.changed && TextOf(first, "p-c-size-val") == "18 px");
+    const Form up = pass({{"p-c-size-next", kClickEvent, ""}});
+    CHECK(up.changed && size == 19 && TextOf(up, "p-c-size-val") == "19 px");
+    CHECK_EQ(up.blocks[0].rml, first.blocks[0].rml); // a step is a value the window sets, and rebuilds nothing
+    const Form down = pass({{"p-c-size-previous", kClickEvent, ""}});
+    CHECK(down.changed && size == 18);
+    size             = 20;
+    const Form top   = pass({{"p-c-size-next", kClickEvent, ""}});
+    CHECK(!top.changed && size == 20);
+    size             = 10;
+    const Form floor = pass({{"p-c-size-previous", kClickEvent, ""}});
+    CHECK(!floor.changed && size == 10);
+}
+
 TEST(a_card_holds_its_rows_and_what_they_show)
 {
     FormState state;

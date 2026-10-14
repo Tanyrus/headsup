@@ -68,7 +68,12 @@ namespace headsup
         // Rebased, since a typed read of the new key would have Ashita's store hold its default before the old is asked.
         constexpr const char* kCursorWidthKey = "cursorWidth", *kCursorHeightKey = "cursorHeight";
         constexpr const char* kCursorEdgeKey  = "cursorOutlineThickness";
+        constexpr const char* kMenuFontSizeKey = "menuFontSize";
+        constexpr const char* kOldMenuScaleKey = "menuScale"; // a percent of Ashita's own font size
+        // Ashita's own font size, which the window's old size was a percent of: GetFontSize() in the game, 2026-10-14.
+        constexpr float kAshitaFontPixels = 18.0f;
         constexpr IntKey kRebasedInts[] = {{kCursorWidthKey, &Settings::cursorWidth, kMinCursorSide, kMaxCursorSide},
+            {kMenuFontSizeKey, &Settings::menuFontSize, kMinMenuFontSize, kMaxMenuFontSize},
             {kCursorHeightKey, &Settings::cursorHeight, kMinCursorSide, kMaxCursorSide},
             {kCursorEdgeKey, &Settings::cursorOutlineThickness, kMinCursorEdge, kMaxCursorEdge}};
         constexpr const char* kDashMarkKey = "dashMark";
@@ -153,7 +158,6 @@ namespace headsup
         const char* const kJobLayoutNames[kJobLayoutCount] = {"jobsFirst", "expFirst", "expOnly"};
         constexpr const char* kTargetDetailsKey = "barTargetDetails";
         constexpr const char* kMenuFontKey      = "menuFont";
-        constexpr const char* kMenuScaleKey     = "menuScale";
         constexpr const char* kMenuThemeKey     = "menuTheme";
         const char* const kMenuThemeNames[kMenuThemeCount] = {"phoenix", "aurora"};
         constexpr const char* kMenuXKey = "menuX", *kMenuYKey = "menuY", *kMenuWidthKey = "menuWidth",
@@ -1145,7 +1149,6 @@ namespace headsup
         if (static_cast<int>(s.jobLayout) >= kJobLayoutCount) s.jobLayout = d.jobLayout;
         if (static_cast<int>(s.barSubtitle) >= kSubtitlePlaceCount) s.barSubtitle = d.barSubtitle;
         if (MenuFontNamed(s.menuFont) == nullptr) s.menuFont = d.menuFont;
-        s.menuScale = std::clamp(s.menuScale, kMinMenuScale, kMaxMenuScale);
         if (static_cast<int>(s.menuTheme) >= kMenuThemeCount) s.menuTheme = d.menuTheme;
         for (int* side : {&s.menuX, &s.menuY, &s.menuWidth, &s.menuHeight})
             *side = std::clamp(*side, 0, kMaxMenuSide);
@@ -1226,7 +1229,10 @@ namespace headsup
             s.barCurrency = *currency;
         s.barTargetDetails = store.GetBool(kTargetDetailsKey, s.barTargetDetails);
         s.menuFont         = store.GetString(kMenuFontKey, s.menuFont.c_str());
-        s.menuScale        = LoadInt(store, kMenuScaleKey, s.menuScale);
+        s.menuFontSize     = Rebased(store, kMenuFontSizeKey, kOldMenuScaleKey, s.menuFontSize, [&](float percent) {
+            const MenuFont* font = MenuFontNamed(s.menuFont);
+            return kAshitaFontPixels * percent / kPercent * (font != nullptr ? font->scale : 1.0f);
+        });
         const std::string menuTheme = store.GetString(kMenuThemeKey, "");
         for (int t = 0; t < kMenuThemeCount; ++t)
             if (menuTheme == kMenuThemeNames[t]) s.menuTheme = static_cast<MenuTheme>(t);
@@ -1334,7 +1340,6 @@ namespace headsup
         store.Set(kClockZoneKey, s.clockZone ? kClockZoneNames[static_cast<int>(*s.clockZone)] : kLocalZone);
         setBool(kTargetDetailsKey, s.barTargetDetails);
         store.Set(kMenuFontKey, s.menuFont.c_str());
-        setFloat(kMenuScaleKey, static_cast<float>(s.menuScale));
         store.Set(kMenuThemeKey, kMenuThemeNames[static_cast<int>(s.menuTheme)]);
         setFloat(kMenuXKey, static_cast<float>(s.menuX));
         setFloat(kMenuYKey, static_cast<float>(s.menuY));

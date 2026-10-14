@@ -489,7 +489,7 @@ namespace headsup
     }
 
     bool RmlMenu::Update(const MenuHost& host, Settings& settings, const MenuReadings& readings,
-        const std::vector<std::string>& fonts, float em, double version)
+        const std::vector<std::string>& fonts, double version)
     {
         m_Layout = host.layout;
         if (std::exchange(m_Closed, false)) open = false;
@@ -512,8 +512,7 @@ namespace headsup
             return changed;
         }
         if (!Document(host, settings)) return false;
-        const MenuFont* font = MenuFontNamed(m_Look.textFont);
-        const float pixels   = std::round(em * static_cast<float>(settings.menuScale) / kPercent * (font != nullptr ? font->scale : 1.0f));
+        const auto pixels = static_cast<float>(settings.menuFontSize);
         if (pixels != m_FontPixels)
         {
             m_FontPixels = pixels;

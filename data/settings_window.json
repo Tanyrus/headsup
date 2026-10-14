@@ -360,7 +360,7 @@
           "settings": [
             {"key": "window-theme", "name": "Window Theme", "tip": "The color and style of this config window."},
             {"key": "font", "name": "Font", "tip": "The font used for this config window."},
-            {"key": "size", "name": "Font Size", "tip": "The font size used for this config window."},
+            {"key": "size", "name": "Font Size", "tip": "The font size used for this config window, in pixels."},
             {"key": "window-opacity", "name": "Window Opacity", "tip": "The opacity of this config window."}
           ]
         },

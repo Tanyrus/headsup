@@ -63,7 +63,7 @@ namespace headsup
     constexpr int kMaxCursorRaise = 10; // pixels, up or down
     constexpr int kMinOpacity = 10, kMaxOpacity = 100; // percent
 
-    constexpr int kMinMenuScale = 70, kMaxMenuScale = 160; // percent
+    constexpr int kMinMenuFontSize = 10, kMaxMenuFontSize = 40, kDefaultMenuFontSize = 18; // pixels
     constexpr int kMinMenuOpacity = 30; // percent: fainter, the window could not be found to set it back
     constexpr int kMaxMenuSide  = 16384; // pixels: more than any screen is across
 
@@ -102,7 +102,7 @@ namespace headsup
         int helpBarX = 0, helpBarY = 0;          // back-buffer pixels from the help bar's place under the top bar
         bool helpBarBackground = true;           // off, the help text alone
         std::string menuFont = kDefaultMenuFont; // the settings window's text, by its kMenuFonts name
-        int menuScale        = 100;              // percent: the settings window's text and everything sized by it
+        int menuFontSize     = kDefaultMenuFontSize; // pixels: the settings window's text and everything sized by it
         int menuOpacity      = 100;              // percent
         MenuTheme menuTheme  = MenuTheme::Phoenix;
         // Where the player left the settings window, in pixels; no width for one never moved, which opens in the

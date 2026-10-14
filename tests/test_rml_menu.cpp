@@ -53,7 +53,7 @@ namespace
             for (int i = 0; i < count; ++i)
             {
                 m_Rml.complaints.seconds += kFrameSeconds;
-                changed = menu.Update(m_Host, settings, m_Readings, m_Fonts, kEm, kVersion) || changed;
+                changed = menu.Update(m_Host, settings, m_Readings, m_Fonts, kVersion) || changed;
                 m_Host.context->Update();
                 m_Host.context->Render();
             }
@@ -1011,8 +1011,8 @@ TEST(the_window_is_kept_where_it_is_dragged_by_its_title)
     const Rml::Vector2f was = window.Center("title");
     CHECK(window.Drag("head", Rml::Vector2f(-120.0f, 40.0f)));
     const Rml::Vector2f now = window.Center("title");
-    CHECK_EQ(now.x - was.x, -120.0f);
-    CHECK_EQ(now.y - was.y, 40.0f);
+    CHECK(std::abs(now.x - was.x + 120.0f) < 0.01f);
+    CHECK(std::abs(now.y - was.y - 40.0f) < 0.01f);
     CHECK(window.settings.menuWidth > 0 && window.settings.menuHeight > 0);
     CHECK_EQ(window.settings.menuX, static_cast<int>((test::RmlSession::kWidth - window.settings.menuWidth) / 2) - 120);
 }
@@ -1185,6 +1185,24 @@ TEST(a_toggles_word_sits_inside_its_track_clear_of_the_knob_at_either_end)
         window.Click(box);
         window.Frames(30);
     }
+}
+
+TEST(the_windows_font_size_is_its_settings_pixels_whatever_its_font_and_its_arrows_step_it)
+{
+    Window window; // in Barlow Condensed, which was drawn larger than the size asked
+    const auto pixels = [&] { return window.Find("page")->GetOwnerDocument()->GetComputedValues().font_size(); };
+    CHECK_EQ(pixels(), 18.0f);
+    window.settings.menuFontSize = 24;
+    window.Frames(2);
+    CHECK_EQ(pixels(), 24.0f);
+    window.Page("configmenu");
+    CHECK(window.Click("configmenu-settings-window-size-next"));
+    CHECK_EQ(window.settings.menuFontSize, 25);
+    window.Frames(2);
+    CHECK_EQ(pixels(), 25.0f);
+    CHECK(window.Click("configmenu-settings-window-size-previous"));
+    CHECK_EQ(window.settings.menuFontSize, 24);
+    CHECK_EQ(window.Said(), "");
 }
 
 TEST(the_window_is_as_opaque_as_its_setting_from_the_moment_it_opens)

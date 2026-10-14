@@ -190,6 +190,9 @@ namespace headsup
             EndRow();
         }
         void SliderInt(const char* label, int& value, int lo, int hi, const char* format, const char* tip);
+        // A number stepped one at a time by the arrows either side of it, for one whose change moves the window under
+        // the pointer, as a slider's would.
+        void Stepper(const char* label, int& value, int lo, int hi, const char* format, const char* tip);
         void SliderFloat(const char* label, float& value, float lo, float hi, const char* format, const char* tip);
         // A slider over a few named steps, the first being 0: it shows the name of the one it is on.
         void SliderNamed(const char* label, int& value, const char* const* names, int count, const char* tip);

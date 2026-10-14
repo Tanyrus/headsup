@@ -279,6 +279,27 @@ namespace headsup
             Formatted(format, value), tip);
     }
 
+    void Form::Stepper(const char* label, int& value, int lo, int hi, const char* format, const char* tip)
+    {
+        Row(label, tip);
+        const std::string name  = label;
+        const std::string shown = Id(label) + "-val";
+        int stepped             = value;
+        if (Pressable("<div class=\"tri left\"></div>", (name + " previous").c_str(), "btn step", nullptr)) --stepped;
+        // The arrows take their room from the number, so the row ends where a slider's does.
+        Out() += "<div class=\"stepval\" id=\"" + shown + "\" style=\"width:" + Em(kControlWidth - 2.0f * kSquareRoom) +
+                 ";\"></div>";
+        if (Pressable("<div class=\"tri right\"></div>", (name + " next").c_str(), "btn step", nullptr)) ++stepped;
+        stepped = std::clamp(stepped, lo, hi);
+        if (stepped != value)
+        {
+            value   = stepped;
+            changed = true;
+        }
+        Set(shown, FormValueKind::Text, {}, Formatted(format, value));
+        EndRow();
+    }
+
     void Form::SliderNamed(const char* label, int& value, const char* const* names, int count, const char* tip)
     {
         const std::string slider = Id(label);

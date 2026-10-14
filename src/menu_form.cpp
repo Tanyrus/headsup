@@ -1203,7 +1203,7 @@ namespace headsup
                 break;
             case SettingPiece::Size:
                 form.Fade(false);
-                form.SliderInt(label.c_str(), s.menuScale, kMinMenuScale, kMaxMenuScale, "%d%%", tip);
+                form.Stepper(label.c_str(), s.menuFontSize, kMinMenuFontSize, kMaxMenuFontSize, "%d px", tip);
                 break;
             case SettingPiece::WindowOpacity:
                 form.Fade(false);
