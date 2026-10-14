@@ -5,8 +5,9 @@ they will attack you, and replaces the game's nameplates with clearer ones: name
 detects you, player status icons and a target cursor. It only reads what the game already shows and the server
 already sends, apart from three requests the game's own menus make, which the top panel sends for you: the one the game
 sends when you open Region Info, while the panel's Zone widget is on, and the two it sends when you open the
-Currencies menu, while the Gil widget is on ([Top panel](#top-panel) says when). It never targets or checks anything
-itself.
+Currencies menu, while the Gil widget is on ([Top panel](#top-panel) says when). It never targets anything itself, and
+it checks a monster itself only with Auto-Check switched on, which is off unless you turn it on: it then sends the same
+request `/check` does, for monsters alone and never for a player.
 
 Download `headsup.dll` from the latest release on the [Releases](https://github.com/Tanyrus/headsup/releases) page and
 put it in Ashita's `plugins` folder. Load it with `/load headsup`; `/hu` opens its settings, and `/hu menu <page>`
@@ -114,9 +115,10 @@ out. A tag in a line can be dragged too: to another place in a line, or out of t
 Typed by hand a tag is a dollar sign and its word, such as `$name`, and `$$` is one dollar sign.
 
 Tags can share one place. Drop a tag onto a tag that is already in a line and the two become one button, such as
-Level Sync / Bazaar: the nameplate then draws the first of them that has something to show, so a synced player shows
-the level sync icon and any other player their bazaar. Backspace beside such a button takes its last tag out. Typed by
-hand it is `${sync|bazaar}`.
+Level Sync or Bazaar. The nameplate then draws the left one when it has something to show and the next one when it has
+not, so a synced player shows the level sync icon and any other player their bazaar. Drop one of a button's tags on
+another to swap their order, drag one out to take it off alone, and Backspace beside the button takes its last tag
+out. Typed by hand it is `${sync|bazaar}`.
 
 | Tag | Typed | Kinds | Draws |
 |---|---|---|---|
@@ -151,7 +153,8 @@ line has these settings:
 - **Line Visibility:** Always, or only when any picked condition holds: When Targeted, When Unclaimed, When Claimed by
   You, When Claimed by Others, When Engaged in Combat, When Too Weak, When Aggressive, When Passive, When Party Member,
   When Friend, When Linkshell Member or When Owner is You (the ones that fit the kind)
-- **Alignment:** left, center or right against the bottom line, which itself stays on the game's name
+- **Alignment:** left, center or right against the bottom line, which itself stays on the game's name. A line wider
+  than the name hangs out past it on the side it is set to
 - **Font and Font Style:** a line's own font, or the Default Font from the Entities page, in bold, italics, underline
   or any of them together
 - **Text Size and Icon Size:** a percent of the Base Font Size and the Base Icon Size set on the Entities page
@@ -333,6 +336,7 @@ the height is drawn as large as fits, and the menu says what that is. Bar text r
 | Umbra Dark | Each part in a dark rounded pill |
 | Phoenix Red, Ornate | The ornate look in red |
 | Phoenix Red, Pills | The pill look in red |
+| Aurora | Slate glass, lit from cyan into violet, with widgets that show no pill until lit |
 
 The game's help bar is the strip across the top that shows a menu's title and help text while a menu is open. HeadsUp's
 bar covers its top, and the rest of it shows below the bar unless the bar is taller. The switch, off by default, stops

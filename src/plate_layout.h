@@ -20,11 +20,8 @@ namespace headsup
         float width = 0.0f, height = 0.0f;
     };
 
-    // A composed line as the renderer measured it, in screen pixels: each item's box (a text's ink box without its
-    // halo, an icon run with its gaps and badge overhang, a gap's width), its tallest text item's height (0 for a
-    // line without text), whether it holds icons, and the size of the ornament that goes with it (0 by 0 for none):
-    // over it, between it and the line above when there is one, or under it for the plate's last line.
-    // padBelow and padAbove: extra space between it and the line under it, or over it.
+    // A composed line as the renderer measured it, in screen pixels: its items' boxes, its tallest text's height (0
+    // without text), whether it holds icons, its ornament's size and side, and the room kept under and over it.
     struct LineInput
     {
         std::vector<ItemSize> items;

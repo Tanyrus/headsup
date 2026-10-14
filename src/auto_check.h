@@ -55,9 +55,8 @@ namespace headsup
         const char* name  = "";    // only read by Due
     };
 
-    // Checks mobs by itself so their exact level shows without the player asking: one at a time, the nearest
-    // first, each once for as long as its answer holds. Players are never checked: the server tells a player who
-    // examined them.
+    // Checks mobs by itself, the nearest first and each once for as long as its answer holds, so their exact level
+    // shows unasked. Never a player: the server tells a player who examined them.
     class AutoCheck
     {
     public:
@@ -69,9 +68,8 @@ namespace headsup
         // An answer came. True when HeadsUp asked for it and the player did not, so that nobody waits to read it
         // in the chat log.
         bool TakeAnswer(const CheckAnswer& answer, double now);
-        // Whether a chat line is the checker addon's report of a check HeadsUp made by itself. The addon (atom0s's,
-        // loaded by Ashita's default script) writes one for every answer whoever asked, and reads the packet as
-        // it came, so keeping the answer from the game does not keep this from the log.
+        // Whether a chat line is the checker addon's report of a check HeadsUp made. The addon reads each answer as
+        // it came, whoever asked and whatever blocked it, so keeping the answer from the game keeps no line out.
         bool OwnReport(std::string_view line, double now) const;
         // The mob was seen dead: what comes back is another spawn.
         void Forget(uint32_t serverId);

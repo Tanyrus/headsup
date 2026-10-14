@@ -17,7 +17,6 @@ namespace headsup
 {
     namespace
     {
-        constexpr float kPercent       = 100.0f;
         constexpr char kSpace          = ' ';
         constexpr const char* kJobJoin = "/";
 

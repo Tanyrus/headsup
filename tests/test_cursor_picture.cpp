@@ -100,6 +100,14 @@ TEST(the_cursors_folder_lists_its_cursor_files_by_name)
         CursorFileNames({"sword.cur", "Gold Arrow.ANI", "readme.txt", "arrow.png", "sword.ani", ".cur", "backup.cur.bak", "axe.Cur"});
     CHECK((names == std::vector<std::string>{"axe", "Gold Arrow", "sword"}));
     CHECK(CursorFileNames({}).empty());
+    // Windows opens Arrow.cur for arrow too: two files whose names differ only by case are one name.
+    CHECK((CursorFileNames({"arrow.ani", "Arrow.cur"}) == std::vector<std::string>{"Arrow"}));
+    // A name the settings would not keep is not offered: picking it would only put the feather back.
+    const std::string longest(kMaxCursorFileName, 'a'), tooLong(kMaxCursorFileName + 1, 'b');
+    CHECK((CursorFileNames({tooLong + ".cur", longest + ".cur"}) == std::vector<std::string>{longest}));
+    CHECK(IsCursorFileName(longest) && !IsCursorFileName(tooLong) && !IsCursorFileName(""));
+    for (const char* path : {"..\\x", "a/b", "c:evil"})
+        CHECK(!IsCursorFileName(path));
 }
 
 TEST(a_cursor_files_bytes_are_its_first_frames_picture_or_nothing)

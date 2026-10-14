@@ -57,7 +57,6 @@ namespace headsup
         // What is Aurora's alone: glass in place of flat fills, and dark text on the picked choice's bright gradient.
         std::string AuroraMenuRules(const MenuColors& c)
         {
-            const std::string a = RcssColor(c.accent);
             std::string css;
             css += "body{decorator:vertical-gradient(#111b2cf2 #090e17f2);background-color:transparent;border-color:" +
                    RcssColor(Faded(c.accent, kAuroraFrame)) + ";}";
@@ -121,7 +120,7 @@ namespace headsup
         // The list is as wide as its longest name in the window's font, and the page takes the rest.
         css += "#columns{position:absolute;display:flex;left:" + Em(kGutter) + ";right:" + Em(kGutter) + ";top:" + Em(top) +
                ";bottom:" + Em(kGutter) + ";}";
-        css += std::string("#") + kMenuSidebarId + "{flex:0 0 auto;}";
+        css += std::string("#") + kMenuSidebarId + "{flex:0 0 auto;overflow-y:auto;}";
         // What a name moves by under the pointer comes off the room after it, so the list keeps its width.
         css += ".nav{position:relative;height:" + Em(kNavHeight) + ";line-height:" + Em(kNavHeight) + ";padding-left:" +
                Em(kGutter) + ";padding-right:" + Em(kGutter) + ";white-space:nowrap;border-radius:" + Em(kNavHeight / 2.0f) +
@@ -202,6 +201,9 @@ namespace headsup
                Em(kToggleHeight / 2.0f) + ";background-color:" + color(c.control) + ";transition:background-color" + kSlide + ";}";
         css += ".check:hover{background-color:" + color(c.hover) + ";}";
         css += ".check.on{background-color:" + color(Faded(c.accent, kWash)) + ";}";
+        // The knob takes no click of its own: pressed while it slides under the pointer and let go once it has
+        // passed, a click would be on two elements and so on neither.
+        css += ".mark{pointer-events:none;}";
         css += ".mark{position:absolute;left:" + Em(kToggleInset) + ";top:" + Em(kToggleInset) + ";width:" + Em(kToggleKnob) +
                ";height:" + Em(kToggleKnob) + ";border-radius:" + Em(kToggleKnob / 2.0f) + ";background-color:" +
                color(c.muted) + ";transition:left" + kSlide + ",background-color" + kSlide + ";}";

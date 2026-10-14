@@ -1,6 +1,7 @@
 #include "plate_image.h"
 
 #include "argb.h"
+#include "plate_settings.h"
 
 #include <algorithm>
 #include <cmath>
@@ -64,6 +65,19 @@ namespace headsup
         };
 
         float Cover(const Coverage& c, size_t i) { return static_cast<float>(c.alpha[i]) / kFullCoverage; }
+
+        // The share of the pixel at (x, y) that a shape covers, sampled at samples points across it each way.
+        template <typename Inside>
+        float Covered(int x, int y, int samples, const Inside& inside)
+        {
+            const auto count = static_cast<float>(samples);
+            int covered      = 0;
+            for (int sy = 0; sy < samples; ++sy)
+                for (int sx = 0; sx < samples; ++sx)
+                    covered += inside(static_cast<float>(x) + (static_cast<float>(sx) + 0.5f) / count,
+                        static_cast<float>(y) + (static_cast<float>(sy) + 0.5f) / count);
+            return static_cast<float>(covered) / (count * count);
+        }
 
         // Each pixel's coverage, from 0 to 1, blurred by a Gaussian in two passes.
         std::vector<float> Blurred(const Coverage& c, float blur)
@@ -286,40 +300,68 @@ namespace headsup
         };
         for (int y = 0; y < c.height; ++y)
             for (int x = 0; x < c.width; ++x)
-            {
-                int covered = 0;
-                for (int sy = 0; sy < kMarkSamples; ++sy)
-                    for (int sx = 0; sx < kMarkSamples; ++sx)
-                        covered += inside(static_cast<float>(x) + (static_cast<float>(sx) + 0.5f) / kMarkSamples,
-                            static_cast<float>(y) + (static_cast<float>(sy) + 0.5f) / kMarkSamples);
                 c.alpha[static_cast<size_t>(y * c.width + x)] =
-                    static_cast<uint8_t>(std::lround(kFullCoverage * static_cast<float>(covered) / (kMarkSamples * kMarkSamples)));
-            }
+                    static_cast<uint8_t>(std::lround(kFullCoverage * Covered(x, y, kMarkSamples, inside)));
         return c;
     }
 
-    Coverage Joined(const std::vector<Coverage>& pieces, int margin)
+    namespace
     {
+        constexpr int kItalicLeanShare = 4; // of the text's height
+
+        // How far the piece after this one starts from where this one does.
+        int Advance(int width, std::span<const int> room, size_t piece, size_t count)
+        {
+            return width - (piece + 1 < count && piece < room.size() ? room[piece] : 0);
+        }
+    }
+
+    int ItalicLean(int pixelHeight, uint8_t style)
+    {
+        return HasStyle(style, FontStyle::Italic) ? pixelHeight / kItalicLeanShare : 0;
+    }
+
+    int JoinedWidth(std::span<const int> widths, std::span<const int> room)
+    {
+        int width = 0;
+        for (size_t i = 0; i < widths.size(); ++i)
+            width += Advance(widths[i], room, i, widths.size());
+        return width;
+    }
+
+    Coverage Joined(const std::vector<Coverage>& pieces, std::span<const int> room, int margin)
+    {
+        std::vector<int> widths;
         Coverage joined{2 * margin, 2 * margin, {}};
         for (const Coverage& piece : pieces)
         {
-            joined.width += piece.width - 2 * margin;
+            widths.push_back(piece.width - 2 * margin);
             joined.height = std::max(joined.height, piece.height);
         }
+        joined.width += JoinedWidth(widths, room);
         joined.alpha.assign(static_cast<size_t>(joined.width) * static_cast<size_t>(joined.height), 0);
         int left = 0;
-        for (const Coverage& piece : pieces)
+        for (size_t i = 0; i < pieces.size(); ++i)
         {
-            // Margins overlap their neighbors': whatever a letter leans into its own stays.
+            const Coverage& piece = pieces[i];
+            // Margins and rooms overlap their neighbors: whatever a letter leans into them stays.
             for (int y = 0; y < piece.height; ++y)
                 for (int x = 0; x < piece.width; ++x)
                 {
                     uint8_t& into = joined.alpha[static_cast<size_t>(y * joined.width + left + x)];
                     into          = std::max(into, piece.alpha[static_cast<size_t>(y * piece.width + x)]);
                 }
-            left += piece.width - 2 * margin;
+            left += Advance(widths[i], room, i, pieces.size());
         }
         return joined;
+    }
+
+    void Underline(Coverage& text, int top, int thickness, int margin)
+    {
+        const int bottom = std::min(top + thickness, text.height);
+        for (int y = std::max(top, 0); y < bottom; ++y)
+            for (int x = margin; x < text.width - margin; ++x)
+                text.alpha[static_cast<size_t>(y * text.width + x)] = kFullAlpha;
     }
 
     Image Resized(const Image& picture, int width, int height)
@@ -512,16 +554,13 @@ namespace headsup
             const float radius = std::hypot(x, y);
             return notchX * (radius * std::cos(angle) - half) - (notchY - half) * radius * std::sin(angle) <= 0.0f;
         };
+        // From the middle, with y up.
+        const auto centered = [&](float x, float y) { return inside(x - half, half - y); };
         for (int y = 0; y < s; ++y)
             for (int x = 0; x < s; ++x)
             {
-                int covered = 0;
-                for (int sy = 0; sy < kPixelSamples; ++sy)
-                    for (int sx = 0; sx < kPixelSamples; ++sx)
-                        covered += inside(static_cast<float>(x) + (static_cast<float>(sx) + 0.5f) / kPixelSamples - half,
-                            half - static_cast<float>(y) - (static_cast<float>(sy) + 0.5f) / kPixelSamples);
                 Paint paint;
-                paint.Over(static_cast<float>(covered) / (kPixelSamples * kPixelSamples), color);
+                paint.Over(Covered(x, y, kPixelSamples, centered), color);
                 image.argb[static_cast<size_t>(y * s + x)] = paint.Color();
             }
         return image;
@@ -547,13 +586,8 @@ namespace headsup
         for (int y = 0; y < s; ++y)
             for (int x = 0; x < s; ++x)
             {
-                int covered = 0;
-                for (int sy = 0; sy < kPixelSamples; ++sy)
-                    for (int sx = 0; sx < kPixelSamples; ++sx)
-                        covered += inside(static_cast<float>(x) + (static_cast<float>(sx) + 0.5f) / kPixelSamples,
-                            static_cast<float>(y) + (static_cast<float>(sy) + 0.5f) / kPixelSamples);
                 Paint paint;
-                paint.Over(static_cast<float>(covered) / (kPixelSamples * kPixelSamples), color);
+                paint.Over(Covered(x, y, kPixelSamples, inside), color);
                 image.argb[static_cast<size_t>(y * s + x)] = paint.Color();
             }
         return image;

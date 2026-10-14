@@ -15,7 +15,7 @@
 #include <string_view>
 #include <utility>
 
-// What the settings window's pages say and the small questions they ask, whichever kit draws them.
+// What the settings window's pages say and the small questions they ask.
 namespace headsup
 {
     const char* const kBarWidgetLabels[] = {"Zone", "Weather", "Vana'diel", "Target", "Gil",
@@ -50,7 +50,6 @@ namespace headsup
     }
     inline bool HasIcons(BarWidget w) { return w == BarWidget::Weather || w == BarWidget::Target || w == BarWidget::Gil; }
 
-    // The game's windows HeadsUp moves out from under the help bar, and those it has seen there.
     // Whether text holds part, in any case.
     inline bool Matches(std::string_view text, const char* part)
     {

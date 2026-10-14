@@ -71,7 +71,8 @@ namespace headsup
             const uint32_t used   = ReadAt<uint32_t>(dib, kDibColorsUsed);
             if (headerSize != kInfoHeaderSize || ReadAt<uint32_t>(dib, kDibCompression) != kUncompressed) return std::nullopt;
             if (bpp != 1 && bpp != 4 && bpp != 8 && bpp != 24 && bpp != kDeepBits) return std::nullopt;
-            if (width <= 0 || doubled <= 0) return std::nullopt;
+            // A height of 1 would be the mask's half of a picture with no rows.
+            if (width <= 0 || doubled < 2) return std::nullopt;
             const auto w = static_cast<uint32_t>(width), h = static_cast<uint32_t>(doubled) / 2;
             const bool paletted = bpp <= 8;
             // Bounded before the sizes below are worked out, which in the 32-bit plugin could otherwise wrap.
@@ -140,37 +141,44 @@ namespace headsup
         std::vector<uint32_t> rates;
         std::vector<CursorFrame> frames;
         bool header = false;
-        auto walk = [&](size_t at, size_t stop, auto& self) -> bool {
+        // Calls each chunk from at up to stop with its id and its body; false for one that runs past stop, or
+        // that the call refuses.
+        const auto chunks = [&](size_t at, size_t stop, const auto& each) {
             while (at + kChunkHeader <= stop)
             {
                 const uint8_t* chunk = data + at;
                 const size_t length  = ReadAt<uint32_t>(chunk, kIdSize);
-                if (length > stop - at - kChunkHeader) return false;
-                const uint8_t* body = chunk + kChunkHeader;
-                if (Is(chunk, "anih") && length >= kAniHeaderSize)
-                {
-                    defaultJiffies = ReadAt<uint32_t>(body, kAniRate);
-                    flags          = ReadAt<uint32_t>(body, kAniFlags);
-                    header         = true;
-                }
-                else if (Is(chunk, "rate"))
-                    for (size_t i = 0; i + sizeof(uint32_t) <= length; i += sizeof(uint32_t))
-                        rates.push_back(ReadAt<uint32_t>(body, i));
-                else if (Is(chunk, "LIST") && length >= kIdSize && Is(body, "fram"))
-                {
-                    if (!self(at + kChunkHeader + kIdSize, at + kChunkHeader + length, self)) return false;
-                }
-                else if (Is(chunk, "icon"))
-                {
-                    auto frame = ReadFirstCursor(body, length);
-                    if (!frame) return false;
-                    frames.push_back(std::move(*frame));
-                }
+                if (length > stop - at - kChunkHeader || !each(chunk, chunk + kChunkHeader, length)) return false;
                 at += kChunkHeader + length + (length & 1); // chunks are padded to an even length
             }
             return true;
         };
-        if (!walk(kRiffHeaderSize, end, walk) || !header || (flags & kFramesAreCursors) == 0 || frames.empty()) return {};
+        // The frames stand in one list, a level under the file's own chunks: nothing is gone into deeper, so a file
+        // of lists within lists costs no more stack than any other.
+        const auto frame = [&](const uint8_t* chunk, const uint8_t* body, size_t length) {
+            if (!Is(chunk, "icon")) return true;
+            auto read = ReadFirstCursor(body, length);
+            if (read) frames.push_back(std::move(*read));
+            return read.has_value();
+        };
+        const bool whole = chunks(kRiffHeaderSize, end, [&](const uint8_t* chunk, const uint8_t* body, size_t length) {
+            if (Is(chunk, "anih") && length >= kAniHeaderSize)
+            {
+                defaultJiffies = ReadAt<uint32_t>(body, kAniRate);
+                flags          = ReadAt<uint32_t>(body, kAniFlags);
+                header         = true;
+            }
+            else if (Is(chunk, "rate"))
+                for (size_t i = 0; i + sizeof(uint32_t) <= length; i += sizeof(uint32_t))
+                    rates.push_back(ReadAt<uint32_t>(body, i));
+            else if (Is(chunk, "LIST") && length >= kIdSize && Is(body, "fram"))
+            {
+                const size_t first = static_cast<size_t>(body - data) + kIdSize;
+                return chunks(first, first + length - kIdSize, frame);
+            }
+            return true;
+        });
+        if (!whole || !header || (flags & kFramesAreCursors) == 0) return {};
         for (size_t i = 0; i < frames.size(); ++i)
             frames[i].seconds = static_cast<double>(i < rates.size() ? rates[i] : defaultJiffies) / kJiffiesPerSecond;
         return frames;

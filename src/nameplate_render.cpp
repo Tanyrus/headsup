@@ -19,7 +19,6 @@ namespace headsup
         constexpr float kOutlinePerHeight = 0.1f; // a badge's outline width, per pixel of its height
         constexpr float kStackGap         = 2.0f; // screen pixels between plates stacked over one another
         constexpr const char* kLineSample = "H"; // any letter: GDI gives a line's height with it
-        constexpr float kPercent          = 100.0f;
         // From the mockup's CSS: a 22 px name's shadows blur 2 and 3 px, 1 px lower, and its glow 14 px.
         constexpr float kShadowDropPerHeight = 0.05f;
         constexpr float kGlowPerHeight       = 0.64f; // the glow's blur radius, per pixel of name height
@@ -124,17 +123,23 @@ namespace headsup
             int width = 0, line = 0;
             return m_Gdi.Extent(kLineSample, font, at, look.line.style, width, line) ? line : 0;
         };
+        // What of each piece's width the next may stand in: a stretch of italic letters is measured and drawn with
+        // room for its last letter's lean, which a mark after it would otherwise stand clear of.
+        std::vector<int> widths(pieces.size()), room(pieces.size());
         auto extent = [&](int at, int& width, int& height) {
             if (!marked) return m_Gdi.Extent(text, font, at, look.line.style, width, height);
             height = lineHeight(at);
-            width  = 0;
-            for (const TextPiece& piece : pieces)
+            for (size_t i = 0; i < pieces.size(); ++i)
             {
-                int pieceWidth = MarkWidth(piece.mark, height), pieceHeight = 0;
-                if (piece.mark == DashMark::None && !m_Gdi.Extent(piece.text.c_str(), font, at, look.line.style, pieceWidth, pieceHeight))
+                const bool letters = pieces[i].mark == DashMark::None;
+                int pieceHeight    = 0;
+                if (!letters)
+                    widths[i] = MarkWidth(pieces[i].mark, height);
+                else if (!m_Gdi.Extent(pieces[i].text.c_str(), font, at, look.line.style, widths[i], pieceHeight))
                     return false;
-                width += pieceWidth;
+                room[i] = letters ? ItalicLean(at, look.line.style) : 0;
             }
+            width = JoinedWidth(widths, room);
             return height > 0;
         };
         // Measured before it is drawn: a long line at a tall height is more than GDI has the memory to draw at all.
@@ -161,15 +166,23 @@ namespace headsup
         auto rasterize = [&] {
             if (!marked) return m_Gdi.Rasterize(text, font, *height, look.line.style, 0, style.margin, coverage);
             const int line = lineHeight(*height);
+            // GDI underlines each stretch of letters it draws and knows nothing of the marks between them: where the
+            // font says where its underline goes, the letters are drawn without and one line is drawn under them all.
+            int under = 0, thick = 0;
+            const bool underlined = HasStyle(look.line.style, FontStyle::Underline) &&
+                                    m_Gdi.UnderlineBand(font, *height, look.line.style, under, thick);
+            const uint8_t letterStyle = underlined ? look.line.style & ~StyleBit(FontStyle::Underline) : look.line.style;
             std::vector<Coverage> drawn(pieces.size());
             for (size_t i = 0; i < pieces.size(); ++i)
             {
                 if (pieces[i].mark != DashMark::None)
                     drawn[i] = MarkCoverage(pieces[i].mark, line, style.margin);
-                else if (!m_Gdi.Rasterize(pieces[i].text.c_str(), font, *height, look.line.style, 0, style.margin, drawn[i]))
+                else if (!m_Gdi.Rasterize(pieces[i].text.c_str(), font, *height, letterStyle, 0, style.margin, drawn[i]))
                     return false;
+                room[i] = pieces[i].mark == DashMark::None ? ItalicLean(*height, look.line.style) : 0;
             }
-            coverage = Joined(drawn, style.margin);
+            coverage = Joined(drawn, room, style.margin);
+            if (underlined) Underline(coverage, style.margin + under, thick, style.margin);
             return line > 0;
         };
         if (!sized || !rasterize())

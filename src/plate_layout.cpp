@@ -58,9 +58,8 @@ namespace headsup
                 place.height = std::max(place.height, lines[i].items[j].height);
             }
         }
-        // The bottom line stays centered on the game's name, and the others are set against its two ends: a line
-        // starts where it starts or ends where it ends, whichever puts it further to the side it is set to, so that
-        // a line wider than the name hangs out on that side and not on the other.
+        // The bottom line stays centered on the game's name. Another starts where it starts or ends where it ends,
+        // whichever is further to the side it is set to: one wider than the name hangs out on that side.
         const float against = lines.empty() ? 0.0f : layout.lines.back().width;
         for (size_t i = 0; i < lines.size(); ++i)
         {
@@ -207,7 +206,7 @@ namespace headsup
         into.textHeight     = 0.0f;
         into.hasIcons       = false;
         // The bottom design line stays on the game's name, so its padding is the space over it.
-        const bool bottom   = line.source == kPlateLines - 1;
+        const bool bottom   = line.source == kBottomLine;
         into.padBelow       = bottom ? 0.0f : line.look.padding * scale;
         into.padAbove       = bottom ? line.look.padding * scale : 0.0f;
         into.ornamentWidth  = 0.0f;

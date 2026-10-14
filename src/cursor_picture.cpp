@@ -45,27 +45,37 @@ namespace headsup
             {
                 const std::string_view ending(extension);
                 if (entry.size() <= ending.size() || lowered(entry.substr(entry.size() - ending.size())) != ending) continue;
-                names.push_back(entry.substr(0, entry.size() - ending.size()));
+                std::string name = entry.substr(0, entry.size() - ending.size());
+                // One the settings would not keep is not offered: picking it would only put the feather back.
+                if (IsCursorFileName(name)) names.push_back(std::move(name));
             }
         }
-        std::ranges::sort(names, [&](const std::string& a, const std::string& b) { return lowered(a) < lowered(b); });
-        const auto repeated = std::ranges::unique(names);
+        // Windows opens a file whatever the case of its name: two that differ only by that are one name.
+        std::ranges::sort(names, [&](const std::string& a, const std::string& b) {
+            return lowered(a) != lowered(b) ? lowered(a) < lowered(b) : a < b;
+        });
+        const auto repeated = std::ranges::unique(names, [&](const std::string& a, const std::string& b) { return lowered(a) == lowered(b); });
         names.erase(repeated.begin(), repeated.end());
         return names;
     }
 
+    namespace
+    {
+        // The shape a style is drawn as where it has no picture: the feather for all but the triangle.
+        const Shape& ShapeOf(CursorStyle style) { return style == CursorStyle::Triangle ? ArrowShape() : FeatherShape(); }
+    }
+
     int NaturalCursorWidth(CursorStyle style, int height)
     {
-        if (CursorIsPicture(style)) return height;
-        return ShapeWidth(style == CursorStyle::Triangle ? ArrowShape() : FeatherShape(), height);
+        return CursorIsPicture(style) ? height : ShapeWidth(ShapeOf(style), height);
     }
 
     CursorDrawing DrawCursor(CursorStyle style, const Image* picture, int pixelWidth, int pixelHeight, int edge,
         uint32_t color, uint32_t edgeColor)
     {
-        if (picture != nullptr && CursorIsPicture(style))
+        if (picture != nullptr)
             return CursorDrawing{Edged(Resized(*picture, pixelWidth, pixelHeight), edge, edgeColor), kPictureTip};
-        const Shape& shape      = style == CursorStyle::Triangle ? ArrowShape() : FeatherShape();
+        const Shape& shape      = ShapeOf(style);
         const Coverage coverage = ShapeCoverage(shape, pixelWidth, pixelHeight, edge);
         const float width       = static_cast<float>(coverage.width - 2 * edge);
         return CursorDrawing{Outlined(coverage, edge, color, edgeColor),

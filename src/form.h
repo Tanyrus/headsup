@@ -29,9 +29,11 @@ namespace headsup
     constexpr const char* kClickEvent  = "click";
     constexpr const char* kChangeEvent = "change"; // a slider moved, a text box typed in
     constexpr const char* kCommitEvent = "commit"; // a text box left by Enter or a click elsewhere, its text changed
-    constexpr const char* kFocusEvent  = "focus";
     constexpr const char* kCaretEvent  = "caret"; // a text box's caret as it loses the keyboard
     constexpr const char* kDropEvent   = "drop";
+    // After the open control's id: a click on its popup that is on none of the popup's parts, which is neither a
+    // click elsewhere, closing it, nor one on the control, which would.
+    constexpr const char* kPopupGround = "-popup";
     // A dragged control was let go, on something or on nothing, anywhere but where it stands.
     constexpr const char* kDragEndEvent = "dragend";
     // The attribute of a control that can be dragged which says what a drop of it brings: a tag chip's slot, as a
@@ -121,6 +123,7 @@ namespace headsup
         std::optional<FormPopup> popup;
         std::optional<FormFocus> focus;
         std::function<bool(uint8_t)> keyDown;
+        std::string focused; // the id of the control that has the keyboard, or none
 
         // What follows is not shown and takes no clicks, while the feature it belongs to is off: a setting that
         // would do nothing is no setting. A card begun so is left out whole.
@@ -134,7 +137,6 @@ namespace headsup
 
         // Any element by id, to write markup into with Raw: the sidebar.
         void BeginBlock(const char* id);
-        void EndBlock() {}
         // A card, its title row folding it; an enabled checkbox sits at the title's right, and what the card is for
         // is written under the title. False when it is folded, with nothing more to do; true, with EndCard to call.
         bool BeginCard(const char* title, bool* enabled = nullptr, const char* about = nullptr);
@@ -248,12 +250,8 @@ namespace headsup
         // text then holds. Live: true whenever a key changed it.
         bool TextAt(const char* id, std::string& text, const char* hint, float width, bool live = false,
             size_t most = 0);
-        // A design line's box across the card: its stretches of text to type in, and its slots as chips between
-        // them. True when its text changed: a stretch typed and then left, a tag taken out with Backspace or Delete
-        // beside its chip, a tag dropped in, or one of its own dragged away. A tag dropped on a stretch goes after
-        // it, on the box at its end, on a chip into that chip's slot and on another tag of its own chip into that
-        // tag's place; one of the line's own let go off every line is gone. draft keeps its caret, and whether it
-        // has the keyboard.
+        // A design line's box: stretches of text to type in with its slots as chips between them, which take drops
+        // and can be dragged. True when its text changed. draft keeps its caret, and says whether it has the keyboard.
         bool LineBox(const char* id, std::string& text, LineDraft& draft);
         // A tag as a chip that reads its name, after its icon when it draws one. True when clicked; dragged, it drops
         // onto a line's box.
@@ -274,8 +272,6 @@ namespace headsup
         // The classes of what is emitted now: " off", which hides it, while faded.
         const char* OffClass() const { return m_Off ? " off" : ""; }
         bool Off() const { return m_Off; }
-        const std::string& CardId() const { return m_CardId; }
-        FormState& State() { return m_State; }
 
     private:
         std::string& Out() { return blocks.back().rml; }

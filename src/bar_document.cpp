@@ -86,10 +86,10 @@ namespace headsup
         }
 
         // A box's fill, edge and corners as BoxOf gives them; no box is a clear one, its room kept.
-        std::string BoxRules(const std::optional<WidgetBox>& box)
+        std::string BoxRules(const std::optional<BoxStyle>& box)
         {
             if (!box) return "background-color:transparent;border-color:transparent;";
-            const BoxStyle& style = box->style;
+            const BoxStyle& style = *box;
             return "background-color:" + RcssColor(style.top) + ";border-color:" +
                    (style.border != 0 ? RcssColor(style.border) : std::string("transparent")) + ";border-radius:" +
                    Px(style.radius) + ";";
@@ -265,7 +265,7 @@ namespace headsup
         const float underHeight = ProgressHeight(m, false), besideHeight = ProgressHeight(m, true);
         const std::string capSource     = DiamondSource(p.accent, cap);
         const std::string dividerSource = DiamondSource(look.ornate ? p.divider : p.accent, divider);
-        auto boxOf = [&](BarWidget widget, bool lit) { return look.BoxOf(PlacedWidget{widget, BarRect{}}, lit); };
+        auto boxOf = [&](BarWidget widget, bool lit) { return look.BoxOf(widget, lit); };
         auto square = [](float size) { return "width:" + Px(size) + ";height:" + Px(size) + ";"; };
         auto centered = [&](float size) { return Px(std::round(mid - size / 2.0f)); };
         const std::string shape = look.ornate ? ".ornate" : ".pills";

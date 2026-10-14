@@ -3,7 +3,6 @@
 namespace headsup
 {
     // Every size in ems, the font size the menu draws its text at, so it holds at any UI scale.
-    constexpr float kPercent        = 100.0f;
     constexpr float kTitleScale     = 1.55f; // the window's name
     constexpr float kPageTitleScale = 1.4f;
     constexpr float kCardTitleScale = 1.12f;

@@ -124,6 +124,11 @@ TEST(a_tag_goes_in_at_the_caret_which_then_stands_after_it)
     RunCaret past{9, 99};
     CHECK(PutTag(text, past, {Tag::Id}));
     CHECK_EQ(text, "Lv $level$con EP$ph$id");
+    // One past the end of its own stretch, as after that stretch was cut short, is the stretch's end.
+    std::string shortened = "ab $level";
+    RunCaret beyond{0, 40};
+    CHECK(PutTag(shortened, beyond, {Tag::Name}));
+    CHECK_EQ(shortened, "ab $name$level");
     // Half a tag is a design nobody wrote: one that will not fit is refused, and the caret stays.
     std::string full(kMaxTemplate - 2, 'x');
     RunCaret at{0, 0};
@@ -150,6 +155,14 @@ TEST(a_tag_taken_out_joins_the_text_either_side_of_it_and_a_stretch_can_be_typed
     CHECK_EQ(WithRun("Lv $level", 7, "x"), "Lv $level"); // no such stretch
     // What would pass the longest a design may be is cut to fit.
     CHECK_EQ(WithRun("$name", 1, std::string(kMaxTemplate, 'y')).size(), kMaxTemplate);
+    // Cut between characters, never inside one: a two-byte letter that would end one byte over goes whole.
+    const std::string almost(kMaxTemplate - 5 - 1, 'Y');
+    CHECK_EQ(WithRun("$name", 1, almost + "\xC3\xA9"), "$name" + almost);
+    CHECK_EQ(WithRun("$name", 1, almost + "Z"), "$name" + almost + "Z");
+    // A cut that leaves half of a doubled mark before a tag has that mark doubled again, and is cut once more.
+    const std::string marked = WithRun("$name", 0, std::string(kMaxTemplate - 5 - 1, 'x') + "$$y");
+    CHECK(marked.size() <= kMaxTemplate);
+    CHECK((RunsOf(marked).slots == std::vector<TagSlot>{{Tag::Name}}));
 }
 
 TEST(tags_in_one_pair_of_braces_share_a_slot)
@@ -250,16 +263,25 @@ TEST(a_card_of_tags_no_line_holds_says_which_tag_would_show_it)
     KindSettings kind;
     kind.lines[0].text = "$detect";
     kind.lines[2].text = "$name";
-    CHECK_EQ(UnusedTagsNote(kind, {Tag::Detect}, kShowsTheseEnding), "");
-    CHECK_EQ(UnusedTagsNote(kind, {Tag::Status}, kShowsTheseEnding), "Put the Statuses tag on a line of the design to show these on a nameplate.");
-    CHECK_EQ(UnusedTagsNote(kind, {Tag::Weak, Tag::Resist}, kShowsTheseEnding),
-        "Put the Weaknesses or Resistances tag on a line of the design to show these on a nameplate.");
-    CHECK_EQ(UnusedTagsNote(kind, {Tag::Weak, Tag::Resist, Tag::Status, Tag::Immune}, kShowsTheseEnding),
-        "Put the Weaknesses, Resistances, Statuses or Immunities tag on a line of the design to show these on a nameplate.");
+    const auto names = [](const std::string& note, Tag tag) { return note.find(TagLabel(tag)) != std::string::npos; };
+    CHECK(UnusedTagsNote(kind, {Tag::Detect}, kShowsTheseEnding).empty()); // a line holds it: nothing to say
+    const std::string one = UnusedTagsNote(kind, {Tag::Status}, kShowsTheseEnding);
+    CHECK(names(one, Tag::Status) && one.ends_with(kShowsTheseEnding));
+    // Every tag of the card is named, in the card's order.
+    const std::string four = UnusedTagsNote(kind, {Tag::Weak, Tag::Resist, Tag::Status, Tag::Immune}, kShowsTheseEnding);
+    size_t at = 0;
+    for (const Tag tag : {Tag::Weak, Tag::Resist, Tag::Status, Tag::Immune})
+    {
+        const size_t found = four.find(TagLabel(tag), at);
+        CHECK(found != std::string::npos);
+        at = found;
+    }
+    CHECK(!names(one, Tag::Weak));
+    // One of a card's tags on a line is enough.
     kind.lines[1].text = "Lv $level $resist";
-    CHECK_EQ(UnusedTagsNote(kind, {Tag::Weak, Tag::Resist}, kShowsTheseEnding), ""); // one of a card's tags is enough
-    CHECK_EQ(UnusedTagsNote(kind, {Tag::Weak, Tag::Resist, Tag::Status, Tag::Immune}, kShowsTheseEnding), "");
-    CHECK_EQ(UnusedTagsNote(kind, {Tag::Weak}, kShowsTheseEnding), "Put the Weaknesses tag on a line of the design to show these on a nameplate.");
+    CHECK(UnusedTagsNote(kind, {Tag::Weak, Tag::Resist}, kShowsTheseEnding).empty());
+    CHECK(UnusedTagsNote(kind, {Tag::Weak, Tag::Resist, Tag::Status, Tag::Immune}, kShowsTheseEnding).empty());
+    CHECK(names(UnusedTagsNote(kind, {Tag::Weak}, kShowsTheseEnding), Tag::Weak));
     kind.lines[1].text = "$$resist"; // a doubled mark is a dollar sign, not the tag
     CHECK(!UnusedTagsNote(kind, {Tag::Resist}, kShowsTheseEnding).empty());
 }

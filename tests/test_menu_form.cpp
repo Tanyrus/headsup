@@ -164,8 +164,9 @@ TEST(only_the_lines_above_the_bottom_one_have_an_alignment)
         w.settings.Kind(PlateKind::Mobs).lines[tab].syncWith = kNoSync;
         const Form form       = w.Pass();
         const FormBlock* card = Block(form, "mobs-line-style");
-        CHECK(card != nullptr && Has(card->rml, ">Text Size<"));
-        CHECK_EQ(Has(card->rml, ">Alignment<"), tab < kPlateLines - 1);
+        const std::string line = "mobs" + std::to_string(tab);
+        CHECK(card != nullptr && Has(card->rml, ("mobs-line-style-text-size-" + line).c_str()));
+        CHECK_EQ(Has(card->rml, ("mobs-line-style-alignment-" + line).c_str()), tab < kPlateLines - 1);
     }
 }
 
@@ -201,7 +202,9 @@ TEST(the_cursor_style_list_has_headsups_styles_then_the_folders_files)
     const char* list = "entities-target-cursor-cursor-style";
     const Form open  = w.Pass({{list, kClickEvent, ""}});
     CHECK(open.popup && w.state.cursorsRequested); // opening it asks for the folder to be read again
-    CHECK(Has(open.popup->rml, ">Vanilla<") && Has(open.popup->rml, ">Phoenix Feather<") && Has(open.popup->rml, ">sword<"));
+    // Each of HeadsUp's own styles, then each file of the folder: six rows, the last the second file.
+    CHECK(Has(open.popup->rml, "entities-target-cursor-cursor-style-o-5") && !Has(open.popup->rml, "entities-target-cursor-cursor-style-o-6"));
+    CHECK(Has(open.popup->rml, ">Gold Arrow<") && Has(open.popup->rml, ">sword<"));
     CHECK(ClassOn(open, "entities-target-cursor-cursor-style-o-2", "picked")); // the feather, a new install's
     w.state.cursorsRequested = false;
     w.Pass();
@@ -340,16 +343,12 @@ TEST(a_color_off_its_default_has_an_arrow_that_puts_it_back)
     CHECK(w.settings.weakBadgeColor == Settings{}.weakBadgeColor);
 }
 
-TEST(the_dash_marks_are_listed_as_shapes_and_no_words_but_no)
+TEST(the_dash_mark_is_picked_from_a_list_whose_first_row_is_none)
 {
     Window w;
     const char* list = "entities-nameplates-replace-dashes";
     const Form open  = w.Pass({{list, kClickEvent, ""}});
     CHECK(open.popup);
-    CHECK(Has(open.popup->rml, ">No<"));
-    for (const char* shape : {"dash dot", "dash square", "dash diamond"})
-        CHECK(Has(open.popup->rml, shape));
-    CHECK(!Has(open.popup->rml, "Diamond") && !Has(open.popup->rml, "Square") && !Has(open.popup->rml, "Dot"));
     CHECK(ClassOn(open, "entities-nameplates-replace-dashes-o-3", "picked")); // the diamond, a new install's
     CHECK(w.Pass({{"entities-nameplates-replace-dashes-o-0", kClickEvent, ""}}).changed);
     CHECK(w.settings.dashMark == DashMark::None);

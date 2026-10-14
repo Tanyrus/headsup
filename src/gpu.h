@@ -44,6 +44,9 @@ namespace headsup
         // The box Rasterize draws the text's letters in, set solid and before its margin, without drawing them; false
         // when GDI cannot measure it.
         bool Extent(const char* text, const char* family, int pixelHeight, uint8_t style, int& width, int& height);
+        // The font's underline in the line Rasterize draws (without its margin): the row it starts on and how many
+        // rows thick it is. False for a font that does not say, such as a bitmap font.
+        bool UnderlineBand(const char* family, int pixelHeight, uint8_t style, int& top, int& thickness);
         // Where the font's ink sits in the line Rasterize draws (without its margin): the top and bottom of the ink of
         // glyphs, and the bottom of an H's. Drawn once for each family, size and glyphs, then kept, past Release too.
         LineInk FontInk(const char* family, int pixelHeight, const char* glyphs);

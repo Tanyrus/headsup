@@ -41,6 +41,7 @@ namespace headsup
                 const std::string id = kNavStart + PageKey(info.page);
                 if (form.Clicked(id) && state.page != info.page)
                 {
+                    state.Leave();
                     state.page       = info.page;
                     form.scrollToTop = true;
                 }
@@ -49,7 +50,6 @@ namespace headsup
             }
             for (const PageInfo& info : kPages)
                 form.Set(kNavStart + PageKey(info.page), FormValueKind::Class, "picked", {}, info.page == state.page);
-            form.EndBlock();
         }
 
         // A row of keys: each a chip that a click removes, and while there are fewer than most, a chip that takes
@@ -73,9 +73,12 @@ namespace headsup
                     for (const uint8_t key : HeldKeys(form.keyDown))
                     {
                         if (std::ranges::find(capture.held, key) != capture.held.end()) continue;
-                        if (std::ranges::find(keys, key) == keys.end()) keys.push_back(key);
-                        form.changed = true;
-                        capture.on   = false;
+                        if (std::ranges::find(keys, key) == keys.end())
+                        {
+                            keys.push_back(key);
+                            form.changed = true;
+                        }
+                        capture.on = false;
                         break;
                     }
             }

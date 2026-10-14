@@ -1,9 +1,12 @@
 #include "cursor_file.h"
 #include "test.h"
 
+#include <algorithm>
 #include <cstring>
+#include <initializer_list>
 #include <iterator>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace headsup;
@@ -160,6 +163,110 @@ TEST(a_cursor_larger_than_its_format_allows_is_not_read)
     CHECK_EQ(frames(PlainCursor(1, 257, 1, 2)), 0u);
     CHECK_EQ(frames(PlainCursor(2, 2, 8, 256)), 1u);
     CHECK_EQ(frames(PlainCursor(2, 2, 8, 257)), 0u); // more colors than 8 bits can pick from
+}
+
+TEST(a_frame_that_says_more_than_it_holds_is_not_read)
+{
+    auto frames = [](const std::vector<uint8_t>& file) { return ReadCursorFile(file.data(), file.size()).size(); };
+    // A frame whose directory entry gives it only its header's bytes, in a file that goes on long past them: its
+    // pixels would be read from whatever comes after the frame.
+    std::vector<uint8_t> shortFrame = PlainCursor(32, 32, 8, 2);
+    shortFrame[14] = 40; // the entry's byte count
+    shortFrame[15] = 0;
+    CHECK_EQ(frames(shortFrame), 0u);
+    // A pixel that picks a color past the palette's end.
+    std::vector<uint8_t> beyond = TinyCursor();
+    beyond[22 + 40 + 12] = 3; // the bottom row's first pixel: the palette has colors 0 to 2
+    CHECK_EQ(frames(beyond), 0u);
+    // An entry that starts past the file, or is shorter than a header.
+    std::vector<uint8_t> past = TinyCursor();
+    past[18] = 0xFF;
+    past[19] = 0xFF;
+    CHECK_EQ(frames(past), 0u);
+    // The file ends where that entry does: under the address sanitizer, reading a whole header there is caught.
+    std::vector<uint8_t> headless = TinyCursor();
+    headless[14] = 39;
+    headless.resize(22 + 39);
+    headless.shrink_to_fit();
+    CHECK_EQ(frames(headless), 0u);
+}
+
+TEST(a_frame_of_no_size_a_packed_one_or_one_of_a_depth_cursors_do_not_have_is_not_read)
+{
+    auto frames = [](std::vector<uint8_t> file, size_t at, std::initializer_list<uint8_t> bytes) {
+        std::copy(bytes.begin(), bytes.end(), file.begin() + static_cast<long>(22 + at));
+        return ReadCursorFile(file.data(), file.size()).size();
+    };
+    const std::vector<uint8_t> tiny = TinyCursor();
+    CHECK_EQ(frames(tiny, 0, {40}), 1u); // as it is
+    CHECK_EQ(frames(tiny, 4, {0, 0, 0, 0}), 0u);             // no width
+    CHECK_EQ(frames(tiny, 4, {0xFE, 0xFF, 0xFF, 0xFF}), 0u); // a negative one
+    CHECK_EQ(frames(tiny, 8, {0, 0, 0, 0}), 0u);             // no height
+    CHECK_EQ(frames(tiny, 8, {1, 0, 0, 0}), 0u);             // the mask's half alone: a picture of no rows
+    CHECK_EQ(frames(tiny, 8, {0xFC, 0xFF, 0xFF, 0xFF}), 0u); // top-down, which cursors are not
+    CHECK_EQ(frames(tiny, 16, {1}), 0u);                     // run-length packed
+    CHECK_EQ(frames(tiny, 14, {16}), 0u);                    // 16 bits a pixel
+    CHECK_EQ(frames(tiny, 0, {124}), 0u);                    // a newer header than cursors carry
+}
+
+namespace
+{
+    // An animated cursor of these chunks after its header, whose flags say its frames are cursor files.
+    std::vector<uint8_t> Animation(const std::vector<uint8_t>& chunks, uint32_t flags = 1)
+    {
+        std::vector<uint8_t> header;
+        for (const uint32_t v : {36u, 1u, 1u, 0u, 0u, 0u, 1u, 10u, flags})
+            Put32(header, v);
+        std::vector<uint8_t> body = {'A', 'C', 'O', 'N'};
+        PutChunk(body, "anih", header);
+        body.insert(body.end(), chunks.begin(), chunks.end());
+        std::vector<uint8_t> file;
+        PutChunk(file, "RIFF", body);
+        return file;
+    }
+    std::vector<uint8_t> FrameList(const std::vector<std::vector<uint8_t>>& cursors)
+    {
+        std::vector<uint8_t> list = {'f', 'r', 'a', 'm'};
+        for (const std::vector<uint8_t>& cursor : cursors)
+            PutChunk(list, "icon", cursor);
+        std::vector<uint8_t> chunk;
+        PutChunk(chunk, "LIST", list);
+        return chunk;
+    }
+}
+
+TEST(an_animation_is_its_list_of_whole_frames_and_nothing_nested_deeper)
+{
+    auto frames = [](const std::vector<uint8_t>& file) { return ReadCursorFile(file.data(), file.size()).size(); };
+    CHECK_EQ(frames(Animation(FrameList({TinyCursor(), TinyCursor(4)}))), 2u);
+    CHECK_EQ(frames(Animation({})), 0u); // a header and no frames
+    // One frame that is no cursor, and the file is none.
+    std::vector<uint8_t> broken = TinyCursor();
+    broken[2]                   = 1;
+    CHECK_EQ(frames(Animation(FrameList({TinyCursor(), broken}))), 0u);
+    // A chunk of an odd length is followed by a byte of padding, which the next chunk starts after.
+    std::vector<uint8_t> odd;
+    PutChunk(odd, "INAM", {'a', 'b', 'c'});
+    const std::vector<uint8_t> list = FrameList({TinyCursor()});
+    odd.insert(odd.end(), list.begin(), list.end());
+    CHECK_EQ(frames(Animation(odd)), 1u);
+    // The file's own size may be the whole file's or what follows it: whichever ends first is the end.
+    std::vector<uint8_t> whole = Animation(FrameList({TinyCursor()}));
+    whole[4] += 8;
+    CHECK_EQ(frames(whole), 1u);
+    // Frames stand one list deep. A list within a list is not gone into, however many there are: a file of them
+    // nested by the hundred thousand is read as having no frames, and the reading returns.
+    std::vector<uint8_t> nested = FrameList({TinyCursor()});
+    for (int depth = 0; depth < 200000; ++depth)
+    {
+        std::vector<uint8_t> outer = {'L', 'I', 'S', 'T'};
+        Put32(outer, static_cast<uint32_t>(nested.size() + 4));
+        outer.insert(outer.end(), {'f', 'r', 'a', 'm'});
+        outer.insert(outer.end(), nested.begin(), nested.end());
+        nested = std::move(outer);
+        if (depth == 0) CHECK_EQ(frames(Animation(nested)), 0u);
+    }
+    CHECK_EQ(frames(Animation(nested)), 0u);
 }
 
 TEST(the_chocobo_pointer_has_two_frames_each_shown_five_sixths_of_a_second)

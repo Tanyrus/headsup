@@ -418,11 +418,14 @@ namespace headsup
             for (int channel = 0; channel < 3; ++channel)
             {
                 const std::string slider = swatch + "-p-" + kChannels[channel];
-                if (const FormEvent* moved = Took(slider, kChangeEvent))
+                // A slider says its value as it is made and each time it is set: only a level other than the color's
+                // own is the player's, or opening the picker would round the color to it.
+                const FormEvent* moved = Took(slider, kChangeEvent);
+                const float to         = moved != nullptr ? std::clamp(std::strtof(moved->value.c_str(), nullptr), 0.0f, kColorFull) : 0.0f;
+                if (moved != nullptr && std::lround(to) != std::lround(color.v[channel] * kColorFull))
                 {
-                    color.v[channel] =
-                        std::clamp(std::strtof(moved->value.c_str(), nullptr), 0.0f, kColorFull) / kColorFull;
-                    changed = true;
+                    color.v[channel] = to / kColorFull;
+                    changed          = true;
                 }
                 const int level = static_cast<int>(std::lround(color.v[channel] * kColorFull));
                 rml += std::string("<div class=\"pick-row\"><div class=\"pick-name\">") + kChannelNames[channel] +
@@ -682,16 +685,14 @@ namespace headsup
         const TemplateRuns had = RunsOf(text);
         const int runs         = static_cast<int>(had.texts.size());
         const std::string was  = text;
+        // Asked each pass and never kept: a box built anew loses the keyboard without saying so.
+        draft.typing = focused.starts_with(box + kRunIdInfix);
         bool reshaped          = false;
         for (int run = 0; run < runs && !reshaped; ++run)
         {
             const std::string input = runId(run);
-            if (Took(input, kFocusEvent) != nullptr) draft.typing = true;
             if (const FormEvent* caret = Took(input, kCaretEvent))
-            {
-                draft.caret  = RunCaret{run, static_cast<size_t>(std::strtoul(caret->value.c_str(), nullptr, 10))};
-                draft.typing = false;
-            }
+                draft.caret = RunCaret{run, static_cast<size_t>(std::strtoul(caret->value.c_str(), nullptr, 10))};
             if (const FormEvent* kill = Took(input, kKillEvent); kill != nullptr && !kill->value.empty())
             {
                 // The stretch as it stands typed, then without the tag before it or after it.

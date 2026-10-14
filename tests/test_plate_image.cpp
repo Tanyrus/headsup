@@ -1,6 +1,7 @@
 #include "plate_image.h"
 
 #include "argb.h"
+#include "plate_settings.h"
 #include "test.h"
 
 #include <algorithm>
@@ -457,9 +458,8 @@ TEST(a_lines_ink_runs_from_its_glyphs_top_to_their_bottom_with_the_h_on_its_base
 
 namespace
 {
-    // Whether a point is in a circular arrow in a square of this size, from its middle with x right and y up: a
-    // ring 0.11 of the size thick at 0.32 of it from the middle, but for the eighth counterclockwise of straight
-    // up, and at the ring's top a head pointing left into that gap, 0.26 long and 0.34 tall at its base.
+    // Whether a point is in a circular arrow, from its square's middle with y up: a ring open for the eighth
+    // counterclockwise of straight up, and at the ring's top a head pointing left into that gap.
     bool InsideResetArrow(float x, float y, float size)
     {
         const float pi = 3.14159265f, radius = 0.32f * size, length = 0.26f * size;
@@ -558,7 +558,7 @@ TEST(pieces_are_joined_side_by_side_into_one_line_with_one_margin_around_it)
         for (int x = 1; x < 4; ++x)
             b.alpha[static_cast<size_t>(y * 5 + x)] = 100;
     }
-    const Coverage joined = Joined({a, b}, 1);
+    const Coverage joined = Joined({a, b}, {}, 1);
     CHECK(joined.width == 2 + 3 + 2 && joined.height == 4);
     for (int x = 0; x < joined.width; ++x)
     {
@@ -566,6 +566,58 @@ TEST(pieces_are_joined_side_by_side_into_one_line_with_one_margin_around_it)
         CHECK_EQ(At(joined, x, 1), x == 0 || x == 6 ? 0 : x < 3 ? 200 : 100);
     }
     // One piece is itself, and none is an empty line.
-    CHECK(Joined({a}, 1).alpha == a.alpha);
-    CHECK(Joined({}, 1).width == 2 && Joined({}, 1).alpha.empty() == false);
+    CHECK(Joined({a}, {}, 1).alpha == a.alpha);
+    CHECK(Joined({}, {}, 1).width == 2 && Joined({}, {}, 1).alpha.empty() == false);
+}
+
+TEST(a_piece_stands_in_the_room_the_one_before_it_leaves_for_its_last_letters_lean)
+{
+    // Two pieces of italic letters, 6 wide with 2 of room for the last letter's lean, a mark 3 wide between them and
+    // a margin of 1: the mark starts where the first piece's cells end, and only the last piece keeps its room.
+    const std::vector<int> widths{8, 3, 8}, room{2, 0, 2};
+    CHECK_EQ(JoinedWidth(widths, room), 6 + 3 + 8);
+    CHECK_EQ(JoinedWidth(widths, {}), 8 + 3 + 8); // upright: nothing to stand in
+    CHECK_EQ(JoinedWidth({}, {}), 0);
+    const auto piece = [](int width, uint8_t ink) {
+        Coverage c{width + 2, 3, std::vector<uint8_t>(static_cast<size_t>((width + 2) * 3), 0)};
+        for (int x = 1; x <= width; ++x)
+            c.alpha[static_cast<size_t>(c.width + x)] = ink;
+        return c;
+    };
+    Coverage letters = piece(8, 100);
+    letters.alpha[static_cast<size_t>(letters.width + 7)] = 30; // the lean, faint in its room
+    letters.alpha[static_cast<size_t>(letters.width + 8)] = 0;
+    const Coverage joined = Joined({letters, piece(3, 255), letters}, room, 1);
+    CHECK_EQ(joined.width, 17 + 2);
+    const std::vector<int> row{0, 100, 100, 100, 100, 100, 100, 255, 255, 255, 100, 100, 100, 100, 100, 100, 30, 0, 0};
+    for (int x = 0; x < joined.width; ++x)
+        CHECK_EQ(At(joined, x, 1), row[static_cast<size_t>(x)]);
+    // What leans into the room stays where the next piece is fainter than it.
+    const Coverage faint = Joined({letters, piece(3, 10)}, room, 1);
+    CHECK_EQ(At(faint, 7, 1), 30);
+    CHECK_EQ(At(faint, 8, 1), 10);
+    // Only italics lean.
+    CHECK(ItalicLean(40, StyleBit(FontStyle::Italic)) > 0);
+    CHECK_EQ(ItalicLean(40, StyleBit(FontStyle::Bold) | StyleBit(FontStyle::Underline)), 0);
+}
+
+TEST(a_line_is_drawn_under_the_whole_of_a_text_inside_its_margin)
+{
+    Coverage text{12, 9, std::vector<uint8_t>(12 * 9, 0)};
+    text.alpha[static_cast<size_t>(4 * 12 + 5)] = 77; // a letter
+    Underline(text, 6, 2, 2);
+    for (int y = 0; y < text.height; ++y)
+        for (int x = 0; x < text.width; ++x)
+        {
+            const bool under = (y == 6 || y == 7) && x >= 2 && x < 10;
+            CHECK_EQ(At(text, x, y), under ? 255 : y == 4 && x == 5 ? 77 : 0);
+        }
+    // Past the image's last row it is cut, and one of no thickness is none.
+    Coverage low{6, 4, std::vector<uint8_t>(24, 0)};
+    Underline(low, 3, 5, 1);
+    CHECK(At(low, 2, 3) == 255 && At(low, 2, 2) == 0);
+    Coverage none{6, 4, std::vector<uint8_t>(24, 0)};
+    Underline(none, 1, 0, 1);
+    Underline(none, 9, 2, 1);
+    CHECK(none.alpha == std::vector<uint8_t>(24, 0));
 }

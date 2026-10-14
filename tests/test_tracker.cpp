@@ -575,6 +575,16 @@ TEST(a_dead_far_or_disabled_row_mob_gets_no_outline)
     fallen.alive      = false;
     t.Update({fallen}, kLevel20, marked, CursorTargets{});
     CHECK(!t.Find(0x5000)->outline);
+    // Nor does a dead pet, which is a mob to the game and goes by the pets' rows: those have none for the dead.
+    marked.Kind(PlateKind::Pets).rows[static_cast<int>(PetRow::Yours)].outline = OutlineMode::Shown;
+    ActorInput pet = Mob(0x6000, kSnipper, "Snipper");
+    pet.pet        = true;
+    pet.petRow     = PetRow::Yours;
+    t.Update({pet}, kLevel20, marked, CursorTargets{});
+    CHECK(t.Find(0x6000)->outline);
+    pet.alive = false;
+    t.Update({pet}, kLevel20, marked, CursorTargets{});
+    CHECK(!t.Find(0x6000)->outline);
 }
 
 namespace

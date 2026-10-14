@@ -281,7 +281,7 @@ TEST(an_ornament_at_the_top_or_the_bottom_goes_with_whichever_line_is_first_or_l
     mobs.lines[2].text = "";
     at = OrnamentLineOf(ComposePlate(AggressiveMob(), kPlayer, s, kGame));
     CHECK(at.line == 1 && at.under);
-    // A plate left with one line by a text that fits no texture keeps both.
+    // A plate that loses its icons keeps the ornament at the line that is left.
     ComposedPlate plate = ComposePlate(AggressiveMob(), kPlayer, s, kGame);
     CHECK_EQ(plate.lines.size(), size_t{2});
     DropIcons(plate);

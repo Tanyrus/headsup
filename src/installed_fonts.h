@@ -12,9 +12,8 @@ namespace headsup
     // Bundled fonts are always there; Windows' are where its Fonts folder has their file.
     bool MenuFontInstalled(const MenuFont& font);
 
-    // The font families the settings window offers. Windows takes up to a second to list its fonts, which froze the
-    // game when a page with a font dropdown first showed: a thread lists them once they are first asked for, and
-    // until it is done the choices are the bundled fonts and the one in use.
+    // The font families the settings window offers. Windows takes up to a second to list them, so a thread does
+    // once they are first asked for: until it is done the choices are the bundled fonts and the one in use.
     class InstalledFonts
     {
     public:

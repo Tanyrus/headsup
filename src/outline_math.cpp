@@ -1,5 +1,8 @@
 #include "outline_math.h"
 
+#include "argb.h"
+#include "plate_settings.h"
+
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -35,16 +38,15 @@ namespace headsup
 
     namespace
     {
-        constexpr float kWholePercent = 100.0f;
-        constexpr float kOpaque       = 255.0f;
+        constexpr auto kOpaque = static_cast<float>(kOpaqueAlpha);
     }
 
-    float OutlinePixels(int percent) { return static_cast<float>(percent) / kWholePercent * kOutlineUnitPx; }
+    float OutlinePixels(int percent) { return static_cast<float>(percent) / kPercent * kOutlineUnitPx; }
 
     uint8_t OutlineAlpha(int opacityPercent, float distance, float range, bool fadeIn)
     {
         const float share = fadeIn ? FadeShare(distance, range) : 1.0f;
-        return static_cast<uint8_t>(std::lround(kOpaque * static_cast<float>(opacityPercent) / kWholePercent * share));
+        return static_cast<uint8_t>(std::lround(kOpaque * static_cast<float>(opacityPercent) / kPercent * share));
     }
 
     uint32_t ScaledAlphaRef(uint32_t reference, uint8_t alpha) { return reference * alpha / static_cast<uint32_t>(kOpaque); }

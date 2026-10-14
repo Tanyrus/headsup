@@ -107,30 +107,21 @@ namespace headsup
                (content.coin ? static_cast<float>(CoinPixels(metrics)) + metrics.gap : 0.0f);
     }
 
-    std::optional<WidgetBox> BarLook::BoxOf(const PlacedWidget& placed, bool lit) const
+    std::optional<BoxStyle> BarLook::BoxOf(BarWidget widget, bool lit) const
     {
-        const BarRect& r    = placed.rect;
-        const bool isTarget = placed.widget == BarWidget::Target;
+        const bool isTarget = widget == BarWidget::Target;
         if (ornate)
         {
-            // The target's frame and the hover tint take the pill row, clear of the strip's edges.
             if (!isTarget && !lit) return std::nullopt;
             // The target's frame always has the tint, so a hovered one has more of it.
             const uint32_t fill = isTarget && lit ? AlphaTimes(palette.highlight, kLitTarget) : palette.highlight;
-            const BoxStyle style{
-                .radius = kFrameRadius, .top = fill, .bottom = fill, .border = isTarget ? palette.accent : 0u};
-            if (isTarget) return WidgetBox{BarRect{r.x, row.y, r.width, row.height}, style};
-            // Neighbours meet at a divider's diamond, drawn from a whole pixel and centered on their shared edge: the
-            // tint's edges, whole pixels too, stay clear of it.
-            const float inset = DiamondClearance(metrics);
-            const float left = std::round(r.x + inset), right = std::round(r.x + r.width - inset);
-            return WidgetBox{BarRect{left, row.y, right - left, row.height}, style};
+            return BoxStyle{.radius = kFrameRadius, .top = fill, .bottom = fill, .border = isTarget ? palette.accent : 0u};
         }
-        const bool flat = placed.widget == BarWidget::Zone || placed.widget == BarWidget::EarthTime;
+        const bool flat = widget == BarWidget::Zone || widget == BarWidget::EarthTime;
         if (flat && !lit) return std::nullopt;
         const uint32_t fill = lit ? palette.highlight : palette.pill;
-        return WidgetBox{r, BoxStyle{.radius = metrics.pillRadius, .top = fill, .bottom = fill,
-                                .border = isTarget || lit ? palette.accent : palette.pillBorder}};
+        return BoxStyle{.radius = metrics.pillRadius, .top = fill, .bottom = fill,
+            .border = isTarget || lit ? palette.accent : palette.pillBorder};
     }
 
     int CoinPixels(const BarMetrics& metrics) { return WholePixels(metrics.icon * kCoinScale); }

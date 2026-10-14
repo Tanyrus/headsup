@@ -29,6 +29,7 @@ namespace
     public:
         Settings settings;
         RmlMenu menu;
+        std::vector<uint8_t> held; // the keys that are down, by their virtual-key codes
 
         explicit Window(MenuTheme theme = MenuTheme::Phoenix, const char* font = kBarlowCondensed)
         {
@@ -36,7 +37,7 @@ namespace
             m_Host.context     = m_Rml.context;
             m_Host.textFont    = font;
             m_Host.menuFonts = {kBarlowCondensed};
-            m_Host.keyDown   = [](uint8_t) { return false; };
+            m_Host.keyDown   = [this](uint8_t key) { return std::ranges::find(held, key) != held.end(); };
             menu.open        = true;
             Frames(2);
         }
@@ -92,6 +93,39 @@ namespace
             const Rml::Vector2f at = Center(id);
             m_Host.context->ProcessMouseMove(static_cast<int>(at.x), static_cast<int>(at.y), 0);
             Frames(kEaseFrames);
+        }
+
+        void PointerTo(Rml::Vector2f at)
+        {
+            m_Host.context->ProcessMouseMove(static_cast<int>(at.x), static_cast<int>(at.y), 0);
+            Frames(2);
+        }
+        bool ClickAt(Rml::Vector2f at)
+        {
+            m_Host.context->ProcessMouseMove(static_cast<int>(at.x), static_cast<int>(at.y), 0);
+            bool changed = Frames();
+            m_Host.context->ProcessMouseButtonDown(kLeftButton, 0);
+            changed = Frames() || changed;
+            m_Host.context->ProcessMouseButtonUp(kLeftButton, 0);
+            return Frames(3) || changed;
+        }
+        // A press and its release that both reach one frame, as a tap does, or any click through a long frame.
+        bool Tap(const std::string& id)
+        {
+            Center(id);
+            Frames();
+            const Rml::Vector2f at = Center(id);
+            m_Host.context->ProcessMouseMove(static_cast<int>(at.x), static_cast<int>(at.y), 0);
+            m_Host.context->ProcessMouseButtonDown(kLeftButton, 0);
+            m_Host.context->ProcessMouseButtonUp(kLeftButton, 0);
+            return Frames(3);
+        }
+        // What a text box holds.
+        std::string Typed(const std::string& id)
+        {
+            auto* input = rmlui_dynamic_cast<Rml::ElementFormControlInput*>(Find(id));
+            if (input == nullptr) throw test::Failure{"the window has no text box " + id};
+            return input->GetValue();
         }
 
         // Presses the left button on one control and lets it go on another, or that far from the first.
@@ -325,6 +359,102 @@ TEST(a_swatch_opens_the_color_picker_and_closes_it)
     CHECK(!window.Shows("mobs-line-style-text-color-mobs1-swatch-p-hex"));
 }
 
+TEST(a_color_looked_at_in_its_picker_is_the_color_it_was)
+{
+    Window window;
+    const std::string swatch = "entities-colors-claim-status-claimed-yours-colors-claim-status";
+    const Color before       = window.settings.palette.claim[static_cast<int>(ClaimState::Yours)];
+    CHECK(!window.Click(swatch)); // opening it is no change
+    CHECK(window.Shows(swatch + "-p-hex"));
+    CHECK(!window.Frames(5));
+    CHECK(window.settings.palette.claim[static_cast<int>(ClaimState::Yours)] == before);
+    CHECK(!window.Shows(swatch.substr(0, swatch.size()) + "-reset")); // so no arrow to put it back
+    window.Click(swatch);
+    CHECK(window.settings.palette.claim[static_cast<int>(ClaimState::Yours)] == before);
+}
+
+TEST(a_click_on_the_pickers_own_ground_leaves_it_open)
+{
+    Window window;
+    const std::string swatch = "entities-colors-claim-status-claimed-yours-colors-claim-status";
+    window.Click(swatch);
+    CHECK(window.Shows(swatch + "-p-hex"));
+    // Its padding, beside the sliders: no control, and still the picker.
+    Rml::Element* picker = window.Find("popup");
+    window.ClickAt(picker->GetAbsoluteOffset(Rml::BoxArea::Border) + Rml::Vector2f(3.0f, 3.0f));
+    CHECK(window.Shows(swatch + "-p-hex"));
+    window.Click("page-title"); // anywhere else closes it
+    CHECK(!window.Shows(swatch + "-p-hex"));
+}
+
+TEST(a_row_left_waiting_for_a_key_waits_no_longer_once_its_page_or_the_window_is_left)
+{
+    constexpr uint8_t kF12 = 0x7B, kLetterA = 0x41;
+    Window window;
+    window.Page("userinterface");
+    const std::string add = "userinterface-screenshot-mode-key-add";
+    window.Click(add);
+    window.Page("mobs"); // a change of mind
+    window.held = {kF12};
+    window.Page("userinterface");
+    CHECK(!window.Frames(2));
+    CHECK_EQ(window.settings.screenshotKey, 0);
+    window.held.clear();
+    window.Click(add);
+    window.menu.open = false;
+    window.Frames(2);
+    window.held      = {kF12};
+    window.menu.open = true;
+    CHECK(!window.Frames(3));
+    CHECK_EQ(window.settings.screenshotKey, 0);
+    // Waited for on its page, the key is taken; and one the row already holds is no change.
+    window.held.clear();
+    window.Page("mousecursor");
+    const std::string keep = "mousecursor-mouse-pointer-keep-pointer-add";
+    window.Click(keep);
+    window.held = {kLetterA};
+    CHECK(window.Frames(2));
+    const std::vector<uint8_t> kept = window.settings.keepPointerKeys;
+    CHECK(std::ranges::find(kept, kLetterA) != kept.end());
+    window.held.clear();
+    window.Frames(2);
+    window.Click(keep);
+    window.held = {kLetterA};
+    CHECK(!window.Frames(2));
+    CHECK(window.settings.keepPointerKeys == kept);
+}
+
+TEST(the_list_of_pages_scrolls_in_a_window_too_short_for_it)
+{
+    Window window;
+    window.OpenAt(0, 0, 900, 100); // asked shorter than it goes, so it opens at its least height
+    Rml::Element* body = window.Find("nav-debug")->GetOwnerDocument();
+    const float bottom = body->GetAbsoluteOffset(Rml::BoxArea::Border).y + body->GetBox().GetSize(Rml::BoxArea::Border).y;
+    // The last page's name is reached inside the window, and takes its click.
+    window.Click("nav-debug");
+    Rml::Element* last = window.Find("nav-debug");
+    CHECK(last->GetAbsoluteOffset(Rml::BoxArea::Border).y + last->GetBox().GetSize(Rml::BoxArea::Border).y <= bottom);
+    CHECK(window.Shows("debug-headsup-head") || last->IsClassSet("picked"));
+}
+
+TEST(a_dash_mark_is_shown_as_its_shape_in_the_list_and_in_the_closed_control)
+{
+    Window window;
+    const std::string list = "entities-nameplates-replace-dashes";
+    const auto shape = [&](const std::string& id) {
+        Rml::ElementList shapes;
+        window.Find(id)->GetElementsByClassName(shapes, "dash");
+        return shapes.size();
+    };
+    CHECK_EQ(shape(list), 1u); // the diamond a new install draws, on the control itself
+    window.Click(list);
+    CHECK_EQ(shape(list + "-o-0"), 0u); // no mark: a dash stays a dash
+    for (int mark = 1; mark < kDashMarkCount; ++mark)
+        CHECK_EQ(shape(list + "-o-" + std::to_string(mark)), 1u);
+    window.Click(list + "-o-0");
+    CHECK_EQ(shape(list), 0u);
+}
+
 TEST(rmlui_reads_every_page_of_both_themes_without_a_complaint)
 {
     for (const MenuTheme theme : {MenuTheme::Phoenix, MenuTheme::Aurora})
@@ -449,6 +579,151 @@ TEST(backspace_and_delete_beside_a_tag_take_it_out_and_the_arrows_step_past_it)
     CHECK_EQ(text, "ab Z$levelY c");
 }
 
+TEST(what_is_typed_is_kept_when_the_click_that_ends_it_is_over_within_one_frame)
+{
+    Window window;
+    window.Page("players");
+    const std::string box = "players-nameplate-design-design-players-1";
+    std::string& text     = window.settings.Kind(PlateKind::Players).lines[1].text;
+    text                  = "ab";
+    window.Frames(2);
+    const auto type = [&](const char* letter) {
+        window.Click(box + "-t-0");
+        window.Key(Rml::Input::KI_END);
+        window.Type(letter);
+    };
+    // On another page's name: the page opens, and the line it left has what was typed.
+    type("c");
+    CHECK(window.Tap("nav-mobs"));
+    CHECK_EQ(text, "abc");
+    CHECK(window.Shows("mobs-line-style-head"));
+    // On its own card's title, which folds the card.
+    window.Page("players");
+    type("d");
+    CHECK(window.Tap("players-nameplate-design-head"));
+    CHECK_EQ(text, "abcd");
+    window.Tap("players-nameplate-design-head");
+    // On the close button.
+    type("e");
+    CHECK(window.Tap("close"));
+    CHECK_EQ(text, "abcde");
+    CHECK(!window.menu.open);
+}
+
+TEST(a_window_closed_while_a_box_has_the_keyboard_keeps_what_was_typed_and_takes_no_more)
+{
+    Window window;
+    window.Page("players");
+    const std::string box = "players-nameplate-design-design-players-1";
+    std::string& text     = window.settings.Kind(PlateKind::Players).lines[1].text;
+    text                  = "ab";
+    window.Frames(2);
+    window.Click(box + "-t-0");
+    window.Key(Rml::Input::KI_END);
+    window.Type("c");
+    window.menu.open = false; // as a command closes it, with no click to take the keyboard from the box
+    CHECK(window.Frames(2));  // saved as it closes
+    CHECK_EQ(text, "abc");
+    window.Type("wasd"); // typed at the game, the window gone
+    window.menu.open = true;
+    window.Frames(3);
+    window.Click("page-title");
+    CHECK_EQ(text, "abc");
+}
+
+TEST(a_box_typed_in_keeps_the_keyboard_when_what_it_filters_is_listed_anew)
+{
+    Window window;
+    window.Page("userinterface");
+    const std::string find = "userinterface-game-windows-find-window";
+    window.Click(find);
+    for (const char* letter : {"e", "q", "u"})
+        window.Type(letter); // a frame after each: the list under the box changes with every letter
+    CHECK_EQ(window.Typed(find), "equ");
+}
+
+TEST(a_tag_clicked_goes_to_the_line_that_last_had_the_keyboard)
+{
+    Window window;
+    window.Page("players");
+    KindSettings& players = window.settings.Kind(PlateKind::Players);
+    players.lines[0].text = "top";
+    players.lines[1].text = "ab";
+    window.Frames(2);
+    const std::string top = "players-nameplate-design-design-players-0", middle = "players-nameplate-design-design-players-1";
+    // Typing that makes a tag, and then Backspace at the stretch's start: the middle line is built anew.
+    window.Click(middle + "-t-0");
+    window.Key(Rml::Input::KI_END);
+    window.Type(" $job");
+    window.Key(Rml::Input::KI_HOME);
+    window.Key(Rml::Input::KI_BACK);
+    // Then the top line is typed in, and a tag clicked: it is the top line's.
+    window.Click(top + "-t-0");
+    window.Click("tag-1");
+    CHECK(players.lines[0].text.find("level") != std::string::npos);
+    CHECK(players.lines[1].text.find("level") == std::string::npos);
+}
+
+TEST(escape_gives_a_box_back_what_it_held_and_a_click_beside_a_lines_stretches_types_at_its_end)
+{
+    Window window;
+    window.Page("players");
+    const std::string box = "players-nameplate-design-design-players-1";
+    std::string& text     = window.settings.Kind(PlateKind::Players).lines[1].text;
+    text                  = "ab $level";
+    window.Frames(2);
+    window.Click(box + "-t-0");
+    window.Type("zz");
+    CHECK(!window.Key(Rml::Input::KI_ESCAPE)); // nothing changed
+    CHECK_EQ(text, "ab $level");
+    CHECK_EQ(window.Typed(box + "-t-0"), "ab ");
+    // The box's own ground, past its last chip: the keyboard goes to the end of the line.
+    Rml::Element* line = window.Find(box);
+    const Rml::Vector2f corner = line->GetAbsoluteOffset(Rml::BoxArea::Border) + line->GetBox().GetSize(Rml::BoxArea::Border);
+    window.ClickAt(corner - Rml::Vector2f(3.0f, 3.0f));
+    window.Type("!");
+    window.Click("page-title");
+    CHECK_EQ(text, "ab $level!");
+}
+
+TEST(every_switch_of_every_page_flips_a_setting_of_its_own_and_flips_it_back)
+{
+    // Not settings: what the window itself is showing.
+    const std::vector<std::string> windowsOwn{"userinterface-game-windows-all-windows"};
+    // The windows moved under the panel are a set: one taken out and put back stands last in the list.
+    const auto same = [](Settings a, Settings b) {
+        std::ranges::sort(a.movedWindows);
+        std::ranges::sort(b.movedWindows);
+        return a == b;
+    };
+    for (const PageInfo& info : kPages)
+    {
+        Window window;
+        window.Page(PageKey(info.page).c_str());
+        const Settings fresh = window.settings;
+        std::vector<std::string> switches;
+        for (Rml::Element* element : window.OfClass("check"))
+            if (!element->GetId().empty()) switches.push_back(element->GetId());
+        std::vector<std::pair<std::string, Settings>> flipped;
+        for (const std::string& id : switches)
+        {
+            if (std::ranges::find(windowsOwn, id) != windowsOwn.end()) continue;
+            window.settings = fresh;
+            window.Frames(2);
+            if (!window.Shows(id)) continue; // a setting of something that is off on a new install
+            if (!window.Click(id) || window.settings == fresh) throw test::Failure{"the switch " + id + " changes no setting"};
+            flipped.emplace_back(id, window.settings);
+            if (!window.Shows(id)) continue; // it switched off what it stands in
+            window.Click(id);
+            if (!same(window.settings, fresh)) throw test::Failure{"the switch " + id + " does not flip back"};
+        }
+        for (size_t a = 0; a < flipped.size(); ++a)
+            for (size_t b = a + 1; b < flipped.size(); ++b)
+                if (flipped[a].second == flipped[b].second)
+                    throw test::Failure{"the switches " + flipped[a].first + " and " + flipped[b].first + " set the same setting"};
+    }
+}
+
 namespace
 {
     struct KeysSeen final : Rml::EventListener
@@ -525,6 +800,37 @@ TEST(the_font_arrows_step_through_the_fonts_and_a_slider_follows_the_pointer)
     CHECK(window.Drag("entities-nameplates-vertical-offset", Rml::Vector2f(60.0f, 0.0f)));
     CHECK(window.settings.nameRaise > was);
     CHECK_EQ(window.TextOf("entities-nameplates-vertical-offset-val"), std::to_string(window.settings.nameRaise) + " px");
+}
+
+TEST(a_slider_takes_the_arrow_keys_only_while_the_pointer_is_on_the_window)
+{
+    Window window;
+    window.Page("entities");
+    const std::string slider = "entities-nameplates-vertical-offset";
+    window.Drag(slider, Rml::Vector2f(60.0f, 0.0f));
+    // Still on the window, an arrow nudges the slider last moved.
+    const int dragged = window.settings.nameRaise;
+    CHECK(window.Key(Rml::Input::KI_RIGHT));
+    CHECK_EQ(window.settings.nameRaise, dragged + 1);
+    // With the pointer off the window the arrows are the game's, for its camera: the slider is left alone.
+    window.PointerTo(Rml::Vector2f(5.0f, 5.0f));
+    CHECK(!window.Key(Rml::Input::KI_RIGHT, 3));
+    CHECK_EQ(window.settings.nameRaise, dragged + 1);
+    // And it does not take them up again by itself when the pointer comes back.
+    window.PointerTo(window.Center("page-title"));
+    CHECK(!window.Key(Rml::Input::KI_RIGHT));
+    CHECK_EQ(window.settings.nameRaise, dragged + 1);
+    // A text box keeps the keyboard wherever the pointer goes: it is typed in.
+    window.Page("players");
+    const std::string box = "players-nameplate-design-design-players-1";
+    window.settings.Kind(PlateKind::Players).lines[1].text = "ab";
+    window.Frames(2);
+    window.Click(box + "-t-0");
+    window.Key(Rml::Input::KI_END);
+    window.PointerTo(Rml::Vector2f(5.0f, 5.0f));
+    window.Type("c");
+    window.Click("page-title");
+    CHECK_EQ(window.settings.Kind(PlateKind::Players).lines[1].text, "abc");
 }
 
 TEST(a_card_folds_on_its_title_and_a_switch_takes_a_click)

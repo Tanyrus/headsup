@@ -77,6 +77,21 @@ TEST(the_friend_list_is_found_by_the_numbers_its_slots_hold)
     std::vector<uint8_t> twice = data;
     twice.insert(twice.end(), data.begin(), data.end());
     CHECK(!LocateFriendList(Section(twice)));
+    // A run with less than a whole list of data after its start is none: its last slots would be read past the end.
+    std::vector<uint8_t> cut = data;
+    cut.resize(kBefore + kFriendSlotBytes * (kFriendSlots - 1));
+    cut.shrink_to_fit();
+    CHECK(!LocateFriendList(Section(cut)));
+    // The block list numbers its slots from 1 again, and in the client more data follows it. Only the second
+    // number, which it lacks, tells it from a second friend list.
+    std::vector<uint8_t> blocks = data;
+    blocks.resize(kBefore + kFriendSlotBytes * (2 * kFriendSlots + 10), 0);
+    for (int slot = 0; slot < kFriendSlots; ++slot)
+    {
+        const auto number = static_cast<uint16_t>(4 * (slot + 1));
+        std::memcpy(&blocks[kBefore + kFriendSlotBytes * static_cast<size_t>(kFriendSlots + slot) + 0x70], &number, 2);
+    }
+    CHECK(LocateFriendList(Section(blocks)) == static_cast<uint32_t>(kBefore));
 }
 
 TEST(a_friends_character_is_known_once_the_server_has_said_who_they_play)
@@ -90,6 +105,9 @@ TEST(a_friends_character_is_known_once_the_server_has_said_who_they_play)
     CHECK((FriendCharacters(first) == std::vector<uint32_t>{65002}));
     // A friend removed leaves an empty slot, whatever else it still holds.
     std::memset(&data[kBefore], 0, 8);
+    CHECK(FriendCharacters(first).empty());
+    // The block list's first slot is no friend's, whatever character it comes to hold.
+    Put(data, kBefore + kFriendSlotBytes * kFriendSlots + 0x30, "eefd0000");
     CHECK(FriendCharacters(first).empty());
     // Several come in ascending order, which the lookup counts on.
     std::vector<uint8_t> more = Data();

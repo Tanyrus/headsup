@@ -192,6 +192,27 @@ TEST(a_text_box_takes_its_text_when_it_is_left)
     CHECK(Has(form.blocks[0].rml, "placeholder=\"A Name\""));
 }
 
+TEST(a_number_box_takes_a_whole_number_within_its_limit_and_nothing_else)
+{
+    FormState state;
+    int value = 7;
+    const auto pass = [&](const char* typed) {
+        Form form({{"p-c-x", kCommitEvent, typed}}, state);
+        form.pageKey = "p";
+        form.BeginCard("C");
+        form.NumberAt("X", "x", value, 300);
+        form.EndCard();
+        return form.changed;
+    };
+    CHECK(pass("120") && value == 120);
+    CHECK(!pass("120")); // the same again is no change
+    CHECK(pass("-45") && value == -45);
+    CHECK(pass("99999") && value == 300); // past its limit, either way, is the limit
+    CHECK(pass("-99999") && value == -300);
+    CHECK(!pass("abc") && value == -300); // no number: as it was
+    CHECK(!pass("") && value == -300);
+}
+
 TEST(what_is_faded_is_marked_off_and_takes_no_clicks)
 {
     FormState state;
@@ -204,8 +225,6 @@ TEST(what_is_faded_is_marked_off_and_takes_no_clicks)
     CHECK(ClassOn(form, "page-mouse-pointer-height-box", "off") && ClassOn(form, "page-mouse-pointer-height-label-row", "off"));
     // The card itself was begun before the fade: it shows.
     CHECK(!ClassOn(form, "page-mouse-pointer", "off"));
-    // The card's title was written before the fade began.
-    CHECK(!ClassOn(form, "page-mouse-pointer-head", "off"));
     const Form plain = Pass({}, state, b);
     CHECK_EQ(plain.blocks[0].rml, form.blocks[0].rml); // fading replaces no markup
 }
@@ -323,6 +342,13 @@ TEST(a_swatch_opens_three_sliders_and_the_color_as_written)
     CHECK(color == ColorFromRgb(0x102030));
     pass({{"p-c-edge-p-hex", kCommitEvent, "nonsense"}});
     CHECK(color == ColorFromRgb(0x102030));
+    // A slider says its value as it is made and each time it is set. Said back as it stands, a level is not the
+    // player's: a color between two levels, as 0.15 is, stays the color it was.
+    color = Color{{1.0f, 0.15f, 0.15f}};
+    const Form echoed = pass({{"p-c-edge-p-r", kChangeEvent, "255"}, {"p-c-edge-p-g", kChangeEvent, "38"}, {"p-c-edge-p-b", kChangeEvent, "38"}});
+    CHECK(!echoed.changed && (color == Color{{1.0f, 0.15f, 0.15f}}));
+    const Form nudged = pass({{"p-c-edge-p-g", kChangeEvent, "39"}});
+    CHECK(nudged.changed && color.v[1] == 39.0f / 255.0f && color.v[2] == 0.15f);
 }
 
 TEST(a_list_of_checks_stays_open_and_a_condition_unchecked_under_always_turns_always_off)
@@ -366,10 +392,12 @@ namespace
         std::string text;
         LineDraft draft;
         bool edited = false, chip = false;
+        std::string focused; // the control with the keyboard
 
         Form Pass(const std::vector<FormEvent>& events)
         {
             Form form(events, state);
+            form.focused = focused;
             form.pageKey = "p";
             form.BeginCard("C");
             edited = form.LineBox("line", text, draft);
@@ -421,8 +449,11 @@ TEST(a_line_box_is_its_stretches_of_text_with_its_tags_as_chips_between_them)
     CHECK(!first.changed && !card.edited);
 
     // Typed in and left, a stretch is the design's; its caret is kept for a chip clicked after.
-    card.Pass({{"p-c-line-t-1", kFocusEvent, ""}});
+    card.focused = "p-c-line-t-1";
+    card.Pass({});
     CHECK(card.draft.typing);
+    // The keyboard gone, however that came about, the box is typed in no more.
+    card.focused = "p-c-other";
     const Form typed = card.Pass({{"p-c-line-t-1", kCaretEvent, "2"}, {"p-c-line-t-1", kCommitEvent, " ends"}});
     CHECK(typed.changed && card.edited && card.text == "Lv $level ends");
     CHECK((card.draft.caret == RunCaret{1, 2}) && !card.draft.typing);

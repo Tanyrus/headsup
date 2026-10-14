@@ -44,14 +44,6 @@ namespace headsup
         texture = nullptr;
     }
 
-    namespace
-    {
-        // GDI measures an italic text by its letters' cells, and the last letter leans past its own: the room it is
-        // drawn and measured with, as a share of the text's height.
-        constexpr int kItalicLeanShare = 4;
-        int Lean(int pixelHeight, uint8_t style) { return HasStyle(style, FontStyle::Italic) ? pixelHeight / kItalicLeanShare : 0; }
-    }
-
     HDC GdiText::WithFont(std::string_view family, int pixelHeight, uint8_t style, int tracking)
     {
         if (m_Context == nullptr) m_Context = CreateCompatibleDC(nullptr);
@@ -80,7 +72,7 @@ namespace headsup
         const auto length       = static_cast<int>(wide.size());
         SIZE size{};
         if (!GetTextExtentPoint32W(dc, wide.c_str(), length, &size)) return false;
-        const int width  = size.cx + Lean(pixelHeight, style) + 2 * margin;
+        const int width  = size.cx + ItalicLean(pixelHeight, style) + 2 * margin;
         const int height = size.cy + 2 * margin;
         BITMAPINFO info{};
         info.bmiHeader.biSize        = sizeof(info.bmiHeader);
@@ -124,8 +116,21 @@ namespace headsup
         const std::wstring wide = Utf16(text);
         SIZE size{};
         if (!GetTextExtentPoint32W(dc, wide.c_str(), static_cast<int>(wide.size()), &size)) return false;
-        width  = size.cx + Lean(pixelHeight, style);
+        width  = size.cx + ItalicLean(pixelHeight, style);
         height = size.cy;
+        return true;
+    }
+
+    bool GdiText::UnderlineBand(const char* family, int pixelHeight, uint8_t style, int& top, int& thickness)
+    {
+        const HDC dc = WithFont(family, pixelHeight, style, 0);
+        if (dc == nullptr) return false;
+        // Only an outline font says where its underline goes; GDI's own is drawn by the same two numbers.
+        OUTLINETEXTMETRICW metrics{};
+        metrics.otmSize = sizeof(metrics);
+        if (GetOutlineTextMetricsW(dc, sizeof(metrics), &metrics) == 0) return false;
+        top       = metrics.otmTextMetrics.tmAscent - metrics.otmsUnderscorePosition;
+        thickness = std::max(1, static_cast<int>(metrics.otmsUnderscoreSize));
         return true;
     }
 

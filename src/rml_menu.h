@@ -74,6 +74,9 @@ namespace headsup
         bool Place(const MenuHost& host, Settings& settings, float pixels);
         void ApplyOpacity();
         bool RunKey(Rml::ElementFormControlInput* input, const std::string& id, Rml::Input::KeyIdentifier key);
+        // One pass of the pages over these events, told which control has the keyboard.
+        Form Pass(std::vector<FormEvent> events, const MenuHost& host, Settings& settings, const MenuReadings& readings,
+            const std::vector<std::string>& fonts);
         void FitRuns();
         void ApplyBlocks(const std::vector<FormBlock>& blocks);
         void ApplyValues(const std::vector<FormValue>& values);

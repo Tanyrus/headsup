@@ -83,8 +83,7 @@ namespace headsup
         constexpr const char* kOldCursorSizeKey    = "cursorSize";    // its height in pixels, its width its shape's
         constexpr const char* kOldCursorOutlineKey = "cursorOutline"; // percent, of twice the edge
         constexpr float kCursorEdgeRebase          = 2.0f;
-        constexpr size_t kMaxCursorFileName        = 64;
-        constexpr const char* kPathCharacters      = "\\/:";
+        constexpr std::string_view kPathCharacters = "\\/:";
 
         struct FloatKey
         {
@@ -213,8 +212,6 @@ namespace headsup
         constexpr const char* kMaxIconsSuffix   = "MaxIcons";
         constexpr const char* kDefaultFontKey   = "defaultFont";
         constexpr const char* kDetectionShownKey = "detectionShown";
-        constexpr float kPercentScale = 100.0f;
-        constexpr int kMobIconLine = 0, kMobLevelLine = 1, kNameLine = kPlateLines - 1;
 
         float ClampFloat(float v, float lo, float hi, float fallback)
         {
@@ -235,14 +232,13 @@ namespace headsup
         }
 
         // Saturates rather than overflowing, so Clamp then takes a huge value to the nearest limit.
+        int Whole(float v) { return static_cast<int>(std::clamp<double>(std::round(v), INT_MIN, INT_MAX)); }
+
         int LoadInt(SettingsStore& store, const char* key, int fallback)
         {
             const float v = store.GetFloat(key, static_cast<float>(fallback));
-            if (!std::isfinite(v)) return fallback;
-            return static_cast<int>(std::clamp<double>(std::round(v), INT_MIN, INT_MAX));
+            return std::isfinite(v) ? Whole(v) : fallback;
         }
-
-        int Whole(float v) { return static_cast<int>(std::clamp<double>(std::round(v), INT_MIN, INT_MAX)); }
 
         // What a key the store lacks reads as: no line of a file holds a line break, so it differs from every text.
         constexpr const char* kNoText = "\n";
@@ -378,7 +374,7 @@ namespace headsup
             // Bold was a switch of its own before a line had styles.
             if (store.GetString(key("Style").c_str(), kNoText) != kNoText)
                 line.style = static_cast<uint8_t>(LoadHex(store, key("Style"), line.style));
-            else if (store.GetString(key("Bold").c_str(), "") == kTrue)
+            else if (HeldSwitch(store, key("Bold").c_str()).value_or(false))
                 line.style = StyleBit(FontStyle::Bold);
             line.textSize = LoadInt(store, key("TextSize").c_str(), line.textSize);
             line.iconSize = Rebased(store, key("IconScale"), key("IconSize"), line.iconSize,
@@ -434,16 +430,24 @@ namespace headsup
                 row.outline = static_cast<OutlineMode>(NameIndex(kOutlineModeNames, kOutlineModeCount, store.GetString((base + "Outline").c_str(), ""), static_cast<int>(row.outline)));
                 LoadPick(store, base + "Color", row.outlineColor);
             }
+            // Dead mobs had no row before: each went by the row it had alive. Where a file's rows all agree, as
+            // with every mob on the game's own names, the dead keep that; rows that differ say nothing for them.
+            const int dead = static_cast<int>(Category::Dead);
+            if (kind == PlateKind::Mobs && store.GetString((RowBase(kind, dead) + "Plate").c_str(), kNoText) == kNoText)
+            {
+                const auto differs = [&](const RowSettings& row) { return row.plate != k.rows[0].plate; };
+                if (std::none_of(k.rows, k.rows + dead, differs)) k.rows[dead].plate = k.rows[0].plate;
+            }
             for (int n = 0; n < kPlateLines; ++n)
                 LoadLine(store, LineBase(kind, n), k.lines[n], iconShare);
             const std::string base = std::string(KindKey(kind)) + kOrnamentInfix;
             OrnamentSettings& o    = k.ornament;
-            const std::string visibility = store.GetString((base + "Visibility").c_str(), kNoText);
-            const std::string wasOn      = store.GetString((base + kOldOrnamentOnSuffix).c_str(), kNoText);
+            const std::string visibility  = store.GetString((base + "Visibility").c_str(), kNoText);
+            const std::optional<bool> wasOn = HeldSwitch(store, (base + kOldOrnamentOnSuffix).c_str());
             if (visibility != kNoText)
                 o.place = static_cast<OrnamentPlace>(NameIndex(kOrnamentPlaceNames, kOrnamentPlaceCount, visibility, static_cast<int>(o.place)));
-            else if (wasOn != kNoText)
-                o.place = wasOn != kTrue ? OrnamentPlace::Disabled
+            else if (wasOn)
+                o.place = !*wasOn ? OrnamentPlace::Disabled
                           : store.GetString((base + kOldOrnamentPlaceSuffix).c_str(), "") == kOldOrnamentUpperPlace ? OrnamentPlace::AboveMiddle
                                                                                                                      : OrnamentPlace::BelowMiddle;
             o.width  = LoadInt(store, (base + "Width").c_str(), o.width);
@@ -451,10 +455,9 @@ namespace headsup
             LoadPick(store, base + "Color", o.color);
         }
 
-        // A kind's opacities and its lines' glow in combat, from a file of any age: the kind's own keys, else what
-        // the two settings of before held. Those covered the mobs: one opacity for every mob that was not your target,
-        // pets among them, and one switch for the glow of a mob your party had claimed.
-        void LoadOpacity(SettingsStore& store, PlateKind kind, KindSettings& k)
+        // A kind's opacities and its lines' glow in combat, from a file of any age: the kind's own keys, else the two
+        // settings of before, which were the mobs': one opacity, pets among them, and one switch for the glow.
+        void LoadFading(SettingsStore& store, PlateKind kind, KindSettings& k)
         {
             const std::string base = std::string(KindKey(kind)) + kOpacityInfix;
             OpacitySettings& o     = k.opacity;
@@ -753,20 +756,20 @@ namespace headsup
             KindSettings& npcs      = s.Kind(PlateKind::Npcs);
             KindSettings& pets      = s.Kind(PlateKind::Pets); // drawn as mobs then: the mobs' keys covered them
             s.detectionShown        = kAllDetection;           // such a file showed every icon, the aggression one too
-            LineDesign& mobIcons    = mobs.lines[kMobIconLine];
-            LineDesign& mobLevel    = mobs.lines[kMobLevelLine];
-            LineDesign& mobName     = mobs.lines[kNameLine];
+            LineDesign& mobIcons    = mobs.lines[kTopLine];
+            LineDesign& mobLevel    = mobs.lines[kMiddleLine];
+            LineDesign& mobName     = mobs.lines[kBottomLine];
             const int base          = std::clamp(o.mobNameSize, kMinTextSize, kMaxTextSize);
             auto percent            = [&](int px) {
                 const float pixels = static_cast<float>(std::clamp(px, kMinTextSize, kMaxTextSize));
-                return static_cast<int>(std::lround(kPercentScale * pixels / static_cast<float>(base)));
+                return static_cast<int>(std::lround(kPercent * pixels / static_cast<float>(base)));
             };
             // An icon's pixels as a percent of the base icon size, which such a file leaves at its default.
-            auto iconScale          = [](float pixels) { return static_cast<int>(std::lround(kPercentScale * pixels / kDefaultIconSize)); };
+            auto iconScale          = [](float pixels) { return static_cast<int>(std::lround(kPercent * pixels / kDefaultIconSize)); };
             // The icons are playerIconSize percent of the name they stand beside.
             auto IconPercent        = [&](int nameSize) {
                 const float pixels = static_cast<float>(std::clamp(nameSize, kMinTextSize, kMaxTextSize));
-                return iconScale(static_cast<float>(o.playerIconSize) / kPercentScale * pixels);
+                return iconScale(static_cast<float>(o.playerIconSize) / kPercent * pixels);
             };
             auto fontOf             = [](const std::string& font) { return font == kDefaultFont ? std::string() : font; };
             auto boldOf             = [](bool bold) { return bold ? StyleBit(FontStyle::Bold) : uint8_t{0}; };
@@ -824,28 +827,28 @@ namespace headsup
             mobLevel.shadowColor.custom = o.labelShadowColor;
             mobLevel.shadow             = strength(o.labelShadow);
 
-            mobIcons.font = mobName.font = pets.lines[kNameLine].font = fontOf(o.fontName);
-            mobIcons.style = mobName.style = pets.lines[kNameLine].style = boldOf(o.fontBold);
+            mobIcons.font = mobName.font = pets.lines[kBottomLine].font = fontOf(o.fontName);
+            mobIcons.style = mobName.style = pets.lines[kBottomLine].style = boldOf(o.fontBold);
             mobLevel.font = fontOf(o.labelFontName);
             mobLevel.style = boldOf(o.labelFontBold);
             for (const PlateKind kind : {PlateKind::Players, PlateKind::Self})
             {
-                LineDesign& line = s.Kind(kind).lines[kNameLine];
+                LineDesign& line = s.Kind(kind).lines[kBottomLine];
                 line.font        = fontOf(o.playerFontName);
                 line.style       = boldOf(o.playerFontBold);
                 line.text        = PlayerNameText(o);
             }
-            players.lines[kNameLine].iconSize = IconPercent(o.playerNameSize);
-            self.lines[kNameLine].iconSize    = IconPercent(o.selfNameSize);
-            npcs.lines[kNameLine].font = fontOf(o.npcFontName);
-            npcs.lines[kNameLine].style = boldOf(o.npcFontBold);
+            players.lines[kBottomLine].iconSize = IconPercent(o.playerNameSize);
+            self.lines[kBottomLine].iconSize    = IconPercent(o.selfNameSize);
+            npcs.lines[kBottomLine].font = fontOf(o.npcFontName);
+            npcs.lines[kBottomLine].style = boldOf(o.npcFontBold);
 
             s.baseSize                         = base;
             mobLevel.textSize                  = percent(o.labelSize);
             mobIcons.iconSize                  = iconScale(static_cast<float>(std::clamp(o.iconSize, kMinTextSize, kMaxTextSize)));
-            players.lines[kNameLine].textSize  = percent(o.playerNameSize);
-            self.lines[kNameLine].textSize     = percent(o.selfNameSize);
-            npcs.lines[kNameLine].textSize     = percent(o.npcNameSize);
+            players.lines[kBottomLine].textSize  = percent(o.playerNameSize);
+            self.lines[kBottomLine].textSize     = percent(o.selfNameSize);
+            npcs.lines[kBottomLine].textSize     = percent(o.npcNameSize);
             s.timerPercent                     = percent(o.timerSize);
 
             std::string level;
@@ -894,8 +897,8 @@ namespace headsup
             if (o.ownOrnamentColor) mobs.ornament.color = ColorPick{ColorSource::Custom, o.ornamentColor};
             for (KindSettings& k : s.kinds)
             {
-                k.lines[kNameLine].shadow = strength(o.nameShadow);
-                if (o.ownNameColor) k.lines[kNameLine].color = ColorPick{ColorSource::Custom, o.nameColor};
+                k.lines[kBottomLine].shadow = strength(o.nameShadow);
+                if (o.ownNameColor) k.lines[kBottomLine].color = ColorPick{ColorSource::Custom, o.nameColor};
             }
         }
 
@@ -1075,6 +1078,11 @@ namespace headsup
 
     const char* CursorStyleName(CursorStyle style) { return kCursorStyleNames[static_cast<int>(style)]; }
 
+    bool IsCursorFileName(std::string_view name)
+    {
+        return !name.empty() && name.size() <= kMaxCursorFileName && name.find_first_of(kPathCharacters) == std::string_view::npos;
+    }
+
     Settings Clamp(Settings s)
     {
         const Settings d;
@@ -1103,9 +1111,7 @@ namespace headsup
         s.helpBarY        = std::clamp(s.helpBarY, -kMaxHelpBarOffset, kMaxHelpBarOffset);
         for (const ColorKey& c : kColors)
             s.*c.field = ClampColor(s.*c.field, d.*c.field);
-        // The file's name goes into a path under the cursors folder: one that would lead out of it is no name.
-        const bool named = !s.cursorFile.empty() && s.cursorFile.size() <= kMaxCursorFileName &&
-                           s.cursorFile.find_first_of(kPathCharacters) == std::string::npos;
+        const bool named = IsCursorFileName(s.cursorFile);
         if (!named) s.cursorFile.clear();
         if (static_cast<int>(s.cursorStyle) >= kCursorStyleCount || (s.cursorStyle == CursorStyle::File && !named))
             s.cursorStyle = d.cursorStyle;
@@ -1248,7 +1254,7 @@ namespace headsup
         for (int k = 0; k < kPlateKindCount; ++k)
         {
             const auto kind = static_cast<PlateKind>(k);
-            LoadOpacity(store, kind, s.kinds[k]);
+            LoadFading(store, kind, s.kinds[k]);
             if (HasStatusIcons(kind))
                 s.kinds[k].maxIcons = LoadInt(store, (std::string(KindKey(kind)) + kMaxIconsSuffix).c_str(), s.kinds[k].maxIcons);
         }

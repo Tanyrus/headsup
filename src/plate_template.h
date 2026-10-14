@@ -72,9 +72,8 @@ namespace headsup
     // Adds to the slot of this number the tags it does not hold yet; false, with nothing changed, when it holds
     // them all, the text would pass kMaxTemplate or no slot has the number.
     bool JoinSlot(std::string& text, int slot, const TagSlot& more);
-    // The text without one tag of the slot of this number: the tag of that number in it, or its last. A slot left
-    // with none goes whole: the stretches either side of it are joined, and caret is where they met. The text as it
-    // is for a slot or a tag that is not there.
+    // The text without one tag of a slot, or its last. A slot left with none goes whole, the stretches either side
+    // joined and caret where they met. The text as it is for a slot or a tag that is not there.
     constexpr int kLastTag = -1;
     std::string WithoutTag(std::string_view text, int slot, int tag, RunCaret& caret);
     // Puts one tag of a slot in the place of another of it, which moves along with those between: the first of a

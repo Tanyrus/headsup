@@ -15,7 +15,6 @@ namespace headsup
         const char* const kOneRowKeys[kPlateKindCount]   = {"", "", "self", "npc", ""};
         const char* const kOneRowLabels[kPlateKindCount] = {"", "", "Self", "NPCs", ""};
         const char* const kKindKeys[kPlateKindCount]     = {"mobs", "players", "self", "npcs", "pets"};
-        const char* const kKindLabels[kPlateKindCount]   = {"Mobs", "Players", "Self", "NPCs", "Pets"};
         const char* const kConditionLabels[kShowConditionCount] = {"When Targeted", "When Unclaimed", "When Claimed by You",
             "When Claimed by Others", "When Engaged in Combat", "When Too Weak", "When Aggressive", "When Passive",
             "When Party Member", "When Friend", "When Linkshell Member", "When Owner is You"};
@@ -136,7 +135,6 @@ namespace headsup
     }
 
     const char* KindKey(PlateKind kind) { return kKindKeys[static_cast<int>(kind)]; }
-    const char* KindLabel(PlateKind kind) { return kKindLabels[static_cast<int>(kind)]; }
 
     std::vector<ShowCondition> ConditionsFor(PlateKind kind)
     {

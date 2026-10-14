@@ -763,9 +763,8 @@ public:
         m_NameHook.NewFrame(NameOwners());
     }
 
-    // The game reads its keys through DirectInput, which the keyboard callback's answer does not reach: the arrows
-    // turned the camera while a line was typed. Ashita keeps them from the game while a text box has the keyboard,
-    // and still hands HeadsUp every key.
+    // The game reads its keys through DirectInput, past the keyboard callback's answer: the arrows turned the camera
+    // while a line was typed. Ashita holds them from the game meanwhile, and still hands HeadsUp every key.
     void HoldGameKeys(bool typing)
     {
         if (typing == m_GameKeysHeld) return;
@@ -1397,6 +1396,7 @@ private:
             FindClose(search);
         }
         m_CursorFiles = headsup::CursorFileNames(entries);
+        m_CursorFileRead.reset(); // a file that could not be read may have been put right since
     }
 
     // The File cursor's picture, read when the settings come to name another file.
@@ -1408,8 +1408,12 @@ private:
         std::optional<headsup::Image> picture;
         for (const char* extension : headsup::kCursorExtensions)
         {
-            std::ifstream in(CursorsFolder() + m_Settings.cursorFile + extension, std::ios::binary);
-            const std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+            std::ifstream in(CursorsFolder() + m_Settings.cursorFile + extension, std::ios::binary | std::ios::ate);
+            const std::streamoff size = in.tellg();
+            if (!in || size <= 0 || static_cast<uint64_t>(size) > headsup::kMaxCursorFileBytes) continue;
+            std::vector<uint8_t> bytes(static_cast<size_t>(size));
+            in.seekg(0);
+            if (!in.read(reinterpret_cast<char*>(bytes.data()), size)) continue;
             picture = headsup::CursorFilePicture(bytes.data(), bytes.size());
             if (picture) break;
         }

@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <vector>
 
 namespace headsup
@@ -75,8 +76,16 @@ namespace headsup
     Coverage MarkCoverage(DashMark mark, int textHeight, int margin);
     // How wide that piece is without its margin.
     int MarkWidth(DashMark mark, int textHeight);
+    // The room an italic text is measured and drawn with past its last letter's cell, which that letter leans out
+    // of: none for a text that is not italic (style: FontStyle bits).
+    int ItalicLean(int pixelHeight, uint8_t style);
+    // How wide pieces of one line are side by side, by their widths without margins. room: what of each piece's
+    // width, at its end, the next piece may stand in; the last keeps its own, and pieces past the list leave none.
+    int JoinedWidth(std::span<const int> widths, std::span<const int> room);
     // Pieces of one line, each inside the same margin, side by side as one piece inside that margin.
-    Coverage Joined(const std::vector<Coverage>& pieces, int margin);
+    Coverage Joined(const std::vector<Coverage>& pieces, std::span<const int> room, int margin);
+    // A line under the whole of a text inside its margin: thickness rows from the row top, as far as the image goes.
+    void Underline(Coverage& text, int top, int thickness, int margin);
 
     // A picture at another size: each new pixel is the average of what it covers of the old, weighted by alpha so a
     // clear pixel's color darkens nothing.

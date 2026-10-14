@@ -13,7 +13,6 @@ namespace headsup
         constexpr double kBobPeriod       = 1.2;    // seconds
         constexpr float kBobShare         = 0.15f;  // of the cursor's height
         constexpr float kCursorEdgePerHeight = 0.05f; // the cursor's edge at 100 percent
-        constexpr float kWholePercent        = 100.0f;
         constexpr float kRasterSmallest   = 6.0f;   // pixels
         constexpr float kRasterStep       = 1.25f;
         constexpr float kRasterOverscale  = 1.05f;  // text is scaled up this much before it is redrawn larger
@@ -86,7 +85,7 @@ namespace headsup
 
     int CursorEdgePixels(int pixelHeight, int percent)
     {
-        return WholePixels(static_cast<float>(pixelHeight) * kCursorEdgePerHeight * static_cast<float>(percent) / kWholePercent);
+        return WholePixels(static_cast<float>(pixelHeight) * kCursorEdgePerHeight * static_cast<float>(percent) / kPercent);
     }
 
     CursorSpot KeepOnScreen(CursorSpot spot, float width, float height, float screenWidth, float screenHeight, float top)
@@ -193,7 +192,7 @@ namespace headsup
         const bool aimedAt = rank != kPlainRank;
         const int percent  = aimedAt ? opacity.targeted : hasTarget ? opacity.notTargeted : opacity.noTarget;
         const float share  = opacity.fadeIn && !aimedAt ? FadeShare(distance, opacity.range) : 1.0f;
-        return static_cast<uint32_t>(std::lround(static_cast<float>(kOpaqueAlpha) * static_cast<float>(percent) / kWholePercent * share));
+        return static_cast<uint32_t>(std::lround(static_cast<float>(kOpaqueAlpha) * static_cast<float>(percent) / kPercent * share));
     }
 
     bool DrawnBefore(int rankA, float depthA, int rankB, float depthB)

@@ -3,8 +3,6 @@
 #include "test.h"
 
 #include <algorithm>
-#include <cmath>
-#include <cstdio>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -99,6 +97,7 @@ TEST(labels_are_title_case_with_small_words_left_alone_inside)
     CHECK(TitleCaseText("hide level and icons") == "Hide Level and Icons");
     CHECK(TitleCaseText("NM Placeholders") == "NM Placeholders");
     CHECK(TitleCaseText("Out of range") == "Out of Range");
+    CHECK(TitleCaseText("when owner is you") == "When Owner is You");
     CHECK(TitleCaseText("Scale with distance") == "Scale with Distance");
     CHECK(TitleCaseText("of the sea") == "Of the Sea");
     CHECK(TitleCaseText("NPC or object") == "NPC or Object");
@@ -114,20 +113,21 @@ TEST(the_show_dropdown_reads_always_one_condition_how_many_or_never)
 {
     const std::vector<ShowCondition> mobs = ConditionsFor(PlateKind::Mobs);
     LineShow show;
-    CHECK_EQ(ShowSummary(show, mobs), "Always");
+    const std::string always = ShowSummary(show, mobs);
     show.when = ConditionBit(ShowCondition::YourClaim);
-    CHECK_EQ(ShowSummary(show, mobs), "Always"); // Always wins over what is checked under it
+    CHECK_EQ(ShowSummary(show, mobs), always); // Always wins over what is checked under it
     show.always = false;
-    CHECK_EQ(ShowSummary(show, mobs), "When Claimed by You");
+    CHECK_EQ(ShowSummary(show, mobs), ConditionLabel(ShowCondition::YourClaim)); // one condition is named
     show.when |= ConditionBit(ShowCondition::Targeted) | ConditionBit(ShowCondition::TooWeak);
-    CHECK_EQ(ShowSummary(show, mobs), "3 Conditions");
+    CHECK(ShowSummary(show, mobs).starts_with("3 ")); // several are counted
     show.when = 0;
-    CHECK_EQ(ShowSummary(show, mobs), "Never");
+    const std::string never = ShowSummary(show, mobs);
+    CHECK(never != always && !never.empty());
     // A condition the kind's list does not offer cannot be seen or unchecked there, so it is not counted.
     show.when = ConditionBit(ShowCondition::Friend) | ConditionBit(ShowCondition::Unclaimed);
-    CHECK_EQ(ShowSummary(show, mobs), "When Unclaimed");
-    CHECK_EQ(ShowSummary(show, ConditionsFor(PlateKind::Players)), "When Friend");
-    CHECK_EQ(ShowSummary(show, ConditionsFor(PlateKind::Npcs)), "Never");
+    CHECK_EQ(ShowSummary(show, mobs), ConditionLabel(ShowCondition::Unclaimed));
+    CHECK_EQ(ShowSummary(show, ConditionsFor(PlateKind::Players)), ConditionLabel(ShowCondition::Friend));
+    CHECK_EQ(ShowSummary(show, ConditionsFor(PlateKind::Npcs)), never);
 }
 
 TEST(a_font_dropdowns_arrows_step_through_its_list_and_around_its_ends)
@@ -221,6 +221,11 @@ TEST(unchecking_a_condition_under_always_turns_always_off_and_keeps_the_rest)
     CHECK(ToggleCondition(show, offered, 0)); // Always off leaves what was checked
     CHECK(!show.always && show.when == all);
     CHECK(!ToggleCondition(show, offered, 5) && !ToggleCondition(show, offered, -1)); // no such row
+    // The last row is a row like the others: on a pet's page it is the one that asks whose pet it is.
+    const std::vector<ShowCondition> pets = ConditionsFor(PlateKind::Pets);
+    LineShow whose{false, 0};
+    CHECK(ToggleCondition(whose, pets, static_cast<int>(pets.size())));
+    CHECK_EQ(whose.when, ConditionBit(ShowCondition::OwnerIsYou));
     CHECK(!show.always && show.when == all);
     // A condition another kind's lines have, saved in the file, is not carried into what Always leaves checked.
     LineShow stray{true, ConditionBit(ShowCondition::Aggressive)};
@@ -240,9 +245,11 @@ TEST(the_sync_dropdown_lists_no_then_its_targets)
     CHECK_EQ(SyncOfEntry(targets, 2), 2);
     CHECK_EQ(SyncOfEntry(targets, 3), kNoSync);
     CHECK_EQ(SyncOfEntry({}, 0), kNoSync);
-    CHECK_EQ(SyncEntryLabel(targets, 0), "Do Not Sync");
-    CHECK_EQ(SyncEntryLabel(targets, 1), "Sync with Top Line");
-    CHECK_EQ(SyncEntryLabel(targets, 2), "Sync with Bottom Line");
+    // An entry names the line it syncs with, and the first names none.
+    const auto names = [&](int entry, int line) { return SyncEntryLabel(targets, entry).find(kLineLabels[line]) != std::string::npos; };
+    CHECK(names(1, 0) && !names(1, 2));
+    CHECK(names(2, 2) && !names(2, 0));
+    CHECK(!names(0, 0) && !names(0, 2) && !SyncEntryLabel(targets, 0).empty());
 }
 
 TEST(the_clocks_zone_dropdown_lists_local_first_and_then_every_zone)

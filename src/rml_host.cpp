@@ -179,12 +179,14 @@ namespace headsup
         }
     }
 
-    // A press on nothing of HeadsUp's takes the keyboard from its text box, as a click elsewhere in a window does:
-    // the box would otherwise go on keeping every key from the game.
+    // A press on nothing of HeadsUp's takes the keyboard from its text box or slider, as a click elsewhere in a
+    // window does: the box would go on keeping every key from the game, and the slider on moving with the arrows.
     bool RmlHost::Press(int button, int modifiers)
     {
         const bool outside = m_Overlay->ProcessMouseButtonDown(button, modifiers);
-        if (Rml::Element* focus = outside ? m_Overlay->GetFocusElement() : nullptr) focus->Blur();
+        // Its document takes the keyboard: blurred alone, a slider's part would hand it to the slider.
+        if (Rml::Element* focus = outside ? m_Overlay->GetFocusElement() : nullptr)
+            if (Rml::ElementDocument* document = focus->GetOwnerDocument()) document->Focus();
         return !outside;
     }
 

@@ -101,59 +101,20 @@ TEST(a_widgets_text_starts_after_its_icons_and_coin_each_with_a_gap)
     CHECK(Near(look.Leading(gil), 17.0f + 7.65f));
 }
 
-TEST(the_ornate_target_is_framed_and_a_lit_widget_tinted_on_the_pill_row)
+TEST(the_ornate_target_is_framed_and_a_lit_widget_tinted)
 {
     Settings settings;
     const BarLook look  = LookOf(BarTheme::PhoenixGold, settings);
     const BarPalette& p = look.palette;
-    const BarRect rect{100.0f, 0.0f, 80.0f, 45.0f};
-    CHECK(!look.BoxOf(PlacedWidget{BarWidget::Weather, rect}, false).has_value());
-    const std::optional<WidgetBox> tint = look.BoxOf(PlacedWidget{BarWidget::Weather, rect}, true);
-    CHECK(tint.has_value() && tint->rect.y == look.row.y && tint->rect.height == look.row.height);
-    CHECK(tint->style.top == p.highlight && tint->style.bottom == p.highlight && tint->style.border == 0u);
-    const std::optional<WidgetBox> frame = look.BoxOf(PlacedWidget{BarWidget::Target, rect}, false);
-    CHECK(frame.has_value() && frame->rect == (BarRect{100.0f, look.row.y, 80.0f, look.row.height}));
-    CHECK(frame->style.top == p.highlight && frame->style.border == p.accent);
+    CHECK(!look.BoxOf(BarWidget::Weather, false).has_value());
+    const std::optional<BoxStyle> tint = look.BoxOf(BarWidget::Weather, true);
+    CHECK(tint.has_value() && tint->top == p.highlight && tint->bottom == p.highlight && tint->border == 0u);
+    const std::optional<BoxStyle> frame = look.BoxOf(BarWidget::Target, false);
+    CHECK(frame.has_value() && frame->top == p.highlight && frame->border == p.accent);
     // The frame always has the hover tint, so hovering the target doubles it: 0x1A, 10%, to 0x34.
-    const std::optional<WidgetBox> hovered = look.BoxOf(PlacedWidget{BarWidget::Target, rect}, true);
-    CHECK(hovered.has_value() && hovered->rect == frame->rect && hovered->style.border == p.accent);
-    CHECK(hovered->style.top == 0x34C9A24Au && hovered->style.bottom == 0x34C9A24Au);
-}
-
-TEST(a_lit_ornate_widgets_tint_stops_clear_of_the_dividers_beside_it)
-{
-    // Ornate neighbours meet at a divider, a diamond 0.22 H across drawn in whole pixels from a rounded corner (as
-    // AddImage draws it): a hovered widget's tint stops two clear pixels short of it, the bar's least clear space,
-    // and leaves the widget's icons and text at least as far inside it.
-    Settings settings;
-    size_t dividers = 0; // one between each pair of neighbours in a section
-    for (const std::vector<BarWidget>& section : DefaultPlacement())
-        dividers += section.empty() ? 0 : section.size() - 1;
-    for (const BarTheme theme : {BarTheme::PhoenixGold, BarTheme::PhoenixRedOrnate})
-        for (int h = kMinBarHeight; h <= kMaxBarHeight; ++h)
-        {
-            const BarLook look  = LookOf(theme, settings, {}, h);
-            const BarMetrics& m = look.metrics;
-            std::array<float, kBarWidgetCount> natural{};
-            natural.fill(1800.0f / kBarWidgetCount); // narrow enough that the whole default bar fits
-            const BarLayout layout = LayoutBar(1920.0f, m, BarShape::Ornate, natural, 0.0f);
-            CHECK_EQ(layout.dividers.size(), dividers);
-            const auto size = static_cast<float>(WholePixels(m.diamond));
-            for (const PlacedWidget& placed : layout.widgets)
-            {
-                if (placed.widget == BarWidget::Target) continue;
-                const std::optional<WidgetBox> tint = look.BoxOf(placed, true);
-                CHECK(tint.has_value());
-                const float left = tint->rect.x, right = tint->rect.x + tint->rect.width;
-                for (const float divider : layout.dividers)
-                {
-                    const float drawn = std::round(divider - size / 2.0f);
-                    CHECK(left >= drawn + size + 2.0f || right <= drawn - 2.0f);
-                }
-                const BarRect& r = placed.rect;
-                CHECK(r.x + m.padding - left >= 2.0f && right - (r.x + r.width - m.padding) >= 2.0f);
-            }
-        }
+    const std::optional<BoxStyle> hovered = look.BoxOf(BarWidget::Target, true);
+    CHECK(hovered.has_value() && hovered->border == p.accent);
+    CHECK(hovered->top == 0x34C9A24Au && hovered->bottom == 0x34C9A24Au);
 }
 
 TEST(pills_frame_every_widget_but_zone_and_earth_time_until_lit)
@@ -161,18 +122,17 @@ TEST(pills_frame_every_widget_but_zone_and_earth_time_until_lit)
     Settings settings;
     const BarLook look  = LookOf(BarTheme::UmbraDark, settings);
     const BarPalette& p = look.palette;
-    const BarRect rect{100.0f, look.row.y, 80.0f, look.row.height};
     for (const BarWidget flat : {BarWidget::Zone, BarWidget::EarthTime})
     {
-        CHECK(!look.BoxOf(PlacedWidget{flat, rect}, false).has_value());
-        const std::optional<WidgetBox> lit = look.BoxOf(PlacedWidget{flat, rect}, true);
-        CHECK(lit.has_value() && lit->rect == rect && lit->style.top == p.highlight && lit->style.border == p.accent);
+        CHECK(!look.BoxOf(flat, false).has_value());
+        const std::optional<BoxStyle> lit = look.BoxOf(flat, true);
+        CHECK(lit.has_value() && lit->top == p.highlight && lit->border == p.accent);
     }
-    const std::optional<WidgetBox> bags = look.BoxOf(PlacedWidget{BarWidget::Bags, rect}, false);
-    CHECK(bags.has_value() && bags->style.top == p.pill && bags->style.border == p.pillBorder);
-    const std::optional<WidgetBox> target = look.BoxOf(PlacedWidget{BarWidget::Target, rect}, false);
-    CHECK(target.has_value() && target->style.top == p.pill && target->style.border == p.accent);
-    CHECK(Near(bags->style.radius, look.metrics.pillRadius));
+    const std::optional<BoxStyle> bags = look.BoxOf(BarWidget::Bags, false);
+    CHECK(bags.has_value() && bags->top == p.pill && bags->border == p.pillBorder);
+    const std::optional<BoxStyle> target = look.BoxOf(BarWidget::Target, false);
+    CHECK(target.has_value() && target->top == p.pill && target->border == p.accent);
+    CHECK(Near(bags->radius, look.metrics.pillRadius));
 }
 
 TEST(a_widget_of_figures_draws_its_title_in_the_detail_font_in_every_theme)

@@ -28,8 +28,7 @@ namespace headsup
 {
     constexpr int kMinOutlineThickness = 25, kMaxOutlineThickness = 400; // percent of kOutlineUnitPx
     constexpr int kMinSmoothness = SmoothnessCopies(SmoothnessLevel::Low), kMaxSmoothness = SmoothnessCopies(SmoothnessLevel::Ultra);
-    constexpr float kMinOutlineDistance = 15.0f, kMaxOutlineDistance = 50.0f; // yalms: the game draws no mob past 50
-    constexpr int kMinTextSize = 8, kMaxTextSize = 48;   // pixels: the base and cursor sizes
+    constexpr int kMinTextSize = 8, kMaxTextSize = 48;   // pixels: the base font and base icon sizes
     constexpr int kDefaultIconSize = 16;                 // pixels: the base icon size
     constexpr int kMinNameRaise = 0, kMaxNameRaise = 40; // pixels
     constexpr const char* kDefaultFont = kMarcellusSC;
@@ -50,6 +49,10 @@ namespace headsup
     const char* CursorStyleName(CursorStyle style); // as the settings file has it
     // A picture keeps its own colors; a shape is filled with the cursor's.
     constexpr bool CursorIsPicture(CursorStyle style) { return style == CursorStyle::Chocobo || style == CursorStyle::File; }
+    // A cursor file is kept by its name, which goes into a path under the cursors folder: not empty, not over
+    // this long, and with nothing in it that would lead out of the folder.
+    constexpr size_t kMaxCursorFileName = 64;
+    bool IsCursorFileName(std::string_view name);
     constexpr int kMinCursorSide = 4, kMaxCursorSide = 64; // pixels: the target cursor's width and height
     constexpr int kDefaultCursorHeight = 20;
     int DefaultCursorWidth(); // the default style's at that height
@@ -69,7 +72,7 @@ namespace headsup
         int outlineThickness = 100; // percent of kOutlineUnitPx
         int outlineOpacity   = 60;  // percent
         bool outlineFadeIn   = false; // fainter with distance, down to almost nothing at the range
-        int smoothness     = 4;     // shifted copies per mesh: a SmoothnessLevel's
+        int smoothness     = kMinSmoothness; // shifted copies per mesh: a SmoothnessLevel's
         float maxDistance  = 50.0f; // yalms
         // Which elements and statuses get badges, as BadgeRules has them.
         int elementWeakRank   = BadgeRules{}.elementWeakRank;

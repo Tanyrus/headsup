@@ -67,12 +67,12 @@ namespace headsup
     // What the Show dropdown reads when closed: Always, the one condition checked, how many are, or Never. Only the
     // conditions the kind is offered count.
     std::string ShowSummary(const LineShow& show, const std::vector<ShowCondition>& offered);
-    // A click on the Line Visibility list's row: 0 is Always, then the conditions offered. Under Always every
-    // condition reads checked, so unchecking one turns Always off and leaves the others checked. False for no such
-    // row.
+    // A click on a row of the Line Visibility list: 0 is Always, then the conditions offered. Unchecking one under
+    // Always turns Always off and leaves the others checked. False for no such row.
     bool ToggleCondition(LineShow& show, const std::vector<ShowCondition>& offered, int row);
 
-    // A design line's box between frames: whether it is typed in, and its caret, where a clicked tag goes.
+    // A design line's box: its caret, kept between frames for where a clicked tag goes, and whether one of its
+    // stretches has the keyboard this frame.
     struct LineDraft
     {
         RunCaret caret;
@@ -87,7 +87,7 @@ namespace headsup
     };
 
     // A kind page's own state, begun anew when another kind's page opens: the line last typed in, which takes a
-    // clicked tag, the three lines' boxes, the Line Style tab that is open and the name being typed for Friends.
+    // clicked tag, the three lines' boxes and the Line Style tab that is open.
     struct DesignEditor
     {
         PlateKind kind = PlateKind::Mobs;
@@ -121,7 +121,7 @@ namespace headsup
     // One entry of the Cursor Style list: one of HeadsUp's own styles, or a file of the cursors folder.
     struct CursorChoice
     {
-        CursorStyle style = CursorStyle::Feather;
+        CursorStyle style = kDefaultCursorStyle;
         std::string file; // a File's name
         bool operator==(const CursorChoice&) const = default;
     };

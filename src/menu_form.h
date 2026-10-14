@@ -49,6 +49,16 @@ namespace headsup
         KeyCapture shotKeyCapture;  // screenshot mode's
         WindowFilter windows;
         DesignEditor design;
+
+        // What a page was in the middle of is dropped when it is left, by another page or by the window closing: a
+        // row waiting for a key would take one pressed for the game, and a reset asked once would wait armed.
+        void Leave()
+        {
+            form.popup.clear();
+            confirmReset   = false;
+            keyCapture     = {};
+            shotKeyCapture = {};
+        }
     };
 
     // One pass of the window: the sidebar, then the open page's cards. fonts: FontChoices, for the nameplates' and

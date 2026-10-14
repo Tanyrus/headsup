@@ -181,13 +181,16 @@ namespace headsup
     };
     // How opaque a kind's nameplates are, in percent, by what you target: with no target, as another than your
     // target, and as your target. Fading in, each is whole within kFadeNearYalms and almost nothing at the range.
+    constexpr float kPercent = 100.0f; // what a setting in percent is a share of
+    constexpr float kMinOutlineDistance = 15.0f, kMaxOutlineDistance = 50.0f; // yalms: the game draws no mob past 50
+
     struct OpacitySettings
     {
         int noTarget    = 100;
         int notTargeted = 100;
         int targeted    = 100;
         bool fadeIn     = false;
-        float range     = 50.0f; // yalms
+        float range     = kMaxOutlineDistance;
         bool operator==(const OpacitySettings&) const = default;
     };
     struct KindSettings
@@ -205,7 +208,6 @@ namespace headsup
     const char* RowKey(PlateKind kind, int row);   // "aggressive", "partyMember", "self", ...: settings keys
     const char* RowLabel(PlateKind kind, int row); // "Aggressive", "Party Member", "Self", ...: the menu
     const char* KindKey(PlateKind kind);           // "mobs", "players", "self", "npcs", "pets"
-    const char* KindLabel(PlateKind kind);         // "Mobs", "Players", "Self", "NPCs", "Pets"
     // The conditions a kind's lines may be shown by, in the menu's order.
     std::vector<ShowCondition> ConditionsFor(PlateKind kind);
     const char* ConditionLabel(ShowCondition c);

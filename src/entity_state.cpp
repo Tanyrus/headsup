@@ -1,7 +1,6 @@
 #include "entity_state.h"
 
 #include <algorithm>
-#include <cctype>
 #include <optional>
 
 namespace headsup

@@ -1,8 +1,5 @@
 #include "menu_state.h"
 
-#include "entity_state.h"
-#include "nameplate.h"
-#include "plate_compose.h"
 #include "settings.h"
 
 #include <cctype>
@@ -238,6 +235,6 @@ namespace headsup
     {
         const CursorChoice saved{settings.cursorStyle, settings.cursorStyle == CursorStyle::File ? settings.cursorFile : std::string()};
         const auto at = std::ranges::find(choices, saved);
-        return at != choices.end() ? static_cast<int>(at - choices.begin()) : static_cast<int>(Settings{}.cursorStyle);
+        return at != choices.end() ? static_cast<int>(at - choices.begin()) : static_cast<int>(kDefaultCursorStyle);
     }
 }

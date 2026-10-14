@@ -86,7 +86,7 @@ namespace headsup
     // lines left empty.
     void DropIcons(ComposedPlate& plate);
     // A plate without the texts whose image fits no texture: leftOut holds a flag for each Text item in the plate's
-    // order. Their items go, with the gaps that set them apart, the lines left empty and the ornament as above.
+    // order. Their items go, with the gaps that set them apart and the lines left empty.
     void DropTexts(ComposedPlate& plate, std::span<const uint8_t> leftOut);
     // Your placeholder timers' lines: the default font and an untouched line's shadow, white, at the timers' size.
     LineLook TimerLook(const Settings& settings);

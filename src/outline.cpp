@@ -26,7 +26,7 @@ namespace headsup
             return d;
         }
 
-        const D3DRENDERSTATETYPE kSavedStates[] = {D3DRS_STENCILENABLE, D3DRS_STENCILFUNC, D3DRS_STENCILREF,
+        constexpr D3DRENDERSTATETYPE kSavedStates[] = {D3DRS_STENCILENABLE, D3DRS_STENCILFUNC, D3DRS_STENCILREF,
             D3DRS_STENCILMASK, D3DRS_STENCILWRITEMASK, D3DRS_STENCILPASS, D3DRS_STENCILFAIL, D3DRS_STENCILZFAIL,
             D3DRS_ZWRITEENABLE, D3DRS_FOGENABLE, D3DRS_TEXTUREFACTOR, D3DRS_ALPHABLENDENABLE, D3DRS_SRCBLEND,
             D3DRS_DESTBLEND, D3DRS_ALPHAREF};
@@ -36,7 +36,14 @@ namespace headsup
             DWORD stage;
             D3DTEXTURESTAGESTATETYPE type;
         };
-        constexpr size_t kAlphaRefState = std::size(kSavedStates) - 1;
+        constexpr size_t SavedPlaceOf(D3DRENDERSTATETYPE state)
+        {
+            size_t place = 0;
+            while (place < std::size(kSavedStates) && kSavedStates[place] != state) ++place;
+            return place;
+        }
+        constexpr size_t kAlphaRefState = SavedPlaceOf(D3DRS_ALPHAREF);
+        static_assert(kAlphaRefState < std::size(kSavedStates));
         const StageState kSavedStages[] = {{0, D3DTSS_COLOROP}, {0, D3DTSS_COLORARG1}, {0, D3DTSS_ALPHAOP},
             {0, D3DTSS_ALPHAARG1}, {0, D3DTSS_ALPHAARG2}, {1, D3DTSS_COLOROP}, {1, D3DTSS_ALPHAOP}};
     }
