@@ -162,7 +162,8 @@ namespace headsup
         void EndCard();
 
         // A row: its label at the left, with its tip, and the controls that follow at the right, until EndRow.
-        // Text after "##" in a label is no part of what shows: it keeps two controls of one label apart.
+        // In a label, what is before "##" shows and what follows it names the control's id, which is otherwise
+        // named by the whole label.
         void Row(const char* label, const char* tip);
         void EndRow();
         // A line of controls across the card, with no label.
@@ -331,6 +332,9 @@ namespace headsup
         bool m_Off       = false;
         bool m_Indent    = false;
         int m_CardsShown = 0;
+        size_t m_CardOff = 0;         // the card's own off value, in values
+        bool m_CardSwitched = false;  // whether the card has a switch in its title
+        int m_ShownInCard = 0;        // its parts that show
         std::string m_CardId;
         std::unordered_set<std::string> m_Ids; // this pass's, to keep them apart
     };

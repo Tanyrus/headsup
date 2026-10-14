@@ -296,7 +296,8 @@ namespace headsup
                 bool moved        = at != s.movedWindows.end();
                 const bool was    = moved;
                 const char* label = WindowLabel(window);
-                form.Row(((label != nullptr ? std::string(label) : window) + "##window " + window).c_str(),
+                const std::string name = label != nullptr ? std::string(label) : window;
+                form.Row((name + "##" + name + " window " + window).c_str(),
                     "Under Bar, then its X and Y offset.");
                 form.CheckAt(("under " + window).c_str(), moved);
                 auto offset = std::ranges::find(s.windowOffsets, window, &WindowOffset::name);
@@ -403,8 +404,7 @@ namespace headsup
             const int w = static_cast<int>(widget);
             form.Note(kBarWidgetTips[w]);
             // Each widget's controls have ids of their own: nothing open or typed in is carried to another tab.
-            const std::string scope = std::string("##") + BarWidgetName(widget);
-            const auto label        = [&scope](const char* text) { return text + scope; };
+            const auto label = [widget](const char* text) { return std::string(text) + "##" + text + " " + BarWidgetName(widget); };
             form.Switch(label("Enabled").c_str(), s.barWidgets[w], nullptr);
             form.Fade(!BarOn(s) || !s.barWidgets[w]);
             auto [section, index] = PlaceOf(s.barSections, widget);
@@ -558,7 +558,7 @@ namespace headsup
             {
                 if (i == first) form.Raw("</div><div class=\"column second\">");
                 const auto entry = static_cast<Entry>(i);
-                form.Swatch((std::string(label(entry)) + "##" + title).c_str(), colors[i],
+                form.Swatch((std::string(label(entry)) + "##" + label(entry) + " " + title).c_str(), colors[i],
                     entryTip != nullptr ? entryTip(entry) : nullptr, &defaults[i]);
             }
             form.Raw("</div></div>");
@@ -614,7 +614,8 @@ namespace headsup
             {
                 RowSettings& row = k.rows[order[i]];
                 if (!HasOutlineColor(row.outline)) continue;
-                form.ColorPickRow((std::string(RowLabel(kind, order[i])) + "##outline").c_str(), row.outlineColor, sources,
+                form.ColorPickRow((std::string(RowLabel(kind, order[i])) + "##" + RowLabel(kind, order[i]) + " outline").c_str(),
+                    row.outlineColor, sources,
                     "This row's outline color: your own, or a palette on the Entities page.");
             }
             form.EndCard();
@@ -666,8 +667,8 @@ namespace headsup
             const int n      = editor.styleTab;
             LineDesign& line = k.lines[n];
             // Each line's controls have ids of their own: one held, open or typed in is not carried to another tab.
-            const std::string scope = std::string("##") + KindKey(kind) + std::to_string(n);
-            const auto label        = [&scope](const char* text) { return text + scope; };
+            const std::string scope = std::string(" ") + KindKey(kind) + std::to_string(n);
+            const auto label        = [&scope](const char* text) { return text + std::string("##") + text + scope; };
 
             const std::vector<int> targets = SyncTargets(k, n);
             const int synced               = SyncEntry(targets, line.syncWith);
@@ -726,16 +727,17 @@ namespace headsup
             const bool off      = !s.enabled || !s.nameplates;
             form.Fade(off);
             if (!form.BeginCard("Ornament", nullptr, "A diamond rule over, under or between the nameplate's lines.")) return;
-            const std::string scope = std::string("##") + KindKey(kind) + " ornament";
-            form.EnumDropdown(("Visibility" + scope).c_str(), o.place, kOrnamentPlaceCount,
+            const std::string scope = std::string(" ") + KindKey(kind) + " ornament";
+            const auto label        = [&scope](const char* text) { return text + std::string("##") + text + scope; };
+            form.EnumDropdown(label("Visibility").c_str(), o.place, kOrnamentPlaceCount,
                 [](OrnamentPlace p) { return kOrnamentPlaceLabels[static_cast<int>(p)]; }, "Where the ornament goes, if anywhere.",
                 OrnamentPlaceTip);
             form.Fade(off || o.place == OrnamentPlace::Disabled);
-            form.SliderInt(("Width" + scope).c_str(), o.width, kMinOrnamentWidth, kMaxOrnamentWidth, "%d px",
+            form.SliderInt(label("Width").c_str(), o.width, kMinOrnamentWidth, kMaxOrnamentWidth, "%d px",
                 "The rule's length, before the distance scale.");
-            form.SliderInt(("Height" + scope).c_str(), o.height, kMinOrnamentThickness, kMaxOrnamentThickness, "%d px",
+            form.SliderInt(label("Height").c_str(), o.height, kMinOrnamentThickness, kMaxOrnamentThickness, "%d px",
                 "The diamond's height.");
-            form.ColorPickRow(("Color" + scope).c_str(), o.color, SourcesFor(kind, false),
+            form.ColorPickRow(label("Color").c_str(), o.color, SourcesFor(kind, false),
                 "Its color: your own, or a palette by the entity's state.");
             form.EndCard();
         }

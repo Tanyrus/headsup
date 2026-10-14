@@ -287,9 +287,50 @@ TEST(two_controls_of_one_name_get_ids_of_their_own)
     form.Switch("Same", b, nullptr);
     form.Switch("Same##other", b, nullptr);
     form.EndCard();
-    CHECK(!ClassOn(form, "p-c-same", "on") && ClassOn(form, "p-c-same-2", "on") && ClassOn(form, "p-c-same-other", "on"));
+    CHECK(!ClassOn(form, "p-c-same", "on") && ClassOn(form, "p-c-same-2", "on") && ClassOn(form, "p-c-other", "on"));
     // What follows "##" is not shown.
     CHECK(Has(form.blocks[0].rml, ">Same</div>") && !Has(form.blocks[0].rml, "##"));
+}
+
+TEST(what_follows_two_hashes_names_the_id_and_what_comes_before_is_shown)
+{
+    FormState state;
+    Form form({}, state);
+    form.pageKey = "p";
+    CHECK(form.BeginCard("A Title##t"));
+    form.Action("Do It##do");
+    form.Caption("Head##h");
+    form.EndCard();
+    const std::string& rml = form.blocks[0].rml;
+    CHECK_EQ(form.blocks[0].id, std::string("p-t"));
+    CHECK(Has(rml, "id=\"p-t-head\"") && Has(rml, ">A Title</div>"));
+    CHECK(Has(rml, "id=\"p-t-do\"") && Has(rml, ">Do It</div>"));
+    CHECK(Has(rml, "id=\"p-t-h-caption\"") && Has(rml, ">Head</div>"));
+    CHECK(!Has(rml, "##"));
+}
+
+TEST(a_card_that_shows_nothing_goes_unless_its_title_has_a_switch)
+{
+    FormState state;
+    const auto pass = [&](bool* enabled, bool note) {
+        Form form({}, state);
+        form.pageKey = "p";
+        form.BeginCard("C", enabled);
+        bool on = false;
+        form.Fade(true);
+        form.Switch("Hidden", on, nullptr);
+        form.Fade(false);
+        if (note) form.Note("Shown.");
+        form.EndCard();
+        return form;
+    };
+    const Form empty = pass(nullptr, false);
+    CHECK(ClassOn(empty, "p-c", kOffClass) && empty.CardsShown() == 0);
+    bool enabled = false;
+    const Form switched = pass(&enabled, false);
+    CHECK(!ClassOn(switched, "p-c", kOffClass) && switched.CardsShown() == 1);
+    const Form noted = pass(nullptr, true);
+    CHECK(!ClassOn(noted, "p-c", kOffClass) && noted.CardsShown() == 1);
 }
 
 TEST(segments_and_tabs_mark_the_picked_one_and_take_a_click)
