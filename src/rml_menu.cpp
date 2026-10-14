@@ -120,7 +120,7 @@ namespace headsup
 
     bool RmlMenu::OpenPage(const std::string& name)
     {
-        const std::optional<Page> page = PageNamed(name);
+        const std::optional<Page> page = m_Layout->PageNamed(name);
         if (!page) return false;
         m_State.Leave();
         m_State.page = *page;
@@ -484,13 +484,14 @@ namespace headsup
         Form form(std::move(events), m_State.form, host.keyDown);
         if (Rml::Element* focus = host.context->GetFocusElement(); focus != nullptr && focus->GetOwnerDocument() == m_Document)
             form.focused = focus->GetId();
-        BuildMenu(form, settings, readings, m_State, fonts, host.menuFonts);
+        BuildMenu(form, settings, readings, m_State, fonts, host.menuFonts, *m_Layout);
         return form;
     }
 
     bool RmlMenu::Update(const MenuHost& host, Settings& settings, const MenuReadings& readings,
         const std::vector<std::string>& fonts, float em, double version)
     {
+        m_Layout = host.layout;
         if (std::exchange(m_Closed, false)) open = false;
         if (!open || host.context == nullptr)
         {
@@ -567,7 +568,7 @@ namespace headsup
             input->GetSelection(&caret, nullptr, nullptr);
         }
 
-        const char* title = kPages[static_cast<int>(m_State.page)].label;
+        const char* title = m_Layout->PageOf(m_State.page).name;
         if (m_TitleShown != title)
         {
             m_PageTitle->SetInnerRML(EscapedRml(title));

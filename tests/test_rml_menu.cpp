@@ -280,15 +280,15 @@ TEST(a_pages_name_stays_on_one_line_under_the_pointer_and_its_highlight_goes_on_
     {
         Window window(MenuTheme::Phoenix, font);
         const float page = left(window.Find("main"));
-        for (const PageInfo& info : kPages)
+        for (const LayoutPage& info : kWindowLayout.pages)
         {
-            const std::string id = "nav-" + PageKey(info.page);
+            const std::string id = std::string("nav-") + info.key;
             Rml::Element* entry  = window.Find(id);
             window.PointAt(id);
             const float height = entry->GetBox().GetSize(Rml::BoxArea::Border).y;
             CHECK(entry->GetScrollHeight() <= entry->GetClientHeight() + 0.5f);
             const float nameEnd = entry->GetAbsoluteOffset(Rml::BoxArea::Content).x +
-                                  static_cast<float>(Rml::ElementUtilities::GetStringWidth(entry, Rml::String(info.label)));
+                                  static_cast<float>(Rml::ElementUtilities::GetStringWidth(entry, Rml::String(info.name)));
             CHECK(right(entry) - nameEnd >= height / 4.0f);
             CHECK(right(entry) <= page);
             // The page beside the list stays where it is while the entry moves under the pointer.
@@ -363,7 +363,7 @@ TEST(a_swatch_opens_the_color_picker_and_closes_it)
 TEST(a_color_looked_at_in_its_picker_is_the_color_it_was)
 {
     Window window;
-    const std::string swatch = "entities-colors-claim-status-claimed-yours-colors-claim-status";
+    const std::string swatch = "entities-colors-claim-status-claimed-yours-claim-colors";
     const Color before       = window.settings.palette.claim[static_cast<int>(ClaimState::Yours)];
     CHECK(!window.Click(swatch)); // opening it is no change
     CHECK(window.Shows(swatch + "-p-hex"));
@@ -377,7 +377,7 @@ TEST(a_color_looked_at_in_its_picker_is_the_color_it_was)
 TEST(a_click_on_the_pickers_own_ground_leaves_it_open)
 {
     Window window;
-    const std::string swatch = "entities-colors-claim-status-claimed-yours-colors-claim-status";
+    const std::string swatch = "entities-colors-claim-status-claimed-yours-claim-colors";
     window.Click(swatch);
     CHECK(window.Shows(swatch + "-p-hex"));
     // Its padding, beside the sliders: no control, and still the picker.
@@ -461,9 +461,9 @@ TEST(rmlui_reads_every_page_of_both_themes_without_a_complaint)
     for (const MenuTheme theme : {MenuTheme::Phoenix, MenuTheme::Aurora})
     {
         Window window(theme);
-        for (const PageInfo& page : kPages)
+        for (const LayoutPage& page : kWindowLayout.pages)
         {
-            window.Page(PageKey(page.page).c_str());
+            window.Page(page.key);
             CHECK_EQ(window.Said(), "");
         }
     }
@@ -697,10 +697,10 @@ TEST(every_switch_of_every_page_flips_a_setting_of_its_own_and_flips_it_back)
         std::ranges::sort(b.movedWindows);
         return a == b;
     };
-    for (const PageInfo& info : kPages)
+    for (const LayoutPage& info : kWindowLayout.pages)
     {
         Window window;
-        window.Page(PageKey(info.page).c_str());
+        window.Page(info.key);
         const Settings fresh = window.settings;
         std::vector<std::string> switches;
         for (Rml::Element* element : window.OfClass("check"))
@@ -759,10 +759,10 @@ TEST(every_dropdown_slider_row_of_choices_and_number_of_every_page_and_tab_sets_
     const auto seen = [&](const std::string& id) {
         return std::ranges::any_of(set, [&](const auto& done) { return done.first == id; });
     };
-    for (const PageInfo& info : kPages)
+    for (const LayoutPage& info : kWindowLayout.pages)
     {
         Window window;
-        window.Page(PageKey(info.page).c_str());
+        window.Page(info.key);
         // Every switch on, so that what a feature switched off on a new install hides is there to work.
         for (int pass = 0; pass < 3; ++pass)
             for (Rml::Element* element : window.OfClass("check"))
@@ -1087,9 +1087,9 @@ TEST(every_control_of_every_page_takes_a_click_and_the_window_stands)
     for (const MenuTheme theme : {MenuTheme::Phoenix, MenuTheme::Aurora})
     {
         Window window(theme);
-        for (const PageInfo& page : kPages)
+        for (const LayoutPage& page : kWindowLayout.pages)
         {
-            window.Page(PageKey(page.page).c_str());
+            window.Page(page.key);
             const std::vector<std::string> ids = window.Clickable();
             CHECK(!ids.empty());
             for (const std::string& id : ids)
@@ -1100,7 +1100,7 @@ TEST(every_control_of_every_page_takes_a_click_and_the_window_stands)
                 // What opened a list or a picker closes it again.
                 if (window.Find("popup") != nullptr && window.Find("popup")->IsVisible(true) && window.Shows(id)) window.Click(id);
                 CHECK(window.menu.open);
-                window.Page(PageKey(page.page).c_str());
+                window.Page(page.key);
             }
             CHECK_EQ(window.Said(), "");
         }
@@ -1181,7 +1181,7 @@ TEST(the_window_is_as_opaque_as_its_setting_from_the_moment_it_opens)
 TEST(a_setting_of_something_switched_off_is_not_shown)
 {
     Window window;
-    const std::string least = "entities-nameplates-min-size", cursor = "entities-target-cursor-height";
+    const std::string least = "entities-nameplates-min-size", cursor = "entities-target-cursor-cursor-height";
     CHECK(window.Shows(least) && window.Shows(cursor));
     // Its own switch stays, to turn it back on.
     CHECK(window.Click("entities-nameplates-scale-with-distance"));

@@ -7,6 +7,7 @@
 #include "menu_state.h"
 #include "plate_settings.h"
 #include "plate_template.h"
+#include "window_layout.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -143,6 +144,7 @@ namespace headsup
         std::optional<FormFocus> focus;
         std::function<bool(uint8_t)> keyDown;
         std::string focused; // the id of the control that has the keyboard, or none
+        const WindowLayout* layout = &kWindowLayout; // the words of the kit's own lists
 
         // What follows is not shown and takes no clicks, while the feature it belongs to is off: a setting that
         // would do nothing is no setting. A card begun so is left out whole.
@@ -162,7 +164,8 @@ namespace headsup
         void EndCard();
 
         // A row: its label at the left, with its tip, and the controls that follow at the right, until EndRow.
-        // Text after "##" in a label is no part of what shows: it keeps two controls of one label apart.
+        // In a label, what is before "##" shows and what follows it names the control's id, which is otherwise
+        // named by the whole label.
         void Row(const char* label, const char* tip);
         void EndRow();
         // A line of controls across the card, with no label.
@@ -190,15 +193,6 @@ namespace headsup
         void SliderNamed(const char* label, int& value, const char* const* names, int count, const char* tip);
         // A dropdown of the whole numbers from first to last, either way round, each shown as text gives it.
         // option: what each number does, by the number.
-        // A dropdown of an enum's count values, each named and explained by a function of the value.
-        template <typename Enum, typename Name, typename Tip>
-        void EnumDropdown(const char* label, Enum& value, int count, Name name, const char* tip, Tip explain)
-        {
-            int picked = static_cast<int>(value);
-            NumberDropdown(label, picked, 0, count - 1, [&](int i) { return std::string(name(static_cast<Enum>(i))); }, tip,
-                0.0f, [&](int i) { return std::string(explain(static_cast<Enum>(i))); });
-            value = static_cast<Enum>(picked);
-        }
         template <typename Name>
         void NumberDropdown(const char* label, int& value, int first, int last, Name text, const char* tip,
             float width = 0.0f, const OptionTip& option = {})
@@ -302,7 +296,7 @@ namespace headsup
 
     private:
         std::string& Out() { return blocks.back().rml; }
-        // The label a row shows: what is before "##", each word capitalized.
+        // The label a row shows: what is before "##", as the layout words it.
         static std::string Shown(const char* label);
         // A dropdown's closed control: what it shows and its arrow. True while its popup is open.
         // markup: shown, or name, is RML and not words to escape.
@@ -331,6 +325,9 @@ namespace headsup
         bool m_Off       = false;
         bool m_Indent    = false;
         int m_CardsShown = 0;
+        size_t m_CardOff = 0;         // the card's own off value, in values
+        bool m_CardSwitched = false;  // whether the card has a switch in its title
+        int m_ShownInCard = 0;        // its parts that show
         std::string m_CardId;
         std::unordered_set<std::string> m_Ids; // this pass's, to keep them apart
     };

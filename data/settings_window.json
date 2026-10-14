@@ -1,0 +1,809 @@
+{
+  "pages": [
+    {
+      "key": "entities",
+      "name": "Entities",
+      "cards": [
+        {
+          "key": "nameplates",
+          "name": "Nameplates",
+          "description": "HeadsUp's nameplates: names, levels, icons and the rest, as each kind's page designs them.",
+          "settings": [
+            {"key": "base-font-size", "name": "Base Font Size", "tip": "Every line's text size is a percent of this."},
+            {"key": "default-font", "name": "Default Font", "tip": "The font of every line whose own font is Default."},
+            {"key": "base-icon-size", "name": "Base Icon Size", "tip": "Every line's icon size is a percent of this."},
+            {"key": "auto-check", "name": "Auto-Check", "tip": "Checks each mob that comes near by itself, so its exact level and difficulty show, and keeps the check's line out of the chat log. Players are not checked: the server tells a player who examined them."},
+            {
+              "key": "replace-dashes",
+              "name": "Replace Dashes (-)",
+              "tip": "What a dash typed in a nameplate design, or between the two ends of a level or a difficulty, is drawn as.",
+              "options": [
+                {"name": "No", "tip": "Dashes stay dashes."},
+                {"tip": "A dot."},
+                {"tip": "A square."},
+                {"tip": "A diamond, as at the middle of an ornament."}
+              ]
+            },
+            {"key": "scale-with-distance", "name": "Scale with Distance", "tip": "Sizes follow how far a name's owner is from you."},
+            {"key": "min-size", "name": "Min Size", "tip": "The smallest a far name shrinks to."},
+            {"key": "max-size", "name": "Max Size", "tip": "The largest a near name grows to."},
+            {"key": "scale-your-own-name", "name": "Scale Your Own Name", "tip": "Off, your own nameplate keeps one size as the camera zooms."},
+            {"key": "vertical-offset", "name": "Vertical Offset", "tip": "How far above the game's own spot names sit."},
+            {"key": "stack-names", "name": "Stack Names", "tip": "Names that would cover each other rise one over another. Your target's keeps its place."}
+          ]
+        },
+        {
+          "key": "outline-style",
+          "name": "Outline Style",
+          "description": "Colored borders around mobs, and anything else whose rows ask for one.",
+          "settings": [
+            {"key": "thickness", "name": "Thickness"},
+            {"key": "opacity", "name": "Opacity"},
+            {"key": "smoothness", "name": "Smoothness", "tip": "Higher is rounder and costs a little more."},
+            {"key": "outline-range", "name": "Range", "tip": "Anything farther gets no outline."},
+            {"key": "outline-fade-in", "name": "Fade In", "tip": "Outlines grow fainter with distance: whole within {near} yalms, almost gone at the range."},
+            {"key": "stencil-note", "name": "Outlines are unavailable: the depth buffer has no stencil bits."}
+          ]
+        },
+        {
+          "key": "target-cursor",
+          "name": "Target Cursor",
+          "description": "The cursor above your target's nameplate.",
+          "settings": [
+            {
+              "key": "cursor-style",
+              "name": "Cursor Style",
+              "options": [
+                {"name": "Vanilla", "tip": "Uses the vanilla target cursor. WARNING: May have issues if the vanilla target frame is hidden."},
+                {"name": "Triangle", "tip": "Uses a simple triangle target cursor, that looks similar to the vanilla target cursor."},
+                {"name": "Phoenix Feather", "tip": "Uses a phoenix feather icon as the target cursor."},
+                {"name": "Chocobo", "tip": "Uses the PlayOnline mouse pointer as the target cursor."},
+                {"tip": "Uses a custom icon as the target cursor."}
+              ]
+            },
+            {"key": "width", "name": "Width"},
+            {"key": "cursor-height", "name": "Height"},
+            {"key": "outline-thickness", "name": "Outline Thickness", "tip": "Its dark edge."},
+            {"key": "scale", "name": "Scale", "tip": "Larger the nearer your target is."},
+            {"key": "float", "name": "Float", "tip": "It bobs up and down. Off, it stays still."},
+            {"key": "cursor-vertical-offset", "name": "Vertical Offset", "tip": "How far over its place the cursor sits, or under it."},
+            {"key": "color", "name": "Color", "tip": "The cursor's color. Over anything that has no such color, as a player's aggression, it is the Targeting color."},
+            {"key": "edge-color", "name": "Edge Color", "tip": "The cursor's edge."}
+          ]
+        },
+        {
+          "key": "colors-aggression",
+          "name": "Colors: Aggression",
+          "description": "Colors indicating whether an enemy will attack you, or not, and if they are a notorious monster.",
+          "settings": [
+            {
+              "key": "aggression-colors",
+              "rows": [
+                {"key": "passive", "name": "Passive"},
+                {"key": "aggressive", "name": "Aggressive"},
+                {"key": "nm-passive", "name": "NM (Passive)"},
+                {"key": "nm-aggressive", "name": "NM (Aggressive)"},
+                {"key": "nm-placeholder", "name": "NM (Placeholder)"},
+                {"key": "no-data", "name": "No Data"}
+              ]
+            }
+          ]
+        },
+        {
+          "key": "colors-toughness",
+          "name": "Colors: Toughness",
+          "description": "Colors indicating how dangerous an enemy is to you at your current level. Easy Prey covers Incredibly Easy Prey, and Very Tough covers Incredibly Tough.",
+          "settings": [
+            {
+              "key": "toughness-colors",
+              "rows": [
+                {"key": "unknown-level", "name": "Unknown Level"},
+                {"key": "too-weak", "name": "Too Weak"},
+                {"key": "easy-prey", "name": "Easy Prey"},
+                {"key": "decent-challenge", "name": "Decent Challenge"},
+                {"key": "even-match", "name": "Even Match"},
+                {"key": "tough", "name": "Tough"},
+                {"key": "very-tough", "name": "Very Tough"}
+              ]
+            }
+          ]
+        },
+        {
+          "key": "colors-claim-status",
+          "name": "Colors: Claim Status",
+          "description": "Colors indicating whether or not the mob is claimed, and who is the owner of the claim.",
+          "settings": [
+            {
+              "key": "claim-colors",
+              "rows": [
+                {"key": "unclaimed", "name": "Unclaimed"},
+                {"key": "claimed-others", "name": "Claimed (Others')"},
+                {"key": "claimed-yours", "name": "Claimed (Yours)"}
+              ]
+            }
+          ]
+        },
+        {
+          "key": "colors-targeting",
+          "name": "Colors: Targeting",
+          "description": "Colors indicating whether you are targeting the entity, locked onto it, sub-targeting, etc. The target cursor takes these too.",
+          "settings": [
+            {
+              "key": "targeting-colors",
+              "rows": [
+                {"key": "not-targeted", "name": "Not Targeted"},
+                {"key": "targeted", "name": "Targeted"},
+                {"key": "locked-on", "name": "Locked On"},
+                {"key": "sub-target", "name": "Sub-Target", "tip": "Picking for a spell, ability or trade."},
+                {"key": "out-of-range", "name": "Out of Range", "tip": "A sub-target out of the spell or ability's range."}
+              ]
+            }
+          ]
+        },
+        {
+          "key": "colors-entity-type",
+          "name": "Colors: Entity Type",
+          "description": "Colors indicating what type of entity the target is, or what their relation is to you.",
+          "settings": [
+            {
+              "key": "entity-type-colors",
+              "rows": [
+                {"key": "mob", "name": "Mob"},
+                {"key": "player", "name": "Player"},
+                {"key": "friend", "name": "Friend"},
+                {"key": "party-member", "name": "Party Member"},
+                {"key": "linkshell-member", "name": "Linkshell Member"},
+                {"key": "npc-or-object", "name": "NPC or Object"},
+                {"key": "pet", "name": "Pet"}
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {"key": "mobs", "name": "Mobs", "child": true},
+    {"key": "players", "name": "Players", "child": true},
+    {"key": "self", "name": "Self", "child": true},
+    {"key": "npcs", "name": "NPCs", "child": true},
+    {"key": "pets", "name": "Pets", "child": true},
+    {
+      "key": "userinterface",
+      "name": "User Interface",
+      "cards": [
+        {
+          "key": "screenshot-mode",
+          "name": "Screenshot Mode",
+          "description": "Every name, the top panel and every addon window go, as with /hu screenshot. Ashita's /screenshot hide turns it on by itself for its picture.",
+          "settings": [
+            {"key": "key", "name": "Key", "tip": "Turns screenshot mode on and off. The game sees the key too, so pick one it does not use."},
+            {"key": "hide-game-windows", "name": "Hide Game Windows", "tip": "The game's own windows and chat go too."}
+          ]
+        },
+        {
+          "key": "window-groups",
+          "name": "Window Groups",
+          "settings": [
+            {
+              "key": "groups",
+              "words": [
+                {"key": "note", "name": "Windows in a group move by its offset together, keeping their places beside each other. Each window's own X and Y below still moves it within the group."},
+                {"key": "under-bar", "tip": "Under Bar: the whole group goes below the help bar."},
+                {"key": "remove", "tip": "Removes the group; its windows stay where the game puts them."},
+                {"key": "add-window", "name": "+ Add Window"},
+                {"key": "new-group", "name": "+ New Group"}
+              ]
+            }
+          ]
+        },
+        {
+          "key": "game-windows",
+          "name": "Game Windows",
+          "settings": [
+            {"key": "every-window", "name": "Every Window", "tip": "Every window that opens under the bar goes below it, not only those switched on or grouped."},
+            {"key": "game-help", "name": "Game Help", "tip": "The game's own help bar goes under the top panel, and the windows under it. Off while it is hidden."},
+            {
+              "key": "window-defaults",
+              "words": [
+                {"key": "headsup-defaults", "name": "HeadsUp Defaults", "tip": "Every window under the bar, the game's help too, in the groups the game opens them in. Offsets are cleared."},
+                {"key": "headsup-help", "name": "HeadsUp Help", "tip": "HeadsUp's help text in place of the game's help bar, which is hidden, and every window under it."},
+                {"key": "game-defaults", "name": "Game Defaults", "tip": "Every window where the game puts it: nothing moved, no groups, no offsets."}
+              ]
+            },
+            {
+              "key": "window-list",
+              "words": [
+                {"key": "note", "name": "Under Bar takes a window below the help bar, all together; X and Y move it from where the game puts it. Type a number, then Enter."},
+                {"key": "find", "name": "Find"},
+                {"key": "name-hint", "name": "Name"},
+                {"key": "all-windows", "tip": "Every window the game has, not only the named ones and yours."},
+                {"key": "row-tip", "tip": "Under Bar, then its X and Y offset."}
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "toppanel",
+      "name": "Top Panel",
+      "child": true,
+      "cards": [
+        {
+          "key": "top-panel",
+          "name": "Top Panel",
+          "description": "Hover a widget for details; click it to keep them open. The Widgets page has each one's options.",
+          "settings": [
+            {"key": "theme", "name": "Theme"},
+            {
+              "key": "separators",
+              "name": "Separators",
+              "options": [
+                {"name": "Theme's"},
+                {"name": "Diamonds"},
+                {"name": "None"}
+              ]
+            },
+            {"key": "title-font", "name": "Title Font"},
+            {"key": "text-font", "name": "Text Font"},
+            {"key": "height", "name": "Height"},
+            {"key": "text-size", "name": "Text Size", "tip": "Auto follows the height. Too large for two lines, the second line goes as One Line says."},
+            {
+              "key": "one-line",
+              "name": "One Line",
+              "tip": "On a bar too short for two lines, each widget's second line goes before or after its title, or is left off.",
+              "options": [
+                {"name": "Hide"},
+                {"name": "Before"},
+                {"name": "After"}
+              ]
+            },
+            {"key": "popup-size", "name": "Popup Size", "tip": "Auto follows the height."},
+            {"key": "hide-readout", "name": "Hide Readout", "tip": "The game's S, R and % numbers at the top right."}
+          ]
+        },
+        {
+          "key": "help-bar",
+          "name": "Help Bar",
+          "description": "The game's help text, in a bar of its own under the top panel.",
+          "settings": [
+            {"key": "hide-game-help", "name": "Hide Game Help", "tip": "The game's own help bar, which the top panel covers."},
+            {"key": "position", "name": "Position", "tip": "Pixels from its place under the top panel."},
+            {"key": "background", "name": "Background", "tip": "Off, the help text alone, with no bar behind it."}
+          ]
+        }
+      ]
+    },
+    {
+      "key": "widgets",
+      "name": "Widgets",
+      "child": true,
+      "cards": [
+        {
+          "key": "widgets",
+          "name": "Widgets",
+          "description": "A tab for each widget, with its options.",
+          "settings": [
+            {
+              "key": "widget-tabs",
+              "rows": [
+                {"key": "enabled", "name": "Enabled"},
+                {"key": "section", "name": "Section"},
+                {"key": "second-line", "name": "Second Line"},
+                {"key": "icons", "name": "Icons"},
+                {"key": "details", "name": "Details", "tip": "Aggro icons after the name, weaknesses after the level."},
+                {"key": "currency", "name": "Currency"},
+                {"key": "time-zone", "name": "Time Zone", "tip": "Local is your computer's. Another zone goes before the time, as in PDT 21:07."},
+                {"key": "server-time", "name": "Server Time", "tip": "Japan's time, which the server keeps and the resets go by, as a second line under your own."},
+                {"key": "24-hour", "name": "24-Hour"},
+                {"key": "seconds", "name": "Seconds", "tip": "On your own line."},
+                {"key": "layout", "name": "Layout", "tip": "Which is the larger line, your jobs and levels or your EXP, with the other under it; or the EXP alone."},
+                {"key": "exp-bar", "name": "EXP Bar"},
+                {"key": "job-names", "name": "Job Names", "tip": "Off, the levels alone."},
+                {"key": "latency", "name": "Latency", "tip": "After the rates, once measured."}
+              ]
+            }
+          ]
+        },
+        {
+          "key": "layout",
+          "name": "Layout",
+          "description": "Drag a chip to move it; click it to open its tab above.",
+          "settings": [
+            {"key": "trays"},
+            {"key": "reset-layout", "name": "Reset Layout", "tip": "Puts every widget back in its first place. Switches stay."}
+          ]
+        }
+      ]
+    },
+    {
+      "key": "mousecursor",
+      "name": "Mouse Cursor",
+      "child": true,
+      "cards": [
+        {
+          "key": "mouse-pointer",
+          "name": "Mouse Pointer",
+          "settings": [
+            {"key": "chocobo", "name": "Chocobo", "tip": "PlayOnline's chocobo as the mouse pointer."},
+            {"key": "pointer-fix", "name": "Pointer Fix", "tip": "Keeps the game's pointer under yours after a resize, and clicks where you click. It also shows the pointer again over Ashita's windows."},
+            {"key": "keep-pointer", "name": "Keep Pointer", "tip": "The game hides its pointer when a key runs a command. While only these keys are held, it stays."}
+          ]
+        }
+      ]
+    },
+    {
+      "key": "configmenu",
+      "name": "Config Menu",
+      "cards": [
+        {
+          "key": "settings-window",
+          "name": "Settings Window",
+          "settings": [
+            {"key": "window-theme", "name": "Theme", "tip": "The window's colors and light."},
+            {"key": "font", "name": "Font", "tip": "Titles stay in the bar's font."},
+            {"key": "size", "name": "Size", "tip": "Drag its corner to resize the window."},
+            {"key": "window-opacity", "name": "Window Opacity", "tip": "How much of the game shows through this window."}
+          ]
+        },
+        {
+          "key": "reset",
+          "name": "Reset",
+          "settings": [
+            {
+              "key": "reset-all-settings",
+              "name": "Reset All Settings",
+              "tip": "Every setting on every page back to its default.",
+              "words": [
+                {"key": "note", "name": "Every setting goes back to its default. This cannot be undone."},
+                {"key": "reset-everything", "name": "Reset Everything"},
+                {"key": "keep-them", "name": "Keep Them"}
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "debug",
+      "name": "Debug",
+      "cards": [
+        {
+          "key": "headsup",
+          "name": "HeadsUp",
+          "description": "All of HeadsUp, as /hu on and /hu off.",
+          "settings": [
+            {"key": "debug-report", "name": "Debug Report", "tip": "As /hu debug: writes a report to logs/headsup."}
+          ]
+        },
+        {
+          "key": "this-frame",
+          "name": "This Frame",
+          "settings": [
+            {"key": "mobs-outlined", "name": "Mobs Outlined"},
+            {"key": "meshes-outlined", "name": "Meshes Outlined"},
+            {"key": "stencil-buffer", "name": "Stencil Buffer"},
+            {"key": "nameplates", "name": "Nameplates"},
+            {"key": "drawn", "name": "Drawn"},
+            {"key": "game-s-names", "name": "Game's Names"},
+            {"key": "frame-time", "name": "Frame Time"},
+            {"key": "last-save", "name": "Last Save"},
+            {"key": "your-level", "name": "Your Level"}
+          ]
+        }
+      ]
+    }
+  ],
+  "entity": {
+    "cards": [
+      {
+        "key": "visibility",
+        "name": "Visibility",
+        "description": "What each kind of entity shows, and whether it gets an outline.",
+        "settings": [
+          {
+            "key": "visibility",
+            "rows": [
+              {"key": "aggressive", "name": "Aggressive", "tip": "Would attack you at your level. Too Weak mobs only attack while you sit or rest.", "kinds": ["mobs"]},
+              {"key": "passive", "name": "Passive", "tip": "Passive, or aggressive but Too Weak for you.", "kinds": ["mobs"]},
+              {"key": "nm-aggressive", "name": "NM (Aggressive)", "tip": "Notorious monsters that would attack you.", "kinds": ["mobs"]},
+              {"key": "nm-passive", "name": "NM (Passive)", "tip": "Notorious monsters that would leave you alone.", "kinds": ["mobs"]},
+              {"key": "nm-placeholder", "name": "NM (Placeholder)", "tip": "Lottery placeholders, whose death can pop an NM, while nobody has claimed them.", "kinds": ["mobs"]},
+              {"key": "claimed-yours", "name": "Claimed (Yours)", "tip": "Claimed by you or your party, whatever else it is.", "kinds": ["mobs"]},
+              {"key": "claimed-others", "name": "Claimed (Others')", "tip": "Claimed by anyone outside your party, whatever else it is.", "kinds": ["mobs"]},
+              {"key": "dead", "name": "Dead", "tip": "Dead, until its body is gone. It keeps its name alone.", "kinds": ["mobs"]},
+              {"key": "no-data", "name": "No Data", "tip": "Not in the Phoenix data.", "kinds": ["mobs"]},
+              {"key": "players", "name": "Players", "tip": "Every player the rows below do not cover.", "kinds": ["players"]},
+              {"key": "party-members", "name": "Party Members", "tip": "In your party.", "kinds": ["players"]},
+              {"key": "friends", "name": "Friends", "tip": "On your Friend List in the game (Communication > Friend List), and not in your party.", "kinds": ["players"]},
+              {"key": "linkshell-members", "name": "Linkshell Members", "tip": "In your linkshell, and neither in your party nor a friend. The game tells a player's linkshell only when you /check them.", "kinds": ["players"]},
+              {"key": "self", "name": "Self", "kinds": ["self"]},
+              {"key": "npcs", "name": "NPCs", "kinds": ["npcs"]},
+              {"key": "your-pets", "name": "Your Pets", "tip": "A pet of yours.", "kinds": ["pets"]},
+              {"key": "party-pets", "name": "Party Pets", "tip": "A pet of someone in your party.", "kinds": ["pets"]},
+              {"key": "friend-pets", "name": "Friend Pets", "tip": "A pet of a friend who is not in your party.", "kinds": ["pets"]},
+              {"key": "others-pets", "name": "Others' Pets", "tip": "Anyone else's pet.", "kinds": ["pets"]}
+            ],
+            "words": [
+              {"key": "nameplates", "name": "Nameplates"},
+              {"key": "outlines", "name": "Outlines"}
+            ]
+          }
+        ]
+      },
+      {
+        "key": "outline-design",
+        "name": "Outline Design",
+        "description": "Each row's outline color: a custom color, or one of the palettes by the entity's state.",
+        "settings": [
+          {"key": "outline-colors", "tip": "This row's outline color: your own, or a palette on the Entities page."}
+        ]
+      },
+      {
+        "key": "nameplate-design",
+        "name": "Nameplate Design",
+        "description": "Design this entity's nameplate by writing in the text box and by dragging and dropping tags from below. Drop a tag onto another and the two share that place: the left one is drawn when it has something to show, and the next one when it has not. Drag a tag out of the lines to remove it.",
+        "settings": [
+          {"key": "design"},
+          {
+            "key": "max-icons-shown",
+            "name": "Max Icons Shown",
+            "tip": "The most status icons a nameplate shows, counted along its lines from the top. GM's always shows.",
+            "kinds": ["players", "self"],
+            "words": [
+              {"key": "all", "name": "All"}
+            ]
+          },
+          {"key": "unused-tags"}
+        ]
+      },
+      {
+        "key": "line-style",
+        "name": "Line Style",
+        "description": "How each line is drawn. A line's tab holds its settings.",
+        "settings": [
+          {
+            "key": "line-styles",
+            "rows": [
+              {"key": "sync-line-style", "name": "Sync Line Style", "tip": "Borrows every setting below from another line, so the two always match. A line that borrows from this one is not offered."},
+              {"key": "line-visibility", "name": "Line Visibility", "tip": "When this line shows: always, or when any checked condition holds."},
+              {"key": "alignment", "name": "Alignment", "tip": "Where the line sits against the bottom line. A line wider than it hangs past its other end."},
+              {"key": "font", "name": "Font", "tip": "The line's font. Default is the font on the Entities page."},
+              {"key": "font-style", "name": "Font Style", "tip": "Any of the three together."},
+              {"key": "text-size", "name": "Text Size", "tip": "Of the base font size on the Entities page."},
+              {"key": "icon-size", "name": "Icon Size", "tip": "Every icon on this line, of the base icon size on the Entities page."},
+              {"key": "padding", "name": "Padding", "tip": "Extra space under this line, which moves it and what is above it up.", "tipBottomLine": "Extra space over this line, which moves the lines above it up."},
+              {"key": "text-color", "name": "Text Color", "tip": "The text's color: your own, the game's, or a palette by the entity's state."},
+              {"key": "shadow-strength", "name": "Shadow Strength", "tip": "The dark, soft shadow behind the letters that keeps them readable over bright ground. 0 is none."},
+              {"key": "shadow-color", "name": "Shadow Color", "tip": "The shadow's color; black as a rule."},
+              {"key": "glow-strength", "name": "Glow Strength", "tip": "A colored halo around the letters, as a mob's name glows in its outline color. 0 is none."},
+              {"key": "glow-size", "name": "Glow Size", "tip": "How far the halo spreads."},
+              {"key": "glow-color", "name": "Glow Color", "tip": "The halo's color."},
+              {
+                "key": "disable-glow-in-combat",
+                "name": "Disable Glow In Combat",
+                "tip": {"mobs": "No glow on this line once you or your party has claimed the mob.", "players": "No glow on this line while the player has their weapon out.", "self": "No glow on this line while you have your weapon out.", "npcs": "No glow on this line while the NPC is fighting.", "pets": "No glow on this line while the pet is fighting."}
+              }
+            ],
+            "words": [
+              {"key": "do-not-sync", "name": "Do Not Sync", "tip": "This line keeps a style of its own."},
+              {"key": "sync-with", "name": "Sync with {line}", "tip": "Every setting below is the {line}'s, so the two always match."},
+              {"key": "uses-style", "name": "Uses the {line}'s style."}
+            ]
+          }
+        ]
+      },
+      {
+        "key": "ornament",
+        "name": "Ornament",
+        "description": "A diamond rule over, under or between the nameplate's lines.",
+        "settings": [
+          {
+            "key": "ornament",
+            "rows": [
+              {"key": "visibility", "name": "Visibility", "tip": "Where the ornament goes, if anywhere."},
+              {"key": "width", "name": "Width", "tip": "The rule's length, before the distance scale."},
+              {"key": "height", "name": "Height", "tip": "The diamond's height."},
+              {"key": "color", "name": "Color", "tip": "Its color: your own, or a palette by the entity's state."}
+            ]
+          }
+        ]
+      },
+      {
+        "key": "nameplate-opacity",
+        "name": "Nameplate Opacity",
+        "description": "Changes the opacity of the nameplate depending on what you are targeting.",
+        "settings": [
+          {"key": "no-target", "name": "No Target", "tip": "If you have no target, use this opacity for all nameplates."},
+          {"key": "not-targeted", "name": "Not Targeted", "tip": "If you have a target, but this is not your target, use this opacity for the nameplate."},
+          {"key": "is-targeted", "name": "Is Targeted", "tip": "If this is your target, use this opacity for the nameplate, at any distance."},
+          {"key": "fade-in", "name": "Fade In", "tip": "Nameplates grow fainter with distance: at the opacity above within {near} yalms, almost gone at the range. Your target's never fades.", "kinds": ["mobs", "players", "npcs", "pets"]},
+          {"key": "range", "name": "Range", "tip": "Where a nameplate that fades in is almost gone.", "kinds": ["mobs", "players", "npcs", "pets"]}
+        ]
+      },
+      {
+        "key": "detection-icons",
+        "name": "Detection Icons",
+        "description": "Which icons the Detection tag shows: aggression, linking and how it senses you, in MobDB's icons.",
+        "kinds": ["mobs"],
+        "settings": [
+          {
+            "key": "detection",
+            "rows": [
+              {"key": "aggression", "name": "Aggression"},
+              {"key": "links", "name": "Links"},
+              {"key": "sight", "name": "Sight"},
+              {"key": "true-sight", "name": "True Sight"},
+              {"key": "sound", "name": "Sound"},
+              {"key": "scent", "name": "Scent"},
+              {"key": "use-of-spells", "name": "Use of Spells"},
+              {"key": "use-of-abilities", "name": "Use of Abilities"},
+              {"key": "low-player-hp", "name": "Low Player HP"}
+            ],
+            "words": [
+              {"key": "senses", "name": "Senses:"},
+              {"key": "hide", "name": "Hide"},
+              {"key": "show", "name": "Show"}
+            ]
+          }
+        ]
+      },
+      {
+        "key": "badges",
+        "name": "Badges",
+        "description": "The small text on the icons of the Weaknesses, Resistances, Statuses and Immunities tags. The Target widget's popup takes its ranks and colors from here too.",
+        "kinds": ["mobs"],
+        "settings": [
+          {"key": "badge-font", "name": "Badge Font"},
+          {"key": "use-rank-system", "name": "Use Rank System", "tip": "Phoenix's ranks, -3 to 11, instead of percents. -3 is +50% and 4 is -50%."},
+          {"key": "weak-color", "name": "Weak Color"},
+          {"key": "resist-color", "name": "Resist Color"},
+          {"key": "status-resist-color", "name": "Status Resist Color"},
+          {"key": "immune-color", "name": "Immune Color"}
+        ]
+      },
+      {
+        "key": "weaknesses",
+        "name": "Weaknesses",
+        "description": "Which elements the Weaknesses and Resistances tags show beside the damage types.",
+        "kinds": ["mobs"],
+        "settings": [
+          {"key": "weak-from", "name": "Weak From", "tip": "The least element weakness that gets a badge."},
+          {"key": "resist-from", "name": "Resist From", "tip": "The least element resistance that gets a badge."},
+          {"key": "max-elements", "name": "Max Elements", "tip": "Past this many, those nearest neutral are left off."}
+        ]
+      },
+      {
+        "key": "statuses",
+        "name": "Statuses",
+        "description": "Which statuses the Statuses tag shows, weak or resisted.",
+        "kinds": ["mobs"],
+        "settings": [
+          {
+            "key": "status-table",
+            "rows": [
+              {"key": "paralyze", "name": "Paralyze"},
+              {"key": "bind", "name": "Bind"},
+              {"key": "silence", "name": "Silence"},
+              {"key": "slow", "name": "Slow"},
+              {"key": "poison", "name": "Poison"},
+              {"key": "light-sleep", "name": "Light Sleep"},
+              {"key": "dark-sleep", "name": "Dark Sleep"},
+              {"key": "blind", "name": "Blind"},
+              {"key": "stun", "name": "Stun"},
+              {"key": "gravity", "name": "Gravity"}
+            ],
+            "words": [
+              {"key": "weak", "name": "Weak"},
+              {"key": "resist", "name": "Resist"}
+            ]
+          }
+        ]
+      },
+      {
+        "key": "placeholder-timers",
+        "name": "Placeholder Timers",
+        "kinds": ["self"],
+        "settings": [
+          {"key": "respawn-timers", "name": "Respawn Timers", "tip": "Above your name, a countdown for each placeholder you see die, as Bigmouth Billy [11A] 3:15. It reads \"up\" when due."},
+          {"key": "timer-size", "name": "Timer Size", "tip": "Of the base font size on the Entities page."}
+        ]
+      }
+    ]
+  },
+  "lists": [
+    {
+      "key": "plate-mode",
+      "options": [
+        {"name": "Hide Nameplate", "tip": "No name at all."},
+        {"name": "Show Nameplate", "tip": "HeadsUp's nameplate."},
+        {"name": "When Targeted", "tip": "The nameplate while it is your target, and no name otherwise."},
+        {"name": "Vanilla Nameplate", "tip": "The game's own name, and nothing of HeadsUp's."}
+      ]
+    },
+    {
+      "key": "outline-mode",
+      "options": [
+        {"name": "No Outline", "tip": "No outline."},
+        {"name": "Show Outline", "tip": "An outline whenever it is in range."},
+        {"name": "When Targeted", "tip": "An outline while it is your target."},
+        {"name": "Inherit", "tip": "The outline its aggression gives it, as any other mob's.", "tipOnClaimRows": "The outline it would have unclaimed."}
+      ]
+    },
+    {
+      "key": "color-source",
+      "options": [
+        {"name": "Custom", "tip": "A color of your own."},
+        {"name": "Vanilla Color", "tip": "The color the game gives the name."},
+        {"name": "Color by Aggression", "tip": "Colors indicating whether an enemy will attack you, or not, and if they are a notorious monster."},
+        {"name": "Color by Toughness", "tip": "Colors indicating how dangerous an enemy is to you at your current level."},
+        {"name": "Color by Claim Status", "tip": "Colors indicating whether or not the mob is claimed, and who is the owner of the claim."},
+        {"name": "Color by Targeting", "tip": "Colors indicating whether you are targeting the entity, locked onto it, sub-targeting, etc."},
+        {"name": "Color by Entity Type", "tip": "Colors indicating what type of entity the target is, or what their relation is to you."}
+      ]
+    },
+    {
+      "key": "show-condition",
+      "options": [
+        {"name": "When Targeted", "tip": "While it is your target."},
+        {"name": "When Unclaimed", "tip": "While nobody has claimed the mob."},
+        {"name": "When Claimed by You", "tip": "While you or your party has claimed the mob."},
+        {"name": "When Claimed by Others", "tip": "While someone outside your party has claimed the mob."},
+        {"name": "When Engaged in Combat", "tip": "While it is fighting."},
+        {"name": "When Too Weak", "tip": "While the mob is too weak to be worth experience."},
+        {"name": "When Aggressive", "tip": "While the mob would attack you."},
+        {"name": "When Passive", "tip": "While the mob would leave you alone."},
+        {"name": "When Party Member", "tip": "While the player is in your party."},
+        {"name": "When Friend", "tip": "While the player is a friend."},
+        {"name": "When Linkshell Member", "tip": "While the player is in your linkshell."},
+        {"name": "When Owner is You", "tip": "While the pet is yours."}
+      ]
+    },
+    {
+      "key": "ornament-place",
+      "options": [
+        {"name": "Disabled", "tip": "No ornament."},
+        {"name": "Top", "tip": "Over the nameplate's first line."},
+        {"name": "Above Middle Line", "tip": "Between the top and middle lines, while both show."},
+        {"name": "Below Middle Line", "tip": "Between the middle and bottom lines, while both show."},
+        {"name": "Bottom", "tip": "Under the nameplate's last line."}
+      ]
+    },
+    {
+      "key": "align",
+      "options": [
+        {"name": "Left"},
+        {"name": "Center"},
+        {"name": "Right"}
+      ]
+    },
+    {
+      "key": "font-style",
+      "options": [
+        {"name": "Bold"},
+        {"name": "Italics"},
+        {"name": "Underline"}
+      ]
+    },
+    {
+      "key": "smoothness",
+      "options": [
+        {"name": "Low"},
+        {"name": "Medium"},
+        {"name": "High"},
+        {"name": "Ultra"}
+      ]
+    },
+    {
+      "key": "bar-theme",
+      "options": [
+        {"name": "Phoenix Gold", "tip": "An ornate strip in dark brown and gold, with diamonds between its widgets."},
+        {"name": "Umbra Dark", "tip": "Each widget in a grey pill, lit in blue."},
+        {"name": "Phoenix Red, Ornate", "tip": "The ornate strip in Phoenix's dark red."},
+        {"name": "Phoenix Red, Pills", "tip": "Each widget in a pill, in Phoenix's dark red."},
+        {"name": "Aurora", "tip": "Slate glass, lit from cyan into violet."}
+      ]
+    },
+    {
+      "key": "menu-theme",
+      "options": [
+        {"name": "Phoenix", "tip": "Phoenix's dark red, lit in its royal red."},
+        {"name": "Aurora", "tip": "Slate glass, lit from cyan into violet."}
+      ]
+    },
+    {
+      "key": "bar-sections",
+      "options": [
+        {"name": "Left"},
+        {"name": "Center"},
+        {"name": "Right"}
+      ]
+    },
+    {
+      "key": "bar-widgets",
+      "options": [
+        {"name": "Zone", "tip": "The zone, its region and who holds it. Hover for the influence there and the conquest tally."},
+        {"name": "Weather", "tip": "The weather now and today's chance of it. Hover for the forecast."},
+        {"name": "Vana'diel", "tip": "The Vana'diel day, time and moon."},
+        {"name": "Target", "tip": "Your target's name, level and con. Hover a mob for its details."},
+        {"name": "Gil", "tip": "Gil, or another currency. Hover for every currency."},
+        {"name": "Bags", "tip": "How full your inventory is. Hover for every bag."},
+        {"name": "Clock", "tip": "Your computer's time, or another time zone's, over the server's if you like. Hover for the daily reset and conquest tally."},
+        {"name": "Game Help", "tip": "The game's help text, in a bar of its own under the top panel."},
+        {"name": "FPS", "tip": "Frames per second. Hover for frame times."},
+        {"name": "Job", "tip": "Jobs, levels and EXP to the next level, with a bar. Hover for EXP per hour."},
+        {"name": "Connection", "tip": "Bytes sent and received each second; amber or red when data stops. Hover for latency."},
+        {"name": "Party", "tip": "Party size and the lowest HP and MP. Hover for each member."},
+        {"name": "Signet", "tip": "Time left on Signet or Sanction, while one is on."},
+        {"name": "Distance", "tip": "How far your target is, in yalms."}
+      ]
+    },
+    {
+      "key": "plate-lines",
+      "options": [
+        {"name": "Top Line"},
+        {"name": "Middle Line"},
+        {"name": "Bottom Line"}
+      ]
+    },
+    {
+      "key": "job-layout",
+      "options": [
+        {"name": "Jobs First"},
+        {"name": "EXP First"},
+        {"name": "EXP Only"}
+      ]
+    },
+    {
+      "key": "exp-bar",
+      "options": [
+        {"name": "Under"},
+        {"name": "Beside"},
+        {"name": "Off"}
+      ]
+    },
+    {
+      "key": "tags",
+      "options": [
+        {"name": "Name", "tip": "The entity's name."},
+        {"name": "Level", "tip": "A mob's level, or range, as 20-23; its exact level after a /check. A player's main job level when known."},
+        {"name": "Difficulty", "tip": "The con at each end of the level range, as EP-DC; one con after a /check."},
+        {"name": "ID", "tip": "The last three hex digits of the mob's ID, as players name placeholders: [106]."},
+        {"name": "Server ID", "tip": "The mob's whole server ID in decimal: [17190918]."},
+        {"name": "Placeholder", "tip": "[PH] on a lottery placeholder, whose death can pop an NM; nothing on other mobs."},
+        {"name": "Detection", "tip": "Aggression, links, and how it detects you, as picked in Detection Icons."},
+        {"name": "Weaknesses", "tip": "Damage types and elements it is weak to, with their percents or ranks."},
+        {"name": "Resistances", "tip": "Damage types and elements it resists, with their percents or ranks."},
+        {"name": "Statuses", "tip": "Statuses it is weak to or resists, as picked in Statuses."},
+        {"name": "Immunities", "tip": "Statuses it cannot take, each with a times sign."},
+        {"name": "GM", "tip": "The GM icon."},
+        {"name": "Mentor", "tip": "The mentor icon."},
+        {"name": "New Adventurer", "tip": "The new adventurer icon."},
+        {"name": "Level Sync", "tip": "The level sync icon."},
+        {"name": "Away", "tip": "The away icon."},
+        {"name": "Linkshell", "tip": "The linkshell icon, in the linkshell's color."},
+        {"name": "Bazaar", "tip": "The bazaar icon."},
+        {"name": "Seeking Party", "tip": "The seeking party icon."},
+        {"name": "Job", "tip": "Jobs as WAR/MNK: yours, your party's, and a player's once you have checked them."},
+        {"name": "Owner", "tip": "The pet's owner."},
+        {"name": "Title", "tip": "The player's title: yours, and a player's once you have checked them."}
+      ]
+    }
+  ],
+  "words": [
+    {"key": "switched-off", "name": "Switched Off"},
+    {"key": "switched-off-top-panel", "name": "These settings are the top panel's, which is off: the Top Panel page switches it on."},
+    {"key": "switched-off-headsup", "name": "HeadsUp is off: the Debug page switches it on."},
+    {"key": "key-add", "name": "+ Add Key"},
+    {"key": "key-waiting", "name": "Press a Key..."},
+    {"key": "always", "name": "Always", "tip": "The line shows whatever else holds."},
+    {"key": "never", "name": "Never"},
+    {"key": "conditions", "name": "{count} Conditions"},
+    {"key": "local", "name": "Local"},
+    {"key": "themes-font", "name": "Theme's"},
+    {"key": "default-font", "name": "Default"},
+    {"key": "unused-tags-these", "name": "Put the {tags} tag on a line of the design to show these on a nameplate."},
+    {"key": "unused-tags-name", "name": "Put the {tags} tag on a line of the design to show a name: the game's own is hidden where HeadsUp draws the nameplate."},
+    {"key": "or", "name": "or"},
+    {"key": "slot-tip", "tip": "These share one place, tried from the left: the first that has something to show is drawn. Drop one on another to change their order, or drag one out."}
+  ]
+}

@@ -287,15 +287,56 @@ TEST(two_controls_of_one_name_get_ids_of_their_own)
     form.Switch("Same", b, nullptr);
     form.Switch("Same##other", b, nullptr);
     form.EndCard();
-    CHECK(!ClassOn(form, "p-c-same", "on") && ClassOn(form, "p-c-same-2", "on") && ClassOn(form, "p-c-same-other", "on"));
+    CHECK(!ClassOn(form, "p-c-same", "on") && ClassOn(form, "p-c-same-2", "on") && ClassOn(form, "p-c-other", "on"));
     // What follows "##" is not shown.
     CHECK(Has(form.blocks[0].rml, ">Same</div>") && !Has(form.blocks[0].rml, "##"));
+}
+
+TEST(what_follows_two_hashes_names_the_id_and_what_comes_before_is_shown)
+{
+    FormState state;
+    Form form({}, state);
+    form.pageKey = "p";
+    CHECK(form.BeginCard("A Title##t"));
+    form.Action("Do It##do");
+    form.Caption("Head##h");
+    form.EndCard();
+    const std::string& rml = form.blocks[0].rml;
+    CHECK_EQ(form.blocks[0].id, std::string("p-t"));
+    CHECK(Has(rml, "id=\"p-t-head\"") && Has(rml, ">A Title</div>"));
+    CHECK(Has(rml, "id=\"p-t-do\"") && Has(rml, ">Do It</div>"));
+    CHECK(Has(rml, "id=\"p-t-h-caption\"") && Has(rml, ">Head</div>"));
+    CHECK(!Has(rml, "##"));
+}
+
+TEST(a_card_that_shows_nothing_goes_unless_its_title_has_a_switch)
+{
+    FormState state;
+    const auto pass = [&](bool* enabled, bool note) {
+        Form form({}, state);
+        form.pageKey = "p";
+        form.BeginCard("C", enabled);
+        bool on = false;
+        form.Fade(true);
+        form.Switch("Hidden", on, nullptr);
+        form.Fade(false);
+        if (note) form.Note("Shown.");
+        form.EndCard();
+        return form;
+    };
+    const Form empty = pass(nullptr, false);
+    CHECK(ClassOn(empty, "p-c", kOffClass) && empty.CardsShown() == 0);
+    bool enabled = false;
+    const Form switched = pass(&enabled, false);
+    CHECK(!ClassOn(switched, "p-c", kOffClass) && switched.CardsShown() == 1);
+    const Form noted = pass(nullptr, true);
+    CHECK(!ClassOn(noted, "p-c", kOffClass) && noted.CardsShown() == 1);
 }
 
 TEST(segments_and_tabs_mark_the_picked_one_and_take_a_click)
 {
     FormState state;
-    const char* const options[] = {"hide", "before", "after"};
+    const char* const options[] = {"Hide", "Before", "After"};
     int picked = 2, tab = 0;
     const auto pass = [&](const std::vector<FormEvent>& events) {
         Form form(events, state);
@@ -312,9 +353,9 @@ TEST(segments_and_tabs_mark_the_picked_one_and_take_a_click)
     CHECK(Has(first.blocks[0].rml, "<div class=\"seg\" id=\"p-c-one-line-s-0\" style=\"width:4.6em;\">Hide</div>"));
     CHECK(ClassOn(first, "p-c-one-line-s-2", "picked") && !ClassOn(first, "p-c-one-line-s-0", "picked"));
     // Three tabs, two to a row: a row of two and a row of one.
-    CHECK(Has(first.blocks[0].rml, "<div class=\"tab-row\"><div class=\"tab\" id=\"p-c-tabs-t-0\">hide</div>"
-                                   "<div class=\"tab\" id=\"p-c-tabs-t-1\">before</div></div><div class=\"tab-row\">"
-                                   "<div class=\"tab\" id=\"p-c-tabs-t-2\">after</div></div><div class=\"tab-rule\"></div>"));
+    CHECK(Has(first.blocks[0].rml, "<div class=\"tab-row\"><div class=\"tab\" id=\"p-c-tabs-t-0\">Hide</div>"
+                                   "<div class=\"tab\" id=\"p-c-tabs-t-1\">Before</div></div><div class=\"tab-row\">"
+                                   "<div class=\"tab\" id=\"p-c-tabs-t-2\">After</div></div><div class=\"tab-rule\"></div>"));
     const Form clicked = pass({{"p-c-one-line-s-0", kClickEvent, ""}, {"p-c-tabs-t-2", kClickEvent, ""}});
     CHECK(picked == 0 && clicked.changed && tab == 2);
     CHECK(ClassOn(clicked, "p-c-tabs-t-2", "picked") && ClassOn(clicked, "p-c-one-line-s-0", "picked"));
@@ -397,12 +438,12 @@ TEST(a_list_of_checks_stays_open_and_a_condition_unchecked_under_always_turns_al
     CHECK(show.when == ConditionBit(conditions[0]) && checked.changed && checked.popup);
     CHECK(ClassOn(checked, "p-c-show-o-1", "on") && !ClassOn(checked, "p-c-show-o-2", "on"));
     // Each row says when it holds.
-    CHECK(Has(checked.popup->rml, (std::string("id=\"p-c-show-o-1\" tip=\"") + ConditionTip(conditions[0]) + "\"").c_str()));
-    CHECK(Has(checked.popup->rml, (std::string("id=\"p-c-show-o-0\" tip=\"") + kShowAlwaysTip + "\"").c_str()));
+    CHECK(Has(checked.popup->rml, (std::string("id=\"p-c-show-o-1\" tip=\"") + kWindowLayout.OptionsOf(WindowList::ShowCondition)[static_cast<size_t>(conditions[0])].tip + "\"").c_str()));
+    CHECK(Has(checked.popup->rml, (std::string("id=\"p-c-show-o-0\" tip=\"") + kWindowLayout.WordOf(WindowWord::Always).tip + "\"").c_str()));
     // Under Always every condition reads checked.
     const Form always = pass({{"p-c-show-o-0", kClickEvent, ""}});
     CHECK(show.always && ClassOn(always, "p-c-show-o-0", "on") && ClassOn(always, "p-c-show-o-2", "on"));
-    CHECK_EQ(TextOf(always, "p-c-show-val"), kShowAlways);
+    CHECK_EQ(TextOf(always, "p-c-show-val"), std::string(kWindowLayout.WordOf(WindowWord::Always).name));
     // Unchecking one of them turns Always off and leaves the others checked.
     const Form one = pass({{"p-c-show-o-2", kClickEvent, ""}});
     CHECK(one.changed && !show.always && one.popup);

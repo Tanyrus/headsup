@@ -30,8 +30,6 @@ namespace headsup
 
     const BarPalette& PaletteOf(BarTheme theme);
     // The menu's name for a theme.
-    const char* BarThemeName(BarTheme theme);
-    const char* BarThemeTip(BarTheme theme); // what the theme looks like, for its option
 
     // Pixel sizes, following the bar's height H.
     struct BarMetrics

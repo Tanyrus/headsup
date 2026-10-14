@@ -41,26 +41,11 @@ namespace headsup
                 .text = 0xFFE3ECFA, .heading = 0xFF5EE6FF, .tagFill = 0x265EE6FF, .tagBorder = 0, .tagText = 0xFFCFE9FF,
                 .highlight = 0x335EE6FF},
         };
-        const char* const kNames[kBarThemeCount] = {
-            "Phoenix Gold", "Umbra Dark", "Phoenix Red, Ornate", "Phoenix Red, Pills", "Aurora"};
     }
 
     const BarPalette& PaletteOf(BarTheme theme)
     {
         return kPalettes[std::clamp(static_cast<int>(theme), 0, kBarThemeCount - 1)];
-    }
-
-    const char* BarThemeName(BarTheme theme)
-    {
-        return kNames[std::clamp(static_cast<int>(theme), 0, kBarThemeCount - 1)];
-    }
-
-    const char* BarThemeTip(BarTheme theme)
-    {
-        static const char* const kTips[kBarThemeCount] = {"An ornate strip in dark brown and gold, with diamonds between its widgets.",
-            "Each widget in a grey pill, lit in blue.", "The ornate strip in Phoenix's dark red.",
-            "Each widget in a pill, in Phoenix's dark red.", "Slate glass, lit from cyan into violet."};
-        return kTips[std::clamp(static_cast<int>(theme), 0, kBarThemeCount - 1)];
     }
 
     BarMetrics MetricsFor(int barHeight, BarShape shape, int barText, int popupText)

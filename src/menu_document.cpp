@@ -29,19 +29,6 @@ namespace headsup
         constexpr float kCrossBar     = 0.12f;
     }
 
-    const char* MenuThemeName(MenuTheme theme)
-    {
-        static const char* const kNames[kMenuThemeCount] = {"Phoenix", "Aurora"};
-        return kNames[std::clamp(static_cast<int>(theme), 0, kMenuThemeCount - 1)];
-    }
-
-    const char* MenuThemeTip(MenuTheme theme)
-    {
-        static const char* const kTips[kMenuThemeCount] = {"Phoenix's dark red, lit in its royal red.",
-            "Slate glass, lit from cyan into violet."};
-        return kTips[std::clamp(static_cast<int>(theme), 0, kMenuThemeCount - 1)];
-    }
-
     namespace
     {
         // The accent's alpha where it is light and no fill: a slider's filled part and a hovered card's edge, the
