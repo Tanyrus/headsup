@@ -201,7 +201,9 @@ checked them.
 ### Placeholder timers
 
 The Self page has a Placeholder Timers card. With Respawn Timers on, a countdown appears above your name for each
-placeholder you see die, such as Bigmouth Billy [11A] 3:15; it reads "up" when the placeholder is due.
+lottery placeholder that dies within 50 yalms of you, such as Bigmouth Billy [11A] 3:14, and for each lottery NM, whose
+death brings its placeholder back on the placeholder's own timer; it reads "up" when the placeholder is due. The server
+tells only those within 50 yalms of a death, so a kill farther away, even by your party, starts no timer.
 
 ### Target cursor
 

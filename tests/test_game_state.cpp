@@ -252,6 +252,16 @@ TEST(a_check_reply_is_handed_back_for_the_plugin_to_finish)
     CHECK(!Feed(game, CheckReplyWith(kDefeat)).check.has_value());
 }
 
+TEST(a_defeat_is_handed_back_for_the_timers)
+{
+    GameState game              = Filled();
+    const Seen full             = Look(game);
+    const PacketFollowUp defeat = Feed(game, CheckReplyWith(kDefeat));
+    CHECK(defeat.mobDied == kMob && !defeat.check && !defeat.answer);
+    CHECK(!Feed(game, CheckReplyWith(kCon)).mobDied.has_value());
+    CHECK(Look(game) == full);
+}
+
 TEST(a_player_check_pairs_the_message_with_the_general_packet_that_follows_it)
 {
     GameState game;
@@ -387,4 +397,36 @@ TEST(a_checked_player_shares_your_linkshell_when_their_check_names_one_you_wear)
     const std::vector<std::string> unread{""};
     check.general.linkshell.clear();
     CHECK(!SharesLinkshell(&check, unread));
+}
+
+namespace
+{
+    // GP_SERV_CHAR_NPC (0x00E): the index at 0x08, what it carries at 0x0A, the entity's flags at 0x21, where 0x800
+    // is Untargetable.
+    constexpr uint16_t kChigoe = 0x123;
+    constexpr uint32_t kUntargetableFlag = 0x800, kCallForHelpFlag = 0x20;
+    Packet MobUpdate(uint16_t index, uint8_t carries, uint32_t flags)
+    {
+        return Blank(0x00E, 0x48).Put(0x08, index).Put(0x0A, carries).Put(0x21, flags);
+    }
+}
+
+TEST(a_mob_the_server_makes_untargetable_is_known_until_it_says_otherwise)
+{
+    GameState game;
+    CHECK(!game.Untargetable(kChigoe));
+    Feed(game, MobUpdate(kChigoe, kGeneral, kUntargetableFlag | kCallForHelpFlag));
+    CHECK(game.Untargetable(kChigoe) && !game.Untargetable(kChigoe + 1));
+    Feed(game, MobUpdate(kChigoe, kMoved, 0)); // a move carries no flags
+    CHECK(game.Untargetable(kChigoe));
+    Feed(game, MobUpdate(kChigoe, kGeneral, kCallForHelpFlag)); // it engaged
+    CHECK(!game.Untargetable(kChigoe));
+    Feed(game, MobUpdate(kChigoe, kGeneral, kUntargetableFlag));
+    Feed(game, MobUpdate(kChigoe, kDespawn, 0)); // gone, and its index free for another
+    CHECK(!game.Untargetable(kChigoe));
+    Feed(game, MobUpdate(kChigoe, kGeneral, kUntargetableFlag));
+    Feed(game, ZoneIn(kRain));
+    CHECK(!game.Untargetable(kChigoe));
+    Feed(game, Cut(MobUpdate(kChigoe, kGeneral, kUntargetableFlag), 0x24)); // too short to hold the flags
+    CHECK(!game.Untargetable(kChigoe));
 }

@@ -82,6 +82,17 @@ namespace headsup
     };
     std::optional<InspectMessage> ParseInspectMessage(const uint8_t* data, uint32_t size);
 
+    constexpr uint16_t kEntityUpdatePacket = 0x00E; // server to client: an NPC's or a mob's update
+    struct EntityUpdate
+    {
+        uint16_t index; // entity target index
+        bool despawn;
+        std::optional<bool> untargetable; // when the update carries the entity's flags
+    };
+    // From Phoenix's src/map/packets/entity_update.cpp: a mob or an NPC set untargetable, as a Chigoe is until it
+    // engages, has the flags' Untargetable bit (the packet's TargetOffFlag) in every update that carries them.
+    std::optional<EntityUpdate> ParseEntityUpdate(const uint8_t* data, uint32_t size);
+
     // A linkshell's name as Phoenix packs it (EncodeStringLinkshell): 6-bit codes from the first byte's top bits,
     // a-z 1 to 26, A-Z 27 to 52, 0-9 53 to 62, ended by 63 or by four 1 bits and zeros, 20 at most.
     std::string LinkshellName(const uint8_t* packed, size_t bytes);

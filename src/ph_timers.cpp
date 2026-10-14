@@ -17,26 +17,26 @@ namespace headsup
         constexpr const char* kUnknownNmName = "NM";
     }
 
-    std::optional<PhSighting> SightingOf(const MobRecord* mob, bool alive, bool bodyDrawn)
+    std::optional<PhSighting> SightingOf(const MobRecord* mob)
     {
-        if (mob == nullptr || mob->placeholderOf == 0) return std::nullopt;
+        if (mob == nullptr) return std::nullopt;
+        if (mob->placeholders > 0) return PhSighting{mob->id, mob->placeholderRespawn, mob->name};
+        if (mob->placeholderOf == 0) return std::nullopt;
         const MobRecord* nm = MobById(mob->placeholderOf);
-        return PhSighting{mob->id, mob->respawn, nm != nullptr ? nm->name : kUnknownNmName, alive, bodyDrawn};
+        return PhSighting{mob->id, mob->respawn, nm != nullptr ? nm->name : kUnknownNmName};
     }
 
-    void PhTimers::Update(double now, const std::vector<PhSighting>& placeholders)
+    void PhTimers::Died(double now, const PhSighting& mob)
     {
-        std::unordered_map<uint32_t, bool> inRange;
-        for (const PhSighting& ph : placeholders)
-        {
-            const auto before = m_WasAlive.find(ph.serverId);
-            if (ph.alive)
-                m_Timers.erase(ph.serverId);
-            else if (ph.respawnSeconds > 0 && before != m_WasAlive.end() && before->second && ph.bodyDrawn)
-                m_Timers[ph.serverId] = Timer{ph.serverId, ph.nmName, now + kDeathToDespawnSeconds + ph.respawnSeconds};
-            inRange[ph.serverId] = ph.alive;
-        }
-        m_WasAlive = std::move(inRange);
+        if (mob.respawnSeconds == 0) return;
+        m_Timers[mob.serverId] = Timer{mob.serverId, mob.nmName,
+            now - kDefeatMessageSeconds + kDeathToDespawnSeconds + static_cast<double>(mob.respawnSeconds)};
+    }
+
+    void PhTimers::Update(double now, const std::vector<uint32_t>& aliveMobs)
+    {
+        for (const uint32_t serverId : aliveMobs)
+            m_Timers.erase(serverId);
         std::erase_if(m_Timers, [&](const auto& entry) { return now > entry.second.dueAt + kUpSeconds; });
     }
 

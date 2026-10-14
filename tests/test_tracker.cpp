@@ -276,6 +276,17 @@ TEST(mobs_beyond_max_distance_are_not_outlined)
     CHECK(!t.Find(0x3000)->outline);
 }
 
+TEST(a_mob_that_cannot_be_targeted_is_not_outlined)
+{
+    Tracker t;
+    const Settings s;
+    ActorInput hidden = BountyHunter(0x3000);
+    hidden.untargetable = true; // as a Chigoe is until it engages
+    t.Update({BountyHunter(0x2000), hidden}, kLevel20, s, CursorTargets{});
+    CHECK(t.Find(0x2000)->outline);
+    CHECK(!t.Find(0x3000)->outline);
+}
+
 TEST(an_outline_is_as_opaque_as_the_setting_and_fainter_with_distance_only_when_it_fades_in)
 {
     Tracker t;

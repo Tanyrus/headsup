@@ -10,96 +10,105 @@ namespace
     constexpr uint32_t kBigmouthBilly = 17191196;
     constexpr uint32_t kOtherWorm     = 17191195;
     constexpr uint32_t kLaTheineMob   = 17195258; // zone 102
+    constexpr uint32_t kWildRabbit    = 17190918; // no lottery
+    // From the defeat message to the placeholder's return: its despawn, less the second the message waits, then its
+    // respawn.
+    constexpr double kWormSpan = kDeathToDespawnSeconds - kDefeatMessageSeconds + 180.0;
 
-    PhSighting Worm(bool alive, bool bodyDrawn = true, uint32_t serverId = kWorm)
-    {
-        return PhSighting{serverId, 180, "Bigmouth Billy", alive, bodyDrawn};
-    }
+    PhSighting Worm(uint32_t serverId = kWorm) { return PhSighting{serverId, 180, "Bigmouth Billy"}; }
+    PhSighting Billy() { return PhSighting{kBigmouthBilly, 180, "Bigmouth Billy"}; }
 }
 
 TEST(a_placeholder_is_seen_with_its_respawn_and_its_nms_name)
 {
     const MobRecord* worm = MobById(kWorm);
-    const auto seen       = SightingOf(worm, false, true);
+    const auto seen       = SightingOf(worm);
     CHECK(seen.has_value());
     CHECK(seen->serverId == kWorm && seen->respawnSeconds == 180 && seen->nmName == "Bigmouth Billy");
-    CHECK(!seen->alive && seen->bodyDrawn);
-    CHECK(!SightingOf(MobById(kBigmouthBilly), true, true).has_value()); // not a placeholder
-    CHECK(!SightingOf(nullptr, true, true).has_value());
+    CHECK(!SightingOf(MobById(kWildRabbit)).has_value()); // no lottery
+    CHECK(!SightingOf(nullptr).has_value());
     MobRecord orphan     = *worm;
     orphan.placeholderOf = 1; // an NM the data does not have
-    CHECK(SightingOf(&orphan, true, true)->nmName == "NM");
+    CHECK(SightingOf(&orphan)->nmName == "NM");
 }
 
-TEST(a_placeholder_you_see_die_gets_its_respawn_timer)
+TEST(a_lottery_nm_is_seen_with_its_placeholders_respawn_and_its_own_name)
+{
+    const auto seen = SightingOf(MobById(kBigmouthBilly));
+    CHECK(seen.has_value());
+    CHECK(seen->serverId == kBigmouthBilly && seen->respawnSeconds == 180 && seen->nmName == "Bigmouth Billy");
+    MobRecord untimed          = *MobById(kBigmouthBilly);
+    untimed.placeholderRespawn = 0; // its placeholders are on no timer
+    CHECK(SightingOf(&untimed).has_value() && SightingOf(&untimed)->respawnSeconds == 0);
+}
+
+TEST(a_placeholders_defeat_starts_its_timer)
 {
     PhTimers t;
-    t.Update(100.0, {Worm(true)});
-    t.Update(101.0, {Worm(false)});
+    t.Died(101.0, Worm());
     const std::vector<TimerLine> lines = t.Lines(kEastRonfaure, 101.0);
     CHECK_EQ(lines.size(), 1u);
-    CHECK(lines[0].text == "Bigmouth Billy [11A] 3:15" && !lines[0].up); // 15 s to its despawn, then its 180 s
-    t.Update(110.0, {Worm(false)}); // its body still in view
-    CHECK(t.Lines(kEastRonfaure, 210.5)[0].text == "Bigmouth Billy [11A] 1:26");
+    CHECK(lines[0].text == "Bigmouth Billy [11A] 3:14" && !lines[0].up); // despawn 14 s after the message, then 180 s
+    CHECK(t.Lines(kEastRonfaure, 210.5)[0].text == "Bigmouth Billy [11A] 1:25");
 }
 
-TEST(a_placeholder_you_did_not_see_die_gets_none)
+TEST(an_nms_defeat_starts_its_placeholders_timer_under_the_nms_id)
 {
-    PhTimers unseen;
-    unseen.Update(100.0, {Worm(true, false)});
-    unseen.Update(101.0, {Worm(false, false)});
-    CHECK(unseen.Lines(kEastRonfaure, 101.0).empty());
+    PhTimers t;
+    t.Died(101.0, Billy());
+    CHECK(t.Lines(kEastRonfaure, 101.0)[0].text == "Bigmouth Billy [11C] 3:14");
+    CHECK_EQ(*t.SecondsLeft(kBigmouthBilly, 101.0), kWormSpan);
+    CHECK(!t.SecondsLeft(kWorm, 101.0).has_value());
+}
 
-    PhTimers alreadyDead; // came into range as a corpse
-    alreadyDead.Update(100.0, {Worm(false)});
-    alreadyDead.Update(101.0, {Worm(false)});
-    CHECK(alreadyDead.Lines(kEastRonfaure, 101.0).empty());
+TEST(a_death_with_no_respawn_starts_nothing)
+{
+    PhTimers t; // a Dynamis statue's spawn: it never comes back on a timer
+    t.Died(101.0, PhSighting{kWorm, 0, "Bigmouth Billy"});
+    CHECK(t.Lines(kEastRonfaure, 101.0).empty());
+}
 
-    PhTimers noRespawn; // a Dynamis statue's spawn: it never comes back on a timer
-    noRespawn.Update(100.0, {PhSighting{kWorm, 0, "Bigmouth Billy", true, true}});
-    noRespawn.Update(101.0, {PhSighting{kWorm, 0, "Bigmouth Billy", false, true}});
-    CHECK(noRespawn.Lines(kEastRonfaure, 101.0).empty());
+TEST(a_mob_seen_alive_again_loses_its_timer)
+{
+    PhTimers t;
+    t.Died(101.0, Worm());
+    t.Update(250.0, {kOtherWorm});
+    CHECK_EQ(t.Lines(kEastRonfaure, 250.0).size(), 1u);
+    t.Update(251.0, {kWorm});
+    CHECK(t.Lines(kEastRonfaure, 251.0).empty());
+}
 
-    PhTimers away; // left range alive and came back to its corpse
-    away.Update(100.0, {Worm(true)});
-    away.Update(101.0, {});
-    away.Update(102.0, {Worm(false)});
-    CHECK(away.Lines(kEastRonfaure, 102.0).empty());
+TEST(a_later_defeat_starts_the_timer_again)
+{
+    PhTimers t;
+    t.Died(101.0, Worm());
+    t.Died(400.0, Worm());
+    CHECK_EQ(*t.SecondsLeft(kWorm, 400.0), kWormSpan);
 }
 
 TEST(a_timer_reads_up_when_due_then_goes)
 {
     PhTimers t;
-    t.Update(100.0, {Worm(true)});
-    t.Update(101.0, {Worm(false)});
-    t.Update(296.0, {});
-    const std::vector<TimerLine> due = t.Lines(kEastRonfaure, 296.0);
-    CHECK(due.size() == 1 && due[0].text == "Bigmouth Billy [11A] up" && due[0].up);
-    t.Update(296.0 + kUpSeconds, {});
-    CHECK_EQ(t.Lines(kEastRonfaure, 296.0 + kUpSeconds).size(), 1u);
-    t.Update(296.0 + kUpSeconds + 1.0, {});
-    CHECK(t.Lines(kEastRonfaure, 296.0 + kUpSeconds + 1.0).empty());
-}
-
-TEST(a_placeholder_seen_alive_again_loses_its_timer)
-{
-    PhTimers t;
-    t.Update(100.0, {Worm(true)});
-    t.Update(101.0, {Worm(false)});
-    t.Update(250.0, {Worm(true)});
-    CHECK(t.Lines(kEastRonfaure, 250.0).empty());
+    t.Died(101.0, Worm());
+    const double due = 101.0 + kWormSpan;
+    t.Update(due, {});
+    const std::vector<TimerLine> lines = t.Lines(kEastRonfaure, due);
+    CHECK(lines.size() == 1 && lines[0].text == "Bigmouth Billy [11A] up" && lines[0].up);
+    t.Update(due + kUpSeconds, {});
+    CHECK_EQ(t.Lines(kEastRonfaure, due + kUpSeconds).size(), 1u);
+    t.Update(due + kUpSeconds + 1.0, {});
+    CHECK(t.Lines(kEastRonfaure, due + kUpSeconds + 1.0).empty());
 }
 
 TEST(only_this_zones_timers_show_soonest_first)
 {
     PhTimers t;
-    t.Update(100.0, {Worm(true), Worm(true, true, kLaTheineMob)});
-    t.Update(101.0, {Worm(true), Worm(false, true, kLaTheineMob)});
-    t.Update(110.0, {Worm(false), Worm(true, true, kOtherWorm)});
-    t.Update(111.0, {Worm(false, true, kOtherWorm)});
+    t.Died(101.0, Worm(kLaTheineMob));
+    t.Died(110.0, Worm());
+    t.Died(111.0, Worm(kOtherWorm));
     const std::vector<TimerLine> lines = t.Lines(kEastRonfaure, 120.0);
     CHECK_EQ(lines.size(), 2u);
-    CHECK(lines[0].text == "Bigmouth Billy [11A] 3:05" && lines[1].text == "Bigmouth Billy [11B] 3:06");
+    CHECK(lines[0].text == "Bigmouth Billy [11A] 3:04" && lines[1].text == "Bigmouth Billy [11B] 3:05");
 }
 
 TEST(a_countdown_reads_minutes_and_seconds_or_hours)
@@ -114,11 +123,8 @@ TEST(a_countdown_reads_minutes_and_seconds_or_hours)
 TEST(a_placeholders_seconds_left_count_down_to_zero)
 {
     PhTimers timers;
-    const PhSighting dead{0x1001ABC, 300, "Some NM", false, true};
-    timers.Update(100.0, {PhSighting{0x1001ABC, 300, "Some NM", true, true}});
-    timers.Update(110.0, {dead});
+    timers.Died(110.0, PhSighting{0x1001ABC, 300, "Some NM"});
     CHECK(!timers.SecondsLeft(0x1001DEF, 110.0).has_value());
-    CHECK(timers.SecondsLeft(0x1001ABC, 110.0).has_value());
-    CHECK_EQ(*timers.SecondsLeft(0x1001ABC, 110.0), kDeathToDespawnSeconds + 300.0);
+    CHECK_EQ(*timers.SecondsLeft(0x1001ABC, 110.0), kDeathToDespawnSeconds - kDefeatMessageSeconds + 300.0);
     CHECK_EQ(*timers.SecondsLeft(0x1001ABC, 110.0 + kDeathToDespawnSeconds + 400.0), 0.0);
 }
