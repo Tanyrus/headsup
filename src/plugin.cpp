@@ -567,6 +567,8 @@ public:
             m_AutoCheck.Clear();
         }
         if (next.check) OnCheckReply(*next.check);
+        if (next.mobDied && m_Settings.phTimers)
+            if (const auto mob = headsup::SightingOf(headsup::MobById(*next.mobDied))) m_PhTimers.Died(Now(), *mob);
         return next.answer && m_AutoCheck.TakeAnswer(*next.answer, Now());
     }
 
@@ -1806,7 +1808,7 @@ private:
         }
         const uint32_t count = std::min<uint32_t>(entity->GetEntityMapSize(), headsup::kMaxEntities);
         std::vector<headsup::ActorInput> inputs;
-        std::vector<headsup::PhSighting> sightings;
+        std::vector<uint32_t> aliveMobs; // which lose their placeholder timers
         std::vector<headsup::PetLink> pets;
         std::vector<headsup::CheckCandidate> checkable;
         const bool autoChecks = m_Settings.enabled && m_Settings.autoCheck;
@@ -1847,11 +1849,7 @@ private:
                 candidate.gaugeable = record == nullptr || (record->flags & headsup::kMobNotorious) == 0;
                 candidate.name      = name;
             }
-            if (isMob && m_Settings.phTimers)
-            {
-                const bool bodyDrawn = m_Names.FramesSinceMesh(index) <= headsup::kMeshGraceFrames;
-                if (const auto sighting = headsup::SightingOf(record, alive, bodyDrawn)) sightings.push_back(*sighting);
-            }
+            if (isMob && alive) aliveMobs.push_back(serverId);
             inputs.push_back(headsup::ActorInput{
                 .actor    = static_cast<headsup::ActorPtr>(actor),
                 .index    = index,
@@ -1901,9 +1899,7 @@ private:
                 m_AshitaCore->GetPacketManager()->AddOutgoingPacket(headsup::kCheckRequestPacket,
                     static_cast<uint32_t>(request.size()), request.data());
             }
-        // With timers off no sightings are passed, so turning them on never takes a placeholder that died meanwhile for
-        // one seen dying.
-        m_PhTimers.Update(now, sightings);
+        m_PhTimers.Update(now, aliveMobs);
         m_Zone = static_cast<uint16_t>(party->GetMemberZone(0));
         m_TimerLines.clear();
         if (m_Settings.phTimers) m_TimerLines = m_PhTimers.Lines(m_Zone, now);

@@ -13,10 +13,6 @@
 
 namespace headsup
 {
-    // A body counts as drawn for this many frames after the game last drew it: some frames credit an entity's body draws
-    // to whoever else is on the stack.
-    constexpr uint32_t kMeshGraceFrames = 8;
-
     // Some of a name is enough: a replaced name must show whenever the game's would, as the game's is hidden.
     bool NameOnScreen(const ScreenBox& plate, float screenWidth, float screenHeight);
 
