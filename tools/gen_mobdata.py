@@ -205,9 +205,10 @@ def c_resistances(key) -> str:
     return f'    {{{immunity}u, {c_list(sdt)}, {c_list(elements)}, {c_list(statuses)}}},'
 
 
-def c_record(r, resistances: int, placeholders: int) -> str:
+def c_record(r, resistances: int, placeholders: int, placeholder_respawn: int) -> str:
     return (f"    {{{r['id']}u, {c_string(r['name'])}, {r['minLevel']}, {r['maxLevel']}, {r['flags']}, {r['respawn']}u, "
-            f"{r['detects']}, {r['expLevelMod']}, {r['placeholderOf']}u, {placeholders}, {resistances}, {r['drops']}}},")
+            f"{r['detects']}, {r['expLevelMod']}, {r['placeholderOf']}u, {placeholders}, {resistances}, {r['drops']}, "
+            f"{placeholder_respawn}u}},")
 
 
 def c_drop(entry) -> str:
@@ -246,6 +247,11 @@ def generate(records, lists, commit: str) -> str:
     for nm, count in placeholders.items():
         if count > 0xFF:
             raise DataError(f'{nm} has {count} placeholders, more than MobRecord::placeholders holds')
+    # An NM's placeholders share one respawn but in a few odd lots: the shortest is the time not to miss.
+    returns = {}
+    for r in records:
+        if r['placeholderOf'] != 0 and r['respawn'] > 0:
+            returns[r['placeholderOf']] = min(returns.get(r['placeholderOf'], r['respawn']), r['respawn'])
     for r in records:
         if r['drops'] > len(lists):
             raise DataError(f"mob {r['id']} has drop list {r['drops']}, past the {len(lists)} in {DROPS_NAME}")
@@ -257,7 +263,7 @@ def generate(records, lists, commit: str) -> str:
     lines += ['const MobResistances kMobResistances[] = {']
     lines += [c_resistances(key) for key in table]
     lines += ['};', '', 'const MobRecord kMobs[] = {']
-    lines += [c_record(r, index, placeholders[r['id']]) for r, index in zip(records, indices)]
+    lines += [c_record(r, index, placeholders[r['id']], returns.get(r['id'], 0)) for r, index in zip(records, indices)]
     lines += ['};', '']
     return '\n'.join(lines)
 

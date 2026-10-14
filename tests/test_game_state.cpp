@@ -252,6 +252,16 @@ TEST(a_check_reply_is_handed_back_for_the_plugin_to_finish)
     CHECK(!Feed(game, CheckReplyWith(kDefeat)).check.has_value());
 }
 
+TEST(a_defeat_is_handed_back_for_the_timers)
+{
+    GameState game              = Filled();
+    const Seen full             = Look(game);
+    const PacketFollowUp defeat = Feed(game, CheckReplyWith(kDefeat));
+    CHECK(defeat.mobDied == kMob && !defeat.check && !defeat.answer);
+    CHECK(!Feed(game, CheckReplyWith(kCon)).mobDied.has_value());
+    CHECK(Look(game) == full);
+}
+
 TEST(a_player_check_pairs_the_message_with_the_general_packet_that_follows_it)
 {
     GameState game;

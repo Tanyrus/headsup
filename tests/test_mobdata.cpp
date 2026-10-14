@@ -183,3 +183,10 @@ TEST(an_nm_counts_its_placeholders_and_any_other_mob_has_none)
     CHECK_EQ(MobById(17191194)->placeholders, 0);
     CHECK_EQ(MobById(17199648)->placeholders, 0);
 }
+
+TEST(a_lottery_nm_knows_how_long_its_placeholder_takes_to_come_back)
+{
+    CHECK_EQ(MobById(17191196)->placeholderRespawn, 180u); // Bigmouth Billy, whose Carrion Worms return in 3 minutes
+    CHECK_EQ(MobById(17191194)->placeholderRespawn, 0u);   // a worm itself
+    CHECK_EQ(MobById(17199648)->placeholderRespawn, 0u);   // no lottery at all
+}

@@ -50,6 +50,13 @@ namespace headsup
         return CheckAnswer{ReadAt<uint32_t>(data, kReplyServerId), GivesLevel(*message)};
     }
 
+    std::optional<uint32_t> ParseMobDeath(const uint8_t* data, uint32_t size)
+    {
+        const std::optional<uint16_t> message = ReplyMessage(data, size);
+        if (!message || (*message != kDefeatsMessage && *message != kFallsMessage)) return std::nullopt;
+        return ReadAt<uint32_t>(data, kReplyServerId);
+    }
+
     double CheckLifetime(const MobRecord* mob)
     {
         return mob != nullptr && mob->respawn > 0 ? static_cast<double>(mob->respawn) : kDefaultCheckLifetime;
