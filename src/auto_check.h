@@ -1,6 +1,7 @@
 #pragma once
 
 #include "check.h"
+#include "entity_state.h"
 
 #include <array>
 #include <cstddef>
@@ -21,6 +22,9 @@ namespace headsup
     std::array<uint8_t, kCheckRequestSize> CheckRequest(uint32_t serverId, uint16_t index);
     // The server id an outgoing check asks about; nothing for a short packet.
     std::optional<uint32_t> CheckRequestTarget(const uint8_t* data, uint32_t size);
+    // The mob a check the player made themselves asks about: an outgoing check the game sent, not a plugin, and
+    // that nothing kept from the server. Its answer is theirs to read.
+    std::optional<uint32_t> PlayersCheck(uint16_t id, const uint8_t* data, uint32_t size, bool injected, bool blocked);
 
     // Past 50 yalms Phoenix logs a mob's check as one from too far away: HeadsUp asks from well inside that.
     constexpr float kAutoCheckRange = 45.0f;
@@ -33,11 +37,18 @@ namespace headsup
     // the server takes no check.
     constexpr bool MayAutoCheck(bool on, bool zoning, bool inEvent, int level) { return on && !zoning && !inEvent && level > 0; }
 
+    // A zone's own mobs and NPCs have server ids from here up and indices below the players': a player's id is
+    // far lower, and their index and their pet's at or past the second.
+    constexpr uint32_t kFirstZoneEntityId = 0x01000000;
+    constexpr uint16_t kFirstPlayerIndex  = 0x400;
+
     struct CheckCandidate
     {
         uint32_t serverId = 0;
         uint16_t index    = 0;
-        float distance    = 0.0f; // yalms from you
+        EntityKind kind   = EntityKind::Npc;
+        bool pet          = false; // somebody's pet, which is no mob to the server's check
+        float distance    = 0.0f;  // yalms from you
         bool alive        = false;
         bool known        = false; // a check's answer for it is held
         bool gaugeable    = true;  // false for one the server never gauges, as the data says of notorious monsters
@@ -50,7 +61,8 @@ namespace headsup
     class AutoCheck
     {
     public:
-        // The mob to check now, if one is due, which is then asked about.
+        // The mob to check now, if one is due, which is then asked about. Whatever is handed in, only a living mob
+        // that is nobody's pet is ever due, and none the player has just asked about themselves.
         std::optional<CheckCandidate> Due(std::span<const CheckCandidate> mobs, double now);
         // The player checked something themselves: its answer is theirs to read.
         void PlayerAsked(uint32_t serverId, double now);

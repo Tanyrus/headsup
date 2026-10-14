@@ -1987,6 +1987,26 @@ TEST(a_kinds_opacity_is_bounded_and_your_own_nameplate_never_fades_with_distance
     CHECK_EQ(Clamp(s).Kind(PlateKind::Npcs).opacity.range, kMinOutlineDistance);
 }
 
+TEST(a_kinds_icon_limit_is_kept_for_the_kinds_that_show_status_icons_and_is_bounded)
+{
+    Settings s;
+    s.Kind(PlateKind::Players).maxIcons = 3;
+    s.Kind(PlateKind::Self).maxIcons    = 5;
+    s.Kind(PlateKind::Mobs).maxIcons    = 2; // no page sets a mob's, so no file holds it
+    MapStore store;
+    SaveSettings(s, store);
+    CHECK(!store.values.contains("mobsMaxIcons"));
+    const Settings loaded = LoadSettings(store);
+    CHECK_EQ(loaded.Kind(PlateKind::Players).maxIcons, 3);
+    CHECK_EQ(loaded.Kind(PlateKind::Self).maxIcons, 5);
+    CHECK_EQ(loaded.Kind(PlateKind::Mobs).maxIcons, kCountedIcons);
+    s.Kind(PlateKind::Players).maxIcons = 0;
+    s.Kind(PlateKind::Self).maxIcons    = 99;
+    const Settings bounded = Clamp(s);
+    CHECK_EQ(bounded.Kind(PlateKind::Players).maxIcons, 1);
+    CHECK_EQ(bounded.Kind(PlateKind::Self).maxIcons, kCountedIcons);
+}
+
 TEST(the_cursors_two_switches_of_before_become_its_style)
 {
     // The cursor was on or off, and a feather or an arrow.

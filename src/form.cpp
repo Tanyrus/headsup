@@ -630,19 +630,45 @@ namespace headsup
 
     namespace
     {
-        // The tag a dropped chip stands for, by the chip's id; nothing for anything else dropped.
-        std::optional<Tag> DroppedTag(const FormEvent* drop)
+        constexpr const char* kSlotTip = "These share one place, tried from the left: the first that has something to show "
+                                         "is drawn. Drop one on another to change their order, or drag one out.";
+        constexpr const char* kSlotJoin = "or"; // between the tags of a chip of several
+
+        // The slot a dropped chip carries; nothing for anything else dropped.
+        TagSlot DroppedSlot(const FormEvent* drop)
         {
-            if (drop == nullptr || !drop->value.starts_with(kTagIdStart)) return std::nullopt;
-            const int tag = std::atoi(drop->value.c_str() + std::strlen(kTagIdStart));
-            return tag >= 0 && tag < kTagCount ? std::optional<Tag>(static_cast<Tag>(tag)) : std::nullopt;
+            if (drop == nullptr) return {};
+            const TemplateRuns carried = RunsOf(drop->carried);
+            const bool oneSlot = carried.slots.size() == 1 && carried.texts.front().empty() && carried.texts.back().empty();
+            return oneSlot ? carried.slots.front() : TagSlot{};
         }
 
-        std::string ChipMarkup(const std::string& id, Tag tag, const char* classes)
+        // A tag as something to drag: its name after its icon when it draws one, and the tag a drop of it brings.
+        std::string TagMarkup(const std::string& id, Tag tag, const char* classes, const char* tip)
         {
             const std::optional<Icon> icon = TagIcon(tag);
-            return std::string("<div class=\"") + classes + "\" id=\"" + id + "\"" + TipAttribute(TagTip(tag)) + ">" +
+            return std::string("<div class=\"") + classes + "\" id=\"" + id + "\" " + kCarriesAttribute + "=\"" +
+                   EscapedRml(TagName(tag)) + "\"" + TipAttribute(tip) + ">" +
                    (icon ? "<img src=\"" + IconSource(*icon) + "\"/>" : std::string()) + EscapedRml(TagLabel(tag)) + "</div>";
+        }
+
+        // The id of one tag of a line's chip, which is the chip's own while the chip holds no other.
+        std::string TagIdOf(const std::string& chip, const TagSlot& slot, int tag)
+        {
+            return slot.size() == 1 ? chip : chip + kChipTagInfix + std::to_string(tag);
+        }
+
+        // A line's slot as a chip: one tag is the chip, and several are parts of it, each dragged alone.
+        std::string SlotMarkup(const std::string& id, const TagSlot& slot)
+        {
+            if (slot.size() == 1) return TagMarkup(id, slot.front(), "btn accent chip in drag", TagTip(slot.front()));
+            std::string parts;
+            for (size_t tag = 0; tag < slot.size(); ++tag)
+            {
+                if (tag > 0) parts += std::string("<div class=\"or\">") + kSlotJoin + "</div>";
+                parts += TagMarkup(TagIdOf(id, slot, static_cast<int>(tag)), slot[tag], "part drag", kSlotTip);
+            }
+            return "<div class=\"btn accent chip in\" id=\"" + id + "\"" + TipAttribute(kSlotTip) + ">" + parts + "</div>";
         }
     }
 
@@ -669,13 +695,16 @@ namespace headsup
             if (const FormEvent* kill = Took(input, kKillEvent); kill != nullptr && !kill->value.empty())
             {
                 // The stretch as it stands typed, then without the tag before it or after it.
-                const int tag = kill->value.front() == kKillBack ? run - 1 : run;
-                RunCaret at;
+                const bool back = kill->value.front() == kKillBack;
+                const int tag   = back ? run - 1 : run;
                 const std::string typed = WithRun(text, run, std::string_view(kill->value).substr(1));
+                const TemplateRuns now  = RunsOf(typed);
+                // Where the keyboard stays when a chip of several tags only loses its last.
+                RunCaret at{run, back || now.slots != had.slots ? 0 : now.texts[static_cast<size_t>(run)].size()};
                 // Typing that made or unmade a tag has the numbers mean something else: it is kept, and the tag stays.
-                text     = RunsOf(typed).tags == had.tags ? WithoutTag(typed, tag, at) : typed;
+                text     = now.slots == had.slots ? WithoutTag(typed, tag, kLastTag, at) : typed;
                 reshaped = true;
-                if (RunsOf(text).tags != had.tags && RunsOf(typed).tags == had.tags)
+                if (RunsOf(text).slots != had.slots && RunsOf(typed).slots == had.slots)
                 {
                     draft.caret = at;
                     focus       = FormFocus{runId(at.run), at.at};
@@ -684,20 +713,64 @@ namespace headsup
             else if (const FormEvent* typed = Took(input, kCommitEvent))
             {
                 text     = WithRun(text, run, typed->value);
-                reshaped = RunsOf(text).tags != had.tags;
+                reshaped = RunsOf(text).slots != had.slots;
             }
         }
-        // A chip dropped on a stretch goes after it, on a tag after that, and anywhere else in the box at its end.
-        for (int part = -1; part < 2 * runs - 1 && !reshaped; ++part)
+        // Where a chip can be let go in the box: on the box, a stretch, a chip, or one tag of a chip of several.
+        struct Place
         {
-            const bool chip          = part >= 0 && part % 2 != 0;
-            const std::string target = part < 0 ? box : chip ? chipId(part / 2) : runId(part / 2);
-            const std::optional<Tag> dropped = DroppedTag(Took(target, kDropEvent));
-            if (!dropped) continue;
-            RunCaret at = part < 0 ? RunCaret{} : chip ? RunCaret{part / 2 + 1, 0} : RunCaret{part / 2, std::string::npos};
-            if (PutTag(text, at, *dropped)) draft.caret = at;
-            reshaped = true;
+            std::string id;
+            int run = -1, slot = -1, tag = -1;
+        };
+        std::vector<Place> places{Place{box}};
+        // One of the line's own tags dragged from its place: it leaves it, wherever it was let go.
+        std::optional<Place> taken;
+        for (int run = 0; run < runs; ++run)
+        {
+            places.push_back(Place{runId(run), run});
+            if (run == runs - 1) break;
+            const TagSlot& slot = had.slots[static_cast<size_t>(run)];
+            if (slot.size() > 1) places.push_back(Place{chipId(run), -1, run});
+            for (int tag = 0; tag < static_cast<int>(slot.size()); ++tag)
+            {
+                places.push_back(Place{TagIdOf(chipId(run), slot, tag), -1, run, tag});
+                if (Took(places.back().id, kDragEndEvent) != nullptr) taken = places.back();
+            }
         }
+        RunCaret nowhere;
+        // A tag dropped on a stretch goes after it, on a chip into that chip's slot, on another tag of its own chip
+        // into that tag's place, and anywhere else in the box at its end.
+        for (const Place& place : places)
+        {
+            if (reshaped) break;
+            const FormEvent* drop = Took(place.id, kDropEvent);
+            const TagSlot dropped = DroppedSlot(drop);
+            if (dropped.empty()) continue;
+            const bool own = taken && drop->value == taken->id;
+            reshaped       = true;
+            if (place.slot >= 0)
+            {
+                if (own && place.slot == taken->slot)
+                    MoveTag(text, place.slot, taken->tag, place.tag);
+                // Nothing joined is nothing moved: the chip already holds what was dragged.
+                else if (JoinSlot(text, place.slot, dropped) && own)
+                    text = WithoutTag(text, taken->slot, taken->tag, nowhere);
+                continue;
+            }
+            RunCaret at = place.run < 0 ? RunCaret{} : RunCaret{place.run, std::string::npos};
+            if (!PutTag(text, at, dropped)) continue;
+            // The slot went in before the stretch the caret is in: one of the line's own then leaves the place it
+            // had, which is a slot further on when the new one stands before it.
+            if (own)
+            {
+                const int put    = at.run - 1;
+                const bool whole = had.slots[static_cast<size_t>(taken->slot)].size() == 1;
+                text             = WithoutTag(text, taken->slot + (put <= taken->slot ? 1 : 0), taken->tag, nowhere);
+                if (whole && taken->slot < put) --at.run;
+            }
+            draft.caret = at;
+        }
+        if (taken && !reshaped) text = WithoutTag(text, taken->slot, taken->tag, nowhere);
         const bool edited = text != was;
 
         const TemplateRuns shown = RunsOf(text);
@@ -707,7 +780,7 @@ namespace headsup
             const std::string input = runId(static_cast<int>(run));
             Out() += "<input type=\"text\" class=\"run\" id=\"" + input + "\"/>";
             Set(input, FormValueKind::Value, {}, shown.texts[run]);
-            if (run < shown.tags.size()) Out() += ChipMarkup(chipId(static_cast<int>(run)), shown.tags[run], "btn accent chip in");
+            if (run < shown.slots.size()) Out() += SlotMarkup(chipId(static_cast<int>(run)), shown.slots[run]);
         }
         Out() += "</div>";
         Set(box, FormValueKind::Class, "off", {}, m_Off);
@@ -718,7 +791,7 @@ namespace headsup
     bool Form::TagChip(Tag tag)
     {
         const std::string chip = kTagIdStart + std::to_string(static_cast<int>(tag));
-        Out() += ChipMarkup(chip, tag, "btn accent chip drag");
+        Out() += TagMarkup(chip, tag, "btn accent chip drag", TagTip(tag));
         Set(chip, FormValueKind::Class, "off", {}, m_Off);
         return !m_Off && Clicked(chip);
     }

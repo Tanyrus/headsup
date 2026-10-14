@@ -379,6 +379,28 @@ namespace
         }
     };
     const std::string kConChip = "tag-" + std::to_string(static_cast<int>(Tag::Con));
+    // A chip let go on a part of a line box, with the slot it carries as a line's text holds it.
+    FormEvent Drop(const char* on, const std::string& chip, const char* carried) { return FormEvent{on, kDropEvent, chip, carried}; }
+    FormEvent LetGo(const char* chip) { return FormEvent{chip, kDragEndEvent, "", ""}; }
+
+    // A card with two lines' boxes.
+    struct TwoBoxes
+    {
+        FormState state;
+        std::string top, bottom;
+        LineDraft topDraft, bottomDraft;
+
+        Form Pass(const std::vector<FormEvent>& events)
+        {
+            Form form(events, state);
+            form.pageKey = "p";
+            form.BeginCard("C");
+            form.LineBox("top", top, topDraft);
+            form.LineBox("bottom", bottom, bottomDraft);
+            form.EndCard();
+            return form;
+        }
+    };
 }
 
 TEST(a_line_box_is_its_stretches_of_text_with_its_tags_as_chips_between_them)
@@ -393,7 +415,7 @@ TEST(a_line_box_is_its_stretches_of_text_with_its_tags_as_chips_between_them)
     const size_t after  = rml.find("<input type=\"text\" class=\"run\" id=\"p-c-line-t-1\"/>");
     CHECK(before != std::string::npos && chip != std::string::npos && after != std::string::npos);
     CHECK(before < chip && chip < after);
-    CHECK(Has(rml, ">Level</div>") && !Has(rml, "$level"));
+    CHECK(Has(rml, ">Level</div>") && !Has(rml, ">$level<"));
     CHECK_EQ(ValueText(first, "p-c-line-t-0"), "Lv ");
     CHECK_EQ(ValueText(first, "p-c-line-t-1"), " end");
     CHECK(!first.changed && !card.edited);
@@ -437,20 +459,107 @@ TEST(a_tag_chip_dropped_in_a_line_box_goes_after_what_it_is_dropped_on)
 {
     BoxCard card;
     card.text = "Lv $level end";
-    card.Pass({{"p-c-line", kDropEvent, kConChip}}); // on the box itself: at its end
+    card.Pass({Drop("p-c-line", kConChip, "$con")}); // on the box itself: at its end
     CHECK_EQ(card.text, "Lv $level end$con");
     CHECK((card.draft.caret == RunCaret{2, 0})); // and a chip clicked next lands after it
     card.text = "Lv $level end";
-    card.Pass({{"p-c-line-t-0", kDropEvent, kConChip}}); // on a stretch: after it
+    const Form onStretch = card.Pass({Drop("p-c-line-t-0", kConChip, "$con")}); // on a stretch: after it
     CHECK_EQ(card.text, "Lv $con$level end");
-    card.text = "Lv $level end";
-    const Form onChip = card.Pass({{"p-c-line-c-0", kDropEvent, kConChip}}); // on a tag: after that
-    CHECK_EQ(card.text, "Lv $level$con end");
-    CHECK(onChip.changed && card.edited);
+    CHECK(onStretch.changed && card.edited);
     // Anything else dropped is nothing, and a click on the chip under the box is the page's to place.
     card.Pass({{"p-c-line", kDropEvent, "page-title"}});
-    CHECK_EQ(card.text, "Lv $level$con end");
+    card.Pass({Drop("p-c-line", "page-title", "no tag")});
+    CHECK_EQ(card.text, "Lv $con$level end");
     card.Pass({{kConChip, kClickEvent, ""}});
-    CHECK(card.chip && card.text == "Lv $level$con end");
+    CHECK(card.chip && card.text == "Lv $con$level end");
+}
+
+TEST(a_tag_dropped_on_a_chip_shares_its_slot)
+{
+    BoxCard card;
+    card.text = "Lv $level end";
+    const Form joined = card.Pass({Drop("p-c-line-c-0", kConChip, "$con")});
+    CHECK_EQ(card.text, "Lv ${level|con} end");
+    CHECK(joined.changed && card.edited);
+    // The one chip holds each as a part of its own, which is dragged alone and carries its tag wherever it goes.
+    const std::string& rml = joined.blocks[0].rml;
+    const size_t level = rml.find("id=\"p-c-line-c-0-0\" carries=\"$level\"");
+    const size_t con   = rml.find("id=\"p-c-line-c-0-1\" carries=\"$con\"");
+    CHECK(level != std::string::npos && con != std::string::npos && level < con);
+    const Form again = card.Pass({Drop("p-c-line-c-0", kConChip, "$con")}); // it holds that tag already
+    CHECK(!again.changed && card.text == "Lv ${level|con} end");
+    // Backspace beside the chip takes the last of its tags, and the keyboard stays where it was.
+    const Form back = card.Pass({{"p-c-line-t-1", kKillEvent, std::string(1, kKillBack) + " end"}});
+    CHECK_EQ(card.text, "Lv $level end");
+    CHECK((back.focus == FormFocus{"p-c-line-t-1", 0}));
+    card.text = "Lv ${level|con} end";
+    const Form forward = card.Pass({{"p-c-line-t-0", kKillEvent, std::string(1, kKillForward) + "Lv "}});
+    CHECK_EQ(card.text, "Lv $level end");
+    CHECK((forward.focus == FormFocus{"p-c-line-t-0", 3}));
+}
+
+TEST(a_chip_dragged_out_of_its_line_is_gone_and_one_let_go_in_the_line_has_moved)
+{
+    BoxCard card;
+    card.text = "a $name b $level c";
+    const Form out = card.Pass({LetGo("p-c-line-c-0")}); // let go on nothing that is a line
+    CHECK_EQ(card.text, "a  b $level c");
+    CHECK(out.changed && card.edited);
+    // One tag of a chip that holds several goes alone.
+    card.text = "a ${name|title} b $level c";
+    card.Pass({LetGo("p-c-line-c-0-1")});
+    CHECK_EQ(card.text, "a $name b $level c");
+    card.text = "a ${name|title} b $level c";
+    card.Pass({LetGo("p-c-line-c-0-0")});
+    CHECK_EQ(card.text, "a $title b $level c");
+    // Let go on another tag of its own chip, it takes that tag's place: the first of a chip's tags is the first tried.
+    card.text = "a ${name|title} b $level c";
+    const Form turned = card.Pass({Drop("p-c-line-c-0-0", "p-c-line-c-0-1", "$title"), LetGo("p-c-line-c-0-1")});
+    CHECK_EQ(card.text, "a ${title|name} b $level c");
+    CHECK(turned.changed);
+    // On its own chip and no tag of it, it stays as it was.
+    card.Pass({Drop("p-c-line-c-0", "p-c-line-c-0-1", "$name"), LetGo("p-c-line-c-0-1")});
+    CHECK_EQ(card.text, "a ${title|name} b $level c");
+    // One tag of a chip can go to a stretch, or to another chip, and the rest stay.
+    card.text = "a ${name|title} b $level c";
+    card.Pass({Drop("p-c-line-t-2", "p-c-line-c-0-1", "$title"), LetGo("p-c-line-c-0-1")});
+    CHECK_EQ(card.text, "a $name b $level c$title");
+    card.text = "a ${name|title} b $level c";
+    card.Pass({Drop("p-c-line-c-1", "p-c-line-c-0-0", "$name"), LetGo("p-c-line-c-0-0")});
+    CHECK_EQ(card.text, "a $title b ${level|name} c");
+    card.text = "a ${name|title} b ${level|con} c";
+    card.Pass({Drop("p-c-line-c-1-0", "p-c-line-c-0-1", "$title"), LetGo("p-c-line-c-0-1")}); // on a tag of another chip
+    CHECK_EQ(card.text, "a $name b ${level|con|title} c");
+    // Let go on a stretch of its own line, it goes after that stretch: from before it, and from after it.
+    card.text = "a $name b $level c";
+    card.Pass({Drop("p-c-line-t-2", "p-c-line-c-0", "$name"), LetGo("p-c-line-c-0")});
+    CHECK_EQ(card.text, "a  b $level c$name");
+    card.text = "a $name b $level c";
+    card.Pass({Drop("p-c-line-t-0", "p-c-line-c-1", "$level"), LetGo("p-c-line-c-1")});
+    CHECK_EQ(card.text, "a $level$name b  c");
+    // On another chip of the line, it shares that chip's slot and leaves its own place.
+    card.text = "a $name b $level c";
+    card.Pass({Drop("p-c-line-c-1", "p-c-line-c-0", "$name"), LetGo("p-c-line-c-0")});
+    CHECK_EQ(card.text, "a  b ${level|name} c");
+    // On a chip that holds its tag already nothing joins, so it stays where it was.
+    card.text = "$name ${level|name}";
+    const Form same = card.Pass({Drop("p-c-line-c-1", "p-c-line-c-0", "$name"), LetGo("p-c-line-c-0")});
+    CHECK(!same.changed && card.text == "$name ${level|name}");
+}
+
+TEST(a_chip_dragged_from_one_line_to_another_leaves_the_first)
+{
+    TwoBoxes card;
+    card.top    = "$sync $name";
+    card.bottom = "Lv $level";
+    card.Pass({Drop("p-c-bottom", "p-c-top-c-0", "$sync"), LetGo("p-c-top-c-0")});
+    CHECK_EQ(card.top, " $name");
+    CHECK_EQ(card.bottom, "Lv $level$sync");
+    // One tag of a chip of several goes alone, and on a chip of the other line it joins that chip.
+    card.top    = "${sync|bazaar} $name";
+    card.bottom = "Lv $level";
+    card.Pass({Drop("p-c-bottom-c-0", "p-c-top-c-0-1", "$bazaar"), LetGo("p-c-top-c-0-1")});
+    CHECK_EQ(card.top, "$sync $name");
+    CHECK_EQ(card.bottom, "Lv ${level|bazaar}");
 }
 

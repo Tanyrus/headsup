@@ -210,6 +210,7 @@ namespace headsup
         constexpr const char* kOldPetRow        = "Pet"; // the pets' one row of before, after kRowInfix
         constexpr const char* kLineInfix        = "Line";
         constexpr const char* kOrnamentInfix    = "Ornament";
+        constexpr const char* kMaxIconsSuffix   = "MaxIcons";
         constexpr const char* kDefaultFontKey   = "defaultFont";
         constexpr const char* kDetectionShownKey = "detectionShown";
         constexpr float kPercentScale = 100.0f;
@@ -490,6 +491,7 @@ namespace headsup
             StoreFloat(store, base + "Width", static_cast<float>(k.ornament.width));
             StoreFloat(store, base + "Height", static_cast<float>(k.ornament.height));
             SavePick(store, base + "Color", k.ornament.color);
+            if (HasStatusIcons(kind)) StoreFloat(store, std::string(KindKey(kind)) + kMaxIconsSuffix, static_cast<float>(k.maxIcons));
             const std::string opacity = std::string(KindKey(kind)) + kOpacityInfix;
             StoreFloat(store, opacity + "NoTarget", static_cast<float>(k.opacity.noTarget));
             StoreFloat(store, opacity + "NotTargeted", static_cast<float>(k.opacity.notTargeted));
@@ -1058,6 +1060,7 @@ namespace headsup
                 opacity.range = ClampFloat(opacity.range, kMinOutlineDistance, kMaxOutlineDistance, defaults.opacity.range);
                 // Your own nameplate is never far from you.
                 if (static_cast<PlateKind>(k) == PlateKind::Self) opacity.fadeIn = false;
+                kind.maxIcons = std::clamp(kind.maxIcons, 1, kCountedIcons);
             }
             Palette fallback = d.palette;
             const std::vector<PaletteEntry> entries = PaletteEntries(s.palette), defaults = PaletteEntries(fallback);
@@ -1243,7 +1246,12 @@ namespace headsup
         if (saved >= kDesignerVersion || store.GetBool(kDesignsSavedKey, false)) LoadDesigner(store, s);
         else if (file) MigrateDesigner(LoadOld(store, saved), s);
         for (int k = 0; k < kPlateKindCount; ++k)
-            LoadOpacity(store, static_cast<PlateKind>(k), s.kinds[k]);
+        {
+            const auto kind = static_cast<PlateKind>(k);
+            LoadOpacity(store, kind, s.kinds[k]);
+            if (HasStatusIcons(kind))
+                s.kinds[k].maxIcons = LoadInt(store, (std::string(KindKey(kind)) + kMaxIconsSuffix).c_str(), s.kinds[k].maxIcons);
+        }
         return Clamp(s);
     }
 

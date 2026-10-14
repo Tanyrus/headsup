@@ -94,11 +94,10 @@ namespace headsup
 
     namespace
     {
-        // A piece of a line's text: a tag, or text with what it shows (a doubled mark is one) beside what was typed.
+        // A piece of a line's text: a slot, or text with what it shows (a doubled mark is one) beside what was typed.
         struct Token
         {
-            bool isTag = false;
-            Tag tag    = Tag::Name;
+            TagSlot slot;
             std::string typed, shown;
         };
 
@@ -106,7 +105,7 @@ namespace headsup
         {
             std::vector<Token> tokens;
             const auto literal = [&](std::string_view typed, std::string_view shown) {
-                if (tokens.empty() || tokens.back().isTag) tokens.push_back(Token{});
+                if (tokens.empty() || !tokens.back().slot.empty()) tokens.push_back(Token{});
                 tokens.back().typed += typed;
                 tokens.back().shown += shown;
             };
@@ -124,16 +123,25 @@ namespace headsup
                     i += 2;
                     continue;
                 }
-                // The name straight after the mark, or in braces after it.
+                // The name straight after the mark, or in braces after it, where a bar sets more names beside it.
                 const bool braced = i + 1 < text.size() && text[i + 1] == kNameOpen;
-                const size_t name = i + (braced ? 2 : 1);
-                size_t end        = name;
-                while (end < text.size() && IsLower(text[end])) ++end;
-                const bool closed     = !braced || (end < text.size() && text[end] == kNameClose);
-                const TagEntry* entry = closed ? FindTag(text.substr(name, end - name)) : nullptr;
-                const size_t past     = entry != nullptr && braced ? end + 1 : end;
-                if (entry != nullptr)
-                    tokens.push_back(Token{true, entry->tag, {}, {}});
+                size_t end        = i + (braced ? 2 : 1);
+                TagSlot slot;
+                bool known = true;
+                for (bool more = true; more;)
+                {
+                    const size_t name = end;
+                    while (end < text.size() && IsLower(text[end])) ++end;
+                    const TagEntry* entry = FindTag(text.substr(name, end - name));
+                    known                 = known && entry != nullptr;
+                    if (entry != nullptr) slot.push_back(entry->tag);
+                    more = braced && end < text.size() && text[end] == kSlotBar;
+                    if (more) ++end;
+                }
+                const bool tags   = known && (!braced || (end < text.size() && text[end] == kNameClose));
+                const size_t past = tags && braced ? end + 1 : end;
+                if (tags)
+                    tokens.push_back(Token{std::move(slot), {}, {}});
                 else
                     literal(text.substr(i, past - i), text.substr(i, past - i));
                 i = past;
@@ -161,7 +169,7 @@ namespace headsup
     {
         std::vector<Atom> atoms;
         for (Token& token : Tokens(text))
-            atoms.push_back(Atom{token.isTag, token.tag, std::move(token.shown)});
+            atoms.push_back(Atom{std::move(token.slot), std::move(token.shown)});
         return atoms;
     }
 
@@ -170,12 +178,12 @@ namespace headsup
         TemplateRuns runs{{std::string()}, {}};
         for (Token& token : Tokens(text))
         {
-            if (!token.isTag)
+            if (token.slot.empty())
             {
                 runs.texts.back() = std::move(token.typed);
                 continue;
             }
-            runs.tags.push_back(token.tag);
+            runs.slots.push_back(std::move(token.slot));
             runs.texts.emplace_back();
         }
         return runs;
@@ -187,15 +195,20 @@ namespace headsup
         for (size_t i = 0; i < runs.texts.size(); ++i)
         {
             text += runs.texts[i];
-            if (i >= runs.tags.size()) break;
+            if (i >= runs.slots.size()) break;
             if (OddMarksAtEnd(runs.texts[i])) text += kTagMark;
-            const std::string_view name = TagName(runs.tags[i]) + 1;
-            const std::string& next     = runs.texts[i + 1];
+            const TagSlot& slot     = runs.slots[i];
+            const std::string& next = runs.texts[i + 1];
             // A small letter straight after the name would be read as more of it.
-            if (!next.empty() && IsLower(next.front()))
-                text.append(1, kTagMark).append(1, kNameOpen).append(name).append(1, kNameClose);
-            else
-                text.append(1, kTagMark).append(name);
+            const bool braced = slot.size() > 1 || (!next.empty() && IsLower(next.front()));
+            text += kTagMark;
+            if (braced) text += kNameOpen;
+            for (size_t tag = 0; tag < slot.size(); ++tag)
+            {
+                if (tag > 0) text += kSlotBar;
+                text += TagName(slot[tag]) + 1;
+            }
+            if (braced) text += kNameClose;
         }
         return text;
     }
@@ -208,7 +221,7 @@ namespace headsup
         return tags;
     }
 
-    bool PutTag(std::string& text, RunCaret& caret, Tag tag)
+    bool PutTag(std::string& text, RunCaret& caret, const TagSlot& slot)
     {
         TemplateRuns runs  = RunsOf(text);
         const RunCaret at  = Placed(runs, caret);
@@ -216,7 +229,7 @@ namespace headsup
         const std::string after = runs.texts[run].substr(at.at);
         runs.texts[run].resize(at.at);
         runs.texts.insert(runs.texts.begin() + at.run + 1, after);
-        runs.tags.insert(runs.tags.begin() + at.run, tag);
+        runs.slots.insert(runs.slots.begin() + at.run, slot);
         std::string put = JoinRuns(runs);
         if (put.size() > kMaxTemplate) return false;
         text  = std::move(put);
@@ -224,16 +237,62 @@ namespace headsup
         return true;
     }
 
-    std::string WithoutTag(std::string_view text, int tag, RunCaret& caret)
+    bool JoinSlot(std::string& text, int slot, const TagSlot& more)
     {
         TemplateRuns runs = RunsOf(text);
-        if (tag < 0 || tag >= static_cast<int>(runs.tags.size())) return std::string(text);
-        const auto at = static_cast<size_t>(tag);
-        caret         = RunCaret{tag, runs.texts[at].size()};
-        runs.texts[at] += runs.texts[at + 1];
-        runs.texts.erase(runs.texts.begin() + tag + 1);
-        runs.tags.erase(runs.tags.begin() + tag);
+        if (slot < 0 || slot >= static_cast<int>(runs.slots.size())) return false;
+        TagSlot& into    = runs.slots[static_cast<size_t>(slot)];
+        const size_t had = into.size();
+        for (const Tag tag : more)
+            if (std::ranges::find(into, tag) == into.end()) into.push_back(tag);
+        std::string joined = JoinRuns(runs);
+        if (into.size() == had || joined.size() > kMaxTemplate) return false;
+        text = std::move(joined);
+        return true;
+    }
+
+    namespace
+    {
+        bool HasSlot(const TemplateRuns& runs, int slot) { return slot >= 0 && slot < static_cast<int>(runs.slots.size()); }
+
+        // Takes the slot out, joins the stretches either side of it, and gives where they met.
+        RunCaret Erase(TemplateRuns& runs, int slot)
+        {
+            const auto at = static_cast<size_t>(slot);
+            const RunCaret met{slot, runs.texts[at].size()};
+            runs.texts[at] += runs.texts[at + 1];
+            runs.texts.erase(runs.texts.begin() + slot + 1);
+            runs.slots.erase(runs.slots.begin() + slot);
+            return met;
+        }
+    }
+
+    std::string WithoutTag(std::string_view text, int slot, int tag, RunCaret& caret)
+    {
+        TemplateRuns runs = RunsOf(text);
+        if (!HasSlot(runs, slot)) return std::string(text);
+        TagSlot& tags = runs.slots[static_cast<size_t>(slot)];
+        const int at  = tag == kLastTag ? static_cast<int>(tags.size()) - 1 : tag;
+        if (at < 0 || at >= static_cast<int>(tags.size())) return std::string(text);
+        if (tags.size() > 1)
+            tags.erase(tags.begin() + at);
+        else
+            caret = Erase(runs, slot);
         return JoinRuns(runs);
+    }
+
+    bool MoveTag(std::string& text, int slot, int from, int to)
+    {
+        TemplateRuns runs = RunsOf(text);
+        if (!HasSlot(runs, slot)) return false;
+        TagSlot& tags   = runs.slots[static_cast<size_t>(slot)];
+        const int count = static_cast<int>(tags.size());
+        if (from == to || from < 0 || from >= count || to < 0 || to >= count) return false;
+        const Tag moved = tags[static_cast<size_t>(from)];
+        tags.erase(tags.begin() + from);
+        tags.insert(tags.begin() + to, moved);
+        text = JoinRuns(runs);
+        return true;
     }
 
     std::string WithRun(std::string_view text, int run, std::string_view typed)
@@ -276,7 +335,7 @@ namespace headsup
     {
         for (const LineDesign& line : kind.lines)
             for (const Atom& atom : ParseTemplate(line.text))
-                if (atom.isTag && atom.tag == tag) return true;
+                if (std::ranges::find(atom.slot, tag) != atom.slot.end()) return true;
         return false;
     }
 }

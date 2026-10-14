@@ -23,11 +23,26 @@ namespace
 
     CheckCandidate Mob(uint32_t serverId, float distance, bool known = false)
     {
-        return CheckCandidate{serverId, static_cast<uint16_t>(serverId & 0xFFF), distance, true, known, true, "Land Crab"};
+        CheckCandidate mob;
+        mob.serverId = serverId;
+        mob.index    = static_cast<uint16_t>(serverId & 0xFFF);
+        mob.kind     = EntityKind::Mob;
+        mob.distance = distance;
+        mob.alive    = true;
+        mob.known    = known;
+        mob.name     = "Land Crab";
+        return mob;
     }
-    // The stock checker addon's line for an answer, with the color codes it sets around each part.
-    const std::string kCheckerLine = "\x1E\x51[\x1E\x06" "checker\x1E\x51]\x1E\x01 \x1E\x6ALand Crab\x1E\x01 \x1E\x52\x81\xA8\x1E\x01 "
-                                     "\x1E\x51(\x1E\x06Lv. \x1E\x52" "5\x1E\x51)\x1E\x01 too weak to be worthwhile";
+    // The stock checker addon's line for an answer, built as its checker.lua builds it from Ashita's chat library:
+    // the header, the name, an arrow, the level in brackets, the con, and the defense remark in brackets.
+    const std::string kCheckerStart = "\x1E\x51[\x1E\x06" "checker\x1E\x51]\x1E\x01 \x1E\x6ALand Crab\x1E\x01 "
+                                      "\x1E\x52\x81\xA8\x1E\x01 ";
+    const std::string kCheckerLine = kCheckerStart + "\x1E\x51(Lv. \x1E\x52" "5\x1E\x01\x1E\x51)\x1E\x01 "
+                                     "\x1E\x43too weak to be worthwhile\x1E\x01 "
+                                     "\x1E\x51(\x1E\x6AHigh Defense\x1E\x01\x1E\x51)\x1E\x01";
+    // And for an answer the server would not gauge.
+    const std::string kCheckerUngauged = kCheckerStart + "\x1E\x51(Lv. \x1E\x52???\x1E\x01\x1E\x51)\x1E\x01 "
+                                         "\x1E\x05Impossible to gauge!\x1E\x01";
 }
 
 // What the client sent for /check on a Land Crab (index 3) and what Phoenix answered, as captured on the test
@@ -46,6 +61,61 @@ TEST(a_check_is_asked_as_the_client_asks_it)
     CHECK(!CheckRequestTarget(clients.data(), 7));
 }
 
+TEST(a_check_is_the_players_own_only_when_the_game_sent_it_and_it_went_out)
+{
+    const std::vector<uint8_t> clients = Bytes("dd086b49034006010300000000808843");
+    const auto size                    = static_cast<uint32_t>(clients.size());
+    CHECK(PlayersCheck(kCheckRequestPacket, clients.data(), size, false, false) == kCrab);
+    CHECK(!PlayersCheck(kCheckRequestPacket, clients.data(), size, true, false)); // a plugin's, HeadsUp's own among them
+    CHECK(!PlayersCheck(kCheckRequestPacket, clients.data(), size, false, true)); // one that never left
+    CHECK(!PlayersCheck(0x0DE, clients.data(), size, false, false));              // another packet
+    CHECK(!PlayersCheck(kCheckRequestPacket, clients.data(), 7, false, false));
+}
+
+TEST(only_a_living_mob_that_is_nobodys_pet_is_ever_asked_about)
+{
+    // The server tells a player who examined them: nothing but a mob may ever be asked about, whatever is handed in.
+    CheckCandidate player = Mob(65002, 1.0f);
+    player.kind           = EntityKind::Player;
+    player.index          = 0x401;
+    CheckCandidate npc = Mob(kWorm, 1.5f);
+    npc.kind           = EntityKind::Npc;
+    CheckCandidate pet = Mob(kHare, 2.0f);
+    pet.pet            = true;
+    // An entity read as a mob that carries a player's id, or stands at a player's index.
+    CheckCandidate playersId    = Mob(65003, 2.5f);
+    CheckCandidate playersIndex = Mob(kCrab + 1, 2.6f);
+    playersIndex.index          = 0x402;
+    AutoCheck checks;
+    CHECK(!checks.Due({{player, npc, pet, playersId, playersIndex}}, 10.0));
+    const std::optional<CheckCandidate> due = checks.Due({{player, npc, pet, playersId, playersIndex, Mob(kCrab, 30.0f)}}, 10.0);
+    CHECK(due && due->serverId == kCrab);
+}
+
+TEST(a_mob_the_player_has_just_checked_is_not_checked_again_by_headsup)
+{
+    AutoCheck checks;
+    const std::vector<CheckCandidate> mobs{Mob(kCrab, 5.0f)};
+    checks.PlayerAsked(kCrab, 10.0);
+    CHECK(!checks.Due(mobs, 10.1)); // the answer on its way is the player's: a second would be read twice
+    // An answer that never came leaves the mob to HeadsUp.
+    CHECK(checks.Due(mobs, 10.0 + kOwnAnswerWait + 0.1).has_value());
+}
+
+TEST(a_mob_that_dies_while_headsups_check_is_on_its_way_still_has_the_answer_kept_out)
+{
+    AutoCheck checks;
+    const std::vector<CheckCandidate> mobs{Mob(kCrab, 5.0f)};
+    CHECK(checks.Due(mobs, 10.0).has_value());
+    checks.Forget(kCrab); // seen dead before the answer came
+    CHECK(checks.OwnReport(kCheckerLine, 10.25));
+    CHECK(checks.TakeAnswer(CheckAnswer{kCrab, true}, 10.3));
+    CHECK(checks.OwnReport(kCheckerLine, 10.35));
+    // Its answer in, what comes back is another spawn, asked about as soon as it is up.
+    checks.Forget(kCrab);
+    CHECK(checks.Due(mobs, 12.0).has_value());
+}
+
 TEST(an_answer_to_a_check_names_its_mob_whether_it_could_be_gauged_or_not)
 {
     std::vector<uint8_t> answer = Bytes("290e6649e9fd000003400601050000004000000000040300ad000000");
@@ -56,6 +126,17 @@ TEST(an_answer_to_a_check_names_its_mob_whether_it_could_be_gauged_or_not)
     answer[0x18] = 0x1F; // any other battle message is no answer to a check
     CHECK(!ParseCheckAnswer(answer.data(), size));
     CHECK(!ParseCheckAnswer(answer.data(), 0x10));
+    // The nine remarks on defense and evasion are answers, from the first to the last and no further.
+    for (const uint8_t message : {uint8_t{0xAA}, uint8_t{0xB2}})
+    {
+        answer[0x18] = message;
+        CHECK((ParseCheckAnswer(answer.data(), size) == CheckAnswer{kCrab, true}));
+    }
+    for (const uint8_t message : {uint8_t{0xA9}, uint8_t{0xB3}})
+    {
+        answer[0x18] = message;
+        CHECK(!ParseCheckAnswer(answer.data(), size));
+    }
 }
 
 TEST(the_nearest_mob_in_range_with_no_answer_is_checked_and_no_sooner_than_the_gap_after_the_last)
@@ -116,6 +197,15 @@ TEST(only_an_answer_headsup_alone_asked_for_is_kept_from_the_chat_log)
     AutoCheck late;
     CHECK(late.Due(mobs, 10.0).has_value());
     CHECK(!late.TakeAnswer(CheckAnswer{kCrab, true}, 10.0 + kOwnAnswerWait + 1.0));
+    // A check the player made long before, or of another mob, takes nothing from HeadsUp's own.
+    AutoCheck stale;
+    stale.PlayerAsked(kCrab, 1.0);
+    CHECK(stale.Due(mobs, 10.0).has_value());
+    CHECK(stale.TakeAnswer(CheckAnswer{kCrab, true}, 10.2));
+    AutoCheck another;
+    CHECK(another.Due(mobs, 10.0).has_value());
+    another.PlayerAsked(kWorm, 10.1);
+    CHECK(another.TakeAnswer(CheckAnswer{kCrab, true}, 10.2));
 }
 
 TEST(nothing_is_checked_with_the_setting_off_between_zones_or_in_an_event)
@@ -148,7 +238,14 @@ TEST(the_checker_addons_line_for_a_check_headsup_made_is_kept_out_too)
     CHECK(other.Due(mobs, 10.0).has_value());
     CHECK(!other.OwnReport("Land Crab is no longer stunned.", 10.2));
     CHECK(!other.OwnReport("[distance] Land Crab Lv. 5", 10.2));
+    CHECK(!other.OwnReport(kCheckerStart + "widescan cleared", 10.2)); // the addon's, and no report of a level
     std::string worm = kCheckerLine;
     worm.replace(worm.find("Land Crab"), 9, "Carrion Worm");
     CHECK(!other.OwnReport(worm, 10.2));
+    // The report of an answer the server would not gauge is the addon's line all the same.
+    CHECK(other.OwnReport(kCheckerUngauged, 10.2));
+    // An ask that never got its answer does not keep a later line out.
+    AutoCheck lost;
+    CHECK(lost.Due(mobs, 10.0).has_value());
+    CHECK(!lost.OwnReport(kCheckerLine, 10.0 + kOwnAnswerWait + 1.0));
 }

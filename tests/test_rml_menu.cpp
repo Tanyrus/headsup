@@ -1,6 +1,7 @@
 #include "rml_menu.h"
 
 #include "fonts.h"
+#include "menu_state.h"
 #include "plate_template.h"
 #include "rml_session.h"
 #include "test.h"
@@ -29,11 +30,11 @@ namespace
         Settings settings;
         RmlMenu menu;
 
-        explicit Window(MenuTheme theme = MenuTheme::Phoenix)
+        explicit Window(MenuTheme theme = MenuTheme::Phoenix, const char* font = kBarlowCondensed)
         {
             settings.menuTheme = theme;
             m_Host.context     = m_Rml.context;
-            m_Host.textFont    = kBarlowCondensed;
+            m_Host.textFont    = font;
             m_Host.menuFonts = {kBarlowCondensed};
             m_Host.keyDown   = [](uint8_t) { return false; };
             menu.open        = true;
@@ -83,6 +84,14 @@ namespace
             changed = Frames() || changed;
             m_Host.context->ProcessMouseButtonUp(kLeftButton, 0);
             return Frames(3) || changed;
+        }
+
+        // Puts the pointer on a control's middle and lets the control ease into its look under it.
+        void PointAt(const std::string& id)
+        {
+            const Rml::Vector2f at = Center(id);
+            m_Host.context->ProcessMouseMove(static_cast<int>(at.x), static_cast<int>(at.y), 0);
+            Frames(kEaseFrames);
         }
 
         // Presses the left button on one control and lets it go on another, or that far from the first.
@@ -208,6 +217,7 @@ namespace
 
     private:
         static constexpr int kDragSteps    = 6;
+        static constexpr int kEaseFrames   = 8; // longer than a control takes between two looks
         static constexpr float kFromTheEnd = 6.0f; // pixels
         test::RmlSession m_Rml; // before the menu: its document is closed while RmlUi still runs
         MenuHost m_Host;
@@ -224,6 +234,32 @@ TEST(the_window_opens_on_its_first_page_and_the_sidebar_opens_the_others)
     CHECK(window.Shows("mobs-line-style-head"));
     window.Click("close");
     CHECK(!window.menu.open);
+}
+
+TEST(a_pages_name_stays_on_one_line_under_the_pointer_and_its_highlight_goes_on_past_it)
+{
+    auto left  = [](Rml::Element* element) { return element->GetAbsoluteOffset(Rml::BoxArea::Border).x; };
+    auto right = [&](Rml::Element* element) { return left(element) + element->GetBox().GetSize(Rml::BoxArea::Border).x; };
+    // The narrowest and the widest of the fonts the window can be set in.
+    for (const char* font : {kBarlowCondensed, kCinzel})
+    {
+        Window window(MenuTheme::Phoenix, font);
+        const float page = left(window.Find("main"));
+        for (const PageInfo& info : kPages)
+        {
+            const std::string id = "nav-" + PageKey(info.page);
+            Rml::Element* entry  = window.Find(id);
+            window.PointAt(id);
+            const float height = entry->GetBox().GetSize(Rml::BoxArea::Border).y;
+            CHECK(entry->GetScrollHeight() <= entry->GetClientHeight() + 0.5f);
+            const float nameEnd = entry->GetAbsoluteOffset(Rml::BoxArea::Content).x +
+                                  static_cast<float>(Rml::ElementUtilities::GetStringWidth(entry, Rml::String(info.label)));
+            CHECK(right(entry) - nameEnd >= height / 4.0f);
+            CHECK(right(entry) <= page);
+            // The page beside the list stays where it is while the entry moves under the pointer.
+            CHECK_EQ(left(window.Find("main")), page);
+        }
+    }
 }
 
 TEST(the_close_buttons_cross_is_two_turned_bars_in_the_middle_of_its_circle)
@@ -323,7 +359,7 @@ TEST(a_line_box_keeps_what_is_typed_once_it_is_left)
     const std::string box = "players-nameplate-design-design-players-2";
     const std::string was = window.settings.Kind(PlateKind::Players).lines[2].text;
     // Its tags stand in it as chips, and the stretch after the last of them is typed in.
-    const size_t tags = RunsOf(was).tags.size();
+    const size_t tags = RunsOf(was).slots.size();
     CHECK(tags > 0 && window.Shows(box + "-c-0"));
     window.Click(box + "-t-" + std::to_string(tags));
     window.Type(" hi");
@@ -349,8 +385,23 @@ TEST(a_tag_chip_goes_in_at_the_caret_by_click_and_after_what_it_is_dropped_on_by
     CHECK(window.Shows(box + "-c-0") && window.Shows(box + "-t-1"));
     CHECK(window.Drag("tag-0", box + "-t-1"));
     CHECK_EQ(text, "a${level}b$name");
+    // Dropped on a chip of the line, a tag shares that chip's slot.
     CHECK(window.Drag("tag-19", box + "-c-0"));
-    CHECK_EQ(text, "a$level${job}b$name");
+    CHECK_EQ(text, "a${level|job}b$name");
+    // A chip of the line dragged onto another joins it.
+    CHECK(window.Drag(box + "-c-1", box + "-c-0"));
+    CHECK_EQ(text, "a${level|job|name}b");
+    // Barely moved and let go where it stands, a tag stays: that was a click with an unsteady hand.
+    CHECK(!window.Drag(box + "-c-0-1", Rml::Vector2f(2.0f, 0.0f)));
+    CHECK_EQ(text, "a${level|job|name}b");
+    // One tag of the chip dragged off every line goes alone, and one let go on another takes its place in the order.
+    CHECK(window.Drag(box + "-c-0-1", "page-title"));
+    CHECK_EQ(text, "a${level|name}b");
+    CHECK(window.Drag(box + "-c-0-1", box + "-c-0-0"));
+    CHECK_EQ(text, "a${name|level}b");
+    CHECK(window.Drag(box + "-c-0-0", "page-title"));
+    CHECK(window.Drag(box + "-c-0", "page-title")); // the one left is the chip itself
+    CHECK_EQ(text, "ab");
 }
 
 TEST(backspace_and_delete_beside_a_tag_take_it_out_and_the_arrows_step_past_it)
@@ -396,6 +447,44 @@ TEST(backspace_and_delete_beside_a_tag_take_it_out_and_the_arrows_step_past_it)
     window.Type("Z");
     window.Click("page-title");
     CHECK_EQ(text, "ab Z$levelY c");
+}
+
+namespace
+{
+    struct KeysSeen final : Rml::EventListener
+    {
+        int count = 0;
+        void ProcessEvent(Rml::Event&) override { ++count; }
+    };
+}
+
+TEST(the_arrow_that_steps_past_a_tag_is_not_also_a_key_of_the_stretch_it_leaves)
+{
+    Window window;
+    window.Page("players");
+    const std::string box = "players-nameplate-design-design-players-1";
+    window.settings.Kind(PlateKind::Players).lines[1].text = "ab $level cd";
+    window.Frames(2);
+    window.Click(box + "-t-0");
+    window.Key(Rml::Input::KI_END);
+    KeysSeen seen;
+    Rml::Element* stretch = window.Find(box + "-t-0");
+    stretch->AddEventListener(Rml::EventId::Keydown, &seen);
+    // Inside its text an arrow is the stretch's own key.
+    window.Key(Rml::Input::KI_LEFT);
+    window.Key(Rml::Input::KI_RIGHT);
+    CHECK_EQ(seen.count, 2);
+    // The one that steps on from its end never reaches it: it would show its caret for a key, with the keyboard gone.
+    window.Key(Rml::Input::KI_RIGHT);
+    CHECK_EQ(seen.count, 2);
+    window.Key(Rml::Input::KI_LEFT); // and back, from the start of the stretch after the tag
+    Rml::Element* after = window.Find(box + "-t-1");
+    after->AddEventListener(Rml::EventId::Keydown, &seen);
+    window.Key(Rml::Input::KI_RIGHT);
+    window.Key(Rml::Input::KI_LEFT);
+    CHECK_EQ(seen.count, 2);
+    stretch->RemoveEventListener(Rml::EventId::Keydown, &seen);
+    after->RemoveEventListener(Rml::EventId::Keydown, &seen);
 }
 
 TEST(a_stretch_is_as_wide_as_its_text_and_the_last_takes_the_rest_of_the_box)

@@ -20,6 +20,7 @@ namespace headsup
         constexpr float kPopupTall    = 18.0f; // the most of a dropdown's list shown before it scrolls
         constexpr float kNavHeight    = 2.0f;
         constexpr float kNavGap       = 0.2f;  // between two pages of the sidebar
+        constexpr float kNavSlide     = 0.35f; // how far a page's name moves under the pointer
         constexpr float kToggleInset  = 0.2f;  // a toggle's knob from its track's edge
         constexpr float kToggleKnob   = kToggleHeight - 2.0f * kToggleInset;
         constexpr float kArrow        = 0.35f; // half an arrow's base
@@ -80,7 +81,6 @@ namespace headsup
         const auto color    = [](uint32_t argb) { return RcssColor(argb); };
         const std::string frame = Em(kFrame), radius = Em(kRadius), control = Em(kControlWidth);
         const float top    = kGutter + kHeadHeight + 0.5f; // where the sidebar and the page start
-        const float mainX  = kGutter + kSidebarWidth + kGutter;
         const std::string wash = "horizontal-gradient(" + color(Faded(c.accent, kWash)) + " " + color(Faded(c.accentEnd, kWash)) + ")";
         const std::string fadingOut = " " + color(Faded(c.accentEnd, 0)) + ")";
         std::string css;
@@ -118,18 +118,22 @@ namespace headsup
         css += "#resize-mark{position:absolute;right:0.3em;bottom:0.3em;width:0px;height:0px;border-left:0.5em transparent;"
                "border-bottom:0.5em " + color(c.raisedEdge) + ";}";
         // The pages, as pills: each slides a little under the pointer, and the picked one is filled.
-        css += std::string("#") + kMenuSidebarId + "{position:absolute;left:" + Em(kGutter) + ";top:" + Em(top) +
-               ";width:" + Em(kSidebarWidth) + ";bottom:" + Em(kGutter) + ";}";
+        // The list is as wide as its longest name in the window's font, and the page takes the rest.
+        css += "#columns{position:absolute;display:flex;left:" + Em(kGutter) + ";right:" + Em(kGutter) + ";top:" + Em(top) +
+               ";bottom:" + Em(kGutter) + ";}";
+        css += std::string("#") + kMenuSidebarId + "{flex:0 0 auto;}";
+        // What a name moves by under the pointer comes off the room after it, so the list keeps its width.
         css += ".nav{position:relative;height:" + Em(kNavHeight) + ";line-height:" + Em(kNavHeight) + ";padding-left:" +
-               Em(kGutter) + ";border-radius:" + Em(kNavHeight / 2.0f) + ";margin-bottom:" + Em(kNavGap) + ";color:" +
-               color(c.label) + ";transition:background-color" + kEase + ",color" + kEase + ",padding-left" + kEase + ";}";
+               Em(kGutter) + ";padding-right:" + Em(kGutter) + ";white-space:nowrap;border-radius:" + Em(kNavHeight / 2.0f) +
+               ";margin-bottom:" + Em(kNavGap) + ";color:" + color(c.label) + ";transition:background-color" + kEase +
+               ",color" + kEase + ",padding-left" + kEase + ",padding-right" + kEase + ";}";
         css += ".nav.child{margin-left:" + Em(kGutter) + ";}";
-        css += ".nav:hover{background-color:" + color(c.accentSoft) + ";padding-left:1.35em;}";
+        css += ".nav:hover{background-color:" + color(c.accentSoft) + ";padding-left:" + Em(kGutter + kNavSlide) +
+               ";padding-right:" + Em(kGutter - kNavSlide) + ";}";
         css += ".nav.picked{background-color:transparent;decorator:horizontal-gradient(" + color(Faded(c.accent, kPickedStart)) +
                " " + color(Faded(c.accentEnd, kPickedEnd)) + ");color:" + color(c.text) + ";}";
         // The page: its title stays put and its cards scroll.
-        css += "#main{position:absolute;left:" + Em(mainX) + ";right:" + Em(kGutter) + ";top:" + Em(top) + ";bottom:" +
-               Em(kGutter) + ";}";
+        css += "#main{position:relative;flex:1 1 0px;margin-left:" + Em(kGutter) + ";}";
         css += std::string("#") + kMenuPageTitleId + "{font-family:\"" + look.titleFont + "\";font-size:" +
                Em(kPageTitleScale) + ";color:" + color(c.heading) + ";}";
         css += std::string("#") + kMenuPageId + "{position:absolute;left:0px;right:0px;top:2.4em;bottom:0px;overflow-y:auto;}";
@@ -304,6 +308,9 @@ namespace headsup
         css += ".tri.left{left:0.5em;border-right:0.45em " + color(c.text) + ";}";
         css += ".tri.right{left:0.6em;border-left:0.45em " + color(c.text) + ";}";
         css += ".chip img{width:1em;height:1em;margin-right:0.3em;vertical-align:-0.15em;}";
+        // A chip of several tags: each a part of its own to drag, with a quiet word between.
+        css += ".chip .part,.chip .or{display:inline-block;}";
+        css += ".chip .or{margin:0px 0.4em;opacity:0.65;}";
         css += ".drag{drag:clone;}";
         // Tabs: equal across each row, the open one filled, standing on a rule.
         css += ".tab-row{display:flex;flex-direction:row;margin-bottom:" + Em(kTabGap) + ";}";
@@ -339,9 +346,9 @@ namespace headsup
         return "<rml><head><style>" + css + "</style></head><body>"
                "<handle id=\"head\" move_target=\"#document\"><div id=\"title\">HeadsUp</div><div id=\"" +
                kMenuVersionId + "\"></div></handle><div id=\"head-line\"></div><div id=\"" + kMenuCloseId +
-               "\"><div class=\"cross\"></div><div class=\"cross back\"></div></div><div id=\"" + kMenuSidebarId +
-               "\"></div><div id=\"main\"><div id=\"" + kMenuPageTitleId + "\"></div><div id=\"" + kMenuPageId +
-               "\"></div></div><div id=\"" + kMenuPopupId + "\" class=\"hidden\"></div><div id=\"" + kMenuTipId +
+               "\"><div class=\"cross\"></div><div class=\"cross back\"></div></div><div id=\"columns\"><div id=\"" +
+               kMenuSidebarId + "\"></div><div id=\"main\"><div id=\"" + kMenuPageTitleId + "\"></div><div id=\"" +
+               kMenuPageId + "\"></div></div></div><div id=\"" + kMenuPopupId + "\" class=\"hidden\"></div><div id=\"" + kMenuTipId +
                "\" class=\"hidden\"></div><handle id=\"resize\" size_target=\"#document\"><div id=\"resize-mark\"></div>"
                "</handle></body></rml>";
     }

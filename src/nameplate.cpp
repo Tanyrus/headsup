@@ -190,8 +190,9 @@ namespace headsup
 
     uint32_t PlateAlpha(const OpacitySettings& opacity, int rank, bool hasTarget, float distance)
     {
-        const int percent = rank != kPlainRank ? opacity.targeted : hasTarget ? opacity.notTargeted : opacity.noTarget;
-        const float share = opacity.fadeIn ? FadeShare(distance, opacity.range) : 1.0f;
+        const bool aimedAt = rank != kPlainRank;
+        const int percent  = aimedAt ? opacity.targeted : hasTarget ? opacity.notTargeted : opacity.noTarget;
+        const float share  = opacity.fadeIn && !aimedAt ? FadeShare(distance, opacity.range) : 1.0f;
         return static_cast<uint32_t>(std::lround(static_cast<float>(kOpaqueAlpha) * static_cast<float>(percent) / kWholePercent * share));
     }
 

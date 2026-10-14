@@ -635,7 +635,9 @@ namespace headsup
             KindSettings& k = s.Kind(kind);
             form.Fade(!s.enabled || !s.nameplates);
             if (!form.BeginCard("Nameplate Design", nullptr,
-                    "Design this entity's nameplate by writing in the text box and by dragging and dropping tags from below."))
+                    "Design this entity's nameplate by writing in the text box and by dragging and dropping tags from below. "
+                    "Drop a tag onto another and the two share that place: the left one is drawn when it has something to "
+                    "show, and the next one when it has not. Drag a tag out of the lines to remove it."))
                 return;
             for (int i = 0; i < kPlateLines; ++i)
             {
@@ -649,9 +651,14 @@ namespace headsup
             }
             form.Line("line chips");
             for (const Tag tag : TagsFor(kind))
-                if (form.TagChip(tag) && PutTag(k.lines[editor.line].text, editor.drafts[editor.line].caret, tag))
+                if (form.TagChip(tag) && PutTag(k.lines[editor.line].text, editor.drafts[editor.line].caret, {tag}))
                     form.changed = true;
             form.EndLine();
+            if (HasStatusIcons(kind))
+                form.NumberDropdown(
+                    "Max Icons Shown", k.maxIcons, 1, kCountedIcons,
+                    [](int most) { return most == kCountedIcons ? std::string(kEveryIcon) : std::to_string(most); },
+                    "The most status icons a nameplate shows, counted along its lines from the top. GM's always shows.");
             // Under the chips, so nothing above moves under the mouse when it comes and goes.
             if (const std::string note = UnusedTagsNote(k, {Tag::Name}, kShowsNameEnding); !note.empty())
                 form.Note(note.c_str());
@@ -757,12 +764,13 @@ namespace headsup
             form.SliderInt("Not Targeted", o.notTargeted, kMinOpacity, kMaxOpacity, "%d%%",
                 "If you have a target, but this is not your target, use this opacity for the nameplate.");
             form.SliderInt("Is Targeted", o.targeted, kMinOpacity, kMaxOpacity, "%d%%",
-                "If this is your target, use this opacity for the nameplate.");
+                "If this is your target, use this opacity for the nameplate, at any distance.");
             // Your own nameplate is never far from you.
             if (kind != PlateKind::Self)
             {
                 form.Switch("Fade In", o.fadeIn,
-                    "Nameplates grow fainter with distance: at the opacity above within 10 yalms, almost gone at the range.");
+                    "Nameplates grow fainter with distance: at the opacity above within 10 yalms, almost gone at the range. "
+                    "Your target's never fades.");
                 form.Fade(off || !o.fadeIn);
                 form.SliderFloat("Range", o.range, kMinOutlineDistance, kMaxOutlineDistance, "%.0f yalms",
                     "Where a nameplate that fades in is almost gone.");

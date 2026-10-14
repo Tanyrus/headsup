@@ -20,6 +20,7 @@ namespace headsup
     {
         bool zonedIn = false;            // the scene camera is the last zone's
         std::optional<CheckReply> check; // its lifetime needs the mob's name from the game's memory
+        std::optional<CheckAnswer> answer; // the mob a check's answer is about, gauged or not, for Auto-Check
     };
 
     // A player's /check as the server answered it: the message, then the general part, kept until the next check of

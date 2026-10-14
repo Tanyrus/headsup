@@ -145,6 +145,9 @@ namespace headsup
             }
         }
 
+        // A player's status icon that the kind's limit counts: every one but GM's, which is always drawn.
+        bool IsCountedIcon(Tag tag) { return tag != Tag::Gm && TagIcon(tag).has_value(); }
+
         bool IsBadgeTag(Tag tag)
         {
             return tag == Tag::Weak || tag == Tag::Resist || tag == Tag::Status || tag == Tag::Immune;
@@ -317,6 +320,7 @@ namespace headsup
             return text;
         };
         std::optional<BadgeRules> badgeRules;
+        int statusIcons = 0; // the plate's so far, of those its kind limits
         plate.lines.reserve(kPlateLines);
         for (int i = 0; i < kPlateLines; ++i)
         {
@@ -325,16 +329,31 @@ namespace headsup
             LineBuilder builder;
             for (const Atom& atom : ParseTemplate(kind.lines[i].text))
             {
-                if (nameOnly && !(atom.isTag && atom.tag == Tag::Name)) continue;
-                if (!atom.isTag)
-                    builder.Literal(marked(atom.text));
-                else if (IsTextTag(atom.tag))
+                if (atom.slot.empty())
                 {
-                    const std::string text = TagText(atom.tag, info, player);
-                    builder.Text(DashesAreMarks(atom.tag) ? marked(text) : text, atom.tag == Tag::Name);
+                    if (!nameOnly) builder.Literal(marked(atom.text));
+                    continue;
                 }
-                else
-                    builder.Icons(TagIcons(atom.tag, info, s, badgeRules), IsBadgeTag(atom.tag));
+                // A slot is the first of its tags that has something to show, or as one tag with nothing.
+                bool drawn = false;
+                for (const Tag tag : atom.slot)
+                {
+                    if (drawn || (nameOnly && tag != Tag::Name)) continue;
+                    if (IsTextTag(tag))
+                    {
+                        const std::string text = TagText(tag, info, player);
+                        drawn                  = !text.empty();
+                        if (drawn) builder.Text(DashesAreMarks(tag) ? marked(text) : text, tag == Tag::Name);
+                        continue;
+                    }
+                    const bool counted = IsCountedIcon(tag);
+                    if (counted && statusIcons >= kind.maxIcons) continue;
+                    std::vector<IconDraw> icons = TagIcons(tag, info, s, badgeRules);
+                    drawn                       = !icons.empty();
+                    if (drawn && counted) ++statusIcons;
+                    if (drawn) builder.Icons(std::move(icons), IsBadgeTag(tag));
+                }
+                if (!drawn && !nameOnly) builder.Empty();
             }
             builder.Finish();
             if (builder.items.empty()) continue;

@@ -252,6 +252,7 @@ class HeadsUp final : public IPlugin
     headsup::PlayerJobs m_OwnJobs;                                // yours as the game has them, this frame
     bool m_DebugPending = false;
     bool m_Screenshot = false;
+    bool m_GameKeysHeld = false; // Ashita keeps the keyboard from the game while a text box of HeadsUp's has it
     std::mutex m_CommandLock;
     std::vector<std::string> m_Commands; // /hu lines as they came, until the frame that runs them
     headsup::ShotWatch m_Shot;
@@ -358,6 +359,7 @@ public:
     {
         if (m_SettingsChangedAt || m_SavedKeys.Unwritten()) SaveSettings();
         SetScreenshot(false);
+        HoldGameKeys(false);
         m_AshitaCore->GetInputManager()->GetMouse()->RemoveCallback(kName);
         m_AshitaCore->GetInputManager()->GetKeyboard()->RemoveCallback(kName);
         g_Rml = nullptr;
@@ -565,9 +567,7 @@ public:
             m_AutoCheck.Clear();
         }
         if (next.check) OnCheckReply(*next.check);
-        if (id != headsup::kCheckReplyPacket) return false;
-        const std::optional<headsup::CheckAnswer> answer = headsup::ParseCheckAnswer(data, size);
-        return answer && m_AutoCheck.TakeAnswer(*answer, Now());
+        return next.answer && m_AutoCheck.TakeAnswer(*next.answer, Now());
     }
 
     // HeadsUp never changes or blocks the game's packets: every one still goes to the server.
@@ -578,9 +578,8 @@ public:
         UNREFERENCED_PARAMETER(sizeChunk);
         UNREFERENCED_PARAMETER(dataChunk);
         if (!blocked) m_Connection.Sent(Now());
-        // A check the player made themselves, which no plugin put in: its answer is theirs to read.
-        if (id == headsup::kCheckRequestPacket && !injected && !blocked)
-            if (const std::optional<uint32_t> target = headsup::CheckRequestTarget(data, size)) m_AutoCheck.PlayerAsked(*target, Now());
+        if (const std::optional<uint32_t> target = headsup::PlayersCheck(id, data, size, injected, blocked))
+            m_AutoCheck.PlayerAsked(*target, Now());
         return false;
     }
 
@@ -760,7 +759,18 @@ public:
         }
         if (headsup::SaveDue(m_SettingsChangedAt, now, m_RmlMenu.open)) SaveSettings();
         UpdatePointer();
+        HoldGameKeys(m_Rml.WantsText());
         m_NameHook.NewFrame(NameOwners());
+    }
+
+    // The game reads its keys through DirectInput, which the keyboard callback's answer does not reach: the arrows
+    // turned the camera while a line was typed. Ashita keeps them from the game while a text box has the keyboard,
+    // and still hands HeadsUp every key.
+    void HoldGameKeys(bool typing)
+    {
+        if (typing == m_GameKeysHeld) return;
+        m_GameKeysHeld = typing;
+        m_AshitaCore->GetInputManager()->GetKeyboard()->SetBlockInput(typing);
     }
 
     // The game draws nameplates into its scene image, copies it to the back buffer and ends that scene before Present.
@@ -993,7 +1003,7 @@ private:
     {
         if (m_Settings.screenshotKey == 0 || GetForegroundWindow() != g_GameWindow) return false;
         const bool typing = m_AshitaCore->GetChatManager()->IsInputOpen() != 0 ||
-                            m_AshitaCore->GetGuiManager()->GetIO().WantTextInput;
+                            m_AshitaCore->GetGuiManager()->GetIO().WantTextInput || m_Rml.WantsText();
         return (m_Screenshot || !typing) && KeyDown(static_cast<uint8_t>(m_Settings.screenshotKey));
     }
 
@@ -1795,6 +1805,7 @@ private:
         std::vector<headsup::PhSighting> sightings;
         std::vector<headsup::PetLink> pets;
         std::vector<headsup::CheckCandidate> checkable;
+        const bool autoChecks = m_Settings.enabled && m_Settings.autoCheck;
         for (uint32_t i = 0; i < count; ++i)
         {
             if (entity->GetRawEntity(i) == nullptr) continue;
@@ -1817,18 +1828,25 @@ private:
                 m_Checks.Forget(serverId); // the next spawn rolls a new level
                 m_AutoCheck.Forget(serverId);
             }
-            if (isMob)
+            const headsup::MobRecord* record   = isMob ? headsup::MobById(serverId) : nullptr;
+            const headsup::CheckResult* checked = isMob ? m_Checks.Result(serverId, now) : nullptr;
+            const float distance                = headsup::DistanceFromSquared(entity->GetDistance(i));
+            if (autoChecks)
             {
-                const headsup::MobRecord* record = headsup::MobById(serverId);
-                checkable.push_back(headsup::CheckCandidate{serverId, index, headsup::DistanceFromSquared(entity->GetDistance(i)),
-                    alive, m_Checks.Result(serverId, now) != nullptr,
-                    record == nullptr || (record->flags & headsup::kMobNotorious) == 0, name});
+                headsup::CheckCandidate& candidate = checkable.emplace_back();
+                candidate.serverId  = serverId;
+                candidate.index     = index;
+                candidate.kind      = kind;
+                candidate.distance  = distance;
+                candidate.alive     = alive;
+                candidate.known     = checked != nullptr;
+                candidate.gaugeable = record == nullptr || (record->flags & headsup::kMobNotorious) == 0;
+                candidate.name      = name;
             }
             if (isMob && m_Settings.phTimers)
             {
                 const bool bodyDrawn = m_Names.FramesSinceMesh(index) <= headsup::kMeshGraceFrames;
-                if (const auto sighting = headsup::SightingOf(headsup::MobById(serverId), alive, bodyDrawn))
-                    sightings.push_back(*sighting);
+                if (const auto sighting = headsup::SightingOf(record, alive, bodyDrawn)) sightings.push_back(*sighting);
             }
             inputs.push_back(headsup::ActorInput{
                 .actor    = static_cast<headsup::ActorPtr>(actor),
@@ -1836,9 +1854,9 @@ private:
                 .serverId = serverId,
                 .kind     = kind,
                 .alive    = alive,
-                .distance = headsup::DistanceFromSquared(entity->GetDistance(i)),
+                .distance = distance,
                 .name     = name,
-                .checked  = isMob ? m_Checks.Result(serverId, now) : nullptr,
+                .checked  = checked,
                 .status   = CurrentStatus(entity, index, kind),
                 .pose     = isPlayer ? headsup::PoseFromStatus(state) : headsup::Pose::Standing,
                 .feet = headsup::FromEntityPosition(entity->GetLocalPositionX(i), entity->GetLocalPositionY(i), entity->GetLocalPositionZ(i)),
@@ -1864,15 +1882,15 @@ private:
                 input.petRow = headsup::PetRowOf(yours, headsup::InYourParty(entity->GetServerId(ownerIndex), yours, m_PartyIds),
                     headsup::IsFriend(m_Friends, entity->GetServerId(ownerIndex)));
             }
-        // A pet is no mob to the server's check.
-        std::erase_if(checkable, [&](const headsup::CheckCandidate& mob) { return petOwners.contains(mob.index); });
+        for (headsup::CheckCandidate& candidate : checkable)
+            candidate.pet = petOwners.contains(candidate.index);
         m_Player.level   = player->GetMainJobLevel();
         m_Player.sitting = headsup::IsSittingStatus(entity->GetStatus(m_SelfIndex));
         // The status the server gave you says an event runs: your own stayed 0 through an NPC's dialog, a cutscene
         // and one begun at zone-in.
         m_Player.inEvent = headsup::IsEventStatus(entity->GetStatusServer(m_SelfIndex));
         m_Tracker.Update(inputs, m_Player, m_Settings, m_CursorTargets);
-        if (headsup::MayAutoCheck(m_Settings.enabled && m_Settings.autoCheck, player->GetIsZoning() != 0, m_Player.inEvent, m_Player.level))
+        if (headsup::MayAutoCheck(autoChecks, player->GetIsZoning() != 0, m_Player.inEvent, m_Player.level))
             if (const std::optional<headsup::CheckCandidate> mob = m_AutoCheck.Due(checkable, now))
             {
                 auto request = headsup::CheckRequest(mob->serverId, mob->index); // Ashita takes the bytes as non-const

@@ -111,6 +111,11 @@ namespace headsup
     constexpr int kMinOrnamentWidth = 20, kMaxOrnamentWidth = 300;       // pixels
     constexpr int kMinOrnamentThickness = 3, kMaxOrnamentThickness = 24; // pixels
     constexpr size_t kMaxTemplate = 255;                                 // bytes of a line's text
+    // A player's status icons, less GM's, which is drawn whatever the limit: mentor, new adventurer, level sync,
+    // away, linkshell, bazaar and seeking party.
+    constexpr int kCountedIcons = 7;
+    // Whether a kind's nameplates can show those icons, so that its page sets their limit and its file keeps it.
+    constexpr bool HasStatusIcons(PlateKind kind) { return kind == PlateKind::Players || kind == PlateKind::Self; }
 
     // The tags a template is built from.
     constexpr const char* kTagDetect       = "$detect";
@@ -191,6 +196,7 @@ namespace headsup
         LineDesign lines[kPlateLines];
         OrnamentSettings ornament;
         OpacitySettings opacity;
+        int maxIcons = kCountedIcons; // the status icons a nameplate draws at most, GM's aside
         bool operator==(const KindSettings&) const = default;
     };
     std::array<KindSettings, kPlateKindCount> DefaultKinds();

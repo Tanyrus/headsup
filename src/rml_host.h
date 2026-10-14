@@ -57,6 +57,7 @@ namespace headsup
     private:
         void Render(Rml::Context* context);
         void Type(uint32_t virtualKey);
+        bool Press(int button, int modifiers);
 
         std::optional<RmlSystem> m_System;
         RmlRender m_Render;

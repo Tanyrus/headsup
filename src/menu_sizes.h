@@ -11,7 +11,6 @@ namespace headsup
     constexpr float kWindowHeight   = 36.0f;
     constexpr float kMinWindowWidth  = 42.0f; // a row of two mode dropdowns and a few letters of its label
     constexpr float kMinWindowHeight = 16.0f;
-    constexpr float kSidebarWidth   = 8.5f;
     constexpr float kGutter         = 1.0f;  // around the window's parts and between cards
     constexpr float kCardPad        = 0.9f;  // a card's content from its edges
     constexpr float kCardRadius     = 0.6f;

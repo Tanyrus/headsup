@@ -110,7 +110,13 @@ The Nameplate Design card holds three lines: Top Line, Middle Line and Bottom Li
 name does. You type in a line as you would anywhere, and put tags in it: a tag draws something, such as the name or
 the level. Click a tag under the lines to put it where you last typed, or drag it into a line. A tag stands in its line
 as the same button, with text to type before and after it, and Backspace or Delete beside a tag takes the whole tag
-out. Typed by hand a tag is a dollar sign and its word, such as `$name`, and `$$` is one dollar sign.
+out. A tag in a line can be dragged too: to another place in a line, or out of the lines altogether, which removes it.
+Typed by hand a tag is a dollar sign and its word, such as `$name`, and `$$` is one dollar sign.
+
+Tags can share one place. Drop a tag onto a tag that is already in a line and the two become one button, such as
+Level Sync / Bazaar: the nameplate then draws the first of them that has something to show, so a synced player shows
+the level sync icon and any other player their bazaar. Backspace beside such a button takes its last tag out. Typed by
+hand it is `${sync|bazaar}`.
 
 | Tag | Typed | Kinds | Draws |
 |---|---|---|---|
@@ -131,7 +137,9 @@ out. Typed by hand a tag is a dollar sign and its word, such as `$name`, and `$$
 | Owner | `$owner` | Pets | The pet's owner |
 
 The icons are XIUI's HQ ones for players and MobDB's for mobs. An icon shows only when it applies to that player. Away, mentor, new adventurer and GM appear once the server has told
-HeadsUp about the player, and the names of players sitting, resting or in a chair are lowered to their heads.
+HeadsUp about the player, and the names of players sitting, resting or in a chair are lowered to their heads. On the
+Players and Self pages, Max Icons Shown limits how many of a player's icons a nameplate draws, counted along its
+lines from the top; the GM icon always shows.
 
 Weaknesses, resistances, statuses and immunities are shown as small badges on icons. The Badges card sets their font,
 colors and whether they show ranks; the Weaknesses and Statuses cards pick what is worth a badge.
@@ -159,7 +167,7 @@ middle line and the one above or below it, where it is drawn while both lines sh
 
 The Nameplate Opacity card sets how see-through a kind's nameplates are by what you target: with No Target, when the
 entity is Not Targeted while something else is, and when it Is Targeted. Fade In makes them fainter with distance, up to
-a Range of their own; your own nameplate has no fading.
+a Range of their own; your target's nameplate never fades with distance, and your own has no fading.
 
 ![A Goblin Leecher's red outline and nameplate](resources/nameplate_and_outline.png)
 

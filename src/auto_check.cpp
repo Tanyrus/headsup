@@ -14,6 +14,13 @@ namespace headsup
         constexpr size_t kRequestServerId = 0x04, kRequestIndex = 0x08;
         // What every line of the checker addon's holds: its name in the line's header, and the level it reports.
         constexpr std::string_view kCheckerAddon = "checker", kCheckerLevel = "Lv. ";
+
+        // A mob by more than the kind the client's flags gave it: the server tells a player who examined them.
+        bool IsZoneMob(const CheckCandidate& entity)
+        {
+            return entity.kind == EntityKind::Mob && !entity.pet && entity.serverId >= kFirstZoneEntityId &&
+                   entity.index < kFirstPlayerIndex;
+        }
     }
 
     std::array<uint8_t, kCheckRequestSize> CheckRequest(uint32_t serverId, uint16_t index)
@@ -32,14 +39,23 @@ namespace headsup
         return ReadAt<uint32_t>(data, kRequestServerId);
     }
 
+    std::optional<uint32_t> PlayersCheck(uint16_t id, const uint8_t* data, uint32_t size, bool injected, bool blocked)
+    {
+        if (id != kCheckRequestPacket || injected || blocked) return std::nullopt;
+        return CheckRequestTarget(data, size);
+    }
+
     std::optional<CheckCandidate> AutoCheck::Due(std::span<const CheckCandidate> mobs, double now)
     {
         if (m_LastAsk && now - *m_LastAsk < kAutoCheckGap) return std::nullopt;
         const CheckCandidate* nearest = nullptr;
         for (const CheckCandidate& mob : mobs)
         {
-            if (!mob.alive || mob.known || !mob.gaugeable || mob.distance > kAutoCheckRange) continue;
+            if (!IsZoneMob(mob) || !mob.alive || mob.known || !mob.gaugeable || mob.distance > kAutoCheckRange) continue;
             if (m_NeverGauged.contains(mob.serverId)) continue;
+            // The answer to the player's own check is on its way: a second would be read twice.
+            if (const auto theirs = m_PlayerAsked.find(mob.serverId); theirs != m_PlayerAsked.end() && now - theirs->second < kOwnAnswerWait)
+                continue;
             if (const auto asked = m_Asked.find(mob.serverId); asked != m_Asked.end() && now - asked->second < kAskAgain) continue;
             if (nearest == nullptr || mob.distance < nearest->distance) nearest = &mob;
         }
@@ -86,12 +102,9 @@ namespace headsup
 
     void AutoCheck::Forget(uint32_t serverId)
     {
-        m_Asked.erase(serverId);
-        m_PlayerAsked.erase(serverId);
-        m_Waiting.erase(serverId);
         m_NeverGauged.erase(serverId);
-        m_OwnAnswered.erase(serverId);
-        m_Names.erase(serverId);
+        // An answer still on its way is HeadsUp's to keep out; with none owed, the next spawn is asked about at once.
+        if (!m_Waiting.contains(serverId)) m_Asked.erase(serverId);
     }
 
     void AutoCheck::Clear() { *this = AutoCheck{}; }

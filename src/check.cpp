@@ -21,11 +21,21 @@ namespace headsup
         constexpr size_t kReplyMinSize     = kReplyMessage + sizeof(uint16_t);
     }
 
+    namespace
+    {
+        // The message of an incoming 0x029 long enough to answer a check, and whether it is one that gives a level.
+        std::optional<uint16_t> ReplyMessage(const uint8_t* data, uint32_t size)
+        {
+            if (data == nullptr || size < kReplyMinSize) return std::nullopt;
+            return ReadAt<uint16_t>(data, kReplyMessage);
+        }
+        constexpr bool GivesLevel(uint16_t message) { return message >= kFirstCheckMessage && message <= kLastCheckMessage; }
+    }
+
     std::optional<CheckReply> ParseCheckReply(const uint8_t* data, uint32_t size)
     {
-        if (data == nullptr || size < kReplyMinSize) return std::nullopt;
-        const auto message = ReadAt<uint16_t>(data, kReplyMessage);
-        if (message < kFirstCheckMessage || message > kLastCheckMessage) return std::nullopt;
+        const std::optional<uint16_t> message = ReplyMessage(data, size);
+        if (!message || !GivesLevel(*message)) return std::nullopt;
         const auto level = ReadAt<int32_t>(data, kReplyLevel);
         const auto type  = ReadAt<uint32_t>(data, kReplyCheckType);
         if (level <= 0 || type < kCheckTypeBase || type >= kCheckTypeBase + kConCount) return std::nullopt;
@@ -35,11 +45,9 @@ namespace headsup
 
     std::optional<CheckAnswer> ParseCheckAnswer(const uint8_t* data, uint32_t size)
     {
-        if (data == nullptr || size < kReplyMinSize) return std::nullopt;
-        const auto message = ReadAt<uint16_t>(data, kReplyMessage);
-        const bool gauged  = message >= kFirstCheckMessage && message <= kLastCheckMessage;
-        if (!gauged && message != kImpossibleToGauge) return std::nullopt;
-        return CheckAnswer{ReadAt<uint32_t>(data, kReplyServerId), gauged};
+        const std::optional<uint16_t> message = ReplyMessage(data, size);
+        if (!message || (!GivesLevel(*message) && *message != kImpossibleToGauge)) return std::nullopt;
+        return CheckAnswer{ReadAt<uint32_t>(data, kReplyServerId), GivesLevel(*message)};
     }
 
     double CheckLifetime(const MobRecord* mob)

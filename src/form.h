@@ -24,6 +24,7 @@ namespace headsup
         std::string id;
         std::string type;
         std::string value; // a change's or commit's new value, a drop's dragged control, a caret's place in bytes
+        std::string carried = {}; // a drop's: what the dragged control carries (kCarriesAttribute), a tag chip's slot
     };
     constexpr const char* kClickEvent  = "click";
     constexpr const char* kChangeEvent = "change"; // a slider moved, a text box typed in
@@ -31,6 +32,11 @@ namespace headsup
     constexpr const char* kFocusEvent  = "focus";
     constexpr const char* kCaretEvent  = "caret"; // a text box's caret as it loses the keyboard
     constexpr const char* kDropEvent   = "drop";
+    // A dragged control was let go, on something or on nothing, anywhere but where it stands.
+    constexpr const char* kDragEndEvent = "dragend";
+    // The attribute of a control that can be dragged which says what a drop of it brings: a tag chip's slot, as a
+    // line's text holds it.
+    constexpr const char* kCarriesAttribute = "carries";
     // A tag beside a stretch of a line box is to go: Backspace at the stretch's start, or Delete at its end. Its
     // value is which (kKillBack or kKillForward) and then the stretch as it is typed.
     constexpr const char* kKillEvent   = "kill";
@@ -38,6 +44,7 @@ namespace headsup
     // The ids of a line box's parts, after the box's own: a stretch of text and a tag, each with its number.
     constexpr const char* kRunIdInfix  = "-t-";
     constexpr const char* kChipIdInfix = "-c-";
+    constexpr const char* kChipTagInfix = "-"; // after a chip's id and before a tag's number, in a chip of several
 
     // What an element shows that is no part of the markup: set on the element when it changes, so a slider being
     // dragged or a row fading replaces nothing.
@@ -241,10 +248,12 @@ namespace headsup
         // text then holds. Live: true whenever a key changed it.
         bool TextAt(const char* id, std::string& text, const char* hint, float width, bool live = false,
             size_t most = 0);
-        // A design line's box across the card: its stretches of text to type in, and its tags as chips between
+        // A design line's box across the card: its stretches of text to type in, and its slots as chips between
         // them. True when its text changed: a stretch typed and then left, a tag taken out with Backspace or Delete
-        // beside it, or a tag chip dropped in, which goes after what it is dropped on, or at the end. draft keeps
-        // its caret, and whether it has the keyboard.
+        // beside its chip, a tag dropped in, or one of its own dragged away. A tag dropped on a stretch goes after
+        // it, on the box at its end, on a chip into that chip's slot and on another tag of its own chip into that
+        // tag's place; one of the line's own let go off every line is gone. draft keeps its caret, and whether it
+        // has the keyboard.
         bool LineBox(const char* id, std::string& text, LineDraft& draft);
         // A tag as a chip that reads its name, after its icon when it draws one. True when clicked; dragged, it drops
         // onto a line's box.

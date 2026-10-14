@@ -84,6 +84,7 @@ namespace headsup
     }
 
     constexpr const char* kDefaultFontChoice = "Default"; // a line's font: the one on the Entities page
+    constexpr const char* kEveryIcon         = "All";     // a kind's icon limit at every icon there is
 
     // What each palette's colors tell, under its card's title and on the color source that takes them.
     constexpr const char* kAggressionColorsTip =

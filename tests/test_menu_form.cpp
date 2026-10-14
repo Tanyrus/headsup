@@ -287,6 +287,27 @@ TEST(every_kind_has_a_nameplate_opacity_card_and_yours_none_of_its_fading)
     }
 }
 
+TEST(the_pages_of_the_kinds_with_status_icons_set_how_many_a_nameplate_shows)
+{
+    Window w;
+    for (const Page page : {Page::Players, Page::Self})
+    {
+        w.state.page           = page;
+        const std::string list = std::string(PageKey(page)) + "-nameplate-design-max-icons-shown";
+        CHECK(w.Pass({{list, kClickEvent, ""}}).popup);
+        CHECK(w.Pass({{list + "-o-2", kClickEvent, ""}}).changed); // the list starts at one icon
+        CHECK_EQ(w.settings.Kind(*KindOfPage(page)).maxIcons, 3);
+    }
+    CHECK_EQ(w.settings.Kind(PlateKind::Mobs).maxIcons, kCountedIcons);
+    for (const Page page : {Page::Mobs, Page::Npcs, Page::Pets})
+    {
+        w.state.page          = page;
+        const std::string card = std::string(PageKey(page)) + "-nameplate-design";
+        const Form form        = w.Pass();
+        CHECK(!Has(Block(form, card.c_str())->rml, "max-icons-shown"));
+    }
+}
+
 TEST(a_lines_glow_can_be_switched_off_for_combat_once_it_has_a_glow)
 {
     Window w;

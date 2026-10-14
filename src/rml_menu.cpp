@@ -40,6 +40,15 @@ namespace headsup
             return rmlui_dynamic_cast<Rml::ElementFormControlInput*>(element);
         }
 
+        // Whether a drag ended with the pointer still on the control dragged, which is a click with an unsteady
+        // hand. RmlUi looks past that control for what is under the pointer, so it would count as a drop on what
+        // the control stands in.
+        bool LetGoOn(Rml::Element* dragged, const Rml::Event& event)
+        {
+            return dragged->IsPointWithinElement(
+                Rml::Vector2f(event.GetParameter<float>("mouse_x", 0.0f), event.GetParameter<float>("mouse_y", 0.0f)));
+        }
+
         bool IsText(Rml::ElementFormControlInput* input)
         {
             return input != nullptr && input->GetAttribute<Rml::String>("type", "text") == "text";
@@ -173,7 +182,7 @@ namespace headsup
         m_PageTitle  = m_Document->GetElementById(kMenuPageTitleId);
         m_Popup      = m_Document->GetElementById(kMenuPopupId);
         m_Tip        = m_Document->GetElementById(kMenuTipId);
-        for (const Rml::EventId id : {Rml::EventId::Click, Rml::EventId::Change, Rml::EventId::Dragdrop,
+        for (const Rml::EventId id : {Rml::EventId::Click, Rml::EventId::Change, Rml::EventId::Dragdrop, Rml::EventId::Dragend,
                  Rml::EventId::Mouseover, Rml::EventId::Mousemove, Rml::EventId::Animationend})
             m_Document->AddEventListener(id, this);
         // On their way down: taking and losing the keyboard do not come back up, and a text box keeps its keys.
@@ -324,8 +333,9 @@ namespace headsup
     }
 
     // A key in a stretch of a line box that is not the stretch's own to take: Backspace at its start and Delete
-    // at its end are for the tag beside it, and the arrows step past that tag into the next stretch.
-    void RmlMenu::RunKey(Rml::ElementFormControlInput* input, const std::string& id, Rml::Input::KeyIdentifier key)
+    // at its end are for the tag beside it, and the arrows step past that tag into the next stretch. True when
+    // the key moved the keyboard to another stretch: the one it left must not get it too.
+    bool RmlMenu::RunKey(Rml::ElementFormControlInput* input, const std::string& id, Rml::Input::KeyIdentifier key)
     {
         const std::string value = input->GetValue();
         int start = 0, end = 0;
@@ -338,10 +348,17 @@ namespace headsup
         else if (key == Rml::Input::KI_LEFT && atStart)
         {
             Rml::ElementFormControlInput* before = RunBeside(input, -1);
-            if (before != nullptr) FocusAt(before, CharacterOf(before->GetValue(), before->GetValue().size()));
+            if (before == nullptr) return false;
+            FocusAt(before, CharacterOf(before->GetValue(), before->GetValue().size()));
+            return true;
         }
         else if (key == Rml::Input::KI_RIGHT && atEnd)
-            FocusAt(RunBeside(input, 1), 0);
+        {
+            Rml::ElementFormControlInput* after = RunBeside(input, 1);
+            FocusAt(after, 0);
+            return after != nullptr;
+        }
+        return false;
     }
 
     // Each stretch of a line box is as wide as what is typed in it, so that its tags sit against its letters.
@@ -426,13 +443,19 @@ namespace headsup
                 }
                 else if (key == Rml::Input::KI_RETURN || key == Rml::Input::KI_NUMPADENTER)
                     input->Blur();
-                else if (target->IsClassSet(kRunClass))
-                    RunKey(input, id, key);
+                // RmlUi's text box shows its caret for every arrow it is given, with or without the keyboard.
+                else if (target->IsClassSet(kRunClass) && RunKey(input, id, key))
+                    event.StopPropagation();
             }
             break;
         case Rml::EventId::Dragdrop:
-            if (auto* dragged = static_cast<Rml::Element*>(event.GetParameter<void*>("drag_element", nullptr)))
-                m_Events.push_back(FormEvent{id, kDropEvent, dragged->GetId()});
+            if (auto* dragged = static_cast<Rml::Element*>(event.GetParameter<void*>("drag_element", nullptr));
+                dragged != nullptr && !LetGoOn(dragged, event))
+                m_Events.push_back(FormEvent{id, kDropEvent, dragged->GetId(),
+                    dragged->GetAttribute<Rml::String>(kCarriesAttribute, "")});
+            break;
+        case Rml::EventId::Dragend:
+            if (!LetGoOn(target, event)) m_Events.push_back(FormEvent{id, kDragEndEvent, {}, {}});
             break;
         case Rml::EventId::Mouseover:
         case Rml::EventId::Mousemove:

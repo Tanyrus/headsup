@@ -58,16 +58,20 @@ namespace headsup
                 place.height = std::max(place.height, lines[i].items[j].height);
             }
         }
-        // The bottom line stays centered on the game's name, and the others are set against its two ends.
+        // The bottom line stays centered on the game's name, and the others are set against its two ends: a line
+        // starts where it starts or ends where it ends, whichever puts it further to the side it is set to, so that
+        // a line wider than the name hangs out on that side and not on the other.
         const float against = lines.empty() ? 0.0f : layout.lines.back().width;
         for (size_t i = 0; i < lines.size(); ++i)
         {
-            LinePlace& place = layout.lines[i];
+            LinePlace& place    = layout.lines[i];
+            const float starts  = layout.centerX - against / 2.0f;
+            const float ends    = layout.centerX + against / 2.0f - place.width;
             switch (lines[i].align)
             {
-            case Align::Left: place.left = layout.centerX - against / 2.0f; break;
+            case Align::Left: place.left = std::min(starts, ends); break;
             case Align::Center: place.left = layout.centerX - place.width / 2.0f; break;
-            case Align::Right: place.left = layout.centerX + against / 2.0f - place.width; break;
+            case Align::Right: place.left = std::max(starts, ends); break;
             }
         }
 

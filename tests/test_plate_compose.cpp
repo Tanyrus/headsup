@@ -623,6 +623,76 @@ TEST(a_players_title_shows_once_known_and_takes_its_space_with_it_when_not)
     CHECK_EQ(Rendered(Compose(mob, s).lines.back()), "Young Quadav");
 }
 
+TEST(a_slot_draws_the_first_of_its_tags_that_has_something_to_show)
+{
+    Settings s;
+    std::string& line = s.Kind(PlateKind::Players).lines[2].text;
+    line              = "${sync|bazaar} $name";
+    const auto icons  = [&](const PlayerStatus& status) {
+        const ComposedPlate plate = Compose(PlayerWith(status), s);
+        std::vector<Icon> drawn;
+        for (const PlateItem& item : plate.lines[0].items)
+            for (const IconDraw& icon : item.icons) drawn.push_back(icon.icon);
+        return drawn;
+    };
+    PlayerStatus status;
+    status.bazaar = true;
+    CHECK(icons(status) == std::vector<Icon>{Icon::Bazaar}); // not synced: the next in the slot
+    status.levelSync = true;
+    CHECK(icons(status) == std::vector<Icon>{Icon::LevelSync}); // one place, so never both
+    // Neither, and the slot takes its space with it as a tag with nothing to show does.
+    CHECK_EQ(Rendered(Compose(PlayerWith(PlayerStatus{}), s).lines[0]), "Chadmage");
+    // Text and icons share a slot alike: a title when it is known, and the linkshell's icon until then.
+    line           = "$name ${title|linkshell}";
+    ActorInfo info = LinkshellPlayer();
+    CHECK_EQ(Rendered(Compose(info, s).lines[0]), "Chadmage [1]");
+    info.title = 266;
+    CHECK_EQ(Rendered(Compose(info, s).lines[0]), "Chadmage Looks Sublime in a Subligar");
+    // Where a plate keeps its name alone, a slot that holds the name shows it and any other shows nothing.
+    line = "${title|name} ${sync|bazaar}";
+    PlayerState watching = kPlayer;
+    watching.inEvent     = true;
+    info.status->bazaar  = true;
+    const ComposedPlate alone = ComposePlate(info, watching, s, kGame);
+    CHECK_EQ(alone.lines.size(), size_t{1});
+    CHECK_EQ(Rendered(alone.lines[0]), "Chadmage");
+}
+
+TEST(a_plate_draws_no_more_status_icons_than_its_kind_allows_and_gms_besides)
+{
+    Settings s;
+    KindSettings& players = s.Kind(PlateKind::Players);
+    players.lines[1].text = "$away$bazaar";
+    players.lines[2].text = "$gm$mentor$seeking $name ${sync|linkshell}";
+    PlayerStatus all;
+    all.gm = all.mentor = all.seekingParty = all.away = all.bazaar = all.linkshell = all.levelSync = all.newAdventurer = true;
+    const auto icons = [&](const PlayerStatus& status) {
+        std::vector<Icon> drawn;
+        for (const ComposedLine& line : Compose(PlayerWith(status), s).lines)
+            for (const PlateItem& item : line.items)
+                for (const IconDraw& icon : item.icons) drawn.push_back(icon.icon);
+        return drawn;
+    };
+    // A new install's limit is every icon there is.
+    CHECK((icons(all) == std::vector<Icon>{Icon::Away, Icon::Bazaar, Icon::Gm, Icon::Mentor, Icon::Invite, Icon::LevelSync}));
+    // Counted in reading order, the upper line first; GM's is never counted and always drawn.
+    players.maxIcons = 3;
+    CHECK((icons(all) == std::vector<Icon>{Icon::Away, Icon::Bazaar, Icon::Gm, Icon::Mentor}));
+    players.maxIcons = 1;
+    CHECK((icons(all) == std::vector<Icon>{Icon::Away, Icon::Gm}));
+    // Only what is drawn counts: an icon the player lacks leaves its place in the count to the next, and a slot is one.
+    PlayerStatus some;
+    some.mentor = some.linkshell = some.levelSync = true;
+    players.maxIcons = 2;
+    CHECK((icons(some) == std::vector<Icon>{Icon::Mentor, Icon::LevelSync}));
+    players.maxIcons = 1;
+    CHECK((icons(some) == std::vector<Icon>{Icon::Mentor}));
+    CHECK_EQ(Rendered(Compose(PlayerWith(some), s).lines[0]), "[1] Chadmage"); // what is left out leaves no gap at the end
+    // Each kind has its own limit.
+    s.Kind(PlateKind::Mobs).maxIcons = 1;
+    CHECK_EQ(Rendered(Compose(AggressiveMob(), s).lines[0]), "[3]");
+}
+
 TEST(a_dead_player_keeps_its_whole_plate)
 {
     ActorInfo info   = LinkshellPlayer();
