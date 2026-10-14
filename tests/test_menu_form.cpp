@@ -475,6 +475,38 @@ TEST(the_visibility_rows_come_in_the_layouts_order)
     CHECK(!order(w.Pass()));
 }
 
+TEST(a_palettes_rows_moved_in_the_layout_keep_their_own_colors)
+{
+    test::EditedLayout edited;
+    edited.SwapRows("entity-type-colors", 0, 1);
+    Window w;
+    w.layout = edited.Layout();
+    const char* mobArrow = "entities-colors-entity-type-mob-entity-type-colors-reset";
+    const int mob        = static_cast<int>(TargetType::Mob);
+    const Color original = w.settings.palette.type[mob];
+    w.settings.palette.type[mob] = Color{{0.1f, 0.2f, 0.3f}};
+    const Form moved             = w.Pass();
+    CHECK(!ClassOn(moved, mobArrow, "hidden"));
+    CHECK(ClassOn(moved, "entities-colors-entity-type-player-entity-type-colors-reset", "hidden"));
+    const Form back = w.Pass({{mobArrow, kClickEvent, ""}});
+    CHECK(back.changed && w.settings.palette.type[mob] == original);
+}
+
+TEST(a_status_rows_moved_in_the_layout_keep_their_own_switches)
+{
+    test::EditedLayout edited;
+    edited.SwapRows("status-table", 0, 1);
+    Window w;
+    w.layout     = edited.Layout();
+    w.state.page = Page::Mobs;
+    w.settings.Kind(PlateKind::Mobs).lines[0].text = "$status";
+    const StatusBadgeRule bind = w.settings.statusBadges[static_cast<int>(StatusTableRow::Bind)];
+    const bool shown           = w.settings.statusBadges[static_cast<int>(StatusTableRow::Paralyze)].show;
+    CHECK(w.Pass({{"mobs-statuses-status-paralyze", kClickEvent, ""}}).changed);
+    CHECK(w.settings.statusBadges[static_cast<int>(StatusTableRow::Paralyze)].show != shown);
+    CHECK(w.settings.statusBadges[static_cast<int>(StatusTableRow::Bind)] == bind);
+}
+
 TEST(a_card_kept_to_some_kinds_shows_on_their_pages_alone)
 {
     test::EditedLayout edited;

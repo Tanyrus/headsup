@@ -317,3 +317,20 @@ class Format(unittest.TestCase):
 class Shipped(unittest.TestCase):
     def test_the_shipped_file_fits_the_code(self):
         gen.parse((ROOT / 'data' / 'settings_window.json').read_text(encoding='utf-8'), 'settings_window.json')
+
+    def test_a_palettes_colors_and_the_status_rows_take_any_order(self):
+        tree = json.loads((ROOT / 'data' / 'settings_window.json').read_text(encoding='utf-8'))
+
+        def reorder(key):
+            changed = copy.deepcopy(tree)
+            settings = [s for page in changed['pages'] for card in page.get('cards', []) for s in card['settings']]
+            settings += [s for card in changed['entity']['cards'] for s in card['settings']]
+            next(s for s in settings if s['key'] == key)['rows'].reverse()
+            return json.dumps(changed)
+
+        for key in ('aggression-colors', 'toughness-colors', 'claim-colors', 'targeting-colors', 'entity-type-colors',
+                    'status-table'):
+            with self.subTest(key):
+                gen.parse(reorder(key), 'settings_window.json')
+        with self.assertRaisesRegex(gen.DataError, 'the rows of "detection" come in the code\'s order'):
+            gen.parse(reorder('detection'), 'settings_window.json')  # its senses are a group under the first two

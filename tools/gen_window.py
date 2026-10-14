@@ -123,14 +123,14 @@ PIECES = Pieces(
         'cursor-style': Setting(options=5, nameless=frozenset({4})), 'width': Setting(), 'cursor-height': Setting(),
         'outline-thickness': Setting(), 'scale': Setting(), 'float': Setting(), 'cursor-vertical-offset': Setting(),
         'color': Setting(), 'edge-color': Setting(),
-        'aggression-colors': Setting(unnamed=True, rows_fixed=True, rows=rows(
+        'aggression-colors': Setting(unnamed=True, rows=rows(
             'passive', 'aggressive', 'nm-passive', 'nm-aggressive', 'nm-placeholder', 'no-data')),
-        'toughness-colors': Setting(unnamed=True, rows_fixed=True, rows=rows(
+        'toughness-colors': Setting(unnamed=True, rows=rows(
             'unknown-level', 'too-weak', 'easy-prey', 'decent-challenge', 'even-match', 'tough', 'very-tough')),
-        'claim-colors': Setting(unnamed=True, rows_fixed=True, rows=rows('unclaimed', 'claimed-others', 'claimed-yours')),
-        'targeting-colors': Setting(unnamed=True, rows_fixed=True, rows=rows(
+        'claim-colors': Setting(unnamed=True, rows=rows('unclaimed', 'claimed-others', 'claimed-yours')),
+        'targeting-colors': Setting(unnamed=True, rows=rows(
             'not-targeted', 'targeted', 'locked-on', 'sub-target', 'out-of-range')),
-        'entity-type-colors': Setting(unnamed=True, rows_fixed=True, rows=rows(
+        'entity-type-colors': Setting(unnamed=True, rows=rows(
             'mob', 'player', 'friend', 'party-member', 'linkshell-member', 'npc-or-object', 'pet')),
         # The entity pages
         'visibility': Setting(entity=True, unnamed=True, rows=VISIBILITY_ROWS,
@@ -155,7 +155,7 @@ PIECES = Pieces(
         'badge-font': Setting(), 'use-rank-system': Setting(), 'weak-color': Setting(), 'resist-color': Setting(),
         'status-resist-color': Setting(), 'immune-color': Setting(),
         'weak-from': Setting(), 'resist-from': Setting(), 'max-elements': Setting(),
-        'status-table': Setting(unnamed=True, rows_fixed=True, rows=rows(
+        'status-table': Setting(unnamed=True, rows=rows(
             'paralyze', 'bind', 'silence', 'slow', 'poison', 'light-sleep', 'dark-sleep', 'blind', 'stun', 'gravity'),
             words={'weak': True, 'resist': True}),
         'respawn-timers': Setting(), 'timer-size': Setting(),
