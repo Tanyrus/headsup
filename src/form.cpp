@@ -520,7 +520,7 @@ namespace headsup
         EndRow();
     }
 
-    void Form::ChecksDropdown(const char* label, LineShow& show, const std::vector<ShowCondition>& conditions,
+    void Form::ChecksDropdown(const char* label, LineShow& show, std::span<const ShowCondition> conditions,
         const char* tip)
     {
         Row(label, tip);

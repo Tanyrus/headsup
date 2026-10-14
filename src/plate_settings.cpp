@@ -104,20 +104,23 @@ namespace headsup
 
     const char* KindKey(PlateKind kind) { return kKindKeys[static_cast<int>(kind)]; }
 
-    std::vector<ShowCondition> ConditionsFor(PlateKind kind)
+    std::span<const ShowCondition> ConditionsFor(PlateKind kind)
     {
+        static constexpr ShowCondition kMobs[] = {ShowCondition::Generally, ShowCondition::Targeted, ShowCondition::Unclaimed,
+            ShowCondition::YourClaim, ShowCondition::OthersClaim, ShowCondition::Engaged, ShowCondition::TooWeak,
+            ShowCondition::Aggressive, ShowCondition::Passive};
+        static constexpr ShowCondition kPlayers[] = {ShowCondition::Generally, ShowCondition::Targeted,
+            ShowCondition::PartyMember, ShowCondition::Friend, ShowCondition::LinkshellMember};
+        static constexpr ShowCondition kSelf[] = {ShowCondition::Generally, ShowCondition::Targeted, ShowCondition::Engaged};
+        static constexpr ShowCondition kPets[] = {ShowCondition::Generally, ShowCondition::Targeted, ShowCondition::OwnerIsYou};
+        static constexpr ShowCondition kOthers[] = {ShowCondition::Generally, ShowCondition::Targeted};
         switch (kind)
         {
-        case PlateKind::Mobs:
-            return {ShowCondition::Generally, ShowCondition::Targeted, ShowCondition::Unclaimed, ShowCondition::YourClaim,
-                ShowCondition::OthersClaim, ShowCondition::Engaged, ShowCondition::TooWeak, ShowCondition::Aggressive,
-                ShowCondition::Passive};
-        case PlateKind::Players:
-            return {ShowCondition::Generally, ShowCondition::Targeted, ShowCondition::PartyMember, ShowCondition::Friend,
-                ShowCondition::LinkshellMember};
-        case PlateKind::Self: return {ShowCondition::Generally, ShowCondition::Targeted, ShowCondition::Engaged};
-        case PlateKind::Pets: return {ShowCondition::Generally, ShowCondition::Targeted, ShowCondition::OwnerIsYou};
-        default: return {ShowCondition::Generally, ShowCondition::Targeted};
+        case PlateKind::Mobs: return kMobs;
+        case PlateKind::Players: return kPlayers;
+        case PlateKind::Self: return kSelf;
+        case PlateKind::Pets: return kPets;
+        default: return kOthers;
         }
     }
 

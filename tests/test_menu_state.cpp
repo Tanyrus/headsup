@@ -81,7 +81,7 @@ TEST(the_show_dropdown_reads_always_one_condition_how_many_or_never)
     const auto NameOfCondition = [](ShowCondition c) {
         return std::string(kWindowLayout.OptionsOf(WindowList::ShowCondition)[static_cast<size_t>(c)].name);
     };
-    const std::vector<ShowCondition> mobs = ConditionsFor(PlateKind::Mobs);
+    const std::span<const ShowCondition> mobs = ConditionsFor(PlateKind::Mobs);
     LineShow show;
     const std::string always = ShowSummary(show, mobs, kWindowLayout);
     show.when = ConditionBit(ShowCondition::YourClaim);
@@ -179,7 +179,7 @@ TEST(a_line_may_sync_with_any_other_line_that_does_not_borrow_from_it)
 
 TEST(unchecking_a_condition_under_always_turns_always_off_and_keeps_the_rest)
 {
-    const std::vector<ShowCondition> offered = ConditionsFor(PlateKind::Players);
+    const std::span<const ShowCondition> offered = ConditionsFor(PlateKind::Players);
     const uint32_t all = ConditionBit(ShowCondition::Generally) | ConditionBit(ShowCondition::Targeted) |
                          ConditionBit(ShowCondition::PartyMember) | ConditionBit(ShowCondition::Friend) |
                          ConditionBit(ShowCondition::LinkshellMember);
@@ -195,7 +195,7 @@ TEST(unchecking_a_condition_under_always_turns_always_off_and_keeps_the_rest)
     CHECK(!show.always && show.when == all);
     CHECK(!ToggleCondition(show, offered, 6) && !ToggleCondition(show, offered, -1)); // no such row
     // The last row is a row like the others: on a pet's page it is the one that asks whose pet it is.
-    const std::vector<ShowCondition> pets = ConditionsFor(PlateKind::Pets);
+    const std::span<const ShowCondition> pets = ConditionsFor(PlateKind::Pets);
     LineShow whose{false, 0};
     CHECK(ToggleCondition(whose, pets, static_cast<int>(pets.size())));
     CHECK_EQ(whose.when, ConditionBit(ShowCondition::OwnerIsYou));

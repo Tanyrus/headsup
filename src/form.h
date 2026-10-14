@@ -9,6 +9,7 @@
 #include "plate_template.h"
 #include "window_layout.h"
 
+#include <span>
 #include <cstdint>
 #include <cstdio>
 #include <functional>
@@ -222,7 +223,7 @@ namespace headsup
         void ColorPickRow(const char* label, ColorPick& pick, const std::vector<ColorSource>& sources, const char* tip);
         // When a line shows, as a dropdown of checks: Always, under which every condition reads checked, then each
         // condition.
-        void ChecksDropdown(const char* label, LineShow& show, const std::vector<ShowCondition>& conditions,
+        void ChecksDropdown(const char* label, LineShow& show, std::span<const ShowCondition> conditions,
             const char* tip);
         // An X and a Y to type, side by side.
         void Offset(const char* label, int& x, int& y, int limit, const char* tip);

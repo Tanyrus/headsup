@@ -67,7 +67,7 @@ namespace headsup
         return zone ? ClockZoneName(*zone) : layout.WordOf(WindowWord::Local).name;
     }
 
-    std::string ShowSummary(const LineShow& show, const std::vector<ShowCondition>& offered, const WindowLayout& layout)
+    std::string ShowSummary(const LineShow& show, std::span<const ShowCondition> offered, const WindowLayout& layout)
     {
         if (show.always) return layout.WordOf(WindowWord::Always).name;
         const auto names = layout.OptionsOf(WindowList::ShowCondition);
@@ -82,7 +82,7 @@ namespace headsup
         return checked > 1 ? Filled(layout.WordOf(WindowWord::Conditions).name, kCountMark, std::to_string(checked)) : only;
     }
 
-    bool ToggleCondition(LineShow& show, const std::vector<ShowCondition>& offered, int row)
+    bool ToggleCondition(LineShow& show, std::span<const ShowCondition> offered, int row)
     {
         if (row < 0 || row > static_cast<int>(offered.size())) return false;
         if (row == 0)

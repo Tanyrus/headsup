@@ -451,7 +451,7 @@ TEST(a_list_of_checks_stays_open_and_a_condition_unchecked_under_always_turns_al
     FormState state;
     LineShow show;
     show.always = false;
-    const std::vector<ShowCondition> conditions = ConditionsFor(PlateKind::Mobs);
+    const std::span<const ShowCondition> conditions = ConditionsFor(PlateKind::Mobs);
     const auto pass = [&](const std::vector<FormEvent>& events) {
         Form form(events, state);
         form.pageKey = "p";

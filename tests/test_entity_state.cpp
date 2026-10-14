@@ -169,7 +169,7 @@ TEST(always_shows_and_otherwise_any_checked_condition_does)
 
 TEST(each_condition_holds_for_its_state_alone)
 {
-    const auto holds = [](ShowCondition c, const EntityState& s, bool youFight = false) { return LineShows(LineShow{false, ConditionBit(c)}, s, youFight); };
+    const auto holds = [](ShowCondition c, const EntityState& s, bool inCombat = false) { return LineShows(LineShow{false, ConditionBit(c)}, s, inCombat); };
     EntityState unclaimed = Mob(Nature::Passive);
     EntityState yours     = Mob(Nature::Aggressive, ClaimState::Yours);
     EntityState others    = Mob(Nature::Aggressive, ClaimState::Others);
@@ -220,7 +220,9 @@ TEST(generally_holds_while_the_entity_is_in_none_of_its_kinds_special_states)
     CHECK(!LineShows(orTargeted, weak, false));
     CHECK(!LineShows(generally, target, false));
     CHECK(!LineShows(generally, Mob(Nature::Passive, ClaimState::Yours), false));
-    CHECK(!LineShows(generally, Mob(Nature::Passive), true));
+    // Your fight is true of every mob at once, so it says nothing against this one: the user's example holds in combat.
+    CHECK(LineShows(generally, Mob(Nature::Passive), true));
+    CHECK(LineShows(orTargeted, mob, true) && !LineShows(orTargeted, weak, true));
     // Every mob is unclaimed or claimed and aggressive or passive: those say nothing against it.
     CHECK(LineShows(generally, Mob(Nature::Passive), false));
     CHECK(LineShows(generally, Placeholder(Category::WillAttack), false));
@@ -237,7 +239,7 @@ TEST(generally_holds_while_the_entity_is_in_none_of_its_kinds_special_states)
     self.self        = true;
     self.playerRow   = PlayerRow::Player;
     CHECK(LineShows(generally, self, false));
-    CHECK(!LineShows(generally, self, true));
+    CHECK(LineShows(generally, self, true));
     EntityState pet = Mob(Nature::Passive);
     pet.pet         = true;
     pet.petRow      = PetRow::Party;

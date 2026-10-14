@@ -8,6 +8,7 @@
 #include "window_layout.h"
 
 #include <algorithm>
+#include <span>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -41,10 +42,10 @@ namespace headsup
 
     // What the Show dropdown reads when closed: Always, the one condition checked, how many are, or Never. Only the
     // conditions the kind is offered count.
-    std::string ShowSummary(const LineShow& show, const std::vector<ShowCondition>& offered, const WindowLayout& layout);
+    std::string ShowSummary(const LineShow& show, std::span<const ShowCondition> offered, const WindowLayout& layout);
     // A click on a row of the Line Visibility list: 0 is Always, then the conditions offered. Unchecking one under
     // Always turns Always off and leaves the others checked. False for no such row.
-    bool ToggleCondition(LineShow& show, const std::vector<ShowCondition>& offered, int row);
+    bool ToggleCondition(LineShow& show, std::span<const ShowCondition> offered, int row);
 
     // A design line's box: its caret, kept between frames for where a clicked tag goes, and whether one of its
     // stretches has the keyboard this frame.
