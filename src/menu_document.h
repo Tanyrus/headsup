@@ -12,8 +12,6 @@ namespace headsup
         Aurora,
     };
     constexpr int kMenuThemeCount = static_cast<int>(MenuTheme::Aurora) + 1;
-    const char* MenuThemeName(MenuTheme theme);
-    const char* MenuThemeTip(MenuTheme theme); // what the theme looks like, for its option
 
     // The settings window's colors (ARGB): a page, the cards on it, the controls on those, each a step lighter, and
     // the trays a step below the page.

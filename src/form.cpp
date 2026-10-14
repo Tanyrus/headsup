@@ -119,7 +119,7 @@ namespace headsup
 
     std::string Form::Shown(const char* label)
     {
-        return TitleCaseText(LabelText(label));
+        return std::string(LabelText(label));
     }
 
     void Form::BeginBlock(const char* id)
@@ -224,7 +224,7 @@ namespace headsup
             const std::string seg = base + kSegmentIdInfix + std::to_string(option);
             if (!m_Off && Clicked(seg)) press(option);
             Out() += "<div class=\"seg\" id=\"" + seg + "\" style=\"width:" + width + ";\">" +
-                     EscapedRml(TitleCaseText(options[option])) + "</div>";
+                     EscapedRml(options[option]) + "</div>";
         }
         Out() += "</div>";
         for (int option = 0; option < count; ++option)
@@ -479,13 +479,15 @@ namespace headsup
     void Form::ColorPickRow(const char* label, ColorPick& pick, const std::vector<ColorSource>& sources, const char* tip)
     {
         Row(label, tip);
-        const auto at = std::ranges::find(sources, pick.source);
-        int chosen    = 0;
+        const auto at    = std::ranges::find(sources, pick.source);
+        const auto words = layout->OptionsOf(WindowList::ColorSource);
+        const auto said  = [&](ColorSource source) { return words[static_cast<size_t>(source)]; };
+        int chosen       = 0;
         // The swatch takes its room from the dropdown, which keeps its place for any other source.
-        if (ListAt(label, SourceLabel(pick.source), kControlWidth - kSquareRoom, static_cast<int>(sources.size()),
-                [&](int i) { return std::string(SourceLabel(sources[static_cast<size_t>(i)])); },
+        if (ListAt(label, std::string(Said(said(pick.source).name)), kControlWidth - kSquareRoom, static_cast<int>(sources.size()),
+                [&](int i) { return std::string(Said(said(sources[static_cast<size_t>(i)]).name)); },
                 at != sources.end() ? static_cast<int>(at - sources.begin()) : -1, chosen, nullptr,
-                [&](int i) { return std::string(SourceTip(sources[static_cast<size_t>(i)])); }))
+                [&](int i) { return std::string(Said(said(sources[static_cast<size_t>(i)]).tip)); }))
         {
             pick.source = sources[static_cast<size_t>(chosen)];
             changed     = true;
@@ -510,7 +512,7 @@ namespace headsup
                 if (event.type != kClickEvent || event.id.compare(0, start.size(), start) != 0) continue;
                 changed |= ToggleCondition(show, conditions, std::atoi(event.id.c_str() + start.size()));
             }
-        if (ListControl(control, ShowSummary(show, conditions), kControlWidth))
+        if (ListControl(control, ShowSummary(show, conditions, *layout), kControlWidth))
         {
             std::string rml = "<div class=\"list\">";
             const auto row  = [&](int index, const char* name, const char* tip, bool on) {
@@ -519,10 +521,14 @@ namespace headsup
                        EscapedRml(name) + "</div>";
                 Set(id, FormValueKind::Class, "on", {}, on);
             };
-            row(0, kShowAlways, kShowAlwaysTip, show.always);
+            const LayoutWord& always = layout->WordOf(WindowWord::Always);
+            const auto names         = layout->OptionsOf(WindowList::ShowCondition);
+            row(0, always.name, always.tip, show.always);
             for (size_t i = 0; i < conditions.size(); ++i)
-                row(static_cast<int>(i) + 1, ConditionLabel(conditions[i]), ConditionTip(conditions[i]),
-                    show.always || (show.when & ConditionBit(conditions[i])) != 0);
+            {
+                const LayoutOption& condition = names[static_cast<size_t>(conditions[i])];
+                row(static_cast<int>(i) + 1, condition.name, condition.tip, show.always || (show.when & ConditionBit(conditions[i])) != 0);
+            }
             popup = FormPopup{control, rml + "</div>"};
         }
         EndRow();

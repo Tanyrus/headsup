@@ -61,8 +61,9 @@ namespace headsup
         }
     };
 
-    // One pass of the window: the sidebar, then the open page's cards. fonts: FontChoices, for the nameplates' and
-    // the bar's fonts. menuFonts: the fonts the window itself can be set in.
+    // One pass of the window: the sidebar, then the open page's cards, as the layout orders and words them. fonts:
+    // FontChoices, for the nameplates' and the bar's fonts. menuFonts: the fonts the window itself can be set in.
     void BuildMenu(Form& form, Settings& settings, const MenuReadings& readings, MenuFormState& state,
-        const std::vector<std::string>& fonts, const std::vector<std::string>& menuFonts);
+        const std::vector<std::string>& fonts, const std::vector<std::string>& menuFonts,
+        const WindowLayout& layout = kWindowLayout);
 }

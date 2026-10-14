@@ -13,39 +13,17 @@ namespace headsup
         return changedAt && (!windowOpen || now - *changedAt >= kSaveSettleSeconds);
     }
 
-    namespace
+    std::string Filled(std::string_view text, std::string_view mark, std::string_view with)
     {
-        constexpr const char* kLocalZoneLabel = "Local";
-    }
-
-    const PageInfo kPages[kPageCount] = {
-        {Page::Entities, "Entities", false},
-        {Page::Mobs, "Mobs", true},
-        {Page::Players, "Players", true},
-        {Page::Self, "Self", true},
-        {Page::Npcs, "NPCs", true},
-        {Page::Pets, "Pets", true},
-        {Page::UserInterface, "User Interface", false},
-        {Page::TopPanel, "Top Panel", true},
-        {Page::Widgets, "Widgets", true},
-        {Page::MouseCursor, "Mouse Cursor", true},
-        {Page::ConfigMenu, "Config Menu", false},
-        {Page::Debug, "Debug", false},
-    };
-
-    std::string PageKey(Page page)
-    {
-        std::string key;
-        for (const char c : std::string_view(kPages[static_cast<int>(page)].label))
-            if (c != ' ') key += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return key;
-    }
-
-    std::optional<Page> PageNamed(std::string_view key)
-    {
-        for (const PageInfo& info : kPages)
-            if (PageKey(info.page) == key) return info.page;
-        return std::nullopt;
+        std::string out;
+        for (size_t at = 0;;)
+        {
+            const size_t found = text.find(mark, at);
+            out += text.substr(at, found - at);
+            if (found == std::string_view::npos) return out;
+            out += with;
+            at = found + mark.size();
+        }
     }
 
     std::optional<PlateKind> KindOfPage(Page page)
@@ -96,26 +74,25 @@ namespace headsup
         return static_cast<ClockZone>(choice - 1);
     }
 
-    std::string ClockZoneChoiceName(int choice)
+    std::string ClockZoneChoiceName(int choice, const WindowLayout& layout)
     {
         const std::optional<ClockZone> zone = ClockZoneOfChoice(choice);
-        return zone ? ClockZoneName(*zone) : kLocalZoneLabel;
+        return zone ? ClockZoneName(*zone) : layout.WordOf(WindowWord::Local).name;
     }
 
-    std::string ShowSummary(const LineShow& show, const std::vector<ShowCondition>& offered)
+    std::string ShowSummary(const LineShow& show, const std::vector<ShowCondition>& offered, const WindowLayout& layout)
     {
-        constexpr const char* kNever = "Never";
-        constexpr const char* kMany  = " Conditions";
-        if (show.always) return kShowAlways;
+        if (show.always) return layout.WordOf(WindowWord::Always).name;
+        const auto names = layout.OptionsOf(WindowList::ShowCondition);
         int checked      = 0;
-        const char* only = kNever;
+        const char* only = layout.WordOf(WindowWord::Never).name;
         for (const ShowCondition condition : offered)
         {
             if ((show.when & ConditionBit(condition)) == 0) continue;
             ++checked;
-            only = ConditionLabel(condition);
+            only = names[static_cast<size_t>(condition)].name;
         }
-        return checked > 1 ? std::to_string(checked) + kMany : only;
+        return checked > 1 ? Filled(layout.WordOf(WindowWord::Conditions).name, kCountMark, std::to_string(checked)) : only;
     }
 
     bool ToggleCondition(LineShow& show, const std::vector<ShowCondition>& offered, int row)
@@ -162,19 +139,20 @@ namespace headsup
         return entry >= 1 && entry <= static_cast<int>(targets.size()) ? targets[static_cast<size_t>(entry) - 1] : kNoSync;
     }
 
-    std::string SyncEntryLabel(const std::vector<int>& targets, int entry)
+    std::string SyncEntryLabel(const std::vector<int>& targets, int entry, const WindowLayout& layout)
     {
-        constexpr const char* kNoSyncLabel = "Do Not Sync";
-        constexpr const char* kSyncWith    = "Sync with ";
         const int line = SyncOfEntry(targets, entry);
-        return line == kNoSync ? kNoSyncLabel : kSyncWith + std::string(kLineLabels[line]);
+        if (line == kNoSync) return layout.WordOf(WindowWord::LineStylesDoNotSync).name;
+        return Filled(layout.WordOf(WindowWord::LineStylesSyncWith).name, kLineMark,
+            layout.OptionsOf(WindowList::PlateLines)[static_cast<size_t>(line)].name);
     }
 
-    std::string SyncEntryTip(const std::vector<int>& targets, int entry)
+    std::string SyncEntryTip(const std::vector<int>& targets, int entry, const WindowLayout& layout)
     {
         const int line = SyncOfEntry(targets, entry);
-        if (line == kNoSync) return "This line keeps a style of its own.";
-        return std::string("Every setting below is the ") + kLineLabels[line] + "'s, so the two always match.";
+        if (line == kNoSync) return std::string(Said(layout.WordOf(WindowWord::LineStylesDoNotSync).tip));
+        return Filled(Said(layout.WordOf(WindowWord::LineStylesSyncWith).tip), kLineMark,
+            layout.OptionsOf(WindowList::PlateLines)[static_cast<size_t>(line)].name);
     }
 
     namespace

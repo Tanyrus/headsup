@@ -14,6 +14,7 @@
 #include <cstring>
 #include <initializer_list>
 #include <optional>
+#include <span>
 #include <utility>
 
 namespace headsup
@@ -26,43 +27,101 @@ namespace headsup
         constexpr const char* kWidgetChip  = "chip "; // a tray chip's name in its card, before its widget's number
         constexpr float kAddWindowShare    = 0.8f;    // of a dropdown's width: a group's "+ Add Window"
         constexpr size_t kMaxFindText      = 31;      // letters of a window's name to look for
+        constexpr int kHelpWidget          = static_cast<int>(BarWidget::GameHelp);
+
+        // What a page is drawn with and from.
+        struct Context
+        {
+            Form& form;
+            Settings& s;
+            const MenuReadings& readings;
+            MenuFormState& state;
+            const std::vector<std::string>& fonts;
+            const std::vector<std::string>& menuFonts;
+            const WindowLayout& layout;
+            std::optional<PlateKind> kind; // an entity page's
+            bool plates        = false;    // the kind has a row that draws a nameplate
+            bool outlineColors = false;    // and one outlined in its own color pick
+        };
+
+        std::string Words(const char* text) { return std::string(Said(text)); }
+
+        // A label that shows name and names its control's id by key, and scope where one control is drawn for
+        // several lines or widgets, whatever name says.
+        std::string Labeled(const char* name, std::string_view key, std::string_view scope = {})
+        {
+            return Words(name) + "##" + std::string(key) + std::string(scope);
+        }
+        const char* Word(const Context& c, WindowWord word) { return c.layout.WordOf(word).name; }
+        const char* WordTip(const Context& c, WindowWord word) { return c.layout.WordOf(word).tip; }
+
+        // A tip that says how near a fade begins.
+        std::string Near(const char* tip) { return Filled(Said(tip), kNearMark, Formatted("%.0f", kFadeNearYalms)); }
+
+        // A list's names, for the kit's rows of choices and named steps.
+        std::vector<const char*> NamesOf(std::span<const LayoutOption> options)
+        {
+            std::vector<const char*> names;
+            for (const LayoutOption& option : options)
+                names.push_back(option.name != nullptr ? option.name : "");
+            return names;
+        }
+
+        // A dropdown of a list's options for a value of the enum they name, in its order.
+        template <typename Enum>
+        void OptionsDropdown(Form& form, const std::string& label, Enum& value, std::span<const LayoutOption> options,
+            const char* tip)
+        {
+            int picked = static_cast<int>(value);
+            form.NumberDropdown(label.c_str(), picked, 0, static_cast<int>(options.size()) - 1,
+                [&](int i) { return Words(options[static_cast<size_t>(i)].name); }, tip, 0.0f,
+                [&](int i) { return Words(options[static_cast<size_t>(i)].tip); });
+            value = static_cast<Enum>(picked);
+        }
+
+        // Whether a mob's design holds one of these tags, which the settings of a card show through.
+        bool Uses(const Settings& s, std::initializer_list<Tag> tags)
+        {
+            return UnusedTagsNote(s.Kind(PlateKind::Mobs), tags, kShowsTheseEnding).empty();
+        }
 
         // The pages as pills, the picked one filled; a child page is indented.
-        void Sidebar(Form& form, MenuFormState& state)
+        void Sidebar(Context& c)
         {
+            Form& form = c.form;
             form.BeginBlock(kSidebarBlock);
-            for (const PageInfo& info : kPages)
+            for (const LayoutPage& page : c.layout.pages)
             {
-                const std::string id = kNavStart + PageKey(info.page);
-                if (form.Clicked(id) && state.page != info.page)
+                const std::string id = kNavStart + std::string(page.key);
+                if (form.Clicked(id) && c.state.page != page.page)
                 {
-                    state.Leave();
-                    state.page       = info.page;
+                    c.state.Leave();
+                    c.state.page     = page.page;
                     form.scrollToTop = true;
                 }
-                form.Raw(std::string("<div class=\"nav") + (info.child ? " child" : "") + "\" id=\"" + id + "\">" +
-                         EscapedRml(info.label) + "</div>");
+                form.Raw(std::string("<div class=\"nav") + (page.child ? " child" : "") + "\" id=\"" + id + "\">" +
+                         EscapedRml(page.name) + "</div>");
             }
-            for (const PageInfo& info : kPages)
-                form.Set(kNavStart + PageKey(info.page), FormValueKind::Class, "picked", {}, info.page == state.page);
+            for (const LayoutPage& page : c.layout.pages)
+                form.Set(kNavStart + std::string(page.key), FormValueKind::Class, kPickedClass, {}, page.page == c.state.page);
         }
 
         // A row of keys: each a chip that a click removes, and while there are fewer than most, a chip that takes
         // the next key pressed that was not already held.
-        void Keys(Form& form, const char* label, const char* tip, std::vector<uint8_t>& keys, size_t most,
+        void Keys(Context& c, const std::string& label, const char* tip, std::vector<uint8_t>& keys, size_t most,
             KeyCapture& capture)
         {
-            const std::string name = label;
-            form.Row(label, tip);
+            Form& form = c.form;
+            form.Row(label.c_str(), tip);
             form.EndRow();
             form.Line("line chips");
             std::optional<size_t> removed;
             for (size_t i = 0; i < keys.size(); ++i)
-                if (form.Button((KeyName(keys[i]) + "  x").c_str(), (name + " key " + std::to_string(i)).c_str(), kChip))
+                if (form.Button((KeyName(keys[i]) + "  x").c_str(), (label + " key " + std::to_string(i)).c_str(), kChip))
                     removed = i;
             if (capture.on)
             {
-                if (form.Button("Press a Key...", (name + " cancel").c_str(), "btn flat chip waiting"))
+                if (form.Button(Word(c, WindowWord::KeyWaiting), (label + " cancel").c_str(), "btn flat chip waiting"))
                     capture.on = false;
                 else if (form.keyDown)
                     for (const uint8_t key : HeldKeys(form.keyDown))
@@ -77,7 +136,7 @@ namespace headsup
                         break;
                     }
             }
-            else if (keys.size() < most && form.Button("+ Add Key", (name + " add").c_str(), kQuietChip))
+            else if (keys.size() < most && form.Button(Word(c, WindowWord::KeyAdd), (label + " add").c_str(), kQuietChip))
                 capture = KeyCapture{true, form.keyDown ? HeldKeys(form.keyDown) : std::vector<uint8_t>{}};
             form.EndLine();
             if (removed)
@@ -88,93 +147,35 @@ namespace headsup
         }
 
         // Every setting back to HeadsUp's defaults, after a second press.
-        void Reset(Form& form, Settings& s, bool& confirm)
+        void ResetAll(Context& c, const LayoutSetting& e)
         {
-            if (!form.BeginCard("Reset")) return;
-            if (!confirm)
-            {
-                if (form.Action("Reset All Settings", "Every setting on every page back to its default.")) confirm = true;
-            }
-            else
-            {
-                form.Note("Every setting goes back to its default. This cannot be undone.");
-                form.Line();
-                if (form.Button("Reset Everything", "reset everything", kAccentPill))
-                {
-                    s            = Settings{};
-                    form.changed = true;
-                    confirm      = false;
-                }
-                if (form.Button("Keep Them", "keep them", kRaisedPill)) confirm = false;
-                form.EndLine();
-            }
-            form.EndCard();
-        }
-
-        void ConfigMenuPage(Form& form, Settings& s, MenuFormState& state, const std::vector<std::string>& menuFonts)
-        {
-            if (form.BeginCard("Settings Window"))
-            {
-                form.EnumDropdown("Theme", s.menuTheme, kMenuThemeCount, MenuThemeName, "The window's colors and light.", MenuThemeTip);
-                form.FontDropdown("Font", s.menuFont, menuFonts, "Titles stay in the bar's font.");
-                form.SliderInt("Size", s.menuScale, kMinMenuScale, kMaxMenuScale, "%d%%",
-                    "Drag its corner to resize the window.");
-                form.SliderInt("Window Opacity", s.menuOpacity, kMinMenuOpacity, kMaxOpacity, "%d%%",
-                    "How much of the game shows through this window.");
-                form.EndCard();
-            }
-            Reset(form, s, state.confirmReset);
-        }
-
-        void MouseCursorPage(Form& form, Settings& s, MenuFormState& state)
-        {
-            form.Fade(!s.enabled);
-            if (form.BeginCard("Mouse Pointer"))
-            {
-                form.Switch("Chocobo", s.chocoboPointer, "PlayOnline's chocobo as the mouse pointer.");
-                form.Switch("Pointer fix", s.fixPointer,
-                    "Keeps the game's pointer under yours after a resize, and clicks where you click. It also shows the "
-                    "pointer again over Ashita's windows.");
-                Keys(form, "Keep pointer",
-                    "The game hides its pointer when a key runs a command. While only these keys are held, it stays.",
-                    s.keepPointerKeys, kMaxKeptKeys, state.keyCapture);
-                form.EndCard();
-            }
+            Form& form = c.form;
             form.Fade(false);
-        }
-
-        void DebugPage(Form& form, Settings& s, const MenuReadings& r, MenuFormState& state)
-        {
-            if (form.BeginCard("HeadsUp", &s.enabled, "All of HeadsUp, as /hu on and /hu off."))
+            if (!c.state.confirmReset)
             {
-                if (form.Action("Debug Report", "As /hu debug: writes a report to logs/headsup.")) state.debugRequested = true;
-                form.EndCard();
+                if (form.Action(Labeled(e.name, e.key).c_str(), e.tip)) c.state.confirmReset = true;
+                return;
             }
-            if (form.BeginCard("This Frame"))
+            form.Note(Word(c, WindowWord::ResetAllSettingsNote));
+            form.Line();
+            if (form.Button(Word(c, WindowWord::ResetAllSettingsResetEverything), "reset everything", kAccentPill))
             {
-                form.Reading("Mobs outlined", std::to_string(r.outlinedMobs));
-                form.Reading("Meshes outlined", std::to_string(r.meshes));
-                form.Reading("Stencil buffer", r.stencilAvailable ? "available" : "missing: no outlines");
-                form.Reading("Nameplates", std::to_string(r.nameplates));
-                form.Reading("Drawn", r.drewInScene ? "into the scene" : "on top");
-                form.Reading("Game's names",
-                    r.hooked ? Formatted("%u, %u by HeadsUp, %u hidden", r.names, r.replaced, r.hidden) : "not hooked");
-                form.Reading("Frame time",
-                    Formatted("%.2f ms (%.0f fps)", r.frameMs, r.frameMs > 0.0 ? 1000.0 / r.frameMs : 0.0));
-                form.Reading("Last save",
-                    Formatted("%.0f ms, %zu %s", r.lastSaveMs, r.lastSaveKeys, r.lastSaveKeys == 1 ? "key" : "keys"));
-                form.Reading("Your level",
-                    r.level > 0 ? Formatted("%d%s", r.level, r.sitting ? ", sitting" : "") : std::string("unknown"));
-                form.EndCard();
+                c.s                  = Settings{};
+                form.changed         = true;
+                c.state.confirmReset = false;
             }
+            if (form.Button(Word(c, WindowWord::ResetAllSettingsKeepThem), "keep them", kRaisedPill)) c.state.confirmReset = false;
+            form.EndLine();
         }
 
         // Each group: its name to type, its Under Bar switch and offset, a remove button, then its windows as chips a
         // click takes out and a dropdown that adds one no group has.
-        void WindowGroups(Form& form, Settings& s)
+        void WindowGroups(Context& c)
         {
-            form.Note("Windows in a group move by its offset together, keeping their places beside each other. Each "
-                      "window's own X and Y below still moves it within the group.");
+            Form& form  = c.form;
+            Settings& s = c.s;
+            form.Fade(false);
+            form.Note(Word(c, WindowWord::GroupsNote));
             std::optional<size_t> removed;
             for (size_t g = 0; g < s.windowGroups.size(); ++g)
             {
@@ -189,11 +190,10 @@ namespace headsup
                     form.changed = true;
                 }
                 form.Raw("<div class=\"gap\"></div>");
-                form.CheckAt((name + " under").c_str(), group.underBar, "Under Bar: the whole group goes below the help bar.");
+                form.CheckAt((name + " under").c_str(), group.underBar, WordTip(c, WindowWord::GroupsUnderBar));
                 form.NumberAt("X", (name + " x").c_str(), group.x, kMaxWindowOffset);
                 form.NumberAt("Y", (name + " y").c_str(), group.y, kMaxWindowOffset);
-                if (form.Button("x", (name + " remove").c_str(), "btn raised round",
-                        "Removes the group; its windows stay where the game puts them."))
+                if (form.Button("x", (name + " remove").c_str(), "btn raised round", WordTip(c, WindowWord::GroupsRemove)))
                     removed = g;
                 form.EndLine();
                 // Its windows, then the one to add.
@@ -210,8 +210,9 @@ namespace headsup
                         }))
                         free.push_back(window);
                 int chosen = 0;
-                if (form.ListAt((name + " add").c_str(), "+ Add Window", kControlWidth * kAddWindowShare, static_cast<int>(free.size()),
-                        [&](int i) { return WindowName(free[static_cast<size_t>(i)]); }, -1, chosen))
+                if (form.ListAt((name + " add").c_str(), Word(c, WindowWord::GroupsAddWindow), kControlWidth * kAddWindowShare,
+                        static_cast<int>(free.size()), [&](int i) { return WindowName(free[static_cast<size_t>(i)]); }, -1,
+                        chosen))
                 {
                     group.windows.push_back(free[static_cast<size_t>(chosen)]);
                     form.changed = true;
@@ -228,49 +229,55 @@ namespace headsup
                 s.windowGroups.erase(s.windowGroups.begin() + static_cast<std::ptrdiff_t>(*removed));
                 form.changed = true;
             }
-            if (s.windowGroups.size() < kMaxWindowGroups && form.Action("+ New Group"))
+            if (s.windowGroups.size() < kMaxWindowGroups &&
+                form.Action(Labeled(Word(c, WindowWord::GroupsNewGroup), "new-group").c_str()))
             {
                 s.windowGroups.push_back(WindowGroup{"Group " + std::to_string(s.windowGroups.size() + 1), 0, 0, false, {}});
                 form.changed = true;
             }
         }
 
-        // The game's windows HeadsUp moves out from under the help bar, and those it has seen there.
-        void MovedWindows(Form& form, Settings& s, const MenuReadings& readings, WindowFilter& list)
+        // Three ways to set every game window at once.
+        void WindowDefaults(Context& c)
         {
-            form.Switch("Every Window", s.allUnderBar,
-                "Every window that opens under the bar goes below it, not only those switched on or grouped.");
-            form.Switch("Game Help", s.moveGameHelp,
-                "The game's own help bar goes under the top panel, and the windows under it. Off while it is hidden.");
+            Form& form = c.form;
+            form.Fade(false);
             form.Line();
-            if (form.Button("HeadsUp Defaults", "headsup defaults", kRaisedPill,
-                    "Every window under the bar, the game's help too, in the groups the game opens them in. Offsets are "
-                    "cleared."))
+            const auto button = [&](WindowWord word, const char* id, const char* look) {
+                return form.Button(Word(c, word), id, look, WordTip(c, word));
+            };
+            if (button(WindowWord::WindowDefaultsHeadsupDefaults, "headsup defaults", kRaisedPill))
             {
-                UseHeadsUpWindowDefaults(s);
+                UseHeadsUpWindowDefaults(c.s);
                 form.changed = true;
             }
-            if (form.Button("HeadsUp Help", "headsup help", kRaisedPill,
-                    "HeadsUp's help text in place of the game's help bar, which is hidden, and every window under it."))
+            if (button(WindowWord::WindowDefaultsHeadsupHelp, "headsup help", kRaisedPill))
             {
-                UseHelpTextDefaults(s);
+                UseHelpTextDefaults(c.s);
                 form.changed = true;
             }
-            if (form.Button("Game Defaults", "game defaults", kFlatPill,
-                    "Every window where the game puts it: nothing moved, no groups, no offsets."))
+            if (button(WindowWord::WindowDefaultsGameDefaults, "game defaults", kFlatPill))
             {
-                UseGameWindowDefaults(s);
+                UseGameWindowDefaults(c.s);
                 form.changed = true;
             }
             form.EndLine();
-            form.Note("Under Bar takes a window below the help bar, all together; X and Y move it from where the game "
-                      "puts it. Type a number, then Enter.");
+        }
+
+        // The game's windows HeadsUp moves out from under the help bar, and those it has seen there.
+        void WindowList(Context& c)
+        {
+            Form& form         = c.form;
+            Settings& s        = c.s;
+            WindowFilter& list = c.state.windows;
+            form.Fade(false);
+            form.Note(Word(c, WindowWord::WindowListNote));
             {
-                form.Row("Find", nullptr);
-                form.TextAt("find window", list.text, "Name", kFilterWidth, true, kMaxFindText);
+                form.Row(Labeled(Word(c, WindowWord::WindowListFind), "find").c_str(), nullptr);
+                form.TextAt("find window", list.text, Word(c, WindowWord::WindowListNameHint), kFilterWidth, true, kMaxFindText);
                 // Which windows are listed is the window's state, and no setting to save.
                 const bool was = form.changed;
-                form.CheckAt("all windows", list.all, "Every window the game has, not only the named ones and yours.");
+                form.CheckAt("all windows", list.all, WordTip(c, WindowWord::WindowListAllWindows));
                 form.changed = was;
                 form.EndRow();
             }
@@ -285,20 +292,19 @@ namespace headsup
                 const char* label = WindowLabel(name);
                 if (!(list.all || label != nullptr || has(s.movedWindows, name) ||
                         std::ranges::any_of(s.windowOffsets, [&](const WindowOffset& o) { return o.name == name; }) ||
-                        (readings.seenWindows != nullptr && has(*readings.seenWindows, name))))
+                        (c.readings.seenWindows != nullptr && has(*c.readings.seenWindows, name))))
                     continue;
                 if (Matches(name, list.text.c_str()) || (label != nullptr && Matches(label, list.text.c_str())))
                     listed.push_back(name);
             }
             for (const std::string& window : listed)
             {
-                const auto at     = std::ranges::find(s.movedWindows, window);
-                bool moved        = at != s.movedWindows.end();
-                const bool was    = moved;
-                const char* label = WindowLabel(window);
-                const std::string name = label != nullptr ? std::string(label) : window;
-                form.Row((name + "##" + name + " window " + window).c_str(),
-                    "Under Bar, then its X and Y offset.");
+                const auto at          = std::ranges::find(s.movedWindows, window);
+                bool moved             = at != s.movedWindows.end();
+                const bool was         = moved;
+                const char* label      = WindowLabel(window);
+                const std::string name = TitleCaseText(label != nullptr ? std::string(label) : window); // the game's own
+                form.Row((name + "##" + name + " window " + window).c_str(), WordTip(c, WindowWord::WindowListRowTip));
                 form.CheckAt(("under " + window).c_str(), moved);
                 auto offset = std::ranges::find(s.windowOffsets, window, &WindowOffset::name);
                 int dx = offset != s.windowOffsets.end() ? offset->x : 0, dy = offset != s.windowOffsets.end() ? offset->y : 0;
@@ -325,138 +331,115 @@ namespace headsup
             }
         }
 
-        void UserInterfacePage(Form& form, Settings& s, const MenuReadings& readings, MenuFormState& state)
+        // One widget's options: its switch, its section, what it shows and its own settings, as the layout orders
+        // them; a row the widget has nothing for is left out.
+        void WidgetOptions(Context& c, const LayoutSetting& e, BarWidget widget)
         {
-            form.Fade(false);
-            // First: the cards under it list every window and run long.
-            if (form.BeginCard("Screenshot Mode", nullptr,
-                    "Every name, the top panel and every addon window go, as with /hu screenshot. Ashita's /screenshot "
-                    "hide turns it on by itself for its picture."))
-            {
-                std::vector<uint8_t> key;
-                if (s.screenshotKey != 0) key.push_back(static_cast<uint8_t>(s.screenshotKey));
-                Keys(form, "Key", "Turns screenshot mode on and off. The game sees the key too, so pick one it does not use.",
-                    key, 1, state.shotKeyCapture);
-                s.screenshotKey = key.empty() ? 0 : key.front();
-                form.Switch("Hide game windows", s.screenshotHidesGame, "The game's own windows and chat go too.");
-                form.EndCard();
-            }
-            if (form.BeginCard("Window Groups"))
-            {
-                WindowGroups(form, s);
-                form.EndCard();
-            }
-            if (form.BeginCard("Game Windows"))
-            {
-                MovedWindows(form, s, readings, state.windows);
-                form.EndCard();
-            }
-        }
-
-        void TopPanelPage(Form& form, Settings& s, const MenuReadings& readings, const std::vector<std::string>& fonts)
-        {
-            form.Fade(!s.enabled);
-            if (form.BeginCard("Top Panel", &s.showBar,
-                    "Hover a widget for details; click it to keep them open. The Widgets page has each one's options."))
-            {
-                form.Fade(!BarOn(s));
-                form.EnumDropdown("Theme", s.barTheme, kBarThemeCount, BarThemeName, nullptr, BarThemeTip);
-                const char* const separators[kBarSeparatorsCount] = {"Theme's", "Diamonds", "None"};
-                form.Segments("Separators", s.barSeparators, separators, kBarSeparatorsCount, nullptr, kWideSegmentWidth);
-                form.FontDropdown("Title font", s.barTitleFont, fonts, nullptr, kThemeFont);
-                form.FontDropdown("Text font", s.barTextFont, fonts, nullptr, kThemeFont);
-                form.SliderInt("Height", s.barHeight, kMinBarHeight, kMaxBarHeight, "%d px", nullptr);
-                std::string textSize = "%d px";
-                if (s.barTextSize == kAutoBarTextSize)
-                    textSize = "Auto";
-                else if (readings.barTitlePixels > 0 && readings.barTitlePixels != s.barTextSize)
-                    textSize = Formatted("%%d px (%d fits)", readings.barTitlePixels);
-                form.SliderInt("Text size", s.barTextSize, kAutoBarTextSize, kMaxBarTextSize, textSize.c_str(),
-                    "Auto follows the height. Too large for two lines, the second line goes as One Line says.");
-                const char* const oneLine[kSubtitlePlaceCount] = {"Hide", "Before", "After"};
-                form.Segments("One line", s.barSubtitle, oneLine, kSubtitlePlaceCount,
-                    "On a bar too short for two lines, each widget's second line goes before or after its title, or is "
-                    "left off.");
-                form.SliderInt("Popup size", s.popupTextSize, kAutoPopupTextSize, kMaxBarTextSize,
-                    s.popupTextSize == kAutoPopupTextSize ? "Auto" : "%d px", "Auto follows the height.");
-                form.Fade(!s.enabled);
-                form.Switch("Hide readout", s.hideNetstat, "The game's S, R and % numbers at the top right.");
-                form.EndCard();
-            }
-            const int help = static_cast<int>(BarWidget::GameHelp);
-            form.Fade(!BarOn(s));
-            if (form.BeginCard("Help Bar", &s.barWidgets[help], kBarWidgetTips[help]))
-            {
-                form.Fade(!s.enabled);
-                form.Switch("Hide game help", s.hideHelpBar, "The game's own help bar, which the top panel covers.");
-                form.Fade(!BarOn(s) || !s.barWidgets[help]);
-                form.Offset("Position", s.helpBarX, s.helpBarY, kMaxHelpBarOffset,
-                    "Pixels from its place under the top panel.");
-                form.Switch("Background", s.helpBarBackground, "Off, the help text alone, with no bar behind it.");
-                form.EndCard();
-            }
-            form.Fade(false);
-        }
-
-        // One widget's options: its switch, its section, what it shows and its own settings.
-        void WidgetOptions(Form& form, Settings& s, BarWidget widget)
-        {
+            Form& form  = c.form;
+            Settings& s = c.s;
             const int w = static_cast<int>(widget);
-            form.Note(kBarWidgetTips[w]);
-            // Each widget's controls have ids of their own: nothing open or typed in is carried to another tab.
-            const auto label = [widget](const char* text) { return std::string(text) + "##" + text + " " + BarWidgetName(widget); };
-            form.Switch(label("Enabled").c_str(), s.barWidgets[w], nullptr);
-            form.Fade(!BarOn(s) || !s.barWidgets[w]);
-            auto [section, index] = PlaceOf(s.barSections, widget);
-            int moved             = section;
-            form.Segments(label("Section").c_str(), moved, kBarSectionLabels, kBarSectionCount, nullptr);
-            if (moved != section)
-                form.changed |= MoveWidget(s.barSections, static_cast<BarSection>(section), index,
-                    static_cast<BarSection>(moved), s.barSections[moved].size());
-            if (HasSecondLine(widget)) form.Switch(label("Second line").c_str(), s.barSecondLine[w], nullptr);
-            if (HasIcons(widget)) form.Switch(label("Icons").c_str(), s.barIcons[w], nullptr);
-            switch (widget)
+            form.Note(c.layout.OptionsOf(WindowList::BarWidgets)[static_cast<size_t>(w)].tip);
+            const bool off = !BarOn(s) || !s.barWidgets[w];
+            for (const LayoutRow& row : c.layout.RowsOf(e))
             {
-            case BarWidget::Target:
-                form.Switch("Details", s.barTargetDetails, "Aggro icons after the name, weaknesses after the level.");
-                break;
-            case BarWidget::Gil:
-                form.NumberDropdown("Currency", s.barCurrency, kGilCurrency, kCurrencyCount - 1,
-                    [](int c) { return std::string(kCurrencyTable[c].name); }, nullptr);
-                break;
-            case BarWidget::EarthTime:
-            {
-                int zone = ClockZoneChoice(s.clockZone);
-                form.NumberDropdown("Time zone", zone, 0, kClockZoneChoices - 1, ClockZoneChoiceName,
-                    "Local is your computer's. Another zone goes before the time, as in PDT 21:07.");
-                s.clockZone = ClockZoneOfChoice(zone);
-                form.Switch("Server time", s.clockServerTime,
-                    "Japan's time, which the server keeps and the resets go by, as a second line under your own.");
-                form.Switch("24-hour", s.clock24, nullptr);
-                form.Switch("Seconds", s.clockSeconds, "On your own line.");
-                break;
+                // The rows every widget has take ids of their own: nothing open or typed is carried to another tab.
+                const std::string label = Labeled(row.name, row.key, std::string(" ") + BarWidgetName(widget));
+                const std::string own   = Labeled(row.name, row.key);
+                form.Fade(off);
+                switch (static_cast<WidgetTabsRow>(row.row))
+                {
+                case WidgetTabsRow::Enabled:
+                    form.Fade(!BarOn(s));
+                    form.Switch(label.c_str(), s.barWidgets[w], row.tip);
+                    break;
+                case WidgetTabsRow::Section:
+                {
+                    auto [section, index] = PlaceOf(s.barSections, widget);
+                    int moved             = section;
+                    const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(WindowList::BarSections));
+                    form.Segments(label.c_str(), moved, names.data(), kBarSectionCount, row.tip);
+                    if (moved != section)
+                        form.changed |= MoveWidget(s.barSections, static_cast<BarSection>(section), index,
+                            static_cast<BarSection>(moved), s.barSections[moved].size());
+                    break;
+                }
+                case WidgetTabsRow::SecondLine:
+                    if (HasSecondLine(widget)) form.Switch(label.c_str(), s.barSecondLine[w], row.tip);
+                    break;
+                case WidgetTabsRow::Icons:
+                    if (HasIcons(widget)) form.Switch(label.c_str(), s.barIcons[w], row.tip);
+                    break;
+                case WidgetTabsRow::Details:
+                    if (widget == BarWidget::Target) form.Switch(own.c_str(), s.barTargetDetails, row.tip);
+                    break;
+                case WidgetTabsRow::Currency:
+                    if (widget == BarWidget::Gil)
+                        form.NumberDropdown(own.c_str(), s.barCurrency, kGilCurrency, kCurrencyCount - 1,
+                            [](int currency) { return std::string(kCurrencyTable[currency].name); }, row.tip);
+                    break;
+                case WidgetTabsRow::TimeZone:
+                    if (widget == BarWidget::EarthTime)
+                    {
+                        int zone = ClockZoneChoice(s.clockZone);
+                        form.NumberDropdown(own.c_str(), zone, 0, kClockZoneChoices - 1,
+                            [&](int choice) { return ClockZoneChoiceName(choice, c.layout); }, row.tip);
+                        s.clockZone = ClockZoneOfChoice(zone);
+                    }
+                    break;
+                case WidgetTabsRow::ServerTime:
+                    if (widget == BarWidget::EarthTime) form.Switch(own.c_str(), s.clockServerTime, row.tip);
+                    break;
+                case WidgetTabsRow::N24Hour:
+                    if (widget == BarWidget::EarthTime) form.Switch(own.c_str(), s.clock24, row.tip);
+                    break;
+                case WidgetTabsRow::Seconds:
+                    if (widget == BarWidget::EarthTime) form.Switch(own.c_str(), s.clockSeconds, row.tip);
+                    break;
+                case WidgetTabsRow::Layout:
+                    if (widget == BarWidget::Job)
+                    {
+                        const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(WindowList::JobLayout));
+                        form.Segments(own.c_str(), s.jobLayout, names.data(), kJobLayoutCount, row.tip, kWideSegmentWidth);
+                    }
+                    break;
+                case WidgetTabsRow::ExpBar:
+                    if (widget == BarWidget::Job)
+                    {
+                        const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(WindowList::ExpBar));
+                        form.Segments(own.c_str(), s.expBar, names.data(), kExpBarPlaceCount, row.tip);
+                    }
+                    break;
+                case WidgetTabsRow::JobNames:
+                    if (widget == BarWidget::Job) form.Switch(own.c_str(), s.jobNames, row.tip);
+                    break;
+                case WidgetTabsRow::Latency:
+                    if (widget == BarWidget::Connection) form.Switch(own.c_str(), s.barLatency, row.tip);
+                    break;
+                }
             }
-            case BarWidget::Job:
-            {
-                const char* const layouts[kJobLayoutCount] = {"Jobs first", "EXP first", "EXP only"};
-                form.Segments("Layout", s.jobLayout, layouts, kJobLayoutCount,
-                    "Which is the larger line, your jobs and levels or your EXP, with the other under it; or the EXP "
-                    "alone.",
-                    kWideSegmentWidth);
-                const char* const places[kExpBarPlaceCount] = {"Under", "Beside", "Off"};
-                form.Segments("EXP bar", s.expBar, places, kExpBarPlaceCount, nullptr);
-                form.Switch("Job names", s.jobNames, "Off, the levels alone.");
-                break;
-            }
-            case BarWidget::Connection: form.Switch("Latency", s.barLatency, "After the rates, once measured."); break;
-            default: break;
-            }
+        }
+
+        // A tab for each widget, the picked one's options under the tabs.
+        void WidgetTabsOf(Context& c, const LayoutSetting& e)
+        {
+            Form& form = c.form;
+            form.Fade(!BarOn(c.s));
+            const std::vector<BarWidget> tabs = WidgetTabs();
+            const auto words                  = c.layout.OptionsOf(WindowList::BarWidgets);
+            std::vector<const char*> labels;
+            for (const BarWidget widget : tabs)
+                labels.push_back(words[static_cast<size_t>(widget)].name);
+            const auto open = std::ranges::find(tabs, static_cast<BarWidget>(c.state.widget));
+            const int count = static_cast<int>(tabs.size());
+            const int tab   = form.Tabs("widget", open != tabs.end() ? static_cast<int>(open - tabs.begin()) : 0,
+                labels.data(), count, TabsPerRow(count, kWidgetTabRows));
+            c.state.widget  = static_cast<int>(tabs[static_cast<size_t>(tab)]);
+            WidgetOptions(c, e, tabs[static_cast<size_t>(tab)]);
         }
 
         // Left, Center and Right as trays sunk into the card, each holding its widgets as raised chips in bar order:
         // a chip drags to another place or tray, and a click picks it, which opens its tab. A lit dot says it is on.
-        // Returns whether a chip was clicked.
-        bool Trays(Form& form, Settings& s, int& picked)
+        void Trays(Context& c)
         {
             struct Drop
             {
@@ -465,9 +448,14 @@ namespace headsup
                 BarSection to;
                 size_t at;
             };
-            bool clicked = false;
+            Form& form  = c.form;
+            Settings& s = c.s;
+            int& picked = c.state.widget;
+            form.Fade(!BarOn(s));
             std::optional<Drop> drop; // applied after the trays are written, so no list changes under its own loop
             const std::string chipStart = form.Named(kWidgetChip) + "-";
+            const auto sections         = c.layout.OptionsOf(WindowList::BarSections);
+            const auto widgets          = c.layout.OptionsOf(WindowList::BarWidgets);
             // The chip a drop names, as the section it is in and its place there.
             const auto dropped = [&](const std::string& target, BarSection to, size_t at) {
                 const FormEvent* event = form.Took(target, kDropEvent);
@@ -481,159 +469,158 @@ namespace headsup
             for (int section = 0; section < kBarSectionCount; ++section)
             {
                 const auto here = static_cast<BarSection>(section);
-                form.Raw(std::string("<div class=\"tray\"><div class=\"tray-name\">") + kBarSectionLabels[section] + "</div>");
-                const std::vector<BarWidget>& widgets = s.barSections[section];
-                for (size_t i = 0; i < widgets.size(); ++i)
+                form.Raw(std::string("<div class=\"tray\"><div class=\"tray-name\">") +
+                         EscapedRml(Said(sections[static_cast<size_t>(section)].name)) + "</div>");
+                const std::vector<BarWidget>& held = s.barSections[section];
+                for (size_t i = 0; i < held.size(); ++i)
                 {
-                    const int w          = static_cast<int>(widgets[i]);
+                    const int w          = static_cast<int>(held[i]);
                     const std::string id = form.Id(kWidgetChip + std::to_string(w));
-                    form.Raw("<div class=\"btn raised wchip drag\" id=\"" + id + "\" tip=\"" + EscapedRml(kBarWidgetTips[w]) +
-                             "\"><div class=\"dot\"></div>" + EscapedRml(TitleCaseText(kBarWidgetLabels[w])) + "</div>");
+                    form.Raw("<div class=\"btn raised wchip drag\" id=\"" + id + "\" tip=\"" +
+                             EscapedRml(Said(widgets[static_cast<size_t>(w)].tip)) + "\"><div class=\"dot\"></div>" +
+                             EscapedRml(Said(widgets[static_cast<size_t>(w)].name)) + "</div>");
                     form.Set(id, FormValueKind::Class, kOffClass, {}, form.Off());
+                    // A clicked chip's tab is at the page's top, which the trays may have scrolled out of view.
                     if (!form.Off() && form.Clicked(id))
                     {
-                        picked  = w;
-                        clicked = true;
+                        picked           = w;
+                        form.scrollToTop = true;
                     }
                     form.Set(id, FormValueKind::Class, "on", {}, s.barWidgets[w]);
-                    form.Set(id, FormValueKind::Class, "picked", {}, w == picked);
+                    form.Set(id, FormValueKind::Class, kPickedClass, {}, w == picked);
                     dropped(id, here, i); // dropped on a chip: before it
                 }
                 // The rest of the tray takes a drop at the section's end.
                 const std::string end = form.Id("tray end " + std::to_string(section));
                 form.Raw("<div class=\"tray-end\" id=\"" + end + "\"></div></div>");
-                dropped(end, here, widgets.size());
+                dropped(end, here, held.size());
             }
             form.EndLine();
             if (drop) form.changed |= MoveWidget(s.barSections, drop->from, drop->index, drop->to, drop->at);
-            return clicked;
         }
 
-        void WidgetsPage(Form& form, Settings& s, MenuFormState& state)
+        // A palette's colors in two columns, the first the longer, each with an arrow back to its default.
+        void PaletteSwatches(Context& c, const LayoutSetting& e, Color* colors, const Color* defaults)
         {
-            // The tabs come first, so a tab's options show without scrolling past the trays.
-            form.Fade(!BarOn(s));
-            if (form.BeginCard("Widgets", nullptr, "A tab for each widget, with its options."))
-            {
-                const std::vector<BarWidget> tabs = WidgetTabs();
-                std::vector<std::string> names;
-                std::vector<const char*> labels;
-                names.reserve(tabs.size()); // the labels point into it
-                for (const BarWidget widget : tabs)
-                    labels.push_back(names.emplace_back(TitleCaseText(kBarWidgetLabels[static_cast<int>(widget)])).c_str());
-                const auto open = std::ranges::find(tabs, static_cast<BarWidget>(state.widget));
-                const int count = static_cast<int>(tabs.size());
-                const int tab   = form.Tabs("widget", open != tabs.end() ? static_cast<int>(open - tabs.begin()) : 0,
-                    labels.data(), count, TabsPerRow(count, kWidgetTabRows));
-                state.widget    = static_cast<int>(tabs[static_cast<size_t>(tab)]);
-                WidgetOptions(form, s, tabs[static_cast<size_t>(tab)]);
-                form.EndCard();
-            }
-            form.Fade(!BarOn(s));
-            if (form.BeginCard("Layout", nullptr, "Drag a chip to move it; click it to open its tab above."))
-            {
-                // A clicked chip's tab is at the page's top, which the trays may have scrolled out of view.
-                if (Trays(form, s, state.widget)) form.scrollToTop = true;
-                if (form.Action("Reset Layout", "Puts every widget back in its first place. Switches stay.") &&
-                    s.barSections != DefaultPlacement())
-                {
-                    s.barSections = DefaultPlacement();
-                    form.changed  = true;
-                }
-                form.EndCard();
-            }
-            form.Fade(false);
-        }
-
-        // entryTip, when given, says for an entry when it applies.
-        template <typename Entry>
-        void PaletteCard(Form& form, const char* title, const char* tip, Color* colors, const Color* defaults, int count,
-            const char* (*label)(Entry), const char* (*entryTip)(Entry) = nullptr)
-        {
-            if (!form.BeginCard(title, nullptr, tip)) return;
-            // Two columns, the first the longer.
+            Form& form = c.form;
+            form.Fade(!c.s.enabled);
+            const auto rows = c.layout.RowsOf(e);
+            const int count = static_cast<int>(rows.size());
             const int first = (count + 1) / 2;
             form.Raw("<div class=\"columns\"><div class=\"column\">");
             for (int i = 0; i < count; ++i)
             {
                 if (i == first) form.Raw("</div><div class=\"column second\">");
-                const auto entry = static_cast<Entry>(i);
-                form.Swatch((std::string(label(entry)) + "##" + label(entry) + " " + title).c_str(), colors[i],
-                    entryTip != nullptr ? entryTip(entry) : nullptr, &defaults[i]);
+                const LayoutRow& row = rows[static_cast<size_t>(i)];
+                form.Swatch(Labeled(row.name, row.key, std::string(" ") + e.key).c_str(), colors[i], row.tip, &defaults[i]);
             }
             form.Raw("</div></div>");
-            form.EndCard();
         }
 
-        void Visibility(Form& form, Settings& s, PlateKind kind, const int* order, int rows)
+        // The settings row a visibility row stands for, among its kind's.
+        int RowIndexOf(VisibilityRow row)
         {
-            KindSettings& k   = s.Kind(kind);
+            switch (row)
+            {
+            case VisibilityRow::Aggressive: return CategoryIndex(Category::WillAttack);
+            case VisibilityRow::Passive: return CategoryIndex(Category::WontAttack);
+            case VisibilityRow::NmAggressive: return CategoryIndex(Category::NmWillAttack);
+            case VisibilityRow::NmPassive: return CategoryIndex(Category::NmWontAttack);
+            case VisibilityRow::NmPlaceholder: return CategoryIndex(Category::Placeholder);
+            case VisibilityRow::ClaimedYours: return CategoryIndex(Category::PartyClaim);
+            case VisibilityRow::ClaimedOthers: return CategoryIndex(Category::OtherClaim);
+            case VisibilityRow::Dead: return CategoryIndex(Category::Dead);
+            case VisibilityRow::NoData: return CategoryIndex(Category::Unknown);
+            case VisibilityRow::Players: return static_cast<int>(PlayerRow::Player);
+            case VisibilityRow::PartyMembers: return static_cast<int>(PlayerRow::PartyMember);
+            case VisibilityRow::Friends: return static_cast<int>(PlayerRow::Friend);
+            case VisibilityRow::LinkshellMembers: return static_cast<int>(PlayerRow::LinkshellMember);
+            case VisibilityRow::Self:
+            case VisibilityRow::Npcs: return 0;
+            case VisibilityRow::YourPets: return static_cast<int>(PetRow::Yours);
+            case VisibilityRow::PartyPets: return static_cast<int>(PetRow::Party);
+            case VisibilityRow::FriendPets: return static_cast<int>(PetRow::Friend);
+            case VisibilityRow::OthersPets: return static_cast<int>(PetRow::Others);
+            }
+            return 0;
+        }
+
+        // The rows of the kind's page, in the layout's order, each with its settings row.
+        template <typename Visit>
+        void ForEachVisibilityRow(const Context& c, Visit visit)
+        {
+            const LayoutSetting* visibility = c.layout.SettingOf(SettingPiece::Visibility);
+            if (visibility == nullptr) return;
+            for (const LayoutRow& row : c.layout.RowsOf(*visibility))
+                if ((row.kinds & KindBit(*c.kind)) != 0) visit(row, RowIndexOf(static_cast<VisibilityRow>(row.row)));
+        }
+
+        void Visibility(Context& c)
+        {
+            Form& form           = c.form;
+            Settings& s          = c.s;
+            const PlateKind kind = *c.kind;
+            KindSettings& k      = s.Kind(kind);
             const bool plates = s.enabled && s.nameplates, outlines = s.enabled && s.outlines;
+            const auto modes        = c.layout.OptionsOf(WindowList::PlateMode);
+            const auto outlineModes = c.layout.OptionsOf(WindowList::OutlineMode);
             form.Fade(!s.enabled);
-            if (!form.BeginCard("Visibility", nullptr, "What each kind of entity shows, and whether it gets an outline."))
-                return;
             form.Row("##visibility heads", nullptr);
             form.Fade(!plates);
-            form.Caption("Nameplates", "head", kModeWidth);
+            form.Caption(Labeled(Word(c, WindowWord::VisibilityNameplates), "nameplates").c_str(), "head", kModeWidth);
             form.Fade(!outlines);
-            form.Caption("Outlines", "head", kModeWidth);
+            form.Caption(Labeled(Word(c, WindowWord::VisibilityOutlines), "outlines").c_str(), "head", kModeWidth);
             form.EndRow();
-            for (int i = 0; i < rows; ++i)
-            {
-                const int r      = order[i];
+            ForEachVisibilityRow(c, [&](const LayoutRow& shown, int r) {
                 RowSettings& row = k.rows[r];
                 form.Fade(!s.enabled);
-                form.Row(RowLabel(kind, r), RowTip(kind, r));
+                form.Row(Labeled(NameOf(shown, kind), shown.key).c_str(), TipOf(shown, kind));
                 form.Fade(!plates);
                 int plate = static_cast<int>(row.plate);
                 form.DropdownAt((std::string("plate ") + RowKey(kind, r)).c_str(), plate, 0, kPlateModeCount - 1,
-                    [](int m) { return std::string(PlateModeLabel(static_cast<PlateMode>(m))); }, kModeWidth, nullptr,
-                    [](int m) { return std::string(PlateModeTip(static_cast<PlateMode>(m))); });
+                    [&](int m) { return Words(modes[static_cast<size_t>(m)].name); }, kModeWidth, nullptr,
+                    [&](int m) { return Words(modes[static_cast<size_t>(m)].tip); });
                 row.plate = static_cast<PlateMode>(plate);
                 form.Fade(!outlines);
                 int outline         = static_cast<int>(row.outline);
                 const bool claimRow = kind == PlateKind::Mobs && IsClaimRow(static_cast<Category>(r));
                 form.DropdownAt((std::string("outline ") + RowKey(kind, r)).c_str(), outline, 0, OutlineModesFor(kind, r) - 1,
-                    [](int m) { return std::string(OutlineModeLabel(static_cast<OutlineMode>(m))); }, kModeWidth, nullptr,
-                    [claimRow](int m) { return std::string(OutlineModeTip(static_cast<OutlineMode>(m), claimRow)); });
+                    [&](int m) { return Words(outlineModes[static_cast<size_t>(m)].name); }, kModeWidth, nullptr, [&](int m) {
+                        const LayoutOption& mode = outlineModes[static_cast<size_t>(m)];
+                        return Words(claimRow && mode.otherTip != nullptr ? mode.otherTip : mode.tip);
+                    });
                 row.outline = static_cast<OutlineMode>(outline);
                 form.EndRow();
-            }
-            form.EndCard();
+            });
         }
 
-        void OutlineDesign(Form& form, Settings& s, PlateKind kind, const int* order, int rows)
+        void OutlineColors(Context& c, const LayoutSetting& e)
         {
-            KindSettings& k = s.Kind(kind);
-            form.Fade(!s.enabled || !s.outlines);
-            if (!form.BeginCard("Outline Design", nullptr,
-                    "Each row's outline color: a custom color, or one of the palettes by the entity's state."))
-                return;
-            const std::vector<ColorSource> sources = SourcesFor(kind, false);
-            for (int i = 0; i < rows; ++i)
-            {
-                RowSettings& row = k.rows[order[i]];
-                if (!HasOutlineColor(row.outline)) continue;
-                form.ColorPickRow((std::string(RowLabel(kind, order[i])) + "##" + RowLabel(kind, order[i]) + " outline").c_str(),
-                    row.outlineColor, sources,
-                    "This row's outline color: your own, or a palette on the Entities page.");
-            }
-            form.EndCard();
+            Form& form      = c.form;
+            KindSettings& k = c.s.Kind(*c.kind);
+            form.Fade(!c.s.enabled || !c.s.outlines);
+            const std::vector<ColorSource> sources = SourcesFor(*c.kind, false);
+            ForEachVisibilityRow(c, [&](const LayoutRow& shown, int r) {
+                RowSettings& row = k.rows[r];
+                if (!HasOutlineColor(row.outline)) return;
+                form.ColorPickRow(Labeled(NameOf(shown, c.kind), shown.key, " outline").c_str(), row.outlineColor, sources,
+                    TipOf(e, c.kind));
+            });
         }
 
-        void NameplateDesign(Form& form, Settings& s, PlateKind kind, DesignEditor& editor)
+        // The three lines' boxes, each named, then the kind's tags as chips to click or drag into them.
+        void Design(Context& c)
         {
-            KindSettings& k = s.Kind(kind);
-            form.Fade(!s.enabled || !s.nameplates);
-            if (!form.BeginCard("Nameplate Design", nullptr,
-                    "Design this entity's nameplate by writing in the text box and by dragging and dropping tags from below. "
-                    "Drop a tag onto another and the two share that place: the left one is drawn when it has something to "
-                    "show, and the next one when it has not. Drag a tag out of the lines to remove it."))
-                return;
+            Form& form           = c.form;
+            const PlateKind kind = *c.kind;
+            KindSettings& k      = c.s.Kind(kind);
+            DesignEditor& editor = c.state.design;
+            const auto lines     = c.layout.OptionsOf(WindowList::PlateLines);
+            form.Fade(!c.s.enabled || !c.s.nameplates || !c.plates);
             for (int i = 0; i < kPlateLines; ++i)
             {
                 form.Line("line design");
-                form.Caption(kLineLabels[i], "line-name");
+                form.Caption(lines[static_cast<size_t>(i)].name, "line-name");
                 if (form.LineBox((std::string("design ") + KindKey(kind) + " " + std::to_string(i)).c_str(), k.lines[i].text,
                         editor.drafts[i]) ||
                     editor.drafts[i].typing)
@@ -645,406 +632,720 @@ namespace headsup
                 if (form.TagChip(tag) && PutTag(k.lines[editor.line].text, editor.drafts[editor.line].caret, {tag}))
                     form.changed = true;
             form.EndLine();
-            if (HasStatusIcons(kind))
-                form.NumberDropdown(
-                    "Max Icons Shown", k.maxIcons, 1, kCountedIcons,
-                    [](int most) { return most == kCountedIcons ? std::string(kEveryIcon) : std::to_string(most); },
-                    "The most status icons a nameplate shows, counted along its lines from the top. GM's always shows.");
-            // Under the chips, so nothing above moves under the mouse when it comes and goes.
-            if (const std::string note = UnusedTagsNote(k, {Tag::Name}, kShowsNameEnding); !note.empty())
-                form.Note(note.c_str());
-            form.EndCard();
         }
 
-        // Every tab shows the same rows; a synced line's tab alone shows only its Sync row.
-        void LineStyles(Form& form, Settings& s, PlateKind kind, const std::vector<std::string>& fonts, DesignEditor& editor)
+        // Every tab shows the same rows; a synced line's tab alone shows only its Sync row and what it uses.
+        void LineStyles(Context& c, const LayoutSetting& e)
         {
-            KindSettings& k = s.Kind(kind);
-            const bool off  = !s.enabled || !s.nameplates;
+            Form& form           = c.form;
+            const PlateKind kind = *c.kind;
+            KindSettings& k      = c.s.Kind(kind);
+            DesignEditor& editor = c.state.design;
+            const bool off       = !c.s.enabled || !c.s.nameplates || !c.plates;
+            const auto lines     = c.layout.OptionsOf(WindowList::PlateLines);
             form.Fade(off);
-            if (!form.BeginCard("Line Style", nullptr, "How each line is drawn. A line's tab holds its settings.")) return;
-            editor.styleTab  = form.Tabs("line style", editor.styleTab, kLineLabels, kPlateLines);
+            const std::vector<const char*> tabs = NamesOf(lines);
+            editor.styleTab  = form.Tabs("line style", editor.styleTab, tabs.data(), kPlateLines);
             const int n      = editor.styleTab;
             LineDesign& line = k.lines[n];
             // Each line's controls have ids of their own: one held, open or typed in is not carried to another tab.
             const std::string scope = std::string(" ") + KindKey(kind) + std::to_string(n);
-            const auto label        = [&scope](const char* text) { return text + std::string("##") + text + scope; };
-
-            const std::vector<int> targets = SyncTargets(k, n);
-            const int synced               = SyncEntry(targets, line.syncWith);
-            int sync                       = synced;
-            form.NumberDropdown(label("Sync Line Style").c_str(), sync, 0, static_cast<int>(targets.size()),
-                [&targets](int entry) { return SyncEntryLabel(targets, entry); },
-                "Borrows every setting below from another line, so the two always match. A line that borrows from this "
-                "one is not offered.",
-                0.0f, [&targets](int entry) { return SyncEntryTip(targets, entry); });
-            if (sync != synced) line.syncWith = SyncOfEntry(targets, sync);
-            if (line.syncWith != kNoSync)
-            {
-                form.Note((std::string("Uses the ") + kLineLabels[line.syncWith] + "'s style.").c_str());
-                form.EndCard();
-                return;
-            }
             const std::vector<ColorSource> sources = SourcesFor(kind, true);
-            form.ChecksDropdown(label("Line Visibility").c_str(), line.show, ConditionsFor(kind),
-                "When this line shows: always, or when any checked condition holds.");
-            // The bottom line is what the others are set against.
-            if (n < kPlateLines - 1)
-                form.Segments(label("Alignment").c_str(), line.align, kAlignLabels, kAlignCount,
-                    "Where the line sits against the bottom line. A line wider than it hangs past its other end.",
-                    kControlWidth / kAlignCount);
-            form.FontDropdown(label("Font").c_str(), line.font, fonts,
-                "The line's font. Default is the font on the Entities page.", kDefaultFontChoice);
-            form.Toggles(label("Font Style").c_str(), line.style, kFontStyleLabels, kFontStyleCount, "Any of the three together.",
-                kControlWidth / kFontStyleCount);
-            form.SliderInt(label("Text Size").c_str(), line.textSize, kMinSizePercent, kMaxSizePercent, "%d%%",
-                "Of the base font size on the Entities page.");
-            form.SliderInt(label("Icon Size").c_str(), line.iconSize, kMinSizePercent, kMaxSizePercent, "%d%%",
-                "Every icon on this line, of the base icon size on the Entities page.");
-            form.SliderInt(label("Padding").c_str(), line.padding, 0, kMaxLinePadding, "%d px",
-                n < kPlateLines - 1 ? "Extra space under this line, which moves it and what is above it up."
-                                    : "Extra space over this line, which moves the lines above it up.");
-            form.ColorPickRow(label("Text Color").c_str(), line.color, sources,
-                "The text's color: your own, the game's, or a palette by the entity's state.");
-            form.SliderInt(label("Shadow Strength").c_str(), line.shadow, kMinShadow, kMaxShadow, "%d%%",
-                "The dark, soft shadow behind the letters that keeps them readable over bright ground. 0 is none.");
-            form.Fade(off || line.shadow == 0);
-            form.ColorPickRow(label("Shadow Color").c_str(), line.shadowColor, sources, "The shadow's color; black as a rule.");
-            form.Fade(off);
-            form.SliderInt(label("Glow Strength").c_str(), line.glow, kMinGlow, kMaxGlow, "%d%%",
-                "A colored halo around the letters, as a mob's name glows in its outline color. 0 is none.");
-            form.Fade(off || line.glow == 0);
-            form.SliderInt(label("Glow Size").c_str(), line.glowSize, kMinGlowSize, kMaxGlowSize, "%d%%",
-                "How far the halo spreads.");
-            form.ColorPickRow(label("Glow Color").c_str(), line.glowColor, sources, "The halo's color.");
-            form.Switch(label("Disable Glow In Combat").c_str(), line.glowOffInCombat, kGlowOffTips[static_cast<int>(kind)]);
-            form.EndCard();
-        }
-
-        void Ornament(Form& form, Settings& s, PlateKind kind)
-        {
-            OrnamentSettings& o = s.Kind(kind).ornament;
-            const bool off      = !s.enabled || !s.nameplates;
-            form.Fade(off);
-            if (!form.BeginCard("Ornament", nullptr, "A diamond rule over, under or between the nameplate's lines.")) return;
-            const std::string scope = std::string(" ") + KindKey(kind) + " ornament";
-            const auto label        = [&scope](const char* text) { return text + std::string("##") + text + scope; };
-            form.EnumDropdown(label("Visibility").c_str(), o.place, kOrnamentPlaceCount,
-                [](OrnamentPlace p) { return kOrnamentPlaceLabels[static_cast<int>(p)]; }, "Where the ornament goes, if anywhere.",
-                OrnamentPlaceTip);
-            form.Fade(off || o.place == OrnamentPlace::Disabled);
-            form.SliderInt(label("Width").c_str(), o.width, kMinOrnamentWidth, kMaxOrnamentWidth, "%d px",
-                "The rule's length, before the distance scale.");
-            form.SliderInt(label("Height").c_str(), o.height, kMinOrnamentThickness, kMaxOrnamentThickness, "%d px",
-                "The diamond's height.");
-            form.ColorPickRow(label("Color").c_str(), o.color, SourcesFor(kind, false),
-                "Its color: your own, or a palette by the entity's state.");
-            form.EndCard();
-        }
-
-        void Opacity(Form& form, Settings& s, PlateKind kind)
-        {
-            OpacitySettings& o = s.Kind(kind).opacity;
-            const bool off     = !s.enabled || !s.nameplates;
-            form.Fade(off);
-            if (!form.BeginCard("Nameplate Opacity", nullptr, "Changes the opacity of the nameplate depending on what you are targeting."))
-                return;
-            form.SliderInt("No Target", o.noTarget, kMinOpacity, kMaxOpacity, "%d%%",
-                "If you have no target, use this opacity for all nameplates.");
-            form.SliderInt("Not Targeted", o.notTargeted, kMinOpacity, kMaxOpacity, "%d%%",
-                "If you have a target, but this is not your target, use this opacity for the nameplate.");
-            form.SliderInt("Is Targeted", o.targeted, kMinOpacity, kMaxOpacity, "%d%%",
-                "If this is your target, use this opacity for the nameplate, at any distance.");
-            // Your own nameplate is never far from you.
-            if (kind != PlateKind::Self)
+            for (const LayoutRow& row : c.layout.RowsOf(e))
             {
-                form.Switch("Fade In", o.fadeIn,
-                    ("Nameplates grow fainter with distance: at the opacity above within " + Formatted("%.0f", kFadeNearYalms) +
-                        " yalms, almost gone at the range. Your target's never fades.").c_str());
-                form.Fade(off || !o.fadeIn);
-                form.SliderFloat("Range", o.range, kMinOutlineDistance, kMaxOutlineDistance, "%.0f yalms",
-                    "Where a nameplate that fades in is almost gone.");
-            }
-            form.EndCard();
-        }
-
-        void MobCards(Form& form, Settings& s, const std::vector<std::string>& fonts)
-        {
-            const bool off = !s.enabled || !s.nameplates;
-            // A card whose settings show only through tags says which, while no line of the design holds one of them.
-            const auto shown = [&](std::initializer_list<Tag> tags) {
-                const std::string note = UnusedTagsNote(s.Kind(PlateKind::Mobs), tags, kShowsTheseEnding);
-                if (!note.empty()) form.Note(note.c_str());
-                return note.empty();
-            };
-            form.Fade(off);
-            if (form.BeginCard("Detection Icons", nullptr,
-                    "Which icons the Detection tag shows: aggression, linking and how it senses you, in MobDB's icons."))
-            {
-                form.Fade(off || !shown({Tag::Detect}));
-                for (int d = 0; d < kDetectionIconCount; ++d)
+                const auto r = static_cast<LineStylesRow>(row.row);
+                if (r != LineStylesRow::SyncLineStyle && line.syncWith != kNoSync) continue;
+                const std::string label = Labeled(NameOf(row, kind), row.key, scope);
+                const char* tip         = TipOf(row, kind);
+                form.Fade(off);
+                switch (r)
                 {
-                    // Aggression and links first; the rest is what the mob senses you by.
-                    if (static_cast<DetectionIcon>(d) == DetectionIcon::Sight)
-                    {
-                        form.Caption("Senses:", "line-name");
-                        form.Indent(true);
-                    }
-                    const uint32_t bit = DetectionBit(static_cast<DetectionIcon>(d));
-                    bool on            = (s.detectionShown & bit) != 0;
-                    form.Switch(DetectionLabel(static_cast<DetectionIcon>(d)), on, nullptr, "Hide", "Show");
-                    s.detectionShown = on ? s.detectionShown | bit : s.detectionShown & ~bit;
+                case LineStylesRow::SyncLineStyle:
+                {
+                    const std::vector<int> targets = SyncTargets(k, n);
+                    const int synced               = SyncEntry(targets, line.syncWith);
+                    int sync                       = synced;
+                    form.NumberDropdown(label.c_str(), sync, 0, static_cast<int>(targets.size()),
+                        [&](int entry) { return SyncEntryLabel(targets, entry, c.layout); }, tip, 0.0f,
+                        [&](int entry) { return SyncEntryTip(targets, entry, c.layout); });
+                    if (sync != synced) line.syncWith = SyncOfEntry(targets, sync);
+                    if (line.syncWith != kNoSync)
+                        form.Note(Filled(Said(Word(c, WindowWord::LineStylesUsesStyle)), kLineMark,
+                            Said(lines[static_cast<size_t>(line.syncWith)].name)).c_str());
+                    break;
                 }
-                form.Indent(false);
-                form.EndCard();
+                case LineStylesRow::LineVisibility: form.ChecksDropdown(label.c_str(), line.show, ConditionsFor(kind), tip); break;
+                case LineStylesRow::Alignment:
+                    // The bottom line is what the others are set against.
+                    if (n < kPlateLines - 1)
+                    {
+                        const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(WindowList::Align));
+                        form.Segments(label.c_str(), line.align, names.data(), kAlignCount, tip, kControlWidth / kAlignCount);
+                    }
+                    break;
+                case LineStylesRow::Font:
+                    form.FontDropdown(label.c_str(), line.font, c.fonts, tip, Word(c, WindowWord::DefaultFont));
+                    break;
+                case LineStylesRow::FontStyle:
+                {
+                    const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(WindowList::FontStyle));
+                    form.Toggles(label.c_str(), line.style, names.data(), kFontStyleCount, tip, kControlWidth / kFontStyleCount);
+                    break;
+                }
+                case LineStylesRow::TextSize:
+                    form.SliderInt(label.c_str(), line.textSize, kMinSizePercent, kMaxSizePercent, "%d%%", tip);
+                    break;
+                case LineStylesRow::IconSize:
+                    form.SliderInt(label.c_str(), line.iconSize, kMinSizePercent, kMaxSizePercent, "%d%%", tip);
+                    break;
+                case LineStylesRow::Padding:
+                    form.SliderInt(label.c_str(), line.padding, 0, kMaxLinePadding, "%d px", n < kPlateLines - 1 ? tip : row.otherTip);
+                    break;
+                case LineStylesRow::TextColor: form.ColorPickRow(label.c_str(), line.color, sources, tip); break;
+                case LineStylesRow::ShadowStrength:
+                    form.SliderInt(label.c_str(), line.shadow, kMinShadow, kMaxShadow, "%d%%", tip);
+                    break;
+                case LineStylesRow::ShadowColor:
+                    form.Fade(off || line.shadow == 0);
+                    form.ColorPickRow(label.c_str(), line.shadowColor, sources, tip);
+                    break;
+                case LineStylesRow::GlowStrength: form.SliderInt(label.c_str(), line.glow, kMinGlow, kMaxGlow, "%d%%", tip); break;
+                case LineStylesRow::GlowSize:
+                    form.Fade(off || line.glow == 0);
+                    form.SliderInt(label.c_str(), line.glowSize, kMinGlowSize, kMaxGlowSize, "%d%%", tip);
+                    break;
+                case LineStylesRow::GlowColor:
+                    form.Fade(off || line.glow == 0);
+                    form.ColorPickRow(label.c_str(), line.glowColor, sources, tip);
+                    break;
+                case LineStylesRow::DisableGlowInCombat:
+                    form.Fade(off || line.glow == 0);
+                    form.Switch(label.c_str(), line.glowOffInCombat, tip);
+                    break;
+                }
             }
-            // The Target widget's popup reads the ranks switch and these colors too, whatever the nameplates do or hold.
-            form.Fade(!s.enabled);
-            if (form.BeginCard("Badges", nullptr,
-                    "The small text on the icons of the Weaknesses, Resistances, Statuses and Immunities tags. The Target "
-                    "widget's popup takes its ranks and colors from here too."))
+        }
+
+        void Ornament(Context& c, const LayoutSetting& e)
+        {
+            Form& form              = c.form;
+            const PlateKind kind    = *c.kind;
+            OrnamentSettings& o     = c.s.Kind(kind).ornament;
+            const bool off          = !c.s.enabled || !c.s.nameplates || !c.plates;
+            const std::string scope = std::string(" ") + KindKey(kind) + " ornament";
+            for (const LayoutRow& row : c.layout.RowsOf(e))
             {
-                shown({Tag::Weak, Tag::Resist, Tag::Status, Tag::Immune});
-                form.FontDropdown("Badge Font", s.badgeFontName, fonts, nullptr, kDefaultFontChoice);
-                form.Switch("Use Rank System", s.showRanks,
-                    "Phoenix's ranks, -3 to 11, instead of percents. -3 is +50% and 4 is -50%.");
-                static const Settings kDefaults;
-                form.Swatch("Weak Color", s.weakBadgeColor, nullptr, &kDefaults.weakBadgeColor);
-                form.Swatch("Resist Color", s.resistBadgeColor, nullptr, &kDefaults.resistBadgeColor);
-                form.Swatch("Status Resist Color", s.rankBadgeColor, nullptr, &kDefaults.rankBadgeColor);
-                form.Swatch("Immune Color", s.immuneBadgeColor, nullptr, &kDefaults.immuneBadgeColor);
-                form.EndCard();
+                const std::string label = Labeled(NameOf(row, kind), row.key, scope);
+                const char* tip         = TipOf(row, kind);
+                form.Fade(off || o.place == OrnamentPlace::Disabled);
+                switch (static_cast<OrnamentRow>(row.row))
+                {
+                case OrnamentRow::Visibility:
+                    form.Fade(off);
+                    OptionsDropdown(form, label, o.place, c.layout.OptionsOf(WindowList::OrnamentPlace), tip);
+                    break;
+                case OrnamentRow::Width:
+                    form.SliderInt(label.c_str(), o.width, kMinOrnamentWidth, kMaxOrnamentWidth, "%d px", tip);
+                    break;
+                case OrnamentRow::Height:
+                    form.SliderInt(label.c_str(), o.height, kMinOrnamentThickness, kMaxOrnamentThickness, "%d px", tip);
+                    break;
+                case OrnamentRow::Color: form.ColorPickRow(label.c_str(), o.color, SourcesFor(kind, false), tip); break;
+                }
             }
+        }
+
+        // Which of the Detection tag's icons show: aggression and links, then what the mob senses you by.
+        void Detection(Context& c, const LayoutSetting& e)
+        {
+            Form& form  = c.form;
+            Settings& s = c.s;
+            form.Fade(!s.enabled || !s.nameplates || !Uses(s, {Tag::Detect}));
+            const auto rows = c.layout.RowsOf(e);
+            for (int d = 0; d < kDetectionIconCount; ++d)
+            {
+                if (static_cast<DetectionIcon>(d) == DetectionIcon::Sight)
+                {
+                    form.Caption(Labeled(Word(c, WindowWord::DetectionSenses), "senses").c_str(), "line-name");
+                    form.Indent(true);
+                }
+                const LayoutRow& row = rows[static_cast<size_t>(d)];
+                const uint32_t bit   = DetectionBit(static_cast<DetectionIcon>(d));
+                bool on              = (s.detectionShown & bit) != 0;
+                form.Switch(Labeled(row.name, row.key).c_str(), on, row.tip, Word(c, WindowWord::DetectionHide),
+                    Word(c, WindowWord::DetectionShow));
+                s.detectionShown = on ? s.detectionShown | bit : s.detectionShown & ~bit;
+            }
+            form.Indent(false);
+        }
+
+        // Each status's switch, then the weakest and the least resisted rank that gets a badge.
+        void StatusTable(Context& c, const LayoutSetting& e)
+        {
+            Form& form           = c.form;
+            Settings& s          = c.s;
+            const bool dim       = !s.enabled || !s.nameplates || !Uses(s, {Tag::Status});
             const auto cutoff    = [&s](int rank) { return CutoffText(rank, s.showRanks); };
             const auto weakTip   = [&s](int rank) { return CutoffTip(rank, s.showRanks, true); };
             const auto resistTip = [&s](int rank) { return CutoffTip(rank, s.showRanks, false); };
-            form.Fade(off);
-            if (form.BeginCard("Weaknesses", nullptr,
-                    "Which elements the Weaknesses and Resistances tags show beside the damage types."))
+            form.Fade(dim);
+            form.Row("##status heads", nullptr);
+            form.Caption("", "head", kToggleWidth);
+            form.Caption(Labeled(Word(c, WindowWord::StatusTableWeak), "weak").c_str(), "head", kCutoffWidth);
+            form.Caption(Labeled(Word(c, WindowWord::StatusTableResist), "resist").c_str(), "head", kCutoffWidth);
+            form.EndRow();
+            const auto rows = c.layout.RowsOf(e);
+            for (int i = 0; i < kStatusRankCount; ++i)
             {
-                form.Fade(off || !shown({Tag::Weak, Tag::Resist}));
-                form.NumberDropdown("Weak From", s.elementWeakRank, kMaxWeakRank, kNoWeakRank, cutoff,
-                    "The least element weakness that gets a badge.", 0.0f, weakTip);
-                form.NumberDropdown("Resist From", s.elementResistRank, kMinResistRank, kNoResistRank, cutoff,
-                    "The least element resistance that gets a badge.", 0.0f, resistTip);
-                form.NumberDropdown("Max Elements", s.maxElements, kElementCount, 0, ElementCountText,
-                    "Past this many, those nearest neutral are left off.", 0.0f, ElementCountTip);
-                form.EndCard();
-            }
-            form.Fade(off);
-            if (form.BeginCard("Statuses", nullptr, "Which statuses the Statuses tag shows, weak or resisted."))
-            {
-                const bool dim = off || !shown({Tag::Status});
+                StatusBadgeRule& rule = s.statusBadges[i];
+                const LayoutRow& row  = rows[static_cast<size_t>(i)];
+                const std::string key = row.key;
                 form.Fade(dim);
-                form.Row("##status heads", nullptr);
-                form.Caption("", "head", kToggleWidth);
-                form.Caption("Weak", "head", kCutoffWidth);
-                form.Caption("Resist", "head", kCutoffWidth);
+                form.Row(Labeled(row.name, key).c_str(), row.tip);
+                form.Raw("<div class=\"switch-cell\">");
+                form.CheckAt(("status " + key).c_str(), rule.show);
+                form.Raw("</div>");
+                form.Fade(dim || !rule.show);
+                form.DropdownAt(("weak " + key).c_str(), rule.weakRank, kMaxWeakRank, kNoWeakRank, cutoff, kCutoffWidth, nullptr,
+                    weakTip);
+                form.DropdownAt(("resist " + key).c_str(), rule.resistRank, kMinResistRank, kNoResistRank, cutoff,
+                    kCutoffWidth, nullptr, resistTip);
                 form.EndRow();
-                for (int i = 0; i < kStatusRankCount; ++i)
-                {
-                    StatusBadgeRule& rule = s.statusBadges[i];
-                    const std::string status = StatusRankLabel(static_cast<StatusRank>(i));
-                    form.Fade(dim);
-                    form.Row(status.c_str(), nullptr);
-                    form.Raw("<div class=\"switch-cell\">");
-                    form.CheckAt(("status " + status).c_str(), rule.show);
-                    form.Raw("</div>");
-                    form.Fade(dim || !rule.show);
-                    form.DropdownAt(("weak " + status).c_str(), rule.weakRank, kMaxWeakRank, kNoWeakRank, cutoff, kCutoffWidth,
-                        nullptr, weakTip);
-                    form.DropdownAt(("resist " + status).c_str(), rule.resistRank, kMinResistRank, kNoResistRank, cutoff,
-                        kCutoffWidth, nullptr, resistTip);
-                    form.EndRow();
-                }
-                form.EndCard();
             }
         }
 
-        void Timers(Form& form, Settings& s)
+        void TargetCursorStyle(Context& c, const LayoutSetting& e, const std::string& label, const char* tip)
         {
+            Form& form  = c.form;
+            Settings& s = c.s;
             form.Fade(!s.enabled);
-            if (!form.BeginCard("Placeholder Timers")) return;
-            form.Switch("Respawn Timers", s.phTimers,
-                "Above your name, a countdown for each placeholder you see die, as Bigmouth Billy [11A] 3:15. It reads "
-                "\"up\" when due.");
-            form.Fade(!s.enabled || !s.phTimers);
-            form.SliderInt("Timer Size", s.timerPercent, kMinSizePercent, kMaxSizePercent, "%d%%",
-                "Of the base font size on the Entities page.");
-            form.EndCard();
+            static const std::vector<std::string> kNoFiles;
+            const auto options = c.layout.OptionsOf(e);
+            const std::vector<CursorChoice> choices =
+                CursorChoices(c.readings.cursorFiles != nullptr ? *c.readings.cursorFiles : kNoFiles, s);
+            const auto said = [&](int choice) { return options[static_cast<size_t>(choices[static_cast<size_t>(choice)].style)]; };
+            int picked      = CursorChoiceOf(choices, s);
+            form.NumberDropdown(label.c_str(), picked, 0, static_cast<int>(choices.size()) - 1,
+                [&](int choice) {
+                    const CursorChoice& shown = choices[static_cast<size_t>(choice)];
+                    return shown.style == CursorStyle::File ? shown.file : Words(said(choice).name);
+                },
+                tip, 0.0f, [&](int choice) { return Words(said(choice).tip); });
+            if (form.Opened(label)) c.state.cursorsRequested = true;
+            const CursorChoice& choice = choices[static_cast<size_t>(picked)];
+            // Another style comes at its own width, or it would be squeezed into the one before's.
+            if (choice.style != s.cursorStyle && choice.style != CursorStyle::Vanilla)
+                s.cursorWidth = std::clamp(NaturalCursorWidth(choice.style, s.cursorHeight), kMinCursorSide, kMaxCursorSide);
+            s.cursorStyle = choice.style;
+            s.cursorFile  = choice.file;
         }
 
-        void EntitiesPage(Form& form, Settings& s, const MenuReadings& readings, MenuFormState& state,
-            const std::vector<std::string>& fonts)
+        // A setting, wherever the layout puts it. Each says when it shows, its card's condition included, as it may
+        // be moved out of that card.
+        void DrawSetting(Context& c, const LayoutSetting& e)
         {
-            form.Fade(!s.enabled);
-            if (form.BeginCard("Nameplates", &s.nameplates,
-                    "HeadsUp's nameplates: names, levels, icons and the rest, as each kind's page designs them."))
-            {
-                form.Fade(!s.enabled || !s.nameplates);
-                form.SliderInt("Base Font Size", s.baseSize, kMinTextSize, kMaxTextSize, "%d px",
-                    "Every line's text size is a percent of this.");
-                form.FontDropdown("Default Font", s.defaultFont, fonts, "The font of every line whose own font is Default.");
-                form.SliderInt("Base Icon Size", s.baseIconSize, kMinTextSize, kMaxTextSize, "%d px",
-                    "Every line's icon size is a percent of this.");
-                form.Switch("Auto-Check", s.autoCheck,
-                    "Checks each mob that comes near by itself, so its exact level and difficulty show, and keeps the check's "
-                    "line out of the chat log. Players are not checked: the server tells a player who examined them.");
-                int dash = static_cast<int>(s.dashMark);
-                form.MarkupDropdown("Replace Dashes (-)", dash, {"No", kDotMark, kSquareMark, kDiamondMark},
-                    "What a dash typed in a nameplate design, or between the two ends of a level or a difficulty, is drawn as.",
-                    [](int mark) { return std::string(kDashMarkTips[mark]); });
-                s.dashMark = static_cast<DashMark>(dash);
-                form.Switch("Scale with Distance", s.scaleWithDistance, "Sizes follow how far a name's owner is from you.");
-                form.Fade(!s.enabled || !s.nameplates || !s.scaleWithDistance);
-                form.Indent(true);
-                form.SliderInt("Min Size", s.scaleMin, kMinSizePercent, kMaxSizePercent, "%d%%",
-                    "The smallest a far name shrinks to.");
-                form.SliderInt("Max Size", s.scaleMax, kMinSizePercent, kMaxSizePercent, "%d%%",
-                    "The largest a near name grows to.");
-                form.Switch("Scale Your Own Name", s.scaleOwnName,
-                    "Off, your own nameplate keeps one size as the camera zooms.");
-                form.Indent(false);
-                form.Fade(!s.enabled || !s.nameplates);
-                form.SliderInt("Vertical Offset", s.nameRaise, kMinNameRaise, kMaxNameRaise, "%d px",
-                    "How far above the game's own spot names sit.");
-                form.Switch("Stack Names", s.stackNames,
-                    "Names that would cover each other rise one over another. Your target's keeps its place.");
-                form.EndCard();
-            }
-            form.Fade(!s.enabled);
-            if (form.BeginCard("Outline Style", &s.outlines,
-                    "Colored borders around mobs, and anything else whose rows ask for one."))
-            {
-                form.Fade(!s.enabled || !s.outlines);
-                form.SliderInt("Thickness", s.outlineThickness, kMinOutlineThickness, kMaxOutlineThickness, "%d%%", nullptr);
-                form.SliderInt("Opacity", s.outlineOpacity, kMinOpacity, kMaxOpacity, "%d%%", nullptr);
-                int smoothness = static_cast<int>(SmoothnessLevelOf(s.smoothness));
-                form.SliderNamed("Smoothness", smoothness, kSmoothnessLabels, kSmoothnessLevelCount,
-                    "Higher is rounder and costs a little more.");
-                s.smoothness = SmoothnessCopies(static_cast<SmoothnessLevel>(smoothness));
-                form.SliderFloat("Range", s.maxDistance, kMinOutlineDistance, kMaxOutlineDistance, "%.0f yalms",
-                    "Anything farther gets no outline.");
-                form.Switch("Fade In", s.outlineFadeIn,
-                    ("Outlines grow fainter with distance: whole within " + Formatted("%.0f", kFadeNearYalms) +
-                        " yalms, almost gone at the range.").c_str());
-                if (!readings.stencilAvailable) form.Note("Outlines are unavailable: the depth buffer has no stencil bits.");
-                form.EndCard();
-            }
-            form.Fade(!s.enabled);
-            if (form.BeginCard("Target Cursor", nullptr, "The cursor above your target's nameplate."))
-            {
-                static const std::vector<std::string> kNoFiles;
-                const std::vector<CursorChoice> choices = CursorChoices(readings.cursorFiles != nullptr ? *readings.cursorFiles : kNoFiles, s);
-                const auto shown = [&](int c) {
-                    const CursorChoice& choice = choices[static_cast<size_t>(c)];
-                    return choice.style == CursorStyle::File ? choice.file : std::string(kCursorStyleLabels[static_cast<int>(choice.style)]);
-                };
-                int picked = CursorChoiceOf(choices, s);
-                form.NumberDropdown("Cursor Style", picked, 0, static_cast<int>(choices.size()) - 1, shown, nullptr, 0.0f, [&](int c) {
-                    return std::string(kCursorStyleTips[static_cast<int>(choices[static_cast<size_t>(c)].style)]);
-                });
-                if (form.Opened("Cursor Style")) state.cursorsRequested = true;
-                const CursorChoice& choice = choices[static_cast<size_t>(picked)];
-                // Another style comes at its own width, or it would be squeezed into the one before's.
-                if (choice.style != s.cursorStyle && choice.style != CursorStyle::Vanilla)
-                    s.cursorWidth = std::clamp(NaturalCursorWidth(choice.style, s.cursorHeight), kMinCursorSide, kMaxCursorSide);
-                s.cursorStyle = choice.style;
-                s.cursorFile  = choice.file;
-                const bool noSettings = !s.enabled || s.cursorStyle == CursorStyle::Vanilla;
-                form.Fade(noSettings);
-                form.SliderInt("Width", s.cursorWidth, kMinCursorSide, kMaxCursorSide, "%d px", nullptr);
-                form.SliderInt("Height", s.cursorHeight, kMinCursorSide, kMaxCursorSide, "%d px", nullptr);
-                form.SliderInt("Outline Thickness", s.cursorOutlineThickness, kMinCursorEdge, kMaxCursorEdge, "%d%%",
-                    "Its dark edge.");
-                form.Switch("Scale", s.scaleCursor, "Larger the nearer your target is.");
-                form.Switch("Float", s.cursorFloat, "It bobs up and down. Off, it stays still.");
-                form.SliderInt("Vertical Offset", s.cursorRaise, -kMaxCursorRaise, kMaxCursorRaise, "%d px",
-                    "How far over its place the cursor sits, or under it.");
-                const std::vector<ColorSource> cursorSources = CursorSources();
-                form.Fade(noSettings || CursorIsPicture(s.cursorStyle));
-                form.ColorPickRow("Color", s.cursorColor, cursorSources,
-                    "The cursor's color. Over anything that has no such color, as a player's aggression, it is the Targeting color.");
-                form.Fade(noSettings);
-                form.ColorPickRow("Edge Color", s.cursorEdgeColor, cursorSources, "The cursor's edge.");
-                form.EndCard();
-            }
-            form.Fade(!s.enabled);
+            Form& form              = c.form;
+            Settings& s             = c.s;
+            const MenuReadings& r   = c.readings;
+            const std::string label = Labeled(NameOf(e, c.kind), e.key);
+            const char* tip         = TipOf(e, c.kind);
+            const bool on = s.enabled, plates = s.enabled && s.nameplates, outlines = s.enabled && s.outlines;
+            const bool cursor = s.enabled && s.cursorStyle != CursorStyle::Vanilla;
+            const bool shown  = plates && c.plates; // a kind's design, on a page whose rows draw a nameplate
+            static const Settings kDefaults;
             static const Palette kPalette = DefaultPalette();
-            PaletteCard(form, "Colors: Aggression", kAggressionColorsTip, s.palette.aggression, kPalette.aggression, kNatureCount,
-                NatureLabel);
-            PaletteCard(form, "Colors: Toughness",
-                (std::string(kToughnessColorsTip) + " Easy Prey covers Incredibly Easy Prey, and Very Tough covers Incredibly Tough.").c_str(),
-                s.palette.toughness, kPalette.toughness, kLabelShadeCount, ToughnessLabel);
-            PaletteCard(form, "Colors: Claim Status", kClaimColorsTip, s.palette.claim, kPalette.claim, kClaimStateCount, ClaimLabel);
-            PaletteCard(form, "Colors: Targeting", (std::string(kTargetingColorsTip) + " The target cursor takes these too.").c_str(),
-                s.palette.target, kPalette.target, kTargetStateCount, TargetStateLabel, TargetStateTip);
-            PaletteCard(form, "Colors: Entity Type", kEntityTypeColorsTip, s.palette.type, kPalette.type, kTargetTypeCount, TargetTypeLabel);
-            form.Fade(false);
+            const auto cutoff             = [&s](int rank) { return CutoffText(rank, s.showRanks); };
+            switch (e.piece)
+            {
+            // Entities
+            case SettingPiece::BaseFontSize:
+                form.Fade(!plates);
+                form.SliderInt(label.c_str(), s.baseSize, kMinTextSize, kMaxTextSize, "%d px", tip);
+                break;
+            case SettingPiece::DefaultFont:
+                form.Fade(!plates);
+                form.FontDropdown(label.c_str(), s.defaultFont, c.fonts, tip);
+                break;
+            case SettingPiece::BaseIconSize:
+                form.Fade(!plates);
+                form.SliderInt(label.c_str(), s.baseIconSize, kMinTextSize, kMaxTextSize, "%d px", tip);
+                break;
+            case SettingPiece::AutoCheck:
+                form.Fade(!plates);
+                form.Switch(label.c_str(), s.autoCheck, tip);
+                break;
+            case SettingPiece::ReplaceDashes:
+            {
+                form.Fade(!plates);
+                const auto options = c.layout.OptionsOf(e);
+                int dash           = static_cast<int>(s.dashMark);
+                form.MarkupDropdown(label.c_str(), dash, {Words(options[0].name), kDotMark, kSquareMark, kDiamondMark}, tip,
+                    [&](int mark) { return Words(options[static_cast<size_t>(mark)].tip); });
+                s.dashMark = static_cast<DashMark>(dash);
+                break;
+            }
+            case SettingPiece::ScaleWithDistance:
+                form.Fade(!plates);
+                form.Switch(label.c_str(), s.scaleWithDistance, tip);
+                break;
+            case SettingPiece::MinSize:
+            case SettingPiece::MaxSize:
+            case SettingPiece::ScaleYourOwnName:
+                form.Fade(!plates || !s.scaleWithDistance);
+                form.Indent(true);
+                if (e.piece == SettingPiece::MinSize)
+                    form.SliderInt(label.c_str(), s.scaleMin, kMinSizePercent, kMaxSizePercent, "%d%%", tip);
+                else if (e.piece == SettingPiece::MaxSize)
+                    form.SliderInt(label.c_str(), s.scaleMax, kMinSizePercent, kMaxSizePercent, "%d%%", tip);
+                else
+                    form.Switch(label.c_str(), s.scaleOwnName, tip);
+                form.Indent(false);
+                break;
+            case SettingPiece::VerticalOffset:
+                form.Fade(!plates);
+                form.SliderInt(label.c_str(), s.nameRaise, kMinNameRaise, kMaxNameRaise, "%d px", tip);
+                break;
+            case SettingPiece::StackNames:
+                form.Fade(!plates);
+                form.Switch(label.c_str(), s.stackNames, tip);
+                break;
+            case SettingPiece::Thickness:
+                form.Fade(!outlines);
+                form.SliderInt(label.c_str(), s.outlineThickness, kMinOutlineThickness, kMaxOutlineThickness, "%d%%", tip);
+                break;
+            case SettingPiece::Opacity:
+                form.Fade(!outlines);
+                form.SliderInt(label.c_str(), s.outlineOpacity, kMinOpacity, kMaxOpacity, "%d%%", tip);
+                break;
+            case SettingPiece::Smoothness:
+            {
+                form.Fade(!outlines);
+                const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(WindowList::Smoothness));
+                int smoothness = static_cast<int>(SmoothnessLevelOf(s.smoothness));
+                form.SliderNamed(label.c_str(), smoothness, names.data(), kSmoothnessLevelCount, tip);
+                s.smoothness = SmoothnessCopies(static_cast<SmoothnessLevel>(smoothness));
+                break;
+            }
+            case SettingPiece::OutlineRange:
+                form.Fade(!outlines);
+                form.SliderFloat(label.c_str(), s.maxDistance, kMinOutlineDistance, kMaxOutlineDistance, "%.0f yalms", tip);
+                break;
+            case SettingPiece::OutlineFadeIn:
+                form.Fade(!outlines);
+                form.Switch(label.c_str(), s.outlineFadeIn, Near(tip).c_str());
+                break;
+            case SettingPiece::StencilNote:
+                form.Fade(!outlines);
+                if (!r.stencilAvailable) form.Note(NameOf(e, c.kind));
+                break;
+            case SettingPiece::CursorStyle: TargetCursorStyle(c, e, label, tip); break;
+            case SettingPiece::Width:
+                form.Fade(!cursor);
+                form.SliderInt(label.c_str(), s.cursorWidth, kMinCursorSide, kMaxCursorSide, "%d px", tip);
+                break;
+            case SettingPiece::CursorHeight:
+                form.Fade(!cursor);
+                form.SliderInt(label.c_str(), s.cursorHeight, kMinCursorSide, kMaxCursorSide, "%d px", tip);
+                break;
+            case SettingPiece::OutlineThickness:
+                form.Fade(!cursor);
+                form.SliderInt(label.c_str(), s.cursorOutlineThickness, kMinCursorEdge, kMaxCursorEdge, "%d%%", tip);
+                break;
+            case SettingPiece::Scale:
+                form.Fade(!cursor);
+                form.Switch(label.c_str(), s.scaleCursor, tip);
+                break;
+            case SettingPiece::Float:
+                form.Fade(!cursor);
+                form.Switch(label.c_str(), s.cursorFloat, tip);
+                break;
+            case SettingPiece::CursorVerticalOffset:
+                form.Fade(!cursor);
+                form.SliderInt(label.c_str(), s.cursorRaise, -kMaxCursorRaise, kMaxCursorRaise, "%d px", tip);
+                break;
+            case SettingPiece::Color:
+                form.Fade(!cursor || CursorIsPicture(s.cursorStyle));
+                form.ColorPickRow(label.c_str(), s.cursorColor, CursorSources(), tip);
+                break;
+            case SettingPiece::EdgeColor:
+                form.Fade(!cursor);
+                form.ColorPickRow(label.c_str(), s.cursorEdgeColor, CursorSources(), tip);
+                break;
+            case SettingPiece::AggressionColors: PaletteSwatches(c, e, s.palette.aggression, kPalette.aggression); break;
+            case SettingPiece::ToughnessColors: PaletteSwatches(c, e, s.palette.toughness, kPalette.toughness); break;
+            case SettingPiece::ClaimColors: PaletteSwatches(c, e, s.palette.claim, kPalette.claim); break;
+            case SettingPiece::TargetingColors: PaletteSwatches(c, e, s.palette.target, kPalette.target); break;
+            case SettingPiece::EntityTypeColors: PaletteSwatches(c, e, s.palette.type, kPalette.type); break;
+            // The entity pages
+            case SettingPiece::Visibility: Visibility(c); break;
+            case SettingPiece::OutlineColors: OutlineColors(c, e); break;
+            case SettingPiece::Design: Design(c); break;
+            case SettingPiece::MaxIconsShown:
+                form.Fade(!shown);
+                if (HasStatusIcons(*c.kind))
+                    form.NumberDropdown(label.c_str(), s.Kind(*c.kind).maxIcons, 1, kCountedIcons,
+                        [&](int most) {
+                            return most == kCountedIcons ? Words(Word(c, WindowWord::MaxIconsShownAll)) : std::to_string(most);
+                        },
+                        tip);
+                break;
+            case SettingPiece::UnusedTags:
+                form.Fade(!shown);
+                // Under the chips, so nothing above moves under the mouse when it comes and goes.
+                if (const std::string note = UnusedTagsNote(s.Kind(*c.kind), {Tag::Name}, kShowsNameEnding); !note.empty())
+                    form.Note(note.c_str());
+                break;
+            case SettingPiece::LineStyles: LineStyles(c, e); break;
+            case SettingPiece::Ornament: Ornament(c, e); break;
+            case SettingPiece::NoTarget:
+                form.Fade(!shown);
+                form.SliderInt(label.c_str(), s.Kind(*c.kind).opacity.noTarget, kMinOpacity, kMaxOpacity, "%d%%", tip);
+                break;
+            case SettingPiece::NotTargeted:
+                form.Fade(!shown);
+                form.SliderInt(label.c_str(), s.Kind(*c.kind).opacity.notTargeted, kMinOpacity, kMaxOpacity, "%d%%", tip);
+                break;
+            case SettingPiece::IsTargeted:
+                form.Fade(!shown);
+                form.SliderInt(label.c_str(), s.Kind(*c.kind).opacity.targeted, kMinOpacity, kMaxOpacity, "%d%%", tip);
+                break;
+            case SettingPiece::FadeIn:
+                form.Fade(!shown);
+                form.Switch(label.c_str(), s.Kind(*c.kind).opacity.fadeIn, Near(tip).c_str());
+                break;
+            case SettingPiece::Range:
+                form.Fade(!shown || !s.Kind(*c.kind).opacity.fadeIn);
+                form.SliderFloat(label.c_str(), s.Kind(*c.kind).opacity.range, kMinOutlineDistance, kMaxOutlineDistance,
+                    "%.0f yalms", tip);
+                break;
+            case SettingPiece::Detection: Detection(c, e); break;
+            // The Target widget's popup reads the ranks switch and these colors too, whatever the nameplates do or hold.
+            case SettingPiece::BadgeFont:
+                form.Fade(!on);
+                form.FontDropdown(label.c_str(), s.badgeFontName, c.fonts, tip, Word(c, WindowWord::DefaultFont));
+                break;
+            case SettingPiece::UseRankSystem:
+                form.Fade(!on);
+                form.Switch(label.c_str(), s.showRanks, tip);
+                break;
+            case SettingPiece::WeakColor:
+                form.Fade(!on);
+                form.Swatch(label.c_str(), s.weakBadgeColor, tip, &kDefaults.weakBadgeColor);
+                break;
+            case SettingPiece::ResistColor:
+                form.Fade(!on);
+                form.Swatch(label.c_str(), s.resistBadgeColor, tip, &kDefaults.resistBadgeColor);
+                break;
+            case SettingPiece::StatusResistColor:
+                form.Fade(!on);
+                form.Swatch(label.c_str(), s.rankBadgeColor, tip, &kDefaults.rankBadgeColor);
+                break;
+            case SettingPiece::ImmuneColor:
+                form.Fade(!on);
+                form.Swatch(label.c_str(), s.immuneBadgeColor, tip, &kDefaults.immuneBadgeColor);
+                break;
+            case SettingPiece::WeakFrom:
+                form.Fade(!plates || !Uses(s, {Tag::Weak, Tag::Resist}));
+                form.NumberDropdown(label.c_str(), s.elementWeakRank, kMaxWeakRank, kNoWeakRank, cutoff, tip, 0.0f,
+                    [&s](int rank) { return CutoffTip(rank, s.showRanks, true); });
+                break;
+            case SettingPiece::ResistFrom:
+                form.Fade(!plates || !Uses(s, {Tag::Weak, Tag::Resist}));
+                form.NumberDropdown(label.c_str(), s.elementResistRank, kMinResistRank, kNoResistRank, cutoff, tip, 0.0f,
+                    [&s](int rank) { return CutoffTip(rank, s.showRanks, false); });
+                break;
+            case SettingPiece::MaxElements:
+                form.Fade(!plates || !Uses(s, {Tag::Weak, Tag::Resist}));
+                form.NumberDropdown(label.c_str(), s.maxElements, kElementCount, 0, ElementCountText, tip, 0.0f, ElementCountTip);
+                break;
+            case SettingPiece::StatusTable: StatusTable(c, e); break;
+            case SettingPiece::RespawnTimers:
+                form.Fade(!on);
+                form.Switch(label.c_str(), s.phTimers, tip);
+                break;
+            case SettingPiece::TimerSize:
+                form.Fade(!on || !s.phTimers);
+                form.SliderInt(label.c_str(), s.timerPercent, kMinSizePercent, kMaxSizePercent, "%d%%", tip);
+                break;
+            // User Interface
+            case SettingPiece::Key:
+            {
+                form.Fade(false);
+                std::vector<uint8_t> key;
+                if (s.screenshotKey != 0) key.push_back(static_cast<uint8_t>(s.screenshotKey));
+                Keys(c, label, tip, key, 1, c.state.shotKeyCapture);
+                s.screenshotKey = key.empty() ? 0 : key.front();
+                break;
+            }
+            case SettingPiece::HideGameWindows:
+                form.Fade(false);
+                form.Switch(label.c_str(), s.screenshotHidesGame, tip);
+                break;
+            case SettingPiece::Groups: WindowGroups(c); break;
+            case SettingPiece::EveryWindow:
+                form.Fade(false);
+                form.Switch(label.c_str(), s.allUnderBar, tip);
+                break;
+            case SettingPiece::GameHelp:
+                form.Fade(false);
+                form.Switch(label.c_str(), s.moveGameHelp, tip);
+                break;
+            case SettingPiece::WindowDefaults: WindowDefaults(c); break;
+            case SettingPiece::WindowList: WindowList(c); break;
+            // Top Panel and Widgets
+            case SettingPiece::Theme:
+                form.Fade(!BarOn(s));
+                OptionsDropdown(form, label, s.barTheme, c.layout.OptionsOf(WindowList::BarTheme), tip);
+                break;
+            case SettingPiece::Separators:
+            {
+                form.Fade(!BarOn(s));
+                const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(e));
+                form.Segments(label.c_str(), s.barSeparators, names.data(), kBarSeparatorsCount, tip, kWideSegmentWidth);
+                break;
+            }
+            case SettingPiece::TitleFont:
+                form.Fade(!BarOn(s));
+                form.FontDropdown(label.c_str(), s.barTitleFont, c.fonts, tip, Word(c, WindowWord::ThemesFont));
+                break;
+            case SettingPiece::TextFont:
+                form.Fade(!BarOn(s));
+                form.FontDropdown(label.c_str(), s.barTextFont, c.fonts, tip, Word(c, WindowWord::ThemesFont));
+                break;
+            case SettingPiece::Height:
+                form.Fade(!BarOn(s));
+                form.SliderInt(label.c_str(), s.barHeight, kMinBarHeight, kMaxBarHeight, "%d px", tip);
+                break;
+            case SettingPiece::TextSize:
+            {
+                form.Fade(!BarOn(s));
+                std::string textSize = "%d px";
+                if (s.barTextSize == kAutoBarTextSize)
+                    textSize = "Auto";
+                else if (r.barTitlePixels > 0 && r.barTitlePixels != s.barTextSize)
+                    textSize = Formatted("%%d px (%d fits)", r.barTitlePixels);
+                form.SliderInt(label.c_str(), s.barTextSize, kAutoBarTextSize, kMaxBarTextSize, textSize.c_str(), tip);
+                break;
+            }
+            case SettingPiece::OneLine:
+            {
+                form.Fade(!BarOn(s));
+                const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(e));
+                form.Segments(label.c_str(), s.barSubtitle, names.data(), kSubtitlePlaceCount, tip);
+                break;
+            }
+            case SettingPiece::PopupSize:
+                form.Fade(!BarOn(s));
+                form.SliderInt(label.c_str(), s.popupTextSize, kAutoPopupTextSize, kMaxBarTextSize,
+                    s.popupTextSize == kAutoPopupTextSize ? "Auto" : "%d px", tip);
+                break;
+            case SettingPiece::HideReadout:
+                form.Fade(!on);
+                form.Switch(label.c_str(), s.hideNetstat, tip);
+                break;
+            case SettingPiece::HideGameHelp:
+                form.Fade(!on);
+                form.Switch(label.c_str(), s.hideHelpBar, tip);
+                break;
+            case SettingPiece::Position:
+                form.Fade(!BarOn(s) || !s.barWidgets[kHelpWidget]);
+                form.Offset(label.c_str(), s.helpBarX, s.helpBarY, kMaxHelpBarOffset, tip);
+                break;
+            case SettingPiece::Background:
+                form.Fade(!BarOn(s) || !s.barWidgets[kHelpWidget]);
+                form.Switch(label.c_str(), s.helpBarBackground, tip);
+                break;
+            case SettingPiece::WidgetTabs: WidgetTabsOf(c, e); break;
+            case SettingPiece::Trays: Trays(c); break;
+            case SettingPiece::ResetLayout:
+                form.Fade(!BarOn(s));
+                if (form.Action(label.c_str(), tip) && s.barSections != DefaultPlacement())
+                {
+                    s.barSections = DefaultPlacement();
+                    form.changed  = true;
+                }
+                break;
+            // Mouse Cursor, Config Menu and Debug
+            case SettingPiece::Chocobo:
+                form.Fade(!on);
+                form.Switch(label.c_str(), s.chocoboPointer, tip);
+                break;
+            case SettingPiece::PointerFix:
+                form.Fade(!on);
+                form.Switch(label.c_str(), s.fixPointer, tip);
+                break;
+            case SettingPiece::KeepPointer:
+                form.Fade(!on);
+                Keys(c, label, tip, s.keepPointerKeys, kMaxKeptKeys, c.state.keyCapture);
+                break;
+            case SettingPiece::WindowTheme:
+                form.Fade(false);
+                OptionsDropdown(form, label, s.menuTheme, c.layout.OptionsOf(WindowList::MenuTheme), tip);
+                break;
+            case SettingPiece::Font:
+                form.Fade(false);
+                form.FontDropdown(label.c_str(), s.menuFont, c.menuFonts, tip);
+                break;
+            case SettingPiece::Size:
+                form.Fade(false);
+                form.SliderInt(label.c_str(), s.menuScale, kMinMenuScale, kMaxMenuScale, "%d%%", tip);
+                break;
+            case SettingPiece::WindowOpacity:
+                form.Fade(false);
+                form.SliderInt(label.c_str(), s.menuOpacity, kMinMenuOpacity, kMaxOpacity, "%d%%", tip);
+                break;
+            case SettingPiece::ResetAllSettings: ResetAll(c, e); break;
+            case SettingPiece::DebugReport:
+                form.Fade(false);
+                if (form.Action(label.c_str(), tip)) c.state.debugRequested = true;
+                break;
+            case SettingPiece::MobsOutlined:
+                form.Fade(false);
+                form.Reading(label.c_str(), std::to_string(r.outlinedMobs));
+                break;
+            case SettingPiece::MeshesOutlined:
+                form.Fade(false);
+                form.Reading(label.c_str(), std::to_string(r.meshes));
+                break;
+            case SettingPiece::StencilBuffer:
+                form.Fade(false);
+                form.Reading(label.c_str(), r.stencilAvailable ? "available" : "missing: no outlines");
+                break;
+            case SettingPiece::Nameplates:
+                form.Fade(false);
+                form.Reading(label.c_str(), std::to_string(r.nameplates));
+                break;
+            case SettingPiece::Drawn:
+                form.Fade(false);
+                form.Reading(label.c_str(), r.drewInScene ? "into the scene" : "on top");
+                break;
+            case SettingPiece::GameSNames:
+                form.Fade(false);
+                form.Reading(label.c_str(),
+                    r.hooked ? Formatted("%u, %u by HeadsUp, %u hidden", r.names, r.replaced, r.hidden) : "not hooked");
+                break;
+            case SettingPiece::FrameTime:
+                form.Fade(false);
+                form.Reading(label.c_str(), Formatted("%.2f ms (%.0f fps)", r.frameMs, r.frameMs > 0.0 ? 1000.0 / r.frameMs : 0.0));
+                break;
+            case SettingPiece::LastSave:
+                form.Fade(false);
+                form.Reading(label.c_str(),
+                    Formatted("%.0f ms, %zu %s", r.lastSaveMs, r.lastSaveKeys, r.lastSaveKeys == 1 ? "key" : "keys"));
+                break;
+            case SettingPiece::YourLevel:
+                form.Fade(false);
+                form.Reading(label.c_str(),
+                    r.level > 0 ? Formatted("%d%s", r.level, r.sitting ? ", sitting" : "") : std::string("unknown"));
+                break;
+            }
         }
 
-        void KindPage(Form& form, Settings& s, PlateKind kind, MenuFormState& state, const std::vector<std::string>& fonts)
+        // What a card does of its own, wherever it is: whether it is left out, whether it is switched off, and the
+        // switch in its title.
+        struct CardState
         {
-            DesignEditor& editor = state.design;
-            if (editor.kind != kind)
+            bool skipped  = false;
+            bool off      = false;
+            bool* enabled = nullptr;
+        };
+        CardState CardStateOf(CardPiece piece, Context& c)
+        {
+            Settings& s       = c.s;
+            const bool on     = s.enabled;
+            const bool plates = s.enabled && s.nameplates;
+            switch (piece)
             {
-                editor = DesignEditor{.kind = kind};
+            case CardPiece::Plain:
+            case CardPiece::ScreenshotMode:
+            case CardPiece::WindowGroups:
+            case CardPiece::GameWindows:
+            case CardPiece::SettingsWindow:
+            case CardPiece::Reset:
+            case CardPiece::ThisFrame: return {};
+            case CardPiece::Nameplates: return {false, !on, &s.nameplates};
+            case CardPiece::OutlineStyle: return {false, !on, &s.outlines};
+            case CardPiece::TargetCursor:
+            case CardPiece::ColorsAggression:
+            case CardPiece::ColorsToughness:
+            case CardPiece::ColorsClaimStatus:
+            case CardPiece::ColorsTargeting:
+            case CardPiece::ColorsEntityType:
+            case CardPiece::Visibility:
+            case CardPiece::Badges:
+            case CardPiece::PlaceholderTimers:
+            case CardPiece::MousePointer: return {false, !on};
+            case CardPiece::OutlineDesign: return {c.kind && !c.outlineColors, !on || !s.outlines};
+            case CardPiece::NameplateDesign:
+            case CardPiece::LineStyle:
+            case CardPiece::Ornament:
+            case CardPiece::NameplateOpacity: return {c.kind && !c.plates, !plates};
+            case CardPiece::DetectionIcons:
+            case CardPiece::Weaknesses:
+            case CardPiece::Statuses: return {false, !plates};
+            case CardPiece::TopPanel: return {false, !on, &s.showBar};
+            case CardPiece::HelpBar: return {false, !BarOn(s), &s.barWidgets[kHelpWidget]};
+            case CardPiece::Widgets:
+            case CardPiece::Layout: return {false, !BarOn(s)};
+            case CardPiece::Headsup: return {false, false, &s.enabled};
             }
-            const KindSettings& k = s.Kind(kind);
-            const int rows        = RowCountOf(kind);
-            int order[kMaxRows]   = {}; // the rows as the menu lists them
-            bool outlineColors = false, plates = false;
-            for (int i = 0; i < rows; ++i)
+            return {};
+        }
+
+        // A card whose settings show only through tags says which, while no line of the mobs' design holds one.
+        void CardNote(CardPiece piece, Context& c)
+        {
+            const auto note = [&](std::initializer_list<Tag> tags) {
+                if (const std::string text = UnusedTagsNote(c.s.Kind(PlateKind::Mobs), tags, kShowsTheseEnding); !text.empty())
+                    c.form.Note(text.c_str());
+            };
+            switch (piece)
             {
-                order[i] = kind == PlateKind::Mobs ? CategoryIndex(kMobRowOrder[i]) : i;
-                outlineColors |= HasOutlineColor(k.rows[order[i]].outline);
-                plates |= DrawsPlate(k.rows[order[i]].plate);
-            }
-            Visibility(form, s, kind, order, rows);
-            if (outlineColors) OutlineDesign(form, s, kind, order, rows);
-            if (plates)
-            {
-                NameplateDesign(form, s, kind, editor);
-                LineStyles(form, s, kind, fonts, editor);
-                Ornament(form, s, kind);
-                Opacity(form, s, kind);
-            }
-            switch (kind)
-            {
-            case PlateKind::Mobs: MobCards(form, s, fonts); break;
-            case PlateKind::Self: Timers(form, s); break;
+            case CardPiece::DetectionIcons: note({Tag::Detect}); break;
+            case CardPiece::Badges: note({Tag::Weak, Tag::Resist, Tag::Status, Tag::Immune}); break;
+            case CardPiece::Weaknesses: note({Tag::Weak, Tag::Resist}); break;
+            case CardPiece::Statuses: note({Tag::Status}); break;
             default: break;
             }
-            form.Fade(false);
         }
     }
 
     void BuildMenu(Form& form, Settings& s, const MenuReadings& readings, MenuFormState& state,
-        const std::vector<std::string>& fonts, const std::vector<std::string>& menuFonts)
+        const std::vector<std::string>& fonts, const std::vector<std::string>& menuFonts, const WindowLayout& layout)
     {
-        Sidebar(form, state);
-        form.pageKey = PageKey(state.page);
-        switch (state.page)
+        form.layout = &layout;
+        Context c{form, s, readings, state, fonts, menuFonts, layout, KindOfPage(state.page)};
+        Sidebar(c);
+        const LayoutPage& page = layout.PageOf(state.page);
+        form.pageKey           = page.key;
+        if (c.kind)
         {
-        case Page::Entities: EntitiesPage(form, s, readings, state, fonts); break;
-        case Page::Mobs:
-        case Page::Players:
-        case Page::Self:
-        case Page::Npcs:
-        case Page::Pets: KindPage(form, s, *KindOfPage(state.page), state, fonts); break;
-        case Page::UserInterface: UserInterfacePage(form, s, readings, state); break;
-        case Page::TopPanel: TopPanelPage(form, s, readings, fonts); break;
-        case Page::Widgets: WidgetsPage(form, s, state); break;
-        case Page::MouseCursor: MouseCursorPage(form, s, state); break;
-        case Page::ConfigMenu: ConfigMenuPage(form, s, state, menuFonts); break;
-        case Page::Debug: DebugPage(form, s, readings, state); break;
+            if (state.design.kind != *c.kind) state.design = DesignEditor{.kind = *c.kind};
+            const KindSettings& k = s.Kind(*c.kind);
+            for (int r = 0; r < RowCountOf(*c.kind); ++r)
+            {
+                c.outlineColors |= HasOutlineColor(k.rows[r].outline);
+                c.plates |= DrawsPlate(k.rows[r].plate);
+            }
+        }
+        const uint8_t kinds = c.kind ? KindBit(*c.kind) : kEveryKind;
+        for (const LayoutCard& card : layout.CardsOf(page))
+        {
+            if ((card.kinds & kinds) == 0) continue;
+            const CardState own = CardStateOf(card.piece, c);
+            if (own.skipped) continue;
+            form.Fade(own.off);
+            if (!form.BeginCard(Labeled(card.name, card.key).c_str(), own.enabled, card.about)) continue;
+            CardNote(card.piece, c);
+            for (const LayoutSetting& setting : layout.SettingsOf(card))
+                if ((setting.kinds & kinds) != 0 && (!setting.entity || c.kind)) DrawSetting(c, setting);
+            form.EndCard();
         }
         form.Fade(false);
         // A page whose every card is switched off says what switches them on.
-        if (form.CardsShown() == 0 && form.BeginCard("Switched Off"))
+        if (form.CardsShown() == 0 && form.BeginCard(Labeled(Word(c, WindowWord::SwitchedOff), "switched-off").c_str()))
         {
-            form.Note(s.enabled ? "These settings are the top panel's, which is off: the Top Panel page switches it on."
-                                : "HeadsUp is off: the Debug page switches it on.");
+            form.Note(Word(c, s.enabled ? WindowWord::SwitchedOffTopPanel : WindowWord::SwitchedOffHeadsup));
             form.EndCard();
         }
         s = Clamp(s);

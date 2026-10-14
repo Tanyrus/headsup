@@ -47,39 +47,6 @@ TEST(a_change_waiting_when_the_window_is_closed_saves_at_once)
     CHECK(SaveDue(10.0, 10.25, false));
 }
 
-TEST(the_sidebar_has_the_four_major_pages_with_their_children_under_them)
-{
-    CHECK_EQ(kPageCount, 12);
-    CHECK(kPages[0].page == Page::Entities && !kPages[0].child);
-    for (int i = 1; i <= 5; ++i)
-        CHECK(kPages[i].child);
-    CHECK(kPages[6].page == Page::UserInterface && !kPages[6].child);
-    CHECK(kPages[7].page == Page::TopPanel && kPages[7].child);
-    CHECK(kPages[8].page == Page::Widgets && kPages[8].child);
-    CHECK(kPages[9].page == Page::MouseCursor && kPages[9].child); // under User Interface
-    CHECK(kPages[10].page == Page::ConfigMenu && !kPages[10].child);
-    CHECK(kPages[11].page == Page::Debug && !kPages[11].child);
-    CHECK(std::string_view(kPages[6].label) == "User Interface");
-    CHECK(std::string_view(kPages[7].label) == "Top Panel" && std::string_view(kPages[8].label) == "Widgets");
-}
-
-TEST(every_page_is_found_by_its_key_and_nothing_else)
-{
-    for (const PageInfo& info : kPages)
-        CHECK(PageNamed(PageKey(info.page)) == info.page);
-    CHECK(PageKey(Page::UserInterface) == "userinterface");
-    CHECK(PageKey(Page::TopPanel) == "toppanel" && PageKey(Page::Widgets) == "widgets");
-    CHECK(!PageNamed("global"));
-    CHECK(!PageNamed("topbar")); // the Top Panel page's name before
-    CHECK(!PageNamed(""));
-}
-
-TEST(every_row_of_the_table_is_the_page_at_its_index)
-{
-    for (int i = 0; i < kPageCount; ++i)
-        CHECK_EQ(static_cast<int>(kPages[i].page), i);
-}
-
 TEST(the_kind_pages_know_their_kind)
 {
     const std::pair<Page, PlateKind> kinds[] = {{Page::Mobs, PlateKind::Mobs}, {Page::Players, PlateKind::Players},
@@ -111,23 +78,26 @@ TEST(labels_are_title_case_with_small_words_left_alone_inside)
 
 TEST(the_show_dropdown_reads_always_one_condition_how_many_or_never)
 {
+    const auto NameOfCondition = [](ShowCondition c) {
+        return std::string(kWindowLayout.OptionsOf(WindowList::ShowCondition)[static_cast<size_t>(c)].name);
+    };
     const std::vector<ShowCondition> mobs = ConditionsFor(PlateKind::Mobs);
     LineShow show;
-    const std::string always = ShowSummary(show, mobs);
+    const std::string always = ShowSummary(show, mobs, kWindowLayout);
     show.when = ConditionBit(ShowCondition::YourClaim);
-    CHECK_EQ(ShowSummary(show, mobs), always); // Always wins over what is checked under it
+    CHECK_EQ(ShowSummary(show, mobs, kWindowLayout), always); // Always wins over what is checked under it
     show.always = false;
-    CHECK_EQ(ShowSummary(show, mobs), ConditionLabel(ShowCondition::YourClaim)); // one condition is named
+    CHECK_EQ(ShowSummary(show, mobs, kWindowLayout), NameOfCondition(ShowCondition::YourClaim)); // one condition is named
     show.when |= ConditionBit(ShowCondition::Targeted) | ConditionBit(ShowCondition::TooWeak);
-    CHECK(ShowSummary(show, mobs).starts_with("3 ")); // several are counted
+    CHECK(ShowSummary(show, mobs, kWindowLayout).starts_with("3 ")); // several are counted
     show.when = 0;
-    const std::string never = ShowSummary(show, mobs);
+    const std::string never = ShowSummary(show, mobs, kWindowLayout);
     CHECK(never != always && !never.empty());
     // A condition the kind's list does not offer cannot be seen or unchecked there, so it is not counted.
     show.when = ConditionBit(ShowCondition::Friend) | ConditionBit(ShowCondition::Unclaimed);
-    CHECK_EQ(ShowSummary(show, mobs), ConditionLabel(ShowCondition::Unclaimed));
-    CHECK_EQ(ShowSummary(show, ConditionsFor(PlateKind::Players)), ConditionLabel(ShowCondition::Friend));
-    CHECK_EQ(ShowSummary(show, ConditionsFor(PlateKind::Npcs)), never);
+    CHECK_EQ(ShowSummary(show, mobs, kWindowLayout), NameOfCondition(ShowCondition::Unclaimed));
+    CHECK_EQ(ShowSummary(show, ConditionsFor(PlateKind::Players), kWindowLayout), NameOfCondition(ShowCondition::Friend));
+    CHECK_EQ(ShowSummary(show, ConditionsFor(PlateKind::Npcs), kWindowLayout), never);
 }
 
 TEST(a_font_dropdowns_arrows_step_through_its_list_and_around_its_ends)
@@ -246,24 +216,27 @@ TEST(the_sync_dropdown_lists_no_then_its_targets)
     CHECK_EQ(SyncOfEntry(targets, 3), kNoSync);
     CHECK_EQ(SyncOfEntry({}, 0), kNoSync);
     // An entry names the line it syncs with, and the first names none.
-    const auto names = [&](int entry, int line) { return SyncEntryLabel(targets, entry).find(kLineLabels[line]) != std::string::npos; };
+    const auto names = [&](int entry, int line) {
+        const char* name = kWindowLayout.OptionsOf(WindowList::PlateLines)[static_cast<size_t>(line)].name;
+        return SyncEntryLabel(targets, entry, kWindowLayout).find(name) != std::string::npos;
+    };
     CHECK(names(1, 0) && !names(1, 2));
     CHECK(names(2, 2) && !names(2, 0));
-    CHECK(!names(0, 0) && !names(0, 2) && !SyncEntryLabel(targets, 0).empty());
+    CHECK(!names(0, 0) && !names(0, 2) && !SyncEntryLabel(targets, 0, kWindowLayout).empty());
 }
 
 TEST(the_clocks_zone_dropdown_lists_local_first_and_then_every_zone)
 {
     CHECK_EQ(kClockZoneChoices, kClockZoneCount + 1);
-    CHECK(ClockZoneChoiceName(0) == "Local" && ClockZoneChoiceName(1) == "Japan (JST)");
-    CHECK(ClockZoneChoiceName(kClockZoneChoices - 1) == "Australia Eastern (AET)");
+    CHECK(ClockZoneChoiceName(0, kWindowLayout) == kWindowLayout.WordOf(WindowWord::Local).name);
+    CHECK(ClockZoneChoiceName(1, kWindowLayout) == ClockZoneName(ClockZone(0)));
     CHECK(ClockZoneChoice(std::nullopt) == 0 && !ClockZoneOfChoice(0).has_value());
     CHECK(!ClockZoneOfChoice(-1).has_value() && !ClockZoneOfChoice(kClockZoneChoices).has_value());
     for (int z = 0; z < kClockZoneCount; ++z)
     {
         const auto zone = static_cast<ClockZone>(z);
         CHECK(ClockZoneOfChoice(ClockZoneChoice(zone)) == zone);
-        CHECK(ClockZoneChoiceName(ClockZoneChoice(zone)) == ClockZoneName(zone));
+        CHECK(ClockZoneChoiceName(ClockZoneChoice(zone), kWindowLayout) == ClockZoneName(zone));
     }
 }
 
