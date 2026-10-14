@@ -1,6 +1,7 @@
 #pragma once
 
 #include "code_patch.h"
+#include "friend_list.h"
 #include "name_frame.h"
 #include "native_locate.h"
 #include "plate_settings.h"
@@ -194,6 +195,19 @@ namespace headsup
 
     private:
         uint32_t m_Global = 0;
+    };
+
+    // The friends of the game's own friend list (friend_list.h), read where the client keeps it.
+    class FriendListReader
+    {
+    public:
+        // The characters its friends play, by server id in ascending order; none while the list is not found. It
+        // is looked for on the first reads, as the client fills it once you are signed on.
+        std::vector<uint32_t> Read();
+
+    private:
+        const uint8_t* m_First = nullptr;
+        int m_Searches         = 0;
     };
 
     class NetStatsReader

@@ -179,11 +179,6 @@ namespace headsup
     const char* StatusRankLabel(StatusRank status) { return kStatusRankLabels[static_cast<int>(status)]; }
     const char* TargetStateTip(TargetState target) { return kTargetStateTips[static_cast<int>(target)]; }
 
-    bool IsCharacterName(std::string_view name)
-    {
-        const auto letter = [](char c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'); };
-        return name.size() >= kMinCharacterName && name.size() <= kMaxCharacterName && std::ranges::all_of(name, letter);
-    }
 
     const char* const kAlignLabels[kAlignCount]                 = {"Left", "Center", "Right"};
     const char* const kFontStyleLabels[kFontStyleCount]         = {"Bold", "Italics", "Underline"};

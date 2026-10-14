@@ -863,42 +863,6 @@ namespace headsup
             }
         }
 
-        void Friends(Form& form, Settings& s, std::string& typed)
-        {
-            form.Fade(!s.enabled);
-            if (!form.BeginCard("Friends", nullptr,
-                    "Players named here are Friends, in the rows above and in the Entity Type colors. Click a name to "
-                    "remove it."))
-                return;
-            form.Line("line chips");
-            std::optional<size_t> removed;
-            for (size_t i = 0; i < s.friends.size(); ++i)
-                if (form.Button((s.friends[i] + "  x").c_str(), ("friend " + std::to_string(i)).c_str(), kChip)) removed = i;
-            const std::string rule = "A character's name, " + std::to_string(kMinCharacterName) + " to " +
-                                     std::to_string(kMaxCharacterName) + " letters. Enter adds it.";
-            std::string name = typed;
-            form.Raw("<div class=\"tip-wrap\" tip=\"" + EscapedRml(rule) + "\">");
-            const bool entered = form.TextAt("add friend", name, "Add a Name", kFilterWidth, false, kMaxCharacterName);
-            form.Raw("</div>");
-            form.EndLine();
-            if (entered)
-            {
-                typed = name;
-                if (std::optional<std::string> added = FriendToAdd(s.friends, typed))
-                {
-                    s.friends.push_back(std::move(*added));
-                    typed.clear();
-                    form.changed = true;
-                }
-            }
-            if (removed)
-            {
-                s.friends.erase(s.friends.begin() + static_cast<std::ptrdiff_t>(*removed));
-                form.changed = true;
-            }
-            form.EndCard();
-        }
-
         void Timers(Form& form, Settings& s)
         {
             form.Fade(!s.enabled);
@@ -1026,7 +990,6 @@ namespace headsup
             if (editor.kind != kind)
             {
                 editor = DesignEditor{.kind = kind};
-                state.friendName.clear();
             }
             const KindSettings& k = s.Kind(kind);
             const int rows        = RowCountOf(kind);
@@ -1050,7 +1013,6 @@ namespace headsup
             switch (kind)
             {
             case PlateKind::Mobs: MobCards(form, s, fonts); break;
-            case PlateKind::Players: Friends(form, s, state.friendName); break;
             case PlateKind::Self: Timers(form, s); break;
             default: break;
             }

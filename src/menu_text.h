@@ -110,7 +110,7 @@ namespace headsup
     const char* const kPlayerRowTips[kPlayerRowCount] = {
         "Every player the rows below do not cover.",
         "In your party.",
-        "Named in the Friends card below, and not in your party.",
+        "On your Friend List in the game (Communication > Friend List), and not in your party.",
         "In your linkshell, and neither in your party nor a friend. The game tells a player's linkshell only when "
         "you /check them."}; // by PlayerRow
     const char* const kPetRowTips[kPetRowCount] = {"A pet of yours.", "A pet of someone in your party.",

@@ -246,6 +246,8 @@ class HeadsUp final : public IPlugin
     std::vector<uint32_t> m_PartyIds;           // server IDs of you, your party and alliance, this frame
     std::vector<std::string> m_Linkshells;      // the linkshells you wear, as last read
     std::optional<double> m_LinkshellsReadAt;
+    headsup::FriendListReader m_FriendList;
+    std::vector<uint32_t> m_Friends; // the characters your friends play, by server id in ascending order
     std::unordered_map<uint32_t, headsup::PlayerJobs> m_PartyJobs; // theirs as the party list has them, by server ID
     headsup::PlayerJobs m_OwnJobs;                                // yours as the game has them, this frame
     bool m_DebugPending = false;
@@ -1781,6 +1783,9 @@ private:
         UpdateParty(party, player);
         if (!m_LinkshellsReadAt || now - *m_LinkshellsReadAt >= kLinkshellReadSeconds)
         {
+            // The game's own friend list, read with them: a friend is told by the character the list says they play.
+            const bool inZone = m_Player.level > 0 && player->GetIsZoning() == 0;
+            m_Friends         = inZone ? m_FriendList.Read() : std::vector<uint32_t>{};
             m_Linkshells       = WornLinkshells();
             m_LinkshellsReadAt = now;
         }
@@ -1839,7 +1844,7 @@ private:
                 .claimedByParty = isMob && headsup::ClaimedByParty(claim, m_PartyIds),
                 .claimed        = isMob && headsup::IsClaimed(claim),
                 .party          = isPlayer && headsup::InYourParty(serverId, self, m_PartyIds),
-                .isFriend       = isPlayer && headsup::IsFriend(m_Settings.friends, name),
+                .isFriend       = isPlayer && headsup::IsFriend(m_Friends, serverId),
                 .linkshell      = isPlayer && headsup::SharesLinkshell(m_GameState.PlayerCheckOf(serverId), m_Linkshells),
                 .engaged        = state == kEngagedStatus,
                 .self           = self,
@@ -1856,7 +1861,7 @@ private:
                 input.pet                 = true;
                 input.ownerName           = headsup::EntityName(entity, ownerIndex);
                 input.petRow = headsup::PetRowOf(yours, headsup::InYourParty(entity->GetServerId(ownerIndex), yours, m_PartyIds),
-                    headsup::IsFriend(m_Settings.friends, input.ownerName));
+                    headsup::IsFriend(m_Friends, entity->GetServerId(ownerIndex)));
             }
         // A pet is no mob to the server's check.
         std::erase_if(checkable, [&](const headsup::CheckCandidate& mob) { return petOwners.contains(mob.index); });

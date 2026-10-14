@@ -152,7 +152,6 @@ namespace headsup
         std::array<KindSettings, kPlateKindCount> kinds = DefaultKinds();
         Palette palette = DefaultPalette();
         uint32_t detectionShown = kDefaultDetection;
-        std::vector<std::string> friends;
         ColorPick cursorColor{ColorSource::Target};
         ColorPick cursorEdgeColor{ColorSource::Custom, ColorFromRgb(0x000000)};
         const KindSettings& Kind(PlateKind k) const { return kinds[static_cast<int>(k)]; }

@@ -74,8 +74,6 @@ namespace headsup
     // the row the mob's aggression gives, an Aggression pick takes that row's nature.
     uint32_t RowColor(const EntityState& state, const Settings& settings);
     bool LineShows(const LineShow& show, const EntityState& state);
-    // Whether the Friends list names this player, ignoring case.
-    bool IsFriend(const std::vector<std::string>& friends, std::string_view name);
     // Whether a player is in your party or alliance: among the members' server IDs, and not you.
     bool InYourParty(uint32_t serverId, bool self, std::span<const uint32_t> memberIds);
 

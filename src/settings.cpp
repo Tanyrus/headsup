@@ -211,7 +211,6 @@ namespace headsup
         constexpr const char* kLineInfix        = "Line";
         constexpr const char* kOrnamentInfix    = "Ornament";
         constexpr const char* kDefaultFontKey   = "defaultFont";
-        constexpr const char* kFriendsKey       = "friends";
         constexpr const char* kDetectionShownKey = "detectionShown";
         constexpr float kPercentScale = 100.0f;
         constexpr int kMobIconLine = 0, kMobLevelLine = 1, kNameLine = kPlateLines - 1;
@@ -508,9 +507,6 @@ namespace headsup
                 LoadColor(store, e.key, *e.color);
             s.defaultFont    = store.GetString(kDefaultFontKey, s.defaultFont.c_str());
             s.detectionShown = LoadHex(store, kDetectionShownKey, s.detectionShown);
-            std::istringstream names(store.GetString(kFriendsKey, ""));
-            for (std::string name; names >> name;)
-                s.friends.push_back(name);
         }
 
         void SaveDesigner(SettingsStore& store, const Settings& s)
@@ -522,10 +518,6 @@ namespace headsup
                 StoreColor(store, e.key, *e.color);
             store.Set(kDefaultFontKey, s.defaultFont.c_str());
             StoreHex(store, kDetectionShownKey, s.detectionShown);
-            std::string names;
-            for (const std::string& name : s.friends)
-                names += (names.empty() ? "" : " ") + name;
-            store.Set(kFriendsKey, names.c_str());
             StoreBool(store, kDesignsSavedKey, true);
         }
 
@@ -1073,12 +1065,6 @@ namespace headsup
                 *entries[i].color = ClampColor(*entries[i].color, *defaults[i].color);
             if (s.defaultFont.empty() || s.defaultFont.size() > kMaxFontName) s.defaultFont = d.defaultFont;
             s.detectionShown &= kAllDetection;
-            std::vector<std::string> friends;
-            for (std::string& name : s.friends)
-                if (IsCharacterName(name) &&
-                    std::ranges::none_of(friends, [&](const std::string& kept) { return SameIgnoringCase(kept, name); }))
-                    friends.push_back(std::move(name));
-            s.friends = std::move(friends);
         }
     }
 

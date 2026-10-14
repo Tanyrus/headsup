@@ -141,15 +141,6 @@ namespace headsup
         return true;
     }
 
-    std::optional<std::string> FriendToAdd(const std::vector<std::string>& friends, std::string_view typed)
-    {
-        const auto blank = [](char c) { return std::isspace(static_cast<unsigned char>(c)) != 0; };
-        while (!typed.empty() && blank(typed.front())) typed.remove_prefix(1);
-        while (!typed.empty() && blank(typed.back())) typed.remove_suffix(1);
-        if (!IsCharacterName(typed) || IsFriend(friends, typed)) return std::nullopt;
-        return std::string(typed);
-    }
-
     std::vector<int> SyncTargets(const KindSettings& kind, int line)
     {
         std::vector<int> targets;

@@ -204,18 +204,6 @@ TEST(each_condition_holds_for_its_state_alone)
     CHECK(!holds(ShowCondition::PartyMember, yours)); // a mob is never a party member
 }
 
-TEST(a_friend_is_named_in_the_list_whatever_the_case)
-{
-    const std::vector<std::string> friends{"Chadmage", "pollux"};
-    CHECK(IsFriend(friends, "Chadmage"));
-    CHECK(IsFriend(friends, "chadMAGE"));
-    CHECK(IsFriend(friends, "Pollux"));
-    CHECK(!IsFriend(friends, "Chad"));
-    CHECK(!IsFriend(friends, "Chadmages"));
-    CHECK(!IsFriend(friends, ""));
-    CHECK(!IsFriend({}, "Chadmage"));
-}
-
 TEST(the_cursor_takes_its_picks_color_and_the_targeting_color_where_the_pick_has_nothing_to_read)
 {
     Settings s;

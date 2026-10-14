@@ -484,7 +484,6 @@ TEST(a_saved_file_loads_every_setting_and_saves_back_the_same)
     expected.scaleMax         = loaded.scaleMax;
     expected.timerPercent     = loaded.timerPercent;
     expected.detectionShown   = loaded.detectionShown;
-    expected.friends          = loaded.friends;
     expected.cursorEdgeColor  = loaded.cursorEdgeColor;
     CHECK(loaded == expected);
     MapStore saved;
@@ -1133,7 +1132,6 @@ TEST(every_designer_key_round_trips)
     s.scaleMax   = 120;
     s.timerPercent = 50;
     s.detectionShown = DetectionBit(DetectionIcon::Aggro) | DetectionBit(DetectionIcon::Blood);
-    s.friends    = {"Tanyrus", "Chadmage"};
     s.cursorEdgeColor = ColorPick{ColorSource::Type, {{0.2f, 0.2f, 0.2f}}};
     s.cursorColor     = ColorPick{ColorSource::Custom, {{0.9f, 0.8f, 0.1f}}};
     s.cursorStyle     = CursorStyle::File;
@@ -1146,7 +1144,7 @@ TEST(every_designer_key_round_trips)
     CHECK_EQ(store.values.at("mobsLine2Text"), "Lv $level $con $$ $id");
     CHECK_EQ(store.values.at("mobsLine2When"), "5");
     CHECK_EQ(store.values.at("petsLine1Text"), "$owner's $name");
-    CHECK_EQ(store.values.at("friends"), "Tanyrus Chadmage");
+    CHECK(!store.values.contains("friends")); // the list of friends kept by hand is gone: the game's own is read
     CHECK_EQ(store.values.at("settingsVersion"), "4.0000");
 }
 
@@ -1190,7 +1188,6 @@ TEST(clamp_keeps_designer_values_in_range)
     s.Kind(PlateKind::Players).ornament.height = 9999;
     s.palette.toughness[static_cast<int>(LabelShade::Tough)].v[1] = std::nanf("");
     s.palette.claim[static_cast<int>(ClaimState::Yours)]          = {{2.0f, -1.0f, 0.5f}};
-    s.friends = {"", "Two Words", "Fine"};
     const Settings c = Clamp(s);
     CHECK_EQ(c.baseSize, kMaxTextSize);
     CHECK_EQ(c.scaleMin, 300);
@@ -1208,8 +1205,6 @@ TEST(clamp_keeps_designer_values_in_range)
     // The channel that was no number takes the default's.
     CHECK(c.palette.toughness[static_cast<int>(LabelShade::Tough)] == (Color{{1.00f, 1.00f, 0.35f}}));
     CHECK(c.palette.claim[static_cast<int>(ClaimState::Yours)] == (Color{{1.0f, 0.0f, 0.5f}}));
-    CHECK_EQ(c.friends.size(), size_t{1});
-    CHECK_EQ(c.friends[0], "Fine");
 }
 
 TEST(clamp_puts_a_color_source_its_kind_does_not_offer_back_to_the_default)
@@ -1264,16 +1259,6 @@ TEST(a_file_that_saved_aggression_on_a_kind_without_one_loads_as_target_type)
     CHECK(s.Kind(PlateKind::Pets).rows[static_cast<int>(PetRow::Others)].outlineColor.source == ColorSource::Type);
     CHECK(s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WontAttack)].outlineColor.source == ColorSource::Aggression);
     CHECK(s == Settings{});
-}
-
-TEST(clamp_keeps_each_character_name_among_the_friends_once)
-{
-    Settings s;
-    s.friends = {"Tanyrus", "Ab", "tanyrus", "Chad1", "Pollux", "Abcdefghijklmnop", "POLLUX", "Two Words", "", "Abc",
-        "Tom's"};
-    const Settings c = Clamp(s);
-    CHECK((c.friends == std::vector<std::string>{"Tanyrus", "Pollux", "Abc"})); // the first spelling of each stays
-    CHECK(Clamp(c).friends == c.friends);
 }
 
 TEST(an_old_file_migrates_field_by_field)
@@ -1561,9 +1546,9 @@ TEST(a_save_after_loading_this_builds_file_passes_on_only_the_key_that_changed)
     CHECK(file.sets == std::vector<std::string>{"mobsLine3Glow"});
     keys.ReadBack(true);
     file.sets.clear();
-    s.friends.push_back("Chadmage");
-    CHECK((keys.Save(s) == std::vector<KeyText>{{"friends", "Chadmage"}}));
-    CHECK(file.sets == std::vector<std::string>{"friends"});
+    s.Kind(PlateKind::Pets).lines[0].text = "of $owner";
+    CHECK((keys.Save(s) == std::vector<KeyText>{{"petsLine1Text", "of $owner"}}));
+    CHECK(file.sets == std::vector<std::string>{"petsLine1Text"});
     CHECK(file.values == WholeSave(s)); // the store is what a save of every key would have made it
 }
 
@@ -1594,7 +1579,7 @@ TEST(the_first_save_after_a_migration_passes_on_every_key_the_file_lacks_and_non
     CHECK(passed == expected);
     CHECK_EQ(file.sets.size(), passed.size()); // each key once
     for (const char* designer : {"mobsRowAggressivePlate", "mobsLine3Text", "petsLine1TextSize", "selfOrnamentVisibility",
-             "paletteAggressionPassiveR", "defaultFont", "friends", "nameplateDesigns", "settingsVersion"})
+             "paletteAggressionPassiveR", "defaultFont", "nameplateDesigns", "settingsVersion"})
         CHECK(passed.contains(designer));
     for (const char* old : kOldKeys)
         CHECK(!passed.contains(old));
@@ -1791,7 +1776,6 @@ namespace
         s.Kind(PlateKind::Pets).lines[1].text      = "($owner)";
         s.Kind(PlateKind::Players).lines[2].glow   = 80;
         s.palette.aggression[static_cast<int>(Nature::Passive)] = {{0.25f, 0.5f, 0.75f}};
-        s.friends = {"Chadmage"};
         return s;
     }
 }

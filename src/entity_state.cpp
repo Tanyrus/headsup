@@ -226,14 +226,6 @@ namespace headsup
         return false;
     }
 
-    bool IsFriend(const std::vector<std::string>& friends, std::string_view name)
-    {
-        const auto lower = [](char ch) { return std::tolower(static_cast<unsigned char>(ch)); };
-        const auto same  = [&](const std::string& entry)
-        { return std::ranges::equal(entry, name, [&](char a, char b) { return lower(a) == lower(b); }); };
-        return std::ranges::any_of(friends, same);
-    }
-
     bool InYourParty(uint32_t serverId, bool self, std::span<const uint32_t> memberIds)
     {
         return !self && std::ranges::find(memberIds, serverId) != memberIds.end();

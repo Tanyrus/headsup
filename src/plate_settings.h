@@ -219,10 +219,6 @@ namespace headsup
     constexpr uint32_t DetectionBit(DetectionIcon d) { return 1u << static_cast<int>(d); }
     const char* DetectionLabel(DetectionIcon d);
 
-    // A character's name is letters alone, this many of them, as Phoenix's validateCharacterName has it.
-    constexpr size_t kMinCharacterName = 3, kMaxCharacterName = 15;
-    bool IsCharacterName(std::string_view name);
-
     // The menu's words, each as a row shows it: Title Case, as TitleCaseText gives it.
     const char* PlateModeLabel(PlateMode mode);
     const char* OutlineModeLabel(OutlineMode mode);

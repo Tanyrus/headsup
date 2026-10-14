@@ -130,33 +130,6 @@ TEST(the_show_dropdown_reads_always_one_condition_how_many_or_never)
     CHECK_EQ(ShowSummary(show, ConditionsFor(PlateKind::Npcs)), "Never");
 }
 
-TEST(a_friend_is_added_trimmed_once_and_only_as_a_character_name)
-{
-    const std::vector<std::string> friends{"Chadmage", "pollux"};
-    CHECK(FriendToAdd(friends, "Tanyrus") == std::string("Tanyrus"));
-    CHECK(FriendToAdd(friends, "  Tanyrus\t") == std::string("Tanyrus"));
-    CHECK(FriendToAdd({}, "Abc") == std::string("Abc"));
-    CHECK(!FriendToAdd(friends, ""));
-    CHECK(!FriendToAdd(friends, "   "));
-    CHECK(!FriendToAdd(friends, "Chadmage"));
-    CHECK(!FriendToAdd(friends, " chadMAGE "));
-    CHECK(!FriendToAdd(friends, "POLLUX"));
-    CHECK(FriendToAdd(friends, "Chad") == std::string("Chad")); // a part of a name is another name
-    CHECK(!FriendToAdd(friends, "Two Words")); // the list is saved with spaces between its names
-    CHECK(!FriendToAdd({}, "Ab"));             // the game takes no name under three letters
-    CHECK(FriendToAdd({}, "Abcdefghijklmno") == std::string("Abcdefghijklmno"));
-    CHECK(!FriendToAdd({}, "Abcdefghijklmnop")); // nor over fifteen
-    CHECK(!FriendToAdd({}, "Chad1"));            // nor anything but letters
-    CHECK(!FriendToAdd({}, "Tom's"));
-    // Whatever it takes, Clamp keeps.
-    for (const char* name : {"Tanyrus", "Abc", "Abcdefghijklmno"})
-    {
-        Settings s;
-        s.friends = {*FriendToAdd({}, name)};
-        CHECK(Clamp(s).friends == s.friends);
-    }
-}
-
 TEST(a_font_dropdowns_arrows_step_through_its_list_and_around_its_ends)
 {
     const std::vector<std::string> fonts{"Barlow Condensed", "Cinzel", "Marcellus SC"};

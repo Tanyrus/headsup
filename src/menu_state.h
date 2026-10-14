@@ -72,10 +72,6 @@ namespace headsup
     // row.
     bool ToggleCondition(LineShow& show, const std::vector<ShowCondition>& offered, int row);
 
-    // A name typed into the Friends card as it joins the list: trimmed. Nothing when it is no character's name or
-    // is there already in any case.
-    std::optional<std::string> FriendToAdd(const std::vector<std::string>& friends, std::string_view typed);
-
     // A design line's box between frames: whether it is typed in, and its caret, where a clicked tag goes.
     struct LineDraft
     {

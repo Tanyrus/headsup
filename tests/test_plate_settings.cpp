@@ -169,21 +169,6 @@ TEST(every_default_color_pick_is_one_its_kinds_page_offers)
     CHECK(mobs.ornament.color.source == ColorSource::Aggression);
 }
 
-TEST(a_character_name_is_three_to_fifteen_letters)
-{
-    CHECK(IsCharacterName("Abc"));
-    CHECK(IsCharacterName("Tanyrus"));
-    CHECK(IsCharacterName("Abcdefghijklmno")); // 15
-    CHECK(!IsCharacterName("Ab"));
-    CHECK(!IsCharacterName("Abcdefghijklmnop")); // 16
-    CHECK(!IsCharacterName(""));
-    CHECK(!IsCharacterName("Chad1"));
-    CHECK(!IsCharacterName("Two Words"));
-    CHECK(!IsCharacterName("Tom's"));
-    CHECK(!IsCharacterName("Chad-mage"));
-    CHECK(!IsCharacterName("Ren\xC3\xA9" "e")); // letters past the alphabet are not the game's
-}
-
 TEST(by_nature_is_offered_only_on_the_mob_rows_that_can_step_aside)
 {
     for (int k = 0; k < kPlateKindCount; ++k)

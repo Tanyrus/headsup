@@ -119,18 +119,6 @@ TEST(a_widgets_chip_dropped_on_another_goes_before_it)
     CHECK(w.state.widget == static_cast<int>(left[0]) && clicked.scrollToTop);
 }
 
-TEST(a_friend_is_added_by_name_and_removed_by_its_chip)
-{
-    Window w;
-    w.state.page = Page::Players;
-    w.Pass({{"players-friends-add-friend", kCommitEvent, "Amutiyaal"}});
-    CHECK(w.settings.friends == std::vector<std::string>{"Amutiyaal"});
-    const Form form = w.Pass();
-    CHECK(Has(Block(form, "players-friends")->rml, "Amutiyaal  x"));
-    w.Pass({{"players-friends-friend-0", kClickEvent, ""}});
-    CHECK(w.settings.friends.empty());
-}
-
 TEST(the_reset_card_asks_twice)
 {
     Window w;

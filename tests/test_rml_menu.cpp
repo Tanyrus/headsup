@@ -421,19 +421,6 @@ TEST(a_stretch_is_as_wide_as_its_text_and_the_last_takes_the_rest_of_the_box)
     CHECK_EQ(window.Said(), "");
 }
 
-TEST(a_friend_is_added_with_enter_and_removed_by_a_click_on_the_name)
-{
-    Window window;
-    window.Page("players");
-    window.Click("players-friends-add-friend");
-    window.Type("Tanyrus");
-    CHECK(window.Key(Rml::Input::KI_RETURN));
-    CHECK_EQ(window.settings.friends.size(), 1u);
-    CHECK_EQ(window.settings.friends[0], "Tanyrus");
-    CHECK(window.Click("players-friends-friend-0"));
-    CHECK(window.settings.friends.empty());
-}
-
 TEST(the_font_arrows_step_through_the_fonts_and_a_slider_follows_the_pointer)
 {
     Window window;

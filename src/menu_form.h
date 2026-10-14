@@ -49,7 +49,6 @@ namespace headsup
         KeyCapture shotKeyCapture;  // screenshot mode's
         WindowFilter windows;
         DesignEditor design;
-        std::string friendName;     // the Friends card's box, as typed
     };
 
     // One pass of the window: the sidebar, then the open page's cards. fonts: FontChoices, for the nameplates' and
