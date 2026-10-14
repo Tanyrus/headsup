@@ -36,7 +36,8 @@ namespace headsup
             {"clockSeconds", &Settings::clockSeconds},
             {"stackNames", &Settings::stackNames},
             {"nameplates", &Settings::nameplates}, {"outlines", &Settings::outlines},
-            {"outlineFadeIn", &Settings::outlineFadeIn}, {"cursorFloat", &Settings::cursorFloat}};
+            {"outlineFadeIn", &Settings::outlineFadeIn}, {"cursorFloat", &Settings::cursorFloat},
+            {"autoCheck", &Settings::autoCheck}};
 
         struct IntKey
         {

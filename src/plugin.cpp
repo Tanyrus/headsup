@@ -1,5 +1,6 @@
 #include "Ashita.h"
 
+#include "auto_check.h"
 #include "bar_connection.h"
 #include "bar_document.h"
 #include "bar_fps.h"
@@ -239,6 +240,7 @@ class HeadsUp final : public IPlugin
     headsup::InstalledFonts m_Fonts;
     headsup::PlayerState m_Player;
     headsup::CheckResults m_Checks;
+    headsup::AutoCheck m_AutoCheck;
     headsup::GameState m_GameState;
     std::unordered_set<uint16_t> m_BuffSynced; // you and your party, from the buffs the game keeps, this frame
     std::vector<uint32_t> m_PartyIds;           // server IDs of you, your party and alliance, this frame
@@ -314,8 +316,8 @@ public:
     double GetVersion(void) const override { return kVersion; }
     uint32_t GetFlags(void) const override
     {
-        return static_cast<uint32_t>(Ashita::PluginFlags::UseCommands | Ashita::PluginFlags::UsePackets |
-                                     Ashita::PluginFlags::UseDirect3D);
+        return static_cast<uint32_t>(Ashita::PluginFlags::UseCommands | Ashita::PluginFlags::UseText |
+                                     Ashita::PluginFlags::UsePackets | Ashita::PluginFlags::UseDirect3D);
     }
 
     bool Initialize(IAshitaCore* core, ILogManager* logger, const uint32_t id) override
@@ -527,7 +529,22 @@ public:
         }
     }
 
-    // HeadsUp only reads packets: every one still reaches the game.
+    // The only chat line HeadsUp keeps out: the checker addon's report of a check HeadsUp made by itself.
+    bool HandleIncomingText(int32_t mode, bool indent, const char* message, int32_t* modifiedMode, bool* modifiedIndent,
+        char* modifiedMessage, bool injected, bool blocked) override
+    {
+        UNREFERENCED_PARAMETER(mode);
+        UNREFERENCED_PARAMETER(indent);
+        UNREFERENCED_PARAMETER(modifiedMode);
+        UNREFERENCED_PARAMETER(modifiedIndent);
+        UNREFERENCED_PARAMETER(modifiedMessage);
+        UNREFERENCED_PARAMETER(injected);
+        UNREFERENCED_PARAMETER(blocked);
+        return message != nullptr && m_AutoCheck.OwnReport(message, Now());
+    }
+
+    // HeadsUp reads packets and lets every one reach the game, but for the answer to a check it made by itself
+    // (Auto-Check), whose chat line nobody asked to read.
     bool HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data, uint8_t* modified, uint32_t sizeChunk,
         const uint8_t* dataChunk, bool injected, bool blocked) override
     {
@@ -540,23 +557,28 @@ public:
 #endif
         if (!injected) m_Connection.Received(Now()); // an addon's injected packet never came from the server
         const headsup::PacketFollowUp next = m_GameState.Received(id, data, size);
-        if (next.zonedIn) m_Names.ForgetCamera();
+        if (next.zonedIn)
+        {
+            m_Names.ForgetCamera();
+            m_AutoCheck.Clear();
+        }
         if (next.check) OnCheckReply(*next.check);
-        return false;
+        if (id != headsup::kCheckReplyPacket) return false;
+        const std::optional<headsup::CheckAnswer> answer = headsup::ParseCheckAnswer(data, size);
+        return answer && m_AutoCheck.TakeAnswer(*answer, Now());
     }
 
     // HeadsUp never changes or blocks the game's packets: every one still goes to the server.
     bool HandleOutgoingPacket(uint16_t id, uint32_t size, const uint8_t* data, uint8_t* modified, uint32_t sizeChunk,
         const uint8_t* dataChunk, bool injected, bool blocked) override
     {
-        UNREFERENCED_PARAMETER(id);
-        UNREFERENCED_PARAMETER(size);
-        UNREFERENCED_PARAMETER(data);
         UNREFERENCED_PARAMETER(modified);
         UNREFERENCED_PARAMETER(sizeChunk);
         UNREFERENCED_PARAMETER(dataChunk);
-        UNREFERENCED_PARAMETER(injected);
         if (!blocked) m_Connection.Sent(Now());
+        // A check the player made themselves, which no plugin put in: its answer is theirs to read.
+        if (id == headsup::kCheckRequestPacket && !injected && !blocked)
+            if (const std::optional<uint32_t> target = headsup::CheckRequestTarget(data, size)) m_AutoCheck.PlayerAsked(*target, Now());
         return false;
     }
 
@@ -1766,6 +1788,7 @@ private:
         std::vector<headsup::ActorInput> inputs;
         std::vector<headsup::PhSighting> sightings;
         std::vector<headsup::PetLink> pets;
+        std::vector<headsup::CheckCandidate> checkable;
         for (uint32_t i = 0; i < count; ++i)
         {
             if (entity->GetRawEntity(i) == nullptr) continue;
@@ -1783,7 +1806,18 @@ private:
             const char* name        = headsup::EntityName(entity, i);
             const uint32_t claim    = entity->GetClaimStatus(i);
             const uint32_t state    = entity->GetStatus(i);
-            if (isMob && !alive) m_Checks.Forget(serverId); // the next spawn rolls a new level
+            if (isMob && !alive)
+            {
+                m_Checks.Forget(serverId); // the next spawn rolls a new level
+                m_AutoCheck.Forget(serverId);
+            }
+            if (isMob)
+            {
+                const headsup::MobRecord* record = headsup::MobById(serverId);
+                checkable.push_back(headsup::CheckCandidate{serverId, index, headsup::DistanceFromSquared(entity->GetDistance(i)),
+                    alive, m_Checks.Result(serverId, now) != nullptr,
+                    record == nullptr || (record->flags & headsup::kMobNotorious) == 0, name});
+            }
             if (isMob && m_Settings.phTimers)
             {
                 const bool bodyDrawn = m_Names.FramesSinceMesh(index) <= headsup::kMeshGraceFrames;
@@ -1824,12 +1858,21 @@ private:
                 input.petRow = headsup::PetRowOf(yours, headsup::InYourParty(entity->GetServerId(ownerIndex), yours, m_PartyIds),
                     headsup::IsFriend(m_Settings.friends, input.ownerName));
             }
+        // A pet is no mob to the server's check.
+        std::erase_if(checkable, [&](const headsup::CheckCandidate& mob) { return petOwners.contains(mob.index); });
         m_Player.level   = player->GetMainJobLevel();
         m_Player.sitting = headsup::IsSittingStatus(entity->GetStatus(m_SelfIndex));
         // The status the server gave you says an event runs: your own stayed 0 through an NPC's dialog, a cutscene
         // and one begun at zone-in.
         m_Player.inEvent = headsup::IsEventStatus(entity->GetStatusServer(m_SelfIndex));
         m_Tracker.Update(inputs, m_Player, m_Settings, m_CursorTargets);
+        if (headsup::MayAutoCheck(m_Settings.enabled && m_Settings.autoCheck, player->GetIsZoning() != 0, m_Player.inEvent, m_Player.level))
+            if (const std::optional<headsup::CheckCandidate> mob = m_AutoCheck.Due(checkable, now))
+            {
+                auto request = headsup::CheckRequest(mob->serverId, mob->index); // Ashita takes the bytes as non-const
+                m_AshitaCore->GetPacketManager()->AddOutgoingPacket(headsup::kCheckRequestPacket,
+                    static_cast<uint32_t>(request.size()), request.data());
+            }
         // With timers off no sightings are passed, so turning them on never takes a placeholder that died meanwhile for
         // one seen dying.
         m_PhTimers.Update(now, sightings);

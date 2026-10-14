@@ -8,6 +8,7 @@ namespace headsup
     {
         constexpr uint16_t kFirstCheckMessage  = 0xAA; // 0xAA-0xB2: the con, then the defense/evasion remark
         constexpr uint16_t kLastCheckMessage   = 0xB2;
+        constexpr uint16_t kImpossibleToGauge  = 249; // a notorious monster's or a battlefield mob's answer
         constexpr uint32_t kCheckTypeBase      = 0x40;  // the reply's check type field: 0x40 + Con
         constexpr double kDefaultCheckLifetime = 600.0; // seconds, when the data has no respawn time
 
@@ -30,6 +31,15 @@ namespace headsup
         if (level <= 0 || type < kCheckTypeBase || type >= kCheckTypeBase + kConCount) return std::nullopt;
         return CheckReply{ReadAt<uint32_t>(data, kReplyServerId), ReadAt<uint16_t>(data, kReplyTargetIndex),
             CheckResult{level, static_cast<Con>(type - kCheckTypeBase)}};
+    }
+
+    std::optional<CheckAnswer> ParseCheckAnswer(const uint8_t* data, uint32_t size)
+    {
+        if (data == nullptr || size < kReplyMinSize) return std::nullopt;
+        const auto message = ReadAt<uint16_t>(data, kReplyMessage);
+        const bool gauged  = message >= kFirstCheckMessage && message <= kLastCheckMessage;
+        if (!gauged && message != kImpossibleToGauge) return std::nullopt;
+        return CheckAnswer{ReadAt<uint32_t>(data, kReplyServerId), gauged};
     }
 
     double CheckLifetime(const MobRecord* mob)

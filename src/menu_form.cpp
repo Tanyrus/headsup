@@ -925,6 +925,9 @@ namespace headsup
                 form.FontDropdown("Default Font", s.defaultFont, fonts, "The font of every line whose own font is Default.");
                 form.SliderInt("Base Icon Size", s.baseIconSize, kMinTextSize, kMaxTextSize, "%d px",
                     "Every line's icon size is a percent of this.");
+                form.Switch("Auto-Check", s.autoCheck,
+                    "Checks each mob that comes near by itself, so its exact level and difficulty show, and keeps the check's "
+                    "line out of the chat log. Players are not checked: the server tells a player who examined them.");
                 int dash = static_cast<int>(s.dashMark);
                 form.MarkupDropdown("Replace Dashes (-)", dash, {"No", kDotMark, kSquareMark, kDiamondMark},
                     "What a dash typed in a nameplate design, or between the two ends of a level or a difficulty, is drawn as.",
