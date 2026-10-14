@@ -54,7 +54,8 @@ namespace headsup
     // candidate's cursor rises this share of its height over the target's own.
     constexpr float kPickedCursorRise = 10.0f / 32.0f;
     // A cursor box moved the least that keeps all of it inside a screen this size.
-    CursorSpot KeepOnScreen(CursorSpot spot, float width, float height, float screenWidth, float screenHeight);
+    // top: what of the screen's top is covered, as by the top panel, which the cursor stays below.
+    CursorSpot KeepOnScreen(CursorSpot spot, float width, float height, float screenWidth, float screenHeight, float top = 0.0f);
 
     // How many icons a row of a run holds; the rest wrap onto rows above.
     constexpr int kIconsPerRow = 8;

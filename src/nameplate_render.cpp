@@ -573,7 +573,7 @@ namespace headsup
                     float top       = layout.cursor.y + CursorBob(now, cursorBox.height, settings.cursorFloat);
                     auto addCursor  = [&](const PlateTexture& cursor) {
                         const CursorSpot kept = KeepOnScreen(CursorSpot{layout.cursor.x, top}, cursorBox.width, cursorBox.height,
-                            screenWidth, screenHeight);
+                            screenWidth, screenHeight, m_CoveredTop);
                         addSquare(cursorQuads, cursor, kept.x, kept.y, fit, 0.0f);
                     };
                     // The cursor is no part of the nameplate: it stays whole however faint the plate is.
@@ -626,7 +626,7 @@ namespace headsup
             {
                 GpuQuad& cursor = cursorQuads[q].gpu;
                 cursor.y = KeepOnScreen(CursorSpot{cursor.x, cursor.y - up}, cursor.width, cursor.height, screenWidth * toX,
-                    screenHeight * toY).y;
+                    screenHeight * toY, m_CoveredTop * toY).y;
             }
             Shown& shown = m_Shown[s.shown];
             if (shown.nameHeight > 0) shown.nameY -= p.rise;
@@ -682,7 +682,7 @@ namespace headsup
             const float width     = t.width * fit, height = t.height * fit;
             const CursorSpot at = CursorAtAnchor(cursor.x, cursor.y, width, height, t.tip, static_cast<float>(settings.cursorRaise));
             const CursorSpot kept = KeepOnScreen(CursorSpot{at.x, at.y + CursorBob(now, height, settings.cursorFloat)}, width,
-                height, screenWidth, screenHeight);
+                height, screenWidth, screenHeight, m_CoveredTop);
             const SquareQuad q = PlaceSquarePixels(kept.x, kept.y, t.width, t.height, t.halo, fit, 1.0f, 1.0f);
             quads.push_back(GpuQuad{t.texture, std::round(q.x), std::round(q.y), q.width, q.height, 0.0f, t.u, t.v, 0.0f, kWhite});
             m_CursorNames.push_back(CursorName{cursor.index, ScreenBox{}});

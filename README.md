@@ -27,55 +27,67 @@ opens them at a page, such as `/hu menu entities`, `/hu menu mobs` or `/hu menu 
 
 | Page | Holds |
 |---|---|
-| Entities | What every kind shares: the nameplate and outline styles, the target cursor and the five color palettes. Under it, a page for each kind: Mobs, Players, Self, NPCs and Pets |
-| User Interface | The Window Groups and Game Windows cards, which move the game's windows. Under it, the Top Panel page and the Widgets page |
-| Mouse Cursor | The chocobo pointer and the pointer fixes |
-| Config Menu | The settings window's own font and size, and the button that puts every setting back to its default |
+| Entities | What every kind shares: the Nameplates card, the outline style, the target cursor and the five color palettes. Under it, a page for each kind: Mobs, Players, Self, NPCs and Pets |
+| User Interface | Screenshot mode and the Window Groups and Game Windows cards, which move the game's windows. Under it, the Top Panel, Widgets and Mouse Cursor pages |
+| Config Menu | The settings window's own theme, font, size and opacity, and the button that puts every setting back to its default |
 | Debug | Switches HeadsUp off as a whole, and writes a report for bug reports |
 
-Settings that belong to a feature that is off are greyed out and cannot be changed until it is on.
+A switch is a toggle. Settings that belong to something switched off are not shown until it is on, and every option of
+a dropdown says what it does when the pointer is over it.
 
 ## Outlines and nameplates
 
 Each kind of entity has its own page: Mobs, Players, Self, NPCs and Pets. A page starts with a Visibility card. Each
-row of it is a group of entities (for mobs: Aggressive, Passive, No Data, Aggressive NM, Passive NM, NM Placeholder,
-Party Claim and Others' Claim; for players: Players, Party Members, Friends and Linkshell Co-Members; Self, NPCs and
-Pets have one row each). A row has two choices: what its nameplate does and what its outline does. Giving the claim rows a
-look of their own helps in crowded places such as Dynamis.
+row of it is a group of entities:
+
+| Page | Rows |
+|---|---|
+| Mobs | Aggressive, Passive, NM (Aggressive), NM (Passive), NM (Placeholder), Claimed (Yours), Claimed (Others'), Dead, No Data |
+| Players | Players, Party Members, Friends, Linkshell Members |
+| Pets | Your Pets, Party Pets, Friend Pets, Others' Pets |
+| Self, NPCs | One row each |
+
+A row has two choices: what its nameplate does and what its outline does. Giving the claim rows a look of their own
+helps in crowded places such as Dynamis.
 
 | Nameplate | What it does |
 |---|---|
-| Hidden | No name at all |
-| Shown | HeadsUp's nameplate |
+| Hide Nameplate | No name at all |
+| Show Nameplate | HeadsUp's nameplate |
 | When Targeted | HeadsUp's nameplate only while the entity is your target |
-| Expanding | Its name alone until you target it, then the whole nameplate |
-| Vanilla | The game's own name, and nothing of HeadsUp's |
+| Vanilla Nameplate | The game's own name, and nothing of HeadsUp's |
 
 | Outline | What it does |
 |---|---|
-| Disabled | No outline |
-| Shown | An outline |
+| No Outline | No outline |
+| Show Outline | An outline |
 | When Targeted | An outline only while the entity is your target |
-| By Nature | On the Party Claim, Others' Claim and NM Placeholder rows only: the mob keeps the outline it would have had otherwise, unclaimed, or by whether it would attack you |
+| Inherit | On the two Claimed rows and the NM (Placeholder) row only: the mob keeps the outline it would have had otherwise, unclaimed, or by whether it would attack you |
 
-Outlines reach up to 50 yalms, as far as the game draws mobs; the Outline Style card sets their thickness, smoothness
-and range. Outlines are hidden behind walls, just like the mob.
+A dead mob is in the Dead row whatever it was, and keeps its name alone. The text of anything dead, a mob or a player,
+is dark grey whatever its colors are set to.
 
-### Outline colors
+Outlines reach up to 50 yalms, as far as the game draws mobs. The Outline Style card on the Entities page sets their
+thickness (100% is four pixels), their opacity, their smoothness (Low to Ultra: rounder costs a little more) and their
+range, from 15 yalms up. With Fade In on, an outline grows fainter with distance: whole within 10 yalms and almost gone
+at the range. Outlines are hidden behind walls, just like the mob.
+
+### Colors
 
 The Outline Design card gives each row's outline a color: one you pick, or one from a palette by the entity's state. The
-palettes are on the Entities page:
+palettes are cards on the Entities page, and a color that is no longer its default has a small round arrow beside it
+that puts the default back:
 
-| Palette | Colors by |
-|---|---|
-| Aggression | Whether a mob would attack you, with notorious monsters, their placeholders and mobs with no data apart |
-| Toughness | How a mob cons to you, from Too Weak to Very Tough, and a color for an unknown level |
-| Claim | Unclaimed, claimed by someone else or claimed by you |
-| Target Status | Not targeted, targeted, locked on, the sub-target you are picking, and a sub-target out of range |
-| Target Type | A mob, an NPC or object, a pet, a player, a friend, a party member or a linkshell co-member |
+| Palette | In a dropdown | Colors by |
+|---|---|---|
+| Colors: Aggression | Color by Aggression | Whether a mob would attack you, with notorious monsters, their placeholders and mobs with no data apart |
+| Colors: Toughness | Color by Toughness | How a mob cons to you, from Too Weak to Very Tough, and a color for an unknown level |
+| Colors: Claim Status | Color by Claim Status | Unclaimed, claimed by someone else or claimed by you |
+| Colors: Targeting | Color by Targeting | Not targeted, targeted, locked on, the sub-target you are picking, and a sub-target out of range |
+| Colors: Entity Type | Color by Entity Type | A mob, a player, a friend, a party member, a linkshell member, an NPC or object, or a pet |
 
-A text color can come from a palette, from the game's own color for the name (which shows claim status), or be one you
-pick.
+A text color can also be Vanilla Color, the game's own color for the name (which shows claim status), or Custom, one
+you pick.
 
 The Aggression palette starts with these colors:
 
@@ -88,33 +100,35 @@ The Aggression palette starts with these colors:
 | Purple | Is a lottery placeholder, whose death can pop a notorious monster |
 | Gray | Is not in HeadsUp's data |
 
-A mob's outline, the glow of its name and the ornament over its name all start on this palette. The Passive and No Data
-rows start without an outline, so green and gray show at first only in a name's glow and ornament; set either row's
-outline to Shown to outline those mobs too.
+A mob's outline, the glow of its name and the ornament of its nameplate all start on this palette. The Passive and No
+Data rows start without an outline, so green and gray show at first only in a name's glow and ornament; set either
+row's outline to Show Outline to outline those mobs too.
 
 ### The nameplate
 
-The Nameplate Design card holds three lines of text. You type in a line as you would anywhere, and put tags in it: a
-tag is a dollar sign and a word, such as `$name`, and it draws something. Click a tag to put it where you last typed, or
-drag it onto a line. Anything else you type shows as typed, and `$$` is one dollar sign. For example, `$level $con` on
-the first line and `$name` on the second shows a monster's level and con over its name.
+The Nameplate Design card holds three lines: Top Line, Middle Line and Bottom Line, which sits where the game's own
+name does. You type in a line as you would anywhere, and put tags in it: a tag draws something, such as the name or
+the level. Click a tag under the lines to put it where you last typed, or drag it into a line. A tag stands in its line
+as the same button, with text to type before and after it, and Backspace or Delete beside a tag takes the whole tag
+out. Typed by hand a tag is a dollar sign and its word, such as `$name`, and `$$` is one dollar sign.
 
-| Tag | Kinds | Draws |
-|---|---|---|
-| `$name` | All | The name |
-| `$level` | Mobs, Players, Self | A mob's level or range, such as 20-23, and its exact level after you `/check` it; a player's main job level when known |
-| `$con` | Mobs | The con at each end of the level range, such as EP-DC, or one con after a `/check`. A tag has no color of its own: its line's Color colors it, and the default level line takes the Toughness palette, which colors it like `/check` |
-| `$detect` | Mobs | Whether it is aggressive or passive, whether it links, and how it detects you: sight, true sight, sound, scent, magic, job abilities, low HP. The Detection card picks which |
-| `$id` | Mobs | The last three hex digits of its ID, which players name placeholders by, such as [106] |
-| `$serverid` | Mobs | Its whole ID in decimal |
-| `$ph` | Mobs | [PH] on a lottery placeholder, whose death can pop a notorious monster |
-| `$weak`, `$resist` | Mobs | The damage types and elements it is weak to or resists, with percents or ranks |
-| `$status` | Mobs | The statuses it is weak to or resists, as the Statuses card picks |
-| `$immune` | Mobs | The statuses it cannot take |
-| `$job` | Players, Self | Jobs, such as WAR/MNK: yours, your party's, and another player's once you have checked them |
-| `$gm`, `$mentor`, `$new`, `$sync`, `$away` | Players, Self | The GM, mentor, new adventurer, level sync and away icons |
-| `$linkshell`, `$bazaar`, `$seeking` | Players, Self | The linkshell icon in its color, the bazaar icon and the seeking party icon |
-| `$owner` | Pets | The pet's owner |
+| Tag | Typed | Kinds | Draws |
+|---|---|---|---|
+| Name | `$name` | All | The name |
+| Level | `$level` | Mobs, Players, Self | A mob's level or range, such as 20-23, and its exact level after a `/check`; a player's main job level when known |
+| Difficulty | `$con` | Mobs | The con at each end of the level range, such as EP-DC, or one con after a `/check`. A tag has no color of its own: its line's Text Color colors it, and the default level line takes the Toughness palette, which colors it like `/check` |
+| Detection | `$detect` | Mobs | Whether it links and how it senses you: sight, true sight, sound, scent, the use of spells or abilities, low player HP. The Detection Icons card picks which, and can add whether it is aggressive |
+| ID | `$id` | Mobs | The last three hex digits of its ID, which players name placeholders by, such as [106] |
+| Server ID | `$serverid` | Mobs | Its whole ID in decimal |
+| Placeholder | `$ph` | Mobs | [PH] on a lottery placeholder, whose death can pop a notorious monster |
+| Weaknesses, Resistances | `$weak`, `$resist` | Mobs | The damage types and elements it is weak to or resists, with percents or ranks |
+| Statuses | `$status` | Mobs | The statuses it is weak to or resists, as the Statuses card picks |
+| Immunities | `$immune` | Mobs | The statuses it cannot take |
+| Job | `$job` | Players, Self | Jobs, such as WAR/MNK: yours, your party's, and another player's once you have checked them |
+| Title | `$title` | Players, Self | The title: yours, and another player's once you have checked them |
+| GM, Mentor, New Adventurer, Level Sync, Away | `$gm`, `$mentor`, `$new`, `$sync`, `$away` | Players, Self | Their icons |
+| Linkshell, Bazaar, Seeking Party | `$linkshell`, `$bazaar`, `$seeking` | Players, Self | The linkshell icon in its color, the bazaar icon and the seeking party icon |
+| Owner | `$owner` | Pets | The pet's owner |
 
 The icons are XIUI's HQ ones for players and MobDB's for mobs. An icon shows only when it applies to that player. Away, mentor, new adventurer and GM appear once the server has told
 HeadsUp about the player, and the names of players sitting, resting or in a chair are lowered to their heads.
@@ -122,39 +136,56 @@ HeadsUp about the player, and the names of players sitting, resting or in a chai
 Weaknesses, resistances, statuses and immunities are shown as small badges on icons. The Badges card sets their font,
 colors and whether they show ranks; the Weaknesses and Statuses cards pick what is worth a badge.
 
-After the design come a Line Style card, with a tab for each line, and an Ornament card. A line has these settings:
+After the design come a Line Style card, with a tab for each line, an Ornament card and a Nameplate Opacity card. A
+line has these settings:
 
-- **Show:** always, or only when any checked condition holds: when targeted, unclaimed, your claim, others' claim,
-  engaged in combat, too weak, aggressive, passive, party member, friend or linkshell co-member (the ones that fit the
-  kind)
-- **Alignment:** left, center or right against the plate's widest line
-- **Font:** a line's own font and bold, or the Default font from the Entities page
-- **Text size and icon size:** a percent of the base font size set on the Entities page; the sliders show the pixels too
-- **Color:** a color of your own, the game's, or from a palette
-- **Shadow, glow and their colors:** the soft dark shadow behind the letters, and a colored halo, such as a monster's
-  name glowing in its outline color
-- **Sync line style:** borrows every setting from another line, so the two always match
+- **Sync Line Style:** borrows every setting from another line, so the two always match
+- **Line Visibility:** Always, or only when any picked condition holds: When Targeted, When Unclaimed, When Claimed by
+  You, When Claimed by Others, When Engaged in Combat, When Too Weak, When Aggressive, When Passive, When Party Member,
+  When Friend, When Linkshell Member or When Owner is You (the ones that fit the kind)
+- **Alignment:** left, center or right against the bottom line, which itself stays on the game's name
+- **Font and Font Style:** a line's own font, or the Default Font from the Entities page, in bold, italics, underline
+  or any of them together
+- **Text Size and Icon Size:** a percent of the Base Font Size and the Base Icon Size set on the Entities page
+- **Padding:** up to 10 pixels of room under the line (over it, for the bottom line)
+- **Text Color:** a color of your own, the game's, or from a palette
+- **Shadow Strength and Shadow Color:** the soft dark shadow behind the letters
+- **Glow Strength, Glow Size and Glow Color:** a colored halo, such as a monster's name glowing in its outline color.
+  Disable Glow In Combat takes it away while the entity fights: a mob once you or your party has claimed it, anyone
+  else while their weapon is out
 
-The Ornament is a diamond rule between lines 1 and 2, or 2 and 3, drawn while both lines show; its width, height and
-color are set in its card.
+The Ornament is a diamond rule. Its Visibility puts it over the nameplate (Top), under it (Bottom), or between the
+middle line and the one above or below it, where it is drawn while both lines show.
+
+The Nameplate Opacity card sets how see-through a kind's nameplates are by what you target: with No Target, when the
+entity is Not Targeted while something else is, and when it Is Targeted. Fade In makes them fainter with distance, up to
+a Range of their own; your own nameplate has no fading.
 
 ![A Goblin Leecher's red outline and nameplate](resources/nameplate_and_outline.png)
 
-The Nameplate Style card, on the Entities page, sets what every nameplate shares: a vertical offset, a base font size,
-the Default font (any font installed in Windows), and whether names scale with distance, between a smallest and a
-largest size. With Scale Your Own Name off, your own nameplate stays one size. With Stack Names on, names that would
-cover each other rise one over another, while your target's keeps its place. The Fading card on the Mobs page makes the
-other mobs' names fainter while you have a target, and its Glow Off While Fighting switch takes a mob's glow away once
-you or your party has claimed it.
+The Nameplates card, on the Entities page, sets what every nameplate shares:
+
+- **Base Font Size, Default Font and Base Icon Size:** what the lines' percents are of, and any font installed in Windows
+- **Auto-Check:** HeadsUp checks each mob that comes near by itself, so its exact level and difficulty show without a
+  `/check`, and keeps the check's line out of the chat log. Players are never checked: the server tells a player who
+  examined them
+- **Replace Dashes (-):** draws each dash typed in a nameplate, and the one in a level range such as 20-23, as a dot,
+  a square or a diamond. A name's own dash stays
+- **Scale with Distance:** names grow and shrink with distance between a Min Size and a Max Size; with Scale Your Own
+  Name off, your own nameplate stays one size
+- **Vertical Offset and Stack Names:** how far over the game's own spot names sit, and whether names that would cover
+  each other rise one over another, while your target's keeps its place
 
 ![A player's nameplate with their icons and the feather cursor](resources/player_nameplate.png)
 
-### Friends and linkshell co-members
+### Friends and linkshell members
 
-Friends are a list of character names on the Players page: type a name and press Enter, and click a name to remove it.
-A Friend row and the Friend colors then apply to them, unless they are in your party. A linkshell co-member is someone in
-your linkshell who is neither in your party nor a friend. The game does not say which linkshell a player wears until you
-`/check` them, so a co-member is known only after you have checked them.
+Your friends are the ones on the game's own Friend List (Communication > Friend List in the game's menu): HeadsUp reads
+it, so there is nothing to type. The Friends row, the Friend Pets row, When Friend and the Friend color apply to a
+friend once the list shows which character they are playing, unless they are in your party. A request that is still
+pending is no friend yet. A linkshell member is someone in your linkshell who is neither in your party nor a friend.
+The game does not say which linkshell a player wears until you `/check` them, so a member is known only after you have
+checked them.
 
 ### Placeholder timers
 
@@ -163,10 +194,22 @@ placeholder you see die, such as Bigmouth Billy [11A] 3:15; it reads "up" when t
 
 ### Target cursor
 
-Your target gets a bobbing arrow, or Phoenix's feather, in place of the game's cursor. The Target Cursor card on the
-Entities page switches it, and sets its size and the thickness of its dark edge. Its colors come from the Target Status
-palette: one for your target, another while locked on, another for the sub-target you are picking and another when that
-sub-target is out of range.
+Your target gets HeadsUp's cursor over its nameplate in place of the game's. The Target Cursor card on the Entities
+page picks its Cursor Style:
+
+| Style | The cursor |
+|---|---|
+| Vanilla | The game's own, with none of HeadsUp's |
+| Triangle | A plain triangle, much like the game's |
+| Phoenix Feather | Phoenix's feather, as at first |
+| Chocobo | PlayOnline's chocobo mouse pointer |
+| A file's name | A cursor of your own: put `.cur` or `.ani` files in `config/headsup/cursors` in your Ashita folder, and they are listed each time the list opens |
+
+The card also sets the cursor's Width and Height, the thickness of its edge, whether it scales with distance, whether
+it floats up and down, and how far over its place it sits. Its Color and its Edge Color are picked as any other color:
+at first the Targeting palette colors it, one color for your target, another while locked on, another for the
+sub-target you are picking and another when that sub-target is out of range. A picture (the chocobo, or a file of
+yours) keeps its own colors inside the edge.
 
 ### Screenshot mode
 

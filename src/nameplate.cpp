@@ -89,10 +89,10 @@ namespace headsup
         return WholePixels(static_cast<float>(pixelHeight) * kCursorEdgePerHeight * static_cast<float>(percent) / kWholePercent);
     }
 
-    CursorSpot KeepOnScreen(CursorSpot spot, float width, float height, float screenWidth, float screenHeight)
+    CursorSpot KeepOnScreen(CursorSpot spot, float width, float height, float screenWidth, float screenHeight, float top)
     {
         return CursorSpot{std::clamp(spot.x, 0.0f, std::max(0.0f, screenWidth - width)),
-            std::clamp(spot.y, 0.0f, std::max(0.0f, screenHeight - height))};
+            std::clamp(spot.y, top, std::max(top, screenHeight - height))};
     }
 
     IconSpot BadgeAt(IconSpot icon, float iconSize, float width, float height)

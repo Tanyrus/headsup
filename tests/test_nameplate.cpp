@@ -468,4 +468,10 @@ TEST(a_cursor_is_kept_inside_the_screen)
     CHECK_EQ(huge.y, 0.0f);
     const CursorSpot below = KeepOnScreen(CursorSpot{100.0f, 1430.0f}, 20.0f, 32.0f, 2560.0f, 1440.0f);
     CHECK_EQ(below.y, 1408.0f);
+    // The top panel lies over the scene: a cursor that would go under it stays just below it, and one already
+    // below it is where it was.
+    CHECK_EQ(KeepOnScreen(CursorSpot{100.0f, 20.0f}, 20.0f, 32.0f, 2560.0f, 1440.0f, 61.0f).y, 61.0f);
+    CHECK_EQ(KeepOnScreen(CursorSpot{100.0f, -50.0f}, 20.0f, 32.0f, 2560.0f, 1440.0f, 61.0f).y, 61.0f);
+    CHECK_EQ(KeepOnScreen(CursorSpot{100.0f, 100.0f}, 20.0f, 32.0f, 2560.0f, 1440.0f, 61.0f).y, 100.0f);
+    CHECK_EQ(KeepOnScreen(CursorSpot{100.0f, 1430.0f}, 20.0f, 32.0f, 2560.0f, 1440.0f, 61.0f).y, 1408.0f);
 }

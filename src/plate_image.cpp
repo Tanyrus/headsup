@@ -152,8 +152,6 @@ namespace headsup
                 return std::clamp(0.5f - outside, 0.0f, 1.0f);
             }
             float Cover(int x, int y) const { return Cover(Across(x), Down(y)); }
-            // Whether column x is in line with the core, so its pixels are covered by their row alone.
-            bool InCore(int x) const { return m_Empty || Across(x) == 0.0f; }
 
         private:
             static float Past(float pixel, float center, float core)
