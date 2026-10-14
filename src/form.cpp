@@ -18,7 +18,7 @@ namespace headsup
 {
     namespace
     {
-        constexpr const char* kIdMark     = "##"; // in a label: what follows keeps controls apart and is not shown
+        constexpr std::string_view kIdMark = "##"; // in a label: before it what shows, after it what names the id
         constexpr float kColorFull        = 255.0f;
         constexpr int kHexDigits          = 6;
         constexpr int kNumberDigits       = 6; // a number box holds a sign and five digits
@@ -47,6 +47,14 @@ namespace headsup
                 out.pop_back();
             return out;
         }
+
+        // What a label names its control's id by, and what it shows.
+        std::string_view IdName(std::string_view label)
+        {
+            const size_t mark = label.find(kIdMark);
+            return mark == std::string_view::npos ? label : label.substr(mark + kIdMark.size());
+        }
+        std::string_view LabelText(std::string_view label) { return label.substr(0, label.find(kIdMark)); }
 
         std::string TipAttribute(std::string_view tip)
         {
@@ -80,7 +88,7 @@ namespace headsup
 
     std::string Form::Id(std::string_view name)
     {
-        std::string id = m_CardId.empty() ? Slug(name) : m_CardId + "-" + Slug(name);
+        std::string id = Named(name);
         if (!m_Ids.insert(id).second)
             for (int again = 2;; ++again)
                 if (std::string next = id + "-" + std::to_string(again); m_Ids.insert(next).second)
@@ -93,7 +101,7 @@ namespace headsup
 
     std::string Form::Named(std::string_view name) const
     {
-        return m_CardId.empty() ? Slug(name) : m_CardId + "-" + Slug(name);
+        return m_CardId.empty() ? Slug(IdName(name)) : m_CardId + "-" + Slug(IdName(name));
     }
 
     const FormEvent* Form::Took(std::string_view id, const char* type) const
@@ -105,13 +113,13 @@ namespace headsup
 
     void Form::Set(std::string id, FormValueKind kind, std::string name, std::string text, bool on)
     {
+        if (kind == FormValueKind::Class && !on && name == kOffClass && id != m_CardId) ++m_ShownInCard;
         values.push_back(FormValue{std::move(id), kind, std::move(name), std::move(text), on});
     }
 
     std::string Form::Shown(const char* label)
     {
-        const char* mark = std::strstr(label, kIdMark);
-        return TitleCaseText(std::string_view(label, mark != nullptr ? static_cast<size_t>(mark - label) : std::strlen(label)));
+        return TitleCaseText(LabelText(label));
     }
 
     void Form::BeginBlock(const char* id)
@@ -122,15 +130,18 @@ namespace headsup
 
     bool Form::BeginCard(const char* title, bool* enabled, const char* about)
     {
-        m_CardId = Slug(pageKey + "/" + title);
+        m_CardId = Slug(pageKey + "/" + std::string(IdName(title)));
         blocks.push_back(FormBlock{m_CardId, {}});
+        m_CardOff       = values.size();
+        m_CardSwitched  = enabled != nullptr;
+        m_ShownInCard   = 0;
         Set(m_CardId, FormValueKind::Class, kOffClass, {}, m_Off);
         if (!m_Off) ++m_CardsShown;
         const std::string head = m_CardId + "-head";
         if (!m_Off && Clicked(head) && !m_State.collapsed.erase(m_CardId)) m_State.collapsed.insert(m_CardId);
         const bool open = !m_Off && !m_State.collapsed.contains(m_CardId);
         Out() += "<div class=\"card-head\" id=\"" + head + "\"><div class=\"arrow" + (open ? " open" : "") +
-                 "\"></div><div class=\"card-title\">" + EscapedRml(title) + "</div>";
+                 "\"></div><div class=\"card-title\">" + EscapedRml(LabelText(title)) + "</div>";
         if (enabled != nullptr)
         {
             const std::string check = m_CardId + "-on";
@@ -149,7 +160,15 @@ namespace headsup
         return true;
     }
 
-    void Form::EndCard() { Out() += "</div>"; }
+    void Form::EndCard()
+    {
+        Out() += "</div>";
+        // Its settings may all be of what is switched off: a card that shows nothing goes, unless its own switch is
+        // the way to switch them on.
+        if (m_ShownInCard > 0 || m_CardSwitched || values[m_CardOff].on) return;
+        values[m_CardOff].on = true;
+        --m_CardsShown;
+    }
 
     void Form::Row(const char* label, const char* tip)
     {
@@ -576,7 +595,7 @@ namespace headsup
 
     bool Form::Button(const char* label, const char* id, const char* classes, const char* tip)
     {
-        return Pressable(EscapedRml(label), id, classes, tip);
+        return Pressable(EscapedRml(LabelText(label)), id, classes, tip);
     }
 
     bool Form::Action(const char* label, const char* tip)
@@ -785,7 +804,7 @@ namespace headsup
         const std::string caption = Id(std::string(text) + kCaptionSuffix);
         Out() += std::string("<div class=\"") + classes + "\" id=\"" + caption + "\"";
         if (width > 0.0f) Out() += " style=\"width:" + Em(width) + ";\"";
-        Out() += ">" + EscapedRml(text) + "</div>";
+        Out() += ">" + EscapedRml(LabelText(text)) + "</div>";
         Set(caption, FormValueKind::Class, kOffClass, {}, m_Off);
     }
 }
