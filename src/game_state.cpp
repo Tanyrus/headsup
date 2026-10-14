@@ -22,8 +22,7 @@ namespace headsup
         {
         case kZoneInPacket:
             m_PlayerStatus.clear(); // target indexes are reused in the next zone
-            m_LevelSynced.clear();
-            m_PlayerLevels.clear();
+            m_PlayerSyncs.clear();
             m_Untargetable.clear();
             m_ConquestOwed   = true;
             m_CurrenciesOwed = true;
@@ -60,8 +59,7 @@ namespace headsup
                 if (update->despawn)
                 {
                     m_PlayerStatus.erase(update->index);
-                    m_LevelSynced.erase(update->index);
-                    m_PlayerLevels.erase(update->index);
+                    m_PlayerSyncs.erase(update->index);
                 }
                 else if (update->status)
                     m_PlayerStatus[update->index] = *update->status;
@@ -79,11 +77,7 @@ namespace headsup
         case kCharSyncPacket:
             if (const auto sync = ParseCharSync(data, size))
             {
-                if (sync->synced)
-                    m_LevelSynced.insert(sync->index);
-                else
-                    m_LevelSynced.erase(sync->index);
-                m_PlayerLevels[sync->index] = sync->level;
+                m_PlayerSyncs[sync->index] = PlayerSync{sync->synced, sync->held, sync->level};
             }
             break;
         case kOwnStatusPacket:
@@ -101,7 +95,7 @@ namespace headsup
             if (const auto general = ParseInspectGeneral(data, size))
             {
                 m_PlayerChecks[general->serverId] = PlayerCheck{*general, m_CheckMessage.value_or(InspectMessage{})};
-                m_PlayerLevels.erase(general->index);
+                if (const auto it = m_PlayerSyncs.find(general->index); it != m_PlayerSyncs.end()) it->second.level = 0;
                 m_CheckMessage.reset();
             }
             break;
@@ -116,15 +110,10 @@ namespace headsup
         return it != m_PlayerStatus.end() ? &it->second : nullptr;
     }
 
-    uint8_t GameState::PlayerLevelOf(uint16_t index) const
+    PlayerSync GameState::SyncOf(uint16_t index) const
     {
-        const auto it = m_PlayerLevels.find(index);
-        return it != m_PlayerLevels.end() ? it->second : 0;
-    }
-
-    bool GameState::LevelSynced(uint16_t index) const
-    {
-        return m_LevelSynced.count(index) != 0;
+        const auto it = m_PlayerSyncs.find(index);
+        return it != m_PlayerSyncs.end() ? it->second : PlayerSync{};
     }
 
     bool GameState::Untargetable(uint16_t index) const { return m_Untargetable.count(index) != 0; }

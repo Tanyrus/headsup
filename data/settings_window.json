@@ -768,7 +768,7 @@
       "key": "tags",
       "options": [
         {"name": "Name", "tip": "The name of the entity."},
-        {"name": "Level", "tip": "Shows the entity's current level. NOTE: For mobs, this will show a range until you /check the mob. You can also enable the Auto-Check feature in the 'Entities/Nameplates' section. For players, this shows once you /check them, or with the Auto-Check feature on, unless they are anonymous."},
+        {"name": "Level", "tip": "Shows the entity's current level. NOTE: For mobs, this will show a range until you /check the mob. You can also enable the Auto-Check feature in the 'Entities/Nameplates' section. For players, this shows once you /check them, or with the Auto-Check feature on once the server has sent it (it does when you come upon them, not when they arrive beside you), unless they are anonymous."},
         {"name": "Difficulty", "tip": "Shows initials indicating the mob's difficulty for your current level (TW for Too Weak, EP for Easy Prey, and so on). NOTE: Shows a range of possibilities until you /check the mob, unless you have the Auto-Check feature enabled in the 'Entities/Nameplates' section."},
         {"name": "ID", "tip": "The last three hex digits of the mob's ID. Example: [106]."},
         {"name": "Server ID", "tip": "The mob's full server ID in decimal. Example: [17190918]."},

@@ -44,7 +44,7 @@ namespace headsup
         constexpr size_t kSyncIndex        = 0x06;
         constexpr size_t kSyncFlags        = 0x10;
         constexpr size_t kSyncLevel        = 0x25; // the main job's
-        constexpr size_t kSyncedLevel      = 0x26; // while level synced, battlefields included; 0 otherwise
+        constexpr size_t kSyncedLevel      = 0x26; // the party's cap while level synced, battlefields included; 0 otherwise
         constexpr size_t kSyncSize         = kSyncedLevel + 1;
         constexpr int kSyncLevelSyncBit    = 2;
 
@@ -107,9 +107,9 @@ namespace headsup
     std::optional<CharSyncUpdate> ParseCharSync(const uint8_t* data, uint32_t size)
     {
         if (data == nullptr || size < kSyncSize || data[kSyncKind] != kSyncCharacter) return std::nullopt;
-        const uint8_t held = data[kSyncedLevel];
-        return CharSyncUpdate{ReadAt<uint16_t>(data, kSyncIndex), Bit(data[kSyncFlags], kSyncLevelSyncBit),
-            held != 0 ? held : data[kSyncLevel]};
+        const uint8_t cap = data[kSyncedLevel];
+        return CharSyncUpdate{ReadAt<uint16_t>(data, kSyncIndex), Bit(data[kSyncFlags], kSyncLevelSyncBit), cap != 0,
+            cap != 0 ? std::min(cap, data[kSyncLevel]) : data[kSyncLevel]};
     }
 
     bool LevelSyncInBuffs(const int16_t* buffs)
@@ -147,7 +147,6 @@ namespace headsup
         s.mentor        = packet->mentor;
         s.newAdventurer = packet->newAdventurer;
         s.gm            = packet->gm;
-        s.anonymous     = packet->anonymous;
         return s;
     }
 }

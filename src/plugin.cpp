@@ -1609,7 +1609,7 @@ private:
         const headsup::PlayerStatus memory = headsup::StatusFromRender(entity->GetRenderFlags1(index), entity->GetRenderFlags2(index),
             entity->GetLinkshellColor(index));
         headsup::PlayerStatus status = headsup::WithPacketStatus(memory, m_GameState.PlayerStatusOf(index, m_SelfIndex));
-        status.levelSync             = m_GameState.LevelSynced(index) || m_BuffSynced.count(index) != 0;
+        status.levelSync             = m_GameState.SyncOf(index).synced || m_BuffSynced.count(index) != 0;
         return status;
     }
 
@@ -1840,9 +1840,10 @@ private:
     {
         const auto member                 = m_PartyJobs.find(serverId);
         const headsup::PlayerCheck* check = m_GameState.PlayerCheckOf(serverId);
+        const headsup::PlayerSync sync    = m_GameState.SyncOf(index);
         return headsup::KnownJobs(index == m_SelfIndex ? &m_OwnJobs : nullptr,
             member != m_PartyJobs.end() ? &member->second : nullptr, check != nullptr ? &check->general : nullptr,
-            headsup::SeenLevel(m_Settings.autoCheck, m_GameState.PlayerLevelOf(index), m_GameState.PlayerStatusOf(index, m_SelfIndex)));
+            headsup::SeenLevel(m_Settings.autoCheck, sync.level, m_GameState.PlayerStatusOf(index, m_SelfIndex)), sync.held);
     }
 
     // Your own title is the client's; another player's comes with a check of them.

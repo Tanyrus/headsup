@@ -35,8 +35,9 @@ namespace headsup
     struct CharSyncUpdate
     {
         uint16_t index; // entity target index, yours included
-        bool synced;
-        uint8_t level; // the main job's, or the one synced to
+        bool synced;   // the sync icon: 0x10's bit, off in battlefields
+        bool held;     // a cap holds the level, in battlefields too
+        uint8_t level; // the main job's, held to the cap
     };
 
     // Layouts from Phoenix's src/map/packets/char_update.cpp (0x00D), char_status.cpp (0x037) and char_sync.cpp (0x067,

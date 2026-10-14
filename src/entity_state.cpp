@@ -242,12 +242,16 @@ namespace headsup
     }
 
     std::optional<PlayerJobs> KnownJobs(const PlayerJobs* own, const PlayerJobs* member, const InspectGeneral* checked,
-        uint8_t seenLevel)
+        uint8_t seenLevel, bool seenHeld)
     {
         for (const PlayerJobs* jobs : {own, member})
             if (jobs != nullptr && jobs->mainJob != 0) return *jobs;
         if (checked != nullptr && checked->mainJob != 0)
+        {
+            // A job changes only in a Mog House, which their next sync packet follows with that job's level.
+            if (seenLevel != 0 && !seenHeld && seenLevel != checked->mainLevel) return PlayerJobs{0, seenLevel, 0, 0};
             return PlayerJobs{checked->mainJob, seenLevel != 0 ? seenLevel : checked->mainLevel, checked->subJob, checked->subLevel};
+        }
         if (seenLevel != 0) return PlayerJobs{0, seenLevel, 0, 0};
         return std::nullopt;
     }

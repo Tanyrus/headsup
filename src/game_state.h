@@ -33,6 +33,12 @@ namespace headsup
         bool operator==(const PlayerCheck&) const = default;
     };
 
+    struct PlayerSync
+    {
+        bool synced = false, held = false; // as CharSyncUpdate's
+        uint8_t level = 0;                 // CharSyncUpdate's, or 0 since a check of them, which is newer
+    };
+
     // Whether the last check of a player names a linkshell you wear. No name is no linkshell.
     bool SharesLinkshell(const PlayerCheck* check, std::span<const std::string> yours);
 
@@ -47,11 +53,9 @@ namespace headsup
 
         // Yours from 0x037 when index is self, anyone else's from 0x00D; null before one arrives.
         const PlayerStatus* PlayerStatusOf(uint32_t index, uint32_t self) const;
-        // From 0x067 alone; the plugin also reads yours and your party's from the buffs the game keeps.
-        bool LevelSynced(uint16_t index) const;
-        // A player's level as their last sync packet gave it; 0 when none came since they or you arrived, or since your
-        // last check of them, which is newer.
-        uint8_t PlayerLevelOf(uint16_t index) const;
+        // A player's last sync packet, yours included; all off when none came since they or you arrived. The plugin
+        // also reads yours and your party's sync from the buffs the game keeps.
+        PlayerSync SyncOf(uint16_t index) const;
         // Whether the server has made this mob or NPC untargetable, from its last update that said.
         bool Untargetable(uint16_t index) const;
         const std::optional<Weather>& ZoneWeather() const { return m_Weather; }
@@ -77,8 +81,7 @@ namespace headsup
 
     private:
         std::unordered_map<uint16_t, PlayerStatus> m_PlayerStatus; // other players, by target index
-        std::unordered_set<uint16_t> m_LevelSynced;                // players, you included, by target index
-        std::unordered_map<uint16_t, uint8_t> m_PlayerLevels;      // the same
+        std::unordered_map<uint16_t, PlayerSync> m_PlayerSyncs;    // players, you included, by target index
         std::unordered_set<uint16_t> m_Untargetable;               // mobs and NPCs, by target index
         std::optional<PlayerStatus> m_OwnStatus;
         std::optional<Weather> m_Weather;

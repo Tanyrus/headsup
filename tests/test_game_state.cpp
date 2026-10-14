@@ -55,10 +55,10 @@ namespace
     // GP_SERV_SERVERSTATUS (0x037) up to its fourth flags word: the first at 0x28.
     Packet OwnStatus(uint32_t flags0) { return Blank(0x037, 0x3C).Put(0x28, flags0); }
     // GP_SERV_ENTITY_SET (0x067): the kind at 0x04 (2 a character, 3 a named entity), the index at 0x06, flags at 0x10.
-    // The main job's level at 0x25.
-    Packet CharSync(uint8_t kind, uint16_t index, uint8_t flags, uint8_t level = 0)
+    // The main job's level at 0x25, the party's cap while synced at 0x26.
+    Packet CharSync(uint8_t kind, uint16_t index, uint8_t flags, uint8_t level = 0, uint8_t cap = 0)
     {
-        return Blank(0x067, 0x28).Put(0x04, kind).Put(0x06, index).Put(0x10, flags).Put(0x25, level);
+        return Blank(0x067, 0x28).Put(0x04, kind).Put(0x06, index).Put(0x10, flags).Put(0x25, level).Put(0x26, cap);
     }
     // Message Basic (0x029) for a check of the goblin: level 22 at 0x0C, check type 0x43 (Decent Challenge) at 0x10.
     Packet CheckReplyWith(uint16_t message)
@@ -95,7 +95,7 @@ namespace
         const PlayerStatus* other = game.PlayerStatusOf(kOther, kSelf);
         const PlayerStatus* own   = game.PlayerStatusOf(kSelf, kSelf);
         return Seen{other != nullptr, other != nullptr && other->away, own != nullptr, own != nullptr && own->away,
-            game.LevelSynced(kOther), game.LevelSynced(kSelf), game.ZoneWeather(), game.Owners()};
+            game.SyncOf(kOther).synced, game.SyncOf(kSelf).synced, game.ZoneWeather(), game.Owners()};
     }
 
     // Something of every kind to lose.
@@ -121,7 +121,7 @@ TEST(a_zone_in_forgets_other_players_and_everyones_sync_names_the_weather_and_sa
     const PacketFollowUp next = Feed(game, ZoneIn(kRain));
     CHECK(next.zonedIn && !next.check.has_value());
     CHECK(game.PlayerStatusOf(kOther, kSelf) == nullptr);
-    CHECK(!game.LevelSynced(kOther) && !game.LevelSynced(kSelf));
+    CHECK(!game.SyncOf(kOther).synced && !game.SyncOf(kSelf).synced);
     const PlayerStatus* own = game.PlayerStatusOf(kSelf, kSelf); // only the next 0x037 changes yours
     CHECK(own != nullptr && own->away);
     CHECK(game.ZoneWeather() == Weather::Rain);
@@ -137,7 +137,7 @@ TEST(a_zone_in_without_a_weather_it_names_clears_the_last_zones)
     game = Filled();
     const PacketFollowUp cut = Feed(game, Cut(ZoneIn(kRain), 0x69));
     CHECK(cut.zonedIn && !game.ZoneWeather().has_value());
-    CHECK(game.PlayerStatusOf(kOther, kSelf) == nullptr && !game.LevelSynced(kOther));
+    CHECK(game.PlayerStatusOf(kOther, kSelf) == nullptr && !game.SyncOf(kOther).synced);
 }
 
 TEST(a_short_or_unknown_packet_changes_nothing_and_leaves_nothing_to_do)
@@ -204,25 +204,25 @@ TEST(a_players_despawn_forgets_their_status_and_sync_and_no_one_elses)
     const PlayerStatus* moved = game.PlayerStatusOf(kOther, kSelf);
     CHECK(moved != nullptr && moved->away);
     Feed(game, OtherPlayer(kOther, static_cast<uint8_t>(kDespawn | kGeneral), kOtherAway)); // over the flags beside it
-    CHECK(game.PlayerStatusOf(kOther, kSelf) == nullptr && !game.LevelSynced(kOther));
+    CHECK(game.PlayerStatusOf(kOther, kSelf) == nullptr && !game.SyncOf(kOther).synced);
     const PlayerStatus* second = game.PlayerStatusOf(kSecond, kSelf);
-    CHECK(second != nullptr && second->seekingParty && game.LevelSynced(kSecond));
+    CHECK(second != nullptr && second->seekingParty && game.SyncOf(kSecond).synced);
 }
 
 TEST(a_players_level_is_kept_from_their_sync_until_they_leave_or_you_zone)
 {
     GameState game;
-    CHECK_EQ(int{game.PlayerLevelOf(kOther)}, 0);
+    CHECK_EQ(int{game.SyncOf(kOther).level}, 0);
     Feed(game, CharSync(kCharacter, kOther, 0, 75));
     Feed(game, CharSync(kCharacter, kSecond, 0, 40));
-    CHECK_EQ(int{game.PlayerLevelOf(kOther)}, 75);
+    CHECK_EQ(int{game.SyncOf(kOther).level}, 75);
     Feed(game, CharSync(kNamed, kOther, 0, 12)); // a named entity's packet is not a character's
-    CHECK_EQ(int{game.PlayerLevelOf(kOther)}, 75);
+    CHECK_EQ(int{game.SyncOf(kOther).level}, 75);
     Feed(game, OtherPlayer(kOther, kDespawn, 0));
-    CHECK_EQ(int{game.PlayerLevelOf(kOther)}, 0);
-    CHECK_EQ(int{game.PlayerLevelOf(kSecond)}, 40);
+    CHECK_EQ(int{game.SyncOf(kOther).level}, 0);
+    CHECK_EQ(int{game.SyncOf(kSecond).level}, 40);
     Feed(game, ZoneIn(kRain));
-    CHECK_EQ(int{game.PlayerLevelOf(kSecond)}, 0);
+    CHECK_EQ(int{game.SyncOf(kSecond).level}, 0);
 }
 
 TEST(a_check_of_a_player_replaces_the_level_of_their_last_sync_until_the_next_one)
@@ -234,10 +234,15 @@ TEST(a_check_of_a_player_replaces_the_level_of_their_last_sync_until_the_next_on
         .Put<uint8_t>(0x0A, 0x01).Put<uint8_t>(0x22, 1).Put<uint8_t>(0x23, 13).Put<uint8_t>(0x24, 74)
         .Put<uint8_t>(0x25, 37);
     Feed(game, general);
-    CHECK_EQ(int{game.PlayerLevelOf(kOther)}, 0);
-    CHECK_EQ(int{game.PlayerLevelOf(kSecond)}, 40);
+    CHECK_EQ(int{game.SyncOf(kOther).level}, 0);
+    CHECK_EQ(int{game.SyncOf(kSecond).level}, 40);
     Feed(game, CharSync(kCharacter, kOther, 0, 30));
-    CHECK_EQ(int{game.PlayerLevelOf(kOther)}, 30);
+    CHECK_EQ(int{game.SyncOf(kOther).level}, 30);
+    CHECK(!game.SyncOf(kOther).held);
+    // Synced, the check takes the level and leaves the sync: its icon stays and the level is still a held one.
+    Feed(game, CharSync(kCharacter, kSecond, kLevelSync, 40, 30));
+    Feed(game, general.Put<uint16_t>(0x08, kSecond));
+    CHECK(game.SyncOf(kSecond).synced && game.SyncOf(kSecond).held && game.SyncOf(kSecond).level == 0);
 }
 
 TEST(a_characters_sync_marks_and_clears_their_level_sync)
@@ -245,12 +250,12 @@ TEST(a_characters_sync_marks_and_clears_their_level_sync)
     GameState game;
     Feed(game, CharSync(kCharacter, kOther, kLevelSync));
     Feed(game, CharSync(kCharacter, kSelf, kLevelSync)); // yours comes the same way
-    CHECK(game.LevelSynced(kOther) && game.LevelSynced(kSelf));
+    CHECK(game.SyncOf(kOther).synced && game.SyncOf(kSelf).synced);
     CHECK(game.PlayerStatusOf(kOther, kSelf) == nullptr);
     Feed(game, CharSync(kCharacter, kOther, kCampaign)); // in a campaign battle and no longer synced
-    CHECK(!game.LevelSynced(kOther) && game.LevelSynced(kSelf));
+    CHECK(!game.SyncOf(kOther).synced && game.SyncOf(kSelf).synced);
     Feed(game, CharSync(kNamed, kOther, kLevelSync)); // naming an entity sets the same byte
-    CHECK(!game.LevelSynced(kOther));
+    CHECK(!game.SyncOf(kOther).synced);
 }
 
 TEST(your_own_status_is_kept_apart_from_other_players)

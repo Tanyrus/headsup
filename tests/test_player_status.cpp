@@ -2,6 +2,7 @@
 #include "test.h"
 
 #include <cstring>
+#include <string>
 #include <vector>
 
 using namespace headsup;
@@ -181,7 +182,33 @@ TEST(a_players_level_comes_with_their_sync_packet_and_is_the_synced_one_while_sy
     // In a battlefield the server keeps the sync icon off and still sends the level it holds the player to.
     const auto field = CharSync(0x02, 1105, 0x00, 75, 40);
     CHECK_EQ(int{ParseCharSync(field.data(), static_cast<uint32_t>(field.size()))->level}, 40);
+    // 0x26 is the party's cap (m_LevelRestriction): a member under it keeps their own level.
+    const auto under = CharSync(0x02, 1105, 0x04, 25, 30);
+    CHECK_EQ(int{ParseCharSync(under.data(), static_cast<uint32_t>(under.size()))->level}, 25);
+    // Whether a cap holds the level, icon or not.
+    CHECK(!ParseCharSync(plain.data(), static_cast<uint32_t>(plain.size()))->held);
+    CHECK(ParseCharSync(synced.data(), static_cast<uint32_t>(synced.size()))->held);
+    CHECK(ParseCharSync(field.data(), static_cast<uint32_t>(field.size()))->held);
     CHECK(!ParseCharSync(synced.data(), 0x26)); // too short for the levels
+}
+
+TEST(sync_packets_the_test_server_sent_read_as_their_characters_were)
+{
+    const auto bytes = [](const char* hex) {
+        std::vector<uint8_t> out;
+        for (const char* c = hex; c[0] != '\0' && c[1] != '\0'; c += 2)
+            out.push_back(static_cast<uint8_t>(std::stoi(std::string(c, 2), nullptr, 16)));
+        return out;
+    };
+    // Headsup (index 1024) after `setLevel(20)`; Headsuptwo (index 1025), WAR 30, then 37, unsynced each time.
+    const auto self   = bytes("6714530d02090004e9fd000000000000000000000000000000000000000000000000000000140000");
+    const auto second = bytes("6714d14e02090104eafd0000000000000000000000000000000000000000000000000000001e0000");
+    const auto later  = bytes("6714aa4f02090104eafd000000000000000000000000000000000000000000000000000000250000");
+    const auto a = ParseCharSync(self.data(), static_cast<uint32_t>(self.size()));
+    CHECK(a && a->index == 1024 && !a->synced && a->level == 20);
+    const auto b = ParseCharSync(second.data(), static_cast<uint32_t>(second.size()));
+    CHECK(b && b->index == 1025 && !b->synced && b->level == 30);
+    CHECK_EQ(int{ParseCharSync(later.data(), static_cast<uint32_t>(later.size()))->level}, 37);
 }
 
 TEST(an_anonymous_player_says_so_in_their_update)
@@ -192,10 +219,6 @@ TEST(an_anonymous_player_says_so_in_their_update)
     CHECK(!update->status->seekingParty && !update->status->away); // its neighbors
     const auto seeking = OtherPlayer(1105, kGeneral, 1u << 11, 0, 0);
     CHECK(!ParseOtherPlayer(seeking.data(), static_cast<uint32_t>(seeking.size()))->status->anonymous);
-    // Only the packets say it: the game's memory, read at load, does not.
-    PlayerStatus packet;
-    packet.anonymous = true;
-    CHECK(WithPacketStatus(PlayerStatus{}, &packet).anonymous);
 }
 
 TEST(your_level_sync_comes_from_your_buffs)

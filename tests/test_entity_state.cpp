@@ -413,14 +413,17 @@ TEST(a_players_jobs_come_from_the_game_then_the_party_list_then_the_last_check_o
 {
     const PlayerJobs own{1, 75, 13, 37}, member{4, 60, 3, 30};
     const InspectGeneral checked = CheckedRedMage();
-    CHECK(KnownJobs(&own, &member, &checked, 0) == own);
-    CHECK(KnownJobs(nullptr, &member, &checked, 0) == member);
-    CHECK(KnownJobs(nullptr, nullptr, &checked, 0) == (PlayerJobs{5, 52, 4, 26}));
-    CHECK(!KnownJobs(nullptr, nullptr, nullptr, 0).has_value());
-    // A level the server sent since the check: it has no job, so the check's stays.
-    CHECK(KnownJobs(nullptr, nullptr, nullptr, 75) == (PlayerJobs{0, 75, 0, 0}));
-    CHECK(KnownJobs(nullptr, nullptr, &checked, 30) == (PlayerJobs{5, 30, 4, 26}));
-    CHECK(KnownJobs(nullptr, &member, nullptr, 75) == member);
+    CHECK(KnownJobs(&own, &member, &checked, 0, false) == own);
+    CHECK(KnownJobs(nullptr, &member, &checked, 0, false) == member);
+    CHECK(KnownJobs(nullptr, nullptr, &checked, 0, false) == (PlayerJobs{5, 52, 4, 26}));
+    CHECK(!KnownJobs(nullptr, nullptr, nullptr, 0, false).has_value());
+    // A level the server sent since the check wins. It has no job: held to a sync's cap, or the check's level still,
+    // the check's job stays; another level of their own may come with another job, changed in their Mog House.
+    CHECK(KnownJobs(nullptr, nullptr, nullptr, 75, false) == (PlayerJobs{0, 75, 0, 0}));
+    CHECK(KnownJobs(nullptr, nullptr, &checked, 30, true) == (PlayerJobs{5, 30, 4, 26}));
+    CHECK(KnownJobs(nullptr, nullptr, &checked, 52, false) == (PlayerJobs{5, 52, 4, 26}));
+    CHECK(KnownJobs(nullptr, nullptr, &checked, 30, false) == (PlayerJobs{0, 30, 0, 0}));
+    CHECK(KnownJobs(nullptr, &member, nullptr, 75, false) == member);
 }
 
 TEST(a_players_level_the_server_sends_shows_with_auto_check_on_unless_they_are_anonymous)
@@ -438,8 +441,8 @@ TEST(a_main_job_of_0_knows_nothing_so_the_next_source_is_asked)
 {
     const PlayerJobs unknown{}, member{4, 60, 3, 30};
     const InspectGeneral checked = CheckedRedMage(), anonymous{};
-    CHECK(KnownJobs(&unknown, &member, nullptr, 0) == member);                      // you, while zoning
-    CHECK(KnownJobs(nullptr, &unknown, &checked, 0) == (PlayerJobs{5, 52, 4, 26})); // a member in another zone
-    CHECK(!KnownJobs(nullptr, nullptr, &anonymous, 0).has_value());                 // an anonymous player's check
-    CHECK(!KnownJobs(&unknown, &unknown, &anonymous, 0).has_value());
+    CHECK(KnownJobs(&unknown, &member, nullptr, 0, false) == member);                      // you, while zoning
+    CHECK(KnownJobs(nullptr, &unknown, &checked, 0, false) == (PlayerJobs{5, 52, 4, 26})); // a member in another zone
+    CHECK(!KnownJobs(nullptr, nullptr, &anonymous, 0, false).has_value());                 // an anonymous player's check
+    CHECK(!KnownJobs(&unknown, &unknown, &anonymous, 0, false).has_value());
 }
