@@ -326,7 +326,16 @@
           "key": "mouse-pointer",
           "name": "Mouse Pointer",
           "settings": [
-            {"key": "chocobo", "name": "Chocobo", "tip": "Changes the mouse cursor to the PlayOnline chocobo cursor."},
+            {
+              "key": "pointer-icon",
+              "name": "Cursor Icon",
+              "tip": "What the mouse cursor looks like. You can place cursor files in the config/headsup/cursors folder and they will appear in the drop-down menu as options.",
+              "options": [
+                {"name": "Vanilla", "tip": "Changes nothing about the mouse cursor, keeping its vanilla appearance."},
+                {"name": "Chocobo", "tip": "Replaces the mouse cursor with the Chocobo cursor from PlayOnline."},
+                {"tip": "Replaces the mouse cursor with this file from the config/headsup/cursors folder."}
+              ]
+            },
             {"key": "pointer-fix", "name": "Pointer Fix", "tip": "Keeps the game's pointer under yours after a resize, and clicks where you click. It also shows the pointer again over Ashita's windows."},
             {"key": "keep-pointer", "name": "Keep Pointer", "tip": "The game hides its pointer when a key runs a command. While only these keys are held, it stays."}
           ]

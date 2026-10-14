@@ -254,6 +254,34 @@ TEST(the_cursor_style_list_has_headsups_styles_then_the_folders_files)
     CHECK(w.settings.cursorStyle == CursorStyle::File && w.settings.cursorFile == "gone");
 }
 
+TEST(the_cursor_icon_list_has_vanilla_the_chocobo_then_the_folders_files)
+{
+    Window w;
+    const std::vector<std::string> files{"Gold Arrow", "sword"};
+    w.readings.cursorFiles = &files;
+    w.state.page           = Page::MouseCursor;
+    const std::string list = "mousecursor-mouse-pointer-pointer-icon";
+    const auto option      = [&](int n) { return list + "-o-" + std::to_string(n); };
+    const Form open        = w.Pass({{list, kClickEvent, ""}});
+    CHECK(open.popup && w.state.cursorsRequested); // opening it asks for the folder to be read again
+    CHECK(Has(open.popup->rml, option(3).c_str()) && !Has(open.popup->rml, option(4).c_str()));
+    CHECK(Has(open.popup->rml, ">Gold Arrow<") && Has(open.popup->rml, ">sword<"));
+    CHECK(ClassOn(open, option(0).c_str(), "picked")); // the game's own, a new install's
+    CHECK(w.Pass({{option(1), kClickEvent, ""}}).changed);
+    CHECK(w.settings.pointerIcon == PointerIcon::Chocobo && w.settings.pointerFile.empty());
+    w.Pass({{list, kClickEvent, ""}});
+    w.Pass({{option(3), kClickEvent, ""}});
+    CHECK(w.settings.pointerIcon == PointerIcon::File && w.settings.pointerFile == "sword");
+    // The target cursor's pick is its own.
+    CHECK(w.settings.cursorStyle == kDefaultCursorStyle && w.settings.cursorFile.empty());
+    // A file the folder no longer has stays chosen, and listed, until another is picked.
+    w.settings.pointerFile = "gone";
+    const Form kept        = w.Pass({{list, kClickEvent, ""}});
+    CHECK(Has(kept.popup->rml, ">gone<") && ClassOn(kept, option(4).c_str(), "picked"));
+    w.Pass({{option(0), kClickEvent, ""}});
+    CHECK(w.settings.pointerIcon == PointerIcon::Vanilla && w.settings.pointerFile.empty());
+}
+
 TEST(a_style_picked_comes_at_its_own_width_for_the_height_set)
 {
     // The feather is slender, the triangle wide and a picture square: a style picked would otherwise be squeezed
@@ -405,33 +433,33 @@ TEST(renaming_a_page_a_card_and_a_setting_changes_no_control_id)
     test::EditedLayout edited;
     edited.RenamePage("mousecursor", "Pointer");
     edited.RenameCard("mouse-pointer", "Mouse");
-    edited.RenameSetting("chocobo", "a bird of the pointer"); // shown as written, small letters and all
+    edited.RenameSetting("pointer-fix", "a fix of the pointer"); // shown as written, small letters and all
     Window w;
     w.layout     = edited.Layout();
     w.state.page = Page::MouseCursor;
-    const Form form = w.Pass({{"mousecursor-mouse-pointer-chocobo", kClickEvent, ""}});
-    CHECK(form.changed && w.settings.chocoboPointer);
+    const Form form = w.Pass({{"mousecursor-mouse-pointer-pointer-fix", kClickEvent, ""}});
+    CHECK(form.changed && !w.settings.fixPointer);
     const FormBlock* card = Block(form, "mousecursor-mouse-pointer");
-    CHECK(card != nullptr && Has(card->rml, ">Mouse<") && Has(card->rml, ">a bird of the pointer<"));
+    CHECK(card != nullptr && Has(card->rml, ">Mouse<") && Has(card->rml, ">a fix of the pointer<"));
     CHECK(Has(form.blocks.front().rml, ">Pointer<"));
 }
 
 TEST(a_setting_moved_to_another_card_works_there_and_sets_only_its_own_key)
 {
     test::EditedLayout edited;
-    edited.MoveSetting("chocobo", "settings-window", 0);
+    edited.MoveSetting("pointer-fix", "settings-window", 0);
     Window w;
     w.layout              = edited.Layout();
     w.state.page          = Page::ConfigMenu;
     const Settings before = w.settings;
-    const Form form       = w.Pass({{"configmenu-settings-window-chocobo", kClickEvent, ""}});
-    CHECK(form.changed && w.settings.chocoboPointer);
+    const Form form       = w.Pass({{"configmenu-settings-window-pointer-fix", kClickEvent, ""}});
+    CHECK(form.changed && !w.settings.fixPointer);
     CHECK_EQ(KeysChanged(before, w.settings).size(), size_t{1});
     // It comes first in its new card, and is gone from its old one.
     const FormBlock* card = Block(form, "configmenu-settings-window");
-    CHECK(At(card, "configmenu-settings-window-chocobo") < At(card, "configmenu-settings-window-window-theme"));
+    CHECK(At(card, "configmenu-settings-window-pointer-fix") < At(card, "configmenu-settings-window-window-theme"));
     w.state.page = Page::MouseCursor;
-    CHECK(At(Block(w.Pass(), "mousecursor-mouse-pointer"), "mousecursor-mouse-pointer-chocobo") == std::string::npos);
+    CHECK(At(Block(w.Pass(), "mousecursor-mouse-pointer"), "mousecursor-mouse-pointer-pointer-fix") == std::string::npos);
 }
 
 TEST(a_setting_moved_to_another_page_hides_as_it_would_at_home)
@@ -456,9 +484,9 @@ TEST(a_card_moved_to_another_page_shows_there_with_its_settings)
     Window w;
     w.layout     = edited.Layout();
     w.state.page = Page::ConfigMenu;
-    const Form form = w.Pass({{"configmenu-mouse-pointer-chocobo", kClickEvent, ""}});
+    const Form form = w.Pass({{"configmenu-mouse-pointer-pointer-fix", kClickEvent, ""}});
     CHECK(form.blocks.size() > 1 && form.blocks[1].id == "configmenu-mouse-pointer");
-    CHECK(form.changed && w.settings.chocoboPointer);
+    CHECK(form.changed && !w.settings.fixPointer);
 }
 
 TEST(the_visibility_rows_come_in_the_layouts_order)

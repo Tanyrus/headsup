@@ -65,7 +65,7 @@ namespace headsup
         }
     }
 
-    std::string PointerSwap::Start()
+    std::string PointerSwap::Start(std::vector<CursorFrame> shown)
     {
         if (Running()) return "";
         HMODULE game = GetModuleHandleA(kGameModule);
@@ -86,15 +86,15 @@ namespace headsup
             m_Replaced.insert(m_Replaced.end(), frames.begin(), frames.end());
         }
 
-        m_Chocobo = ChocoboPointer();
-        for (CursorFrame& f : m_Chocobo)
+        m_Shown = std::move(shown);
+        for (CursorFrame& f : m_Shown)
         {
             HICON frame = CreateIconFromResourceEx(f.resource.data(), static_cast<DWORD>(f.resource.size()), FALSE, kCursorFormat,
                 static_cast<int>(f.image.width), static_cast<int>(f.image.height), LR_DEFAULTCOLOR);
             if (frame == nullptr)
             {
                 Release();
-                return "Windows could not make the chocobo pointer";
+                return "Windows could not make the pointer";
             }
             m_Frames.push_back(frame);
         }
@@ -132,7 +132,7 @@ namespace headsup
         m_Frames.clear();
         m_Known.clear();
         m_Replaced.clear();
-        m_Chocobo.clear();
+        m_Shown.clear();
         m_GamePointer = nullptr;
     }
 
@@ -157,7 +157,7 @@ namespace headsup
         LARGE_INTEGER now;
         QueryPerformanceCounter(&now);
         const double seconds = static_cast<double>(now.QuadPart - m_Start.QuadPart) / static_cast<double>(m_Frequency.QuadPart);
-        return m_Frames[FrameAt(m_Chocobo, seconds)];
+        return m_Frames[FrameAt(m_Shown, seconds)];
     }
 
     bool PointerSwap::Replaced(HCURSOR cursor)

@@ -179,7 +179,7 @@ PIECES = Pieces(
             'seconds', 'layout', 'exp-bar', 'job-names', 'latency')),
         'trays': Setting(unnamed=True), 'reset-layout': Setting(),
         # Mouse Cursor and HeadsUp Config
-        'chocobo': Setting(), 'pointer-fix': Setting(), 'keep-pointer': Setting(),
+        'pointer-icon': Setting(options=3, nameless=frozenset({2})), 'pointer-fix': Setting(), 'keep-pointer': Setting(),
         'window-theme': Setting(), 'font': Setting(), 'size': Setting(), 'window-opacity': Setting(),
         'reset-all-settings': Setting(words={'note': True, 'reset-everything': True, 'keep-them': True}),
         'debug-report': Setting(),

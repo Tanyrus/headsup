@@ -7,6 +7,7 @@
 #include "settings.h"
 #include "window_layout.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -92,15 +93,36 @@ namespace headsup
     std::string SyncEntryLabel(const std::vector<int>& targets, int entry, const WindowLayout& layout);
     std::string SyncEntryTip(const std::vector<int>& targets, int entry, const WindowLayout& layout);
 
-    // One entry of the Cursor Style list: one of HeadsUp's own styles, or a file of the cursors folder.
-    struct CursorChoice
+    // One entry of a list of pictures (the Target Cursor's styles, the Cursor Icon): one of HeadsUp's own, or a file of
+    // the cursors folder. Style's last value is File.
+    template <typename Style>
+    struct PictureChoice
     {
-        CursorStyle style = kDefaultCursorStyle;
+        Style style{};
         std::string file; // a File's name
-        bool operator==(const CursorChoice&) const = default;
+        bool operator==(const PictureChoice&) const = default;
     };
-    // The list: HeadsUp's styles, then each file, then the file the settings name when the folder has none such.
-    std::vector<CursorChoice> CursorChoices(const std::vector<std::string>& files, const Settings& settings);
-    // Which entry the settings have picked.
-    int CursorChoiceOf(const std::vector<CursorChoice>& choices, const Settings& settings);
+
+    // The list: HeadsUp's own, then each file, then the file the settings name when the folder has none such.
+    template <typename Style>
+    std::vector<PictureChoice<Style>> PictureChoices(const std::vector<std::string>& files, Style saved, const std::string& savedFile)
+    {
+        std::vector<PictureChoice<Style>> choices;
+        for (int style = 0; style < static_cast<int>(Style::File); ++style)
+            choices.push_back(PictureChoice<Style>{static_cast<Style>(style), {}});
+        for (const std::string& file : files)
+            choices.push_back(PictureChoice<Style>{Style::File, file});
+        const PictureChoice<Style> kept{Style::File, savedFile};
+        if (saved == Style::File && std::ranges::find(choices, kept) == choices.end()) choices.push_back(kept);
+        return choices;
+    }
+
+    // Which entry the settings have picked, or the fallback's.
+    template <typename Style>
+    int PictureChoiceOf(const std::vector<PictureChoice<Style>>& choices, Style saved, const std::string& savedFile, Style fallback)
+    {
+        const PictureChoice<Style> picked{saved, saved == Style::File ? savedFile : std::string()};
+        const auto at = std::ranges::find(choices, picked);
+        return at != choices.end() ? static_cast<int>(at - choices.begin()) : static_cast<int>(fallback);
+    }
 }

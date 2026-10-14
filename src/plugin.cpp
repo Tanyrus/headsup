@@ -236,7 +236,8 @@ class HeadsUp final : public IPlugin
     std::optional<double> m_CountersReadAt;
     headsup::ConnectionMeter m_Connection;
     bool m_HooksTried = false;
-    bool m_PointerFailed = false; // said once; tried again when the setting changes
+    bool m_PointerFailed = false; // said once; tried again when the setting changes or the folder is read again
+    std::pair<headsup::PointerIcon, std::string> m_PointerFor; // the icon and file the pointer was started for
     headsup::InstalledFonts m_Fonts;
     headsup::PlayerState m_Player;
     headsup::CheckResults m_Checks;
@@ -1399,6 +1400,24 @@ private:
         }
         m_CursorFiles = headsup::CursorFileNames(entries);
         m_CursorFileRead.reset(); // a file that could not be read may have been put right since
+        m_PointerFailed = false;
+    }
+
+    // Each file of the cursors folder by this name, in the order of the cursor extensions; a missing or oversized one
+    // is left out.
+    std::vector<std::vector<uint8_t>> CursorFileContents(const std::string& name)
+    {
+        std::vector<std::vector<uint8_t>> contents;
+        for (const char* extension : headsup::kCursorExtensions)
+        {
+            std::ifstream in(CursorsFolder() + name + extension, std::ios::binary | std::ios::ate);
+            const std::streamoff size = in.tellg();
+            if (!in || size <= 0 || static_cast<uint64_t>(size) > headsup::kMaxCursorFileBytes) continue;
+            std::vector<uint8_t> bytes(static_cast<size_t>(size));
+            in.seekg(0);
+            if (in.read(reinterpret_cast<char*>(bytes.data()), size)) contents.push_back(std::move(bytes));
+        }
+        return contents;
     }
 
     // The File cursor's picture, read when the settings come to name another file.
@@ -1408,17 +1427,8 @@ private:
         if (!wanted || m_CursorFileRead == m_Settings.cursorFile) return;
         m_CursorFileRead = m_Settings.cursorFile;
         std::optional<headsup::Image> picture;
-        for (const char* extension : headsup::kCursorExtensions)
-        {
-            std::ifstream in(CursorsFolder() + m_Settings.cursorFile + extension, std::ios::binary | std::ios::ate);
-            const std::streamoff size = in.tellg();
-            if (!in || size <= 0 || static_cast<uint64_t>(size) > headsup::kMaxCursorFileBytes) continue;
-            std::vector<uint8_t> bytes(static_cast<size_t>(size));
-            in.seekg(0);
-            if (!in.read(reinterpret_cast<char*>(bytes.data()), size)) continue;
-            picture = headsup::CursorFilePicture(bytes.data(), bytes.size());
-            if (picture) break;
-        }
+        for (const std::vector<uint8_t>& bytes : CursorFileContents(m_Settings.cursorFile))
+            if ((picture = headsup::CursorFilePicture(bytes.data(), bytes.size()))) break;
         if (!picture) Print("could not read the cursor " + m_Settings.cursorFile + " in " + CursorsFolder() + "; the feather stands in for it");
         m_Nameplates.SetCursorFile(std::move(picture));
     }
@@ -1565,19 +1575,30 @@ private:
 
     void UpdatePointer()
     {
-        if (!m_Settings.enabled || !m_Settings.chocoboPointer)
+        const bool wanted = m_Settings.enabled && m_Settings.pointerIcon != headsup::PointerIcon::Vanilla;
+        const std::pair<headsup::PointerIcon, std::string> pick{m_Settings.pointerIcon, m_Settings.pointerFile};
+        if (!wanted || pick != m_PointerFor)
         {
             m_PointerFailed = false;
+            m_PointerFor    = pick;
             if (m_Pointer.Running()) m_Pointer.Stop();
-            return;
         }
+        if (!wanted) return;
         if (!m_Pointer.Running() && !m_PointerFailed)
         {
-            if (const std::string failure = m_Pointer.Start(); !failure.empty())
-            {
-                m_PointerFailed = true;
-                Print("the chocobo pointer is off: " + failure + ".");
-            }
+            std::vector<headsup::CursorFrame> frames;
+            if (m_Settings.pointerIcon == headsup::PointerIcon::Chocobo)
+                frames = headsup::ChocoboPointer();
+            else
+                for (const std::vector<uint8_t>& bytes : CursorFileContents(m_Settings.pointerFile))
+                    if (!(frames = headsup::ReadCursorFile(bytes.data(), bytes.size())).empty()) break;
+            m_PointerFailed = true;
+            if (frames.empty())
+                Print("could not read the pointer " + m_Settings.pointerFile + " in " + CursorsFolder() + "; the game's pointer stays.");
+            else if (const std::string failure = m_Pointer.Start(std::move(frames)); !failure.empty())
+                Print("the mouse pointer is the game's: " + failure + ".");
+            else
+                m_PointerFailed = false;
         }
         m_Pointer.Animate();
     }

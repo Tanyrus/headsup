@@ -359,7 +359,7 @@ helpBarY=8.0000
         s.scaleOwnName      = false;
         s.scaleCursor       = true; // apart from the names': a dropped key would take theirs
         s.cursorStyle = CursorStyle::Vanilla; // the cursor was switched off
-        s.chocoboPointer = true;
+        s.pointerIcon    = PointerIcon::Chocobo;
         s.fixPointer     = false;
         s.smoothness     = 12;
         s.cursorHeight   = 31;
@@ -423,7 +423,7 @@ helpBarY=8.0000
 
     // The keys of kSavedFile that only an older build's file carries: a migration reads them, or nothing does, and
     // nothing writes them.
-    const char* const kOldKeys[] = {"untargetedOpacity", "glowOffWhenFighting", "thickness", "cursorSize", "cursorOutline", "replaceCursor", "cursorFeather", "barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
+    const char* const kOldKeys[] = {"chocoboPointer", "untargetedOpacity", "glowOffWhenFighting", "thickness", "cursorSize", "cursorOutline", "replaceCursor", "cursorFeather", "barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
         "serverClockZone", "showLabels", "replaceMobNames", "showIcons", "hideInCombat", "hideClaimed", "hideTooWeak",
         "hideWhileEngaged", "markPlaceholders", "fontBold", "nameGlow", "scalePlayerNames",
         "labelFontBold", "showOrnament", "ownGlowColor", "ownOrnamentColor", "labelFontName", "glowSize",
@@ -1161,6 +1161,8 @@ TEST(every_designer_key_round_trips)
     s.cursorStyle     = CursorStyle::File;
     s.cursorFile      = "My Cursor";
     s.dashMark        = DashMark::Square;
+    s.pointerIcon     = PointerIcon::File;
+    s.pointerFile     = "Gold Arrow";
     MapStore store;
     SaveSettings(s, store);
     CHECK(LoadSettings(store) == s);
@@ -2057,6 +2059,37 @@ TEST(a_cursor_file_is_a_name_and_never_a_path)
     CHECK(LoadSettings(file).dashMark == DashMark::Diamond);
     file.values["dashMark"] = "no";
     CHECK(LoadSettings(file).dashMark == DashMark::None);
+}
+
+TEST(the_mouse_pointer_is_one_icon_and_the_chocobo_switch_of_before_picks_the_chocobo)
+{
+    const auto loaded = [](std::initializer_list<std::pair<const char*, const char*>> keys) {
+        MapStore file = ReleaseFile(keys);
+        return LoadSettings(file);
+    };
+    CHECK(loaded({{"chocoboPointer", "true"}}).pointerIcon == PointerIcon::Chocobo);
+    CHECK(loaded({{"chocoboPointer", "false"}}).pointerIcon == PointerIcon::Vanilla);
+    MapStore fresh;
+    CHECK(LoadSettings(fresh).pointerIcon == PointerIcon::Vanilla);
+    // The key of its own wins over the switch of before.
+    const Settings file = loaded({{"chocoboPointer", "true"}, {"pointerIcon", "file"}, {"pointerFile", "sword"}});
+    CHECK(file.pointerIcon == PointerIcon::File && file.pointerFile == "sword");
+    CHECK(loaded({{"chocoboPointer", "true"}, {"pointerIcon", "vanilla"}}).pointerIcon == PointerIcon::Vanilla);
+    // A file that cannot be in the folder is no pick: the game's own pointer.
+    Settings wild;
+    wild.pointerIcon = PointerIcon::File;
+    wild.pointerFile = "..\\outside";
+    CHECK(Clamp(wild).pointerIcon == PointerIcon::Vanilla && Clamp(wild).pointerFile.empty());
+    wild.pointerIcon = static_cast<PointerIcon>(9);
+    CHECK(Clamp(wild).pointerIcon == PointerIcon::Vanilla);
+    // The switch of before is never written again.
+    Settings chocobo;
+    chocobo.pointerIcon = PointerIcon::Chocobo;
+    MapStore saved      = OwnFileWith(chocobo, {{"chocoboPointer", "false"}});
+    CHECK(LoadSettings(saved) == chocobo);
+    SaveSettings(chocobo, saved);
+    CHECK(std::ranges::find(saved.sets, "chocoboPointer") == saved.sets.end());
+    CHECK_EQ(saved.values.at("pointerIcon"), "chocobo");
 }
 
 TEST(a_cursor_saved_as_one_size_keeps_its_shape_and_its_edge)

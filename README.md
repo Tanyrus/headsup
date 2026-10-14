@@ -242,9 +242,9 @@ During cutscenes and NPC dialogs the top panel hides itself and every nameplate 
 
 ## Mouse pointer
 
-The Mouse Cursor page puts PlayOnline's chocobo back as your mouse pointer, the one the PlayOnline Viewer had. It also
-holds a fix for the game's pointer after a resize and over Ashita's windows, and the keys that do not make the game hide
-its pointer.
+The Mouse Cursor page's Cursor Icon puts PlayOnline's chocobo back as your mouse pointer, the one the PlayOnline Viewer
+had, or any `.cur` or `.ani` file you put in `config/headsup/cursors`. It also holds a fix for the game's pointer after a
+resize and over Ashita's windows, and the keys that do not make the game hide its pointer.
 
 ## Top panel
 

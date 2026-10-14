@@ -67,14 +67,14 @@ TEST(a_list_and_a_word_are_found_by_their_piece)
 TEST(a_setting_moved_in_an_edited_layout_is_in_the_other_cards_range)
 {
     test::EditedLayout edited;
-    edited.MoveSetting("chocobo", "settings-window", 0);
+    edited.MoveSetting("pointer-fix", "settings-window", 0);
     const WindowLayout layout = edited.Layout();
     const auto cardOf = [&](const char* key) {
         return std::ranges::find_if(layout.cards, [&](const LayoutCard& c) { return std::string(c.key) == key; });
     };
     const auto settings = layout.SettingsOf(*cardOf("settings-window"));
-    CHECK(std::string(settings.front().key) == "chocobo");
+    CHECK(std::string(settings.front().key) == "pointer-fix");
     const auto pointer = layout.SettingsOf(*cardOf("mouse-pointer"));
-    CHECK(std::ranges::none_of(pointer, [](const LayoutSetting& s) { return std::string(s.key) == "chocobo"; }));
+    CHECK(std::ranges::none_of(pointer, [](const LayoutSetting& s) { return std::string(s.key) == "pointer-fix"; }));
     CHECK_EQ(layout.settings.size(), kWindowLayout.settings.size());
 }

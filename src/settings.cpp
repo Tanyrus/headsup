@@ -30,7 +30,6 @@ namespace headsup
         constexpr const char* kEnabledKey = "enabled"; // in every file any build saved: what tells a file from none
         constexpr BoolKey kBools[] = {{kEnabledKey, &Settings::enabled}, {"phTimers", &Settings::phTimers},
             {"scaleWithDistance", &Settings::scaleWithDistance}, {"scaleOwnName", &Settings::scaleOwnName},
-            {"chocoboPointer", &Settings::chocoboPointer},
             {"fixPointer", &Settings::fixPointer}, {"showRanks", &Settings::showRanks}, {"showBar", &Settings::showBar},
             {"hideHelpBar", &Settings::hideHelpBar}, {"hideNetstat", &Settings::hideNetstat},
             {"screenshotHidesGame", &Settings::screenshotHidesGame},
@@ -77,6 +76,10 @@ namespace headsup
         constexpr const char* kCursorStyleKey = "cursorStyle";
         constexpr const char* kCursorFileKey  = "cursorFile";
         const char* const kCursorStyleNames[kCursorStyleCount] = {"vanilla", "triangle", "feather", "chocobo", "file"};
+        constexpr const char* kPointerIconKey        = "pointerIcon";
+        constexpr const char* kPointerFileKey        = "pointerFile";
+        constexpr const char* kOldChocoboPointerKey  = "chocoboPointer";
+        const char* const kPointerIconNames[kPointerIconCount] = {"vanilla", "chocobo", "file"};
         // Before it had a style the cursor was on or off, and Phoenix's feather or an arrow.
         constexpr const char* kOldReplaceCursorKey = "replaceCursor";
         constexpr const char* kOldCursorFeatherKey = "cursorFeather";
@@ -1128,6 +1131,10 @@ namespace headsup
         if (!named) s.cursorFile.clear();
         if (static_cast<int>(s.cursorStyle) >= kCursorStyleCount || (s.cursorStyle == CursorStyle::File && !named))
             s.cursorStyle = d.cursorStyle;
+        const bool pointerNamed = IsCursorFileName(s.pointerFile);
+        if (!pointerNamed) s.pointerFile.clear();
+        if (static_cast<int>(s.pointerIcon) >= kPointerIconCount || (s.pointerIcon == PointerIcon::File && !pointerNamed))
+            s.pointerIcon = d.pointerIcon;
         if (static_cast<int>(s.dashMark) >= kDashMarkCount) s.dashMark = d.dashMark;
         ClampPick(s.cursorColor, d.cursorColor, CursorSources());
         ClampPick(s.cursorEdgeColor, d.cursorEdgeColor, CursorSources());
@@ -1172,6 +1179,12 @@ namespace headsup
         else if (wasArrow)
             s.cursorStyle = CursorStyle::Triangle;
         s.cursorFile   = store.GetString(kCursorFileKey, "");
+        const std::string icon = store.GetString(kPointerIconKey, kNoText);
+        if (icon != kNoText)
+            s.pointerIcon = static_cast<PointerIcon>(NameIndex(kPointerIconNames, kPointerIconCount, icon, static_cast<int>(s.pointerIcon)));
+        else if (HeldSwitch(store, kOldChocoboPointerKey).value_or(false))
+            s.pointerIcon = PointerIcon::Chocobo;
+        s.pointerFile = store.GetString(kPointerFileKey, "");
         s.dashMark     = static_cast<DashMark>(
             NameIndex(kDashMarkNames, kDashMarkCount, store.GetString(kDashMarkKey, ""), static_cast<int>(s.dashMark)));
         s.cursorHeight = Rebased(store, kCursorHeightKey, kOldCursorSizeKey, s.cursorHeight, [](float size) { return size; });
@@ -1291,6 +1304,8 @@ namespace headsup
             setColor(c.key, s.*c.field);
         store.Set(kCursorStyleKey, CursorStyleName(s.cursorStyle));
         store.Set(kCursorFileKey, s.cursorFile.c_str());
+        store.Set(kPointerIconKey, kPointerIconNames[static_cast<int>(s.pointerIcon)]);
+        store.Set(kPointerFileKey, s.pointerFile.c_str());
         store.Set(kDashMarkKey, kDashMarkNames[static_cast<int>(s.dashMark)]);
         SavePick(store, kCursorPickKey, s.cursorColor);
         SavePick(store, kCursorEdgePickKey, s.cursorEdgeColor);

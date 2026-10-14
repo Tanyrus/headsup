@@ -53,6 +53,9 @@ namespace headsup
     // this long, and with nothing in it that would lead out of the folder.
     constexpr size_t kMaxCursorFileName = 64;
     bool IsCursorFileName(std::string_view name);
+    // The mouse pointer: the game's own, PlayOnline's chocobo, or a cursor file of the player's.
+    enum class PointerIcon : uint8_t { Vanilla, Chocobo, File };
+    constexpr int kPointerIconCount = 3;
     constexpr int kMinCursorSide = 4, kMaxCursorSide = 64; // pixels: the target cursor's width and height
     constexpr int kDefaultCursorHeight = 20;
     int DefaultCursorWidth(); // the default style's at that height
@@ -130,7 +133,8 @@ namespace headsup
         std::vector<uint8_t> keepPointerKeys; // keys that set off a command without hiding the game's pointer
         CursorStyle cursorStyle = kDefaultCursorStyle;
         std::string cursorFile; // a File cursor's name in the cursors folder, without its extension
-        bool chocoboPointer    = false; // PlayOnline's chocobo in place of the game's mouse pointer
+        PointerIcon pointerIcon = PointerIcon::Vanilla;
+        std::string pointerFile; // a File pointer's name in the cursors folder, without its extension
         bool fixPointer        = true;  // the game reads the mouse in its true client area and syncs its pointer before clicks
         int cursorWidth        = DefaultCursorWidth(); // pixels
         int cursorHeight       = kDefaultCursorHeight;
