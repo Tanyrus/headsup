@@ -604,6 +604,9 @@ TEST(jobs_show_alone_when_there_is_no_sub_job_and_nothing_when_unknown)
     CHECK_EQ(Rendered(Compose(info, s).lines[0]), "Chadmage WAR 75");
     info.jobs = PlayerJobs{0, 0, 0, 0};
     CHECK_EQ(Rendered(Compose(info, s).lines[0]), "Chadmage");
+    // A level the server sent without a check comes with no job.
+    info.jobs = PlayerJobs{0, 75, 0, 0};
+    CHECK_EQ(Rendered(Compose(info, s).lines[0]), "Chadmage 75");
 }
 
 TEST(a_players_title_shows_once_known_and_takes_its_space_with_it_when_not)

@@ -105,7 +105,7 @@ namespace headsup
                 return info.ownerName;
             case Tag::Level:
                 if (IsMob(info)) return LevelText(info.mob, checked);
-                if (IsPlayer(info) && info.jobs && info.jobs->mainJob != 0) return std::to_string(info.jobs->mainLevel);
+                if (IsPlayer(info) && info.jobs && info.jobs->mainLevel != 0) return std::to_string(info.jobs->mainLevel);
                 return {};
             case Tag::Con:
                 return IsMob(info) ? ConText(info.mob, checked, player.level) : std::string();

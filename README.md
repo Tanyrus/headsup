@@ -177,8 +177,9 @@ The Nameplates card, on the Entities page, sets what every nameplate shares:
 
 - **Base Font Size, Default Font and Base Icon Size:** what the lines' percents are of, and any font installed in Windows
 - **Auto-Check:** HeadsUp checks each mob that comes near by itself, so its exact level and difficulty show without a
-  `/check`, and keeps the check's line out of the chat log. Players are never checked: the server tells a player who
-  examined them
+  `/check`, and keeps the check's line out of the chat log. Players are never checked, as the server tells a player who
+  examined them: a player's level is read from what the server already sends about them, and an anonymous player
+  shows none
 - **Replace Dashes (-):** draws each dash typed in a nameplate's design as a dot, a square or a diamond. The dashes
   HeadsUp writes itself, as in a level range such as 20-23, and a name's own dash stay
 - **Scale with Distance:** names grow and shrink with distance between a Min Size and a Max Size; with Scale Your Own

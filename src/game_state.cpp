@@ -23,6 +23,7 @@ namespace headsup
         case kZoneInPacket:
             m_PlayerStatus.clear(); // target indexes are reused in the next zone
             m_LevelSynced.clear();
+            m_PlayerLevels.clear();
             m_Untargetable.clear();
             m_ConquestOwed   = true;
             m_CurrenciesOwed = true;
@@ -60,6 +61,7 @@ namespace headsup
                 {
                     m_PlayerStatus.erase(update->index);
                     m_LevelSynced.erase(update->index);
+                    m_PlayerLevels.erase(update->index);
                 }
                 else if (update->status)
                     m_PlayerStatus[update->index] = *update->status;
@@ -81,6 +83,7 @@ namespace headsup
                     m_LevelSynced.insert(sync->index);
                 else
                     m_LevelSynced.erase(sync->index);
+                m_PlayerLevels[sync->index] = sync->level;
             }
             break;
         case kOwnStatusPacket:
@@ -110,6 +113,12 @@ namespace headsup
         if (index == self) return m_OwnStatus ? &*m_OwnStatus : nullptr;
         const auto it = m_PlayerStatus.find(static_cast<uint16_t>(index));
         return it != m_PlayerStatus.end() ? &it->second : nullptr;
+    }
+
+    uint8_t GameState::PlayerLevelOf(uint16_t index) const
+    {
+        const auto it = m_PlayerLevels.find(index);
+        return it != m_PlayerLevels.end() ? it->second : 0;
     }
 
     bool GameState::LevelSynced(uint16_t index) const

@@ -18,6 +18,7 @@ namespace headsup
         constexpr uint8_t kSendGeneral  = 0x04; // the update carries the flags
         constexpr uint8_t kSendDespawn  = 0x20;
         constexpr int kOtherSeekBit     = 11;
+        constexpr int kOtherAnonymousBit = 12;
         constexpr int kOtherAwayBit     = 14;
         constexpr int kOtherLinkshellBit = 17;
         constexpr int kOtherGmShift     = 24;
@@ -42,7 +43,9 @@ namespace headsup
         constexpr uint8_t kSyncCharacter   = 0x02;
         constexpr size_t kSyncIndex        = 0x06;
         constexpr size_t kSyncFlags        = 0x10;
-        constexpr size_t kSyncSize         = kSyncFlags + 1;
+        constexpr size_t kSyncLevel        = 0x25; // the main job's
+        constexpr size_t kSyncedLevel      = 0x26; // while level synced, battlefields included; 0 otherwise
+        constexpr size_t kSyncSize         = kSyncedLevel + 1;
         constexpr int kSyncLevelSyncBit    = 2;
 
         constexpr uint32_t kGmLevelMask = 0x7;
@@ -72,6 +75,7 @@ namespace headsup
                    flags3 = ReadAt<uint32_t>(data, kOtherFlags3);
         PlayerStatus s;
         s.seekingParty  = Bit(flags1, kOtherSeekBit);
+        s.anonymous     = Bit(flags1, kOtherAnonymousBit);
         s.away          = Bit(flags1, kOtherAwayBit);
         s.linkshell     = Bit(flags1, kOtherLinkshellBit);
         s.gm            = (flags1 >> kOtherGmShift & kGmLevelMask) != 0;
@@ -100,10 +104,12 @@ namespace headsup
         return s;
     }
 
-    std::optional<LevelSyncUpdate> ParseCharSync(const uint8_t* data, uint32_t size)
+    std::optional<CharSyncUpdate> ParseCharSync(const uint8_t* data, uint32_t size)
     {
         if (data == nullptr || size < kSyncSize || data[kSyncKind] != kSyncCharacter) return std::nullopt;
-        return LevelSyncUpdate{ReadAt<uint16_t>(data, kSyncIndex), Bit(data[kSyncFlags], kSyncLevelSyncBit)};
+        const uint8_t held = data[kSyncedLevel];
+        return CharSyncUpdate{ReadAt<uint16_t>(data, kSyncIndex), Bit(data[kSyncFlags], kSyncLevelSyncBit),
+            held != 0 ? held : data[kSyncLevel]};
     }
 
     bool LevelSyncInBuffs(const int16_t* buffs)
@@ -141,6 +147,7 @@ namespace headsup
         s.mentor        = packet->mentor;
         s.newAdventurer = packet->newAdventurer;
         s.gm            = packet->gm;
+        s.anonymous     = packet->anonymous;
         return s;
     }
 }

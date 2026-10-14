@@ -55,9 +55,10 @@ namespace
     // GP_SERV_SERVERSTATUS (0x037) up to its fourth flags word: the first at 0x28.
     Packet OwnStatus(uint32_t flags0) { return Blank(0x037, 0x3C).Put(0x28, flags0); }
     // GP_SERV_ENTITY_SET (0x067): the kind at 0x04 (2 a character, 3 a named entity), the index at 0x06, flags at 0x10.
-    Packet CharSync(uint8_t kind, uint16_t index, uint8_t flags)
+    // The main job's level at 0x25.
+    Packet CharSync(uint8_t kind, uint16_t index, uint8_t flags, uint8_t level = 0)
     {
-        return Blank(0x067, 0x28).Put(0x04, kind).Put(0x06, index).Put(0x10, flags);
+        return Blank(0x067, 0x28).Put(0x04, kind).Put(0x06, index).Put(0x10, flags).Put(0x25, level);
     }
     // Message Basic (0x029) for a check of the goblin: level 22 at 0x0C, check type 0x43 (Decent Challenge) at 0x10.
     Packet CheckReplyWith(uint16_t message)
@@ -150,7 +151,7 @@ TEST(a_short_or_unknown_packet_changes_nothing_and_leaves_nothing_to_do)
         Cut(Conquest({{0, kBastok}, {18, kWindurst}}), 0x65),
         Cut(OtherPlayer(kOther, kDespawn, 0), 0x2B),
         Cut(OwnStatus(0), 0x3B),
-        Cut(CharSync(kCharacter, kOther, 0), 0x10),
+        Cut(CharSync(kCharacter, kOther, 0), 0x26),
         Cut(CheckReplyWith(kCon), 0x19),
         Packet{0x00B, ZoneIn(kRain).bytes},
     };
@@ -206,6 +207,22 @@ TEST(a_players_despawn_forgets_their_status_and_sync_and_no_one_elses)
     CHECK(game.PlayerStatusOf(kOther, kSelf) == nullptr && !game.LevelSynced(kOther));
     const PlayerStatus* second = game.PlayerStatusOf(kSecond, kSelf);
     CHECK(second != nullptr && second->seekingParty && game.LevelSynced(kSecond));
+}
+
+TEST(a_players_level_is_kept_from_their_sync_until_they_leave_or_you_zone)
+{
+    GameState game;
+    CHECK_EQ(int{game.PlayerLevelOf(kOther)}, 0);
+    Feed(game, CharSync(kCharacter, kOther, 0, 75));
+    Feed(game, CharSync(kCharacter, kSecond, 0, 40));
+    CHECK_EQ(int{game.PlayerLevelOf(kOther)}, 75);
+    Feed(game, CharSync(kNamed, kOther, 0, 12)); // a named entity's packet is not a character's
+    CHECK_EQ(int{game.PlayerLevelOf(kOther)}, 75);
+    Feed(game, OtherPlayer(kOther, kDespawn, 0));
+    CHECK_EQ(int{game.PlayerLevelOf(kOther)}, 0);
+    CHECK_EQ(int{game.PlayerLevelOf(kSecond)}, 40);
+    Feed(game, ZoneIn(kRain));
+    CHECK_EQ(int{game.PlayerLevelOf(kSecond)}, 0);
 }
 
 TEST(a_characters_sync_marks_and_clears_their_level_sync)

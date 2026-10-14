@@ -35,15 +35,18 @@ namespace
         return p;
     }
 
-    // GP_SERV_ENTITY_SET (0x067) up to its flags byte, as Phoenix's src/map/packets/char_sync.cpp lays it out for a
-    // character (kind 2) and entity_set_name.cpp for a named entity (kind 3).
-    std::vector<uint8_t> CharSync(uint8_t kind, uint16_t index, uint8_t flags)
+    // GP_SERV_ENTITY_SET (0x067), as Phoenix's src/map/packets/char_sync.cpp lays it out for a character (kind 2):
+    // its main job's level at 0x25 and, while level synced, the level it is synced to at 0x26; entity_set_name.cpp
+    // uses kind 3 for a named entity.
+    std::vector<uint8_t> CharSync(uint8_t kind, uint16_t index, uint8_t flags, uint8_t level = 0, uint8_t syncLevel = 0)
     {
         std::vector<uint8_t> p(0x28, 0);
         p[0]    = 0x67;
         p[0x04] = kind;
         std::memcpy(&p[0x06], &index, 2);
         p[0x10] = flags;
+        p[0x25] = level;
+        p[0x26] = syncLevel;
         return p;
     }
 
@@ -167,6 +170,32 @@ TEST(level_sync_comes_from_a_characters_sync_packet)
     CHECK(!ParseCharSync(named.data(), static_cast<uint32_t>(named.size())));
     CHECK(!ParseCharSync(synced.data(), 0x10)); // too short for the flags
     CHECK(!ParseCharSync(nullptr, 0x28));
+}
+
+TEST(a_players_level_comes_with_their_sync_packet_and_is_the_synced_one_while_synced)
+{
+    const auto plain = CharSync(0x02, 1105, 0x00, 75);
+    CHECK_EQ(int{ParseCharSync(plain.data(), static_cast<uint32_t>(plain.size()))->level}, 75);
+    const auto synced = CharSync(0x02, 1105, 0x04, 75, 30);
+    CHECK_EQ(int{ParseCharSync(synced.data(), static_cast<uint32_t>(synced.size()))->level}, 30);
+    // In a battlefield the server keeps the sync icon off and still sends the level it holds the player to.
+    const auto field = CharSync(0x02, 1105, 0x00, 75, 40);
+    CHECK_EQ(int{ParseCharSync(field.data(), static_cast<uint32_t>(field.size()))->level}, 40);
+    CHECK(!ParseCharSync(synced.data(), 0x26)); // too short for the levels
+}
+
+TEST(an_anonymous_player_says_so_in_their_update)
+{
+    const auto anonymous = OtherPlayer(1105, kGeneral, 1u << 12, 0, 0);
+    const auto update    = ParseOtherPlayer(anonymous.data(), static_cast<uint32_t>(anonymous.size()));
+    CHECK(update && update->status && update->status->anonymous);
+    CHECK(!update->status->seekingParty && !update->status->away); // its neighbors
+    const auto seeking = OtherPlayer(1105, kGeneral, 1u << 11, 0, 0);
+    CHECK(!ParseOtherPlayer(seeking.data(), static_cast<uint32_t>(seeking.size()))->status->anonymous);
+    // Only the packets say it: the game's memory, read at load, does not.
+    PlayerStatus packet;
+    packet.anonymous = true;
+    CHECK(WithPacketStatus(PlayerStatus{}, &packet).anonymous);
 }
 
 TEST(your_level_sync_comes_from_your_buffs)

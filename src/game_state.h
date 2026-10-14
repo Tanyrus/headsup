@@ -49,6 +49,8 @@ namespace headsup
         const PlayerStatus* PlayerStatusOf(uint32_t index, uint32_t self) const;
         // From 0x067 alone; the plugin also reads yours and your party's from the buffs the game keeps.
         bool LevelSynced(uint16_t index) const;
+        // A player's level as their last sync packet gave it; 0 when none came since they or you arrived.
+        uint8_t PlayerLevelOf(uint16_t index) const;
         // Whether the server has made this mob or NPC untargetable, from its last update that said.
         bool Untargetable(uint16_t index) const;
         const std::optional<Weather>& ZoneWeather() const { return m_Weather; }
@@ -75,6 +77,7 @@ namespace headsup
     private:
         std::unordered_map<uint16_t, PlayerStatus> m_PlayerStatus; // other players, by target index
         std::unordered_set<uint16_t> m_LevelSynced;                // players, you included, by target index
+        std::unordered_map<uint16_t, uint8_t> m_PlayerLevels;      // the same
         std::unordered_set<uint16_t> m_Untargetable;               // mobs and NPCs, by target index
         std::optional<PlayerStatus> m_OwnStatus;
         std::optional<Weather> m_Weather;

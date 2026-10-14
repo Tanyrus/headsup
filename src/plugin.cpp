@@ -1801,7 +1801,8 @@ private:
         const auto member                 = m_PartyJobs.find(serverId);
         const headsup::PlayerCheck* check = m_GameState.PlayerCheckOf(serverId);
         return headsup::KnownJobs(index == m_SelfIndex ? &m_OwnJobs : nullptr,
-            member != m_PartyJobs.end() ? &member->second : nullptr, check != nullptr ? &check->general : nullptr);
+            member != m_PartyJobs.end() ? &member->second : nullptr, check != nullptr ? &check->general : nullptr,
+            headsup::SeenLevel(m_Settings.autoCheck, m_GameState.PlayerLevelOf(index), m_GameState.PlayerStatusOf(index, m_SelfIndex)));
     }
 
     // Your own title is the client's; another player's comes with a check of them.

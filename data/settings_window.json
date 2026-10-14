@@ -28,7 +28,7 @@
             {"key": "min-size", "name": "Min Scale", "tip": "The minimum scale for the nameplate. This affects its size when far away."},
             {"key": "max-size", "name": "Max Size", "tip": "The maximum scale for the nameplate. This affects its size when very close."},
             {"key": "scale-your-own-name", "name": "Scale Your Own Name", "tip": "If enabled, the player's name is scaled by how close the camera is to the player character."},
-            {"key": "auto-check", "name": "Auto-Check", "tip": "Automatically checks all nearby enemies to get their exact level and difficulty."},
+            {"key": "auto-check", "name": "Auto-Check", "tip": "Automatically checks all nearby enemies to get their exact level and difficulty. Players are never checked: their level is read from what the server already sends, unless they are anonymous."},
             {"key": "stack-names", "name": "Stack Names", "tip": "If enabled, when nameplates would overlap, they instead stack on top of each other. NOTE: Your target's nameplate will be prioritized and stay in place."}
           ]
         },
@@ -768,7 +768,7 @@
       "key": "tags",
       "options": [
         {"name": "Name", "tip": "The name of the entity."},
-        {"name": "Level", "tip": "Shows the entity's current level. NOTE: For mobs, this will show a range until you /check the mob. You can also enable the Auto-Check feature in the 'Entities/Nameplates' section. For players, this will not show at all until you /check them, even with the Auto-Check feature."},
+        {"name": "Level", "tip": "Shows the entity's current level. NOTE: For mobs, this will show a range until you /check the mob. You can also enable the Auto-Check feature in the 'Entities/Nameplates' section. For players, this shows once you /check them, or with the Auto-Check feature on, unless they are anonymous."},
         {"name": "Difficulty", "tip": "Shows initials indicating the mob's difficulty for your current level (TW for Too Weak, EP for Easy Prey, and so on). NOTE: Shows a range of possibilities until you /check the mob, unless you have the Auto-Check feature enabled in the 'Entities/Nameplates' section."},
         {"name": "ID", "tip": "The last three hex digits of the mob's ID. Example: [106]."},
         {"name": "Server ID", "tip": "The mob's full server ID in decimal. Example: [17190918]."},
@@ -786,9 +786,9 @@
         {"name": "Linkshell", "tip": "Shows an icon representing the player's equipped linkshell."},
         {"name": "Bazaar", "tip": "Shows an icon indicating the player is selling items in their bazaar."},
         {"name": "Seeking Party", "tip": "Shows an icon indicating the player is looking to join a party."},
-        {"name": "Job", "tip": "Shows the player's job and subjob (example: WAR/NIN). NOTE: Only shows after you use /check on the player. Unaffected by the Auto-Check feature, which does not apply to players."},
+        {"name": "Job", "tip": "Shows the player's job and subjob (example: WAR/NIN). NOTE: Only shows after you use /check on the player."},
         {"name": "Owner", "tip": "Shows the name of the pet's owner."},
-        {"name": "Title", "tip": "Shows the player's title. NOTE: Only shows after you use /check on the player. Unaffected by the Auto-Check feature, which does not apply to players."}
+        {"name": "Title", "tip": "Shows the player's title. NOTE: Only shows after you use /check on the player."}
       ]
     }
   ],
