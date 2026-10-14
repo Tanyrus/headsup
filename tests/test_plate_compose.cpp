@@ -213,43 +213,44 @@ TEST(a_dead_mobs_name_does_not_glow)
     CHECK_EQ(ComposePlate(player, kPlayer, glowing, kGame).lines[0].look.glow, 1.5f);
 }
 
-TEST(a_mob_your_party_has_claimed_can_lose_its_glow)
+TEST(a_line_can_lose_its_glow_while_you_are_in_combat_whatever_its_entity_does)
 {
     Settings s; // the default design's name glows at full strength; a second line glows here too
     s.Kind(PlateKind::Mobs).lines[1].glow = 50;
-    ActorInfo yours   = AggressiveMob();
-    yours.state.claim = ClaimState::Yours;
-    yours.state.row   = Category::PartyClaim;
-    const ComposedPlate fought = ComposePlate(yours, kPlayer, s, kGame);
+    PlayerState fighting = kPlayer;
+    fighting.inCombat    = true;
+    // A mob nobody has touched loses its glow while you fight another.
+    const ComposedPlate fought = ComposePlate(AggressiveMob(), fighting, s, kGame);
     CHECK_EQ(fought.lines.size(), size_t{3});
     CHECK_EQ(fought.lines[1].look.glow, 0.0f);
     CHECK_EQ(fought.lines[2].look.glow, 0.0f);
     CHECK_EQ(fought.lines[2].look.shadow, kShadowUnit); // the rest of its look stays
-    // Another party's mob, and one nobody has touched, keep theirs.
-    ActorInfo theirs   = AggressiveMob();
-    theirs.state.claim = ClaimState::Others;
-    theirs.state.row   = Category::OtherClaim;
-    CHECK_EQ(ComposePlate(theirs, kPlayer, s, kGame).lines[2].look.glow, 1.0f);
-    CHECK_EQ(ComposePlate(AggressiveMob(), kPlayer, s, kGame).lines[1].look.glow, 0.5f);
+    // Out of combat, even the mob your party has claimed keeps it.
+    ActorInfo yours   = AggressiveMob();
+    yours.state.claim = ClaimState::Yours;
+    yours.state.row   = Category::PartyClaim;
+    CHECK_EQ(ComposePlate(yours, kPlayer, s, kGame).lines[1].look.glow, 0.5f);
+    CHECK_EQ(ComposePlate(yours, kPlayer, s, kGame).lines[2].look.glow, 1.0f);
     // Each line has the switch for itself.
     s.Kind(PlateKind::Mobs).lines[1].glowOffInCombat = false;
-    const ComposedPlate kept = ComposePlate(yours, kPlayer, s, kGame);
+    const ComposedPlate kept = ComposePlate(AggressiveMob(), fighting, s, kGame);
     CHECK_EQ(kept.lines[1].look.glow, 0.5f);
     CHECK_EQ(kept.lines[2].look.glow, 0.0f);
     // A line that takes its style from another takes that line's switch with it.
     s.Kind(PlateKind::Mobs).lines[2].syncWith = 1;
-    CHECK_EQ(ComposePlate(yours, kPlayer, s, kGame).lines[2].look.glow, 0.5f);
-    // A player's line has it too, off by default: with it on, their name stops glowing while their weapon is out.
+    CHECK_EQ(ComposePlate(AggressiveMob(), fighting, s, kGame).lines[2].look.glow, 0.5f);
+    // A player's line has it too, off by default: with it on, a player's name stops glowing while you fight, though
+    // their own weapon is away.
     Settings glowing;
     LineDesign& name = glowing.Kind(PlateKind::Players).lines[2];
     name.glow        = 150;
-    ActorInfo fighter      = LinkshellPlayer();
-    fighter.state.engaged  = true;
-    CHECK_EQ(ComposePlate(fighter, kPlayer, glowing, kGame).lines[0].look.glow, 1.5f);
+    ActorInfo fighter     = LinkshellPlayer();
+    fighter.state.engaged = true;
+    CHECK_EQ(ComposePlate(fighter, fighting, glowing, kGame).lines[0].look.glow, 1.5f);
     name.glowOffInCombat = true;
-    CHECK_EQ(ComposePlate(fighter, kPlayer, glowing, kGame).lines[0].look.glow, 0.0f);
-    fighter.state.engaged = false;
     CHECK_EQ(ComposePlate(fighter, kPlayer, glowing, kGame).lines[0].look.glow, 1.5f);
+    fighter.state.engaged = false;
+    CHECK_EQ(ComposePlate(fighter, fighting, glowing, kGame).lines[0].look.glow, 0.0f);
 }
 
 TEST(the_ornament_needs_both_of_the_lines_it_sits_between)

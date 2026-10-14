@@ -1892,6 +1892,7 @@ private:
         // The status the server gave you says an event runs: your own stayed 0 through an NPC's dialog, a cutscene
         // and one begun at zone-in.
         m_Player.inEvent = headsup::IsEventStatus(entity->GetStatusServer(m_SelfIndex));
+        m_Player.inCombat = headsup::PlayerInCombat(inputs);
         m_Tracker.Update(inputs, m_Player, m_Settings, m_CursorTargets);
         if (headsup::MayAutoCheck(autoChecks, player->GetIsZoning() != 0, m_Player.inEvent, m_Player.level))
             if (const std::optional<headsup::CheckCandidate> mob = m_AutoCheck.Due(checkable, now))

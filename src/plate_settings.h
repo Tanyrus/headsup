@@ -155,7 +155,7 @@ namespace headsup
         int glow     = 0;
         int glowSize = 100;
         ColorPick glowColor{ColorSource::Aggression};
-        bool glowOffInCombat = false; // no glow while its entity fights: on for a mob's lines
+        bool glowOffInCombat = false; // no glow while you fight: on for a mob's lines
         bool operator==(const LineDesign&) const = default;
     };
 

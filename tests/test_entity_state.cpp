@@ -237,30 +237,6 @@ TEST(the_cursor_takes_its_picks_color_and_the_targeting_color_where_the_pick_has
     CHECK(std::ranges::find(offered, ColorSource::Target) != offered.end());
 }
 
-TEST(a_mob_is_in_combat_once_your_party_has_claimed_it_and_anyone_else_while_engaged)
-{
-    EntityState mob;
-    mob.kind = EntityKind::Mob;
-    CHECK(!InCombat(mob));
-    mob.claim = ClaimState::Others;
-    mob.engaged = true; // fighting someone, but not yours to fight
-    CHECK(!InCombat(mob));
-    mob.claim = ClaimState::Yours;
-    CHECK(InCombat(mob));
-    EntityState player;
-    player.kind = EntityKind::Player;
-    CHECK(!InCombat(player));
-    player.engaged = true;
-    CHECK(InCombat(player));
-    // A pet is a mob to the game, and fights as its owner does: with its weapon out.
-    EntityState pet = mob;
-    pet.pet     = true;
-    pet.engaged = false;
-    CHECK(!InCombat(pet));
-    pet.engaged = true;
-    CHECK(InCombat(pet));
-}
-
 TEST(a_rows_color_is_what_its_outline_pick_resolves_to)
 {
     Settings s;

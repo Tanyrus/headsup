@@ -30,6 +30,13 @@ namespace headsup
         return IsClaimed(claimStatus) && std::ranges::find(partyServerIds, claimStatus) != partyServerIds.end();
     }
 
+    bool PlayerInCombat(std::span<const ActorInput> actors)
+    {
+        return std::ranges::any_of(actors, [](const ActorInput& a) {
+            return (a.self && a.engaged) || (a.kind == EntityKind::Mob && !a.pet && a.alive && a.claimedByParty);
+        });
+    }
+
     void Tracker::Update(const std::vector<ActorInput>& actors, const PlayerState& player, const Settings& settings,
         const CursorTargets& targets)
     {

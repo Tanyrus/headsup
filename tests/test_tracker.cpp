@@ -412,6 +412,34 @@ TEST(squared_distance_becomes_yalms_and_keeps_nan)
     CHECK(std::isnan(DistanceFromSquared(std::nanf(""))));
 }
 
+TEST(you_are_in_combat_with_your_weapon_out_or_while_your_party_holds_a_living_mobs_claim)
+{
+    ActorInput self = Player(0x100);
+    self.self       = true;
+    ActorInput mob  = BountyHunter(0x200);
+    CHECK(!PlayerInCombat(std::vector{self, mob}));
+    self.engaged = true;
+    CHECK(PlayerInCombat(std::vector{self}));
+    // A mage never draws a weapon: the party's claim on a mob is the fight.
+    self.engaged       = false;
+    mob.claimed        = true;
+    mob.claimedByParty = true;
+    CHECK(PlayerInCombat(std::vector{self, mob}));
+    ActorInput dead = mob;
+    dead.alive      = false;
+    CHECK(!PlayerInCombat(std::vector{self, dead}));
+    ActorInput theirs     = mob;
+    theirs.claimedByParty = false;
+    CHECK(!PlayerInCombat(std::vector{self, theirs}));
+    // Someone else's weapon, or a pet's, is not yours.
+    ActorInput other = Player(0x300);
+    other.engaged    = true;
+    ActorInput pet   = BountyHunter(0x400);
+    pet.pet          = true;
+    pet.engaged      = true;
+    CHECK(!PlayerInCombat(std::vector{self, other, pet}));
+}
+
 TEST(a_claim_by_you_or_your_party_is_told_from_anyone_elses)
 {
     // A mob's claim is its claimer's whole server ID, and 0 while nobody holds it: 65001 while the test character

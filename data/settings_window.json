@@ -479,11 +479,7 @@
               {"key": "glow-strength", "name": "Glow Strength", "tip": "A strength of a colored glow behind and around the text on this line. If set to 0%, the glow is disabled."},
               {"key": "glow-size", "name": "Glow Size", "tip": "How far from the text the glow extends."},
               {"key": "glow-color", "name": "Glow Color", "tip": "The color of the glow."},
-              {
-                "key": "disable-glow-in-combat",
-                "name": "Disable Glow In Combat",
-                "tip": {"mobs": "No glow on this line once you or your party has claimed the mob.", "players": "No glow on this line while the player has their weapon out.", "self": "No glow on this line while you have your weapon out.", "npcs": "No glow on this line while the NPC is fighting.", "pets": "No glow on this line while the pet is fighting."}
-              }
+              {"key": "disable-glow-in-combat", "name": "Disable Glow In Combat", "tip": "No glow on this line while you are in combat: your weapon is out, or a mob is claimed by you or your party."}
             ],
             "words": [
               {"key": "do-not-sync", "name": "Do Not Sync", "tip": "Line style is not synced, meaning it has its own unique appearance."},

@@ -308,7 +308,6 @@ namespace headsup
         // An NPC has no life to lose, whatever its health reads.
         const bool dead     = !st.alive && st.kind != EntityKind::Npc;
         const bool deadMob  = dead && st.kind == EntityKind::Mob;
-        const bool fought   = InCombat(st);
         const bool nameOnly = deadMob || player.inEvent;
         const auto marked   = [dash = DashChar(s.dashMark)](std::string text) {
             std::ranges::replace(text, kDash, dash);
@@ -353,7 +352,7 @@ namespace headsup
             builder.Finish();
             if (builder.items.empty()) continue;
             plate.lines.push_back(ComposedLine{i, std::move(builder.items), LookOf(style, st, s, gameArgb)});
-            if (deadMob || (fought && style.glowOffInCombat)) plate.lines.back().look.glow = 0.0f;
+            if (deadMob || (player.inCombat && style.glowOffInCombat)) plate.lines.back().look.glow = 0.0f;
             if (dead) plate.lines.back().look.color = kDeadTextArgb;
         }
         plate.ornament      = kind.ornament.place;

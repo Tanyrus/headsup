@@ -59,9 +59,6 @@ namespace headsup
     TargetState TargetUnderPick(uint16_t index, const CursorTargets& targets);
     // A pick's color for this entity: a custom color, the game's name color, or the palette entry its state picks.
     uint32_t ResolveColor(const ColorPick& pick, const EntityState& state, const Palette& palette, uint32_t gameArgb);
-    // Fighting, for a line that drops its glow then: a mob once you or your party has claimed it, and anyone else,
-    // a pet too, while their weapon is out.
-    bool InCombat(const EntityState& state);
     // The cursor's color over an entity: the pick's, or the Targeting color where the pick reads what that kind of
     // entity has none of, as a player's aggression.
     uint32_t CursorColorOf(const ColorPick& pick, const EntityState& state, const Palette& palette);
