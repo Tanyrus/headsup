@@ -82,10 +82,16 @@ namespace headsup
     enum class ShowCondition : uint8_t
     {
         Targeted, Unclaimed, YourClaim, OthersClaim, Engaged, TooWeak, Aggressive, Passive, PartyMember, Friend, LinkshellMember,
-        OwnerIsYou
+        OwnerIsYou, Generally
     };
-    constexpr int kShowConditionCount = 12;
+    constexpr int kShowConditionCount = 13;
     constexpr uint32_t ConditionBit(ShowCondition c) { return 1u << static_cast<int>(c); }
+    // What Generally holds without. Every mob is unclaimed or claimed and aggressive or passive, so those are not.
+    constexpr bool IsSpecialState(ShowCondition c)
+    {
+        return c != ShowCondition::Unclaimed && c != ShowCondition::Aggressive && c != ShowCondition::Passive &&
+               c != ShowCondition::Generally;
+    }
     struct LineShow
     {
         bool always   = true;

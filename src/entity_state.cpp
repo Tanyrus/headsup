@@ -207,6 +207,8 @@ namespace headsup
             case ShowCondition::Friend: return player && s.playerRow == PlayerRow::Friend;
             case ShowCondition::LinkshellMember: return player && s.playerRow == PlayerRow::LinkshellMember;
             case ShowCondition::OwnerIsYou: return s.pet && s.petRow == PetRow::Yours;
+            case ShowCondition::Generally:
+                return std::ranges::none_of(ConditionsFor(PlateKindOf(s)), [&](ShowCondition c) { return IsSpecialState(c) && Holds(c, s); });
             }
             return false;
         }

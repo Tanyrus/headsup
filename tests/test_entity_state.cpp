@@ -204,6 +204,56 @@ TEST(each_condition_holds_for_its_state_alone)
     CHECK(!holds(ShowCondition::PartyMember, yours)); // a mob is never a party member
 }
 
+TEST(generally_holds_while_the_entity_is_in_none_of_its_kinds_special_states)
+{
+    const LineShow generally{false, ConditionBit(ShowCondition::Generally)};
+    const LineShow orTargeted{false, ConditionBit(ShowCondition::Generally) | ConditionBit(ShowCondition::Targeted)};
+    // The user's example, a mob line with Generally and Targeted.
+    const EntityState mob = Mob(Nature::Aggressive);
+    EntityState target    = mob;
+    target.target         = TargetState::Targeted;
+    EntityState weak      = mob;
+    weak.tooWeak          = true;
+    CHECK(LineShows(orTargeted, mob));
+    CHECK(LineShows(orTargeted, target));
+    CHECK(!LineShows(orTargeted, Mob(Nature::Aggressive, ClaimState::Others)));
+    CHECK(!LineShows(orTargeted, weak));
+    CHECK(!LineShows(generally, target));
+    CHECK(!LineShows(generally, Mob(Nature::Passive, ClaimState::Yours)));
+    EntityState fighting = Mob(Nature::Passive);
+    fighting.engaged     = true;
+    CHECK(!LineShows(generally, fighting));
+    // Every mob is unclaimed or claimed and aggressive or passive: those say nothing against it.
+    CHECK(LineShows(generally, Mob(Nature::Passive)));
+    CHECK(LineShows(generally, Placeholder(Category::WillAttack)));
+    EntityState player;
+    player.kind  = EntityKind::Player;
+    player.alive = true;
+    CHECK(LineShows(generally, player));
+    for (const PlayerRow row : {PlayerRow::PartyMember, PlayerRow::Friend, PlayerRow::LinkshellMember})
+    {
+        player.playerRow = row;
+        CHECK(!LineShows(generally, player));
+    }
+    EntityState self = player;
+    self.self        = true;
+    self.playerRow   = PlayerRow::Player;
+    CHECK(LineShows(generally, self));
+    self.engaged = true;
+    CHECK(!LineShows(generally, self));
+    EntityState pet = Mob(Nature::Passive);
+    pet.pet         = true;
+    pet.petRow      = PetRow::Party;
+    CHECK(LineShows(generally, pet));
+    pet.petRow = PetRow::Yours;
+    CHECK(!LineShows(generally, pet));
+    EntityState npc;
+    npc.kind = EntityKind::Npc;
+    CHECK(LineShows(generally, npc));
+    npc.target = TargetState::Targeted;
+    CHECK(!LineShows(generally, npc));
+}
+
 TEST(the_cursor_takes_its_picks_color_and_the_targeting_color_where_the_pick_has_nothing_to_read)
 {
     Settings s;

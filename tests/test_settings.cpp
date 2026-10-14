@@ -2249,6 +2249,14 @@ TEST(a_lines_conditions_are_the_ones_its_kind_offers)
     CHECK(c.Kind(PlateKind::Pets).lines[1].show == (LineShow{false, ConditionBit(ShowCondition::Targeted)}));
     CHECK(c.Kind(PlateKind::Players).lines[2].show == (LineShow{false, ConditionBit(ShowCondition::Friend)}));
     CHECK(c.Kind(PlateKind::Mobs).lines[2].show == (LineShow{false, ConditionBit(ShowCondition::Passive)}));
+    // Every kind's lines offer Generally, and it is saved with the rest.
+    for (int kind = 0; kind < kPlateKindCount; ++kind)
+        s.Kind(static_cast<PlateKind>(kind)).lines[0].show = LineShow{false, ConditionBit(ShowCondition::Generally)};
+    MapStore store;
+    SaveSettings(Clamp(s), store);
+    const Settings loaded = LoadSettings(store);
+    for (int kind = 0; kind < kPlateKindCount; ++kind)
+        CHECK(loaded.Kind(static_cast<PlateKind>(kind)).lines[0].show == (LineShow{false, ConditionBit(ShowCondition::Generally)}));
 }
 
 TEST(a_font_name_of_31_characters_is_kept_and_one_of_32_refused)

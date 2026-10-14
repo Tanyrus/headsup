@@ -653,7 +653,8 @@
         {"name": "Party Member", "tip": "Visible when the entity is a party member."},
         {"name": "Friend", "tip": "Visible when the entity is a friend."},
         {"name": "Linkshell Member", "tip": "Visible when the entity is a member of your linkshell."},
-        {"name": "You Are Owner", "tip": "Visible even if the owner of the pet is you."}
+        {"name": "You Are Owner", "tip": "Visible even if the owner of the pet is you."},
+        {"name": "Generally", "tip": "Visible generally, when other conditions below do not apply."}
       ]
     },
     {

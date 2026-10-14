@@ -109,13 +109,15 @@ namespace headsup
         switch (kind)
         {
         case PlateKind::Mobs:
-            return {ShowCondition::Targeted, ShowCondition::Unclaimed, ShowCondition::YourClaim, ShowCondition::OthersClaim,
-                ShowCondition::Engaged, ShowCondition::TooWeak, ShowCondition::Aggressive, ShowCondition::Passive};
+            return {ShowCondition::Generally, ShowCondition::Targeted, ShowCondition::Unclaimed, ShowCondition::YourClaim,
+                ShowCondition::OthersClaim, ShowCondition::Engaged, ShowCondition::TooWeak, ShowCondition::Aggressive,
+                ShowCondition::Passive};
         case PlateKind::Players:
-            return {ShowCondition::Targeted, ShowCondition::PartyMember, ShowCondition::Friend, ShowCondition::LinkshellMember};
-        case PlateKind::Self: return {ShowCondition::Targeted, ShowCondition::Engaged};
-        case PlateKind::Pets: return {ShowCondition::Targeted, ShowCondition::OwnerIsYou};
-        default: return {ShowCondition::Targeted};
+            return {ShowCondition::Generally, ShowCondition::Targeted, ShowCondition::PartyMember, ShowCondition::Friend,
+                ShowCondition::LinkshellMember};
+        case PlateKind::Self: return {ShowCondition::Generally, ShowCondition::Targeted, ShowCondition::Engaged};
+        case PlateKind::Pets: return {ShowCondition::Generally, ShowCondition::Targeted, ShowCondition::OwnerIsYou};
+        default: return {ShowCondition::Generally, ShowCondition::Targeted};
         }
     }
 
