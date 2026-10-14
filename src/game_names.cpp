@@ -31,20 +31,12 @@ namespace headsup
         if (m_TextFinished) return;
         m_TextFinished  = true;
         m_MeshDrawsLast = m_MeshDraws;
-        for (const auto& [index, draws] : m_MeshDraws)
-            m_LastMeshFrame[index] = m_Frame;
     }
 
     uint32_t GameNames::MeshDraws(uint16_t index) const
     {
         const auto it = m_MeshDrawsLast.find(index);
         return it == m_MeshDrawsLast.end() ? 0 : it->second;
-    }
-
-    uint32_t GameNames::FramesSinceMesh(uint16_t index) const
-    {
-        const auto it = m_LastMeshFrame.find(index);
-        return it == m_LastMeshFrame.end() ? UINT32_MAX : m_Frame - it->second;
     }
 
     void GameNames::ReadBackBufferSize()

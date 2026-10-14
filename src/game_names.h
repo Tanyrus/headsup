@@ -52,7 +52,6 @@ namespace headsup
         }
 
         uint32_t MeshDraws(uint16_t index) const;
-        uint32_t FramesSinceMesh(uint16_t index) const;
 
     private:
         struct TargetScale
@@ -73,7 +72,6 @@ namespace headsup
 
         std::unordered_map<uint16_t, uint32_t> m_MeshDraws;
         std::unordered_map<uint16_t, uint32_t> m_MeshDrawsLast;
-        std::unordered_map<uint16_t, uint32_t> m_LastMeshFrame;
         uint32_t m_Frame      = 0;
         bool m_TextFinished   = false;
         bool m_NamesThisFrame = false;

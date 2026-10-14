@@ -123,7 +123,7 @@ namespace headsup
         bool screenshotHidesGame = true; // screenshot mode takes the game's own windows and chat too
         // The game's windows moved out from under Game help's bar, by short name (native_locate.h's ShortName).
         std::vector<std::string> movedWindows = DefaultMovedWindows();
-        bool phTimers          = false; // above your name, a respawn timer for each placeholder you see die
+        bool phTimers          = false; // above your name, a respawn timer for each placeholder or NM that dies near you
         bool scaleWithDistance = true;  // sizes follow how far a name's owner is from you
         bool scaleOwnName      = true;  // your own plate too
         bool scaleCursor       = false; // the target cursor's size follows the distance too, apart from the names
