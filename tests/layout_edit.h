@@ -16,7 +16,8 @@ namespace test
     class EditedLayout
     {
     public:
-        explicit EditedLayout(const headsup::WindowLayout& from = headsup::kWindowLayout) : m_From(from)
+        explicit EditedLayout(const headsup::WindowLayout& from = headsup::kWindowLayout)
+            : m_From(from), m_Rows(from.rows.begin(), from.rows.end())
         {
             const headsup::LayoutPage& mobs = from.PageOf(headsup::Page::Mobs);
             for (const headsup::LayoutCard& card : from.CardsOf(mobs))
@@ -66,6 +67,18 @@ namespace test
             });
         }
         void SetKinds(std::string_view card, uint8_t kinds) { CardNamed(card).card.kinds = kinds; }
+        // Two of a setting's rows trade places, by their places among its rows.
+        void SwapRows(std::string_view setting, size_t a, size_t b)
+        {
+            const headsup::LayoutSetting* found = nullptr;
+            ForEachCard([&](Card& card) {
+                for (const headsup::LayoutSetting& s : card.settings)
+                    if (setting == s.key) found = &s;
+            });
+            if (found == nullptr) throw Failure{"the layout has no setting " + std::string(setting)};
+            const auto first = static_cast<size_t>(found->firstRow);
+            std::swap(m_Rows[first + a], m_Rows[first + b]);
+        }
 
         headsup::WindowLayout Layout()
         {
@@ -92,8 +105,8 @@ namespace test
                 m_FlatPages.push_back(page.page);
                 m_FlatPages.back().firstCard = first;
             }
-            return headsup::WindowLayout{m_FlatPages, m_FlatCards, m_FlatSettings, m_From.rows, m_From.options,
-                m_From.lists, m_From.words};
+            return headsup::WindowLayout{m_FlatPages, m_FlatCards, m_FlatSettings, m_Rows, m_From.options, m_From.lists,
+                m_From.words};
         }
 
     private:
@@ -157,6 +170,7 @@ namespace test
         const char* Kept(std::string text) { return m_Names.emplace_back(std::move(text)).c_str(); }
 
         headsup::WindowLayout m_From;
+        std::vector<headsup::LayoutRow> m_Rows;
         std::vector<Card> m_Entity;
         std::vector<Page> m_Pages;
         std::vector<headsup::LayoutPage> m_FlatPages;

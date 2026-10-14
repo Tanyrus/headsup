@@ -1,7 +1,6 @@
 #pragma once
 
 #include "generated/window_pieces.h"
-#include "menu_state.h"
 #include "plate_settings.h"
 
 #include <cstdint>
@@ -11,6 +10,24 @@
 
 namespace headsup
 {
+    // The settings window's pages; the layout gives their order, names and keys.
+    enum class Page : int
+    {
+        Entities,
+        Mobs,
+        Players,
+        Self,
+        Npcs,
+        Pets,
+        UserInterface,
+        TopPanel,
+        Widgets,
+        MouseCursor,
+        ConfigMenu,
+        Debug,
+    };
+    constexpr int kPageCount = static_cast<int>(Page::Debug) + 1;
+
     // A kind as a bit of a kinds mask: which of the entity pages a card, a setting or a row is drawn on.
     constexpr uint8_t KindBit(PlateKind kind) { return static_cast<uint8_t>(1u << static_cast<int>(kind)); }
     constexpr uint8_t kEveryKind = (1u << kPlateKindCount) - 1;
@@ -98,6 +115,9 @@ namespace headsup
         const LayoutWord& WordOf(WindowWord word) const;
     };
     extern const WindowLayout kWindowLayout;
+
+    // A word of the layout as text: a tip the file leaves out is none.
+    inline std::string_view Said(const char* text) { return text != nullptr ? std::string_view(text) : std::string_view(); }
 
     // An entry's words on a kind's page: the kind's own where it has words by kind, the shared ones otherwise.
     const char* NameOf(const LayoutSetting& setting, std::optional<PlateKind> kind);

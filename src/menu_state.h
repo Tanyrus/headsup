@@ -5,6 +5,7 @@
 #include "plate_settings.h"
 #include "plate_template.h"
 #include "settings.h"
+#include "window_layout.h"
 
 #include <cstdint>
 #include <optional>
@@ -19,34 +20,13 @@ namespace headsup
     // a slider being dragged writes no file, or the window is closed, where nothing more can come.
     bool SaveDue(std::optional<double> changedAt, double now, bool windowOpen);
 
-    enum class Page : int
-    {
-        Entities,
-        Mobs,
-        Players,
-        Self,
-        Npcs,
-        Pets,
-        UserInterface,
-        TopPanel,
-        Widgets,
-        MouseCursor,
-        ConfigMenu,
-        Debug,
-    };
-    constexpr int kPageCount = static_cast<int>(Page::Debug) + 1;
-    struct PageInfo
-    {
-        Page page;
-        const char* label;
-        bool child; // indented under the major page before it
-    };
-    extern const PageInfo kPages[kPageCount]; // in sidebar order
-
-    // The label in lower case without spaces: how /hu menu names a page.
-    std::string PageKey(Page page);
-    std::optional<Page> PageNamed(std::string_view key);
     std::optional<PlateKind> KindOfPage(Page page);
+
+    // In a word of the window's file, where the code puts what it stands for: a line's name, a count, the yalms a
+    // fade starts at.
+    constexpr std::string_view kLineMark = "{line}", kCountMark = "{count}", kNearMark = "{near}";
+    // The text with every mark in it replaced by what it stands for.
+    std::string Filled(std::string_view text, std::string_view mark, std::string_view with);
 
     // A label with each word capitalized after a space or a hyphen ("Sub-Target"), but for the small words inside it
     // ("Hide Level and Icons"); letters already capital stay.
@@ -61,12 +41,11 @@ namespace headsup
     constexpr int kClockZoneChoices = kClockZoneCount + 1;
     int ClockZoneChoice(const std::optional<ClockZone>& zone);
     std::optional<ClockZone> ClockZoneOfChoice(int choice);
-    std::string ClockZoneChoiceName(int choice);
+    std::string ClockZoneChoiceName(int choice, const WindowLayout& layout);
 
-    constexpr const char* kShowAlways = "Always";
     // What the Show dropdown reads when closed: Always, the one condition checked, how many are, or Never. Only the
     // conditions the kind is offered count.
-    std::string ShowSummary(const LineShow& show, const std::vector<ShowCondition>& offered);
+    std::string ShowSummary(const LineShow& show, const std::vector<ShowCondition>& offered, const WindowLayout& layout);
     // A click on a row of the Line Visibility list: 0 is Always, then the conditions offered. Unchecking one under
     // Always turns Always off and leaves the others checked. False for no such row.
     bool ToggleCondition(LineShow& show, const std::vector<ShowCondition>& offered, int row);
@@ -115,8 +94,8 @@ namespace headsup
     // the syncWith an entry stands for, and the entry's words.
     int SyncEntry(const std::vector<int>& targets, int syncWith);
     int SyncOfEntry(const std::vector<int>& targets, int entry);
-    std::string SyncEntryLabel(const std::vector<int>& targets, int entry);
-    std::string SyncEntryTip(const std::vector<int>& targets, int entry);
+    std::string SyncEntryLabel(const std::vector<int>& targets, int entry, const WindowLayout& layout);
+    std::string SyncEntryTip(const std::vector<int>& targets, int entry, const WindowLayout& layout);
 
     // One entry of the Cursor Style list: one of HeadsUp's own styles, or a file of the cursors folder.
     struct CursorChoice

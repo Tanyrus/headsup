@@ -24,6 +24,7 @@ namespace headsup
         std::string textFont;                 // the family its text is set in, one RmlUi has
         std::vector<std::string> menuFonts;   // the fonts it can be set in, by their kMenuFonts names
         std::function<bool(uint8_t)> keyDown; // whether a key is down now, by its virtual-key code
+        const WindowLayout* layout = &kWindowLayout; // its pages, cards and settings, in order, with their words
     };
 
     // The /headsup settings window as an RmlUi document in the host's overlay. While it is open, each frame runs
@@ -56,6 +57,7 @@ namespace headsup
         std::optional<Rml::Vector2f> CenterOf(const std::string& id, bool scroll = true);
 
     private:
+        const WindowLayout* m_Layout = &kWindowLayout; // the host's, from its last update
         struct Card
         {
             std::string id, rml;

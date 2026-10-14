@@ -206,17 +206,14 @@ namespace headsup
 
     int RowCountOf(PlateKind kind);                // 9, 4, 1, 1, 4
     const char* RowKey(PlateKind kind, int row);   // "aggressive", "partyMember", "self", ...: settings keys
-    const char* RowLabel(PlateKind kind, int row); // "Aggressive", "Party Member", "Self", ...: the menu
     const char* KindKey(PlateKind kind);           // "mobs", "players", "self", "npcs", "pets"
     // The conditions a kind's lines may be shown by, in the menu's order.
     std::vector<ShowCondition> ConditionsFor(PlateKind kind);
-    const char* ConditionLabel(ShowCondition c);
     // The color sources a kind's picks offer, in the menu's order: text is true for a text color, which may take the
     // game's own, last.
     std::vector<ColorSource> SourcesFor(PlateKind kind, bool text);
     // What the target cursor's color and its edge's may follow: every palette, since it sits on anything.
     std::vector<ColorSource> CursorSources();
-    const char* SourceLabel(ColorSource s);
 
     enum class HookAction : uint8_t { Keep, Hide, Replace }; // the game draws the name; nothing draws it; HeadsUp draws
     enum class DetectionIcon : uint8_t { Aggro, Link, Sight, TrueSight, Sound, Scent, Magic, Ability, Blood };
@@ -225,23 +222,6 @@ namespace headsup
     // What a new install shows: all but the aggression icon, which the outline's color already tells.
     constexpr uint32_t kDefaultDetection = kAllDetection & ~(1u << static_cast<int>(DetectionIcon::Aggro));
     constexpr uint32_t DetectionBit(DetectionIcon d) { return 1u << static_cast<int>(d); }
-    const char* DetectionLabel(DetectionIcon d);
-
-    // The menu's words, each as a row shows it: Title Case, as TitleCaseText gives it.
-    const char* PlateModeLabel(PlateMode mode);
-    const char* OutlineModeLabel(OutlineMode mode);
-    const char* NatureLabel(Nature nature);
-    const char* ToughnessLabel(LabelShade shade);
-    const char* ClaimLabel(ClaimState claim);
-    const char* TargetStateLabel(TargetState target);
-    const char* TargetTypeLabel(TargetType type);
-    // When a target state applies, for the ones whose name does not say; nullptr for the rest.
-    const char* TargetStateTip(TargetState target);
-    const char* StatusRankLabel(StatusRank status);
-    extern const char* const kAlignLabels[kAlignCount];
-    extern const char* const kFontStyleLabels[kFontStyleCount]; // by bit, the lowest first
-    extern const char* const kOrnamentPlaceLabels[kOrnamentPlaceCount];
-    extern const char* const kLineLabels[kPlateLines]; // a line's box and its style tab
 
     // How many of the outline modes a row's dropdown offers, from the first: all but ByNature where it cannot be.
     int OutlineModesFor(PlateKind kind, int row);

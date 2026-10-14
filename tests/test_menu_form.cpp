@@ -1,7 +1,10 @@
+#include "layout_edit.h"
 #include "menu_form.h"
+#include "settings.h"
 #include "test.h"
 
 #include <algorithm>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -17,14 +20,42 @@ namespace
         MenuReadings readings;
         MenuFormState state;
         std::vector<std::string> fonts = {"Arial", "Barlow Condensed"}, menuFonts = {"Segoe UI", "Barlow Condensed"};
+        WindowLayout layout = kWindowLayout;
 
         Form Pass(std::vector<FormEvent> events = {})
         {
             Form form(std::move(events), state.form);
-            BuildMenu(form, settings, readings, state, fonts, menuFonts);
+            BuildMenu(form, settings, readings, state, fonts, menuFonts, layout);
             return form;
         }
     };
+
+    // The keys a save writes, with their values.
+    class SavedKeys final : public SettingsStore
+    {
+    public:
+        std::map<std::string, std::string> values;
+        bool GetBool(const char*, bool fallback) override { return fallback; }
+        float GetFloat(const char*, float fallback) override { return fallback; }
+        std::string GetString(const char*, const char* fallback) override { return fallback; }
+        void Set(const char* key, const char* value) override { values[key] = value; }
+    };
+    // The saved keys whose values differ between two settings.
+    std::vector<std::string> KeysChanged(const Settings& before, const Settings& after)
+    {
+        SavedKeys a, b;
+        SaveSettings(before, a);
+        SaveSettings(after, b);
+        std::vector<std::string> changed;
+        for (const auto& [key, value] : b.values)
+            if (a.values[key] != value) changed.push_back(key);
+        return changed;
+    }
+    // Where the first of these ids is in a block's markup, past the end when it is not.
+    size_t At(const FormBlock* block, const std::string& id)
+    {
+        return block != nullptr ? block->rml.find("id=\"" + id + "\"") : std::string::npos;
+    }
 
     const FormBlock* Block(const Form& form, const char* id)
     {
@@ -62,7 +93,7 @@ TEST(a_click_in_the_sidebar_opens_that_page_at_its_top)
 TEST(every_page_builds_its_cards_with_ids_of_their_own)
 {
     Window w;
-    for (const PageInfo& info : kPages)
+    for (const LayoutPage& info : kWindowLayout.pages)
     {
         w.state.page    = info.page;
         const Form form = w.Pass();
@@ -272,7 +303,7 @@ TEST(every_kind_has_a_nameplate_opacity_card_and_yours_none_of_its_fading)
     for (const Page page : {Page::Mobs, Page::Players, Page::Npcs, Page::Pets, Page::Self})
     {
         w.state.page = page;
-        const std::string card = std::string(PageKey(page)) + "-nameplate-opacity";
+        const std::string card = std::string(kWindowLayout.PageOf(page).key) + "-nameplate-opacity";
         const Form form        = w.Pass();
         const FormBlock* block = Block(form, card.c_str());
         CHECK(block != nullptr);
@@ -296,7 +327,7 @@ TEST(the_pages_of_the_kinds_with_status_icons_set_how_many_a_nameplate_shows)
     for (const Page page : {Page::Players, Page::Self})
     {
         w.state.page           = page;
-        const std::string list = std::string(PageKey(page)) + "-nameplate-design-max-icons-shown";
+        const std::string list = std::string(kWindowLayout.PageOf(page).key) + "-nameplate-design-max-icons-shown";
         CHECK(w.Pass({{list, kClickEvent, ""}}).popup);
         CHECK(w.Pass({{list + "-o-2", kClickEvent, ""}}).changed); // the list starts at one icon
         CHECK_EQ(w.settings.Kind(*KindOfPage(page)).maxIcons, 3);
@@ -305,7 +336,7 @@ TEST(the_pages_of_the_kinds_with_status_icons_set_how_many_a_nameplate_shows)
     for (const Page page : {Page::Mobs, Page::Npcs, Page::Pets})
     {
         w.state.page          = page;
-        const std::string card = std::string(PageKey(page)) + "-nameplate-design";
+        const std::string card = std::string(kWindowLayout.PageOf(page).key) + "-nameplate-design";
         const Form form        = w.Pass();
         CHECK(!Has(Block(form, card.c_str())->rml, "max-icons-shown"));
     }
@@ -326,13 +357,13 @@ TEST(a_lines_glow_can_be_switched_off_for_combat_once_it_has_a_glow)
 TEST(a_color_off_its_default_has_an_arrow_that_puts_it_back)
 {
     Window w;
-    const char* arrow = "entities-colors-claim-status-claimed-yours-colors-claim-status-reset";
+    const char* arrow = "entities-colors-claim-status-claimed-yours-claim-colors-reset";
     const Color original = w.settings.palette.claim[static_cast<int>(ClaimState::Yours)];
     CHECK(ClassOn(w.Pass(), arrow, "hidden")); // nothing to put back
     w.settings.palette.claim[static_cast<int>(ClaimState::Yours)] = Color{{0.1f, 0.2f, 0.3f}};
     const Form moved = w.Pass();
     CHECK(!ClassOn(moved, arrow, "hidden"));
-    CHECK(ClassOn(moved, "entities-colors-claim-status-unclaimed-colors-claim-status-reset", "hidden")); // each color its own
+    CHECK(ClassOn(moved, "entities-colors-claim-status-unclaimed-claim-colors-reset", "hidden")); // each color its own
     const Form back = w.Pass({{arrow, kClickEvent, ""}});
     CHECK(back.changed && w.settings.palette.claim[static_cast<int>(ClaimState::Yours)] == original);
     CHECK(ClassOn(back, arrow, "hidden"));
@@ -352,4 +383,106 @@ TEST(the_dash_mark_is_picked_from_a_list_whose_first_row_is_none)
     CHECK(ClassOn(open, "entities-nameplates-replace-dashes-o-3", "picked")); // the diamond, a new install's
     CHECK(w.Pass({{"entities-nameplates-replace-dashes-o-0", kClickEvent, ""}}).changed);
     CHECK(w.settings.dashMark == DashMark::None);
+}
+
+TEST(a_page_moved_in_the_layout_moves_in_the_sidebar_and_opens_by_its_key)
+{
+    test::EditedLayout edited;
+    edited.MovePage("debug", 0);
+    Window w;
+    w.layout              = edited.Layout();
+    const Form form       = w.Pass();
+    const FormBlock& side = form.blocks.front();
+    CHECK(At(&side, "nav-debug") < At(&side, "nav-entities"));
+    w.Pass({{"nav-debug", kClickEvent, ""}});
+    CHECK(w.state.page == Page::Debug);
+    CHECK(w.layout.PageNamed("debug") == Page::Debug);
+}
+
+TEST(renaming_a_page_a_card_and_a_setting_changes_no_control_id)
+{
+    test::EditedLayout edited;
+    edited.RenamePage("mousecursor", "Pointer");
+    edited.RenameCard("mouse-pointer", "Mouse");
+    edited.RenameSetting("chocobo", "a bird of the pointer"); // shown as written, small letters and all
+    Window w;
+    w.layout     = edited.Layout();
+    w.state.page = Page::MouseCursor;
+    const Form form = w.Pass({{"mousecursor-mouse-pointer-chocobo", kClickEvent, ""}});
+    CHECK(form.changed && w.settings.chocoboPointer);
+    const FormBlock* card = Block(form, "mousecursor-mouse-pointer");
+    CHECK(card != nullptr && Has(card->rml, ">Mouse<") && Has(card->rml, ">a bird of the pointer<"));
+    CHECK(Has(form.blocks.front().rml, ">Pointer<"));
+}
+
+TEST(a_setting_moved_to_another_card_works_there_and_sets_only_its_own_key)
+{
+    test::EditedLayout edited;
+    edited.MoveSetting("chocobo", "settings-window", 0);
+    Window w;
+    w.layout              = edited.Layout();
+    w.state.page          = Page::ConfigMenu;
+    const Settings before = w.settings;
+    const Form form       = w.Pass({{"configmenu-settings-window-chocobo", kClickEvent, ""}});
+    CHECK(form.changed && w.settings.chocoboPointer);
+    CHECK_EQ(KeysChanged(before, w.settings).size(), size_t{1});
+    // It comes first in its new card, and is gone from its old one.
+    const FormBlock* card = Block(form, "configmenu-settings-window");
+    CHECK(At(card, "configmenu-settings-window-chocobo") < At(card, "configmenu-settings-window-window-theme"));
+    w.state.page = Page::MouseCursor;
+    CHECK(At(Block(w.Pass(), "mousecursor-mouse-pointer"), "mousecursor-mouse-pointer-chocobo") == std::string::npos);
+}
+
+TEST(a_setting_moved_to_another_page_hides_as_it_would_at_home)
+{
+    test::EditedLayout edited;
+    edited.MoveSetting("min-size", "this-frame", 0);
+    Window w;
+    w.layout                     = edited.Layout();
+    w.state.page                 = Page::Debug;
+    w.settings.scaleWithDistance = false;
+    CHECK(ClassOn(w.Pass(), "debug-this-frame-min-size-label-row", kOffClass));
+    w.settings.scaleWithDistance = true;
+    const Form form = w.Pass({{"debug-this-frame-min-size", kChangeEvent, "77"}});
+    CHECK(!ClassOn(form, "debug-this-frame-min-size-label-row", kOffClass));
+    CHECK(form.changed && w.settings.scaleMin == 77);
+}
+
+TEST(a_card_moved_to_another_page_shows_there_with_its_settings)
+{
+    test::EditedLayout edited;
+    edited.MoveCard("mouse-pointer", "debug", 0);
+    Window w;
+    w.layout     = edited.Layout();
+    w.state.page = Page::Debug;
+    const Form form = w.Pass({{"debug-mouse-pointer-chocobo", kClickEvent, ""}});
+    CHECK(form.blocks.size() > 1 && form.blocks[1].id == "debug-mouse-pointer");
+    CHECK(form.changed && w.settings.chocoboPointer);
+}
+
+TEST(the_visibility_rows_come_in_the_layouts_order)
+{
+    test::EditedLayout edited;
+    edited.SwapRows("visibility", 0, 1);
+    Window w;
+    w.state.page             = Page::Mobs;
+    const auto order = [&](const Form& form) {
+        const FormBlock* card = Block(form, "mobs-visibility");
+        return At(card, "mobs-visibility-aggressive-label") < At(card, "mobs-visibility-passive-label");
+    };
+    CHECK(order(w.Pass()));
+    w.layout = edited.Layout();
+    CHECK(!order(w.Pass()));
+}
+
+TEST(a_card_kept_to_some_kinds_shows_on_their_pages_alone)
+{
+    test::EditedLayout edited;
+    edited.SetKinds("placeholder-timers", KindBit(PlateKind::Mobs));
+    Window w;
+    w.layout     = edited.Layout();
+    w.state.page = Page::Mobs;
+    CHECK(Block(w.Pass(), "mobs-placeholder-timers") != nullptr);
+    w.state.page = Page::Self;
+    CHECK(Block(w.Pass(), "self-placeholder-timers") == nullptr);
 }
