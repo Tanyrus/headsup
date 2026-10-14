@@ -104,7 +104,8 @@
                 {"key": "decent-challenge", "name": "Decent Challenge"},
                 {"key": "even-match", "name": "Even Match"},
                 {"key": "tough", "name": "Tough"},
-                {"key": "very-tough", "name": "Very Tough"}
+                {"key": "very-tough", "name": "Very Tough"},
+                {"key": "incredibly-tough", "name": "Incredibly Tough"}
               ]
             }
           ]

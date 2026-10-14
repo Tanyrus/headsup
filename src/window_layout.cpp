@@ -66,6 +66,8 @@ namespace headsup
     static_assert(OptionCount(SettingPiece::OneLine) == kSubtitlePlaceCount, "settings_window.json: one-line");
     static_assert(RowCount(SettingPiece::AggressionColors) == kNatureCount, "settings_window.json: aggression-colors");
     static_assert(RowCount(SettingPiece::ToughnessColors) == kLabelShadeCount, "settings_window.json: toughness-colors");
+    static_assert(static_cast<int>(ToughnessColorsRow::IncrediblyTough) == static_cast<int>(LabelShade::IncrediblyTough),
+        "gen_window.py: toughness-colors rows in LabelShade's order");
     static_assert(RowCount(SettingPiece::ClaimColors) == kClaimStateCount, "settings_window.json: claim-colors");
     static_assert(RowCount(SettingPiece::TargetingColors) == kTargetStateCount, "settings_window.json: targeting-colors");
     static_assert(RowCount(SettingPiece::EntityTypeColors) == kTargetTypeCount, "settings_window.json: entity-type-colors");

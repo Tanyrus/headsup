@@ -61,13 +61,16 @@ TEST(unknown_levels_show_question_marks)
     CHECK(MakeLabel(nullptr, nullptr, 20).shade == LabelShade::Unknown);
 }
 
-TEST(the_rarer_cons_share_a_neighbors_color)
+TEST(incredibly_easy_prey_shares_easy_preys_color_and_every_other_con_has_its_own)
 {
-    // The menu has a color per shade: these two cons take their neighbor's, every other con has its own.
     CHECK(ShadeFor(Con::IncrediblyEasyPrey) == LabelShade::EasyPrey);
-    CHECK(ShadeFor(Con::IncrediblyTough) == LabelShade::VeryTough);
+    CHECK(ShadeFor(Con::IncrediblyTough) == LabelShade::IncrediblyTough);
+    CHECK(ShadeFor(Con::VeryTough) == LabelShade::VeryTough);
     CHECK(ShadeFor(Con::DecentChallenge) == LabelShade::DecentChallenge);
     CHECK(ShadeFor(static_cast<Con>(kConCount)) == LabelShade::Unknown);
+    // A range is shaded by its harder end: a level 20 player meets a 37 as Very Tough and a 45 as Incredibly Tough.
+    const MobRecord m = Mob(37, 45);
+    CHECK(MakeLabel(&m, nullptr, 20).shade == LabelShade::IncrediblyTough);
 }
 
 TEST(unknown_player_level_shows_levels_without_a_con)

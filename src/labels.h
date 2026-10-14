@@ -16,9 +16,10 @@ namespace headsup
         DecentChallenge,
         EvenMatch,
         Tough,
-        VeryTough, // and Incredibly Tough
+        VeryTough,
+        IncrediblyTough,
     };
-    constexpr int kLabelShadeCount = static_cast<int>(LabelShade::VeryTough) + 1;
+    constexpr int kLabelShadeCount = static_cast<int>(LabelShade::IncrediblyTough) + 1;
 
     constexpr const char* kPlaceholderMark = "[PH]";
 

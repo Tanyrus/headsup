@@ -182,7 +182,7 @@ namespace headsup
         constexpr const char* kWeakRankSuffix     = "WeakRank";
         constexpr const char* kResistRankSuffix   = "ResistRank";
         const char* const kLabelShadeKeys[kLabelShadeCount] = {"labelUnknown", "labelTooWeak", "labelEasyPrey",
-            "labelDecentChallenge", "labelEvenMatch", "labelTough", "labelVeryTough"};
+            "labelDecentChallenge", "labelEvenMatch", "labelTough", "labelVeryTough", "labelIncrediblyTough"};
 
         const char* const kPlateModeNames[kPlateModeCount]       = {"hidden", "shown", "whenTargeted", "vanilla"};
         // A mode that is gone: its name alone, and the whole nameplate for a target. Such a row is Shown.
@@ -607,6 +607,7 @@ namespace headsup
                 {{1.00f, 1.00f, 1.00f}}, // Even Match
                 {{1.00f, 1.00f, 0.35f}}, // Tough
                 {{1.00f, 0.35f, 0.35f}}, // Very Tough
+                {{0.72f, 0.08f, 0.08f}}, // Incredibly Tough
             };
             Color textOutline = {{0.00f, 0.00f, 0.00f}};
             // By Category, the eight such a file knew: whether its mobs were outlined, and in what color.

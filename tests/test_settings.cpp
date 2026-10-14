@@ -1097,6 +1097,27 @@ TEST(an_entity_types_color_is_saved_under_its_own_name)
     CHECK_EQ(p.type[static_cast<int>(TargetType::Player)].v[2], 0.75f);
 }
 
+TEST(incredibly_tough_has_a_color_of_its_own_which_a_file_without_it_takes_from_the_defaults)
+{
+    const Palette defaults = Settings{}.palette;
+    const Color& deep = defaults.toughness[static_cast<int>(LabelShade::IncrediblyTough)];
+    const Color& very = defaults.toughness[static_cast<int>(LabelShade::VeryTough)];
+    // Deep red: red alone, darker than Very Tough's.
+    CHECK(deep.v[0] > 4 * deep.v[1] && deep.v[0] > 4 * deep.v[2] && deep.v[0] < very.v[0]);
+    Settings s;
+    s.palette.toughness[static_cast<int>(LabelShade::VeryTough)] = {{0.25f, 0.5f, 0.75f}};
+    MapStore file;
+    SaveSettings(s, file);
+    CHECK(file.values.contains("paletteToughnessIncrediblyToughR"));
+    for (const char* key : {"paletteToughnessIncrediblyToughR", "paletteToughnessIncrediblyToughG", "paletteToughnessIncrediblyToughB"})
+        file.values.erase(key);
+    const Palette loaded = LoadSettings(file).palette;
+    CHECK(loaded.toughness[static_cast<int>(LabelShade::IncrediblyTough)] == deep);
+    CHECK(loaded.toughness[static_cast<int>(LabelShade::VeryTough)] == (Color{{0.25f, 0.5f, 0.75f}}));
+    MapStore release = ReleaseFile();
+    CHECK(LoadSettings(release).palette.toughness[static_cast<int>(LabelShade::IncrediblyTough)] == deep);
+}
+
 TEST(every_designer_key_round_trips)
 {
     Settings s;
