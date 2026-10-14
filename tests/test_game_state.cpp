@@ -225,6 +225,21 @@ TEST(a_players_level_is_kept_from_their_sync_until_they_leave_or_you_zone)
     CHECK_EQ(int{game.PlayerLevelOf(kSecond)}, 0);
 }
 
+TEST(a_check_of_a_player_replaces_the_level_of_their_last_sync_until_the_next_one)
+{
+    GameState game;
+    Feed(game, CharSync(kCharacter, kOther, 0, 75));
+    Feed(game, CharSync(kCharacter, kSecond, 0, 40));
+    Packet general = Blank(0x0C9, 0x54).Put<uint32_t>(0x04, 0x01006A2B).Put<uint16_t>(0x08, kOther)
+        .Put<uint8_t>(0x0A, 0x01).Put<uint8_t>(0x22, 1).Put<uint8_t>(0x23, 13).Put<uint8_t>(0x24, 74)
+        .Put<uint8_t>(0x25, 37);
+    Feed(game, general);
+    CHECK_EQ(int{game.PlayerLevelOf(kOther)}, 0);
+    CHECK_EQ(int{game.PlayerLevelOf(kSecond)}, 40);
+    Feed(game, CharSync(kCharacter, kOther, 0, 30));
+    CHECK_EQ(int{game.PlayerLevelOf(kOther)}, 30);
+}
+
 TEST(a_characters_sync_marks_and_clears_their_level_sync)
 {
     GameState game;

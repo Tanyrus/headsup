@@ -247,7 +247,7 @@ namespace headsup
         for (const PlayerJobs* jobs : {own, member})
             if (jobs != nullptr && jobs->mainJob != 0) return *jobs;
         if (checked != nullptr && checked->mainJob != 0)
-            return PlayerJobs{checked->mainJob, checked->mainLevel, checked->subJob, checked->subLevel};
+            return PlayerJobs{checked->mainJob, seenLevel != 0 ? seenLevel : checked->mainLevel, checked->subJob, checked->subLevel};
         if (seenLevel != 0) return PlayerJobs{0, seenLevel, 0, 0};
         return std::nullopt;
     }

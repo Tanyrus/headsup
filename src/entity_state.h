@@ -85,8 +85,8 @@ namespace headsup
     std::unordered_map<uint16_t, uint16_t> PetOwners(std::span<const PetLink> links);
 
     // A player's jobs from the first source that knows them: the game's for you, the party list's, then their last
-    // check, then a level alone that the server sent (0 for none). Null for a source the player has none of; a main
-    // job of 0 (zoning, another zone, anonymous) knows nothing.
+    // check, then a level alone that the server sent since that check (0 for none), which wins over the check's level.
+    // Null for a source the player has none of; a main job of 0 (zoning, another zone, anonymous) knows nothing.
     std::optional<PlayerJobs> KnownJobs(const PlayerJobs* own, const PlayerJobs* member, const InspectGeneral* checked,
         uint8_t seenLevel);
     // The level a player's sync packet gave, shown only with Auto-Check on and once their update has said they are

@@ -49,7 +49,8 @@ namespace headsup
         const PlayerStatus* PlayerStatusOf(uint32_t index, uint32_t self) const;
         // From 0x067 alone; the plugin also reads yours and your party's from the buffs the game keeps.
         bool LevelSynced(uint16_t index) const;
-        // A player's level as their last sync packet gave it; 0 when none came since they or you arrived.
+        // A player's level as their last sync packet gave it; 0 when none came since they or you arrived, or since your
+        // last check of them, which is newer.
         uint8_t PlayerLevelOf(uint16_t index) const;
         // Whether the server has made this mob or NPC untargetable, from its last update that said.
         bool Untargetable(uint16_t index) const;

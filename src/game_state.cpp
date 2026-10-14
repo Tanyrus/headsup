@@ -101,6 +101,7 @@ namespace headsup
             if (const auto general = ParseInspectGeneral(data, size))
             {
                 m_PlayerChecks[general->serverId] = PlayerCheck{*general, m_CheckMessage.value_or(InspectMessage{})};
+                m_PlayerLevels.erase(general->index);
                 m_CheckMessage.reset();
             }
             break;

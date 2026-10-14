@@ -409,7 +409,7 @@ namespace
     }
 }
 
-TEST(a_players_jobs_come_from_the_game_then_the_party_list_then_the_last_check)
+TEST(a_players_jobs_come_from_the_game_then_the_party_list_then_the_last_check_or_sync)
 {
     const PlayerJobs own{1, 75, 13, 37}, member{4, 60, 3, 30};
     const InspectGeneral checked = CheckedRedMage();
@@ -417,9 +417,9 @@ TEST(a_players_jobs_come_from_the_game_then_the_party_list_then_the_last_check)
     CHECK(KnownJobs(nullptr, &member, &checked, 0) == member);
     CHECK(KnownJobs(nullptr, nullptr, &checked, 0) == (PlayerJobs{5, 52, 4, 26}));
     CHECK(!KnownJobs(nullptr, nullptr, nullptr, 0).has_value());
-    // A level the server sent, last: it has no job.
+    // A level the server sent since the check: it has no job, so the check's stays.
     CHECK(KnownJobs(nullptr, nullptr, nullptr, 75) == (PlayerJobs{0, 75, 0, 0}));
-    CHECK(KnownJobs(nullptr, nullptr, &checked, 75) == (PlayerJobs{5, 52, 4, 26}));
+    CHECK(KnownJobs(nullptr, nullptr, &checked, 30) == (PlayerJobs{5, 30, 4, 26}));
     CHECK(KnownJobs(nullptr, &member, nullptr, 75) == member);
 }
 
