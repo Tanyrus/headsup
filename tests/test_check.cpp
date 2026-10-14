@@ -99,3 +99,17 @@ TEST(death_forgets_the_result)
     results.Forget(kMob);
     CHECK(results.Result(kMob, 1.0) == nullptr);
 }
+
+TEST(a_defeat_or_a_fall_names_the_mob_that_died)
+{
+    // The killer is at 0x04 and the mob at 0x08; a death with no attacker is a fall.
+    auto defeated = Reply(kMob, 0x220, 0, 0, kDefeatsMessage);
+    std::memcpy(&defeated[0x04], &kOther, 4);
+    CHECK(ParseMobDeath(defeated.data(), 0x1C) == kMob);
+    CHECK(ParseMobDeath(Reply(kMob, 0x220, 0, 0, kFallsMessage).data(), 0x1C) == kMob);
+    // A check, experience and a mob too strong to gauge are no deaths.
+    for (const uint16_t message : {uint16_t{0xAA}, uint16_t{8}, uint16_t{249}})
+        CHECK(!ParseMobDeath(Reply(kMob, 0x220, 0, 0, message).data(), 0x1C).has_value());
+    CHECK(!ParseMobDeath(defeated.data(), 0x19).has_value());
+    CHECK(!ParseMobDeath(nullptr, 0x1C).has_value());
+}
