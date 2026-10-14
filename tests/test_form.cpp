@@ -82,7 +82,7 @@ TEST(a_card_holds_its_rows_and_what_they_show)
     CHECK(Has(rml, "<div class=\"card-body\"><div class=\"note\">A &lt;tip&gt;</div>"));
     CHECK(Has(rml, "<div class=\"arrow open\"></div><div class=\"card-title\">Mouse Pointer</div>"));
     CHECK(Has(rml, "<div class=\"label\" id=\"page-mouse-pointer-chocobo-label\" tip=\"The chocobo.\">Chocobo</div>"));
-    CHECK(Has(rml, "<div class=\"check\" id=\"page-mouse-pointer-chocobo\"><div class=\"mark\"></div></div>"));
+    CHECK(Has(rml, "<div class=\"check wide\" id=\"page-mouse-pointer-chocobo\"><div class=\"mark\"></div></div>"));
     CHECK(Has(rml, "<input type=\"range\" id=\"page-mouse-pointer-height\" min=\"24\" max=\"64\" step=\"1\"/>"));
     CHECK(Has(rml, "min=\"0.5\" max=\"3\" step=\"0.1\"")); // a float slider steps by its format's last decimal
     // What they show is no part of the markup.

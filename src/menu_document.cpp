@@ -182,8 +182,9 @@ namespace headsup
         // its own it has a cell its own width. The word beside it, when it has one, does not move it.
         css += ".switch-room{position:relative;display:flex;flex-direction:row;justify-content:center;width:" + control + ";}";
         css += ".switch-cell{display:flex;flex-direction:row;justify-content:center;width:" + Em(kToggleWidth) + ";}";
-        css += ".state{position:absolute;left:50%;top:0px;margin-left:" + Em(kToggleWidth / 2.0f + kControlGap) +
-               ";line-height:" + Em(kToggleHeight) + ";color:" + color(c.muted) + ";}";
+        // The word stands in the middle of the wide track, where the knob never goes.
+        css += ".state{position:absolute;left:0px;top:0px;width:100%;text-align:center;pointer-events:none;line-height:" +
+               Em(kToggleHeight) + ";color:" + color(c.muted) + ";}";
         css += ".check{position:relative;width:" + Em(kToggleWidth) + ";height:" + Em(kToggleHeight) + ";border-radius:" +
                Em(kToggleHeight / 2.0f) + ";background-color:" + color(c.control) + ";transition:background-color" + kSlide + ";}";
         css += ".check:hover{background-color:" + color(c.hover) + ";}";
@@ -195,6 +196,8 @@ namespace headsup
                ";height:" + Em(kToggleKnob) + ";border-radius:" + Em(kToggleKnob / 2.0f) + ";background-color:" +
                color(c.muted) + ";transition:left" + kSlide + ",background-color" + kSlide + ";}";
         css += ".check.on .mark{left:" + Em(kToggleWidth - kToggleKnob - kToggleInset) + ";background-color:" + color(c.accent) + ";}";
+        css += ".check.wide{width:" + Em(kSwitchWidth) + ";}";
+        css += ".check.wide.on .mark{left:" + Em(kSwitchWidth - kToggleKnob - kToggleInset) + ";}";
         // Joined choices. These, tabs, buttons and lists ease between their looks, and the picked one is the gradient.
         css += std::string(".seg,.tab,.btn,.dd,.opt,.wchip{transition:background-color") + kEase + ",border-color" + kEase +
                ",color" + kEase + ";}";

@@ -56,6 +56,8 @@ namespace headsup
     // The ids of a line box's parts, after the box's own: a stretch of text and a tag, each with its number.
     // Classes the kit writes, the window sets and the stylesheet draws: one name each for the three.
     constexpr const char* kOffClass     = "off";     // a setting of something switched off: not shown
+    constexpr const char* kCompactCheck = "check";       // a toggle among other controls
+    constexpr const char* kWideCheck    = "check wide";  // a row's toggle, nearly as wide as a slider
     constexpr const char* kPickedClass  = "picked";  // the chosen one of a row of choices
     constexpr const char* kLineBoxClass = "linebox"; // a design line's box
     constexpr const char* kRunClass     = "run";     // a stretch of text in it
@@ -315,8 +317,8 @@ namespace headsup
         void TakeWhole(const std::string& slider, int& value, int lo, int hi);
         void Slider(const std::string& slider, const char* label, float value, float lo, float hi, float step,
             const std::string& shown, const char* tip);
-        // A toggle, and its id.
-        std::string Check(const char* id, bool& on, const char* tip);
+        // A toggle, and its id: a row's is wide, one among other controls compact.
+        std::string Check(const char* id, bool& on, const char* tip, const char* classes = kCompactCheck);
         // A button of any markup inside. True when clicked.
         bool Pressable(const std::string& inside, const char* id, const char* classes, const char* tip);
 

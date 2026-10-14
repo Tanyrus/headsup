@@ -184,7 +184,7 @@ namespace headsup
     void Form::Line(const char* classes) { Out() += std::string("<div class=\"") + classes + "\">"; }
     void Form::EndLine() { Out() += "</div>"; }
 
-    std::string Form::Check(const char* id, bool& on, const char* tip)
+    std::string Form::Check(const char* id, bool& on, const char* tip, const char* classes)
     {
         const std::string check = Id(id);
         if (!m_Off && Clicked(check))
@@ -192,7 +192,7 @@ namespace headsup
             on      = !on;
             changed = true;
         }
-        Out() += "<div class=\"check\" id=\"" + check + "\"" + TipAttribute(tip) + "><div class=\"mark\"></div></div>";
+        Out() += "<div class=\"" + std::string(classes) + "\" id=\"" + check + "\"" + TipAttribute(tip) + "><div class=\"mark\"></div></div>";
         Set(check, FormValueKind::Class, "on", {}, on);
         Set(check, FormValueKind::Class, kOffClass, {}, m_Off);
         return check;
@@ -204,7 +204,7 @@ namespace headsup
     {
         Row(label, tip);
         Out() += "<div class=\"switch-room\">";
-        const std::string check = Check(label, on, nullptr);
+        const std::string check = Check(label, on, nullptr, kWideCheck);
         if (offWord != nullptr && onWord != nullptr)
         {
             Out() += "<div class=\"state\" id=\"" + check + "-state\"></div>";

@@ -1150,6 +1150,40 @@ TEST(a_toggles_knob_slides_across_its_track_in_both_themes)
         };
         const float off = middle(window.Find(box)) - middle(window.Find("entities-nameplates-vertical-offset"));
         CHECK(off > -1.0f && off < 1.0f);
+        // And it is nearly as wide as that slider.
+        const float slider = size(window.Find("entities-nameplates-vertical-offset")).x;
+        CHECK(width > 0.8f * slider && width < slider);
+    }
+}
+
+TEST(a_toggles_word_sits_inside_its_track_clear_of_the_knob_at_either_end)
+{
+    Window window;
+    window.Page("mobs");
+    const std::string box = "mobs-detection-icons-links";
+    auto edges = [](Rml::Element* element) {
+        const float x = element->GetAbsoluteOffset(Rml::BoxArea::Border).x;
+        return std::pair{x, x + element->GetBox().GetSize(Rml::BoxArea::Border).x};
+    };
+    Rml::Element* track = window.Find(box);
+    Rml::Element* word  = window.Find(box + "-state");
+    CHECK(track != nullptr && word != nullptr && !word->GetInnerRML().empty());
+    const auto [trackLeft, trackRight] = edges(track);
+    // The word's own letters, wherever its box reaches: they are centered in it.
+    const auto text = [&] {
+        const auto [left, right] = edges(word);
+        const float middle = (left + right) / 2.0f;
+        const float half   = static_cast<float>(Rml::ElementUtilities::GetStringWidth(word, word->GetInnerRML())) / 2.0f;
+        return std::pair{middle - half, middle + half};
+    };
+    for (int flip = 0; flip < 2; ++flip)
+    {
+        const auto [left, right] = text();
+        const auto [knobLeft, knobRight] = edges(window.Find(box)->GetChild(0));
+        CHECK(left > trackLeft && right < trackRight);
+        CHECK(right < knobLeft || left > knobRight);
+        window.Click(box);
+        window.Frames(30);
     }
 }
 
