@@ -84,10 +84,6 @@ namespace headsup
             return draw;
         }
 
-        // The tags whose text joins two ends with a dash, which is drawn as a design's own dashes are. A name's dash
-        // is part of the name.
-        bool DashesAreMarks(Tag tag) { return tag == Tag::Level || tag == Tag::Con; }
-
         bool IsMob(const ActorInfo& info) { return info.state.kind == EntityKind::Mob; }
         bool IsPlayer(const ActorInfo& info) { return info.state.kind == EntityKind::Player; }
 
@@ -342,7 +338,7 @@ namespace headsup
                     {
                         const std::string text = TagText(tag, info, player);
                         drawn                  = !text.empty();
-                        if (drawn) builder.Text(DashesAreMarks(tag) ? marked(text) : text, tag == Tag::Name);
+                        if (drawn) builder.Text(text, tag == Tag::Name);
                         continue;
                     }
                     const bool counted = IsCountedIcon(tag);

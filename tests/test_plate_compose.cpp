@@ -335,7 +335,7 @@ TEST(each_mob_tag_renders_its_text_or_icons)
     CHECK_EQ(Rendered(ComposePlate(AggressiveMob(), kPlayer, s, kGame).lines[0]), "[006] [17190918]");
 }
 
-TEST(a_dash_in_a_design_or_between_a_levels_ends_is_drawn_as_the_mark_chosen)
+TEST(only_a_dash_typed_in_a_design_is_drawn_as_the_mark_chosen)
 {
     Settings s; // a new install's dashes are diamonds
     s.Kind(PlateKind::Mobs).lines[1].text = "Lv $level - $con";
@@ -343,11 +343,11 @@ TEST(a_dash_in_a_design_or_between_a_levels_ends_is_drawn_as_the_mark_chosen)
     std::snprintf(mob.name, sizeof(mob.name), "Ga-Bhu");
     const auto level = [&] { return ComposePlate(mob, kPlayer, s, kGame).lines[1].items[0].text; };
     const std::string diamond(1, DashChar(DashMark::Diamond)), dot(1, DashChar(DashMark::Dot));
-    CHECK_EQ(level(), "Lv 17" + diamond + "20 " + diamond + " EP" + diamond + "EM");
-    // A name's dash is part of the name: it stays a dash.
+    // The dashes between a range's ends are the tags' own text, not the design's.
+    CHECK_EQ(level(), "Lv 17-20 " + diamond + " EP-EM");
     CHECK_EQ(ComposePlate(mob, kPlayer, s, kGame).lines[2].items[0].text, "Ga-Bhu");
     s.dashMark = DashMark::Dot;
-    CHECK_EQ(level(), "Lv 17" + dot + "20 " + dot + " EP" + dot + "EM");
+    CHECK_EQ(level(), "Lv 17-20 " + dot + " EP-EM");
     s.dashMark = DashMark::None;
     CHECK_EQ(level(), "Lv 17-20 - EP-EM");
     // Each mark has a character of its own, none of them a dash, and a report reads them as dashes.

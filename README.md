@@ -180,8 +180,8 @@ The Nameplates card, on the Entities page, sets what every nameplate shares:
 - **Auto-Check:** HeadsUp checks each mob that comes near by itself, so its exact level and difficulty show without a
   `/check`, and keeps the check's line out of the chat log. Players are never checked: the server tells a player who
   examined them
-- **Replace Dashes (-):** draws each dash typed in a nameplate, and the one in a level range such as 20-23, as a dot,
-  a square or a diamond. A name's own dash stays
+- **Replace Dashes (-):** draws each dash typed in a nameplate's design as a dot, a square or a diamond. The dashes
+  HeadsUp writes itself, as in a level range such as 20-23, and a name's own dash stay
 - **Scale with Distance:** names grow and shrink with distance between a Min Size and a Max Size; with Scale Your Own
   Name off, your own nameplate stays one size
 - **Vertical Offset and Stack Names:** how far over the game's own spot names sit, and whether names that would cover

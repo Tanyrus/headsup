@@ -147,7 +147,7 @@ namespace headsup
         bool outlines   = true;
         int baseSize    = 15; // pixels: a line's text at 100 percent
         int baseIconSize = kDefaultIconSize; // and its icons
-        DashMark dashMark = DashMark::Diamond; // what a dash in a design, or between a level's ends, is drawn as
+        DashMark dashMark = DashMark::Diamond; // what a dash typed in a design is drawn as
         bool autoCheck    = false; // every mob that comes near is checked by HeadsUp, for its exact level
         std::string defaultFont = kDefaultFont;
         int scaleMin = 50, scaleMax = 250; // percent: the distance scale's limits
