@@ -67,6 +67,34 @@ namespace headsup
             u * shareU, v * shareV};
     }
 
+    uint32_t LayerTint(float opacity)
+    {
+        constexpr float kMax = 255.0f;
+        const auto level     = static_cast<uint32_t>(std::lround(std::clamp(opacity, 0.0f, 1.0f) * kMax));
+        return Argb(static_cast<uint8_t>(level), static_cast<uint8_t>(level), static_cast<uint8_t>(level), static_cast<uint8_t>(level));
+    }
+
+    float FilterOpacity(std::span<const float> opacities)
+    {
+        float opacity = 1.0f;
+        for (const float each : opacities)
+            opacity *= each;
+        return opacity;
+    }
+
+    std::array<ScreenVertex, 6> LayerQuad(int width, int height, float shareU, float shareV, uint32_t tint)
+    {
+        const auto corner = [&](float x, float y) {
+            ScreenVertex v = PlacedVertex(x, y, 0, 0, 0, 0, x == 0.0f ? 0.0f : 1.0f, y == 0.0f ? 0.0f : 1.0f, 0.0f, 0.0f, shareU, shareV);
+            v.color        = tint;
+            return v;
+        };
+        const float w = static_cast<float>(width), h = static_cast<float>(height);
+        const ScreenVertex topLeft = corner(0.0f, 0.0f), topRight = corner(w, 0.0f), bottomLeft = corner(0.0f, h),
+                           bottomRight = corner(w, h);
+        return {topLeft, topRight, bottomRight, topLeft, bottomRight, bottomLeft};
+    }
+
     void Transformed(const float* m, float& x, float& y)
     {
         constexpr int kColumn = 4; // floats in a column

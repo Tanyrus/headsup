@@ -45,6 +45,7 @@ namespace
         ~Window() { menu.Close(); }
         // What RmlUi complained of since the window opened.
         std::string Said() const { return m_Rml.Said(); }
+        const test::NoRender& Render() const { return m_Rml.Render(); }
 
         // True when a frame of these changed a setting.
         bool Frames(int count = 1)
@@ -1205,28 +1206,33 @@ TEST(the_windows_font_size_is_its_settings_pixels_whatever_its_font_and_its_arro
     CHECK_EQ(window.Said(), "");
 }
 
-TEST(the_window_is_as_opaque_as_its_setting_from_the_moment_it_opens)
+TEST(the_window_takes_its_opacity_once_as_a_whole_and_never_more_than_its_setting)
 {
-    // Opening, it comes in from nothing and never passes its own opacity.
     Window window;
     window.menu.open = false;
     window.Frames(2);
     window.settings.menuOpacity = 50;
     window.menu.open            = true;
-    float most = 0.0f;
+    // Drawn whole into a layer and laid over the game at its opacity once: its own parts are drawn opaque, so an open
+    // list hides the rows under it. Opening, the parts come in from nothing under that.
+    Rml::ElementDocument* document = window.Find("page")->GetOwnerDocument();
     for (int frame = 0; frame < 12; ++frame)
     {
+        const size_t before = window.Render().composited.size();
         window.Frames();
-        most = std::max(most, window.Find("page")->GetOwnerDocument()->GetComputedValues().opacity());
+        CHECK(window.Render().composited.size() > before && window.Render().composited.back() == 0.5f);
+        CHECK(document->GetComputedValues().opacity() <= 1.0f);
     }
-    CHECK(most > 0.49f && most < 0.51f);
-    CHECK_EQ(window.Find("page")->GetOwnerDocument()->GetComputedValues().opacity(), 0.5f);
-    // The slider on the HeadsUp Config page sets it, and the window follows while it is dragged.
+    CHECK_EQ(document->GetComputedValues().opacity(), 1.0f);
+    // The slider on the HeadsUp Config page sets it, and at full opacity no layer is drawn.
     window.Page("configmenu");
     CHECK(window.Drag("configmenu-settings-window-window-opacity", Rml::Vector2f(400.0f, 0.0f)));
     CHECK_EQ(window.settings.menuOpacity, 100);
     window.Frames(2);
-    CHECK_EQ(window.Find("page")->GetOwnerDocument()->GetComputedValues().opacity(), 1.0f);
+    const size_t opaque = window.Render().composited.size();
+    window.Frames(2);
+    CHECK_EQ(window.Render().composited.size(), opaque);
+    CHECK_EQ(document->GetComputedValues().opacity(), 1.0f);
     CHECK_EQ(window.Said(), "");
 }
 

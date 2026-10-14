@@ -1,6 +1,7 @@
 #include "rml_pure.h"
 #include "test.h"
 
+#include <algorithm>
 #include <vector>
 
 using namespace headsup;
@@ -17,6 +18,38 @@ TEST(a_vertex_is_moved_to_the_pixel_center_with_its_texture_share)
     CHECK_EQ(v.color, 0xFFFF8000u);
     CHECK_EQ(v.u, 0.5f);
     CHECK_EQ(v.v, 0.25f);
+}
+
+TEST(a_layer_is_laid_over_the_target_at_its_opacity_in_premultiplied_color)
+{
+    // Every channel of a premultiplied picture scales with the opacity, its alpha too.
+    CHECK_EQ(LayerTint(1.0f), 0xFFFFFFFFu);
+    CHECK_EQ(LayerTint(0.5f), 0x80808080u);
+    CHECK_EQ(LayerTint(0.0f), 0u);
+    CHECK_EQ(LayerTint(2.0f), 0xFFFFFFFFu);
+    const float opacities[] = {0.5f, 0.5f};
+    CHECK_EQ(FilterOpacity(opacities), 0.25f);
+    CHECK_EQ(FilterOpacity({}), 1.0f);
+    // Two triangles over the whole target, their texture coordinates the target's share of the padded layer, each
+    // pixel's center on its texel's.
+    const auto quad = LayerQuad(2560, 1440, 0.625f, 0.703125f, 0x80808080u);
+    float left = 1e9f, top = 1e9f, right = -1e9f, bottom = -1e9f, uMax = 0.0f, vMax = 0.0f;
+    for (const ScreenVertex& v : quad)
+    {
+        left   = std::min(left, v.x);
+        top    = std::min(top, v.y);
+        right  = std::max(right, v.x);
+        bottom = std::max(bottom, v.y);
+        uMax   = std::max(uMax, v.u);
+        vMax   = std::max(vMax, v.v);
+        CHECK_EQ(v.color, 0x80808080u);
+    }
+    CHECK_EQ(left, -kPixelCenter);
+    CHECK_EQ(top, -kPixelCenter);
+    CHECK_EQ(right, 2560.0f - kPixelCenter);
+    CHECK_EQ(bottom, 1440.0f - kPixelCenter);
+    CHECK_EQ(uMax, 0.625f);
+    CHECK_EQ(vMax, 0.703125f);
 }
 
 TEST(rgba_bytes_become_argb_words)

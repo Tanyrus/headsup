@@ -181,7 +181,7 @@ namespace headsup
         m_Popup      = m_Document->GetElementById(kMenuPopupId);
         m_Tip        = m_Document->GetElementById(kMenuTipId);
         for (const Rml::EventId id : {Rml::EventId::Click, Rml::EventId::Change, Rml::EventId::Dragdrop, Rml::EventId::Dragend,
-                 Rml::EventId::Mouseover, Rml::EventId::Mousemove, Rml::EventId::Animationend})
+                 Rml::EventId::Mouseover, Rml::EventId::Mousemove})
             m_Document->AddEventListener(id, this);
         // On their way down: taking and losing the keyboard do not come back up, and a text box keeps its keys.
         for (const Rml::EventId id : {Rml::EventId::Focus, Rml::EventId::Blur, Rml::EventId::Keydown})
@@ -380,20 +380,19 @@ namespace headsup
         }
     }
 
+    // As a filter, the window is drawn whole into a layer that is laid over the game at this opacity, so its parts do
+    // not show through each other; at full opacity it needs no layer.
     void RmlMenu::ApplyOpacity()
     {
-        m_Document->SetProperty(Rml::PropertyId::Opacity, Rml::Property(static_cast<float>(m_Opacity) / kPercent, Rml::Unit::NUMBER));
+        if (m_Opacity >= kMaxOpacity)
+            m_Document->RemoveProperty(Rml::PropertyId::Filter);
+        else
+            m_Document->SetProperty("filter", "opacity(" + std::to_string(static_cast<float>(m_Opacity) / kPercent) + ")");
     }
 
     void RmlMenu::ProcessEvent(Rml::Event& event)
     {
         if (m_Document == nullptr) return;
-        // The fade the window opens with ends by taking its opacity off the document: it is put back at once.
-        if (event.GetId() == Rml::EventId::Animationend && event.GetTargetElement() == m_Document)
-        {
-            ApplyOpacity();
-            return;
-        }
         Rml::Element* target = event.GetTargetElement();
         Rml::Element* named  = WithId(target);
         const std::string id = named != nullptr ? named->GetId() : std::string();

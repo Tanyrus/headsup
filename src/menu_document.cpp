@@ -75,7 +75,7 @@ namespace headsup
                ";background-color:" + color(c.background) + ";border:1px " + color(c.border) + ";border-radius:" +
                Em(kCardRadius * 1.5f) + ";color:" + color(c.text) + ";font-family:\"" + look.textFont + "\";z-index:5;}";
         // The window comes in a little small and grows to its size.
-        // Its fade has no end of its own: it ends at the opacity the window is set to.
+        // Its fade has no end of its own: it ends at the element's own opacity, under the window's filter.
         css += "body.open{animation:0.22s cubic-out window-in, 0.22s cubic-out window-fade;}";
         css += "@keyframes window-in{from{transform:scale(0.97);}to{transform:scale(1);}}";
         css += "@keyframes window-fade{from{opacity:0;}}";

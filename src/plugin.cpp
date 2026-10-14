@@ -136,6 +136,19 @@ namespace
         return g_RealPresent(device, source, dest, window, dirty);
     }
 
+    // The game's Reset fails while anything holds a default-pool resource, as the settings window's layer is.
+    using ResetFn               = HRESULT(__attribute__((stdcall))*)(IDirect3DDevice8*, D3DPRESENT_PARAMETERS*);
+    constexpr size_t kResetSlot = 14;
+    void** g_ResetSlot          = nullptr;
+    ResetFn g_RealReset         = nullptr;
+    void (*g_BeforeReset)()     = nullptr; // lets go of the plugin's default-pool resources, while it is loaded
+
+    HRESULT __attribute__((stdcall)) HookedReset(IDirect3DDevice8* device, D3DPRESENT_PARAMETERS* parameters)
+    {
+        if (g_BeforeReset != nullptr) g_BeforeReset();
+        return g_RealReset(device, parameters);
+    }
+
     // Writes a vtable slot, which lives in read-only memory.
     bool WriteSlot(void** slot, void* value)
     {
@@ -375,6 +388,7 @@ public:
         m_Fonts.Wait();
         m_Nameplates.Release();
         UnhookPresent();
+        UnhookReset();
         g_Plugin = nullptr;
         m_RmlBar.Release();
         m_RmlMenu.Close();
@@ -394,6 +408,7 @@ public:
     {
         m_Device = device;
         HookPresent(device);
+        HookReset(device);
         m_Outline.SetDevice(device);
         m_Names.SetDevice(device);
         m_Nameplates.SetDevice(device);
@@ -1222,6 +1237,30 @@ private:
         g_PresentSlot = slot;
     }
 
+    void HookReset(IDirect3DDevice8* device)
+    {
+        if (g_ResetSlot != nullptr || device == nullptr) return;
+        void** slot = *reinterpret_cast<void***>(device) + kResetSlot;
+        if (*slot == reinterpret_cast<void*>(&HookedReset)) return;
+        g_RealReset = reinterpret_cast<ResetFn>(*slot);
+        if (!WriteSlot(slot, reinterpret_cast<void*>(&HookedReset)))
+        {
+            Print("the settings window is drawn opaque: Reset could not be hooked.");
+            return;
+        }
+        g_ResetSlot   = slot;
+        g_BeforeReset = [] { if (g_Plugin != nullptr) g_Plugin->BeforeReset(); };
+    }
+
+    // As UnhookPresent.
+    void UnhookReset()
+    {
+        g_BeforeReset = nullptr;
+        if (g_ResetSlot == nullptr) return;
+        if (*g_ResetSlot == reinterpret_cast<void*>(&HookedReset)) WriteSlot(g_ResetSlot, reinterpret_cast<void*>(g_RealReset));
+        g_ResetSlot = nullptr;
+    }
+
     // Puts Present back, unless something hooked it over HeadsUp, whose calls would then still come through here.
     void UnhookPresent()
     {
@@ -1231,6 +1270,8 @@ private:
             WriteSlot(g_PresentSlot, reinterpret_cast<void*>(g_RealPresent));
         g_PresentSlot = nullptr;
     }
+
+    void BeforeReset() { m_Rml.ReleaseLayers(); }
 
     // RmlUi's overlay (the popups and the settings window), over every ImGui window: in a scene of its own.
     void DrawOverGui()

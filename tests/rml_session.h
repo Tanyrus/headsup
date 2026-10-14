@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <string>
+#include <map>
 #include <vector>
 
 namespace test
@@ -27,8 +28,28 @@ namespace test
         void EnableScissorRegion(bool) override {}
         void SetScissorRegion(Rml::Rectanglei) override {}
         void SetTransform(const Rml::Matrix4f*) override {}
+        // An opacity filter keeps its value; a layer composited records the opacity its filters ask for.
+        Rml::CompiledFilterHandle CompileFilter(const Rml::String& name, const Rml::Dictionary& parameters) override
+        {
+            const auto value = parameters.find("value");
+            if (name != "opacity" || value == parameters.end()) return 0;
+            m_Filters[++m_Next] = value->second.Get<float>();
+            return m_Next;
+        }
+        void ReleaseFilter(Rml::CompiledFilterHandle filter) override { m_Filters.erase(filter); }
+        Rml::LayerHandle PushLayer() override { return ++m_Next; }
+        void CompositeLayers(Rml::LayerHandle, Rml::LayerHandle, Rml::BlendMode, Rml::Span<const Rml::CompiledFilterHandle> filters) override
+        {
+            float opacity = 1.0f;
+            for (const Rml::CompiledFilterHandle filter : filters)
+                opacity *= m_Filters.at(filter);
+            composited.push_back(opacity);
+        }
+        void PopLayer() override {}
+        std::vector<float> composited;
 
     private:
+        std::map<uintptr_t, float> m_Filters;
         static constexpr int kImageSide = 16;
         uintptr_t m_Next                = 0;
     };
@@ -67,6 +88,7 @@ namespace test
             context = Rml::CreateContext("overlay", Rml::Vector2i(kWidth, kHeight));
         }
         ~RmlSession() { Rml::Shutdown(); }
+        const NoRender& Render() const { return m_Render; }
         RmlSession(const RmlSession&)            = delete;
         RmlSession& operator=(const RmlSession&) = delete;
 
