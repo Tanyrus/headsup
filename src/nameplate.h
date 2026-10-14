@@ -121,6 +121,10 @@ namespace headsup
     int RasterHeight(float pixels, int current);
     // The height text that keeps its size is drawn at: the size in whole pixels, to RasterHeight's tallest.
     int FixedRasterHeight(float pixels);
+    // The height the target cursor's picture is drawn at, shown pixels tall: RasterHeight's (current, the one drawn
+    // now) when it scales with distance, else FixedRasterHeight's, and never below its height setting, so that each
+    // step of its width is a pixel of the picture and none rounds to the width before it.
+    int CursorRaster(float shown, int current, bool scales, int height);
     // Whether an image whose ink is width by height, with halo pixels around it, fits a texture of this side.
     bool FitsTexture(int width, int height, int halo, int side);
     // The height to try so the image fits: raster when the image drawn at it fits, else raster scaled down by what the

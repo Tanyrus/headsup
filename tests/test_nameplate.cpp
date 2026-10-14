@@ -138,6 +138,28 @@ TEST(a_lone_cursor_points_at_its_anchor)
     CHECK(Near(CursorAtAnchor(1400.0f, 608.0f, 20.0f, 32.0f, 0.5f, 5.0f).x, 1390.0f));
 }
 
+TEST(every_width_step_widens_the_cursors_picture_however_small_it_is_shown)
+{
+    // The tester's report: on the feather, a width step only sometimes changed the width. A cursor walked away from
+    // and back, scaling or not, at heights from the smallest to the largest.
+    for (const bool scales : {true, false})
+        for (int height = kMinCursorSide; height <= kMaxCursorSide; height += 4)
+        {
+            int raster = 0;
+            for (int tenths = 40; tenths <= 1200; tenths += 7)
+                for (const float shown : {tenths / 10.0f, 124.0f - tenths / 10.0f})
+                {
+                    raster = CursorRaster(shown, raster, scales, height);
+                    for (int width = kMinCursorSide; width < kMaxCursorSide; ++width)
+                        if (CursorPixelWidth(raster, width + 1, height) <= CursorPixelWidth(raster, width, height))
+                        {
+                            CHECK(false);
+                            return;
+                        }
+                }
+        }
+}
+
 TEST(a_cursors_picture_is_as_wide_for_its_height_as_the_settings_have_it)
 {
     // Drawn 40 pixels tall where the settings say 9 by 20: 18 wide. An edge of 100 percent is a twentieth of the height.

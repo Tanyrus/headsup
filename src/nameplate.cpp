@@ -215,6 +215,11 @@ namespace headsup
         return WholePixels(std::min(pixels, static_cast<float>(kRasterTallest)));
     }
 
+    int CursorRaster(float shown, int current, bool scales, int height)
+    {
+        return std::max(scales ? RasterHeight(shown, current) : FixedRasterHeight(shown), height);
+    }
+
     bool FitsTexture(int width, int height, int halo, int side)
     {
         return LongerSide(width, height, halo) <= side;

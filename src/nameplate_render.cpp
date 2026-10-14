@@ -377,8 +377,7 @@ namespace headsup
                 // A line's text height and a run's badge text height, in the image.
                 auto textShown  = [&](const ComposedLine& line) { return line.look.textSize * scale * toY; };
                 auto badgeShown = [&](const RunShape& run) { return run.iconSize * kBadgeShare * toY; };
-                p.cursorRaster =
-                    settings.scaleCursor ? RasterHeight(cursorShown, p.cursorRaster) : FixedRasterHeight(cursorShown);
+                p.cursorRaster = CursorRaster(cursorShown, p.cursorRaster, settings.scaleCursor, settings.cursorHeight);
                 const OrnamentSettings& ornament = settings.Kind(PlateKindOf(info->state)).ornament;
                 const float ornamentShown        = static_cast<float>(ornament.height) * scale * toY;
 
