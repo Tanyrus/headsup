@@ -491,6 +491,18 @@ TEST(players_and_npcs_take_the_mob_name_font_from_a_file_saved_before_they_had_t
         CHECK(s.Kind(kind).lines[2].font == "Georgia" && s.Kind(kind).lines[2].style == StyleBit(FontStyle::Bold));
 }
 
+TEST(a_file_from_before_incredibly_tough_had_its_own_color_gains_no_key_for_it)
+{
+    // No build ever wrote labelIncrediblyTough: a typed read of it would add it to a version 2 file for nothing.
+    MapStore file     = Parse(kSavedFile);
+    file.addsDefaults = true;
+    const Settings s  = LoadSettings(file);
+    for (const char* channel : {"R", "G", "B"})
+        CHECK(!file.values.contains(std::string("labelIncrediblyTough") + channel));
+    const int deep = static_cast<int>(LabelShade::IncrediblyTough);
+    CHECK(s.palette.toughness[deep] == Settings{}.palette.toughness[deep]);
+}
+
 TEST(a_saved_file_loads_every_setting_and_saves_back_the_same)
 {
     MapStore file         = Parse(kSavedFile);

@@ -574,6 +574,7 @@ namespace headsup
         }
 
         constexpr int kOldCategoryCount = static_cast<int>(Category::OtherClaim) + 1;
+        constexpr int kOldLabelShadeCount = static_cast<int>(LabelShade::VeryTough) + 1; // Incredibly Tough came later
         struct OldSettings
         {
             bool showLabels = true, replaceMobNames = true, replacePlayerNames = true, replaceNpcNames = true;
@@ -606,7 +607,7 @@ namespace headsup
             Color outOfRangeCursorColor = {{1.00f, 0.25f, 0.25f}};
             bool ownNameColor = false;
             Color nameColor   = {{1.00f, 1.00f, 1.00f}};
-            Color labelColor[kLabelShadeCount] = {
+            Color labelColor[kOldLabelShadeCount] = {
                 {{0.60f, 0.60f, 0.60f}}, // unknown
                 {{0.60f, 0.60f, 0.60f}}, // Too Weak
                 {{0.40f, 1.00f, 0.40f}}, // Easy Prey
@@ -614,7 +615,6 @@ namespace headsup
                 {{1.00f, 1.00f, 1.00f}}, // Even Match
                 {{1.00f, 1.00f, 0.35f}}, // Tough
                 {{1.00f, 0.35f, 0.35f}}, // Very Tough
-                {{0.72f, 0.08f, 0.08f}}, // Incredibly Tough
             };
             Color textOutline = {{0.00f, 0.00f, 0.00f}};
             // By Category, the eight such a file knew: whether its mobs were outlined, and in what color.
@@ -713,7 +713,7 @@ namespace headsup
             o.labelFontBold    = store.GetBool(kOldLabelBoldKey, o.fontBold);
             o.labelShadowColor = o.textOutline;
             LoadColor(store, kOldLabelShadowColorKey, o.labelShadowColor);
-            for (int k = 0; k < kLabelShadeCount; ++k)
+            for (int k = 0; k < kOldLabelShadeCount; ++k)
                 LoadColor(store, kLabelShadeKeys[k], o.labelColor[k]);
             for (int c = 0; c < kOldCategoryCount; ++c)
             {
