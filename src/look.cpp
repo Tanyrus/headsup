@@ -4,7 +4,8 @@ namespace headsup
 {
     LineStyle BadgeLineStyle(const Settings& settings)
     {
-        return LineStyle{settings.badgeFontName, true, ToArgb(LineDesign{}.shadowColor.custom), 0.0f, true};
+        return LineStyle{settings.badgeFontName.empty() ? settings.defaultFont : settings.badgeFontName, StyleBit(FontStyle::Bold),
+            ToArgb(LineDesign{}.shadowColor.custom), 0.0f, true};
     }
 
     uint32_t BadgeColor(BadgeKind kind, const Settings& settings)

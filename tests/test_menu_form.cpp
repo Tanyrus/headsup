@@ -47,7 +47,7 @@ TEST(the_window_is_its_sidebar_and_the_open_pages_cards)
     CHECK(Has(form.blocks.front().rml, "<div class=\"nav\" id=\"nav-entities\">") &&
           Has(form.blocks.front().rml, "<div class=\"nav child\" id=\"nav-mobs\">"));
     CHECK(ClassOn(form, "nav-entities", "picked") && !ClassOn(form, "nav-mobs", "picked"));
-    CHECK(Block(form, "entities-nameplate-style") != nullptr && Block(form, "entities-colors-target-type") != nullptr);
+    CHECK(Block(form, "entities-nameplates") != nullptr && Block(form, "entities-colors-entity-type") != nullptr);
 }
 
 TEST(a_click_in_the_sidebar_opens_that_page_at_its_top)
@@ -55,7 +55,7 @@ TEST(a_click_in_the_sidebar_opens_that_page_at_its_top)
     Window w;
     const Form form = w.Pass({{"nav-toppanel", kClickEvent, ""}});
     CHECK(w.state.page == Page::TopPanel && form.scrollToTop);
-    CHECK(Block(form, "toppanel-top-panel") != nullptr && Block(form, "entities-nameplate-style") == nullptr);
+    CHECK(Block(form, "toppanel-top-panel") != nullptr && Block(form, "entities-nameplates") == nullptr);
     CHECK(ClassOn(form, "nav-toppanel", "picked"));
 }
 
@@ -119,18 +119,6 @@ TEST(a_widgets_chip_dropped_on_another_goes_before_it)
     CHECK(w.state.widget == static_cast<int>(left[0]) && clicked.scrollToTop);
 }
 
-TEST(a_friend_is_added_by_name_and_removed_by_its_chip)
-{
-    Window w;
-    w.state.page = Page::Players;
-    w.Pass({{"players-friends-add-friend", kCommitEvent, "Amutiyaal"}});
-    CHECK(w.settings.friends == std::vector<std::string>{"Amutiyaal"});
-    const Form form = w.Pass();
-    CHECK(Has(Block(form, "players-friends")->rml, "Amutiyaal  x"));
-    w.Pass({{"players-friends-friend-0", kClickEvent, ""}});
-    CHECK(w.settings.friends.empty());
-}
-
 TEST(the_reset_card_asks_twice)
 {
     Window w;
@@ -162,4 +150,206 @@ TEST(a_key_row_takes_the_next_key_pressed_that_was_not_held)
     const bool changed = pass({});
     CHECK(changed && !w.state.keyCapture.on && w.settings.keepPointerKeys.size() == before + 1);
     CHECK_EQ(w.settings.keepPointerKeys.back(), uint8_t{0x70});
+}
+
+TEST(only_the_lines_above_the_bottom_one_have_an_alignment)
+{
+    // The bottom line stays centered on the game's name and the others are set against it.
+    Window w;
+    w.state.page = Page::Mobs;
+    for (int tab = 0; tab < kPlateLines; ++tab)
+    {
+        w.state.design.kind     = PlateKind::Mobs;
+        w.state.design.styleTab = tab;
+        w.settings.Kind(PlateKind::Mobs).lines[tab].syncWith = kNoSync;
+        const Form form       = w.Pass();
+        const FormBlock* card = Block(form, "mobs-line-style");
+        const std::string line = "mobs" + std::to_string(tab);
+        CHECK(card != nullptr && Has(card->rml, ("mobs-line-style-text-size-" + line).c_str()));
+        CHECK_EQ(Has(card->rml, ("mobs-line-style-alignment-" + line).c_str()), tab < kPlateLines - 1);
+    }
+}
+
+TEST(a_page_whose_cards_are_all_switched_off_says_what_switches_them_on)
+{
+    const auto shown = [](const Form& form) {
+        std::vector<std::string> ids;
+        for (const FormBlock& block : form.blocks)
+            if (block.id != kSidebarBlock && !ClassOn(form, block.id.c_str(), "off")) ids.push_back(block.id);
+        return ids;
+    };
+    Window w;
+    CHECK(shown(w.Pass()).size() > 3u);
+    w.settings.enabled = false;
+    const std::vector<std::string> off = shown(w.Pass());
+    CHECK_EQ(off.size(), size_t{1}); // the one card that says HeadsUp is off
+    // The Debug page, which switches HeadsUp on, keeps its cards.
+    w.state.page = Page::Debug;
+    const Form debug = w.Pass({{"debug-headsup-on", kClickEvent, ""}});
+    CHECK(w.settings.enabled && debug.changed);
+    // With the top panel off, its widgets' page has nothing to set either.
+    w.settings.showBar = false;
+    w.state.page       = Page::Widgets;
+    CHECK_EQ(shown(w.Pass()).size(), size_t{1});
+    CHECK(shown(w.Pass()) != off);
+}
+
+TEST(the_cursor_style_list_has_headsups_styles_then_the_folders_files)
+{
+    Window w;
+    const std::vector<std::string> files{"Gold Arrow", "sword"};
+    w.readings.cursorFiles = &files;
+    const char* list = "entities-target-cursor-cursor-style";
+    const Form open  = w.Pass({{list, kClickEvent, ""}});
+    CHECK(open.popup && w.state.cursorsRequested); // opening it asks for the folder to be read again
+    // Each of HeadsUp's own styles, then each file of the folder: six rows, the last the second file.
+    CHECK(Has(open.popup->rml, "entities-target-cursor-cursor-style-o-5") && !Has(open.popup->rml, "entities-target-cursor-cursor-style-o-6"));
+    CHECK(Has(open.popup->rml, ">Gold Arrow<") && Has(open.popup->rml, ">sword<"));
+    CHECK(ClassOn(open, "entities-target-cursor-cursor-style-o-2", "picked")); // the feather, a new install's
+    w.state.cursorsRequested = false;
+    w.Pass();
+    CHECK(!w.state.cursorsRequested); // once, when it opens: not every pass it stays open
+    // A file is the File style with its name; HeadsUp's own styles have no file.
+    CHECK(w.Pass({{"entities-target-cursor-cursor-style-o-5", kClickEvent, ""}}).changed);
+    CHECK(w.settings.cursorStyle == CursorStyle::File && w.settings.cursorFile == "sword");
+    w.Pass({{list, kClickEvent, ""}});
+    w.Pass({{"entities-target-cursor-cursor-style-o-3", kClickEvent, ""}});
+    CHECK(w.settings.cursorStyle == CursorStyle::Chocobo);
+    // A file the folder no longer has stays chosen, and listed, until another is picked.
+    w.settings.cursorStyle = CursorStyle::File;
+    w.settings.cursorFile  = "gone";
+    const Form kept = w.Pass({{list, kClickEvent, ""}});
+    CHECK(Has(kept.popup->rml, ">gone<") && ClassOn(kept, "entities-target-cursor-cursor-style-o-6", "picked"));
+    CHECK(w.settings.cursorStyle == CursorStyle::File && w.settings.cursorFile == "gone");
+}
+
+TEST(a_style_picked_comes_at_its_own_width_for_the_height_set)
+{
+    // The feather is slender, the triangle wide and a picture square: a style picked would otherwise be squeezed
+    // into the width of the one before.
+    Window w;
+    const char* list = "entities-target-cursor-cursor-style";
+    w.settings.cursorHeight = 40;
+    w.settings.cursorWidth  = 11;
+    const auto pick = [&](int option) {
+        w.Pass({{list, kClickEvent, ""}});
+        w.Pass({{(std::string(list) + "-o-" + std::to_string(option)).c_str(), kClickEvent, ""}});
+        return w.settings.cursorWidth;
+    };
+    CHECK_EQ(pick(1), 50); // the triangle, 0.8 as tall as wide
+    CHECK_EQ(pick(3), 40); // the chocobo
+    CHECK_EQ(pick(2), 19); // the feather, 2.155 times as tall as wide
+    // The width is the player's from there: the same style picked again, or a pass with no pick, leaves it.
+    w.settings.cursorWidth = 30;
+    CHECK_EQ(pick(2), 30);
+    w.Pass();
+    CHECK_EQ(w.settings.cursorWidth, 30);
+    // The game's own cursor has no width to set.
+    CHECK_EQ(pick(0), 30);
+}
+
+TEST(the_games_own_cursor_has_no_settings_and_a_picture_no_color)
+{
+    Window w;
+    const auto hidden = [&](const Form& form, const char* row) { return ClassOn(form, row, "off"); };
+    const Form feather = w.Pass();
+    CHECK(!hidden(feather, "entities-target-cursor-width-label-row") && !hidden(feather, "entities-target-cursor-color-label-row"));
+    w.settings.cursorStyle = CursorStyle::Chocobo;
+    const Form chocobo = w.Pass();
+    CHECK(!hidden(chocobo, "entities-target-cursor-width-label-row") && !hidden(chocobo, "entities-target-cursor-edge-color-label-row"));
+    CHECK(hidden(chocobo, "entities-target-cursor-color-label-row")); // it keeps its own colors
+    w.settings.cursorStyle = CursorStyle::Vanilla;
+    const Form vanilla = w.Pass();
+    for (const char* row : {"entities-target-cursor-width-label-row", "entities-target-cursor-float-label-row",
+             "entities-target-cursor-color-label-row", "entities-target-cursor-edge-color-label-row"})
+        CHECK(hidden(vanilla, row));
+    CHECK(!hidden(vanilla, "entities-target-cursor-cursor-style-label-row")); // the list stays, to pick another
+}
+
+TEST(every_kind_has_a_nameplate_opacity_card_and_yours_none_of_its_fading)
+{
+    Window w;
+    for (const Page page : {Page::Mobs, Page::Players, Page::Npcs, Page::Pets, Page::Self})
+    {
+        w.state.page = page;
+        const std::string card = std::string(PageKey(page)) + "-nameplate-opacity";
+        const Form form        = w.Pass();
+        const FormBlock* block = Block(form, card.c_str());
+        CHECK(block != nullptr);
+        CHECK(Has(block->rml, (card + "-no-target").c_str()) && Has(block->rml, (card + "-not-targeted").c_str()) &&
+              Has(block->rml, (card + "-is-targeted").c_str()));
+        CHECK_EQ(Has(block->rml, (card + "-fade-in").c_str()), page != Page::Self);
+        if (page == Page::Self) continue;
+        // The range is the fade's own: it shows once Fade In is on.
+        CHECK(ClassOn(form, (card + "-range-label-row").c_str(), "off"));
+        const Form faded = w.Pass({{card + "-fade-in", kClickEvent, ""}});
+        CHECK(faded.changed && w.settings.Kind(*KindOfPage(page)).opacity.fadeIn);
+        CHECK(!ClassOn(faded, (card + "-range-label-row").c_str(), "off"));
+        w.Pass({{card + "-not-targeted", kChangeEvent, "35"}});
+        CHECK_EQ(w.settings.Kind(*KindOfPage(page)).opacity.notTargeted, 35);
+    }
+}
+
+TEST(the_pages_of_the_kinds_with_status_icons_set_how_many_a_nameplate_shows)
+{
+    Window w;
+    for (const Page page : {Page::Players, Page::Self})
+    {
+        w.state.page           = page;
+        const std::string list = std::string(PageKey(page)) + "-nameplate-design-max-icons-shown";
+        CHECK(w.Pass({{list, kClickEvent, ""}}).popup);
+        CHECK(w.Pass({{list + "-o-2", kClickEvent, ""}}).changed); // the list starts at one icon
+        CHECK_EQ(w.settings.Kind(*KindOfPage(page)).maxIcons, 3);
+    }
+    CHECK_EQ(w.settings.Kind(PlateKind::Mobs).maxIcons, kCountedIcons);
+    for (const Page page : {Page::Mobs, Page::Npcs, Page::Pets})
+    {
+        w.state.page          = page;
+        const std::string card = std::string(PageKey(page)) + "-nameplate-design";
+        const Form form        = w.Pass();
+        CHECK(!Has(Block(form, card.c_str())->rml, "max-icons-shown"));
+    }
+}
+
+TEST(a_lines_glow_can_be_switched_off_for_combat_once_it_has_a_glow)
+{
+    Window w;
+    w.state.page = Page::Players;
+    const char* row = "players-line-style-disable-glow-in-combat-players0-label-row";
+    CHECK(ClassOn(w.Pass(), row, "off")); // no glow, nothing to switch off
+    w.settings.Kind(PlateKind::Players).lines[0].glow = 80;
+    CHECK(!ClassOn(w.Pass(), row, "off"));
+    CHECK(w.Pass({{"players-line-style-disable-glow-in-combat-players0", kClickEvent, ""}}).changed);
+    CHECK(w.settings.Kind(PlateKind::Players).lines[0].glowOffInCombat);
+}
+
+TEST(a_color_off_its_default_has_an_arrow_that_puts_it_back)
+{
+    Window w;
+    const char* arrow = "entities-colors-claim-status-claimed-yours-colors-claim-status-reset";
+    const Color original = w.settings.palette.claim[static_cast<int>(ClaimState::Yours)];
+    CHECK(ClassOn(w.Pass(), arrow, "hidden")); // nothing to put back
+    w.settings.palette.claim[static_cast<int>(ClaimState::Yours)] = Color{{0.1f, 0.2f, 0.3f}};
+    const Form moved = w.Pass();
+    CHECK(!ClassOn(moved, arrow, "hidden"));
+    CHECK(ClassOn(moved, "entities-colors-claim-status-unclaimed-colors-claim-status-reset", "hidden")); // each color its own
+    const Form back = w.Pass({{arrow, kClickEvent, ""}});
+    CHECK(back.changed && w.settings.palette.claim[static_cast<int>(ClaimState::Yours)] == original);
+    CHECK(ClassOn(back, arrow, "hidden"));
+    // A badge color has one too.
+    w.state.page = Page::Mobs;
+    w.settings.weakBadgeColor = Color{{0.0f, 0.0f, 0.0f}};
+    w.Pass({{"mobs-badges-weak-color-reset", kClickEvent, ""}});
+    CHECK(w.settings.weakBadgeColor == Settings{}.weakBadgeColor);
+}
+
+TEST(the_dash_mark_is_picked_from_a_list_whose_first_row_is_none)
+{
+    Window w;
+    const char* list = "entities-nameplates-replace-dashes";
+    const Form open  = w.Pass({{list, kClickEvent, ""}});
+    CHECK(open.popup);
+    CHECK(ClassOn(open, "entities-nameplates-replace-dashes-o-3", "picked")); // the diamond, a new install's
+    CHECK(w.Pass({{"entities-nameplates-replace-dashes-o-0", kClickEvent, ""}}).changed);
+    CHECK(w.settings.dashMark == DashMark::None);
 }

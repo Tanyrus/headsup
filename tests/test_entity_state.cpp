@@ -12,8 +12,8 @@ namespace
         s.alive  = true;
         s.nature = nature;
         s.claim  = claim;
-        s.row    = MobRowOf(nature, claim == ClaimState::Yours, claim != ClaimState::Unclaimed);
-        s.classified = MobRowOf(nature, false, false);
+        s.row    = MobRowOf(nature, claim == ClaimState::Yours, claim != ClaimState::Unclaimed, true);
+        s.classified = MobRowOf(nature, false, false, true);
         return s;
     }
 
@@ -38,11 +38,33 @@ TEST(a_classified_category_maps_to_its_nature_and_a_placeholder_wins)
 
 TEST(a_claim_wins_over_the_placeholder_which_wins_over_the_nature)
 {
-    CHECK(MobRowOf(Nature::Aggressive, false, false) == Category::WillAttack);
-    CHECK(MobRowOf(Nature::Placeholder, false, false) == Category::Placeholder);
-    CHECK(MobRowOf(Nature::Placeholder, false, true) == Category::OtherClaim);
-    CHECK(MobRowOf(Nature::Placeholder, true, true) == Category::PartyClaim);
-    CHECK(MobRowOf(Nature::NoData, false, false) == Category::Unknown);
+    CHECK(MobRowOf(Nature::Aggressive, false, false, true) == Category::WillAttack);
+    CHECK(MobRowOf(Nature::Placeholder, false, false, true) == Category::Placeholder);
+    CHECK(MobRowOf(Nature::Placeholder, false, true, true) == Category::OtherClaim);
+    CHECK(MobRowOf(Nature::Placeholder, true, true, true) == Category::PartyClaim);
+    CHECK(MobRowOf(Nature::NoData, false, false, true) == Category::Unknown);
+    // A pet's row is its owner's standing with you, the nearest first.
+    CHECK(PetRowOf(true, false, false) == PetRow::Yours);
+    CHECK(PetRowOf(false, true, true) == PetRow::Party);
+    CHECK(PetRowOf(false, false, true) == PetRow::Friend);
+    CHECK(PetRowOf(false, false, false) == PetRow::Others);
+    EntityState friendsPet;
+    friendsPet.kind   = EntityKind::Mob;
+    friendsPet.pet    = true;
+    friendsPet.petRow = PetRow::Friend;
+    CHECK(PlateKindOf(friendsPet) == PlateKind::Pets);
+    CHECK_EQ(RowOf(friendsPet), static_cast<int>(PetRow::Friend));
+    // Only your own pet's lines show by "When Owner is You", and no player's or mob's.
+    const LineShow yours{false, ConditionBit(ShowCondition::OwnerIsYou)};
+    CHECK(!LineShows(yours, friendsPet));
+    friendsPet.petRow = PetRow::Yours;
+    CHECK(LineShows(yours, friendsPet));
+    friendsPet.pet = false;
+    CHECK(!LineShows(yours, friendsPet));
+    // Dead, it is in the Dead row whatever it was and whoever claimed it.
+    CHECK(MobRowOf(Nature::Aggressive, false, false, false) == Category::Dead);
+    CHECK(MobRowOf(Nature::Placeholder, true, true, false) == Category::Dead);
+    CHECK(MobRowOf(Nature::NoData, false, true, false) == Category::Dead);
 }
 
 TEST(a_party_member_outranks_a_friend_who_outranks_a_linkshell_co_member)
@@ -59,7 +81,7 @@ TEST(the_plate_kind_and_row_follow_the_state)
     pet.kind = EntityKind::Mob;
     pet.pet  = true;
     CHECK(PlateKindOf(pet) == PlateKind::Pets);
-    CHECK_EQ(RowOf(pet), 0);
+    CHECK_EQ(RowOf(pet), static_cast<int>(PetRow::Others)); // nobody's it is known to be
     EntityState you;
     you.kind = EntityKind::Player;
     you.self = true;
@@ -182,16 +204,61 @@ TEST(each_condition_holds_for_its_state_alone)
     CHECK(!holds(ShowCondition::PartyMember, yours)); // a mob is never a party member
 }
 
-TEST(a_friend_is_named_in_the_list_whatever_the_case)
+TEST(the_cursor_takes_its_picks_color_and_the_targeting_color_where_the_pick_has_nothing_to_read)
 {
-    const std::vector<std::string> friends{"Chadmage", "pollux"};
-    CHECK(IsFriend(friends, "Chadmage"));
-    CHECK(IsFriend(friends, "chadMAGE"));
-    CHECK(IsFriend(friends, "Pollux"));
-    CHECK(!IsFriend(friends, "Chad"));
-    CHECK(!IsFriend(friends, "Chadmages"));
-    CHECK(!IsFriend(friends, ""));
-    CHECK(!IsFriend({}, "Chadmage"));
+    Settings s;
+    const Palette& p = s.palette;
+    EntityState mob;
+    mob.kind   = EntityKind::Mob;
+    mob.nature = Nature::Passive;
+    mob.claim  = ClaimState::Others;
+    mob.target = TargetState::Locked;
+    const uint32_t locked = ToArgb(p.target[static_cast<int>(TargetState::Locked)]);
+    CHECK_EQ(CursorColorOf(ColorPick{ColorSource::Target}, mob, p), locked);
+    CHECK_EQ(CursorColorOf(ColorPick{ColorSource::Aggression}, mob, p), ToArgb(p.aggression[static_cast<int>(Nature::Passive)]));
+    CHECK_EQ(CursorColorOf(ColorPick{ColorSource::Claim}, mob, p), ToArgb(p.claim[static_cast<int>(ClaimState::Others)]));
+    CHECK_EQ(CursorColorOf(ColorPick{ColorSource::Custom, {{0.0f, 0.0f, 1.0f}}}, mob, p), 0xFF0000FFu);
+    // A player has no aggression, toughness or claim to read: the cursor over one is the Targeting color.
+    EntityState player;
+    player.kind   = EntityKind::Player;
+    player.target = TargetState::SubTarget;
+    const uint32_t picking = ToArgb(p.target[static_cast<int>(TargetState::SubTarget)]);
+    for (const ColorSource mobsOnly : {ColorSource::Aggression, ColorSource::Toughness, ColorSource::Claim})
+        CHECK_EQ(CursorColorOf(ColorPick{mobsOnly}, player, p), picking);
+    CHECK_EQ(CursorColorOf(ColorPick{ColorSource::Type}, player, p), ToArgb(p.type[static_cast<int>(TargetType::Player)]));
+    // A pet is a mob in the game's eyes and has its own page, which offers no aggression either.
+    EntityState pet = mob;
+    pet.pet         = true;
+    CHECK_EQ(CursorColorOf(ColorPick{ColorSource::Aggression}, pet, p), locked);
+    // Every source the cursor offers is one it can resolve, and the game's name color is not among them.
+    const std::vector<ColorSource> offered = CursorSources();
+    CHECK(std::ranges::find(offered, ColorSource::Game) == offered.end());
+    CHECK(std::ranges::find(offered, ColorSource::Aggression) != offered.end());
+    CHECK(std::ranges::find(offered, ColorSource::Target) != offered.end());
+}
+
+TEST(a_mob_is_in_combat_once_your_party_has_claimed_it_and_anyone_else_while_engaged)
+{
+    EntityState mob;
+    mob.kind = EntityKind::Mob;
+    CHECK(!InCombat(mob));
+    mob.claim = ClaimState::Others;
+    mob.engaged = true; // fighting someone, but not yours to fight
+    CHECK(!InCombat(mob));
+    mob.claim = ClaimState::Yours;
+    CHECK(InCombat(mob));
+    EntityState player;
+    player.kind = EntityKind::Player;
+    CHECK(!InCombat(player));
+    player.engaged = true;
+    CHECK(InCombat(player));
+    // A pet is a mob to the game, and fights as its owner does: with its weapon out.
+    EntityState pet = mob;
+    pet.pet     = true;
+    pet.engaged = false;
+    CHECK(!InCombat(pet));
+    pet.engaged = true;
+    CHECK(InCombat(pet));
 }
 
 TEST(a_rows_color_is_what_its_outline_pick_resolves_to)

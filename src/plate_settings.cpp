@@ -6,30 +6,33 @@ namespace headsup
 {
     namespace
     {
-        const char* const kMobRowKeys[kCategoryCount]   = {"aggressive", "passive", "noData", "aggressiveNm", "passiveNm", "placeholder", "partyClaim", "othersClaim"};
-        const char* const kMobRowLabels[kCategoryCount] = {"Aggressive", "Passive", "No Data", "Aggressive NM", "Passive NM", "NM Placeholder", "Party Claim", "Others' Claim"};
+        const char* const kMobRowKeys[kCategoryCount]   = {"aggressive", "passive", "noData", "aggressiveNm", "passiveNm", "placeholder", "partyClaim", "othersClaim", "dead"};
+        const char* const kMobRowLabels[kCategoryCount] = {"Aggressive", "Passive", "No Data", "NM (Aggressive)", "NM (Passive)", "NM (Placeholder)", "Claimed (Yours)", "Claimed (Others')", "Dead"};
         const char* const kPlayerRowKeys[kPlayerRowCount]   = {"player", "partyMember", "friend", "linkshell"};
-        const char* const kPlayerRowLabels[kPlayerRowCount] = {"Players", "Party Members", "Friends", "Linkshell Co-Members"};
-        const char* const kOneRowKeys[kPlateKindCount]   = {"", "", "self", "npc", "pet"};
-        const char* const kOneRowLabels[kPlateKindCount] = {"", "", "Self", "NPCs", "Pets"};
+        const char* const kPlayerRowLabels[kPlayerRowCount] = {"Players", "Party Members", "Friends", "Linkshell Members"};
+        const char* const kPetRowKeys[kPetRowCount]   = {"yourPet", "partyPet", "friendPet", "othersPet"};
+        const char* const kPetRowLabels[kPetRowCount] = {"Your Pets", "Party Pets", "Friend Pets", "Others' Pets"};
+        const char* const kOneRowKeys[kPlateKindCount]   = {"", "", "self", "npc", ""};
+        const char* const kOneRowLabels[kPlateKindCount] = {"", "", "Self", "NPCs", ""};
         const char* const kKindKeys[kPlateKindCount]     = {"mobs", "players", "self", "npcs", "pets"};
-        const char* const kKindLabels[kPlateKindCount]   = {"Mobs", "Players", "Self", "NPCs", "Pets"};
-        const char* const kConditionLabels[kShowConditionCount] = {"When Targeted", "Unclaimed", "Your Claim", "Others' Claim",
-            "Engaged in Combat", "Too Weak", "Aggressive", "Passive", "Party Member", "Friend", "Linkshell Co-Member"};
-        const char* const kSourceLabels[kColorSourceCount] = {"Custom", "Game's", "Aggression", "Toughness", "Claim", "Target Status", "Target Type"};
-        const char* const kDetectionLabels[kDetectionIconCount] = {"Aggressive or Passive", "Links", "Sight", "True Sight", "Sound",
-            "Scent", "Magic", "Job Abilities", "Low HP"};
-        const char* const kPlateModeLabels[kPlateModeCount]     = {"Hidden", "Shown", "When Targeted", "Expanding", "Vanilla"};
-        const char* const kOutlineModeLabels[kOutlineModeCount] = {"Disabled", "Shown", "When Targeted", "By Nature"};
-        const char* const kNatureLabels[kNatureCount] = {"Passive", "Aggressive", "Passive NM", "Aggressive NM", "NM Placeholder", "No Data"};
+        const char* const kConditionLabels[kShowConditionCount] = {"When Targeted", "When Unclaimed", "When Claimed by You",
+            "When Claimed by Others", "When Engaged in Combat", "When Too Weak", "When Aggressive", "When Passive",
+            "When Party Member", "When Friend", "When Linkshell Member", "When Owner is You"};
+        const char* const kSourceLabels[kColorSourceCount] = {"Custom", "Vanilla Color", "Color by Aggression", "Color by Toughness",
+            "Color by Claim Status", "Color by Targeting", "Color by Entity Type"};
+        const char* const kDetectionLabels[kDetectionIconCount] = {"Aggression", "Links", "Sight", "True Sight", "Sound",
+            "Scent", "Use of Spells", "Use of Abilities", "Low Player HP"};
+        const char* const kPlateModeLabels[kPlateModeCount]     = {"Hide Nameplate", "Show Nameplate", "When Targeted", "Vanilla Nameplate"};
+        const char* const kOutlineModeLabels[kOutlineModeCount] = {"No Outline", "Show Outline", "When Targeted", "Inherit"};
+        const char* const kNatureLabels[kNatureCount] = {"Passive", "Aggressive", "NM (Passive)", "NM (Aggressive)", "NM (Placeholder)", "No Data"};
         const char* const kToughnessLabels[kLabelShadeCount] = {"Unknown Level", "Too Weak", "Easy Prey", "Decent Challenge",
             "Even Match", "Tough", "Very Tough"};
-        const char* const kClaimLabels[kClaimStateCount]        = {"Unclaimed", "Others' Claim", "Your Claim"};
+        const char* const kClaimLabels[kClaimStateCount]        = {"Unclaimed", "Claimed (Others')", "Claimed (Yours)"};
         const char* const kTargetStateLabels[kTargetStateCount] = {"Not Targeted", "Targeted", "Locked On", "Sub-Target", "Out of Range"};
         const char* const kTargetStateTips[kTargetStateCount]   = {nullptr, nullptr, nullptr, "Picking for a spell, ability or trade.",
             "A sub-target out of the spell or ability's range."};
-        const char* const kTargetTypeLabels[kTargetTypeCount]   = {"Mob", "NPC or Object", "Pet", "Player", "Friend", "Party Member",
-            "Linkshell Co-Member"};
+        const char* const kTargetTypeLabels[kTargetTypeCount]   = {"Mob", "Player", "Friend", "Party Member", "Linkshell Member",
+            "NPC or Object", "Pet"};
         const char* const kStatusRankLabels[kStatusRankCount]   = {"Paralyze", "Bind", "Silence", "Slow", "Poison", "Light Sleep",
             "Dark Sleep", "Blind", "Stun", "Gravity"};
 
@@ -52,8 +55,8 @@ namespace headsup
         const Color claim[kClaimStateCount] = {{{1.00f, 0.95f, 0.60f}}, {{0.55f, 0.45f, 0.40f}}, {{0.30f, 0.65f, 1.00f}}};
         const Color target[kTargetStateCount] = {{{1.00f, 1.00f, 1.00f}}, ColorFromRgb(kPhoenixRed), {{0.65f, 0.40f, 1.00f}},
             {{0.99f, 0.82f, 0.09f}}, {{1.00f, 0.25f, 0.25f}}};
-        const Color type[kTargetTypeCount] = {{{1.00f, 1.00f, 1.00f}}, {{1.00f, 1.00f, 1.00f}}, {{0.70f, 0.95f, 0.80f}},
-            {{1.00f, 1.00f, 1.00f}}, {{1.00f, 0.90f, 0.55f}}, {{0.55f, 0.80f, 1.00f}}, {{0.70f, 1.00f, 0.70f}}};
+        const Color type[kTargetTypeCount] = {{{1.00f, 1.00f, 1.00f}}, {{1.00f, 1.00f, 1.00f}}, {{1.00f, 0.90f, 0.55f}},
+            {{0.55f, 0.80f, 1.00f}}, {{0.70f, 1.00f, 0.70f}}, {{1.00f, 1.00f, 1.00f}}, {{0.70f, 0.95f, 0.80f}}};
         std::ranges::copy(aggression, p.aggression);
         std::ranges::copy(toughness, p.toughness);
         std::ranges::copy(claim, p.claim);
@@ -74,18 +77,22 @@ namespace headsup
             mobs.rows[CategoryIndex(claim)].outlineColor.source = ColorSource::Claim;
         }
         mobs.lines[0].text         = kTagDetect;
-        mobs.lines[0].iconSize     = 107; // 16 px of a 15 px base
         mobs.lines[1].text         = kTagLevelCon;
         mobs.lines[1].textSize     = 87; // 13 px of 15
         mobs.lines[1].color.source = ColorSource::Toughness;
         mobs.lines[2]              = NameLine(kTagName);
         mobs.lines[2].glow         = 100;
-        mobs.ornament.on           = true;
+        for (LineDesign& line : mobs.lines)
+            line.glowOffInCombat = true;
+        mobs.ornament.place        = OrnamentPlace::BelowMiddle;
         const LineDesign player = NameLine(kTagPlayerName);
         kinds[static_cast<int>(PlateKind::Players)].lines[2] = player;
         kinds[static_cast<int>(PlateKind::Self)].lines[2]    = player;
         kinds[static_cast<int>(PlateKind::Npcs)].lines[2]    = NameLine(kTagName);
-        kinds[static_cast<int>(PlateKind::Pets)].lines[2]    = NameLine(kTagName);
+        KindSettings& pets = kinds[static_cast<int>(PlateKind::Pets)];
+        pets.lines[2]      = NameLine(kTagName);
+        for (int row = 0; row < kPetRowCount; ++row)
+            pets.rows[row].plate = PlateMode::WhenTargeted;
         // Only a mob has an aggression, and only the Mobs page offers that palette: the other kinds' picks start on
         // one theirs do.
         for (const PlateKind kind : {PlateKind::Players, PlateKind::Self, PlateKind::Npcs, PlateKind::Pets})
@@ -106,6 +113,7 @@ namespace headsup
         {
         case PlateKind::Mobs: return kCategoryCount;
         case PlateKind::Players: return kPlayerRowCount;
+        case PlateKind::Pets: return kPetRowCount;
         default: return 1;
         }
     }
@@ -114,6 +122,7 @@ namespace headsup
     {
         if (kind == PlateKind::Mobs) return kMobRowKeys[row];
         if (kind == PlateKind::Players) return kPlayerRowKeys[row];
+        if (kind == PlateKind::Pets) return kPetRowKeys[row];
         return kOneRowKeys[static_cast<int>(kind)];
     }
 
@@ -121,11 +130,11 @@ namespace headsup
     {
         if (kind == PlateKind::Mobs) return kMobRowLabels[row];
         if (kind == PlateKind::Players) return kPlayerRowLabels[row];
+        if (kind == PlateKind::Pets) return kPetRowLabels[row];
         return kOneRowLabels[static_cast<int>(kind)];
     }
 
     const char* KindKey(PlateKind kind) { return kKindKeys[static_cast<int>(kind)]; }
-    const char* KindLabel(PlateKind kind) { return kKindLabels[static_cast<int>(kind)]; }
 
     std::vector<ShowCondition> ConditionsFor(PlateKind kind)
     {
@@ -137,6 +146,7 @@ namespace headsup
         case PlateKind::Players:
             return {ShowCondition::Targeted, ShowCondition::PartyMember, ShowCondition::Friend, ShowCondition::LinkshellMember};
         case PlateKind::Self: return {ShowCondition::Targeted, ShowCondition::Engaged};
+        case PlateKind::Pets: return {ShowCondition::Targeted, ShowCondition::OwnerIsYou};
         default: return {ShowCondition::Targeted};
         }
     }
@@ -146,12 +156,14 @@ namespace headsup
     std::vector<ColorSource> SourcesFor(PlateKind kind, bool text)
     {
         std::vector<ColorSource> sources{ColorSource::Custom};
-        if (text) sources.push_back(ColorSource::Game);
         if (kind == PlateKind::Mobs)
             sources.insert(sources.end(), {ColorSource::Aggression, ColorSource::Toughness, ColorSource::Claim});
         sources.insert(sources.end(), {ColorSource::Target, ColorSource::Type});
+        if (text) sources.push_back(ColorSource::Game);
         return sources;
     }
+
+    std::vector<ColorSource> CursorSources() { return SourcesFor(PlateKind::Mobs, false); }
 
     const char* SourceLabel(ColorSource s) { return kSourceLabels[static_cast<int>(s)]; }
     const char* DetectionLabel(DetectionIcon d) { return kDetectionLabels[static_cast<int>(d)]; }
@@ -165,15 +177,12 @@ namespace headsup
     const char* StatusRankLabel(StatusRank status) { return kStatusRankLabels[static_cast<int>(status)]; }
     const char* TargetStateTip(TargetState target) { return kTargetStateTips[static_cast<int>(target)]; }
 
-    bool IsCharacterName(std::string_view name)
-    {
-        const auto letter = [](char c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'); };
-        return name.size() >= kMinCharacterName && name.size() <= kMaxCharacterName && std::ranges::all_of(name, letter);
-    }
 
     const char* const kAlignLabels[kAlignCount]                 = {"Left", "Center", "Right"};
-    const char* const kOrnamentPlaceLabels[kOrnamentPlaceCount] = {"Lines 1-2", "Lines 2-3"};
-    const char* const kLineLabels[kPlateLines]                  = {"Line 1", "Line 2", "Line 3"};
+    const char* const kFontStyleLabels[kFontStyleCount]         = {"Bold", "Italics", "Underline"};
+    const char* const kOrnamentPlaceLabels[kOrnamentPlaceCount] = {"Disabled", "Top", "Above Middle Line", "Below Middle Line",
+        "Bottom"};
+    const char* const kLineLabels[kPlateLines]                  = {"Top Line", "Middle Line", "Bottom Line"};
 
     int OutlineModesFor(PlateKind kind, int row)
     {

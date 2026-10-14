@@ -23,5 +23,10 @@ TEST(badges_are_bold_in_their_own_font_with_a_crisp_black_edge)
 {
     Settings s;
     s.badgeFontName = "Tahoma";
-    CHECK(BadgeLineStyle(s) == (LineStyle{"Tahoma", true, 0xFF000000u, 0.0f, true}));
+    CHECK(BadgeLineStyle(s) == (LineStyle{"Tahoma", StyleBit(FontStyle::Bold), 0xFF000000u, 0.0f, true}));
+    // With no font of their own they are set in the default font, as a line is.
+    s.badgeFontName = "";
+    s.defaultFont   = "Cinzel";
+    CHECK_EQ(BadgeLineStyle(s).font, "Cinzel");
+    CHECK_EQ(BadgeLineStyle(Settings{}).font, Settings{}.defaultFont); // a new install's
 }

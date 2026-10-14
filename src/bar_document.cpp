@@ -16,7 +16,7 @@ namespace headsup
     namespace
     {
         constexpr std::string_view kIconKind = "icon", kStripKind = "strip", kDiamondKind = "diamond", kCoinKind = "coin",
-                                   kStarKind = "star";
+                                   kStarKind = "star", kResetKind = "reset";
         // RmlUi blurs a glow by a Gaussian of this share of its width; the bar's shadow is a CSS blur radius, twice
         // its Gaussian's.
         constexpr float kGlowSigmaPerWidth = 0.4f;
@@ -86,10 +86,10 @@ namespace headsup
         }
 
         // A box's fill, edge and corners as BoxOf gives them; no box is a clear one, its room kept.
-        std::string BoxRules(const std::optional<WidgetBox>& box)
+        std::string BoxRules(const std::optional<BoxStyle>& box)
         {
             if (!box) return "background-color:transparent;border-color:transparent;";
-            const BoxStyle& style = box->style;
+            const BoxStyle& style = *box;
             return "background-color:" + RcssColor(style.top) + ";border-color:" +
                    (style.border != 0 ? RcssColor(style.border) : std::string("transparent")) + ";border-radius:" +
                    Px(style.radius) + ";";
@@ -174,6 +174,11 @@ namespace headsup
         return std::string(kHostSource) + std::string(kStarKind) + kSeparator + std::to_string(pixels);
     }
 
+    std::string ResetSource(uint32_t argb, int pixels)
+    {
+        return std::string(kHostSource) + std::string(kResetKind) + kSeparator + Hex(argb) + kSeparator + std::to_string(pixels);
+    }
+
     std::optional<Image> HostImage(std::string_view name)
     {
         if (name.substr(0, kHostSource.size()) != kHostSource) return std::nullopt;
@@ -201,11 +206,11 @@ namespace headsup
             return StripColumn(static_cast<int>(*rows), static_cast<int>(*below), p.stripTop, p.stripMiddle, p.stripBottom,
                 p.bottomLine, p.underLine, p.below);
         }
-        if (kind == kDiamondKind && parts.size() == 3)
+        if ((kind == kDiamondKind || kind == kResetKind) && parts.size() == 3)
         {
             const std::optional<uint32_t> color = number(1, kHexBase), pixels = number(2);
             if (!color || !pixels) return std::nullopt;
-            return Diamond(static_cast<int>(*pixels), *color);
+            return kind == kDiamondKind ? Diamond(static_cast<int>(*pixels), *color) : ResetArrow(static_cast<int>(*pixels), *color);
         }
         if ((kind == kCoinKind || kind == kStarKind) && parts.size() == 2)
         {
@@ -260,7 +265,7 @@ namespace headsup
         const float underHeight = ProgressHeight(m, false), besideHeight = ProgressHeight(m, true);
         const std::string capSource     = DiamondSource(p.accent, cap);
         const std::string dividerSource = DiamondSource(look.ornate ? p.divider : p.accent, divider);
-        auto boxOf = [&](BarWidget widget, bool lit) { return look.BoxOf(PlacedWidget{widget, BarRect{}}, lit); };
+        auto boxOf = [&](BarWidget widget, bool lit) { return look.BoxOf(widget, lit); };
         auto square = [](float size) { return "width:" + Px(size) + ";height:" + Px(size) + ";"; };
         auto centered = [&](float size) { return Px(std::round(mid - size / 2.0f)); };
         const std::string shape = look.ornate ? ".ornate" : ".pills";

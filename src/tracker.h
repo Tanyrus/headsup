@@ -47,6 +47,7 @@ namespace headsup
         bool claimedByParty = false;
         bool claimed        = false;
         bool pet            = false;
+        PetRow petRow       = PetRow::Others; // a pet's, by its owner
         bool party          = false;
         bool isFriend       = false;
         bool linkshell      = false;
@@ -54,6 +55,7 @@ namespace headsup
         bool self           = false;
         std::optional<PlayerJobs> jobs = std::nullopt;
         const char* ownerName          = "";
+        uint32_t title                 = 0; // a player's, 0 while unknown
     };
 
     struct ActorInfo
@@ -61,12 +63,14 @@ namespace headsup
         bool outline       = false;
         uint8_t stencilRef = 0;     // 1 to kMaxStencilRef when outlined
         uint32_t argb      = 0;     // the outline's D3DCOLOR
+        uint8_t outlineAlpha = 0xFF; // and how opaque it is drawn
         uint16_t index     = 0;     // entity target index
         uint32_t serverId    = 0;       // the mob data key
         const MobRecord* mob = nullptr; // a mob's Phoenix record, when it has one
         Label level{};                  // a living mob's level and con, as the bar's Target widget shows them
         EntityKind kind    = EntityKind::Npc;
         bool alive         = false;
+        float distance     = 0.0f;  // yalms from you
         char name[32]      = {};
         uint32_t linkshellArgb = 0; // a player's linkshell color, for its icon
         Pose pose              = Pose::Standing;
@@ -77,10 +81,11 @@ namespace headsup
         bool placeholder = false;
         std::optional<PlayerJobs> jobs{};
         char ownerName[32] = {};
+        uint32_t title     = 0; // a player's, 0 while unknown
     };
 
-    // Whether a mob's claim (IEntity's ClaimStatus: the claimer's server ID in the low 16 bits, and 1 in the high 16
-    // while it is claimed) is held by anyone.
+    // Whether a mob's claim (IEntity's ClaimStatus: the claimer's whole server ID, and 0 once the claim has ended) is
+    // held by anyone. Phoenix's IDs can fit in 16 bits, so the high half says nothing.
     bool IsClaimed(uint32_t claimStatus);
     // Held by you or a member of your party or alliance.
     bool ClaimedByParty(uint32_t claimStatus, const std::vector<uint32_t>& partyServerIds);

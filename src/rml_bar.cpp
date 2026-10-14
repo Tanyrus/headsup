@@ -50,7 +50,7 @@ namespace headsup
         const Rml::FontMetrics metrics = host.Metrics(family, pixels);
         const LineInk ink              = m_Gdi.FontInk(family, pixels, kDetailGlyphs);
         int width = 0, height = 0;
-        m_Gdi.Extent("H", family, pixels, false, width, height);
+        m_Gdi.Extent("H", family, pixels, 0, width, height);
         FaceLine line{family, pixels, static_cast<float>(height), ink.top, ink.bottom,
             WholePixels(metrics.ascent + metrics.descent)};
         // RmlUi puts a line's baseline its font's ascent under half of what the line's height has over the font's.
@@ -125,7 +125,7 @@ namespace headsup
         if (pixels <= 0) return line;
         const LineInk ink = m_Gdi.FontInk(family, pixels, glyphs);
         int width = 0, height = 0;
-        m_Gdi.Extent("H", family, pixels, false, width, height);
+        m_Gdi.Extent("H", family, pixels, 0, width, height);
         const Rml::FontMetrics metrics = host.Metrics(family, pixels);
         line.height                    = WholePixels(metrics.ascent + metrics.descent);
         // RmlUi puts a line's baseline its font's ascent under half of what the line's height has over the font's.
@@ -155,8 +155,8 @@ namespace headsup
             rows.place.detail  = PlaceLine(host, detailFont, t.detail, kDetailGlyphs, t.detailY, t.detailY);
             // A line box is as tall for any text in its font: the caption's and the help's, as GDI draws them.
             int width = 0, caption = 0, help = 0;
-            m_Gdi.Extent("H", titleFont, t.title, false, width, caption);
-            m_Gdi.Extent("H", detailFont, t.title, false, width, help);
+            m_Gdi.Extent("H", titleFont, t.title, 0, width, caption);
+            m_Gdi.Extent("H", detailFont, t.title, 0, width, help);
             rows.helpBarHeight = std::round(static_cast<float>(std::max(caption, help)) + 2.0f * HelpBarPad(m));
             return rows;
         });

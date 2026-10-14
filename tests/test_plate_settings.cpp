@@ -1,133 +1,11 @@
-#include "menu_state.h"
 #include "plate_settings.h"
 #include "test.h"
 
 #include <algorithm>
 #include <array>
-#include <initializer_list>
-#include <set>
-#include <string>
 #include <vector>
 
 using namespace headsup;
-
-namespace
-{
-    // Each of a table's entries has a label of its own, written as a row of the menu would show it.
-    template <typename Label>
-    void CheckLabels(int count, Label label)
-    {
-        std::set<std::string> seen;
-        for (int i = 0; i < count; ++i)
-        {
-            const char* text = label(i);
-            CHECK(text != nullptr && text[0] != '\0');
-            CHECK_EQ(TitleCaseText(text), std::string(text));
-            CHECK(seen.insert(text).second);
-        }
-    }
-}
-
-TEST(every_entry_of_every_label_table_has_a_title_case_label_of_its_own)
-{
-    CheckLabels(kPlateModeCount, [](int i) { return PlateModeLabel(static_cast<PlateMode>(i)); });
-    CheckLabels(kOutlineModeCount, [](int i) { return OutlineModeLabel(static_cast<OutlineMode>(i)); });
-    CheckLabels(kNatureCount, [](int i) { return NatureLabel(static_cast<Nature>(i)); });
-    CheckLabels(kLabelShadeCount, [](int i) { return ToughnessLabel(static_cast<LabelShade>(i)); });
-    CheckLabels(kClaimStateCount, [](int i) { return ClaimLabel(static_cast<ClaimState>(i)); });
-    CheckLabels(kTargetStateCount, [](int i) { return TargetStateLabel(static_cast<TargetState>(i)); });
-    CheckLabels(kTargetTypeCount, [](int i) { return TargetTypeLabel(static_cast<TargetType>(i)); });
-    CheckLabels(kShowConditionCount, [](int i) { return ConditionLabel(static_cast<ShowCondition>(i)); });
-    CheckLabels(kColorSourceCount, [](int i) { return SourceLabel(static_cast<ColorSource>(i)); });
-    CheckLabels(kDetectionIconCount, [](int i) { return DetectionLabel(static_cast<DetectionIcon>(i)); });
-    CheckLabels(kStatusRankCount, [](int i) { return StatusRankLabel(static_cast<StatusRank>(i)); });
-    CheckLabels(kAlignCount, [](int i) { return kAlignLabels[i]; });
-    CheckLabels(kOrnamentPlaceCount, [](int i) { return kOrnamentPlaceLabels[i]; });
-    CheckLabels(kPlateLines, [](int i) { return kLineLabels[i]; });
-    CheckLabels(kPlateKindCount, [](int i) { return KindLabel(static_cast<PlateKind>(i)); });
-    for (int k = 0; k < kPlateKindCount; ++k)
-    {
-        const auto kind = static_cast<PlateKind>(k);
-        CheckLabels(RowCountOf(kind), [kind](int i) { return RowLabel(kind, i); });
-    }
-}
-
-namespace
-{
-    // A table's labels, entry by entry in its enum's order, against a list written out by hand.
-    template <typename Label>
-    void CheckOrder(int count, Label label, std::initializer_list<const char*> expected)
-    {
-        CHECK_EQ(static_cast<int>(expected.size()), count);
-        int i = 0;
-        for (const char* text : expected)
-            CHECK_EQ(label(i++), text);
-    }
-}
-
-TEST(every_label_names_its_own_enumerator)
-{
-    CheckOrder(kPlateModeCount, [](int i) { return PlateModeLabel(static_cast<PlateMode>(i)); },
-        {"Hidden", "Shown", "When Targeted", "Expanding", "Vanilla"});
-    CHECK_EQ(PlateModeLabel(PlateMode::Hidden), "Hidden");
-    CHECK_EQ(PlateModeLabel(PlateMode::Vanilla), "Vanilla");
-    CheckOrder(kOutlineModeCount, [](int i) { return OutlineModeLabel(static_cast<OutlineMode>(i)); },
-        {"Disabled", "Shown", "When Targeted", "By Nature"});
-    CHECK_EQ(OutlineModeLabel(OutlineMode::ByNature), "By Nature");
-    CheckOrder(kNatureCount, [](int i) { return NatureLabel(static_cast<Nature>(i)); },
-        {"Passive", "Aggressive", "Passive NM", "Aggressive NM", "NM Placeholder", "No Data"});
-    CHECK_EQ(NatureLabel(Nature::Aggressive), "Aggressive");
-    CHECK_EQ(NatureLabel(Nature::NoData), "No Data");
-    CheckOrder(kLabelShadeCount, [](int i) { return ToughnessLabel(static_cast<LabelShade>(i)); },
-        {"Unknown Level", "Too Weak", "Easy Prey", "Decent Challenge", "Even Match", "Tough", "Very Tough"});
-    CHECK_EQ(ToughnessLabel(LabelShade::VeryTough), "Very Tough");
-    CheckOrder(kClaimStateCount, [](int i) { return ClaimLabel(static_cast<ClaimState>(i)); },
-        {"Unclaimed", "Others' Claim", "Your Claim"});
-    CHECK_EQ(ClaimLabel(ClaimState::Yours), "Your Claim");
-    CheckOrder(kTargetStateCount, [](int i) { return TargetStateLabel(static_cast<TargetState>(i)); },
-        {"Not Targeted", "Targeted", "Locked On", "Sub-Target", "Out of Range"});
-    CHECK_EQ(TargetStateLabel(TargetState::Locked), "Locked On");
-    CHECK_EQ(TargetStateLabel(TargetState::OutOfRange), "Out of Range");
-    CheckOrder(kTargetTypeCount, [](int i) { return TargetTypeLabel(static_cast<TargetType>(i)); },
-        {"Mob", "NPC or Object", "Pet", "Player", "Friend", "Party Member", "Linkshell Co-Member"});
-    CHECK_EQ(TargetTypeLabel(TargetType::LinkshellMember), "Linkshell Co-Member");
-    CheckOrder(kOrnamentPlaceCount, [](int i) { return kOrnamentPlaceLabels[i]; }, {"Lines 1-2", "Lines 2-3"});
-    CHECK_EQ(kOrnamentPlaceLabels[static_cast<int>(OrnamentPlace::BetweenLines2And3)], "Lines 2-3");
-    CheckOrder(kAlignCount, [](int i) { return kAlignLabels[i]; }, {"Left", "Center", "Right"});
-    CHECK_EQ(kAlignLabels[static_cast<int>(Align::Right)], "Right");
-    CheckOrder(kPlateLines, [](int i) { return kLineLabels[i]; }, {"Line 1", "Line 2", "Line 3"});
-    CheckOrder(kShowConditionCount, [](int i) { return ConditionLabel(static_cast<ShowCondition>(i)); },
-        {"When Targeted", "Unclaimed", "Your Claim", "Others' Claim", "Engaged in Combat", "Too Weak", "Aggressive",
-            "Passive", "Party Member", "Friend", "Linkshell Co-Member"});
-    CHECK_EQ(ConditionLabel(ShowCondition::LinkshellMember), "Linkshell Co-Member");
-    CheckOrder(kColorSourceCount, [](int i) { return SourceLabel(static_cast<ColorSource>(i)); },
-        {"Custom", "Game's", "Aggression", "Toughness", "Claim", "Target Status", "Target Type"});
-    CHECK_EQ(SourceLabel(ColorSource::Type), "Target Type");
-    CheckOrder(kDetectionIconCount, [](int i) { return DetectionLabel(static_cast<DetectionIcon>(i)); },
-        {"Aggressive or Passive", "Links", "Sight", "True Sight", "Sound", "Scent", "Magic", "Job Abilities", "Low HP"});
-    CHECK_EQ(DetectionLabel(DetectionIcon::Blood), "Low HP");
-    CheckOrder(kStatusRankCount, [](int i) { return StatusRankLabel(static_cast<StatusRank>(i)); },
-        {"Paralyze", "Bind", "Silence", "Slow", "Poison", "Light Sleep", "Dark Sleep", "Blind", "Stun", "Gravity"});
-    CHECK_EQ(StatusRankLabel(StatusRank::Gravity), "Gravity");
-    CheckOrder(kCategoryCount, [](int i) { return RowLabel(PlateKind::Mobs, i); },
-        {"Aggressive", "Passive", "No Data", "Aggressive NM", "Passive NM", "NM Placeholder", "Party Claim", "Others' Claim"});
-    CHECK_EQ(RowLabel(PlateKind::Mobs, CategoryIndex(Category::OtherClaim)), "Others' Claim");
-    CheckOrder(kPlayerRowCount, [](int i) { return RowLabel(PlateKind::Players, i); },
-        {"Players", "Party Members", "Friends", "Linkshell Co-Members"});
-    CHECK_EQ(RowLabel(PlateKind::Players, static_cast<int>(PlayerRow::LinkshellMember)), "Linkshell Co-Members");
-    CheckOrder(kPlateKindCount, [](int i) { return KindLabel(static_cast<PlateKind>(i)); },
-        {"Mobs", "Players", "Self", "NPCs", "Pets"});
-    CHECK_EQ(KindLabel(PlateKind::Pets), "Pets");
-}
-
-TEST(only_the_sub_target_states_of_the_target_palette_say_when_they_apply)
-{
-    CHECK(TargetStateTip(TargetState::None) == nullptr);
-    CHECK(TargetStateTip(TargetState::Targeted) == nullptr);
-    CHECK(TargetStateTip(TargetState::Locked) == nullptr);
-    CHECK_EQ(TargetStateTip(TargetState::SubTarget), "Picking for a spell, ability or trade.");
-    CHECK_EQ(TargetStateTip(TargetState::OutOfRange), "A sub-target out of the spell or ability's range.");
-}
 
 TEST(every_default_color_pick_is_one_its_kinds_page_offers)
 {
@@ -165,21 +43,6 @@ TEST(every_default_color_pick_is_one_its_kinds_page_offers)
     CHECK(mobs.ornament.color.source == ColorSource::Aggression);
 }
 
-TEST(a_character_name_is_three_to_fifteen_letters)
-{
-    CHECK(IsCharacterName("Abc"));
-    CHECK(IsCharacterName("Tanyrus"));
-    CHECK(IsCharacterName("Abcdefghijklmno")); // 15
-    CHECK(!IsCharacterName("Ab"));
-    CHECK(!IsCharacterName("Abcdefghijklmnop")); // 16
-    CHECK(!IsCharacterName(""));
-    CHECK(!IsCharacterName("Chad1"));
-    CHECK(!IsCharacterName("Two Words"));
-    CHECK(!IsCharacterName("Tom's"));
-    CHECK(!IsCharacterName("Chad-mage"));
-    CHECK(!IsCharacterName("Ren\xC3\xA9" "e")); // letters past the alphabet are not the game's
-}
-
 TEST(by_nature_is_offered_only_on_the_mob_rows_that_can_step_aside)
 {
     for (int k = 0; k < kPlateKindCount; ++k)
@@ -205,6 +68,5 @@ TEST(only_a_drawn_outline_has_a_color_to_pick_and_only_headsups_plates_a_design)
     CHECK(!DrawsPlate(PlateMode::Hidden));
     CHECK(DrawsPlate(PlateMode::Shown));
     CHECK(DrawsPlate(PlateMode::WhenTargeted));
-    CHECK(DrawsPlate(PlateMode::Expanding));
     CHECK(!DrawsPlate(PlateMode::Vanilla));
 }

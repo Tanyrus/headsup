@@ -77,7 +77,8 @@ namespace headsup
             if (const auto own = ParseOwnStatus(data, size)) m_OwnStatus = *own;
             break;
         case kCheckReplyPacket:
-            next.check = ParseCheckReply(data, size);
+            next.check  = ParseCheckReply(data, size);
+            next.answer = ParseCheckAnswer(data, size);
             break;
         case kInspectMessagePacket:
             m_CheckMessage = ParseInspectMessage(data, size);

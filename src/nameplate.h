@@ -45,12 +45,17 @@ namespace headsup
     // Whether the game's own arrow would show at this anchor: only inside the screen. A target behind the camera has
     // its anchor left at the corner, (0,0), and one off to a side far outside.
     bool AnchorOnScreen(float x, float y, float screenWidth, float screenHeight);
-    CursorSpot CursorAtAnchor(float anchorX, float anchorY, float width, float height, float tip);
+    CursorSpot CursorAtAnchor(float anchorX, float anchorY, float width, float height, float tip, float raise = 0.0f);
+    // The width in pixels of a cursor drawn pixelHeight tall, whose settings give it width by height.
+    int CursorPixelWidth(int pixelHeight, int width, int height);
+    // The cursor's edge in pixels, at least one: 100 percent is a twentieth of its height.
+    int CursorEdgePixels(int pixelHeight, int percent);
     // The game's arrow over a candidate sits 10 of its 32 pixels above the one over the target: on a nameplate the
     // candidate's cursor rises this share of its height over the target's own.
     constexpr float kPickedCursorRise = 10.0f / 32.0f;
     // A cursor box moved the least that keeps all of it inside a screen this size.
-    CursorSpot KeepOnScreen(CursorSpot spot, float width, float height, float screenWidth, float screenHeight);
+    // top: what of the screen's top is covered, as by the top panel, which the cursor stays below.
+    CursorSpot KeepOnScreen(CursorSpot spot, float width, float height, float screenWidth, float screenHeight, float top = 0.0f);
 
     // How many icons a row of a run holds; the rest wrap onto rows above.
     constexpr int kIconsPerRow = 8;
@@ -89,7 +94,7 @@ namespace headsup
     // there once within half a pixel.
     float EaseRise(float shown, float target, double seconds);
 
-    float CursorBob(double seconds, float height);
+    float CursorBob(double seconds, float height, bool floating);
 
     // Not rounded, so sizes change as smoothly as the game's names; kept within the two limits.
     float DistanceScale(float letterHeight, float screenHeight, float minScale, float maxScale);
@@ -109,9 +114,9 @@ namespace headsup
     // Plates of a higher rank draw over every plate of a lower one: your target's, and over it the one you are picking.
     constexpr int kPlainRank = 0, kTargetRank = 1, kPickedRank = 2;
     int PlateRank(uint16_t index, const CursorTargets& targets);
-    // A plate's alpha, out of kOpaqueAlpha: a mob's that is not picked fades to the menu's opacity while you have a
-    // target.
-    uint32_t PlateAlpha(const Settings& settings, EntityKind kind, int rank, bool hasTarget);
+    // A plate's alpha, out of kOpaqueAlpha: its kind's opacity for no target, not targeted or targeted (rank:
+    // PlateRank's), and fainter with distance where the kind fades in, which your target's and pick's never are.
+    uint32_t PlateAlpha(const OpacitySettings& opacity, int rank, bool hasTarget, float distance);
     // Within a rank, farther plates first, so nearer ones cover them.
     bool DrawnBefore(int rankA, float depthA, int rankB, float depthB);
     // Heights come in steps, and current (the height drawn now) is kept until the shown size falls a step below it or

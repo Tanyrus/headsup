@@ -16,6 +16,7 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -64,6 +65,10 @@ namespace headsup
         void Release();
 
         const std::vector<Shown>& LastShown() const { return m_Shown; }
+        // How much of the screen's top the top panel covers, in back-buffer pixels: cursors stay below it.
+        void SetCoveredTop(float pixels) { m_CoveredTop = pixels; }
+        // The picture a cursor of the File style draws, or none for a file that could not be read.
+        void SetCursorFile(std::optional<Image> picture);
         // The game's cursor is blocked over these.
         const std::vector<CursorName>& CursorNames() const { return m_CursorNames; }
         bool NamesFailed() const { return m_NamesFailed; }
@@ -149,7 +154,11 @@ namespace headsup
         const PlateTexture* PrepareBadge(const IconDraw& icon, const LineStyle& line, int pixelHeight);
         // The ornament's diamond has the shadow of shadowLine.
         bool PrepareOrnament(PlateTexture& t, uint32_t color, int pixelHeight, int width, const LineStyle& shadowLine);
-        bool PrepareCursor(PlateTexture& t, uint32_t color, int pixelHeight, const Settings& settings);
+        bool PrepareCursor(PlateTexture& t, const EntityState& over, int pixelHeight, const Settings& settings);
+        Image m_Chocobo;                   // made when first drawn
+        std::optional<Image> m_CursorFile; // the File style's picture; none while it is not read
+        int m_CursorFileSerial = 0;
+        float m_CoveredTop     = 0.0f;
         bool Upload(PlateTexture& t, const Image& image, TextureKey key);
         // Marks t as holding this key with nothing to draw: its image fits no texture at the smallest height either.
         static void LeaveOut(PlateTexture& t, TextureKey key);

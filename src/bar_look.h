@@ -20,13 +20,6 @@ namespace headsup
         int tracking       = 0; // pixels after each letter
     };
 
-    // A widget's pill, the ornate target's frame or a hover tint: where it is drawn and how.
-    struct WidgetBox
-    {
-        BarRect rect;
-        BoxStyle style;
-    };
-
     // A frame's palette, sizes and fonts: what every part of the bar is drawn with.
     struct BarLook
     {
@@ -50,9 +43,9 @@ namespace headsup
         TextFace FaceOf(PopupFont font) const;
         // The icons and coin before a widget's text.
         float Leading(const WidgetContent& content) const;
-        // lit: hovered or open, with a popup. Ornate: the target's frame and a lit widget's tint, on the pill row.
-        // Pills: every widget's pill, zone and Earth time flat until lit.
-        std::optional<WidgetBox> BoxOf(const PlacedWidget& placed, bool lit) const;
+        // How a widget's box is drawn, or nothing for none. lit: hovered or open, with a popup. Ornate: the target's
+        // frame and a lit widget's tint. Pills: every widget's pill, zone and Earth time flat until lit.
+        std::optional<BoxStyle> BoxOf(BarWidget widget, bool lit) const;
     };
 
     // The bar's fonts: the player's, or the theme's when they set none. Each name lasts as long as the process, for the
@@ -100,11 +93,4 @@ namespace headsup
     constexpr uint32_t kStarColor     = kCoinColor; // a popup's star, in the coin's gold
     constexpr float kShadowStrength   = 0.6f;       // the bar's text shadow, of the mockup's
 
-    struct BarPoint
-    {
-        float x = 0.0f, y = 0.0f;
-    };
-    // The corner of a text's line box that centers its glyphs' ink in box: ink is where the ink is in its image, which
-    // has margin pixels around the line box. Nothing without ink.
-    std::optional<BarPoint> CenteredInk(const BarRect& box, const InkBox& ink, float margin);
 }

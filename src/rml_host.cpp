@@ -16,7 +16,6 @@ namespace headsup
         constexpr const char* kBarContext     = "bar";
         constexpr const char* kOverlayContext = "overlay";
         constexpr int kLeftButton = 0, kRightButton = 1, kMiddleButton = 2; // as RmlUi numbers them
-        constexpr int kKeyDownBit         = 0x8000;                          // GetKeyState: the key is down
         constexpr int kKeyToggledBit      = 0x0001;                          // GetKeyState: a lock is on
         constexpr int kTypedAtMost        = 4;                               // UTF-16 units one key can type
         constexpr wchar_t kFirstPrintable = L' ';
@@ -168,15 +167,26 @@ namespace headsup
         switch (message)
         {
         case WM_MOUSEMOVE: return !m_Overlay->ProcessMouseMove(px, py, modifiers);
-        case WM_LBUTTONDOWN: return !m_Overlay->ProcessMouseButtonDown(kLeftButton, modifiers);
+        case WM_LBUTTONDOWN: return Press(kLeftButton, modifiers);
         case WM_LBUTTONUP: return !m_Overlay->ProcessMouseButtonUp(kLeftButton, modifiers);
-        case WM_RBUTTONDOWN: return !m_Overlay->ProcessMouseButtonDown(kRightButton, modifiers);
+        case WM_RBUTTONDOWN: return Press(kRightButton, modifiers);
         case WM_RBUTTONUP: return !m_Overlay->ProcessMouseButtonUp(kRightButton, modifiers);
-        case WM_MBUTTONDOWN: return !m_Overlay->ProcessMouseButtonDown(kMiddleButton, modifiers);
+        case WM_MBUTTONDOWN: return Press(kMiddleButton, modifiers);
         case WM_MBUTTONUP: return !m_Overlay->ProcessMouseButtonUp(kMiddleButton, modifiers);
         case WM_MOUSEWHEEL: return !m_Overlay->ProcessMouseWheel(WheelNotches(wheelDelta), modifiers);
         default: return false;
         }
+    }
+
+    // A press on nothing of HeadsUp's takes the keyboard from its text box or slider, as a click elsewhere in a
+    // window does: the box would go on keeping every key from the game, and the slider on moving with the arrows.
+    bool RmlHost::Press(int button, int modifiers)
+    {
+        const bool outside = m_Overlay->ProcessMouseButtonDown(button, modifiers);
+        // Its document takes the keyboard: blurred alone, a slider's part would hand it to the slider.
+        if (Rml::Element* focus = outside ? m_Overlay->GetFocusElement() : nullptr)
+            if (Rml::ElementDocument* document = focus->GetOwnerDocument()) document->Focus();
+        return !outside;
     }
 
     bool RmlHost::Key(uint32_t virtualKey, bool down)
@@ -210,7 +220,8 @@ namespace headsup
     {
         if (!Running()) return false;
         Rml::Element* focus = m_Overlay->GetFocusElement();
-        if (focus == nullptr) return false;
+        // A window hidden while one of its boxes had the keyboard leaves the context's focus on that box.
+        if (focus == nullptr || !focus->IsVisible(true)) return false;
         if (rmlui_dynamic_cast<Rml::ElementFormControlTextArea*>(focus) != nullptr) return true;
         const auto* input = rmlui_dynamic_cast<Rml::ElementFormControlInput*>(focus);
         if (input == nullptr) return false;

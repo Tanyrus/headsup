@@ -3,6 +3,8 @@
 #include "bar_placement.h"
 #include "bar_server_time.h"
 #include "plate_settings.h"
+#include "plate_template.h"
+#include "settings.h"
 
 #include <cstdint>
 #include <optional>
@@ -54,14 +56,6 @@ namespace headsup
     std::vector<BarWidget> WidgetTabs();
     // How many tabs go in a row for count of them in rows rows: the rows as even as they come, the first the fuller.
     int TabsPerRow(int count, int rows);
-    // Where a tab goes in a strip of count tabs, perRow to a row, gap apart sideways and between rows: from the
-    // strip's top left, with its width. The tabs of a row are equal and fill the strip, so a last row with fewer has
-    // wider ones.
-    struct TabPlace
-    {
-        float x = 0.0f, y = 0.0f, width = 0.0f;
-    };
-    TabPlace TabAt(int tab, int count, int perRow, float strip, float height, float gap);
 
     // The Clock widget's Time Zone dropdown: the computer's own zone first, as no zone picked, then every ClockZone.
     constexpr int kClockZoneChoices = kClockZoneCount + 1;
@@ -69,27 +63,20 @@ namespace headsup
     std::optional<ClockZone> ClockZoneOfChoice(int choice);
     std::string ClockZoneChoiceName(int choice);
 
-    struct Settings;
-    // A size slider's format: its percent, then the pixels that percent of the base size is drawn at before the
-    // distance scale, as "%d%% (13 px)".
-    std::string SizeFormat(const Settings& settings, int percent);
-
     constexpr const char* kShowAlways = "Always";
     // What the Show dropdown reads when closed: Always, the one condition checked, how many are, or Never. Only the
     // conditions the kind is offered count.
     std::string ShowSummary(const LineShow& show, const std::vector<ShowCondition>& offered);
+    // A click on a row of the Line Visibility list: 0 is Always, then the conditions offered. Unchecking one under
+    // Always turns Always off and leaves the others checked. False for no such row.
+    bool ToggleCondition(LineShow& show, const std::vector<ShowCondition>& offered, int row);
 
-    // A name typed into the Friends card as it joins the list: trimmed. Nothing when it is no character's name or
-    // is there already in any case.
-    std::optional<std::string> FriendToAdd(const std::vector<std::string>& friends, std::string_view typed);
-
-    // A design line's box between frames: its text while typed in, which ImGui takes back on Escape only from a
-    // buffer that has kept it, and its caret in bytes, where a clicked tag goes (past the text means its end).
+    // A design line's box: its caret, kept between frames for where a clicked tag goes, and whether one of its
+    // stretches has the keyboard this frame.
     struct LineDraft
     {
-        char text[kMaxTemplate + 1] = {};
-        size_t caret                = kMaxTemplate;
-        bool typing                 = false;
+        RunCaret caret;
+        bool typing = false;
     };
 
     // The "Add a key" button's wait for a key: those held when it was pressed do not count.
@@ -100,14 +87,13 @@ namespace headsup
     };
 
     // A kind page's own state, begun anew when another kind's page opens: the line last typed in, which takes a
-    // clicked tag, the three lines' boxes, the Line Style tab that is open and the name being typed for Friends.
+    // clicked tag, the three lines' boxes and the Line Style tab that is open.
     struct DesignEditor
     {
         PlateKind kind = PlateKind::Mobs;
         int line       = 0;
         int styleTab   = 0;
         LineDraft drafts[kPlateLines] = {};
-        char friendName[kMaxCharacterName + 1] = {};
     };
 
     // A font dropdown lists unset first, when it has one, a word that stands for an empty name, then the fonts. A
@@ -130,4 +116,17 @@ namespace headsup
     int SyncEntry(const std::vector<int>& targets, int syncWith);
     int SyncOfEntry(const std::vector<int>& targets, int entry);
     std::string SyncEntryLabel(const std::vector<int>& targets, int entry);
+    std::string SyncEntryTip(const std::vector<int>& targets, int entry);
+
+    // One entry of the Cursor Style list: one of HeadsUp's own styles, or a file of the cursors folder.
+    struct CursorChoice
+    {
+        CursorStyle style = kDefaultCursorStyle;
+        std::string file; // a File's name
+        bool operator==(const CursorChoice&) const = default;
+    };
+    // The list: HeadsUp's styles, then each file, then the file the settings name when the folder has none such.
+    std::vector<CursorChoice> CursorChoices(const std::vector<std::string>& files, const Settings& settings);
+    // Which entry the settings have picked.
+    int CursorChoiceOf(const std::vector<CursorChoice>& choices, const Settings& settings);
 }

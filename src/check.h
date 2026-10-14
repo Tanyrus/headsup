@@ -21,6 +21,16 @@ namespace headsup
     };
     std::optional<CheckReply> ParseCheckReply(const uint8_t* data, uint32_t size);
 
+    // The mob an incoming 0x029 answers a /check of, whether the answer gives its level or is "impossible to
+    // gauge"; nothing for any other message.
+    struct CheckAnswer
+    {
+        uint32_t serverId = 0;
+        bool gauged       = false;
+        bool operator==(const CheckAnswer&) const = default;
+    };
+    std::optional<CheckAnswer> ParseCheckAnswer(const uint8_t* data, uint32_t size);
+
     // How long a check result stays valid: the mob's respawn time, after which a new spawn may have another level,
     // else ten minutes.
     double CheckLifetime(const MobRecord* mob);

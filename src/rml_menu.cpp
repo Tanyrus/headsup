@@ -22,6 +22,8 @@ namespace headsup
         constexpr float kPopupDrop  = 2.0f;  // pixels between a control and its popup
         constexpr float kTipDrop    = 18.0f; // pixels from the pointer to its tip
         constexpr char kKeySeparator = '\x1f';
+        // A design line's box and the stretches of text in it, as menu_document styles them.
+        constexpr float kCaretRoom         = 0.4f;     // ems past a stretch's last letter: its caret, and a place to click
 
         Rml::Element* WithId(Rml::Element* element)
         {
@@ -33,6 +35,14 @@ namespace headsup
         Rml::ElementFormControlInput* AsInput(Rml::Element* element)
         {
             return rmlui_dynamic_cast<Rml::ElementFormControlInput*>(element);
+        }
+
+        // Whether a drag ended on the control dragged: a click with an unsteady hand. RmlUi looks past that control
+        // for what is under the pointer, so it would count as a drop on what the control stands in.
+        bool LetGoOn(Rml::Element* dragged, const Rml::Event& event)
+        {
+            return dragged->IsPointWithinElement(
+                Rml::Vector2f(event.GetParameter<float>("mouse_x", 0.0f), event.GetParameter<float>("mouse_y", 0.0f)));
         }
 
         bool IsText(Rml::ElementFormControlInput* input)
@@ -49,6 +59,31 @@ namespace headsup
                     ++at;
                 while (at < text.size() && ContinuesCharacter(text[at]));
             return at;
+        }
+
+        // A byte of a text as RmlUi counts its carets, in characters.
+        int CharacterOf(const std::string& text, size_t byte)
+        {
+            int characters = 0;
+            for (size_t at = 0; at < byte && at < text.size(); ++at)
+                characters += ContinuesCharacter(text[at]) ? 0 : 1;
+            return characters;
+        }
+
+        // The stretch before (-1) or after (1) this one in its box, past the tag between them; none at an end.
+        Rml::ElementFormControlInput* RunBeside(Rml::Element* run, int step)
+        {
+            Rml::Element* at = run;
+            for (int sibling = 0; sibling < 2 && at != nullptr; ++sibling)
+                at = step < 0 ? at->GetPreviousSibling() : at->GetNextSibling();
+            return at != nullptr && at->IsClassSet(kRunClass) ? AsInput(at) : nullptr;
+        }
+
+        void FocusAt(Rml::ElementFormControlInput* input, int character)
+        {
+            if (input == nullptr) return;
+            input->Focus();
+            input->SetSelectionRange(character, character);
         }
 
         std::string KeyOf(const FormValue& value)
@@ -81,11 +116,13 @@ namespace headsup
     }
 
     bool RmlMenu::TakeDebugRequest() { return std::exchange(m_State.debugRequested, false); }
+    bool RmlMenu::TakeCursorsRequest() { return std::exchange(m_State.cursorsRequested, false); }
 
     bool RmlMenu::OpenPage(const std::string& name)
     {
         const std::optional<Page> page = PageNamed(name);
         if (!page) return false;
+        m_State.Leave();
         m_State.page = *page;
         open         = true;
         m_ScrollTo   = 0.0f;
@@ -96,9 +133,10 @@ namespace headsup
     {
         Rml::Element* element = m_Document != nullptr ? m_Document->GetElementById(id) : nullptr;
         if (element == nullptr) return std::nullopt;
-        // What is in the popup or the frame is in view already; a card's control may be scrolled out of it.
+        // What is in the popup or the frame is in view already; a card's control may be scrolled out of it, and in
+        // a short window a page's name.
         for (Rml::Element* up = scroll ? element : nullptr; up != nullptr; up = up->GetParentNode())
-            if (up == m_Page)
+            if (up == m_Page || up == m_Sidebar)
             {
                 element->ScrollIntoView(Rml::ScrollIntoViewOptions(Rml::ScrollAlignment::Nearest));
                 m_Document->GetContext()->Update();
@@ -136,13 +174,14 @@ namespace headsup
         if (m_Document == nullptr) return false;
         m_Look       = std::move(look);
         m_FontPixels = 0.0f;
+        m_Opacity    = 0;
         m_Sidebar    = m_Document->GetElementById(kMenuSidebarId);
         m_Page       = m_Document->GetElementById(kMenuPageId);
         m_PageTitle  = m_Document->GetElementById(kMenuPageTitleId);
         m_Popup      = m_Document->GetElementById(kMenuPopupId);
         m_Tip        = m_Document->GetElementById(kMenuTipId);
-        for (const Rml::EventId id : {Rml::EventId::Click, Rml::EventId::Change, Rml::EventId::Dragdrop,
-                 Rml::EventId::Mouseover, Rml::EventId::Mousemove})
+        for (const Rml::EventId id : {Rml::EventId::Click, Rml::EventId::Change, Rml::EventId::Dragdrop, Rml::EventId::Dragend,
+                 Rml::EventId::Mouseover, Rml::EventId::Mousemove, Rml::EventId::Animationend})
             m_Document->AddEventListener(id, this);
         // On their way down: taking and losing the keyboard do not come back up, and a text box keeps its keys.
         for (const Rml::EventId id : {Rml::EventId::Focus, Rml::EventId::Blur, Rml::EventId::Keydown})
@@ -213,7 +252,14 @@ namespace headsup
             {
             case FormValueKind::Class: element->SetClass(value.name, value.on); break;
             case FormValueKind::Text: element->SetInnerRML(EscapedRml(value.text)); break;
+            case FormValueKind::Markup: element->SetInnerRML(value.text); break;
             case FormValueKind::Property: element->SetProperty(value.name, value.text); break;
+            case FormValueKind::Attribute:
+                if (value.text.empty())
+                    element->RemoveAttribute(value.name);
+                else
+                    element->SetAttribute(value.name, value.text);
+                break;
             case FormValueKind::Value:
             {
                 auto* control = rmlui_dynamic_cast<Rml::ElementFormControl*>(element);
@@ -231,7 +277,7 @@ namespace headsup
     void RmlMenu::ApplyPopup(const std::optional<FormPopup>& popup)
     {
         Rml::Element* anchor = popup ? Find(popup->anchor) : nullptr;
-        m_Popup->SetClass("hidden", anchor == nullptr);
+        m_Popup->SetClass(kHiddenClass, anchor == nullptr);
         m_Popup->SetClass("open", anchor != nullptr);
         if (anchor == nullptr)
         {
@@ -264,7 +310,7 @@ namespace headsup
         while (under != nullptr && !under->HasAttribute(kMenuTipAttribute))
             under = under->GetParentNode();
         const std::string text = under != nullptr ? under->GetAttribute<Rml::String>(kMenuTipAttribute, "") : std::string();
-        m_Tip->SetClass("hidden", text.empty());
+        m_Tip->SetClass(kHiddenClass, text.empty());
         if (text.empty()) return;
         if (text != m_TipShown)
         {
@@ -290,9 +336,64 @@ namespace headsup
             SetPx(m_Tip, Rml::PropertyId::Top, std::round(in.y + kTipDrop));
     }
 
+    // A key in a stretch that is not the stretch's own: Backspace at its start and Delete at its end are for the tag
+    // beside it, and the arrows step past it. True when the keyboard moved: the stretch left must not get the key.
+    bool RmlMenu::RunKey(Rml::ElementFormControlInput* input, const std::string& id, Rml::Input::KeyIdentifier key)
+    {
+        const std::string value = input->GetValue();
+        int start = 0, end = 0;
+        input->GetSelection(&start, &end, nullptr);
+        const bool atStart = start == 0 && end == 0, atEnd = start == end && ByteOf(value, start) == value.size();
+        if (key == Rml::Input::KI_BACK && atStart)
+            m_Events.push_back(FormEvent{id, kKillEvent, kKillBack + value});
+        else if (key == Rml::Input::KI_DELETE && atEnd)
+            m_Events.push_back(FormEvent{id, kKillEvent, kKillForward + value});
+        else if (key == Rml::Input::KI_LEFT && atStart)
+        {
+            Rml::ElementFormControlInput* before = RunBeside(input, -1);
+            if (before == nullptr) return false;
+            FocusAt(before, CharacterOf(before->GetValue(), before->GetValue().size()));
+            return true;
+        }
+        else if (key == Rml::Input::KI_RIGHT && atEnd)
+        {
+            Rml::ElementFormControlInput* after = RunBeside(input, 1);
+            FocusAt(after, 0);
+            return after != nullptr;
+        }
+        return false;
+    }
+
+    // Each stretch of a line box is as wide as what is typed in it, so that its tags sit against its letters.
+    void RmlMenu::FitRuns()
+    {
+        Rml::ElementList runs;
+        m_Page->GetElementsByClassName(runs, kRunClass);
+        for (Rml::Element* run : runs)
+        {
+            Rml::ElementFormControlInput* input = AsInput(run);
+            if (input == nullptr) continue;
+            const float width = static_cast<float>(Rml::ElementUtilities::GetStringWidth(run, input->GetValue())) +
+                                std::round(kCaretRoom * m_FontPixels);
+            const Rml::Property* had = run->GetLocalProperty(Rml::PropertyId::Width);
+            if (had == nullptr || had->Get<float>() != width) SetPx(run, Rml::PropertyId::Width, width);
+        }
+    }
+
+    void RmlMenu::ApplyOpacity()
+    {
+        m_Document->SetProperty(Rml::PropertyId::Opacity, Rml::Property(static_cast<float>(m_Opacity) / kPercent, Rml::Unit::NUMBER));
+    }
+
     void RmlMenu::ProcessEvent(Rml::Event& event)
     {
         if (m_Document == nullptr) return;
+        // The fade the window opens with ends by taking its opacity off the document: it is put back at once.
+        if (event.GetId() == Rml::EventId::Animationend && event.GetTargetElement() == m_Document)
+        {
+            ApplyOpacity();
+            return;
+        }
         Rml::Element* target = event.GetTargetElement();
         Rml::Element* named  = WithId(target);
         const std::string id = named != nullptr ? named->GetId() : std::string();
@@ -300,8 +401,13 @@ namespace headsup
         {
         case Rml::EventId::Click:
             if (id == kMenuCloseId) m_Closed = true;
-            m_Events.push_back(FormEvent{id, kClickEvent, {}});
-            m_Tip->SetClass("hidden", true);
+            // The picker's own ground, between its sliders, is the picker: a click there is one on its control.
+            // A click in a line box beside its stretches is a click at its end.
+            if (target->IsClassSet(kLineBoxClass))
+                if (Rml::ElementFormControlInput* last = AsInput(target->GetLastChild()))
+                    FocusAt(last, CharacterOf(last->GetValue(), last->GetValue().size()));
+            m_Events.push_back(FormEvent{named == m_Popup ? m_State.form.popup + kPopupGround : id, kClickEvent, {}});
+            m_Tip->SetClass(kHiddenClass, true);
             break;
         case Rml::EventId::Change:
             if (AsInput(target) != nullptr)
@@ -311,7 +417,7 @@ namespace headsup
             if (Rml::ElementFormControlInput* input = AsInput(target); IsText(input))
             {
                 m_FocusValue[id] = input->GetValue();
-                m_Events.push_back(FormEvent{id, kFocusEvent, {}});
+                if (target->IsClassSet(kRunClass)) target->GetParentNode()->SetClass(kTypingClass, true);
             }
             break;
         case Rml::EventId::Blur:
@@ -325,6 +431,7 @@ namespace headsup
                     m_Events.push_back(FormEvent{id, kCommitEvent, value});
                 // What it shows from here is the form's to set again.
                 m_Applied.erase(id + kKeySeparator + static_cast<char>('0' + static_cast<int>(FormValueKind::Value)));
+                if (target->IsClassSet(kRunClass)) target->GetParentNode()->SetClass(kTypingClass, false);
             }
             break;
         case Rml::EventId::Keydown:
@@ -339,11 +446,19 @@ namespace headsup
                 }
                 else if (key == Rml::Input::KI_RETURN || key == Rml::Input::KI_NUMPADENTER)
                     input->Blur();
+                // RmlUi's text box shows its caret for every arrow it is given, with or without the keyboard.
+                else if (target->IsClassSet(kRunClass) && RunKey(input, id, key))
+                    event.StopPropagation();
             }
             break;
         case Rml::EventId::Dragdrop:
-            if (auto* dragged = static_cast<Rml::Element*>(event.GetParameter<void*>("drag_element", nullptr)))
-                m_Events.push_back(FormEvent{id, kDropEvent, dragged->GetId()});
+            if (auto* dragged = static_cast<Rml::Element*>(event.GetParameter<void*>("drag_element", nullptr));
+                dragged != nullptr && !LetGoOn(dragged, event))
+                m_Events.push_back(FormEvent{id, kDropEvent, dragged->GetId(),
+                    dragged->GetAttribute<Rml::String>(kCarriesAttribute, "")});
+            break;
+        case Rml::EventId::Dragend:
+            if (!LetGoOn(target, event)) m_Events.push_back(FormEvent{id, kDragEndEvent, {}, {}});
             break;
         case Rml::EventId::Mouseover:
         case Rml::EventId::Mousemove:
@@ -353,21 +468,47 @@ namespace headsup
         }
     }
 
+    namespace
+    {
+        // The first click that comes after a text box said what was typed in it; the end when there is none.
+        std::vector<FormEvent>::iterator ClickAfterTyping(std::vector<FormEvent>& events)
+        {
+            const auto typed = std::ranges::find(events, std::string_view(kCommitEvent), &FormEvent::type);
+            return std::find_if(typed, events.end(), [](const FormEvent& event) { return event.type == kClickEvent; });
+        }
+    }
+
+    Form RmlMenu::Pass(std::vector<FormEvent> events, const MenuHost& host, Settings& settings, const MenuReadings& readings,
+        const std::vector<std::string>& fonts)
+    {
+        Form form(std::move(events), m_State.form, host.keyDown);
+        if (Rml::Element* focus = host.context->GetFocusElement(); focus != nullptr && focus->GetOwnerDocument() == m_Document)
+            form.focused = focus->GetId();
+        BuildMenu(form, settings, readings, m_State, fonts, host.menuFonts);
+        return form;
+    }
+
     bool RmlMenu::Update(const MenuHost& host, Settings& settings, const MenuReadings& readings,
         const std::vector<std::string>& fonts, float em, double version)
     {
         if (std::exchange(m_Closed, false)) open = false;
         if (!open || host.context == nullptr)
         {
-            if (m_Document != nullptr && m_Visible)
+            bool changed = false;
+            if (m_Document != nullptr && m_Visible && host.context != nullptr)
             {
+                // A box that has the keyboard as the window goes gives it up and says what was typed in it, which a
+                // last pass takes with whatever else came this frame: the click on the close button comes after it.
+                if (Rml::Element* focus = host.context->GetFocusElement(); focus != nullptr && focus->GetOwnerDocument() == m_Document)
+                    focus->Blur();
+                changed = Pass(std::exchange(m_Events, {}), host, settings, readings, fonts).changed;
                 m_Document->SetClass("open", false);
                 m_Document->Hide();
                 m_Visible = false;
             }
             m_Events.clear();
-            m_State.form.popup.clear();
-            return false;
+            m_State.Leave();
+            return changed;
         }
         if (!Document(host, settings)) return false;
         const MenuFont* font = MenuFontNamed(m_Look.textFont);
@@ -376,6 +517,11 @@ namespace headsup
         {
             m_FontPixels = pixels;
             SetPx(m_Document, Rml::PropertyId::FontSize, pixels);
+        }
+        if (settings.menuOpacity != m_Opacity)
+        {
+            m_Opacity = settings.menuOpacity;
+            ApplyOpacity();
         }
         if (!m_Visible)
         {
@@ -388,10 +534,38 @@ namespace headsup
         }
         const bool moved = Place(host, settings, pixels);
 
-        // No tip stays once the pointer has left the window.
-        if (!m_Document->IsPseudoClassSet("hover")) m_Tip->SetClass("hidden", true);
-        Form form(std::exchange(m_Events, {}), m_State.form, host.keyDown);
-        BuildMenu(form, settings, readings, m_State, fonts, host.menuFonts);
+        // No tip stays once the pointer has left the window, and a slider gives up the keyboard it kept after a drag
+        // for the arrows to nudge it: off the window those are the game's, and its camera's keys moved the slider.
+        if (!m_Document->IsPseudoClassSet("hover"))
+        {
+            m_Tip->SetClass(kHiddenClass, true);
+            // The keyboard is on a part of the slider, and from any part its keys reach the slider: the window
+            // takes it whole.
+            for (Rml::Element* part = host.context->GetFocusElement(); part != nullptr && part != m_Document; part = part->GetParentNode())
+                if (Rml::ElementFormControlInput* input = AsInput(part); input != nullptr && !IsText(input) && input->GetOwnerDocument() == m_Document)
+                {
+                    m_Document->Focus();
+                    break;
+                }
+        }
+        // A click acts on what was typed before it. With both in one frame the typing gets a pass of its own first:
+        // the click may open another page or fold the card, and the line typed in would never be built to take it.
+        std::vector<FormEvent> events = std::exchange(m_Events, {});
+        bool typed                    = false;
+        if (const auto click = ClickAfterTyping(events); click != events.end())
+        {
+            typed = Pass(std::vector<FormEvent>(events.begin(), click), host, settings, readings, fonts).changed;
+            events.erase(events.begin(), click);
+        }
+        const Form form = Pass(std::move(events), host, settings, readings, fonts);
+        // A card built anew takes its boxes with it: the one that had the keyboard gets it back, where its caret was.
+        std::string typingIn;
+        int caret = 0;
+        if (Rml::ElementFormControlInput* input = AsInput(host.context->GetFocusElement()); IsText(input) && !input->GetId().empty())
+        {
+            typingIn = input->GetId();
+            input->GetSelection(&caret, nullptr, nullptr);
+        }
 
         const char* title = kPages[static_cast<int>(m_State.page)].label;
         if (m_TitleShown != title)
@@ -400,8 +574,18 @@ namespace headsup
             m_TitleShown = title;
         }
         ApplyBlocks(form.blocks);
+        // Whatever a card said of its controls as it was replaced is of controls that are gone.
+        m_Events.clear();
         ApplyPopup(form.popup);
         ApplyValues(form.values);
+        if (form.focus)
+        {
+            if (Rml::ElementFormControlInput* input = AsInput(Find(form.focus->id)))
+                FocusAt(input, CharacterOf(input->GetValue(), form.focus->caret));
+        }
+        else if (Rml::ElementFormControlInput* input = AsInput(Find(typingIn)); input != nullptr && input != host.context->GetFocusElement())
+            FocusAt(input, caret);
+        FitRuns();
         if (form.scrollToTop) m_ScrollTo = 0.0f;
         if (m_ScrollTo)
         {
@@ -410,7 +594,7 @@ namespace headsup
             m_Page->SetScrollTop(*m_ScrollTo);
             m_ScrollTo.reset();
         }
-        return form.changed || moved;
+        return form.changed || typed || moved;
     }
 
     bool RmlMenu::Place(const MenuHost& host, Settings& settings, float pixels)

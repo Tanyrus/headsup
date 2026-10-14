@@ -47,7 +47,7 @@ TEST(a_target_without_a_name_gets_a_cursor_at_the_games_arrow)
     unknown.anchored      = false; // the menu's size was not known
     CHECK(LoneCursors(unknown, s, {}).empty());
     Settings off = s;
-    off.replaceCursor = false;
+    off.cursorStyle = CursorStyle::Vanilla;
     CHECK(LoneCursors(Anchored(554, 0), off, {}).empty());
 }
 
@@ -116,7 +116,7 @@ TEST(a_cursor_is_drawn_for_your_target_and_the_one_you_are_picking_alone)
     CHECK(!CursorShown(700, s, picking));
     CHECK(!CursorShown(0, s, picking) && !CursorShown(0, s, CursorTargets{})); // index 0 is no entity, target or not
     Settings off;
-    off.replaceCursor = false;
+    off.cursorStyle = CursorStyle::Vanilla;
     CHECK(!CursorShown(1105, off, picking));
     CursorTargets unhooked   = picking;
     unhooked.gameArrowsShown = true; // the game draws its own arrows
@@ -132,6 +132,22 @@ TEST(a_lone_cursor_points_at_its_anchor)
     const CursorSpot spot = CursorAtAnchor(1400.0f, 608.0f, 20.0f, 32.0f, 0.5f);
     CHECK(Near(spot.x, 1390.0f) && Near(spot.y, 576.0f));
     CHECK(Near(CursorAtAnchor(1400.0f, 608.0f, 20.0f, 32.0f, 0.25f).x, 1395.0f));
+    // Raised, it stands that far over the anchor; a raise below nothing lowers it onto it.
+    CHECK(Near(CursorAtAnchor(1400.0f, 608.0f, 20.0f, 32.0f, 0.5f, 5.0f).y, 571.0f));
+    CHECK(Near(CursorAtAnchor(1400.0f, 608.0f, 20.0f, 32.0f, 0.5f, -10.0f).y, 586.0f));
+    CHECK(Near(CursorAtAnchor(1400.0f, 608.0f, 20.0f, 32.0f, 0.5f, 5.0f).x, 1390.0f));
+}
+
+TEST(a_cursors_picture_is_as_wide_for_its_height_as_the_settings_have_it)
+{
+    // Drawn 40 pixels tall where the settings say 9 by 20: 18 wide. An edge of 100 percent is a twentieth of the height.
+    CHECK_EQ(CursorPixelWidth(40, 9, 20), 18);
+    CHECK_EQ(CursorPixelWidth(20, 25, 20), 25);
+    CHECK_EQ(CursorPixelWidth(10, 1, 64), 1); // never nothing
+    CHECK_EQ(CursorEdgePixels(40, 100), 2);
+    CHECK_EQ(CursorEdgePixels(40, 400), 8);
+    CHECK_EQ(CursorEdgePixels(40, 50), 1);
+    CHECK_EQ(CursorEdgePixels(8, 50), 1); // at least a pixel
 }
 
 namespace
@@ -260,10 +276,11 @@ TEST(the_cursor_bobs_up_from_its_place_and_back_again)
     float lowest = 0.0f, highest = -100.0f;
     for (double t = 0.0; t < 3.0; t += 0.01)
     {
-        const float bob = CursorBob(t, 20.0f);
-        CHECK(Near(bob, CursorBob(t + 1.2, 20.0f)));
+        const float bob = CursorBob(t, 20.0f, true);
+        CHECK(Near(bob, CursorBob(t + 1.2, 20.0f, true)));
         lowest  = std::min(lowest, bob);
         highest = std::max(highest, bob);
+        CHECK_EQ(CursorBob(t, 20.0f, false), 0.0f); // one that does not float stays in its place
     }
     CHECK(Near(lowest, -3.0f, 0.05f)); // 15% of 20 px, upward
     CHECK(Near(highest, 0.0f, 0.05f));
@@ -318,19 +335,37 @@ TEST(a_badge_hangs_past_its_icons_bottom_right_corner)
 TEST(a_badge_is_readable_on_a_default_icon_and_leaves_the_icons_top_half_clear)
 {
     const Settings s;
-    const float iconSize = BasePixels(s, s.Kind(PlateKind::Mobs).lines[0].iconSize);
+    const float iconSize = static_cast<float>(s.baseIconSize * s.Kind(PlateKind::Mobs).lines[0].iconSize) / 100.0f;
     CHECK(iconSize * kBadgeShare >= 10.0f);             // its text box, about 7 px of digits
     CHECK(1.0f + kBadgeHang - kBadgeShare >= 0.5f); // where its box starts, as a share of the icon from the icon's top
 }
 
-TEST(other_mobs_plates_fade_while_you_have_a_target)
+TEST(a_nameplates_opacity_goes_by_what_you_target_and_by_distance_when_it_fades_in)
 {
-    Settings s;
-    s.untargetedOpacity = 40;
-    CHECK_EQ(PlateAlpha(s, EntityKind::Mob, kPlainRank, true), 102u);
-    CHECK_EQ(PlateAlpha(s, EntityKind::Mob, kPlainRank, false), kOpaqueAlpha); // no target: nothing fades
-    CHECK_EQ(PlateAlpha(s, EntityKind::Mob, kTargetRank, true), kOpaqueAlpha);
-    CHECK_EQ(PlateAlpha(s, EntityKind::Player, kPlainRank, true), kOpaqueAlpha);
+    OpacitySettings o;
+    o.noTarget    = 80;
+    o.notTargeted = 40;
+    o.targeted    = 90;
+    CHECK_EQ(PlateAlpha(o, kPlainRank, false, 5.0f), 204u); // you have no target
+    CHECK_EQ(PlateAlpha(o, kPlainRank, true, 5.0f), 102u);  // you have one, and it is another
+    CHECK_EQ(PlateAlpha(o, kTargetRank, true, 5.0f), 230u); // it is this one
+    CHECK_EQ(PlateAlpha(o, kPickedRank, true, 5.0f), 230u); // or this is the one you are picking
+    CHECK_EQ(PlateAlpha(o, kPickedRank, false, 5.0f), 230u);
+    CHECK_EQ(PlateAlpha(o, kPlainRank, true, 45.0f), 102u); // distance counts for nothing unless it fades in
+    // Fading in, what you do not target is whole within 10 yalms and a hundredth at the range, evenly between.
+    o.fadeIn = true;
+    o.range  = 50.0f;
+    CHECK_EQ(PlateAlpha(o, kPlainRank, true, 8.0f), 102u);
+    CHECK_EQ(PlateAlpha(o, kPlainRank, true, 30.0f), 52u); // 102 * 0.505
+    CHECK_EQ(PlateAlpha(o, kPlainRank, true, 50.0f), 1u);
+    CHECK_EQ(PlateAlpha(o, kPlainRank, false, 30.0f), 103u); // 204 * 0.505
+    // Your target's, and the one you are picking, never fades with distance: it is as opaque as Is Targeted says.
+    CHECK_EQ(PlateAlpha(o, kTargetRank, true, 30.0f), 230u);
+    CHECK_EQ(PlateAlpha(o, kTargetRank, true, 50.0f), 230u);
+    CHECK_EQ(PlateAlpha(o, kPickedRank, true, 45.0f), 230u);
+    o.range = 30.0f;
+    CHECK_EQ(PlateAlpha(o, kPlainRank, false, 20.0f), 103u); // half way to a nearer range
+    CHECK_EQ(PlateAlpha(OpacitySettings{}, kPlainRank, true, 45.0f), kOpaqueAlpha); // a new install's: whole
     CHECK_EQ(WithAlpha(0xFF123456, 102), 0x66123456u);
     CHECK_EQ(WithAlpha(0x80123456, kOpaqueAlpha), 0x80123456u);
 }
@@ -436,4 +471,10 @@ TEST(a_cursor_is_kept_inside_the_screen)
     CHECK_EQ(huge.y, 0.0f);
     const CursorSpot below = KeepOnScreen(CursorSpot{100.0f, 1430.0f}, 20.0f, 32.0f, 2560.0f, 1440.0f);
     CHECK_EQ(below.y, 1408.0f);
+    // The top panel lies over the scene: a cursor that would go under it stays just below it, and one already
+    // below it is where it was.
+    CHECK_EQ(KeepOnScreen(CursorSpot{100.0f, 20.0f}, 20.0f, 32.0f, 2560.0f, 1440.0f, 61.0f).y, 61.0f);
+    CHECK_EQ(KeepOnScreen(CursorSpot{100.0f, -50.0f}, 20.0f, 32.0f, 2560.0f, 1440.0f, 61.0f).y, 61.0f);
+    CHECK_EQ(KeepOnScreen(CursorSpot{100.0f, 100.0f}, 20.0f, 32.0f, 2560.0f, 1440.0f, 61.0f).y, 100.0f);
+    CHECK_EQ(KeepOnScreen(CursorSpot{100.0f, 1430.0f}, 20.0f, 32.0f, 2560.0f, 1440.0f, 61.0f).y, 1408.0f);
 }

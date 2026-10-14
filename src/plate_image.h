@@ -1,8 +1,10 @@
 #pragma once
 
+#include "dash_mark.h"
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <vector>
 
 namespace headsup
@@ -69,6 +71,29 @@ namespace headsup
     // A hard edge grown radius pixels around a shape, for the cursor: the coverage needs a margin of radius.
     Image Outlined(const Coverage& coverage, int radius, uint32_t color, uint32_t outlineColor);
 
+    // A dash drawn as a mark, as a piece of a text textHeight pixels tall inside a margin: the mark where a dash
+    // would sit, with a little room either side.
+    Coverage MarkCoverage(DashMark mark, int textHeight, int margin);
+    // How wide that piece is without its margin.
+    int MarkWidth(DashMark mark, int textHeight);
+    // The room an italic text is measured and drawn with past its last letter's cell, which that letter leans out
+    // of: none for a text that is not italic (style: FontStyle bits).
+    int ItalicLean(int pixelHeight, uint8_t style);
+    // How wide pieces of one line are side by side, by their widths without margins. room: what of each piece's
+    // width, at its end, the next piece may stand in; the last keeps its own, and pieces past the list leave none.
+    int JoinedWidth(std::span<const int> widths, std::span<const int> room);
+    // Pieces of one line, each inside the same margin, side by side as one piece inside that margin.
+    Coverage Joined(const std::vector<Coverage>& pieces, std::span<const int> room, int margin);
+    // A line under the whole of a text inside its margin: thickness rows from the row top, as far as the image goes.
+    void Underline(Coverage& text, int top, int thickness, int margin);
+
+    // A picture at another size: each new pixel is the average of what it covers of the old, weighted by alpha so a
+    // clear pixel's color darkens nothing.
+    Image Resized(const Image& picture, int width, int height);
+    // A picture in its own colors inside a hard edge grown radius pixels around what it covers: the picture's size
+    // and a margin of radius on every side.
+    Image Edged(const Image& picture, int radius, uint32_t edgeColor);
+
     // The ornament between the level line and the name, width by height inside a margin of BlurMargin(shadowBlur): a
     // hairline across its middle that fades in from both ends and lightens toward its center, under a diamond as tall as
     // the ornament, in the lighter color with a dark shadow.
@@ -90,37 +115,14 @@ namespace headsup
     };
     // How far past the box its outer border reaches: its gap and its own pixel, or nothing without one.
     int OuterPad(const BoxStyle& style);
-    // A rounded box width by height, antialiased. With an outer border the image is OuterPad larger on every side.
-    Image Box(int width, int height, const BoxStyle& style);
-    // A box to draw in three: past its corners every column of a row is alike, so it is its left columns, one middle
-    // column stretched across the rest, and its right columns. The image holds the middle column twice, so filtering
-    // between the two blends it with nothing else.
-    constexpr int kSliceMiddleColumns = 2;
-    struct SlicedBox
-    {
-        Image image;             // the left columns, the middle column twice, the right columns
-        int width = 0;           // Box's image's
-        int left = 0, right = 0; // columns; left is width and right 0 when the box has no middle and image is all of it
-    };
-    SlicedBox SliceBox(int width, int height, const BoxStyle& style);
-    // A part of a sliced box as drawn: width pixels from x in the box, the texture's columns from u0 to u1 stretched
-    // across them.
-    struct SliceSpan
-    {
-        int x = 0, width = 0;
-        float u0 = 0.0f, u1 = 0.0f;
-    };
-    // How a box whose image takes u of its texture's width is drawn: its whole image, or its left columns, its first
-    // middle column's center stretched across the middle, and its right columns.
-    std::vector<SliceSpan> SliceSpans(const SlicedBox& box, float u);
     // A diamond size pixels tall and wide.
     Image Diamond(int size, uint32_t color);
     // Gil's coin: a disc size pixels across with a 1 px rim at 60% of its color's brightness.
     Image Coin(int size, uint32_t color);
     // A five-pointed star with a point straight up, in the circle size pixels across.
     Image Star(int size, uint32_t color);
-    // A 1 px line width long, color at the left fading to clear at the right: an ornate popup's heading rule.
-    Image FadingRule(int width, uint32_t color);
+    // A circular arrow in a square size pixels across: most of a ring, turning counterclockwise to a head at its top.
+    Image ResetArrow(int size, uint32_t color);
 
     // A size in whole pixels, at least one: what text and images are drawn at.
     int WholePixels(float size);
@@ -155,5 +157,8 @@ namespace headsup
     // Where the shape points: the x of its lowest point, from 0 to 1 across its width.
     float ShapeTip(const Shape& shape);
 
-    Coverage ShapeCoverage(const Shape& shape, int pixelHeight, int margin);
+    // How wide the shape is at a height, in whole pixels.
+    int ShapeWidth(const Shape& shape, int pixelHeight);
+    // The shape stretched to a width and a height, inside a margin.
+    Coverage ShapeCoverage(const Shape& shape, int pixelWidth, int pixelHeight, int margin);
 }

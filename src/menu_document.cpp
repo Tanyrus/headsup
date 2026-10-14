@@ -1,5 +1,8 @@
 #include "menu_document.h"
 
+#include "form.h"
+
+#include "bar_document.h"
 #include "markup.h"
 #include "menu_sizes.h"
 
@@ -9,23 +12,34 @@ namespace headsup
 {
     namespace
     {
-        constexpr float kFrame        = 1.6f;  // a control's height: a line of text and its padding above and below
+        constexpr float kRunInset     = 0.3f;  // how much shorter a line box's stretches and chips are than the box
         constexpr float kSpacing      = 0.45f; // between rows
-        constexpr float kControlGap   = 0.5f;  // between a row's controls
         constexpr float kPadX         = 0.6f;  // a control's text from its sides
         constexpr float kHeadHeight   = 2.05f; // the window's title row
         constexpr float kScrollbar    = 0.7f;
         constexpr float kPopupTall    = 18.0f; // the most of a dropdown's list shown before it scrolls
         constexpr float kNavHeight    = 2.0f;
-        constexpr float kMark         = 0.8f;  // a checked box's mark
+        constexpr float kNavGap       = 0.2f;  // between two pages of the sidebar
+        constexpr float kNavSlide     = 0.35f; // how far a page's name moves under the pointer
+        constexpr float kToggleInset  = 0.2f;  // a toggle's knob from its track's edge
+        constexpr float kToggleKnob   = kToggleHeight - 2.0f * kToggleInset;
         constexpr float kArrow        = 0.35f; // half an arrow's base
         constexpr float kKnob         = 0.35f; // a slider's knob: a bright bar as tall as its track
+        constexpr float kCrossLength  = 0.85f; // the close button's cross: each of its two bars
+        constexpr float kCrossBar     = 0.12f;
     }
 
     const char* MenuThemeName(MenuTheme theme)
     {
         static const char* const kNames[kMenuThemeCount] = {"Phoenix", "Aurora"};
         return kNames[std::clamp(static_cast<int>(theme), 0, kMenuThemeCount - 1)];
+    }
+
+    const char* MenuThemeTip(MenuTheme theme)
+    {
+        static const char* const kTips[kMenuThemeCount] = {"Phoenix's dark red, lit in its royal red.",
+            "Slate glass, lit from cyan into violet."};
+        return kTips[std::clamp(static_cast<int>(theme), 0, kMenuThemeCount - 1)];
     }
 
     namespace
@@ -37,27 +51,17 @@ namespace headsup
         constexpr float kHeadLineGap = 0.2f; // from the title row down to the line of light under it
         constexpr const char* kEase  = " 0.16s cubic-out"; // a control between two of its looks
         constexpr const char* kSlide = " 0.18s cubic-out"; // a switch's knob and its track
-        constexpr const char* kPop   = " 0.18s back-out";  // a box's mark, a little past its size and back
 
-        uint32_t Faded(uint32_t argb, uint32_t alpha) { return (argb & 0x00FFFFFF) | alpha << 24; }
+        uint32_t Faded(uint32_t argb, uint32_t alpha) { return (argb & ~kAlphaMask) | alpha << kAlphaShift; }
 
-        // What is Aurora's alone: glass in place of flat fills, switches whose knobs slide, and dark text on the
-        // picked choice's bright gradient.
+        // What is Aurora's alone: glass in place of flat fills, and dark text on the picked choice's bright gradient.
         std::string AuroraMenuRules(const MenuColors& c)
         {
-            const std::string a = RcssColor(c.accent);
             std::string css;
             css += "body{decorator:vertical-gradient(#111b2cf2 #090e17f2);background-color:transparent;border-color:" +
                    RcssColor(Faded(c.accent, kAuroraFrame)) + ";}";
             css += ".card{background-color:transparent;decorator:vertical-gradient(#1c283cb8 #131b2ab8);}";
-            css += ".check{width:2.6em;height:1.3em;border-radius:0.65em;}";
-            css += ".check.on{background-color:" + RcssColor(Faded(c.accent, kWash)) + ";}";
-            css += ".mark{left:0.15em;top:0.15em;width:1em;height:1em;border-radius:0.5em;background-color:" +
-                   RcssColor(c.muted) + ";transition:left" + kSlide + ",background-color" + kSlide + ";}";
-            // The shared rule for a checked box places and sizes its mark: the knob says its own again.
-            css += ".check.on .mark{left:1.45em;top:0.15em;width:1em;height:1em;background-color:" + a + ";}";
-            css += ".check.card-on{top:0.55em;}.switch-room{width:2.6em;}";
-            css += ".seg.picked,.tab.picked,.btn.accent{color:" + RcssColor(c.inset | 0xFF000000) + ";}";
+            css += ".seg.picked,.tab.picked,.btn.accent{color:" + RcssColor(Opaque(c.inset)) + ";}";
             css += "scrollbarvertical sliderbar{background-color:" + RcssColor(Faded(c.accent, kAuroraFrame)) + ";}";
             css += std::string("#") + kMenuPopupId + ",#" + kMenuTipId + "{border-color:" + RcssColor(Faded(c.accent, kAuroraPopupFrame)) + ";}";
             return css;
@@ -76,7 +80,6 @@ namespace headsup
         const auto color    = [](uint32_t argb) { return RcssColor(argb); };
         const std::string frame = Em(kFrame), radius = Em(kRadius), control = Em(kControlWidth);
         const float top    = kGutter + kHeadHeight + 0.5f; // where the sidebar and the page start
-        const float mainX  = kGutter + kSidebarWidth + kGutter;
         const std::string wash = "horizontal-gradient(" + color(Faded(c.accent, kWash)) + " " + color(Faded(c.accentEnd, kWash)) + ")";
         const std::string fadingOut = " " + color(Faded(c.accentEnd, 0)) + ")";
         std::string css;
@@ -85,11 +88,12 @@ namespace headsup
                ";background-color:" + color(c.background) + ";border:1px " + color(c.border) + ";border-radius:" +
                Em(kCardRadius * 1.5f) + ";color:" + color(c.text) + ";font-family:\"" + look.textFont + "\";z-index:5;}";
         // The window comes in a little small and grows to its size.
-        css += "body.open{animation:0.22s cubic-out window-in;}";
-        css += "@keyframes window-in{from{opacity:0;transform:scale(0.97);}to{opacity:1;transform:scale(1);}}";
+        // Its fade has no end of its own: it ends at the opacity the window is set to.
+        css += "body.open{animation:0.22s cubic-out window-in, 0.22s cubic-out window-fade;}";
+        css += "@keyframes window-in{from{transform:scale(0.97);}to{transform:scale(1);}}";
+        css += "@keyframes window-fade{from{opacity:0;}}";
         css += "div{display:block;}handle{display:block;}";
-        css += ".hidden{display:none;}";
-        css += ".off{opacity:" + RcssNumber(kOffAlpha) + ";pointer-events:none;}.label.off,.card-head.off{pointer-events:auto;}";
+        css += std::string(".") + kHiddenClass + "{display:none;}";
         // The frame: the title bar moves the window, the corner resizes it.
         css += "#head{position:absolute;left:" + Em(kGutter) + ";right:" + Em(kGutter + kFrame + 0.5f) + ";top:" +
                Em(kGutter) + ";height:" + Em(kHeadHeight) + ";}";
@@ -97,34 +101,41 @@ namespace headsup
                ";color:" + color(c.heading) + ";font-effect:glow(0px 4px 0px 0px " + color(Faded(c.accent, kGlow)) + ");}";
         css += std::string("#") + kMenuVersionId + "{display:inline-block;margin-left:0.5em;color:" + color(c.muted) + ";}";
         css += std::string("#") + kMenuCloseId + "{position:absolute;right:" + Em(kGutter) + ";top:" + Em(kGutter) +
-               ";width:" + frame + ";height:" + frame + ";line-height:" + frame + ";text-align:center;border-radius:" +
-               Em(kFrame / 2.0f) + ";background-color:" + color(c.control) + ";color:" + color(c.muted) + ";}";
+               ";width:" + frame + ";height:" + frame + ";border-radius:" + Em(kFrame / 2.0f) + ";background-color:" +
+               color(c.control) + ";}";
         css += std::string("#") + kMenuCloseId + ":hover{background-color:" + color(c.hover) + ";}";
+        // Its cross is drawn, two bars turned about the circle's middle: a letter x sits low in its line.
+        css += ".cross{position:absolute;left:50%;top:50%;width:" + Em(kCrossLength) + ";height:" + Em(kCrossBar) +
+               ";margin-left:" + Em(-kCrossLength / 2.0f) + ";margin-top:" + Em(-kCrossBar / 2.0f) + ";background-color:" +
+               color(c.muted) + ";transform:rotate(45deg);}";
+        css += ".cross.back{transform:rotate(-45deg);}";
+        css += std::string("#") + kMenuCloseId + ":hover .cross{background-color:" + color(c.text) + ";}";
         css += "#head-line{position:absolute;left:" + Em(kGutter) + ";right:" + Em(kGutter) + ";top:" +
                Em(kGutter + kHeadHeight + kHeadLineGap) + ";height:1px;decorator:horizontal-gradient(" +
                color(Faded(c.accent, kLine)) + fadingOut + ";}";
         css += "#resize{position:absolute;right:0px;bottom:0px;width:1.2em;height:1.2em;}";
         css += "#resize-mark{position:absolute;right:0.3em;bottom:0.3em;width:0px;height:0px;border-left:0.5em transparent;"
                "border-bottom:0.5em " + color(c.raisedEdge) + ";}";
-        // The pages, as pills: each slides a little under the pointer, and a bar grows beside the picked one.
-        css += std::string("#") + kMenuSidebarId + "{position:absolute;left:" + Em(kGutter) + ";top:" + Em(top) +
-               ";width:" + Em(kSidebarWidth) + ";bottom:" + Em(kGutter) + ";}";
+        // The pages, as pills: each slides a little under the pointer, and the picked one is filled.
+        // The list is as wide as its longest name in the window's font, and the page takes the rest.
+        css += "#columns{position:absolute;display:flex;left:" + Em(kGutter) + ";right:" + Em(kGutter) + ";top:" + Em(top) +
+               ";bottom:" + Em(kGutter) + ";}";
+        css += std::string("#") + kMenuSidebarId + "{flex:0 0 auto;overflow-y:auto;}";
+        // What a name moves by under the pointer comes off the room after it, so the list keeps its width.
         css += ".nav{position:relative;height:" + Em(kNavHeight) + ";line-height:" + Em(kNavHeight) + ";padding-left:" +
-               Em(kGutter) + ";border-radius:" + Em(kNavHeight / 2.0f) + ";margin-bottom:" + Em(kSpacing) + ";color:" +
-               color(c.label) + ";transition:background-color" + kEase + ",color" + kEase + ",padding-left" + kEase + ";}";
+               Em(kGutter) + ";padding-right:" + Em(kGutter) + ";white-space:nowrap;border-radius:" + Em(kNavHeight / 2.0f) +
+               ";margin-bottom:" + Em(kNavGap) + ";color:" + color(c.label) + ";transition:background-color" + kEase +
+               ",color" + kEase + ",padding-left" + kEase + ",padding-right" + kEase + ";}";
         css += ".nav.child{margin-left:" + Em(kGutter) + ";}";
-        css += ".nav:hover{background-color:" + color(c.accentSoft) + ";padding-left:1.35em;}";
+        css += ".nav:hover{background-color:" + color(c.accentSoft) + ";padding-left:" + Em(kGutter + kNavSlide) +
+               ";padding-right:" + Em(kGutter - kNavSlide) + ";}";
         css += ".nav.picked{background-color:transparent;decorator:horizontal-gradient(" + color(Faded(c.accent, kPickedStart)) +
                " " + color(Faded(c.accentEnd, kPickedEnd)) + ");color:" + color(c.text) + ";}";
-        css += ".nav-mark{position:absolute;left:0.35em;top:" + Em(kNavHeight / 2.0f) + ";width:0.2em;height:0em;"
-               "border-radius:0.1em;background-color:" + color(c.accent) + ";transition:height 0.2s back-out,top 0.2s back-out;}";
-        css += ".nav.picked .nav-mark{top:0.45em;height:1.1em;}";
         // The page: its title stays put and its cards scroll.
-        css += "#main{position:absolute;left:" + Em(mainX) + ";right:" + Em(kGutter) + ";top:" + Em(top) + ";bottom:" +
-               Em(kGutter) + ";}";
+        css += "#main{position:relative;flex:1 1 0px;margin-left:" + Em(kGutter) + ";}";
         css += std::string("#") + kMenuPageTitleId + "{font-family:\"" + look.titleFont + "\";font-size:" +
                Em(kPageTitleScale) + ";color:" + color(c.heading) + ";}";
-        css += std::string("#") + kMenuPageId + "{position:absolute;left:0px;right:0px;top:2.4em;bottom:0px;overflow-y:auto;}";
+        css += std::string("#") + kMenuPageId + "{position:absolute;left:0px;right:0px;top:" + Em(kPageTop) + ";bottom:0px;overflow-y:auto;}";
         css += "scrollbarvertical{width:" + Em(kScrollbar) + ";}";
         css += "scrollbarvertical sliderbar{width:" + Em(kScrollbar) + ";min-height:2em;border-radius:" +
                Em(kScrollbar / 2.0f) + ";background-color:" + color(c.control) + ";}";
@@ -150,14 +161,15 @@ namespace headsup
                ";font-family:\"" + look.titleFont + "\";font-size:" + Em(kCardTitleScale) + ";color:" + color(c.heading) +
                ";transition:color" + kEase + ";}";
         css += ".card-head:hover .card-title{color:" + color(c.accent) + ";}";
-        css += ".check.card-on{position:absolute;right:" + Em(kCardPad) + ";top:" + Em((kHeaderRow - kFrame) / 2.0f) + ";}";
+        css += ".check.card-on{position:absolute;right:" + Em(kCardPad) + ";top:" + Em((kHeaderRow - kToggleHeight) / 2.0f) + ";}";
         css += ".card-body{padding:0px " + Em(kCardPad) + " " + Em(kCardPad * 0.6f) + " " + Em(kCardPad) +
                ";animation:0.2s cubic-out fade-in;}";
         css += "@keyframes fade-in{from{opacity:0;}to{opacity:1;}}";
-        // Rows: the label at the left, its controls at the right.
-        css += ".row{display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between;"
+        // Rows: the label at the left, its controls at the right. A label too long for what they leave it is cut.
+        css += ".row{display:flex;flex-direction:row;align-items:center;justify-content:space-between;"
                "min-height:" + frame + ";margin-bottom:" + Em(kSpacing) + ";}";
-        css += ".label{flex:1 1 auto;line-height:" + frame + ";color:" + color(c.label) + ";}";
+        css += ".label{flex:1 1 0px;min-width:0px;overflow:hidden;white-space:nowrap;line-height:" + frame + ";color:" +
+               color(c.label) + ";}";
         css += ".ctl{position:relative;display:flex;flex-direction:row;align-items:center;justify-content:flex-end;flex:0 0 auto;}";
         css += ".ctl > *{margin-left:" + Em(kControlGap) + ";}";
         css += ".line{display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;margin-bottom:" + Em(kSpacing) + ";}";
@@ -166,19 +178,36 @@ namespace headsup
         css += ".line.indent{margin-left:" + Em(kGutter) + ";}";
         css += ".gap{flex:1 1 auto;}";
         css += ".note{color:" + color(c.muted) + ";margin-bottom:" + Em(kSpacing) + ";}";
+        css += ".row.indent{margin-left:" + Em(kGutter) + ";}";
         css += ".caption{color:" + color(c.muted) + ";line-height:" + frame + ";}";
-        css += ".line-name{color:" + color(c.label) + ";margin-bottom:0.15em;}";
+        // A column's name over its controls.
+        css += ".head{color:" + color(c.label) + ";line-height:" + frame + ";text-align:center;}";
+        css += ".line-name{color:" + color(c.label) + ";line-height:" + frame + ";}";
+        // A design line: its name, then its box across what is left.
+        css += ".line.design{flex-wrap:nowrap;}";
+        css += ".line.design .line-name{flex:0 0 auto;width:" + Em(kLineNameWidth) + ";}";
+        // A card's rows in two columns, a rule between them.
+        css += ".columns{display:flex;flex-direction:row;}";
+        css += ".column{flex:1 1 0px;min-width:0px;}";
+        css += ".column.second{margin-left:" + Em(kCardPad) + ";padding-left:" + Em(kCardPad) + ";border-left:1px " + color(c.border) + ";}";
         css += ".reading{width:" + control + ";line-height:" + frame + ";}";
-        css += ".switch-room{display:flex;flex-direction:row;justify-content:flex-end;width:" + Em(kSwitchWidth) + ";}";
-        // A checkbox: its mark grows from the middle as it is checked.
-        css += ".check{position:relative;width:" + frame + ";height:" + frame + ";border-radius:" + radius +
-               ";background-color:" + color(c.control) + ";transition:background-color" + kSlide + ";}";
+        // A yes or no is a toggle in the middle of the controls' column, where a slider's middle is; in a column of
+        // its own it has a cell its own width. The word beside it, when it has one, does not move it.
+        css += ".switch-room{position:relative;display:flex;flex-direction:row;justify-content:center;width:" + control + ";}";
+        css += ".switch-cell{display:flex;flex-direction:row;justify-content:center;width:" + Em(kToggleWidth) + ";}";
+        css += ".state{position:absolute;left:50%;top:0px;margin-left:" + Em(kToggleWidth / 2.0f + kControlGap) +
+               ";line-height:" + Em(kToggleHeight) + ";color:" + color(c.muted) + ";}";
+        css += ".check{position:relative;width:" + Em(kToggleWidth) + ";height:" + Em(kToggleHeight) + ";border-radius:" +
+               Em(kToggleHeight / 2.0f) + ";background-color:" + color(c.control) + ";transition:background-color" + kSlide + ";}";
         css += ".check:hover{background-color:" + color(c.hover) + ";}";
-        css += ".mark{position:absolute;left:" + Em(kFrame / 2.0f) + ";top:" + Em(kFrame / 2.0f) +
-               ";width:0em;height:0em;border-radius:0.2em;background-color:" + color(c.accent) +
-               ";transition:left" + kPop + ",top" + kPop + ",width" + kPop + ",height" + kPop + ";}";
-        css += ".check.on .mark{left:" + Em((kFrame - kMark) / 2.0f) + ";top:" + Em((kFrame - kMark) / 2.0f) + ";width:" +
-               Em(kMark) + ";height:" + Em(kMark) + ";}";
+        css += ".check.on{background-color:" + color(Faded(c.accent, kWash)) + ";}";
+        // The knob takes no click of its own: pressed while it slides under the pointer and let go once it has
+        // passed, a click would be on two elements and so on neither.
+        css += ".mark{pointer-events:none;}";
+        css += ".mark{position:absolute;left:" + Em(kToggleInset) + ";top:" + Em(kToggleInset) + ";width:" + Em(kToggleKnob) +
+               ";height:" + Em(kToggleKnob) + ";border-radius:" + Em(kToggleKnob / 2.0f) + ";background-color:" +
+               color(c.muted) + ";transition:left" + kSlide + ",background-color" + kSlide + ";}";
+        css += ".check.on .mark{left:" + Em(kToggleWidth - kToggleKnob - kToggleInset) + ";background-color:" + color(c.accent) + ";}";
         // Joined choices. These, tabs, buttons and lists ease between their looks, and the picked one is the gradient.
         css += std::string(".seg,.tab,.btn,.dd,.opt,.wchip{transition:background-color") + kEase + ",border-color" + kEase +
                ",color" + kEase + ";}";
@@ -211,8 +240,19 @@ namespace headsup
         css += "input.text selection{background-color:" + color(c.accentSoft) + ";}";
         css += "input.num{width:" + Em(kNumberWidth) + ";}";
         css += ".num-name{width:" + Em(kNumberName) + ";text-align:right;color:" + color(c.muted) + ";line-height:" + frame + ";}";
-        css += "input.linebox{display:block;width:100%;height:" + Em(kFrame + 1.2f) + ";padding-top:0.8em;margin-bottom:" +
-               Em(kSpacing) + ";}";
+        // A design line's box looks a text box, and holds stretches of text to type in with tags as chips between
+        // them. It wraps, and its last stretch takes what is left of its row, so a click past the text lands in it.
+        css += ".linebox{box-sizing:border-box;flex:1 1 0px;min-width:0px;display:flex;flex-direction:row;flex-wrap:wrap;"
+               "align-items:center;min-height:" + frame + ";padding:0px " + Em(kPadX) + ";border-radius:" + radius +
+               ";border:1px transparent;background-color:" + color(c.control) + ";transition:border-color" + kEase + ";}";
+        css += ".linebox:hover,.linebox.typing{background-color:" + color(c.hover) + ";}";
+        css += ".linebox.typing{border-color:" + color(Faded(c.accent, kFocus)) + ";}";
+        css += ".linebox input.run{flex:0 0 auto;height:" + Em(kFrame - kRunInset) + ";padding:0.1em 0px;border-width:0px;"
+               "border-radius:0px;background-color:transparent;}";
+        css += ".linebox input.run:hover,.linebox input.run:focus{background-color:transparent;}";
+        css += ".linebox input.run:last-child{flex:1 1 auto;}";
+        css += ".linebox .chip{flex:0 0 auto;height:" + Em(kFrame - kRunInset) + ";line-height:" + Em(kFrame - kRunInset - 0.1f) +
+               ";padding:0px 0.5em;margin:0.1em 0.1em;}";
         css += "input.hex{width:6em;}";
         // A dropdown's closed control; its list is the popup.
         css += ".dd{position:relative;box-sizing:border-box;height:" + frame + ";line-height:" + frame + ";padding:0px " +
@@ -223,7 +263,7 @@ namespace headsup
         css += ".dd-arrow{position:absolute;right:0.5em;top:0.6em;width:0px;height:0px;border-left:" + Em(kArrow) +
                " transparent;border-right:" + Em(kArrow) + " transparent;border-top:0.45em " + color(c.text) + ";}";
         css += std::string("#") + kMenuPopupId + "{position:absolute;z-index:50;box-sizing:border-box;padding:0.2em;"
-               "background-color:" + color(c.card | 0xFF000000) + ";border:1px " + color(c.raisedEdge) + ";border-radius:" +
+               "background-color:" + color(Opaque(c.card)) + ";border:1px " + color(c.raisedEdge) + ";border-radius:" +
                radius + ";}";
         // The popup drops in under its control.
         css += std::string("#") + kMenuPopupId + ".open{animation:0.16s cubic-out drop-in;}";
@@ -232,7 +272,6 @@ namespace headsup
         css += ".opt{height:" + frame + ";line-height:" + frame + ";padding:0px " + Em(kPadX) + ";border-radius:" + radius +
                ";white-space:nowrap;}";
         css += ".opt:hover,.opt.picked{background-color:" + color(c.accentSoft) + ";}";
-        css += ".opt.locked{opacity:" + RcssNumber(kOffAlpha) + ";pointer-events:none;}";
         css += ".dot{display:inline-block;width:" + Em(kChipDot) + ";height:" + Em(kChipDot) + ";border-radius:" +
                Em(kChipDot / 2.0f) + ";margin-right:0.5em;background-color:" + color(c.muted) + ";}";
         css += ".on .dot{background-color:" + color(c.accent) + ";}";
@@ -240,6 +279,14 @@ namespace headsup
         css += ".swatch{box-sizing:border-box;width:" + frame + ";height:" + frame + ";border-radius:" + radius +
                ";border:1px " + color(c.raisedEdge) + ";}";
         css += ".swatch.none{border-color:transparent;}";
+        // The marks a dash can be drawn as, in the Replace Dashes list.
+        css += ".dash{display:inline-block;width:0.6em;height:0.6em;background-color:" + color(c.text) + ";}";
+        css += ".dash.dot{border-radius:0.3em;}";
+        css += ".dash.diamond{width:0.5em;height:0.5em;transform:rotate(45deg);}";
+        // The arrow that puts a color back to its default.
+        css += ".reset{width:" + frame + ";height:" + frame + ";decorator:image(\"" + ResetSource(c.muted, kResetArrowPixels) +
+               "\" contain);}";
+        css += ".reset:hover{decorator:image(\"" + ResetSource(c.accent, kResetArrowPixels) + "\" contain);}";
         css += ".picker{padding:0.4em;}";
         css += ".pick-row{position:relative;display:flex;flex-direction:row;align-items:center;margin-bottom:0.3em;}";
         css += ".pick-name{width:1.2em;color:" + color(c.label) + ";}";
@@ -262,6 +309,10 @@ namespace headsup
                " transparent;border-bottom:" + Em(kArrow) + " transparent;}";
         css += ".tri.left{left:0.5em;border-right:0.45em " + color(c.text) + ";}";
         css += ".tri.right{left:0.6em;border-left:0.45em " + color(c.text) + ";}";
+        css += ".chip img{width:1em;height:1em;margin-right:0.3em;vertical-align:-0.15em;}";
+        // A chip of several tags: each a part of its own to drag, with a quiet word between.
+        css += ".chip .part,.chip .or{display:inline-block;}";
+        css += ".chip .or{margin:0px 0.4em;opacity:0.65;}";
         css += ".drag{drag:clone;}";
         // Tabs: equal across each row, the open one filled, standing on a rule.
         css += ".tab-row{display:flex;flex-direction:row;margin-bottom:" + Em(kTabGap) + ";}";
@@ -287,15 +338,19 @@ namespace headsup
         // What a control says under the pointer.
         css += std::string("#") + kMenuTipId + "{position:absolute;z-index:60;box-sizing:border-box;max-width:" +
                Em(kTipWidth) + ";padding:0.4em 0.6em;border-radius:" + radius + ";border:1px " + color(c.raisedEdge) +
-               ";background-color:" + color(c.card | 0xFF000000) + ";pointer-events:none;}";
+               ";background-color:" + color(Opaque(c.card)) + ";pointer-events:none;}";
 
         if (look.theme == MenuTheme::Aurora) css += AuroraMenuRules(c);
+        // The settings of what is switched off are not shown. Last, and with the body before it, so that no rule
+        // that lays a row or a control out puts it back.
+        css += std::string("body .") + kOffClass + "{display:none;}";
 
         return "<rml><head><style>" + css + "</style></head><body>"
                "<handle id=\"head\" move_target=\"#document\"><div id=\"title\">HeadsUp</div><div id=\"" +
-               kMenuVersionId + "\"></div></handle><div id=\"head-line\"></div><div id=\"" + kMenuCloseId + "\">x</div><div id=\"" + kMenuSidebarId +
-               "\"></div><div id=\"main\"><div id=\"" + kMenuPageTitleId + "\"></div><div id=\"" + kMenuPageId +
-               "\"></div></div><div id=\"" + kMenuPopupId + "\" class=\"hidden\"></div><div id=\"" + kMenuTipId +
+               kMenuVersionId + "\"></div></handle><div id=\"head-line\"></div><div id=\"" + kMenuCloseId +
+               "\"><div class=\"cross\"></div><div class=\"cross back\"></div></div><div id=\"columns\"><div id=\"" +
+               kMenuSidebarId + "\"></div><div id=\"main\"><div id=\"" + kMenuPageTitleId + "\"></div><div id=\"" +
+               kMenuPageId + "\"></div></div></div><div id=\"" + kMenuPopupId + "\" class=\"hidden\"></div><div id=\"" + kMenuTipId +
                "\" class=\"hidden\"></div><handle id=\"resize\" size_target=\"#document\"><div id=\"resize-mark\"></div>"
                "</handle></body></rml>";
     }

@@ -8,6 +8,7 @@ namespace headsup
     {
         constexpr uint16_t kFirstCheckMessage  = 0xAA; // 0xAA-0xB2: the con, then the defense/evasion remark
         constexpr uint16_t kLastCheckMessage   = 0xB2;
+        constexpr uint16_t kImpossibleToGauge  = 249; // a notorious monster's or a battlefield mob's answer
         constexpr uint32_t kCheckTypeBase      = 0x40;  // the reply's check type field: 0x40 + Con
         constexpr double kDefaultCheckLifetime = 600.0; // seconds, when the data has no respawn time
 
@@ -20,16 +21,33 @@ namespace headsup
         constexpr size_t kReplyMinSize     = kReplyMessage + sizeof(uint16_t);
     }
 
+    namespace
+    {
+        // The message of an incoming 0x029 long enough to answer a check, and whether it is one that gives a level.
+        std::optional<uint16_t> ReplyMessage(const uint8_t* data, uint32_t size)
+        {
+            if (data == nullptr || size < kReplyMinSize) return std::nullopt;
+            return ReadAt<uint16_t>(data, kReplyMessage);
+        }
+        constexpr bool GivesLevel(uint16_t message) { return message >= kFirstCheckMessage && message <= kLastCheckMessage; }
+    }
+
     std::optional<CheckReply> ParseCheckReply(const uint8_t* data, uint32_t size)
     {
-        if (data == nullptr || size < kReplyMinSize) return std::nullopt;
-        const auto message = ReadAt<uint16_t>(data, kReplyMessage);
-        if (message < kFirstCheckMessage || message > kLastCheckMessage) return std::nullopt;
+        const std::optional<uint16_t> message = ReplyMessage(data, size);
+        if (!message || !GivesLevel(*message)) return std::nullopt;
         const auto level = ReadAt<int32_t>(data, kReplyLevel);
         const auto type  = ReadAt<uint32_t>(data, kReplyCheckType);
         if (level <= 0 || type < kCheckTypeBase || type >= kCheckTypeBase + kConCount) return std::nullopt;
         return CheckReply{ReadAt<uint32_t>(data, kReplyServerId), ReadAt<uint16_t>(data, kReplyTargetIndex),
             CheckResult{level, static_cast<Con>(type - kCheckTypeBase)}};
+    }
+
+    std::optional<CheckAnswer> ParseCheckAnswer(const uint8_t* data, uint32_t size)
+    {
+        const std::optional<uint16_t> message = ReplyMessage(data, size);
+        if (!message || (!GivesLevel(*message) && *message != kImpossibleToGauge)) return std::nullopt;
+        return CheckAnswer{ReadAt<uint32_t>(data, kReplyServerId), GivesLevel(*message)};
     }
 
     double CheckLifetime(const MobRecord* mob)

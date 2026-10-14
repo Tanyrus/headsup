@@ -3,40 +3,39 @@
 namespace headsup
 {
     // Every size in ems, the font size the menu draws its text at, so it holds at any UI scale.
-    constexpr float kPercent        = 100.0f;
     constexpr float kTitleScale     = 1.55f; // the window's name
     constexpr float kPageTitleScale = 1.4f;
     constexpr float kCardTitleScale = 1.12f;
-    constexpr float kWindowWidth    = 46.0f;
+    constexpr float kWindowWidth    = 50.0f;
     constexpr float kWindowHeight   = 36.0f;
-    constexpr float kMinWindowWidth  = 34.0f;
+    constexpr float kMinWindowWidth  = 42.0f; // a row of two mode dropdowns and a few letters of its label
     constexpr float kMinWindowHeight = 16.0f;
-    constexpr float kSidebarWidth   = 8.5f;
     constexpr float kGutter         = 1.0f;  // around the window's parts and between cards
     constexpr float kCardPad        = 0.9f;  // a card's content from its edges
     constexpr float kCardRadius     = 0.6f;
     constexpr float kRadius         = 0.4f;  // controls
-    constexpr float kSwitchWidth    = 2.3f;
+    constexpr float kToggleWidth    = 3.2f;  // a yes or no: a track twice as wide as it is tall, and its knob
+    constexpr float kToggleHeight   = 1.4f;
     constexpr float kSegmentWidth   = 4.6f;
-    constexpr float kControlWidth   = 12.0f; // sliders and dropdowns
+    constexpr float kControlWidth   = 15.0f; // sliders and dropdowns
+    constexpr float kFrame          = 1.6f;  // a control's height: a line of text and its padding above and below
+    constexpr float kControlGap     = 0.5f;  // between a row's controls
+    constexpr float kPageTop        = 2.4f;  // where a page's cards start under its title
     constexpr float kCutoffWidth    = 5.2f;  // a status badge's cutoff dropdowns
-    // A mode's dropdown, so "When Targeted" shows whole: 13 letters, the frame's padding and its arrow.
-    constexpr float kModeWidth      = 9.4f;
+    // A mode's dropdown, so "Vanilla Nameplate" shows whole: 17 letters, the frame's padding and its arrow.
+    constexpr float kModeWidth      = 11.2f;
     constexpr float kNumberWidth    = 4.2f;  // a number to type
     constexpr float kNumberName     = 1.1f;  // the X or Y before it
-    constexpr float kDragSpeed      = 0.5f;  // a dragged number's change for each pixel
     constexpr float kFilterWidth    = 12.0f;
     constexpr float kGroupNameWidth = 9.0f;
-    constexpr float kLetterWidth    = 0.55f; // a letter of the menu's fonts, at most on average
     constexpr float kWideSegmentWidth = 5.4f; // a choice as long as "Diamonds"
     constexpr float kChipHeight     = 1.9f;
     constexpr float kChipDot        = 0.5f;
-    constexpr float kCheckIndent    = 1.3f;  // a checked list's text from its row's left edge, past its dot
     constexpr float kTabHeight      = 2.0f;
     constexpr float kTabRule        = 0.12f; // the line a strip of tabs stands on
     constexpr float kTabGap         = 0.12f; // between two tabs, and two rows of them: a couple of pixels
-    constexpr int kLineBoxLines     = 2;     // the text lines a design line's box is tall
     constexpr float kTipWidth       = 20.0f;
-    constexpr float kOffAlpha       = 0.42f; // the settings of a feature that is off are drawn this faint
     constexpr float kHeaderRow      = 2.4f;  // a card's title row
+    constexpr float kLineNameWidth  = 6.6f;  // "Middle Line", before its design box
+    constexpr int kResetArrowPixels = 48;    // the reset arrow's picture, drawn smaller than it is
 }

@@ -23,18 +23,20 @@ namespace headsup
         Placeholder, // a lottery placeholder nobody has claimed, whatever it would do
         PartyClaim,  // claimed by you or your party, whatever else it is
         OtherClaim,  // and claimed by anyone else
+        Dead,        // dead, whatever it was and whoever claimed it
     };
-    constexpr int kCategoryCount = static_cast<int>(Category::OtherClaim) + 1;
+    constexpr int kCategoryCount = static_cast<int>(Category::Dead) + 1;
     constexpr int CategoryIndex(Category category) { return static_cast<int>(category); }
-    // The menu's order for the mob rows: ordinary mobs, notorious monsters and their placeholders, claimed mobs, then mobs
-    // with no data.
+    // The menu's order for the mob rows: ordinary mobs, notorious monsters and their placeholders, claimed mobs, dead
+    // ones, then mobs with no data.
     constexpr Category kMobRowOrder[kCategoryCount] = {Category::WillAttack, Category::WontAttack, Category::NmWillAttack,
-        Category::NmWontAttack, Category::Placeholder, Category::PartyClaim, Category::OtherClaim, Category::Unknown};
+        Category::NmWontAttack, Category::Placeholder, Category::PartyClaim, Category::OtherClaim, Category::Dead,
+        Category::Unknown};
 
     enum class PlateKind : uint8_t { Mobs, Players, Self, Npcs, Pets };
     constexpr int kPlateKindCount = 5;
-    enum class PlateMode : uint8_t { Hidden, Shown, WhenTargeted, Expanding, Vanilla };
-    constexpr int kPlateModeCount = 5;
+    enum class PlateMode : uint8_t { Hidden, Shown, WhenTargeted, Vanilla };
+    constexpr int kPlateModeCount = 4;
     // ByNature, on the Placeholder and claim rows of mobs only, steps aside for the row under it.
     enum class OutlineMode : uint8_t { Disabled, Shown, WhenTargeted, ByNature };
     constexpr int kOutlineModeCount = 4;
@@ -58,10 +60,12 @@ namespace headsup
     constexpr int kClaimStateCount = 3;
     enum class TargetState : uint8_t { None, Targeted, Locked, SubTarget, OutOfRange };
     constexpr int kTargetStateCount = 5;
-    enum class TargetType : uint8_t { Mob, Npc, Pet, Player, Friend, PartyMember, LinkshellMember };
+    enum class TargetType : uint8_t { Mob, Player, Friend, PartyMember, LinkshellMember, Npc, Pet }; // the menu's order
     constexpr int kTargetTypeCount = 7;
     enum class PlayerRow : uint8_t { Player, PartyMember, Friend, LinkshellMember };
     constexpr int kPlayerRowCount = 4;
+    enum class PetRow : uint8_t { Yours, Party, Friend, Others }; // by its owner
+    constexpr int kPetRowCount = 4;
     constexpr int kMaxRows        = kCategoryCount; // the mob rows are Category
 
     struct Palette
@@ -77,9 +81,10 @@ namespace headsup
 
     enum class ShowCondition : uint8_t
     {
-        Targeted, Unclaimed, YourClaim, OthersClaim, Engaged, TooWeak, Aggressive, Passive, PartyMember, Friend, LinkshellMember
+        Targeted, Unclaimed, YourClaim, OthersClaim, Engaged, TooWeak, Aggressive, Passive, PartyMember, Friend, LinkshellMember,
+        OwnerIsYou
     };
-    constexpr int kShowConditionCount = 11;
+    constexpr int kShowConditionCount = 12;
     constexpr uint32_t ConditionBit(ShowCondition c) { return 1u << static_cast<int>(c); }
     struct LineShow
     {
@@ -87,6 +92,12 @@ namespace headsup
         uint32_t when = 0;
         bool operator==(const LineShow&) const = default;
     };
+    // A line's font styles: any of them together, as bits.
+    enum class FontStyle : uint8_t { Bold = 1, Italic = 2, Underline = 4 };
+    constexpr int kFontStyleCount    = 3;
+    constexpr uint8_t kAllFontStyles = 7;
+    constexpr uint8_t StyleBit(FontStyle style) { return static_cast<uint8_t>(style); }
+    constexpr bool HasStyle(uint8_t styles, FontStyle style) { return (styles & StyleBit(style)) != 0; }
     enum class Align : uint8_t { Left, Center, Right };
     constexpr int kAlignCount = 3;
     constexpr int kPlateLines = 3;
@@ -95,9 +106,16 @@ namespace headsup
     constexpr int kMinGlow = 0, kMaxGlow = 300;                // 0 is no glow
     constexpr int kMinGlowSize = 25, kMaxGlowSize = 200;
     constexpr int kMinShadow = 0, kMaxShadow = 200;
+    constexpr float kShadowUnit = 1.5f; // a shadow strength of 100 percent, in the mockup's shadows
+    constexpr int kMaxLinePadding = 10; // pixels
     constexpr int kMinOrnamentWidth = 20, kMaxOrnamentWidth = 300;       // pixels
     constexpr int kMinOrnamentThickness = 3, kMaxOrnamentThickness = 24; // pixels
     constexpr size_t kMaxTemplate = 255;                                 // bytes of a line's text
+    // A player's status icons, less GM's, which is drawn whatever the limit: mentor, new adventurer, level sync,
+    // away, linkshell, bazaar and seeking party.
+    constexpr int kCountedIcons = 7;
+    // Whether a kind's nameplates can show those icons, so that its page sets their limit and its file keeps it.
+    constexpr bool HasStatusIcons(PlateKind kind) { return kind == PlateKind::Players || kind == PlateKind::Self; }
 
     // The tags a template is built from.
     constexpr const char* kTagDetect       = "$detect";
@@ -127,25 +145,28 @@ namespace headsup
         LineShow show;
         Align align = Align::Center;
         std::string font;
-        bool bold    = false;
-        int textSize = 100;
+        uint8_t style = 0; // FontStyle bits
+        int textSize  = 100;
         int iconSize = 100;
+        int padding  = 0; // pixels of extra space under the line; over it for the bottom line, which stays on the name
         ColorPick color;
         int shadow = 100;
         ColorPick shadowColor{ColorSource::Custom, ColorFromRgb(0x000000)};
         int glow     = 0;
         int glowSize = 100;
         ColorPick glowColor{ColorSource::Aggression};
+        bool glowOffInCombat = false; // no glow while its entity fights: on for a mob's lines
         bool operator==(const LineDesign&) const = default;
     };
 
-    enum class OrnamentPlace : uint8_t { BetweenLines1And2, BetweenLines2And3 };
-    constexpr int kOrnamentPlaceCount = 2;
-    // The diamond rule between two of a kind's lines, drawn only while both render.
+    constexpr int kTopLine = 0, kMiddleLine = 1, kBottomLine = kPlateLines - 1; // the design's lines
+    // Where a kind's diamond rule goes: over the plate's first line, between the middle line and the one over or
+    // under it while both show, or under the plate's last line.
+    enum class OrnamentPlace : uint8_t { Disabled, Top, AboveMiddle, BelowMiddle, Bottom };
+    constexpr int kOrnamentPlaceCount = 5;
     struct OrnamentSettings
     {
-        bool on            = false;
-        OrnamentPlace place = OrnamentPlace::BetweenLines2And3;
+        OrnamentPlace place = OrnamentPlace::Disabled;
         int width          = 90;
         int height         = 6;
         ColorPick color{ColorSource::Aggression};
@@ -158,37 +179,53 @@ namespace headsup
         ColorPick outlineColor{ColorSource::Aggression};
         bool operator==(const RowSettings&) const = default;
     };
+    // How opaque a kind's nameplates are, in percent, by what you target: with no target, as another than your
+    // target, and as your target. Fading in, each is whole within kFadeNearYalms and almost nothing at the range.
+    constexpr float kPercent = 100.0f; // what a setting in percent is a share of
+    constexpr float kMinOutlineDistance = 15.0f, kMaxOutlineDistance = 50.0f; // yalms: the game draws no mob past 50
+
+    struct OpacitySettings
+    {
+        int noTarget    = 100;
+        int notTargeted = 100;
+        int targeted    = 100;
+        bool fadeIn     = false;
+        float range     = kMaxOutlineDistance;
+        bool operator==(const OpacitySettings&) const = default;
+    };
     struct KindSettings
     {
         RowSettings rows[kMaxRows];
         LineDesign lines[kPlateLines];
         OrnamentSettings ornament;
+        OpacitySettings opacity;
+        int maxIcons = kCountedIcons; // the status icons a nameplate draws at most, GM's aside
         bool operator==(const KindSettings&) const = default;
     };
     std::array<KindSettings, kPlateKindCount> DefaultKinds();
 
-    int RowCountOf(PlateKind kind);                // 8, 4, 1, 1, 1
+    int RowCountOf(PlateKind kind);                // 9, 4, 1, 1, 4
     const char* RowKey(PlateKind kind, int row);   // "aggressive", "partyMember", "self", ...: settings keys
     const char* RowLabel(PlateKind kind, int row); // "Aggressive", "Party Member", "Self", ...: the menu
     const char* KindKey(PlateKind kind);           // "mobs", "players", "self", "npcs", "pets"
-    const char* KindLabel(PlateKind kind);         // "Mobs", "Players", "Self", "NPCs", "Pets"
     // The conditions a kind's lines may be shown by, in the menu's order.
     std::vector<ShowCondition> ConditionsFor(PlateKind kind);
     const char* ConditionLabel(ShowCondition c);
-    // The color sources a kind's picks offer, in the menu's order: text is true for a text color (Game's is offered).
+    // The color sources a kind's picks offer, in the menu's order: text is true for a text color, which may take the
+    // game's own, last.
     std::vector<ColorSource> SourcesFor(PlateKind kind, bool text);
+    // What the target cursor's color and its edge's may follow: every palette, since it sits on anything.
+    std::vector<ColorSource> CursorSources();
     const char* SourceLabel(ColorSource s);
 
     enum class HookAction : uint8_t { Keep, Hide, Replace }; // the game draws the name; nothing draws it; HeadsUp draws
     enum class DetectionIcon : uint8_t { Aggro, Link, Sight, TrueSight, Sound, Scent, Magic, Ability, Blood };
     constexpr int kDetectionIconCount = 9;
     constexpr uint32_t kAllDetection  = (1u << kDetectionIconCount) - 1;
+    // What a new install shows: all but the aggression icon, which the outline's color already tells.
+    constexpr uint32_t kDefaultDetection = kAllDetection & ~(1u << static_cast<int>(DetectionIcon::Aggro));
     constexpr uint32_t DetectionBit(DetectionIcon d) { return 1u << static_cast<int>(d); }
     const char* DetectionLabel(DetectionIcon d);
-
-    // A character's name is letters alone, this many of them, as Phoenix's validateCharacterName has it.
-    constexpr size_t kMinCharacterName = 3, kMaxCharacterName = 15;
-    bool IsCharacterName(std::string_view name);
 
     // The menu's words, each as a row shows it: Title Case, as TitleCaseText gives it.
     const char* PlateModeLabel(PlateMode mode);
@@ -202,6 +239,7 @@ namespace headsup
     const char* TargetStateTip(TargetState target);
     const char* StatusRankLabel(StatusRank status);
     extern const char* const kAlignLabels[kAlignCount];
+    extern const char* const kFontStyleLabels[kFontStyleCount]; // by bit, the lowest first
     extern const char* const kOrnamentPlaceLabels[kOrnamentPlaceCount];
     extern const char* const kLineLabels[kPlateLines]; // a line's box and its style tab
 

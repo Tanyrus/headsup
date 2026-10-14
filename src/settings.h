@@ -6,12 +6,14 @@
 #include "bar_types.h"
 #include "color.h"
 #include "currencies.h"
+#include "dash_mark.h"
 #include "fonts.h"
 #include "icons.h"
 #include "ini_text.h"
 #include "menu_document.h"
 #include "menu_fonts.h"
 #include "native_locate.h"
+#include "outline_math.h"
 #include "plate_settings.h"
 
 #include <array>
@@ -24,13 +26,13 @@
 
 namespace headsup
 {
-    constexpr float kMinThickness = 1.0f, kMaxThickness = 16.0f;            // render-target pixels
-    constexpr int kMinSmoothness = 4, kMaxSmoothness = 16;                  // shifted copies per mesh
-    constexpr float kMinOutlineDistance = 5.0f, kMaxOutlineDistance = 50.0f; // yalms: the game draws no mob past 50
-    constexpr int kMinTextSize = 8, kMaxTextSize = 48;   // pixels: the base and cursor sizes
+    constexpr int kMinOutlineThickness = 25, kMaxOutlineThickness = 400; // percent of kOutlineUnitPx
+    constexpr int kMinSmoothness = SmoothnessCopies(SmoothnessLevel::Low), kMaxSmoothness = SmoothnessCopies(SmoothnessLevel::Ultra);
+    constexpr int kMinTextSize = 8, kMaxTextSize = 48;   // pixels: the base font and base icon sizes
+    constexpr int kDefaultIconSize = 16;                 // pixels: the base icon size
     constexpr int kMinNameRaise = 0, kMaxNameRaise = 40; // pixels
     constexpr const char* kDefaultFont = kMarcellusSC;
-    constexpr const char* kBadgeFont   = kBarlowCondensed; // plain enough to read a few pixels tall
+    constexpr const char* kBadgeFont   = kBarlowCondensed; // what badges were set in before they took the default font
     constexpr size_t kMaxFontName      = 31; // a Windows font name's longest, without its terminator
 
     constexpr std::array<bool, kBarWidgetCount> AllOn()
@@ -40,10 +42,26 @@ namespace headsup
         return on;
     }
 
-    constexpr int kMinCursorOutline = 25, kMaxCursorOutline = 200; // percent
+    // The target cursor: the game's own, one of HeadsUp's shapes or pictures, or a cursor file of the player's.
+    enum class CursorStyle : uint8_t { Vanilla, Triangle, Feather, Chocobo, File };
+    constexpr int kCursorStyleCount = 5;
+    constexpr CursorStyle kDefaultCursorStyle = CursorStyle::Feather;
+    const char* CursorStyleName(CursorStyle style); // as the settings file has it
+    // A picture keeps its own colors; a shape is filled with the cursor's.
+    constexpr bool CursorIsPicture(CursorStyle style) { return style == CursorStyle::Chocobo || style == CursorStyle::File; }
+    // A cursor file is kept by its name, which goes into a path under the cursors folder: not empty, not over
+    // this long, and with nothing in it that would lead out of the folder.
+    constexpr size_t kMaxCursorFileName = 64;
+    bool IsCursorFileName(std::string_view name);
+    constexpr int kMinCursorSide = 4, kMaxCursorSide = 64; // pixels: the target cursor's width and height
+    constexpr int kDefaultCursorHeight = 20;
+    int DefaultCursorWidth(); // the default style's at that height
+    constexpr int kMinCursorEdge = 50, kMaxCursorEdge = 400; // percent
+    constexpr int kMaxCursorRaise = 10; // pixels, up or down
     constexpr int kMinOpacity = 10, kMaxOpacity = 100; // percent
 
     constexpr int kMinMenuScale = 70, kMaxMenuScale = 160; // percent
+    constexpr int kMinMenuOpacity = 30; // percent: fainter, the window could not be found to set it back
     constexpr int kMaxMenuSide  = 16384; // pixels: more than any screen is across
 
     constexpr int kMaxHelpBarOffset = 4000; // pixels either way
@@ -51,8 +69,10 @@ namespace headsup
     struct Settings
     {
         bool enabled       = true;
-        float thickness    = 1.0f;  // render-target pixels
-        int smoothness     = 4;     // shifted copies per mesh
+        int outlineThickness = 100; // percent of kOutlineUnitPx
+        int outlineOpacity   = 60;  // percent
+        bool outlineFadeIn   = false; // fainter with distance, down to almost nothing at the range
+        int smoothness     = kMinSmoothness; // shifted copies per mesh: a SmoothnessLevel's
         float maxDistance  = 50.0f; // yalms
         // Which elements and statuses get badges, as BadgeRules has them.
         int elementWeakRank   = BadgeRules{}.elementWeakRank;
@@ -60,7 +80,7 @@ namespace headsup
         int maxElements       = BadgeRules{}.maxElements;
         StatusBadgeRule statusBadges[kStatusRankCount] = {}; // by StatusRank
         bool showRanks = false; // rank badges as ranks rather than the wikis' percents
-        std::string badgeFontName = kBadgeFont;
+        std::string badgeFontName; // badges' numbers; empty for the default font
         bool showBar       = true;
         BarTheme barTheme  = BarTheme::PhoenixGold;
         BarSeparators barSeparators = BarSeparators::Theme;
@@ -80,6 +100,7 @@ namespace headsup
         bool helpBarBackground = true;           // off, the help text alone
         std::string menuFont = kDefaultMenuFont; // the settings window's text, by its kMenuFonts name
         int menuScale        = 100;              // percent: the settings window's text and everything sized by it
+        int menuOpacity      = 100;              // percent
         MenuTheme menuTheme  = MenuTheme::Phoenix;
         // Where the player left the settings window, in pixels; no width for one never moved, which opens in the
         // screen's middle.
@@ -102,19 +123,20 @@ namespace headsup
         bool screenshotHidesGame = true; // screenshot mode takes the game's own windows and chat too
         // The game's windows moved out from under Game help's bar, by short name (native_locate.h's ShortName).
         std::vector<std::string> movedWindows = DefaultMovedWindows();
-        int untargetedOpacity = 100; // percent: other mobs' plates while you have a target
-        bool glowOffWhenFighting = true; // a mob's lines lose their glow once you or your party has claimed it
         bool phTimers          = false; // above your name, a respawn timer for each placeholder you see die
         bool scaleWithDistance = true;  // sizes follow how far a name's owner is from you
         bool scaleOwnName      = true;  // your own plate too
-        bool scaleCursor       = true;  // the target cursor's size follows the distance too, apart from the names
+        bool scaleCursor       = false; // the target cursor's size follows the distance too, apart from the names
         std::vector<uint8_t> keepPointerKeys; // keys that set off a command without hiding the game's pointer
-        bool replaceCursor     = true;  // our target cursor above the target's nameplate, instead of the game's
-        bool cursorFeather     = true;  // Phoenix's feather instead of the arrow
+        CursorStyle cursorStyle = kDefaultCursorStyle;
+        std::string cursorFile; // a File cursor's name in the cursors folder, without its extension
         bool chocoboPointer    = false; // PlayOnline's chocobo in place of the game's mouse pointer
         bool fixPointer        = true;  // the game reads the mouse in its true client area and syncs its pointer before clicks
-        int cursorSize         = 20;    // pixels tall
-        int cursorOutline      = 50;    // percent of the outline's first thickness
+        int cursorWidth        = DefaultCursorWidth(); // pixels
+        int cursorHeight       = kDefaultCursorHeight;
+        int cursorOutlineThickness = 100; // percent: its edge, a twentieth of its height at 100
+        bool cursorFloat       = true;  // it bobs up and down
+        int cursorRaise        = 5;     // pixels over its place
         int nameRaise          = 6;     // pixels the names HeadsUp draws sit above the game's, with all above them
         bool stackNames        = false; // names HeadsUp draws that would cover each other rise over one another
         Color weakBadgeColor   = {{0.40f, 1.00f, 0.40f}};
@@ -123,15 +145,18 @@ namespace headsup
         Color immuneBadgeColor = {{1.00f, 0.25f, 0.25f}};
         bool nameplates = true;
         bool outlines   = true;
-        int baseSize    = 15; // pixels: a line at 100 percent
+        int baseSize    = 15; // pixels: a line's text at 100 percent
+        int baseIconSize = kDefaultIconSize; // and its icons
+        DashMark dashMark = DashMark::Diamond; // what a dash in a design, or between a level's ends, is drawn as
+        bool autoCheck    = false; // every mob that comes near is checked by HeadsUp, for its exact level
         std::string defaultFont = kDefaultFont;
         int scaleMin = 50, scaleMax = 250; // percent: the distance scale's limits
         int timerPercent = 87;
         std::array<KindSettings, kPlateKindCount> kinds = DefaultKinds();
         Palette palette = DefaultPalette();
-        uint32_t detectionShown = kAllDetection;
-        std::vector<std::string> friends;
-        Color cursorEdgeColor = ColorFromRgb(0x000000);
+        uint32_t detectionShown = kDefaultDetection;
+        ColorPick cursorColor{ColorSource::Target};
+        ColorPick cursorEdgeColor{ColorSource::Custom, ColorFromRgb(0x000000)};
         const KindSettings& Kind(PlateKind k) const { return kinds[static_cast<int>(k)]; }
         KindSettings& Kind(PlateKind k) { return kinds[static_cast<int>(k)]; }
         bool operator==(const Settings&) const = default;

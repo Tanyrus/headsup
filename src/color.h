@@ -9,7 +9,7 @@ namespace headsup
     // Opaque: outline copies take alpha from the mob's texture, where it shapes hair and cloth cut-outs.
     struct Color
     {
-        float v[3]; // r, g, b in 0-1, the layout ImGui's ColorEdit3 edits
+        float v[3]; // r, g, b in 0-1
         bool operator==(const Color&) const = default;
     };
     // From 0xRRGGBB, exactly: ToArgb gives back the same bytes.

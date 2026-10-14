@@ -1,8 +1,5 @@
 #include "menu_state.h"
 
-#include "entity_state.h"
-#include "nameplate.h"
-#include "plate_compose.h"
 #include "settings.h"
 
 #include <cctype>
@@ -31,7 +28,7 @@ namespace headsup
         {Page::UserInterface, "User Interface", false},
         {Page::TopPanel, "Top Panel", true},
         {Page::Widgets, "Widgets", true},
-        {Page::MouseCursor, "Mouse Cursor", false},
+        {Page::MouseCursor, "Mouse Cursor", true},
         {Page::ConfigMenu, "Config Menu", false},
         {Page::Debug, "Debug", false},
     };
@@ -66,7 +63,7 @@ namespace headsup
 
     std::string TitleCaseText(std::string_view text)
     {
-        constexpr std::array<std::string_view, 8> kSmallWords = {"and", "or", "of", "the", "to", "in", "on", "with"};
+        constexpr std::array<std::string_view, 10> kSmallWords = {"and", "or", "of", "the", "to", "in", "on", "with", "by", "is"};
         std::string result(text);
         for (size_t at = 0; at < result.size();)
         {
@@ -91,14 +88,6 @@ namespace headsup
 
     int TabsPerRow(int count, int rows) { return std::max(1, (count + std::max(rows, 1) - 1) / std::max(rows, 1)); }
 
-    TabPlace TabAt(int tab, int count, int perRow, float strip, float height, float gap)
-    {
-        const int columns = std::max(perRow, 1), row = tab / columns;
-        const int inRow   = std::clamp(count - row * columns, 1, columns);
-        const float width = (strip - gap * static_cast<float>(inRow - 1)) / static_cast<float>(inRow);
-        return TabPlace{static_cast<float>(tab % columns) * (width + gap), static_cast<float>(row) * (height + gap), width};
-    }
-
     int ClockZoneChoice(const std::optional<ClockZone>& zone) { return zone ? static_cast<int>(*zone) + 1 : 0; }
 
     std::optional<ClockZone> ClockZoneOfChoice(int choice)
@@ -111,11 +100,6 @@ namespace headsup
     {
         const std::optional<ClockZone> zone = ClockZoneOfChoice(choice);
         return zone ? ClockZoneName(*zone) : kLocalZoneLabel;
-    }
-
-    std::string SizeFormat(const Settings& settings, int percent)
-    {
-        return "%d%% (" + std::to_string(FixedRasterHeight(BasePixels(settings, percent))) + " px)";
     }
 
     std::string ShowSummary(const LineShow& show, const std::vector<ShowCondition>& offered)
@@ -134,13 +118,24 @@ namespace headsup
         return checked > 1 ? std::to_string(checked) + kMany : only;
     }
 
-    std::optional<std::string> FriendToAdd(const std::vector<std::string>& friends, std::string_view typed)
+    bool ToggleCondition(LineShow& show, const std::vector<ShowCondition>& offered, int row)
     {
-        const auto blank = [](char c) { return std::isspace(static_cast<unsigned char>(c)) != 0; };
-        while (!typed.empty() && blank(typed.front())) typed.remove_prefix(1);
-        while (!typed.empty() && blank(typed.back())) typed.remove_suffix(1);
-        if (!IsCharacterName(typed) || IsFriend(friends, typed)) return std::nullopt;
-        return std::string(typed);
+        if (row < 0 || row > static_cast<int>(offered.size())) return false;
+        if (row == 0)
+        {
+            show.always = !show.always;
+            return true;
+        }
+        const uint32_t bit = ConditionBit(offered[static_cast<size_t>(row) - 1]);
+        if (show.always)
+        {
+            show.always = false;
+            show.when   = 0;
+            for (const ShowCondition condition : offered)
+                show.when |= ConditionBit(condition);
+        }
+        show.when ^= bit;
+        return true;
     }
 
     std::vector<int> SyncTargets(const KindSettings& kind, int line)
@@ -169,9 +164,17 @@ namespace headsup
 
     std::string SyncEntryLabel(const std::vector<int>& targets, int entry)
     {
-        constexpr const char* kNoSyncLabel = "No";
+        constexpr const char* kNoSyncLabel = "Do Not Sync";
+        constexpr const char* kSyncWith    = "Sync with ";
         const int line = SyncOfEntry(targets, entry);
-        return line == kNoSync ? kNoSyncLabel : kLineLabels[line];
+        return line == kNoSync ? kNoSyncLabel : kSyncWith + std::string(kLineLabels[line]);
+    }
+
+    std::string SyncEntryTip(const std::vector<int>& targets, int entry)
+    {
+        const int line = SyncOfEntry(targets, entry);
+        if (line == kNoSync) return "This line keeps a style of its own.";
+        return std::string("Every setting below is the ") + kLineLabels[line] + "'s, so the two always match.";
     }
 
     namespace
@@ -214,5 +217,24 @@ namespace headsup
     {
         const int entry = FontEntry(fonts, unset, font);
         return entry == kNoFontEntry ? font : FontEntryLabel(fonts, unset, entry);
+    }
+
+    std::vector<CursorChoice> CursorChoices(const std::vector<std::string>& files, const Settings& settings)
+    {
+        std::vector<CursorChoice> choices;
+        for (int style = 0; style < static_cast<int>(CursorStyle::File); ++style)
+            choices.push_back(CursorChoice{static_cast<CursorStyle>(style), {}});
+        for (const std::string& file : files)
+            choices.push_back(CursorChoice{CursorStyle::File, file});
+        const CursorChoice saved{CursorStyle::File, settings.cursorFile};
+        if (settings.cursorStyle == CursorStyle::File && std::ranges::find(choices, saved) == choices.end()) choices.push_back(saved);
+        return choices;
+    }
+
+    int CursorChoiceOf(const std::vector<CursorChoice>& choices, const Settings& settings)
+    {
+        const CursorChoice saved{settings.cursorStyle, settings.cursorStyle == CursorStyle::File ? settings.cursorFile : std::string()};
+        const auto at = std::ranges::find(choices, saved);
+        return at != choices.end() ? static_cast<int>(at - choices.begin()) : static_cast<int>(kDefaultCursorStyle);
     }
 }

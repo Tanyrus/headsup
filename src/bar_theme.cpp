@@ -55,6 +55,14 @@ namespace headsup
         return kNames[std::clamp(static_cast<int>(theme), 0, kBarThemeCount - 1)];
     }
 
+    const char* BarThemeTip(BarTheme theme)
+    {
+        static const char* const kTips[kBarThemeCount] = {"An ornate strip in dark brown and gold, with diamonds between its widgets.",
+            "Each widget in a grey pill, lit in blue.", "The ornate strip in Phoenix's dark red.",
+            "Each widget in a pill, in Phoenix's dark red.", "Slate glass, lit from cyan into violet."};
+        return kTips[std::clamp(static_cast<int>(theme), 0, kBarThemeCount - 1)];
+    }
+
     BarMetrics MetricsFor(int barHeight, BarShape shape, int barText, int popupText)
     {
         const float h = static_cast<float>(std::clamp(barHeight, kMinBarHeight, kMaxBarHeight));

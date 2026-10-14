@@ -54,6 +54,11 @@ TEST(image_names_round_trip_to_their_images)
     const std::optional<Image> coin = HostImage("hu:coin/17");
     CHECK(coin && coin->width == 17);
     CHECK(!HostImage("hu:icon/999") && !HostImage("hu:nothing") && !HostImage("icon.png") && !HostImage("hu:strip/9/45/13"));
+    // The reset arrow, in the color asked for: the bottom of its ring is that color.
+    const std::optional<Image> reset = HostImage(ResetSource(0xFF8C7270u, 32));
+    CHECK(reset && reset->width == 32 && reset->height == 32);
+    CHECK_EQ(reset->argb[(16 + 10) * 32 + 16], 0xFF8C7270u);
+    CHECK(!HostImage("hu:reset/32"));
 }
 
 TEST(the_document_holds_the_strip_the_caps_the_dividers_and_every_placed_widget)

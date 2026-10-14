@@ -40,8 +40,9 @@ namespace headsup
     struct LineLook
     {
         std::string font;
-        bool bold        = false;
+        uint8_t style    = 0; // FontStyle bits
         float textSize   = 0.0f, iconSize = 0.0f;
+        float padding    = 0.0f;
         uint32_t color   = 0;
         float shadow     = 0.0f;
         uint32_t shadowColor = 0;
@@ -56,14 +57,23 @@ namespace headsup
         std::vector<PlateItem> items;
         LineLook look;
     };
-    constexpr int kNoOrnament = -1;
-    // ornamentAbove: the index into lines of the lower of the two lines the kind's ornament sits between, or none.
+    // ornament: where the kind's ornament goes, while the plate's lines allow it.
     struct ComposedPlate
     {
         std::vector<ComposedLine> lines;
-        int ornamentAbove   = kNoOrnament;
+        OrnamentPlace ornament = OrnamentPlace::Disabled;
         uint32_t ornamentColor = 0;
     };
+    constexpr uint32_t kDeadTextArgb = 0xFF585858; // the dark grey of a dead mob's or player's every line
+    constexpr int kNoOrnament = -1;
+    // The line of a plate its ornament goes with, over it or under it: the first for Top, the last for Bottom, and
+    // the lower of the two it sits between. No line while those two do not both show, or the plate has none.
+    struct OrnamentAt
+    {
+        int line   = kNoOrnament;
+        bool under = false;
+    };
+    OrnamentAt OrnamentLineOf(const ComposedPlate& plate);
 
     // Screenshot mode hides names first, even after /hu off; then the game's stay while HeadsUp or its nameplates are
     // off, and the row decides the rest: a name HeadsUp cannot draw (namesFailed) is the game's, a hidden one hidden.
@@ -73,10 +83,10 @@ namespace headsup
     // The percent of the base size as pixels.
     float BasePixels(const Settings& settings, int percent);
     // A plate as it is drawn once Direct3D could not make an icon: its icon runs and their gaps go, and so do the
-    // lines left empty, and the ornament with either line it sat between.
+    // lines left empty.
     void DropIcons(ComposedPlate& plate);
     // A plate without the texts whose image fits no texture: leftOut holds a flag for each Text item in the plate's
-    // order. Their items go, with the gaps that set them apart, the lines left empty and the ornament as above.
+    // order. Their items go, with the gaps that set them apart and the lines left empty.
     void DropTexts(ComposedPlate& plate, std::span<const uint8_t> leftOut);
     // Your placeholder timers' lines: the default font and an untouched line's shadow, white, at the timers' size.
     LineLook TimerLook(const Settings& settings);

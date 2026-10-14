@@ -12,7 +12,7 @@ namespace headsup
     struct LineStyle
     {
         std::string font;
-        bool bold            = false;
+        uint8_t style        = 0; // FontStyle bits
         uint32_t shadowColor = 0;
         float shadowStrength = 0.0f; // times the mockup's shadow
         bool outline         = false; // a crisp edge in shadowColor instead of the soft shadow

@@ -276,6 +276,28 @@ TEST(mobs_beyond_max_distance_are_not_outlined)
     CHECK(!t.Find(0x3000)->outline);
 }
 
+TEST(an_outline_is_as_opaque_as_the_setting_and_fainter_with_distance_only_when_it_fades_in)
+{
+    Tracker t;
+    Settings s;
+    const uint32_t color = ToArgb(s.palette.aggression[static_cast<int>(Nature::Aggressive)]);
+    t.Update({BountyHunter(0x2000, 8.0f), BountyHunter(0x3000, 30.0f)}, kLevel20, s, CursorTargets{});
+    CHECK_EQ(t.Find(0x2000)->outlineAlpha, 153); // 60 percent, a new install's
+    CHECK_EQ(t.Find(0x3000)->outlineAlpha, 153);
+    CHECK_EQ(t.Find(0x3000)->argb, color); // the color itself stays whole
+    CHECK_EQ(t.Find(0x3000)->distance, 30.0f); // which a nameplate that fades in reads too
+    s.outlineOpacity = 100;
+    s.outlineFadeIn  = true;
+    t.Update({BountyHunter(0x2000, 8.0f), BountyHunter(0x3000, 30.0f), BountyHunter(0x4000, s.maxDistance)}, kLevel20, s,
+        CursorTargets{});
+    CHECK_EQ(t.Find(0x2000)->outlineAlpha, 255);
+    CHECK_EQ(t.Find(0x3000)->outlineAlpha, 129); // half way from 10 yalms to the range of 50
+    CHECK_EQ(t.Find(0x4000)->outlineAlpha, 3);   // a hundredth, at the range
+    s.maxDistance = 30.0f;
+    t.Update({BountyHunter(0x3000, 20.0f)}, kLevel20, s, CursorTargets{});
+    CHECK_EQ(t.Find(0x3000)->outlineAlpha, 129); // the fade ends at the range, wherever that is set
+}
+
 TEST(disabled_outlines_nothing)
 {
     Tracker t;
@@ -381,13 +403,15 @@ TEST(squared_distance_becomes_yalms_and_keeps_nan)
 
 TEST(a_claim_by_you_or_your_party_is_told_from_anyone_elses)
 {
-    // A mob's claim: the claimer's server ID in its low 16 bits, and 1 in its high 16 while it is claimed.
-    const std::vector<uint32_t> party{0x00012345, 0x01098ABC};
-    CHECK(ClaimedByParty(0x00012345, party));  // you
-    CHECK(ClaimedByParty(0x00018ABC, party));  // a party member, by the low half of their ID
-    CHECK(!ClaimedByParty(0x00002345, party)); // the claim ended; the last claimer stays
-    CHECK(!ClaimedByParty(0x00011111, party)); // someone else's
-    CHECK(!ClaimedByParty(0x00012345, {}));
+    // A mob's claim is its claimer's whole server ID, and 0 while nobody holds it: 65001 while the test character
+    // fought a Land Crab, 0 four seconds after it stopped.
+    const std::vector<uint32_t> party{65001, 0x01098ABC};
+    CHECK(IsClaimed(65001) && IsClaimed(0x01098ABC) && !IsClaimed(0));
+    CHECK(ClaimedByParty(65001, party));       // you, with an ID that fits in 16 bits
+    CHECK(ClaimedByParty(0x01098ABC, party));  // a party member
+    CHECK(!ClaimedByParty(0x00008ABC, party)); // someone whose ID only ends as a member's does
+    CHECK(!ClaimedByParty(0, party));
+    CHECK(!ClaimedByParty(65001, {}));
 }
 
 TEST(a_mob_carries_its_server_id_record_and_level_line_and_is_found_by_target_index)
@@ -424,6 +448,7 @@ TEST(the_tracker_fills_each_entitys_state)
     ActorInput member   = Player(0x4000);
     member.party        = true;
     member.jobs         = PlayerJobs{1, 75, 2, 37};
+    member.title        = 266;
     ActorInput you      = Player(0x5000);
     you.index           = 1053;
     you.self            = true;
@@ -445,6 +470,7 @@ TEST(the_tracker_fills_each_entitys_state)
     CHECK(PlateKindOf(t.Find(0x3000)->state) == PlateKind::Pets);
     CHECK(t.Find(0x4000)->state.playerRow == PlayerRow::PartyMember);
     CHECK(t.Find(0x4000)->jobs == (PlayerJobs{1, 75, 2, 37}));
+    CHECK_EQ(t.Find(0x4000)->title, 266u);
     CHECK(t.Find(0x4000)->state.target == TargetState::None);
     CHECK(t.Find(0x5000)->state.self && t.Find(0x5000)->state.engaged);
     CHECK(PlateKindOf(t.Find(0x5000)->state) == PlateKind::Self);
@@ -488,7 +514,7 @@ TEST(the_tracker_fills_claims_rows_placeholders_checks_and_dead_mobs)
     CHECK(t.Find(0x3000)->state.toughness == LabelShade::DecentChallenge);
     CHECK(!t.Find(0x5000)->state.alive);
     CHECK(t.Find(0x5000)->state.nature == Nature::Aggressive);
-    CHECK(t.Find(0x5000)->state.row == Category::WillAttack);
+    CHECK(t.Find(0x5000)->state.row == Category::Dead);
     CHECK(!t.Find(0x5000)->state.tooWeak);
     CHECK(t.Find(0x5000)->state.toughness == LabelShade::Unknown);
     CHECK(t.Find(0x6000)->state.pet);
@@ -532,10 +558,33 @@ TEST(a_dead_far_or_disabled_row_mob_gets_no_outline)
     Tracker t;
     t.Update({BountyHunter(0x2000, 10.0f, false), BountyHunter(0x3000, s.maxDistance + 1.0f), Mob(0x4000, kSnipper, "Snipper")},
         kLevel20, s, CursorTargets{});
-    CHECK(!t.Find(0x2000)->outline); // dead
+    CHECK(!t.Find(0x2000)->outline); // dead, and the Dead row has no outline by default
     CHECK(!t.Find(0x3000)->outline); // past the range
     CHECK(!t.Find(0x4000)->outline); // the Passive row is Disabled by default
     CHECK_EQ(t.OutlinedCount(), 0u);
+    // The Dead row can give a dead mob one, in the color its pick takes from what the mob was.
+    Settings marked = s;
+    SetMobOutline(marked, Category::Dead, OutlineMode::Shown);
+    t.Update({BountyHunter(0x2000, 10.0f, false)}, kLevel20, marked, CursorTargets{});
+    CHECK(t.Find(0x2000)->outline);
+    CHECK_EQ(t.Find(0x2000)->argb, ToArgb(marked.palette.aggression[static_cast<int>(Nature::Aggressive)]));
+    // A dead player gets none, whatever the players' rows say.
+    marked.Kind(PlateKind::Players).rows[static_cast<int>(PlayerRow::Player)].outline = OutlineMode::Shown;
+    ActorInput fallen = Player(0x5000);
+    fallen.self       = false;
+    fallen.alive      = false;
+    t.Update({fallen}, kLevel20, marked, CursorTargets{});
+    CHECK(!t.Find(0x5000)->outline);
+    // Nor does a dead pet, which is a mob to the game and goes by the pets' rows: those have none for the dead.
+    marked.Kind(PlateKind::Pets).rows[static_cast<int>(PetRow::Yours)].outline = OutlineMode::Shown;
+    ActorInput pet = Mob(0x6000, kSnipper, "Snipper");
+    pet.pet        = true;
+    pet.petRow     = PetRow::Yours;
+    t.Update({pet}, kLevel20, marked, CursorTargets{});
+    CHECK(t.Find(0x6000)->outline);
+    pet.alive = false;
+    t.Update({pet}, kLevel20, marked, CursorTargets{});
+    CHECK(!t.Find(0x6000)->outline);
 }
 
 namespace
@@ -614,8 +663,14 @@ TEST(a_mob_that_is_someones_pet_is_outlined_by_the_pets_row_alone)
     Tracker t;
     t.Update({pet}, kLevel20, s, CursorTargets{});
     CHECK(!t.Find(0x2000)->outline); // the Pets rows are Disabled by default, whatever its aggression
-    s.Kind(PlateKind::Pets).rows[0].outline      = OutlineMode::Shown;
-    s.Kind(PlateKind::Pets).rows[0].outlineColor = ColorPick{ColorSource::Custom, {{0.7f, 0.6f, 0.5f}}};
+    // A party member's pet goes by the Party Pets row, and no other.
+    pet.petRow = PetRow::Party;
+    s.Kind(PlateKind::Pets).rows[static_cast<int>(PetRow::Others)].outline = OutlineMode::Shown;
+    t.Update({pet}, kLevel20, s, CursorTargets{});
+    CHECK(!t.Find(0x2000)->outline && t.Find(0x2000)->state.petRow == PetRow::Party);
+    const int partyPets = static_cast<int>(PetRow::Party);
+    s.Kind(PlateKind::Pets).rows[partyPets].outline      = OutlineMode::Shown;
+    s.Kind(PlateKind::Pets).rows[partyPets].outlineColor = ColorPick{ColorSource::Custom, {{0.7f, 0.6f, 0.5f}}};
     for (const Category claim : {Category::PartyClaim, Category::OtherClaim})
         SetMobOutline(s, claim, OutlineMode::Shown);
     SetMobOutline(s, Category::WillAttack, OutlineMode::Disabled);

@@ -1,6 +1,7 @@
 #include "plate_image.h"
 
 #include "argb.h"
+#include "plate_settings.h"
 #include "test.h"
 
 #include <algorithm>
@@ -28,7 +29,6 @@ namespace
     }
 
     int Alpha(uint32_t argb) { return static_cast<int>((argb >> 24) & 0xFFu); }
-    bool Near(float a, float b) { return std::fabs(a - b) < 1e-4f; }
     int Green(uint32_t argb) { return static_cast<int>((argb >> 8) & 0xFFu); }
 
     // A filled square of side size inside an empty margin.
@@ -73,6 +73,49 @@ TEST(partly_covered_text_blends_over_its_outline)
     CHECK_EQ(Pixel(image, 0, 1), 0x80000000u);
 }
 
+TEST(a_picture_resized_is_the_average_of_what_each_new_pixel_covers)
+{
+    // Four by two, a red half and a clear half: at two by one, a red pixel and a clear one.
+    Image picture{4, 2, std::vector<uint32_t>(8, 0)};
+    for (int y = 0; y < 2; ++y)
+        for (int x = 0; x < 2; ++x)
+            picture.argb[static_cast<size_t>(y * 4 + x)] = 0xFFFF0000u;
+    const Image half = Resized(picture, 2, 1);
+    CHECK(half.width == 2 && half.height == 1);
+    CHECK_EQ(Pixel(half, 0, 0), 0xFFFF0000u);
+    CHECK_EQ(Pixel(half, 1, 0), 0u);
+    // One pixel of it all: half covered, and red, not red darkened by the clear half's black.
+    CHECK_EQ(Pixel(Resized(picture, 1, 1), 0, 0), 0x80FF0000u);
+    // Enlarged, each pixel becomes a block of its own color.
+    const Image twice = Resized(picture, 8, 4);
+    CHECK(twice.width == 8 && twice.height == 4);
+    CHECK_EQ(Pixel(twice, 3, 3), 0xFFFF0000u);
+    CHECK_EQ(Pixel(twice, 4, 0), 0u);
+    // Its own size gives it back.
+    CHECK(Resized(picture, 4, 2).argb == picture.argb);
+}
+
+TEST(a_picture_keeps_its_colors_inside_an_edge_grown_around_it)
+{
+    // One blue pixel beside one green: with an edge of 1, they stand in the middle of an image two pixels larger
+    // each way, and every pixel touching them is the edge's color.
+    Image picture{2, 1, {0xFF0000FFu, 0xFF00FF00u}};
+    const Image edged = Edged(picture, 1, 0xFF101010u);
+    CHECK(edged.width == 4 && edged.height == 3);
+    CHECK_EQ(Pixel(edged, 1, 1), 0xFF0000FFu);
+    CHECK_EQ(Pixel(edged, 2, 1), 0xFF00FF00u);
+    for (const auto& [x, y] : {std::pair{0, 1}, {3, 1}, {1, 0}, {2, 2}, {0, 0}, {3, 2}})
+        CHECK_EQ(Pixel(edged, x, y), 0xFF101010u);
+    // A clear pixel of the picture next to a covered one is edge too; far from any, nothing.
+    Image apart{5, 1, {0xFFFFFFFFu, 0u, 0u, 0u, 0u}};
+    const Image far = Edged(apart, 1, 0xFF101010u);
+    CHECK_EQ(Pixel(far, 2, 1), 0xFF101010u);
+    CHECK_EQ(Pixel(far, 4, 1), 0u);
+    // A half clear pixel shows the edge through it.
+    Image faint{1, 1, {0x80FFFFFFu}};
+    CHECK_EQ(Pixel(Edged(faint, 1, 0xFF000000u), 1, 1), 0xC0AAAAAAu);
+}
+
 TEST(sizes_round_to_whole_pixels_and_never_below_one)
 {
     CHECK_EQ(WholePixels(44.49f), 44);
@@ -101,8 +144,9 @@ TEST(a_texts_texture_is_no_larger_than_the_device_makes_or_the_client_holds_many
 
 TEST(the_arrow_points_down_inside_its_margin)
 {
-    const Coverage arrow = ShapeCoverage(ArrowShape(), 8, 2);
-    CHECK_EQ(arrow.width, 14); // 10 wide: the arrow is 0.8 as tall as it is wide
+    CHECK_EQ(ShapeWidth(ArrowShape(), 8), 10); // the arrow is 0.8 as tall as it is wide
+    const Coverage arrow = ShapeCoverage(ArrowShape(), 10, 8, 2);
+    CHECK_EQ(arrow.width, 14);
     CHECK_EQ(arrow.height, 12);
     CHECK_EQ(At(arrow, 7, 2), 255);                      // the middle of its wide top edge
     CHECK(At(arrow, 2, 2) > 0 && At(arrow, 2, 2) < 255); // its top corners, on the slanted edges
@@ -124,10 +168,35 @@ TEST(each_shape_knows_where_it_points)
 TEST(a_square_fills_every_pixel)
 {
     const ShapePoint square[] = {{0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}};
-    const Coverage c = ShapeCoverage(Shape{square, 4, 1.0f}, 5, 0);
-    CHECK_EQ(c.width, 5);
+    const Coverage c = ShapeCoverage(Shape{square, 4, 1.0f}, 7, 5, 0);
+    CHECK(c.width == 7 && c.height == 5); // stretched to the width and height asked for, whatever its own
     for (const uint8_t a : c.alpha)
         CHECK_EQ(a, 255);
+}
+
+TEST(a_shape_is_stretched_to_the_width_and_height_asked_for)
+{
+    // The arrow twice as wide as it would be at this height: still its wide top edge, its slanted sides and its
+    // point under the middle.
+    const Coverage wide = ShapeCoverage(ArrowShape(), 20, 8, 0);
+    CHECK(wide.width == 20 && wide.height == 8);
+    CHECK_EQ(At(wide, 10, 0), 255);
+    CHECK_EQ(At(wide, 1, 7), 0);
+    CHECK_EQ(At(wide, 18, 7), 0);
+    CHECK(At(wide, 9, 7) > 0 && At(wide, 10, 7) > 0);
+    for (int y = 0; y < wide.height; ++y)
+        for (int x = 0; x < wide.width / 2; ++x)
+            CHECK_EQ(At(wide, x, y), At(wide, wide.width - 1 - x, y));
+    // Narrow and tall, each row is as wide as the same row of the wide one, by their widths.
+    const Coverage narrow = ShapeCoverage(ArrowShape(), 5, 8, 0);
+    const auto rowSum = [](const Coverage& c, int y) {
+        int sum = 0;
+        for (int x = 0; x < c.width; ++x)
+            sum += At(c, x, y);
+        return sum;
+    };
+    for (int y = 0; y < 8; ++y)
+        CHECK(std::abs(rowSum(wide, y) - 4 * rowSum(narrow, y)) <= 8);
 }
 
 TEST(the_feather_is_the_phoenix_icon)
@@ -138,8 +207,8 @@ TEST(the_feather_is_the_phoenix_icon)
     for (size_t i = 0; i < feather.count; ++i)
         CHECK(feather.points[i].x >= 0.0f && feather.points[i].x <= 1.0f && feather.points[i].y >= 0.0f &&
               feather.points[i].y <= 1.0f);
-    const Coverage c = ShapeCoverage(feather, 43, 0);
-    CHECK_EQ(c.width, 20);
+    CHECK_EQ(ShapeWidth(feather, 43), 20);
+    const Coverage c = ShapeCoverage(feather, 20, 43, 0);
     int covered = 0;
     for (const uint8_t a : c.alpha)
         covered += a > 127 ? 1 : 0;
@@ -265,94 +334,20 @@ TEST(the_strip_columns_middle_color_is_55_percent_down_its_gradient)
     CHECK(Channel(Pixel(s, 0, 10), kRedShift) < 0xFF && Channel(Pixel(s, 0, 12), kRedShift) < 0xFF);
 }
 
-TEST(a_box_fills_from_its_top_color_to_its_bottom_color_by_each_rows_middle)
+TEST(an_outer_border_reaches_its_gap_and_its_own_pixel_past_the_box)
 {
-    const int height = 20;
-    const Image b = Box(40, height, BoxStyle{.radius = 2.0f, .top = 0xFF000000, .bottom = 0xFFFFFFFF});
-    for (int y = 0; y < height; ++y)
-    {
-        const auto gray = static_cast<uint8_t>(std::lround(255.0f * (static_cast<float>(y) + 0.5f) / height));
-        CHECK_EQ(Pixel(b, 20, y), Opaque(gray, gray, gray));
-    }
-}
-
-TEST(a_box_has_its_fill_inside_its_border_and_clear_corners)
-{
-    const Image b = Box(20, 10,
-        BoxStyle{.radius = 3.0f, .top = 0xFF112233, .bottom = 0xFF112233, .border = 0xFFFFFFFF});
-    CHECK(b.width == 20 && b.height == 10);
-    CHECK_EQ(Pixel(b, 10, 5), 0xFF112233u);
-    CHECK_EQ(Pixel(b, 0, 5), 0xFFFFFFFFu);
-    CHECK_EQ(Alpha(b, 0, 0), 0);
-    const Image framed = Box(20, 10,
-        BoxStyle{.radius = 3.0f, .top = 0xFF112233, .bottom = 0xFF112233, .border = 0xFFFFFFFF,
-            .outer = 0xFF00FF00, .outerGap = 2});
-    CHECK(framed.width == 26 && framed.height == 16);
-    CHECK_EQ(Pixel(framed, 0, 8), 0xFF00FF00u); // the outer border
-    CHECK_EQ(Alpha(framed, 1, 8), 0);            // the gap
-}
-
-TEST(an_outer_border_takes_its_gap_and_its_own_pixel_past_the_box)
-{
-    const BoxStyle ringed{.radius = 3.0f, .border = 0xFFFFFFFF, .outer = 0xFF00FF00, .outerGap = 2};
-    CHECK_EQ(OuterPad(ringed), 3);                                   // two clear pixels, then the ring's
+    CHECK_EQ(OuterPad(BoxStyle{.radius = 3.0f, .border = 0xFFFFFFFF, .outer = 0xFF00FF00, .outerGap = 2}), 3);
+    CHECK_EQ(OuterPad(BoxStyle{.radius = 3.0f}), 0);
     CHECK_EQ(OuterPad(BoxStyle{.radius = 3.0f, .outerGap = 2}), 0); // a gap with no ring around it
-    const Image framed = Box(20, 10, ringed);
-    CHECK(framed.width == 20 + 2 * OuterPad(ringed) && framed.height == 10 + 2 * OuterPad(ringed));
-    CHECK_EQ(Pixel(framed, 0, 8), 0xFF00FF00u);
 }
 
-TEST(a_diamond_a_coin_and_a_fading_rule)
+TEST(a_diamond_and_a_coin)
 {
     const Image d = Diamond(9, 0xFFFFFFFF);
     CHECK(d.width == 9 && d.height == 9 && Alpha(d, 4, 4) == 0xFF && Alpha(d, 0, 0) == 0);
     const Image c = Coin(12, 0xFFE8C35A);
     CHECK(Alpha(c, 6, 6) == 0xFF && Alpha(c, 0, 0) == 0);
     CHECK(Channel(Pixel(c, 0, 6), kRedShift) < Channel(Pixel(c, 6, 6), kRedShift)); // the darker rim
-    const Image r = FadingRule(10, 0xFFFFFFFF);
-    CHECK(r.width == 10 && r.height == 1 && Alpha(r, 0, 0) > 0xF0 && Alpha(r, 9, 0) < 0x20);
-}
-
-namespace
-{
-    // Whether a point lies inside a w by h rect at the origin with corners of radius r: its core rect plus a disc of r.
-    bool InsideRounded(float x, float y, float w, float h, float r)
-    {
-        const float cx = std::clamp(x, r, w - r), cy = std::clamp(y, r, h - r);
-        return (x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r;
-    }
-}
-
-TEST(a_box_no_wider_or_taller_than_its_border_is_just_border)
-{
-    const BoxStyle bordered{.radius = 3.0f, .top = 0xFF112233, .bottom = 0xFF112233, .border = 0xFFFFFFFF};
-    const Image dot = Box(1, 1, bordered);
-    CHECK(dot.width == 1 && dot.height == 1);
-    CHECK_EQ(Pixel(dot, 0, 0), 0xFFFFFFFFu);
-    const Image line = Box(60, 1, bordered);
-    CHECK(line.width == 60 && line.height == 1);
-    for (int x = 0; x < line.width; ++x)
-        CHECK_EQ(Pixel(line, x, 0), 0xFFFFFFFFu); // every pixel is covered, and border colored
-}
-
-TEST(an_opaque_bordered_box_is_opaque_wherever_its_outline_covers_a_pixel_whole)
-{
-    const int width = 60, height = 28;
-    const float radius = 14.0f;
-    const Image box = Box(width, height,
-        BoxStyle{.radius = radius, .top = 0xFF112233, .bottom = 0xFF112233, .border = 0xFFFFFFFF});
-    auto inside = [&](float x, float y) { return InsideRounded(x, y, width, height, radius); };
-    int covered = 0, lowest = 255;
-    for (int y = 0; y < height; ++y)
-        for (int x = 0; x < width; ++x)
-        {
-            const bool whole = inside(x, y) && inside(x + 1.0f, y) && inside(x, y + 1.0f) && inside(x + 1.0f, y + 1.0f);
-            if (!whole) continue;
-            ++covered;
-            lowest = std::min(lowest, static_cast<int>(Alpha(box, x, y)));
-        }
-    CHECK(covered > 1000);
-    CHECK_EQ(lowest, 255); // the fill and border shares of an arc pixel add up to all of it
 }
 
 namespace
@@ -425,103 +420,6 @@ TEST(an_opaque_coin_is_opaque_wherever_its_disc_covers_a_pixel_whole)
     CHECK_EQ(lowest, 255); // the rim and the face add up to the whole disc
 }
 
-TEST(a_translucent_fill_keeps_its_share_with_or_without_a_border)
-{
-    const Image plain = Box(20, 10, BoxStyle{.radius = 3.0f, .top = 0xF7112233, .bottom = 0xF7112233});
-    CHECK_EQ(Pixel(plain, 10, 5), 0xF7112233u);
-    const Image bordered = Box(20, 10,
-        BoxStyle{.radius = 3.0f, .top = 0xF7112233, .bottom = 0xF7112233, .border = 0xFFFFFFFF});
-    CHECK_EQ(Alpha(bordered, 10, 5), 0xF7);
-    CHECK_EQ(Pixel(bordered, 0, 5), 0xFFFFFFFFu); // the border stays opaque
-}
-
-TEST(a_sliced_box_keeps_the_boxs_sides_and_one_middle_column_for_the_rest)
-{
-    const BoxStyle styles[] = {
-        BoxStyle{.radius = 4.95f, .top = 0xF71C160F, .bottom = 0xF70C0A08, .border = 0xFFC9A24A, .outer = 0xFF3D2F14,
-            .outerGap = 2},
-        BoxStyle{.radius = 7.65f, .top = 0xFF222226, .bottom = 0xFF222226, .border = 0xFF3A3A42},
-        BoxStyle{.radius = 9.0f, .top = 0xFF2C2C33, .bottom = 0xFF2C2C33},
-    };
-    for (const BoxStyle& style : styles)
-        for (const auto& [width, height] : {std::pair{394, 564}, {145, 36}, {40, 18}})
-        {
-            const Image box     = Box(width, height, style);
-            const SlicedBox cut = SliceBox(width, height, style);
-            CHECK(cut.width == box.width && cut.image.height == box.height);
-            CHECK(cut.left > 0 && cut.right > 0 && cut.image.width == cut.left + kSliceMiddleColumns + cut.right);
-            CHECK(cut.left + cut.right < box.width);
-            for (int y = 0; y < box.height; ++y)
-            {
-                for (int x = 0; x < cut.left; ++x)
-                    CHECK_EQ(Pixel(cut.image, x, y), Pixel(box, x, y));
-                for (int x = cut.left; x < box.width - cut.right; ++x)
-                    CHECK(Pixel(cut.image, cut.left, y) == Pixel(box, x, y) &&
-                          Pixel(cut.image, cut.left + 1, y) == Pixel(box, x, y));
-                for (int x = 0; x < cut.right; ++x)
-                    CHECK_EQ(Pixel(cut.image, cut.left + kSliceMiddleColumns + x, y),
-                        Pixel(box, box.width - cut.right + x, y));
-            }
-        }
-}
-
-TEST(a_box_too_narrow_for_a_middle_is_sliced_whole)
-{
-    const BoxStyle round{.radius = 9.0f, .top = 0xFF2C2C33, .bottom = 0xFF2C2C33, .border = 0xFFFFFFFF};
-    const SlicedBox cut = SliceBox(18, 18, round);
-    CHECK(cut.width == 18 && cut.left == 18 && cut.right == 0);
-    CHECK(cut.image.argb == Box(18, 18, round).argb);
-}
-
-TEST(a_box_is_sliced_only_when_its_middle_has_three_columns_or_more)
-{
-    // Without a border, every column a 3 px radius leaves clear of the corners is alike: width - 6 of them.
-    const BoxStyle plain{.radius = 3.0f, .top = 0xFF2C2C33, .bottom = 0xFF2C2C33};
-    // The run of columns alike in every row around the image's center column.
-    auto alike = [](const Image& box) {
-        auto same = [&](int a, int b) {
-            for (int y = 0; y < box.height; ++y)
-                if (Pixel(box, a, y) != Pixel(box, b, y)) return false;
-            return true;
-        };
-        const int center = box.width / 2;
-        int first = center, last = center;
-        while (first > 0 && same(first - 1, center))
-            --first;
-        while (last + 1 < box.width && same(last + 1, center))
-            ++last;
-        return last - first + 1;
-    };
-    const Image two = Box(8, 10, plain), three = Box(9, 10, plain);
-    CHECK_EQ(alike(two), 2);
-    CHECK_EQ(alike(three), 3);
-    const SlicedBox whole = SliceBox(8, 10, plain);
-    CHECK(whole.left == 8 && whole.right == 0 && whole.image.argb == two.argb);
-    const SlicedBox sliced = SliceBox(9, 10, plain);
-    CHECK(sliced.left == 3 && sliced.right == 3 && sliced.image.width == 3 + kSliceMiddleColumns + 3);
-}
-
-TEST(a_sliced_box_is_drawn_as_its_sides_with_its_first_middle_columns_center_stretched_between)
-{
-    const BoxStyle pill{.radius = 7.65f, .top = 0xFF222226, .bottom = 0xFF222226, .border = 0xFF3A3A42};
-    constexpr float kU = 0.75f; // the image's share of its texture's width
-    const SlicedBox cut = SliceBox(145, 36, pill);
-    auto column = [&](float u) { return u / kU * static_cast<float>(cut.image.width); }; // an image column
-    const std::vector<SliceSpan> spans = SliceSpans(cut, kU);
-    CHECK_EQ(spans.size(), 3u);
-    CHECK(spans[0].x == 0 && spans[0].width == cut.left && spans[1].x == cut.left);
-    CHECK(spans[2].x == spans[1].x + spans[1].width && spans[2].x + spans[2].width == 145);
-    CHECK_EQ(spans[2].width, cut.right);
-    CHECK(spans[0].u0 == 0.0f && Near(column(spans[0].u1), static_cast<float>(cut.left)));
-    // The middle takes one column's center, the first of the two, so filtering blends it with nothing else.
-    CHECK(spans[1].u0 == spans[1].u1 && Near(column(spans[1].u0), static_cast<float>(cut.left) + 0.5f));
-    CHECK(Near(column(spans[2].u0), static_cast<float>(cut.left + kSliceMiddleColumns)) && spans[2].u1 == kU);
-    // A box with no middle is one span over the whole of its image.
-    const SlicedBox whole = SliceBox(18, 18, pill);
-    const std::vector<SliceSpan> one = SliceSpans(whole, kU);
-    CHECK(one.size() == 1 && one[0].x == 0 && one[0].width == 18 && one[0].u0 == 0.0f && Near(one[0].u1, kU));
-}
-
 TEST(an_image_goes_in_a_textures_corner_and_the_rest_of_its_rows_is_cleared)
 {
     const uint32_t image[] = {0xFF000001, 0xFF000002, 0xFF000003, 0xFF000004, 0xFF000005, 0xFF000006};
@@ -556,4 +454,170 @@ TEST(a_lines_ink_runs_from_its_glyphs_top_to_their_bottom_with_the_h_on_its_base
     CHECK(ink.has_value() && ink->top == 2.0f && ink->baseline == 14.0f && ink->bottom == 17.0f);
     CHECK(!LineInkOf(InkBox{}, capital).has_value()); // GDI drew nothing: no ink to keep
     CHECK(!LineInkOf(glyphs, InkBox{}).has_value());
+}
+
+namespace
+{
+    // Whether a point is in a circular arrow, from its square's middle with y up: a ring open for the eighth
+    // counterclockwise of straight up, and at the ring's top a head pointing left into that gap.
+    bool InsideResetArrow(float x, float y, float size)
+    {
+        const float pi = 3.14159265f, radius = 0.32f * size, length = 0.26f * size;
+        float turn = std::atan2(-x, y); // counterclockwise from straight up
+        if (turn < 0.0f) turn += 2.0f * pi;
+        const bool ring = std::fabs(std::hypot(x, y) - radius) <= 0.055f * size && turn >= pi / 4.0f;
+        const bool head = x <= 0.0f && x >= -length && std::fabs(y - radius) <= 0.17f * size * (x + length) / length;
+        return ring || head;
+    }
+}
+
+TEST(the_reset_arrow_turns_counterclockwise_to_a_head_at_its_top)
+{
+    constexpr int kGrid = 16; // points across a pixel
+    for (const int size : {16, 32, 45})
+    {
+        const Image arrow = ResetArrow(size, 0xFFFFFFFFu);
+        CHECK(arrow.width == size && arrow.height == size);
+        const float half = static_cast<float>(size) / 2.0f;
+        float worst      = 0.0f;
+        for (int y = 0; y < size; ++y)
+            for (int x = 0; x < size; ++x)
+            {
+                int in = 0;
+                for (int sy = 0; sy < kGrid; ++sy)
+                    for (int sx = 0; sx < kGrid; ++sx)
+                        in += InsideResetArrow(static_cast<float>(x) + (static_cast<float>(sx) + 0.5f) / kGrid - half,
+                            half - static_cast<float>(y) - (static_cast<float>(sy) + 0.5f) / kGrid, static_cast<float>(size));
+                worst = std::max(worst, std::fabs(static_cast<float>(Alpha(arrow, x, y)) / 255.0f -
+                                                  static_cast<float>(in) / (kGrid * kGrid)));
+            }
+        CHECK(worst < 0.15f);
+        // Its ring passes the right, the bottom and the left, and its middle and corners are clear.
+        const int reach = static_cast<int>(0.32f * static_cast<float>(size));
+        CHECK(Alpha(arrow, size / 2 + reach, size / 2) > 128);
+        CHECK(Alpha(arrow, size / 2, size / 2 + reach) > 128);
+        CHECK(Alpha(arrow, size / 2 - reach - 1, size / 2) > 128);
+        CHECK(Alpha(arrow, size / 2, size / 2) == 0 && Alpha(arrow, 0, 0) == 0 && Alpha(arrow, size - 1, size - 1) == 0);
+    }
+}
+
+namespace
+{
+    int RowInk(const Coverage& c, int y)
+    {
+        int ink = 0;
+        for (int x = 0; x < c.width; ++x)
+            ink += At(c, x, y) > 127 ? 1 : 0;
+        return ink;
+    }
+}
+
+TEST(a_mark_is_a_small_shape_in_a_line_as_tall_as_its_text)
+{
+    // For text 40 pixels tall inside a margin of 3: as tall as the text's own image, and a little over its middle.
+    for (const DashMark mark : {DashMark::Dot, DashMark::Square, DashMark::Diamond})
+    {
+        const Coverage c = MarkCoverage(mark, 40, 3);
+        CHECK_EQ(c.height, 46);
+        CHECK(c.width > 6 + 8 && c.width < 6 + 30); // narrower than it is tall, with room either side
+        int first = c.height, last = -1, widest = 0;
+        for (int y = 0; y < c.height; ++y)
+        {
+            if (RowInk(c, y) == 0) continue;
+            first  = std::min(first, y);
+            last   = y;
+            widest = std::max(widest, RowInk(c, y));
+        }
+        CHECK(first > 3 + 8 && last < 3 + 36);            // clear of the letters' tops and of their feet
+        CHECK(last - first + 1 >= 8 && last - first + 1 <= 18);
+        const int middle = (first + last) / 2;
+        CHECK(middle >= 3 + 20 && middle <= 3 + 27);      // where a dash sits, a little under the line's middle
+        for (int y = 0; y < c.height; ++y)                 // the same either side of its middle
+            for (int x = 0; x < c.width / 2; ++x)
+                CHECK(std::abs(At(c, x, y) - At(c, c.width - 1 - x, y)) <= 2);
+        // A square is as wide in every row; a diamond and a dot are widest in their middle and narrow to their ends.
+        if (mark == DashMark::Square)
+            CHECK(RowInk(c, first + 1) == widest && RowInk(c, last - 1) == widest);
+        else
+            CHECK(RowInk(c, middle) == widest && RowInk(c, first) < widest && RowInk(c, last) < widest);
+        // A diamond comes to a point; a dot is still wide a quarter of its way down.
+        const int quarter = first + (last - first) / 4;
+        if (mark == DashMark::Diamond) CHECK(RowInk(c, quarter) * 10 <= widest * 7);
+        if (mark == DashMark::Dot) CHECK(RowInk(c, quarter) * 10 >= widest * 8);
+    }
+}
+
+TEST(pieces_are_joined_side_by_side_into_one_line_with_one_margin_around_it)
+{
+    // Two pieces with a margin of 1 around a 2 by 2 and a 3 by 2 block.
+    Coverage a{4, 4, std::vector<uint8_t>(16, 0)}, b{5, 4, std::vector<uint8_t>(20, 0)};
+    for (int y = 1; y < 3; ++y)
+    {
+        for (int x = 1; x < 3; ++x)
+            a.alpha[static_cast<size_t>(y * 4 + x)] = 200;
+        for (int x = 1; x < 4; ++x)
+            b.alpha[static_cast<size_t>(y * 5 + x)] = 100;
+    }
+    const Coverage joined = Joined({a, b}, {}, 1);
+    CHECK(joined.width == 2 + 3 + 2 && joined.height == 4);
+    for (int x = 0; x < joined.width; ++x)
+    {
+        CHECK_EQ(At(joined, x, 0), 0);
+        CHECK_EQ(At(joined, x, 1), x == 0 || x == 6 ? 0 : x < 3 ? 200 : 100);
+    }
+    // One piece is itself, and none is an empty line.
+    CHECK(Joined({a}, {}, 1).alpha == a.alpha);
+    CHECK(Joined({}, {}, 1).width == 2 && Joined({}, {}, 1).alpha.empty() == false);
+}
+
+TEST(a_piece_stands_in_the_room_the_one_before_it_leaves_for_its_last_letters_lean)
+{
+    // Two pieces of italic letters, 6 wide with 2 of room for the last letter's lean, a mark 3 wide between them and
+    // a margin of 1: the mark starts where the first piece's cells end, and only the last piece keeps its room.
+    const std::vector<int> widths{8, 3, 8}, room{2, 0, 2};
+    CHECK_EQ(JoinedWidth(widths, room), 6 + 3 + 8);
+    CHECK_EQ(JoinedWidth(widths, {}), 8 + 3 + 8); // upright: nothing to stand in
+    CHECK_EQ(JoinedWidth({}, {}), 0);
+    const auto piece = [](int width, uint8_t ink) {
+        Coverage c{width + 2, 3, std::vector<uint8_t>(static_cast<size_t>((width + 2) * 3), 0)};
+        for (int x = 1; x <= width; ++x)
+            c.alpha[static_cast<size_t>(c.width + x)] = ink;
+        return c;
+    };
+    Coverage letters = piece(8, 100);
+    letters.alpha[static_cast<size_t>(letters.width + 7)] = 30; // the lean, faint in its room
+    letters.alpha[static_cast<size_t>(letters.width + 8)] = 0;
+    const Coverage joined = Joined({letters, piece(3, 255), letters}, room, 1);
+    CHECK_EQ(joined.width, 17 + 2);
+    const std::vector<int> row{0, 100, 100, 100, 100, 100, 100, 255, 255, 255, 100, 100, 100, 100, 100, 100, 30, 0, 0};
+    for (int x = 0; x < joined.width; ++x)
+        CHECK_EQ(At(joined, x, 1), row[static_cast<size_t>(x)]);
+    // What leans into the room stays where the next piece is fainter than it.
+    const Coverage faint = Joined({letters, piece(3, 10)}, room, 1);
+    CHECK_EQ(At(faint, 7, 1), 30);
+    CHECK_EQ(At(faint, 8, 1), 10);
+    // Only italics lean.
+    CHECK(ItalicLean(40, StyleBit(FontStyle::Italic)) > 0);
+    CHECK_EQ(ItalicLean(40, StyleBit(FontStyle::Bold) | StyleBit(FontStyle::Underline)), 0);
+}
+
+TEST(a_line_is_drawn_under_the_whole_of_a_text_inside_its_margin)
+{
+    Coverage text{12, 9, std::vector<uint8_t>(12 * 9, 0)};
+    text.alpha[static_cast<size_t>(4 * 12 + 5)] = 77; // a letter
+    Underline(text, 6, 2, 2);
+    for (int y = 0; y < text.height; ++y)
+        for (int x = 0; x < text.width; ++x)
+        {
+            const bool under = (y == 6 || y == 7) && x >= 2 && x < 10;
+            CHECK_EQ(At(text, x, y), under ? 255 : y == 4 && x == 5 ? 77 : 0);
+        }
+    // Past the image's last row it is cut, and one of no thickness is none.
+    Coverage low{6, 4, std::vector<uint8_t>(24, 0)};
+    Underline(low, 3, 5, 1);
+    CHECK(At(low, 2, 3) == 255 && At(low, 2, 2) == 0);
+    Coverage none{6, 4, std::vector<uint8_t>(24, 0)};
+    Underline(none, 1, 0, 1);
+    Underline(none, 9, 2, 1);
+    CHECK(none.alpha == std::vector<uint8_t>(24, 0));
 }

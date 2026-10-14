@@ -37,16 +37,16 @@ namespace headsup
     class GdiText
     {
     public:
-        // Text in a font family, white on clear, tracking pixels after each character and margin pixels around it;
-        // false when GDI could not draw or measure it.
-        bool Rasterize(const char* text, const char* family, int pixelHeight, bool bold, int tracking, int margin,
+        // Text in a font family and its styles (FontStyle bits), white on clear, tracking pixels after each character
+        // and margin pixels around it; false when GDI could not draw or measure it.
+        bool Rasterize(const char* text, const char* family, int pixelHeight, uint8_t style, int tracking, int margin,
             Coverage& out);
         // The box Rasterize draws the text's letters in, set solid and before its margin, without drawing them; false
         // when GDI cannot measure it.
-        bool Extent(const char* text, const char* family, int pixelHeight, bool bold, int& width, int& height);
-        // How wide Rasterize draws the text in the family's regular weight, set solid, in pixels, without drawing it;
-        // 0 when GDI cannot measure it.
-        float Measure(const char* text, const char* family, int pixelHeight);
+        bool Extent(const char* text, const char* family, int pixelHeight, uint8_t style, int& width, int& height);
+        // The font's underline in the line Rasterize draws (without its margin): the row it starts on and how many
+        // rows thick it is. False for a font that does not say, such as a bitmap font.
+        bool UnderlineBand(const char* family, int pixelHeight, uint8_t style, int& top, int& thickness);
         // Where the font's ink sits in the line Rasterize draws (without its margin): the top and bottom of the ink of
         // glyphs, and the bottom of an H's. Drawn once for each family, size and glyphs, then kept, past Release too.
         LineInk FontInk(const char* family, int pixelHeight, const char* glyphs);
@@ -58,10 +58,10 @@ namespace headsup
     private:
         // The device context with the font selected and tracking pixels after each character, or null when GDI made
         // neither.
-        HDC WithFont(std::string_view family, int pixelHeight, bool bold, int tracking);
+        HDC WithFont(std::string_view family, int pixelHeight, uint8_t style, int tracking);
 
         HDC m_Context = nullptr;
-        FrameCache<std::tuple<std::string, int, bool>, HFONT> m_Fonts;
+        FrameCache<std::tuple<std::string, int, uint8_t>, HFONT> m_Fonts;
         std::map<std::tuple<std::string, int, std::string>, LineInk, std::less<>> m_Inks;
         uint32_t m_Frame = 0;
     };

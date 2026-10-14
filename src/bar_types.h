@@ -11,7 +11,7 @@ namespace headsup
         UmbraDark,
         PhoenixRedOrnate,
         PhoenixRedPills,
-        Aurora, // glass, and a line of light under the strip. The quads draw it as plain pills.
+        Aurora, // glass, and a line of light under the strip
     };
     constexpr int kBarThemeCount = static_cast<int>(BarTheme::Aurora) + 1;
 

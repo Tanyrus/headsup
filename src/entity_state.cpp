@@ -1,7 +1,6 @@
 #include "entity_state.h"
 
 #include <algorithm>
-#include <cctype>
 #include <optional>
 
 namespace headsup
@@ -32,8 +31,9 @@ namespace headsup
         }
     }
 
-    Category MobRowOf(Nature nature, bool claimedByParty, bool claimed)
+    Category MobRowOf(Nature nature, bool claimedByParty, bool claimed, bool alive)
     {
+        if (!alive) return Category::Dead;
         if (claimedByParty) return Category::PartyClaim;
         if (claimed) return Category::OtherClaim;
         switch (nature)
@@ -55,6 +55,13 @@ namespace headsup
         return linkshell ? PlayerRow::LinkshellMember : PlayerRow::Player;
     }
 
+    PetRow PetRowOf(bool ownerIsYou, bool ownerInParty, bool ownerIsFriend)
+    {
+        if (ownerIsYou) return PetRow::Yours;
+        if (ownerInParty) return PetRow::Party;
+        return ownerIsFriend ? PetRow::Friend : PetRow::Others;
+    }
+
     PlateKind PlateKindOf(const EntityState& s)
     {
         if (s.pet) return PlateKind::Pets;
@@ -69,6 +76,7 @@ namespace headsup
         {
         case PlateKind::Mobs: return CategoryIndex(s.row);
         case PlateKind::Players: return static_cast<int>(s.playerRow);
+        case PlateKind::Pets: return static_cast<int>(s.petRow);
         default: return 0;
         }
     }
@@ -122,6 +130,18 @@ namespace headsup
         case ColorSource::Type: return ToArgb(p.type[static_cast<int>(TypeOf(s))]);
         }
         return ToArgb(pick.custom);
+    }
+
+    bool InCombat(const EntityState& state)
+    {
+        return PlateKindOf(state) == PlateKind::Mobs ? state.claim == ClaimState::Yours : state.engaged;
+    }
+
+    uint32_t CursorColorOf(const ColorPick& pick, const EntityState& state, const Palette& palette)
+    {
+        const std::vector<ColorSource> readable = SourcesFor(PlateKindOf(state), false);
+        const bool reads = std::ranges::find(readable, pick.source) != readable.end();
+        return ResolveColor(reads ? pick : ColorPick{ColorSource::Target}, state, palette, kWhite);
     }
 
     namespace
@@ -191,6 +211,7 @@ namespace headsup
             case ShowCondition::PartyMember: return player && s.playerRow == PlayerRow::PartyMember;
             case ShowCondition::Friend: return player && s.playerRow == PlayerRow::Friend;
             case ShowCondition::LinkshellMember: return player && s.playerRow == PlayerRow::LinkshellMember;
+            case ShowCondition::OwnerIsYou: return s.pet && s.petRow == PetRow::Yours;
             }
             return false;
         }
@@ -202,14 +223,6 @@ namespace headsup
         for (int c = 0; c < kShowConditionCount; ++c)
             if ((show.when & ConditionBit(static_cast<ShowCondition>(c))) != 0 && Holds(static_cast<ShowCondition>(c), s)) return true;
         return false;
-    }
-
-    bool IsFriend(const std::vector<std::string>& friends, std::string_view name)
-    {
-        const auto lower = [](char ch) { return std::tolower(static_cast<unsigned char>(ch)); };
-        const auto same  = [&](const std::string& entry)
-        { return std::ranges::equal(entry, name, [&](char a, char b) { return lower(a) == lower(b); }); };
-        return std::ranges::any_of(friends, same);
     }
 
     bool InYourParty(uint32_t serverId, bool self, std::span<const uint32_t> memberIds)

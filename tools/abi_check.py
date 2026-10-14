@@ -20,7 +20,8 @@ SOURCE = ROOT / 'src'
 CALLED_INTERFACES = ['IAshitaCore', 'IMemoryManager', 'IEntity', 'IParty', 'IPlayer', 'IRecast', 'IChatManager',
                      'IConfigurationManager', 'IGuiManager', 'ITarget', 'IProperties',
                      'IInputManager', 'IMouse', 'IKeyboard', 'IInventory',
-                     'IPacketManager', 'IResourceManager', 'IFontManager', 'IPrimitiveManager']
+                     'IPacketManager', 'IResourceManager', 'IFontManager', 'IPrimitiveManager',
+                     'ICastBar', 'IAutoFollow', 'IPluginManager']
 NOT_CALLED = {'ILogManager'}  # handed to the plugin, never called
 # Calls are matched by name alone: these share a name with a call on another interface and are never made on this one.
 # The plugin's ->GetString calls are IConfigurationManager's; it reads only GetItemById from IResourceManager.

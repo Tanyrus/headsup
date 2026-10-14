@@ -42,6 +42,8 @@ namespace headsup
         void Close();
         // True once after the Debug page's button was pressed: write the /hu debug report.
         bool TakeDebugRequest();
+        // True once after the Cursor Style list was opened: read the cursors folder again.
+        bool TakeCursorsRequest();
         // Opens the window at the page named, as its sidebar spells it in lower case without spaces ("toppanel");
         // false for a name no page has.
         bool OpenPage(const std::string& name);
@@ -70,6 +72,12 @@ namespace headsup
         // Puts the window where the settings have it, or in the screen's middle; then keeps the settings to where the
         // player moves and sizes it. True when they changed.
         bool Place(const MenuHost& host, Settings& settings, float pixels);
+        void ApplyOpacity();
+        bool RunKey(Rml::ElementFormControlInput* input, const std::string& id, Rml::Input::KeyIdentifier key);
+        // One pass of the pages over these events, told which control has the keyboard.
+        Form Pass(std::vector<FormEvent> events, const MenuHost& host, Settings& settings, const MenuReadings& readings,
+            const std::vector<std::string>& fonts);
+        void FitRuns();
         void ApplyBlocks(const std::vector<FormBlock>& blocks);
         void ApplyValues(const std::vector<FormValue>& values);
         void ApplyPopup(const std::optional<FormPopup>& popup);
@@ -81,6 +89,7 @@ namespace headsup
         Rml::ElementDocument* m_Document = nullptr;
         MenuLook m_Look;              // what the document was built with
         float m_FontPixels = 0.0f;
+        int m_Opacity      = 0; // the percent the document was last given; 0 for none yet
         bool m_Visible     = false;
         bool m_Placed      = false;   // it has its first place
         std::optional<std::array<int, 4>> m_OpenedAt; // where it was first laid out: left, top, width, height

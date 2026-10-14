@@ -33,13 +33,22 @@ namespace headsup
         }
     }
 
+    namespace
+    {
+        void PlaceOrnament(LinePlace& place, const LineInput& in, float centerX, float top)
+        {
+            place.ornamentWidth  = in.ornamentWidth;
+            place.ornamentHeight = in.ornamentHeight;
+            place.ornament       = {centerX - in.ornamentWidth / 2.0f, top};
+        }
+    }
+
     PlateLayout LayoutPlate(const ScreenBox& anchor, std::span<const LineInput> lines, float cursorWidth,
-        float cursorHeight, float cursorTip, int timerCount, float timerHeight)
+        float cursorHeight, float cursorTip, int timerCount, float timerHeight, float cursorRaise)
     {
         PlateLayout layout;
         layout.centerX = anchor.CenterX();
         layout.lines.resize(lines.size());
-        float widest = 0.0f;
         for (size_t i = 0; i < lines.size(); ++i)
         {
             LinePlace& place = layout.lines[i];
@@ -48,16 +57,20 @@ namespace headsup
                 place.width += (j > 0 ? kItemGap : 0.0f) + lines[i].items[j].width;
                 place.height = std::max(place.height, lines[i].items[j].height);
             }
-            widest = std::max(widest, place.width);
         }
+        // The bottom line stays centered on the game's name. Another starts where it starts or ends where it ends,
+        // whichever is further to the side it is set to: one wider than the name hangs out on that side.
+        const float against = lines.empty() ? 0.0f : layout.lines.back().width;
         for (size_t i = 0; i < lines.size(); ++i)
         {
-            LinePlace& place = layout.lines[i];
+            LinePlace& place    = layout.lines[i];
+            const float starts  = layout.centerX - against / 2.0f;
+            const float ends    = layout.centerX + against / 2.0f - place.width;
             switch (lines[i].align)
             {
-            case Align::Left: place.left = layout.centerX - widest / 2.0f; break;
+            case Align::Left: place.left = std::min(starts, ends); break;
             case Align::Center: place.left = layout.centerX - place.width / 2.0f; break;
-            case Align::Right: place.left = layout.centerX + widest / 2.0f - place.width; break;
+            case Align::Right: place.left = std::max(starts, ends); break;
             }
         }
 
@@ -70,26 +83,33 @@ namespace headsup
             LinePlace& upper         = layout.lines[i - 1];
             const float sunk         = lowerIn.textHeight > 0.0f ? TextTop(lower, lowerIn) + kNameOverlap : lower.top;
             float bottom;
-            if (lowerIn.ornamentHeight > 0.0f)
+            if (lowerIn.ornamentHeight > 0.0f && !lowerIn.ornamentUnder)
             {
-                lower.ornamentWidth  = lowerIn.ornamentWidth;
-                lower.ornamentHeight = lowerIn.ornamentHeight;
-                lower.ornament.y = sunk - kLineGap - lowerIn.ornamentHeight;
-                lower.ornament.x = layout.centerX - lowerIn.ornamentWidth / 2.0f;
-                bottom           = lower.ornament.y - kLineGap;
+                PlaceOrnament(lower, lowerIn, layout.centerX, sunk - kLineGap - lowerIn.ornamentHeight);
+                bottom = lower.ornament.y - kLineGap;
             }
             else
                 bottom = lowerIn.textHeight > 0.0f && !upperIn.hasIcons ? sunk : lower.top - kLineGap;
-            upper.top = bottom - upper.height;
+            upper.top = bottom - upper.height - upperIn.padBelow - lowerIn.padAbove;
         }
 
         layout.top  = anchor.minY;
         float above = anchor.minY - kLineGap;
         if (!lines.empty())
         {
-            layout.top = layout.lines.front().top;
-            above      = lines.front().textHeight > 0.0f ? TextTop(layout.lines.front(), lines.front()) + kNameOverlap
-                                                         : layout.top - kLineGap;
+            LinePlace& first = layout.lines.front();
+            layout.top       = first.top;
+            above            = lines.front().textHeight > 0.0f ? TextTop(first, lines.front()) + kNameOverlap : layout.top - kLineGap;
+            // Over the plate's first line: what stands on the plate then stands a gap over the ornament.
+            if (lines.front().ornamentHeight > 0.0f && !lines.front().ornamentUnder)
+            {
+                PlaceOrnament(first, lines.front(), layout.centerX, above - kLineGap - lines.front().ornamentHeight);
+                layout.top = std::min(layout.top, first.ornament.y);
+                above      = first.ornament.y - kLineGap;
+            }
+            LinePlace& last = layout.lines.back();
+            if (lines.back().ornamentHeight > 0.0f && lines.back().ornamentUnder)
+                PlaceOrnament(last, lines.back(), layout.centerX, last.top + last.height + kLineGap);
         }
 
         layout.timerStep = timerHeight + kLineGap;
@@ -100,7 +120,7 @@ namespace headsup
             layout.timersY = above + kLineGap - static_cast<float>(timerCount) * layout.timerStep;
             cursorY        = layout.timersY - kLineGap;
         }
-        layout.cursor = CursorAtAnchor(layout.centerX, cursorY, cursorWidth, cursorHeight, cursorTip);
+        layout.cursor = CursorAtAnchor(layout.centerX, cursorY, cursorWidth, cursorHeight, cursorTip, cursorRaise);
 
         for (size_t i = 0; i < lines.size(); ++i)
         {
@@ -185,8 +205,13 @@ namespace headsup
         into.align          = line.look.align;
         into.textHeight     = 0.0f;
         into.hasIcons       = false;
+        // The bottom design line stays on the game's name, so its padding is the space over it.
+        const bool bottom   = line.source == kBottomLine;
+        into.padBelow       = bottom ? 0.0f : line.look.padding * scale;
+        into.padAbove       = bottom ? line.look.padding * scale : 0.0f;
         into.ornamentWidth  = 0.0f;
         into.ornamentHeight = 0.0f;
+        into.ornamentUnder  = false;
         size_t text         = 0;
         for (size_t i = 0; i < line.items.size(); ++i)
         {

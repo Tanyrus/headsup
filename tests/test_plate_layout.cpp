@@ -106,13 +106,65 @@ TEST(items_sit_left_to_right_with_the_gap_and_center_on_the_line)
     CHECK_EQ(line.items[2].y, line.top + 2.0f); // (16 - 12) / 2
 }
 
-TEST(lines_align_against_the_widest_line)
+TEST(lines_align_against_the_bottom_line)
 {
-    const std::vector<LineInput> lines{Text({{40.0f, 10.0f}}, Align::Left), Text({{100.0f, 10.0f}}), Text({{40.0f, 10.0f}}, Align::Right)};
-    const PlateLayout l = LayoutPlate(Anchor(), lines, 0.0f, 0.0f, 0.5f, 0, 0.0f);
-    CHECK_EQ(l.lines[1].left, 50.0f);
-    CHECK_EQ(l.lines[0].left, 50.0f);
-    CHECK_EQ(l.lines[2].left, 150.0f - 40.0f);
+    // The bottom line is 60 wide and centered on the name at 100, so it runs from 70 to 130 whatever its own
+    // alignment says. A narrower line set left starts where it starts, and one set right ends where it ends.
+    const std::vector<LineInput> narrow{Text({{40.0f, 10.0f}}, Align::Left), Text({{40.0f, 10.0f}}, Align::Right),
+        Text({{60.0f, 10.0f}}, Align::Left)};
+    const PlateLayout l = LayoutPlate(Anchor(), narrow, 0.0f, 0.0f, 0.5f, 0, 0.0f);
+    CHECK_EQ(l.lines[2].left, 70.0f);
+    CHECK_EQ(l.lines[0].left, 70.0f);
+    CHECK_EQ(l.lines[1].left, 130.0f - 40.0f);
+    // A wider line goes the way it is set too: left, it ends with the bottom line and hangs out past its left, and
+    // right, it starts with it and hangs out past its right.
+    const std::vector<LineInput> wide{Text({{100.0f, 10.0f}}, Align::Left), Text({{100.0f, 10.0f}}, Align::Right),
+        Text({{60.0f, 10.0f}})};
+    const PlateLayout w = LayoutPlate(Anchor(), wide, 0.0f, 0.0f, 0.5f, 0, 0.0f);
+    CHECK_EQ(w.lines[0].left, 130.0f - 100.0f);
+    CHECK_EQ(w.lines[1].left, 70.0f);
+}
+
+TEST(a_lines_padding_opens_the_gap_under_it_and_the_bottom_lines_the_gap_over_it)
+{
+    std::vector<LineInput> lines{Text({{60.0f, 10.0f}}), Text({{60.0f, 10.0f}}), Text({{60.0f, 10.0f}})};
+    const PlateLayout plain = LayoutPlate(Anchor(), lines, 0.0f, 0.0f, 0.5f, 0, 0.0f);
+    // Under the top line: the top line alone goes up.
+    lines[0].padBelow = 4.0f;
+    PlateLayout l = LayoutPlate(Anchor(), lines, 0.0f, 0.0f, 0.5f, 0, 0.0f);
+    CHECK_EQ(l.lines[0].top, plain.lines[0].top - 4.0f);
+    CHECK_EQ(l.lines[1].top, plain.lines[1].top);
+    CHECK_EQ(l.lines[2].top, plain.lines[2].top);
+    // Under the middle line: the top and the middle go up.
+    lines[1].padBelow = 3.0f;
+    l = LayoutPlate(Anchor(), lines, 0.0f, 0.0f, 0.5f, 0, 0.0f);
+    CHECK_EQ(l.lines[0].top, plain.lines[0].top - 7.0f);
+    CHECK_EQ(l.lines[1].top, plain.lines[1].top - 3.0f);
+    CHECK_EQ(l.lines[2].top, plain.lines[2].top);
+    // Over the bottom line, which stays on the game's name: the two above go up again.
+    lines[2].padAbove = 2.0f;
+    l = LayoutPlate(Anchor(), lines, 0.0f, 0.0f, 0.5f, 0, 0.0f);
+    CHECK_EQ(l.lines[0].top, plain.lines[0].top - 9.0f);
+    CHECK_EQ(l.lines[1].top, plain.lines[1].top - 5.0f);
+    CHECK_EQ(l.lines[2].top, plain.lines[2].top);
+    CHECK_EQ(l.cursor.y, plain.cursor.y - 9.0f); // what stands on the plate goes up with its top line
+}
+
+TEST(a_measured_lines_padding_is_under_it_but_for_the_bottom_design_line_whose_is_over_it)
+{
+    const std::vector<ItemSize> texts{{60.0f, 17.0f}};
+    for (int source = 0; source < kPlateLines; ++source)
+    {
+        ComposedLine line = Line({TextItem("Lv 20")}, 13.0f, 16.0f);
+        line.source       = source;
+        line.look.padding = 5.0f;
+        LineInput in;
+        in.padBelow = in.padAbove = 99.0f; // what another plate left behind goes
+        MeasureLine(line, texts, 2.0f, in);
+        const bool bottom = source == kPlateLines - 1;
+        CHECK_EQ(in.padBelow, bottom ? 0.0f : 10.0f);
+        CHECK_EQ(in.padAbove, bottom ? 10.0f : 0.0f);
+    }
 }
 
 TEST(the_ornament_sits_between_its_line_and_the_one_above)
@@ -144,6 +196,13 @@ TEST(the_cursor_sinks_into_a_text_top_line_and_your_timers_go_under_it)
     const std::vector<LineInput> iconLine{Icons({{40.0f, 16.0f}})};
     const PlateLayout overIcons = LayoutPlate(Anchor(), iconLine, 20.0f, 32.0f, 0.5f, 0, 0.0f);
     CHECK_EQ(overIcons.cursor.y, overIcons.top - kLineGap - 32.0f);
+    // A raised cursor stands that much higher, over the timers too, and nothing else moves for it.
+    const PlateLayout raised = LayoutPlate(Anchor(), lines, 20.0f, 32.0f, 0.5f, 2, 13.0f, 5.0f);
+    CHECK_EQ(raised.cursor.y, timed.cursor.y - 5.0f);
+    CHECK_EQ(raised.cursor.x, timed.cursor.x);
+    CHECK_EQ(raised.timersY, timed.timersY);
+    CHECK_EQ(raised.lines[0].top, timed.lines[0].top);
+    CHECK_EQ(LayoutPlate(Anchor(), lines, 20.0f, 32.0f, 0.5f, 0, 0.0f, -10.0f).cursor.y, plain.cursor.y + 10.0f);
 }
 
 TEST(a_plate_with_no_lines_puts_the_cursor_on_the_games_name)
@@ -198,6 +257,7 @@ TEST(a_measured_text_line_takes_its_texts_boxes_and_its_alignment)
     in.hasIcons       = true;
     in.ornamentWidth  = 90.0f;
     in.ornamentHeight = 6.0f;
+    in.ornamentUnder  = true;
     MeasureLine(line, texts, 2.0f, in);
     CHECK_EQ(in.items.size(), size_t{2});
     CHECK_EQ(in.items[0].width, 60.0f);
@@ -209,6 +269,7 @@ TEST(a_measured_text_line_takes_its_texts_boxes_and_its_alignment)
     CHECK(in.align == Align::Right);
     CHECK_EQ(in.ornamentWidth, 0.0f);
     CHECK_EQ(in.ornamentHeight, 0.0f);
+    CHECK(!in.ornamentUnder);
     // The line's text height is its tallest text's, wherever that stands.
     const std::vector<ItemSize> tallFirst{{60.0f, 19.0f}, {30.0f, 17.0f}};
     MeasureLine(line, tallFirst, 2.0f, in);
@@ -402,7 +463,7 @@ TEST(a_plate_closes_up_around_a_text_left_out)
         Line({TextItem("Young Quadav")}, 15.0f, 15.0f)};
     plate.lines[1].source = 1;
     plate.lines[2].source = 2;
-    plate.ornamentAbove   = 2;
+    plate.ornament        = OrnamentPlace::BelowMiddle;
     DropTexts(plate, std::vector<uint8_t>{1, 0});
     CHECK_EQ(plate.lines.size(), size_t{2});
     const std::vector<ItemSize> name{{92.0f, 21.0f}};
@@ -455,22 +516,38 @@ TEST(what_sits_above_sinks_into_the_lines_text_not_its_taller_box)
     CHECK_EQ(b.lines[0].top, 193.0f - kLineGap - 16.0f);
 }
 
-TEST(the_first_line_has_no_ornament)
+TEST(an_ornament_on_the_first_line_stands_over_the_plate_with_the_cursor_above_it)
 {
     std::vector<LineInput> lines{Text({{60.0f, 13.0f}}), Text({{80.0f, 15.0f}})};
     const PlateLayout plain = LayoutPlate(Anchor(), lines, 20.0f, 32.0f, 0.5f, 0, 0.0f);
     lines[0].ornamentWidth  = 90.0f;
     lines[0].ornamentHeight = 6.0f;
     const PlateLayout with = LayoutPlate(Anchor(), lines, 20.0f, 32.0f, 0.5f, 0, 0.0f);
+    CHECK_EQ(with.lines[0].top, plain.lines[0].top); // no line moves for it
+    // It sinks into the text line's own empty top as a line above would, a gap over the letters.
+    CHECK_EQ(with.lines[0].ornament.y, with.lines[0].top + kNameOverlap - kLineGap - 6.0f);
+    CHECK_EQ(with.lines[0].ornament.x, 100.0f - 45.0f);
+    CHECK_EQ(with.lines[0].ornamentHeight, 6.0f);
+    // The cursor, which sank into the top line, stands a gap over the ornament.
+    CHECK_EQ(with.cursor.y, plain.cursor.y - 6.0f - 2.0f * kLineGap);
+    CHECK_EQ(with.top, with.lines[0].ornament.y);
+    CHECK_EQ(BoxOf(with).top, with.lines[0].ornament.y);
+}
+
+TEST(an_ornament_under_the_last_line_hangs_a_gap_below_it_and_moves_nothing)
+{
+    std::vector<LineInput> lines{Text({{60.0f, 13.0f}}), Text({{80.0f, 15.0f}})};
+    const PlateLayout plain = LayoutPlate(Anchor(), lines, 20.0f, 32.0f, 0.5f, 0, 0.0f);
+    lines[1].ornamentWidth  = 90.0f;
+    lines[1].ornamentHeight = 6.0f;
+    lines[1].ornamentUnder  = true;
+    const PlateLayout with = LayoutPlate(Anchor(), lines, 20.0f, 32.0f, 0.5f, 0, 0.0f);
     CHECK_EQ(with.lines[0].top, plain.lines[0].top);
+    CHECK_EQ(with.lines[1].top, plain.lines[1].top);
     CHECK_EQ(with.cursor.y, plain.cursor.y);
-    CHECK_EQ(with.lines[0].ornamentHeight, 0.0f);
-    const PlateBox a = BoxOf(plain);
-    const PlateBox b = BoxOf(with);
-    CHECK_EQ(a.left, b.left);
-    CHECK_EQ(a.right, b.right);
-    CHECK_EQ(a.top, b.top);
-    CHECK_EQ(a.bottom, b.bottom);
+    CHECK_EQ(with.lines[1].ornament.y, with.lines[1].top + 15.0f + kLineGap);
+    CHECK_EQ(with.lines[1].ornament.x, 100.0f - 45.0f);
+    CHECK_EQ(BoxOf(with).bottom, with.lines[1].ornament.y + 6.0f);
 }
 
 TEST(the_default_mob_plate_has_each_line_its_ornament_timers_and_cursor_in_place)

@@ -557,6 +557,21 @@ namespace headsup
         return "";
     }
 
+    std::vector<uint32_t> FriendListReader::Read()
+    {
+        // Each search reads the whole of the game's data: after this many the client is taken to have no such list.
+        constexpr int kSearches = 20;
+        if (m_First == nullptr && m_Searches < kSearches)
+        {
+            ++m_Searches;
+            const auto* base = reinterpret_cast<const uint8_t*>(GetModuleHandleA(kGameModule));
+            ImageSection data{};
+            if (base != nullptr && FindSection(base, kDataSection, data))
+                if (const std::optional<uint32_t> first = LocateFriendList(data)) m_First = data.bytes + *first;
+        }
+        return m_First != nullptr ? FriendCharacters(m_First) : std::vector<uint32_t>{};
+    }
+
     std::optional<Weather> WeatherReader::Read() const
     {
         if (m_Global == 0) return std::nullopt;

@@ -9,8 +9,6 @@
 #include <cstdint>
 #include <optional>
 #include <span>
-#include <string>
-#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -39,6 +37,7 @@ namespace headsup
         Category row        = Category::Unknown; // mobs
         Category classified = Category::Unknown; // the row its aggression alone gives, under any claim or placeholder row
         PlayerRow playerRow = PlayerRow::Player; // players
+        PetRow petRow       = PetRow::Others;    // pets
         LabelShade toughness = LabelShade::Unknown;
         ClaimState claim    = ClaimState::Unclaimed;
         TargetState target  = TargetState::None;
@@ -46,8 +45,10 @@ namespace headsup
     };
 
     Nature NatureOf(Category classified, bool placeholder); // Classify's answer, with the placeholder flag
-    Category MobRowOf(Nature nature, bool claimedByParty, bool claimed);
+    Category MobRowOf(Nature nature, bool claimedByParty, bool claimed, bool alive);
     PlayerRow PlayerRowOf(bool party, bool isFriend, bool linkshell);
+    // A pet's row by its owner: you, a member of your party, a friend, or anyone else.
+    PetRow PetRowOf(bool ownerIsYou, bool ownerInParty, bool ownerIsFriend);
     PlateKind PlateKindOf(const EntityState& state);
     int RowOf(const EntityState& state); // into KindSettings::rows
     TargetType TypeOf(const EntityState& state);
@@ -58,6 +59,12 @@ namespace headsup
     TargetState TargetUnderPick(uint16_t index, const CursorTargets& targets);
     // A pick's color for this entity: a custom color, the game's name color, or the palette entry its state picks.
     uint32_t ResolveColor(const ColorPick& pick, const EntityState& state, const Palette& palette, uint32_t gameArgb);
+    // Fighting, for a line that drops its glow then: a mob once you or your party has claimed it, and anyone else,
+    // a pet too, while their weapon is out.
+    bool InCombat(const EntityState& state);
+    // The cursor's color over an entity: the pick's, or the Targeting color where the pick reads what that kind of
+    // entity has none of, as a player's aggression.
+    uint32_t CursorColorOf(const ColorPick& pick, const EntityState& state, const Palette& palette);
     // The mode of the row that decides this entity's outline: its own, or for a mob the first row down the chain from a
     // claim to the Placeholder row to its aggression's row that is not ByNature (Disabled if the chain ends on one).
     OutlineMode OutlineModeOf(const EntityState& state, const Settings& settings);
@@ -65,8 +72,6 @@ namespace headsup
     // the row the mob's aggression gives, an Aggression pick takes that row's nature.
     uint32_t RowColor(const EntityState& state, const Settings& settings);
     bool LineShows(const LineShow& show, const EntityState& state);
-    // Whether the Friends list names this player, ignoring case.
-    bool IsFriend(const std::vector<std::string>& friends, std::string_view name);
     // Whether a player is in your party or alliance: among the members' server IDs, and not you.
     bool InYourParty(uint32_t serverId, bool self, std::span<const uint32_t> memberIds);
 
