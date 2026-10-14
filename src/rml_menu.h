@@ -41,7 +41,7 @@ namespace headsup
             const std::vector<std::string>& fonts, float em, double version);
         // Closes the window's document; before the host stops.
         void Close();
-        // True once after the Debug page's button was pressed: write the /hu debug report.
+        // True once after the Debug Report button was pressed: write the /hu debug report.
         bool TakeDebugRequest();
         // True once after the Cursor Style list was opened: read the cursors folder again.
         bool TakeCursorsRequest();

@@ -429,13 +429,13 @@ TEST(the_list_of_pages_scrolls_in_a_window_too_short_for_it)
 {
     Window window;
     window.OpenAt(0, 0, 900, 100); // asked shorter than it goes, so it opens at its least height
-    Rml::Element* body = window.Find("nav-debug")->GetOwnerDocument();
+    Rml::Element* body = window.Find("nav-configmenu")->GetOwnerDocument();
     const float bottom = body->GetAbsoluteOffset(Rml::BoxArea::Border).y + body->GetBox().GetSize(Rml::BoxArea::Border).y;
     // The last page's name is reached inside the window, and takes its click.
-    window.Click("nav-debug");
-    Rml::Element* last = window.Find("nav-debug");
+    window.Click("nav-configmenu");
+    Rml::Element* last = window.Find("nav-configmenu");
     CHECK(last->GetAbsoluteOffset(Rml::BoxArea::Border).y + last->GetBox().GetSize(Rml::BoxArea::Border).y <= bottom);
-    CHECK(window.Shows("debug-headsup-head") || last->IsClassSet("picked"));
+    CHECK(window.Shows("configmenu-headsup-head") || last->IsClassSet("picked"));
 }
 
 TEST(a_dash_mark_is_shown_as_its_shape_in_the_list_and_in_the_closed_control)
@@ -1169,7 +1169,7 @@ TEST(the_window_is_as_opaque_as_its_setting_from_the_moment_it_opens)
     }
     CHECK(most > 0.49f && most < 0.51f);
     CHECK_EQ(window.Find("page")->GetOwnerDocument()->GetComputedValues().opacity(), 0.5f);
-    // The slider on the Config Menu page sets it, and the window follows while it is dragged.
+    // The slider on the HeadsUp Config page sets it, and the window follows while it is dragged.
     window.Page("configmenu");
     CHECK(window.Drag("configmenu-settings-window-window-opacity", Rml::Vector2f(400.0f, 0.0f)));
     CHECK_EQ(window.settings.menuOpacity, 100);

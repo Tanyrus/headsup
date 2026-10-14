@@ -1169,7 +1169,7 @@ namespace headsup
                     form.changed  = true;
                 }
                 break;
-            // Mouse Cursor, Config Menu and Debug
+            // Mouse Cursor and HeadsUp Config
             case SettingPiece::Chocobo:
                 form.Fade(!on);
                 form.Switch(label.c_str(), s.chocoboPointer, tip);

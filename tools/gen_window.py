@@ -99,7 +99,7 @@ VISIBILITY_ROWS = {**rows('aggressive', 'passive', 'nm-aggressive', 'nm-passive'
 PIECES = Pieces(
     pages={'entities': 'Entities', 'mobs': 'Mobs', 'players': 'Players', 'self': 'Self', 'npcs': 'Npcs', 'pets': 'Pets',
            'userinterface': 'UserInterface', 'toppanel': 'TopPanel', 'widgets': 'Widgets', 'mousecursor': 'MouseCursor',
-           'configmenu': 'ConfigMenu', 'debug': 'Debug'},
+           'configmenu': 'ConfigMenu'},
     cards={
         'nameplates': Card(switch=True), 'outline-style': Card(switch=True), 'target-cursor': Card(),
         'colors-aggression': Card(), 'colors-toughness': Card(), 'colors-claim-status': Card(),
@@ -178,7 +178,7 @@ PIECES = Pieces(
             'enabled', 'section', 'second-line', 'icons', 'details', 'currency', 'time-zone', 'server-time', '24-hour',
             'seconds', 'layout', 'exp-bar', 'job-names', 'latency')),
         'trays': Setting(unnamed=True), 'reset-layout': Setting(),
-        # Mouse Cursor, Config Menu and Debug
+        # Mouse Cursor and HeadsUp Config
         'chocobo': Setting(), 'pointer-fix': Setting(), 'keep-pointer': Setting(),
         'window-theme': Setting(), 'font': Setting(), 'size': Setting(), 'window-opacity': Setting(),
         'reset-all-settings': Setting(words={'note': True, 'reset-everything': True, 'keep-them': True}),

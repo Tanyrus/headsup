@@ -24,14 +24,13 @@ opens them at a page, such as `/hu menu entities`, `/hu menu mobs` or `/hu menu 
 ## Settings
 
 `/hu` opens the settings window. `/hu menu <page>` opens it at a page: `entities`, `mobs`, `players`, `self`, `npcs`,
-`pets`, `userinterface`, `toppanel`, `widgets`, `mousecursor`, `configmenu` or `debug`. The pages, in the order of the window's list:
+`pets`, `userinterface`, `toppanel`, `widgets`, `mousecursor` or `configmenu`. The pages, in the order of the window's list:
 
 | Page | Holds |
 |---|---|
 | Entities | What every kind shares: the Nameplates card, the outline style, the target cursor and the five color palettes. Under it, a page for each kind: Mobs, Players, Self, NPCs and Pets |
 | User Interface | Screenshot mode and the Window Groups and Game Windows cards, which move the game's windows. Under it, the Top Panel, Widgets and Mouse Cursor pages |
-| Config Menu | The settings window's own theme, font, size and opacity, and the button that puts every setting back to its default |
-| Debug | Switches HeadsUp off as a whole, and writes a report for bug reports |
+| HeadsUp Config | Switches HeadsUp off as a whole, writes a report for bug reports, sets the settings window's own theme, font, size and opacity, and holds the button that puts every setting back to its default |
 
 A switch is a toggle. Settings that belong to something switched off are not shown until it is on, and every option of
 a dropdown says what it does when the pointer is over it.

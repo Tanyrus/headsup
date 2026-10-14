@@ -11,7 +11,7 @@
 
 namespace headsup
 {
-    // What the pages read from the frame that just ended: the Debug page's figures, and what other pages ask.
+    // What the pages read from the frame that just ended: the This Frame card's figures, and what other pages ask.
     struct MenuReadings
     {
         uint32_t outlinedMobs = 0, meshes = 0, nameplates = 0;

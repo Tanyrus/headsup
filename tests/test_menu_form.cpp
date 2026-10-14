@@ -214,10 +214,10 @@ TEST(a_page_whose_cards_are_all_switched_off_says_what_switches_them_on)
     w.settings.enabled = false;
     const std::vector<std::string> off = shown(w.Pass());
     CHECK_EQ(off.size(), size_t{1}); // the one card that says HeadsUp is off
-    // The Debug page, which switches HeadsUp on, keeps its cards.
-    w.state.page = Page::Debug;
-    const Form debug = w.Pass({{"debug-headsup-on", kClickEvent, ""}});
-    CHECK(w.settings.enabled && debug.changed);
+    // The HeadsUp Config page, which switches HeadsUp on, keeps its cards.
+    w.state.page = Page::ConfigMenu;
+    const Form config = w.Pass({{"configmenu-headsup-on", kClickEvent, ""}});
+    CHECK(w.settings.enabled && config.changed);
     // With the top panel off, its widgets' page has nothing to set either.
     w.settings.showBar = false;
     w.state.page       = Page::Widgets;
@@ -388,15 +388,16 @@ TEST(the_dash_mark_is_picked_from_a_list_whose_first_row_is_none)
 TEST(a_page_moved_in_the_layout_moves_in_the_sidebar_and_opens_by_its_key)
 {
     test::EditedLayout edited;
-    edited.MovePage("debug", 0);
+    edited.MovePage("configmenu", 0);
     Window w;
     w.layout              = edited.Layout();
     const Form form       = w.Pass();
     const FormBlock& side = form.blocks.front();
-    CHECK(At(&side, "nav-debug") < At(&side, "nav-entities"));
-    w.Pass({{"nav-debug", kClickEvent, ""}});
-    CHECK(w.state.page == Page::Debug);
-    CHECK(w.layout.PageNamed("debug") == Page::Debug);
+    CHECK(At(&side, "nav-configmenu") < At(&side, "nav-entities"));
+    w.Pass({{"nav-configmenu", kClickEvent, ""}});
+    CHECK(w.state.page == Page::ConfigMenu);
+    CHECK(w.layout.PageNamed("configmenu") == Page::ConfigMenu);
+    CHECK(!w.layout.PageNamed("debug"));
 }
 
 TEST(renaming_a_page_a_card_and_a_setting_changes_no_control_id)
@@ -439,24 +440,24 @@ TEST(a_setting_moved_to_another_page_hides_as_it_would_at_home)
     edited.MoveSetting("min-size", "this-frame", 0);
     Window w;
     w.layout                     = edited.Layout();
-    w.state.page                 = Page::Debug;
+    w.state.page                 = Page::ConfigMenu;
     w.settings.scaleWithDistance = false;
-    CHECK(ClassOn(w.Pass(), "debug-this-frame-min-size-label-row", kOffClass));
+    CHECK(ClassOn(w.Pass(), "configmenu-this-frame-min-size-label-row", kOffClass));
     w.settings.scaleWithDistance = true;
-    const Form form = w.Pass({{"debug-this-frame-min-size", kChangeEvent, "77"}});
-    CHECK(!ClassOn(form, "debug-this-frame-min-size-label-row", kOffClass));
+    const Form form = w.Pass({{"configmenu-this-frame-min-size", kChangeEvent, "77"}});
+    CHECK(!ClassOn(form, "configmenu-this-frame-min-size-label-row", kOffClass));
     CHECK(form.changed && w.settings.scaleMin == 77);
 }
 
 TEST(a_card_moved_to_another_page_shows_there_with_its_settings)
 {
     test::EditedLayout edited;
-    edited.MoveCard("mouse-pointer", "debug", 0);
+    edited.MoveCard("mouse-pointer", "configmenu", 0);
     Window w;
     w.layout     = edited.Layout();
-    w.state.page = Page::Debug;
-    const Form form = w.Pass({{"debug-mouse-pointer-chocobo", kClickEvent, ""}});
-    CHECK(form.blocks.size() > 1 && form.blocks[1].id == "debug-mouse-pointer");
+    w.state.page = Page::ConfigMenu;
+    const Form form = w.Pass({{"configmenu-mouse-pointer-chocobo", kClickEvent, ""}});
+    CHECK(form.blocks.size() > 1 && form.blocks[1].id == "configmenu-mouse-pointer");
     CHECK(form.changed && w.settings.chocoboPointer);
 }
 

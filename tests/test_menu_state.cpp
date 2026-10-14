@@ -54,7 +54,7 @@ TEST(the_kind_pages_know_their_kind)
     for (const auto& [page, kind] : kinds)
         CHECK(KindOfPage(page) == kind);
     for (const Page page : {Page::Entities, Page::UserInterface, Page::TopPanel, Page::Widgets, Page::MouseCursor,
-             Page::ConfigMenu, Page::Debug})
+             Page::ConfigMenu})
         CHECK(!KindOfPage(page));
 }
 

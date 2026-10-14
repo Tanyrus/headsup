@@ -338,6 +338,14 @@
       "name": "HeadsUp Config",
       "cards": [
         {
+          "key": "headsup",
+          "name": "HeadsUp",
+          "description": "All of HeadsUp, as /hu on and /hu off.",
+          "settings": [
+            {"key": "debug-report", "name": "Debug Report", "tip": "As /hu debug: writes a report to logs/headsup."}
+          ]
+        },
+        {
           "key": "settings-window",
           "name": "Config Window",
           "settings": [
@@ -345,6 +353,21 @@
             {"key": "font", "name": "Font", "tip": "The font used for this config window."},
             {"key": "size", "name": "Font Size", "tip": "The font size used for this config window."},
             {"key": "window-opacity", "name": "Window Opacity", "tip": "The opacity of this config window."}
+          ]
+        },
+        {
+          "key": "this-frame",
+          "name": "This Frame",
+          "settings": [
+            {"key": "mobs-outlined", "name": "Mobs Outlined"},
+            {"key": "meshes-outlined", "name": "Meshes Outlined"},
+            {"key": "stencil-buffer", "name": "Stencil Buffer"},
+            {"key": "nameplates", "name": "Nameplates"},
+            {"key": "drawn", "name": "Drawn"},
+            {"key": "game-s-names", "name": "Game's Names"},
+            {"key": "frame-time", "name": "Frame Time"},
+            {"key": "last-save", "name": "Last Save"},
+            {"key": "your-level", "name": "Your Level"}
           ]
         },
         {
@@ -361,35 +384,6 @@
                 {"key": "keep-them", "name": "Keep Them"}
               ]
             }
-          ]
-        }
-      ]
-    },
-    {
-      "key": "debug",
-      "name": "Debug",
-      "cards": [
-        {
-          "key": "headsup",
-          "name": "HeadsUp",
-          "description": "All of HeadsUp, as /hu on and /hu off.",
-          "settings": [
-            {"key": "debug-report", "name": "Debug Report", "tip": "As /hu debug: writes a report to logs/headsup."}
-          ]
-        },
-        {
-          "key": "this-frame",
-          "name": "This Frame",
-          "settings": [
-            {"key": "mobs-outlined", "name": "Mobs Outlined"},
-            {"key": "meshes-outlined", "name": "Meshes Outlined"},
-            {"key": "stencil-buffer", "name": "Stencil Buffer"},
-            {"key": "nameplates", "name": "Nameplates"},
-            {"key": "drawn", "name": "Drawn"},
-            {"key": "game-s-names", "name": "Game's Names"},
-            {"key": "frame-time", "name": "Frame Time"},
-            {"key": "last-save", "name": "Last Save"},
-            {"key": "your-level", "name": "Your Level"}
           ]
         }
       ]
@@ -792,7 +786,7 @@
   "words": [
     {"key": "switched-off", "name": "Switched Off"},
     {"key": "switched-off-top-panel", "name": "These settings are the top panel's, which is off: the Top Panel page switches it on."},
-    {"key": "switched-off-headsup", "name": "HeadsUp is off: the Debug page switches it on."},
+    {"key": "switched-off-headsup", "name": "HeadsUp is off: the HeadsUp Config page switches it on."},
     {"key": "key-add", "name": "+ Add Key"},
     {"key": "key-waiting", "name": "Press a Key..."},
     {"key": "always", "name": "Always", "tip": "This line is always visible as long as the nameplate as a whole is visible."},
