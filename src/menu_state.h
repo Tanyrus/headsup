@@ -22,11 +22,6 @@ namespace headsup
 
     std::optional<PlateKind> KindOfPage(Page page);
 
-    // In a word of the window's file, where the code puts what it stands for: a line's name, a count, the yalms a
-    // fade starts at.
-    constexpr std::string_view kLineMark = "{line}", kCountMark = "{count}", kNearMark = "{near}";
-    // The text with every mark in it replaced by what it stands for.
-    std::string Filled(std::string_view text, std::string_view mark, std::string_view with);
 
     // A label with each word capitalized after a space or a hyphen ("Sub-Target"), but for the small words inside it
     // ("Hide Level and Icons"); letters already capital stay.

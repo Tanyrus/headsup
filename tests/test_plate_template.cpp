@@ -52,7 +52,6 @@ TEST(every_tag_has_a_name_that_parses_back_to_it)
     {
         const auto tag = static_cast<Tag>(t);
         CHECK(ParseTemplate(TagName(tag)) == std::vector<Atom>{Of(tag)});
-        CHECK(TagTip(tag)[0] != '\0');
     }
 }
 
@@ -258,43 +257,45 @@ TEST(a_design_uses_a_tag_when_any_line_holds_it)
     CHECK(!UsesTag(kind, Tag::Con));
 }
 
+namespace
+{
+    constexpr const char* kSentence = "Put the {tags} tag on a line."; // a note's words, as the window's file gives one
+    std::string NameOf(Tag tag) { return kWindowLayout.OptionsOf(WindowList::Tags)[static_cast<size_t>(tag)].name; }
+    std::string Note(const KindSettings& kind, std::initializer_list<Tag> tags)
+    {
+        return UnusedTagsNote(kind, tags, kSentence, kWindowLayout.OptionsOf(WindowList::Tags), "or");
+    }
+}
+
 TEST(a_card_of_tags_no_line_holds_says_which_tag_would_show_it)
 {
     KindSettings kind;
     kind.lines[0].text = "$detect";
     kind.lines[2].text = "$name";
-    const auto names = [](const std::string& note, Tag tag) { return note.find(TagLabel(tag)) != std::string::npos; };
-    CHECK(UnusedTagsNote(kind, {Tag::Detect}, kShowsTheseEnding).empty()); // a line holds it: nothing to say
-    const std::string one = UnusedTagsNote(kind, {Tag::Status}, kShowsTheseEnding);
-    CHECK(names(one, Tag::Status) && one.ends_with(kShowsTheseEnding));
-    // Every tag of the card is named, in the card's order.
-    const std::string four = UnusedTagsNote(kind, {Tag::Weak, Tag::Resist, Tag::Status, Tag::Immune}, kShowsTheseEnding);
-    size_t at = 0;
-    for (const Tag tag : {Tag::Weak, Tag::Resist, Tag::Status, Tag::Immune})
-    {
-        const size_t found = four.find(TagLabel(tag), at);
-        CHECK(found != std::string::npos);
-        at = found;
-    }
-    CHECK(!names(one, Tag::Weak));
+    const auto names = [](const std::string& note, Tag tag) { return note.find(NameOf(tag)) != std::string::npos; };
+    CHECK(Note(kind, {Tag::Detect}).empty()); // a line holds it: nothing to say
+    CHECK_EQ(Note(kind, {Tag::Status}), "Put the " + NameOf(Tag::Status) + " tag on a line.");
+    // Every tag of the card is named, in the card's order, the last after the word for or.
+    const std::string four = Note(kind, {Tag::Weak, Tag::Resist, Tag::Status, Tag::Immune});
+    CHECK_EQ(four, "Put the " + NameOf(Tag::Weak) + ", " + NameOf(Tag::Resist) + ", " + NameOf(Tag::Status) + " or " +
+                       NameOf(Tag::Immune) + " tag on a line.");
     // One of a card's tags on a line is enough.
     kind.lines[1].text = "Lv $level $resist";
-    CHECK(UnusedTagsNote(kind, {Tag::Weak, Tag::Resist}, kShowsTheseEnding).empty());
-    CHECK(UnusedTagsNote(kind, {Tag::Weak, Tag::Resist, Tag::Status, Tag::Immune}, kShowsTheseEnding).empty());
-    CHECK(names(UnusedTagsNote(kind, {Tag::Weak}, kShowsTheseEnding), Tag::Weak));
+    CHECK(Note(kind, {Tag::Weak, Tag::Resist}).empty());
+    CHECK(Note(kind, {Tag::Weak, Tag::Resist, Tag::Status, Tag::Immune}).empty());
+    CHECK(names(Note(kind, {Tag::Weak}), Tag::Weak));
     kind.lines[1].text = "$$resist"; // a doubled mark is a dollar sign, not the tag
-    CHECK(!UnusedTagsNote(kind, {Tag::Resist}, kShowsTheseEnding).empty());
+    CHECK(!Note(kind, {Tag::Resist}).empty());
 }
 
 TEST(a_design_without_the_name_tag_says_why_no_name_shows)
 {
     KindSettings kind;
     kind.lines[1].text = "Lv $level";
-    CHECK_EQ(UnusedTagsNote(kind, {Tag::Name}, kShowsNameEnding),
-        "Put the Name tag on a line of the design to show a name: the game's own is hidden where HeadsUp draws the nameplate.");
+    CHECK_EQ(Note(kind, {Tag::Name}), "Put the " + NameOf(Tag::Name) + " tag on a line.");
     kind.lines[0].text = "<$name>";
-    CHECK_EQ(UnusedTagsNote(kind, {Tag::Name}, kShowsNameEnding), "");
-    CHECK(!UnusedTagsNote(KindSettings{}, {Tag::Name}, kShowsNameEnding).empty()); // three empty lines
+    CHECK_EQ(Note(kind, {Tag::Name}), "");
+    CHECK(!Note(KindSettings{}, {Tag::Name}).empty()); // three empty lines
 }
 
 TEST(the_default_templates_use_only_tags_the_catalog_knows)

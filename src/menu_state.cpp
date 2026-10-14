@@ -13,19 +13,6 @@ namespace headsup
         return changedAt && (!windowOpen || now - *changedAt >= kSaveSettleSeconds);
     }
 
-    std::string Filled(std::string_view text, std::string_view mark, std::string_view with)
-    {
-        std::string out;
-        for (size_t at = 0;;)
-        {
-            const size_t found = text.find(mark, at);
-            out += text.substr(at, found - at);
-            if (found == std::string_view::npos) return out;
-            out += with;
-            at = found + mark.size();
-        }
-    }
-
     std::optional<PlateKind> KindOfPage(Page page)
     {
         switch (page)

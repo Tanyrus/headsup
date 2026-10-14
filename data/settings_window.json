@@ -760,6 +760,33 @@
         {"name": "Beside"},
         {"name": "Off"}
       ]
+    },
+    {
+      "key": "tags",
+      "options": [
+        {"name": "Name", "tip": "The entity's name."},
+        {"name": "Level", "tip": "A mob's level, or range, as 20-23; its exact level after a /check. A player's main job level when known."},
+        {"name": "Difficulty", "tip": "The con at each end of the level range, as EP-DC; one con after a /check."},
+        {"name": "ID", "tip": "The last three hex digits of the mob's ID, as players name placeholders: [106]."},
+        {"name": "Server ID", "tip": "The mob's whole server ID in decimal: [17190918]."},
+        {"name": "Placeholder", "tip": "[PH] on a lottery placeholder, whose death can pop an NM; nothing on other mobs."},
+        {"name": "Detection", "tip": "Aggression, links, and how it detects you, as picked in Detection Icons."},
+        {"name": "Weaknesses", "tip": "Damage types and elements it is weak to, with their percents or ranks."},
+        {"name": "Resistances", "tip": "Damage types and elements it resists, with their percents or ranks."},
+        {"name": "Statuses", "tip": "Statuses it is weak to or resists, as picked in Statuses."},
+        {"name": "Immunities", "tip": "Statuses it cannot take, each with a times sign."},
+        {"name": "GM", "tip": "The GM icon."},
+        {"name": "Mentor", "tip": "The mentor icon."},
+        {"name": "New Adventurer", "tip": "The new adventurer icon."},
+        {"name": "Level Sync", "tip": "The level sync icon."},
+        {"name": "Away", "tip": "The away icon."},
+        {"name": "Linkshell", "tip": "The linkshell icon, in the linkshell's color."},
+        {"name": "Bazaar", "tip": "The bazaar icon."},
+        {"name": "Seeking Party", "tip": "The seeking party icon."},
+        {"name": "Job", "tip": "Jobs as WAR/MNK: yours, your party's, and a player's once you have checked them."},
+        {"name": "Owner", "tip": "The pet's owner."},
+        {"name": "Title", "tip": "The player's title: yours, and a player's once you have checked them."}
+      ]
     }
   ],
   "words": [
@@ -773,6 +800,10 @@
     {"key": "conditions", "name": "{count} Conditions"},
     {"key": "local", "name": "Local"},
     {"key": "themes-font", "name": "Theme's"},
-    {"key": "default-font", "name": "Default"}
+    {"key": "default-font", "name": "Default"},
+    {"key": "unused-tags-these", "name": "Put the {tags} tag on a line of the design to show these on a nameplate."},
+    {"key": "unused-tags-name", "name": "Put the {tags} tag on a line of the design to show a name: the game's own is hidden where HeadsUp draws the nameplate."},
+    {"key": "or", "name": "or"},
+    {"key": "slot-tip", "tip": "These share one place, tried from the left: the first that has something to show is drawn. Drop one on another to change their order, or drag one out."}
   ]
 }

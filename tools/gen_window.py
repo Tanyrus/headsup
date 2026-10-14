@@ -190,11 +190,11 @@ PIECES = Pieces(
         'plate-mode': List(4), 'outline-mode': List(4, extra={3: 'tipOnClaimRows'}), 'color-source': List(7),
         'show-condition': List(12), 'ornament-place': List(5), 'align': List(3), 'font-style': List(3),
         'smoothness': List(4), 'bar-theme': List(5), 'menu-theme': List(2), 'bar-sections': List(3),
-        'bar-widgets': List(14), 'plate-lines': List(3), 'job-layout': List(3), 'exp-bar': List(3),
+        'bar-widgets': List(14), 'plate-lines': List(3), 'job-layout': List(3), 'exp-bar': List(3), 'tags': List(22),
     },
     words={'switched-off': True, 'switched-off-top-panel': True, 'switched-off-headsup': True, 'key-add': True,
            'key-waiting': True, 'always': True, 'never': True, 'conditions': True, 'local': True, 'themes-font': True,
-           'default-font': True},
+           'default-font': True, 'unused-tags-these': True, 'unused-tags-name': True, 'or': True, 'slot-tip': False},
 )
 
 

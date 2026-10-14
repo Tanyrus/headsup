@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 
 namespace headsup
@@ -118,6 +119,12 @@ namespace headsup
 
     // A word of the layout as text: a tip the file leaves out is none.
     inline std::string_view Said(const char* text) { return text != nullptr ? std::string_view(text) : std::string_view(); }
+
+    // In a word of the layout, where the code puts what it stands for: a line's name, a count, the yalms a fade starts
+    // at, the tags a note names.
+    constexpr std::string_view kLineMark = "{line}", kCountMark = "{count}", kNearMark = "{near}", kTagsMark = "{tags}";
+    // The text with every mark in it replaced by what it stands for.
+    std::string Filled(std::string_view text, std::string_view mark, std::string_view with);
 
     // An entry's words on a kind's page: the kind's own where it has words by kind, the shared ones otherwise.
     const char* NameOf(const LayoutSetting& setting, std::optional<PlateKind> kind);
