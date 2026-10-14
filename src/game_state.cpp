@@ -79,6 +79,7 @@ namespace headsup
         case kCheckReplyPacket:
             next.check  = ParseCheckReply(data, size);
             next.answer = ParseCheckAnswer(data, size);
+            next.mobDied = ParseMobDeath(data, size);
             break;
         case kInspectMessagePacket:
             m_CheckMessage = ParseInspectMessage(data, size);

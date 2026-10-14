@@ -31,6 +31,12 @@ namespace headsup
     };
     std::optional<CheckAnswer> ParseCheckAnswer(const uint8_t* data, uint32_t size);
 
+    // A mob's death as the server tells everyone within 50 yalms of it, a second after: "defeats", or "falls to the
+    // ground" with no attacker (CMobEntity::Die).
+    constexpr uint16_t kDefeatsMessage = 6, kFallsMessage = 20;
+    // The mob an incoming 0x029 says has died; nothing for any other message.
+    std::optional<uint32_t> ParseMobDeath(const uint8_t* data, uint32_t size);
+
     // How long a check result stays valid: the mob's respawn time, after which a new spawn may have another level,
     // else ten minutes.
     double CheckLifetime(const MobRecord* mob);
