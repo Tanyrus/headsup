@@ -56,11 +56,11 @@ TEST(a_claim_wins_over_the_placeholder_which_wins_over_the_nature)
     CHECK_EQ(RowOf(friendsPet), static_cast<int>(PetRow::Friend));
     // Only your own pet's lines show by "When Owner is You", and no player's or mob's.
     const LineShow yours{false, ConditionBit(ShowCondition::OwnerIsYou)};
-    CHECK(!LineShows(yours, friendsPet));
+    CHECK(!LineShows(yours, friendsPet, false));
     friendsPet.petRow = PetRow::Yours;
-    CHECK(LineShows(yours, friendsPet));
+    CHECK(LineShows(yours, friendsPet, false));
     friendsPet.pet = false;
-    CHECK(!LineShows(yours, friendsPet));
+    CHECK(!LineShows(yours, friendsPet, false));
     // Dead, it is in the Dead row whatever it was and whoever claimed it.
     CHECK(MobRowOf(Nature::Aggressive, false, false, false) == Category::Dead);
     CHECK(MobRowOf(Nature::Placeholder, true, true, false) == Category::Dead);
@@ -160,17 +160,16 @@ TEST(always_shows_and_otherwise_any_checked_condition_does)
 {
     EntityState s = Mob(Nature::Aggressive, ClaimState::Yours);
     s.target      = TargetState::Targeted;
-    s.engaged     = true;
-    CHECK(LineShows(LineShow{true, 0}, s));
-    CHECK(!LineShows(LineShow{false, 0}, s));
-    CHECK(LineShows(LineShow{false, ConditionBit(ShowCondition::YourClaim)}, s));
-    CHECK(!LineShows(LineShow{false, ConditionBit(ShowCondition::Unclaimed) | ConditionBit(ShowCondition::OthersClaim)}, s));
-    CHECK(LineShows(LineShow{false, ConditionBit(ShowCondition::Unclaimed) | ConditionBit(ShowCondition::Targeted)}, s));
+    CHECK(LineShows(LineShow{true, 0}, s, false));
+    CHECK(!LineShows(LineShow{false, 0}, s, false));
+    CHECK(LineShows(LineShow{false, ConditionBit(ShowCondition::YourClaim)}, s, false));
+    CHECK(!LineShows(LineShow{false, ConditionBit(ShowCondition::Unclaimed) | ConditionBit(ShowCondition::OthersClaim)}, s, false));
+    CHECK(LineShows(LineShow{false, ConditionBit(ShowCondition::Unclaimed) | ConditionBit(ShowCondition::Targeted)}, s, false));
 }
 
 TEST(each_condition_holds_for_its_state_alone)
 {
-    const auto holds = [](ShowCondition c, const EntityState& s) { return LineShows(LineShow{false, ConditionBit(c)}, s); };
+    const auto holds = [](ShowCondition c, const EntityState& s, bool youFight = false) { return LineShows(LineShow{false, ConditionBit(c)}, s, youFight); };
     EntityState unclaimed = Mob(Nature::Passive);
     EntityState yours     = Mob(Nature::Aggressive, ClaimState::Yours);
     EntityState others    = Mob(Nature::Aggressive, ClaimState::Others);
@@ -189,8 +188,9 @@ TEST(each_condition_holds_for_its_state_alone)
         CHECK(holds(ShowCondition::Passive, Placeholder(ignores)) && !holds(ShowCondition::Aggressive, Placeholder(ignores)));
     unclaimed.tooWeak = true;
     CHECK(holds(ShowCondition::TooWeak, unclaimed) && !holds(ShowCondition::TooWeak, yours));
-    yours.engaged = true;
-    CHECK(holds(ShowCondition::Engaged, yours) && !holds(ShowCondition::Engaged, others));
+    // Your own combat, as its tip says, whatever this entity does.
+    CHECK(!holds(ShowCondition::Engaged, yours));
+    CHECK(holds(ShowCondition::Engaged, others, true) && holds(ShowCondition::Engaged, unclaimed, true));
     yours.target = TargetState::SubTarget;
     CHECK(holds(ShowCondition::Targeted, yours) && !holds(ShowCondition::Targeted, others));
     EntityState party;
@@ -214,44 +214,41 @@ TEST(generally_holds_while_the_entity_is_in_none_of_its_kinds_special_states)
     target.target         = TargetState::Targeted;
     EntityState weak      = mob;
     weak.tooWeak          = true;
-    CHECK(LineShows(orTargeted, mob));
-    CHECK(LineShows(orTargeted, target));
-    CHECK(!LineShows(orTargeted, Mob(Nature::Aggressive, ClaimState::Others)));
-    CHECK(!LineShows(orTargeted, weak));
-    CHECK(!LineShows(generally, target));
-    CHECK(!LineShows(generally, Mob(Nature::Passive, ClaimState::Yours)));
-    EntityState fighting = Mob(Nature::Passive);
-    fighting.engaged     = true;
-    CHECK(!LineShows(generally, fighting));
+    CHECK(LineShows(orTargeted, mob, false));
+    CHECK(LineShows(orTargeted, target, false));
+    CHECK(!LineShows(orTargeted, Mob(Nature::Aggressive, ClaimState::Others), false));
+    CHECK(!LineShows(orTargeted, weak, false));
+    CHECK(!LineShows(generally, target, false));
+    CHECK(!LineShows(generally, Mob(Nature::Passive, ClaimState::Yours), false));
+    CHECK(!LineShows(generally, Mob(Nature::Passive), true));
     // Every mob is unclaimed or claimed and aggressive or passive: those say nothing against it.
-    CHECK(LineShows(generally, Mob(Nature::Passive)));
-    CHECK(LineShows(generally, Placeholder(Category::WillAttack)));
+    CHECK(LineShows(generally, Mob(Nature::Passive), false));
+    CHECK(LineShows(generally, Placeholder(Category::WillAttack), false));
     EntityState player;
     player.kind  = EntityKind::Player;
     player.alive = true;
-    CHECK(LineShows(generally, player));
+    CHECK(LineShows(generally, player, false));
     for (const PlayerRow row : {PlayerRow::PartyMember, PlayerRow::Friend, PlayerRow::LinkshellMember})
     {
         player.playerRow = row;
-        CHECK(!LineShows(generally, player));
+        CHECK(!LineShows(generally, player, false));
     }
     EntityState self = player;
     self.self        = true;
     self.playerRow   = PlayerRow::Player;
-    CHECK(LineShows(generally, self));
-    self.engaged = true;
-    CHECK(!LineShows(generally, self));
+    CHECK(LineShows(generally, self, false));
+    CHECK(!LineShows(generally, self, true));
     EntityState pet = Mob(Nature::Passive);
     pet.pet         = true;
     pet.petRow      = PetRow::Party;
-    CHECK(LineShows(generally, pet));
+    CHECK(LineShows(generally, pet, false));
     pet.petRow = PetRow::Yours;
-    CHECK(!LineShows(generally, pet));
+    CHECK(!LineShows(generally, pet, false));
     EntityState npc;
     npc.kind = EntityKind::Npc;
-    CHECK(LineShows(generally, npc));
+    CHECK(LineShows(generally, npc, false));
     npc.target = TargetState::Targeted;
-    CHECK(!LineShows(generally, npc));
+    CHECK(!LineShows(generally, npc, false));
 }
 
 TEST(the_cursor_takes_its_picks_color_and_the_targeting_color_where_the_pick_has_nothing_to_read)

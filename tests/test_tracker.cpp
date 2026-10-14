@@ -511,7 +511,7 @@ TEST(the_tracker_fills_each_entitys_state)
     CHECK(t.Find(0x4000)->jobs == (PlayerJobs{1, 75, 2, 37}));
     CHECK_EQ(t.Find(0x4000)->title, 266u);
     CHECK(t.Find(0x4000)->state.target == TargetState::None);
-    CHECK(t.Find(0x5000)->state.self && t.Find(0x5000)->state.engaged);
+    CHECK(t.Find(0x5000)->state.self);
     CHECK(PlateKindOf(t.Find(0x5000)->state) == PlateKind::Self);
 }
 

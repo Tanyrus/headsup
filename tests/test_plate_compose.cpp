@@ -239,17 +239,14 @@ TEST(a_line_can_lose_its_glow_while_you_are_in_combat_whatever_its_entity_does)
     // A line that takes its style from another takes that line's switch with it.
     s.Kind(PlateKind::Mobs).lines[2].syncWith = 1;
     CHECK_EQ(ComposePlate(AggressiveMob(), fighting, s, kGame).lines[2].look.glow, 0.5f);
-    // A player's line has it too, off by default: with it on, a player's name stops glowing while you fight, though
-    // their own weapon is away.
+    // A player's line has it too, off by default: with it on, a player's name stops glowing while you fight.
     Settings glowing;
     LineDesign& name = glowing.Kind(PlateKind::Players).lines[2];
     name.glow        = 150;
-    ActorInfo fighter     = LinkshellPlayer();
-    fighter.state.engaged = true;
+    const ActorInfo fighter = LinkshellPlayer();
     CHECK_EQ(ComposePlate(fighter, fighting, glowing, kGame).lines[0].look.glow, 1.5f);
     name.glowOffInCombat = true;
     CHECK_EQ(ComposePlate(fighter, kPlayer, glowing, kGame).lines[0].look.glow, 1.5f);
-    fighter.state.engaged = false;
     CHECK_EQ(ComposePlate(fighter, fighting, glowing, kGame).lines[0].look.glow, 0.0f);
 }
 
@@ -317,6 +314,11 @@ TEST(a_lines_conditions_can_hide_it)
     claimed.state.claim = ClaimState::Yours;
     claimed.state.row   = Category::PartyClaim;
     CHECK_EQ(ComposePlate(claimed, kPlayer, s, kGame).lines.size(), size_t{3});
+    s.Kind(PlateKind::Mobs).lines[1].show = LineShow{false, ConditionBit(ShowCondition::Engaged)};
+    CHECK_EQ(ComposePlate(AggressiveMob(), kPlayer, s, kGame).lines.size(), size_t{2});
+    PlayerState fighting = kPlayer;
+    fighting.inCombat    = true;
+    CHECK_EQ(ComposePlate(AggressiveMob(), fighting, s, kGame).lines.size(), size_t{3});
 }
 
 TEST(each_mob_tag_renders_its_text_or_icons)

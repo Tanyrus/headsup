@@ -33,7 +33,7 @@ namespace headsup
     struct EntityState
     {
         EntityKind kind     = EntityKind::Npc;
-        bool self = false, pet = false, alive = false, engaged = false, tooWeak = false;
+        bool self = false, pet = false, alive = false, tooWeak = false;
         Nature nature       = Nature::NoData;
         Category row        = Category::Unknown; // mobs
         Category classified = Category::Unknown; // the row its aggression alone gives, under any claim or placeholder row
@@ -69,7 +69,7 @@ namespace headsup
     // The color that row's outline pick gives, whether or not the outline is drawn. Once the chain has fallen through to
     // the row the mob's aggression gives, an Aggression pick takes that row's nature.
     uint32_t RowColor(const EntityState& state, const Settings& settings);
-    bool LineShows(const LineShow& show, const EntityState& state);
+    bool LineShows(const LineShow& show, const EntityState& state, bool youFight);
     // Whether a player is in your party or alliance: among the members' server IDs, and not you.
     bool InYourParty(uint32_t serverId, bool self, std::span<const uint32_t> memberIds);
 

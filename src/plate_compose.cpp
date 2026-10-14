@@ -319,7 +319,7 @@ namespace headsup
         for (int i = 0; i < kPlateLines; ++i)
         {
             const LineDesign& style = StyleLine(kind, i);
-            if (!LineShows(style.show, st)) continue;
+            if (!LineShows(style.show, st, player.inCombat)) continue;
             LineBuilder builder;
             for (const Atom& atom : ParseTemplate(kind.lines[i].text))
             {

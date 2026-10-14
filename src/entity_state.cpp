@@ -188,7 +188,7 @@ namespace headsup
 
     namespace
     {
-        bool Holds(ShowCondition c, const EntityState& s)
+        bool Holds(ShowCondition c, const EntityState& s, bool youFight)
         {
             const bool player = s.kind == EntityKind::Player && !s.pet;
             // By its aggression alone: a placeholder's nature does not say whether it would attack.
@@ -199,7 +199,7 @@ namespace headsup
             case ShowCondition::Unclaimed: return s.kind == EntityKind::Mob && s.claim == ClaimState::Unclaimed;
             case ShowCondition::YourClaim: return s.claim == ClaimState::Yours;
             case ShowCondition::OthersClaim: return s.claim == ClaimState::Others;
-            case ShowCondition::Engaged: return s.engaged;
+            case ShowCondition::Engaged: return youFight;
             case ShowCondition::TooWeak: return s.tooWeak;
             case ShowCondition::Aggressive: return attacks;
             case ShowCondition::Passive: return s.kind == EntityKind::Mob && !attacks;
@@ -208,17 +208,17 @@ namespace headsup
             case ShowCondition::LinkshellMember: return player && s.playerRow == PlayerRow::LinkshellMember;
             case ShowCondition::OwnerIsYou: return s.pet && s.petRow == PetRow::Yours;
             case ShowCondition::Generally:
-                return std::ranges::none_of(ConditionsFor(PlateKindOf(s)), [&](ShowCondition c) { return IsSpecialState(c) && Holds(c, s); });
+                return std::ranges::none_of(ConditionsFor(PlateKindOf(s)), [&](ShowCondition c) { return IsSpecialState(c) && Holds(c, s, youFight); });
             }
             return false;
         }
     }
 
-    bool LineShows(const LineShow& show, const EntityState& s)
+    bool LineShows(const LineShow& show, const EntityState& s, bool youFight)
     {
         if (show.always) return true;
         for (int c = 0; c < kShowConditionCount; ++c)
-            if ((show.when & ConditionBit(static_cast<ShowCondition>(c))) != 0 && Holds(static_cast<ShowCondition>(c), s)) return true;
+            if ((show.when & ConditionBit(static_cast<ShowCondition>(c))) != 0 && Holds(static_cast<ShowCondition>(c), s, youFight)) return true;
         return false;
     }
 

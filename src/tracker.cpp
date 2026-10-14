@@ -72,7 +72,6 @@ namespace headsup
             st.self      = a.self;
             st.pet       = a.pet;
             st.alive     = a.alive;
-            st.engaged   = a.engaged;
             st.target    = TargetStateOf(a.index, targets);
             st.claim     = a.claimedByParty ? ClaimState::Yours : a.claimed ? ClaimState::Others : ClaimState::Unclaimed;
             st.playerRow = PlayerRowOf(a.party, a.isFriend, a.linkshell);
