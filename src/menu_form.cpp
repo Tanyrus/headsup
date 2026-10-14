@@ -517,7 +517,8 @@ namespace headsup
             {
                 if (i == first) form.Raw("</div><div class=\"column second\">");
                 const LayoutRow& row = rows[static_cast<size_t>(i)];
-                form.Swatch(Labeled(row.name, row.key, std::string(" ") + e.key).c_str(), colors[i], row.tip, &defaults[i]);
+                form.Swatch(Labeled(row.name, row.key, std::string(" ") + e.key).c_str(), colors[row.row], row.tip,
+                    &defaults[row.row]);
             }
             form.Raw("</div></div>");
         }
@@ -799,11 +800,9 @@ namespace headsup
             form.Caption(Labeled(Word(c, WindowWord::StatusTableWeak), "weak").c_str(), "head", kCutoffWidth);
             form.Caption(Labeled(Word(c, WindowWord::StatusTableResist), "resist").c_str(), "head", kCutoffWidth);
             form.EndRow();
-            const auto rows = c.layout.RowsOf(e);
-            for (int i = 0; i < kStatusRankCount; ++i)
+            for (const LayoutRow& row : c.layout.RowsOf(e))
             {
-                StatusBadgeRule& rule = s.statusBadges[i];
-                const LayoutRow& row  = rows[static_cast<size_t>(i)];
+                StatusBadgeRule& rule = s.statusBadges[row.row];
                 const std::string key = row.key;
                 form.Fade(dim);
                 form.Row(Labeled(row.name, key).c_str(), row.tip);
