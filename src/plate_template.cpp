@@ -10,7 +10,6 @@ namespace headsup
 {
     namespace
     {
-        constexpr uint8_t KindBit(PlateKind kind) { return static_cast<uint8_t>(1u << static_cast<int>(kind)); }
         constexpr uint8_t kMobKinds    = KindBit(PlateKind::Mobs);
         constexpr uint8_t kPlayerKinds = KindBit(PlateKind::Players) | KindBit(PlateKind::Self);
         constexpr uint8_t kNpcKinds    = KindBit(PlateKind::Npcs);
@@ -20,37 +19,33 @@ namespace headsup
         struct TagEntry
         {
             Tag tag;
-            const char* name;  // with the mark
-            const char* label; // on its chip
-            const char* tip;
+            const char* name; // with the mark
             uint8_t kinds;    // the kinds whose page offers it
         };
         // The order is the chips' order on each page that offers the tag, so it need not follow the enum.
         const TagEntry kTags[] = {
-            {Tag::Name, "$name", "Name", "The entity's name.", kAnyKinds},
-            {Tag::Gm, "$gm", "GM", "The GM icon.", kPlayerKinds},
-            {Tag::Mentor, "$mentor", "Mentor", "The mentor icon.", kPlayerKinds},
-            {Tag::New, "$new", "New Adventurer", "The new adventurer icon.", kPlayerKinds},
-            {Tag::Sync, "$sync", "Level Sync", "The level sync icon.", kPlayerKinds},
-            {Tag::Away, "$away", "Away", "The away icon.", kPlayerKinds},
-            {Tag::Linkshell, "$linkshell", "Linkshell", "The linkshell icon, in the linkshell's color.", kPlayerKinds},
-            {Tag::Bazaar, "$bazaar", "Bazaar", "The bazaar icon.", kPlayerKinds},
-            {Tag::Seeking, "$seeking", "Seeking Party", "The seeking party icon.", kPlayerKinds},
-            {Tag::Job, "$job", "Job", "Jobs as WAR/MNK: yours, your party's, and a player's once you have checked them.", kPlayerKinds},
-            {Tag::Level, "$level", "Level",
-                "A mob's level, or range, as 20-23; its exact level after a /check. A player's main job level when known.",
-                kMobKinds | kPlayerKinds},
-            {Tag::Title, "$title", "Title", "The player's title: yours, and a player's once you have checked them.", kPlayerKinds},
-            {Tag::Con, "$con", "Difficulty", "The con at each end of the level range, as EP-DC; one con after a /check.", kMobKinds},
-            {Tag::Id, "$id", "ID", "The last three hex digits of the mob's ID, as players name placeholders: [106].", kMobKinds},
-            {Tag::ServerId, "$serverid", "Server ID", "The mob's whole server ID in decimal: [17190918].", kMobKinds},
-            {Tag::Ph, "$ph", "Placeholder", "[PH] on a lottery placeholder, whose death can pop an NM; nothing on other mobs.", kMobKinds},
-            {Tag::Detect, "$detect", "Detection", "Aggression, links, and how it detects you, as picked in Detection Icons.", kMobKinds},
-            {Tag::Weak, "$weak", "Weaknesses", "Damage types and elements it is weak to, with their percents or ranks.", kMobKinds},
-            {Tag::Resist, "$resist", "Resistances", "Damage types and elements it resists, with their percents or ranks.", kMobKinds},
-            {Tag::Status, "$status", "Statuses", "Statuses it is weak to or resists, as picked in Statuses.", kMobKinds},
-            {Tag::Immune, "$immune", "Immunities", "Statuses it cannot take, each with a times sign.", kMobKinds},
-            {Tag::Owner, "$owner", "Owner", "The pet's owner.", kPetKinds},
+            {Tag::Name, "$name", kAnyKinds},
+            {Tag::Gm, "$gm", kPlayerKinds},
+            {Tag::Mentor, "$mentor", kPlayerKinds},
+            {Tag::New, "$new", kPlayerKinds},
+            {Tag::Sync, "$sync", kPlayerKinds},
+            {Tag::Away, "$away", kPlayerKinds},
+            {Tag::Linkshell, "$linkshell", kPlayerKinds},
+            {Tag::Bazaar, "$bazaar", kPlayerKinds},
+            {Tag::Seeking, "$seeking", kPlayerKinds},
+            {Tag::Job, "$job", kPlayerKinds},
+            {Tag::Level, "$level", kMobKinds | kPlayerKinds},
+            {Tag::Title, "$title", kPlayerKinds},
+            {Tag::Con, "$con", kMobKinds},
+            {Tag::Id, "$id", kMobKinds},
+            {Tag::ServerId, "$serverid", kMobKinds},
+            {Tag::Ph, "$ph", kMobKinds},
+            {Tag::Detect, "$detect", kMobKinds},
+            {Tag::Weak, "$weak", kMobKinds},
+            {Tag::Resist, "$resist", kMobKinds},
+            {Tag::Status, "$status", kMobKinds},
+            {Tag::Immune, "$immune", kMobKinds},
+            {Tag::Owner, "$owner", kPetKinds},
         };
         static_assert(std::size(kTags) == kTagCount);
 
@@ -73,8 +68,6 @@ namespace headsup
     }
 
     const char* TagName(Tag tag) { return EntryOf(tag).name; }
-    const char* TagLabel(Tag tag) { return EntryOf(tag).label; }
-    const char* TagTip(Tag tag) { return EntryOf(tag).tip; }
 
     std::optional<Icon> TagIcon(Tag tag)
     {
@@ -313,22 +306,20 @@ namespace headsup
         return joined;
     }
 
-    std::string UnusedTagsNote(const KindSettings& kind, std::initializer_list<Tag> tags, const char* ending)
+    std::string UnusedTagsNote(const KindSettings& kind, std::initializer_list<Tag> tags, std::string_view sentence,
+        std::span<const LayoutOption> names, std::string_view orWord)
     {
-        constexpr const char* kStart = "Put the ";
-        constexpr const char* kComma = ", ";
-        constexpr const char* kOr    = " or ";
-        constexpr const char* kWhere = " tag on a line of the design";
-        std::string note;
+        constexpr std::string_view kComma = ", ";
+        std::string named;
         size_t left = tags.size();
         for (const Tag tag : tags)
         {
             if (UsesTag(kind, tag)) return {};
-            note += note.empty() ? kStart : left > 1 ? kComma : kOr;
-            note += TagLabel(tag);
+            if (!named.empty()) named += left > 1 ? std::string(kComma) : " " + std::string(orWord) + " ";
+            named += Said(names[static_cast<size_t>(tag)].name);
             --left;
         }
-        return note.empty() ? note : note + kWhere + ending;
+        return named.empty() ? named : Filled(sentence, kTagsMark, named);
     }
 
     bool UsesTag(const KindSettings& kind, Tag tag)

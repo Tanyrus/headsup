@@ -2,11 +2,13 @@
 
 #include "icons.h"
 #include "plate_settings.h"
+#include "window_layout.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -59,8 +61,6 @@ namespace headsup
         bool operator==(const RunCaret&) const = default;
     };
     const char* TagName(Tag tag);  // "$name", as a line's text holds it
-    const char* TagLabel(Tag tag); // "Name", as its chip reads
-    const char* TagTip(Tag tag);   // what it renders, for the chip's tooltip
     // The icon a player's status tag draws, which its chip shows too; nothing for a tag that is text or whose icons
     // depend on the mob.
     std::optional<Icon> TagIcon(Tag tag);
@@ -81,12 +81,10 @@ namespace headsup
     bool MoveTag(std::string& text, int slot, int from, int to);
     // The text with one stretch typed anew, cut to fit kMaxTemplate. What was typed may hold tags of its own.
     std::string WithRun(std::string_view text, int run, std::string_view typed);
-    // What a card says while no line of the design holds any of its tags: "Put the Weaknesses or Resistances tag on a
-    // line of the design", then the ending, which says what that would show. Empty when a line holds one of them.
-    std::string UnusedTagsNote(const KindSettings& kind, std::initializer_list<Tag> tags, const char* ending);
-    constexpr const char* kShowsTheseEnding = " to show these on a nameplate."; // a card of settings the tags show
-    constexpr const char* kShowsNameEnding  = " to show a name: the game's own is hidden where HeadsUp draws the "
-                                              "nameplate.";
+    // What a card says while no line of the design holds any of its tags: the sentence with the tags' names in its
+    // kTagsMark, the last after orWord ("Weaknesses or Resistances"). Empty when a line holds one of them.
+    std::string UnusedTagsNote(const KindSettings& kind, std::initializer_list<Tag> tags, std::string_view sentence,
+        std::span<const LayoutOption> names, std::string_view orWord);
     // Whether any line of a design uses the tag.
     bool UsesTag(const KindSettings& kind, Tag tag);
 }

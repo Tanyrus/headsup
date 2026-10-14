@@ -641,9 +641,6 @@ namespace headsup
 
     namespace
     {
-        constexpr const char* kSlotTip = "These share one place, tried from the left: the first that has something to show "
-                                         "is drawn. Drop one on another to change their order, or drag one out.";
-        constexpr const char* kSlotJoin = "or"; // between the tags of a chip of several
 
         // The slot a dropped chip carries; nothing for anything else dropped.
         TagSlot DroppedSlot(const FormEvent* drop)
@@ -655,12 +652,13 @@ namespace headsup
         }
 
         // A tag as something to drag: its name after its icon when it draws one, and the tag a drop of it brings.
-        std::string TagMarkup(const std::string& id, Tag tag, const char* classes, const char* tip)
+        std::string TagMarkup(const WindowLayout& layout, const std::string& id, Tag tag, const char* classes, const char* tip)
         {
+            const LayoutOption& word = layout.OptionsOf(WindowList::Tags)[static_cast<size_t>(tag)];
             const std::optional<Icon> icon = TagIcon(tag);
             return std::string("<div class=\"") + classes + "\" id=\"" + id + "\" " + kCarriesAttribute + "=\"" +
                    EscapedRml(TagName(tag)) + "\"" + TipAttribute(tip) + ">" +
-                   (icon ? "<img src=\"" + IconSource(*icon) + "\"/>" : std::string()) + EscapedRml(TagLabel(tag)) + "</div>";
+                   (icon ? "<img src=\"" + IconSource(*icon) + "\"/>" : std::string()) + EscapedRml(Said(word.name)) + "</div>";
         }
 
         // The id of one tag of a line's chip, which is the chip's own while the chip holds no other.
@@ -670,16 +668,19 @@ namespace headsup
         }
 
         // A line's slot as a chip: one tag is the chip, and several are parts of it, each dragged alone.
-        std::string SlotMarkup(const std::string& id, const TagSlot& slot)
+        std::string SlotMarkup(const WindowLayout& layout, const std::string& id, const TagSlot& slot)
         {
-            if (slot.size() == 1) return TagMarkup(id, slot.front(), "btn accent chip in drag", TagTip(slot.front()));
+            const auto tips = layout.OptionsOf(WindowList::Tags);
+            if (slot.size() == 1)
+                return TagMarkup(layout, id, slot.front(), "btn accent chip in drag", tips[static_cast<size_t>(slot.front())].tip);
+            const char* shared = layout.WordOf(WindowWord::SlotTip).tip;
             std::string parts;
             for (size_t tag = 0; tag < slot.size(); ++tag)
             {
-                if (tag > 0) parts += std::string("<div class=\"or\">") + kSlotJoin + "</div>";
-                parts += TagMarkup(TagIdOf(id, slot, static_cast<int>(tag)), slot[tag], "part drag", kSlotTip);
+                if (tag > 0) parts += "<div class=\"or\">" + EscapedRml(layout.WordOf(WindowWord::Or).name) + "</div>";
+                parts += TagMarkup(layout, TagIdOf(id, slot, static_cast<int>(tag)), slot[tag], "part drag", shared);
             }
-            return "<div class=\"btn accent chip in\" id=\"" + id + "\"" + TipAttribute(kSlotTip) + ">" + parts + "</div>";
+            return "<div class=\"btn accent chip in\" id=\"" + id + "\"" + TipAttribute(shared) + ">" + parts + "</div>";
         }
     }
 
@@ -789,7 +790,7 @@ namespace headsup
             const std::string input = runId(static_cast<int>(run));
             Out() += std::string("<input type=\"text\" class=\"") + kRunClass + "\" id=\"" + input + "\"/>";
             Set(input, FormValueKind::Value, {}, shown.texts[run]);
-            if (run < shown.slots.size()) Out() += SlotMarkup(chipId(static_cast<int>(run)), shown.slots[run]);
+            if (run < shown.slots.size()) Out() += SlotMarkup(*layout, chipId(static_cast<int>(run)), shown.slots[run]);
         }
         Out() += "</div>";
         Set(box, FormValueKind::Class, kOffClass, {}, m_Off);
@@ -800,7 +801,7 @@ namespace headsup
     bool Form::TagChip(Tag tag)
     {
         const std::string chip = kTagIdStart + std::to_string(static_cast<int>(tag));
-        Out() += TagMarkup(chip, tag, "btn accent chip drag", TagTip(tag));
+        Out() += TagMarkup(*layout, chip, tag, "btn accent chip drag", layout->OptionsOf(WindowList::Tags)[static_cast<size_t>(tag)].tip);
         Set(chip, FormValueKind::Class, kOffClass, {}, m_Off);
         return !m_Off && Clicked(chip);
     }

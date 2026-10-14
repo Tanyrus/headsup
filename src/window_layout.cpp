@@ -6,6 +6,7 @@
 #include "labels.h"
 #include "menu_document.h"
 #include "outline_math.h"
+#include "plate_template.h"
 #include "settings.h"
 
 #include <algorithm>
@@ -58,6 +59,7 @@ namespace headsup
     static_assert(ListCount(WindowList::PlateLines) == kPlateLines, "settings_window.json: plate-lines");
     static_assert(ListCount(WindowList::JobLayout) == kJobLayoutCount, "settings_window.json: job-layout");
     static_assert(ListCount(WindowList::ExpBar) == kExpBarPlaceCount, "settings_window.json: exp-bar");
+    static_assert(ListCount(WindowList::Tags) == kTagCount, "settings_window.json: tags");
     static_assert(OptionCount(SettingPiece::ReplaceDashes) == kDashMarkCount, "settings_window.json: replace-dashes");
     static_assert(OptionCount(SettingPiece::CursorStyle) == kCursorStyleCount, "settings_window.json: cursor-style");
     static_assert(OptionCount(SettingPiece::Separators) == kBarSeparatorsCount, "settings_window.json: separators");
@@ -117,6 +119,19 @@ namespace headsup
     }
 
     const LayoutWord& WindowLayout::WordOf(WindowWord word) const { return *std::ranges::find(words, word, &LayoutWord::word); }
+
+    std::string Filled(std::string_view text, std::string_view mark, std::string_view with)
+    {
+        std::string out;
+        for (size_t at = 0;;)
+        {
+            const size_t found = text.find(mark, at);
+            out += text.substr(at, found - at);
+            if (found == std::string_view::npos) return out;
+            out += with;
+            at = found + mark.size();
+        }
+    }
 
     const char* NameOf(const LayoutSetting& setting, std::optional<PlateKind> kind) { return ByKind(setting.name, setting.nameByKind, kind); }
     const char* TipOf(const LayoutSetting& setting, std::optional<PlateKind> kind) { return ByKind(setting.tip, setting.tipByKind, kind); }

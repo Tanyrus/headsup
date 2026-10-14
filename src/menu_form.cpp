@@ -82,7 +82,12 @@ namespace headsup
         // Whether a mob's design holds one of these tags, which the settings of a card show through.
         bool Uses(const Settings& s, std::initializer_list<Tag> tags)
         {
-            return UnusedTagsNote(s.Kind(PlateKind::Mobs), tags, kShowsTheseEnding).empty();
+            return std::ranges::any_of(tags, [&](Tag tag) { return UsesTag(s.Kind(PlateKind::Mobs), tag); });
+        }
+        // What a card says while no line of a design holds one of these tags.
+        std::string TagsNote(const Context& c, const KindSettings& kind, std::initializer_list<Tag> tags, WindowWord sentence)
+        {
+            return UnusedTagsNote(kind, tags, Word(c, sentence), c.layout.OptionsOf(WindowList::Tags), Word(c, WindowWord::Or));
         }
 
         // The pages as pills, the picked one filled; a child page is indented.
@@ -992,7 +997,7 @@ namespace headsup
             case SettingPiece::UnusedTags:
                 form.Fade(!shown);
                 // Under the chips, so nothing above moves under the mouse when it comes and goes.
-                if (const std::string note = UnusedTagsNote(s.Kind(*c.kind), {Tag::Name}, kShowsNameEnding); !note.empty())
+                if (const std::string note = TagsNote(c, s.Kind(*c.kind), {Tag::Name}, WindowWord::UnusedTagsName); !note.empty())
                     form.Note(note.c_str());
                 break;
             case SettingPiece::LineStyles: LineStyles(c, e); break;
@@ -1296,7 +1301,7 @@ namespace headsup
         void CardNote(CardPiece piece, Context& c)
         {
             const auto note = [&](std::initializer_list<Tag> tags) {
-                if (const std::string text = UnusedTagsNote(c.s.Kind(PlateKind::Mobs), tags, kShowsTheseEnding); !text.empty())
+                if (const std::string text = TagsNote(c, c.s.Kind(PlateKind::Mobs), tags, WindowWord::UnusedTagsThese); !text.empty())
                     c.form.Note(text.c_str());
             };
             switch (piece)
