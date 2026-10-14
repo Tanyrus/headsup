@@ -34,6 +34,7 @@ namespace headsup
         uint8_t placeholders;   // an NM's: how many mobs are its lottery placeholders
         uint16_t resistances;   // index into the table ResistancesOf reads; 0 is neutral
         uint16_t drops = 0;     // index into the lists DropsOf reads; 0 is none
+        uint32_t placeholderRespawn = 0; // an NM's: seconds its placeholder takes to return after it despawns; 0 if none
     };
 
     // One entry of a mob's drop list, as the server loaded it. Rates are per mille (1000 is always) and are tiers, not

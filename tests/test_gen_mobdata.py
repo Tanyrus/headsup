@@ -85,17 +85,28 @@ class Output(unittest.TestCase):
 
     def test_record_line(self):
         records = gen.parse(GOOD)
-        self.assertEqual(gen.c_record(records[2], 1, 0),
-                         '    {17199648u, "Goblin Bounty Hunter", 17, 20, 161, 300u, 259, 0, 0u, 0, 1, 2},')
-        self.assertEqual(gen.c_record(records[0], 0, 3),
-                         '    {17190918u, "Wild Rabbit", 1, 1, 0, 60u, 257, -2, 0u, 3, 0, 0},')
+        self.assertEqual(gen.c_record(records[2], 1, 0, 0),
+                         '    {17199648u, "Goblin Bounty Hunter", 17, 20, 161, 300u, 259, 0, 0u, 0, 1, 2, 0u},')
+        self.assertEqual(gen.c_record(records[0], 0, 3, 240),
+                         '    {17190918u, "Wild Rabbit", 1, 1, 0, 60u, 257, -2, 0u, 3, 0, 0, 240u},')
 
     def test_an_nm_record_counts_the_mobs_that_are_its_placeholders(self):
         worm = '\t101\tCarrion Worm\t4\t5\t0\t180\t2\t0\t17191196' + NEUTRAL + '\n'
         text = gen.generate(gen.parse(HEADER + '\n17191194' + worm + '17191195' + worm +
                                       '17191196\t101\tBigmouth Billy\t9\t9\t8\t0\t2\t0\t0' + NEUTRAL + '\n'), LISTS, 'abc')
-        self.assertIn('    {17191194u, "Carrion Worm", 4, 5, 0, 180u, 2, 0, 17191196u, 0, 0, 0},', text)
-        self.assertIn('    {17191196u, "Bigmouth Billy", 9, 9, 8, 0u, 2, 0, 0u, 2, 0, 0},', text)
+        self.assertIn('    {17191194u, "Carrion Worm", 4, 5, 0, 180u, 2, 0, 17191196u, 0, 0, 0, 0u},', text)
+        self.assertIn('    {17191196u, "Bigmouth Billy", 9, 9, 8, 0u, 2, 0, 0u, 2, 0, 0, 180u},', text)
+
+    def test_an_nm_record_carries_the_shortest_respawn_of_its_placeholders_on_a_timer(self):
+        def billy(*respawns):
+            rows = ''.join(f'{17191190 + i}\t101\tCarrion Worm\t4\t5\t0\t{respawn}\t2\t0\t17191196' + NEUTRAL + '\n'
+                           for i, respawn in enumerate(respawns))
+            text = gen.generate(gen.parse(HEADER + '\n' + rows + '17191196\t101\tBigmouth Billy\t9\t9\t8\t0\t2\t0\t0' +
+                                          NEUTRAL + '\n'), LISTS, 'abc')
+            return next(line for line in text.splitlines() if '"Bigmouth Billy"' in line)
+        self.assertTrue(billy(900, 600).endswith(', 600u},'))  # the earlier is the one not to miss
+        self.assertTrue(billy(0, 600).endswith(', 600u},'))  # a placeholder off any timer brings no time
+        self.assertTrue(billy(0, 0).endswith(', 0u},'))
 
     def test_more_placeholders_than_a_byte_holds_is_an_error(self):
         rows = ''.join(f'{1000 + i}\t101\tWorm\t1\t1\t0\t0\t0\t0\t5000' + NEUTRAL + '\n' for i in range(256))
@@ -110,9 +121,9 @@ class Output(unittest.TestCase):
                                  '{0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},',
                                  '    {12312u, {0, 2500, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {-2, -2, -2, -2, -2, -2, -3, 4}, '
                                  '{0, 0, 0, 0, 0, 6, 6, 0, 0, 0}},'])
-        self.assertIn('"Wild Rabbit", 1, 1, 0, 60u, 257, -2, 0u, 0, 0, 0},', text)
-        self.assertIn('"Carrion Worm", 4, 5, 0, 180u, 2, 0, 17191196u, 0, 1, 1},', text)
-        self.assertIn('"Goblin Bounty Hunter", 17, 20, 161, 300u, 259, 0, 0u, 0, 1, 2},', text)
+        self.assertIn('"Wild Rabbit", 1, 1, 0, 60u, 257, -2, 0u, 0, 0, 0, 0u},', text)
+        self.assertIn('"Carrion Worm", 4, 5, 0, 180u, 2, 0, 17191196u, 0, 1, 1, 0u},', text)
+        self.assertIn('"Goblin Bounty Hunter", 17, 20, 161, 300u, 259, 0, 0u, 0, 1, 2, 0u},', text)
 
     def test_the_plugin_gets_the_immunity_bits_and_the_list_orders(self):
         flags = gen.generate_flags()
