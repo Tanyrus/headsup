@@ -24,13 +24,8 @@ namespace headsup
         constexpr const char* kQuietChip   = "btn flat chip";
         constexpr const char* kNavStart    = "nav-";
         constexpr const char* kWidgetChip  = "chip "; // a tray chip's name in its card, before its widget's number
-
-        std::string Fmt(const char* format, auto... values)
-        {
-            char text[96];
-            std::snprintf(text, sizeof(text), format, values...);
-            return text;
-        }
+        constexpr float kAddWindowShare    = 0.8f;    // of a dropdown's width: a group's "+ Add Window"
+        constexpr size_t kMaxFindText      = 31;      // letters of a window's name to look for
 
         // The pages as pills, the picked one filled; a child page is indented.
         void Sidebar(Form& form, MenuFormState& state)
@@ -120,11 +115,7 @@ namespace headsup
         {
             if (form.BeginCard("Settings Window"))
             {
-                int theme = static_cast<int>(s.menuTheme);
-                form.NumberDropdown("Theme", theme, 0, kMenuThemeCount - 1,
-                    [](int t) { return std::string(MenuThemeName(static_cast<MenuTheme>(t))); },
-                    "The window's colors and light.", 0.0f, [](int t) { return std::string(MenuThemeTip(static_cast<MenuTheme>(t))); });
-                s.menuTheme = static_cast<MenuTheme>(theme);
+                form.EnumDropdown("Theme", s.menuTheme, kMenuThemeCount, MenuThemeName, "The window's colors and light.", MenuThemeTip);
                 form.FontDropdown("Font", s.menuFont, menuFonts, "Titles stay in the bar's font.");
                 form.SliderInt("Size", s.menuScale, kMinMenuScale, kMaxMenuScale, "%d%%",
                     "Drag its corner to resize the window.");
@@ -167,13 +158,13 @@ namespace headsup
                 form.Reading("Nameplates", std::to_string(r.nameplates));
                 form.Reading("Drawn", r.drewInScene ? "into the scene" : "on top");
                 form.Reading("Game's names",
-                    r.hooked ? Fmt("%u, %u by HeadsUp, %u hidden", r.names, r.replaced, r.hidden) : "not hooked");
+                    r.hooked ? Formatted("%u, %u by HeadsUp, %u hidden", r.names, r.replaced, r.hidden) : "not hooked");
                 form.Reading("Frame time",
-                    Fmt("%.2f ms (%.0f fps)", r.frameMs, r.frameMs > 0.0 ? 1000.0 / r.frameMs : 0.0));
+                    Formatted("%.2f ms (%.0f fps)", r.frameMs, r.frameMs > 0.0 ? 1000.0 / r.frameMs : 0.0));
                 form.Reading("Last save",
-                    Fmt("%.0f ms, %zu %s", r.lastSaveMs, r.lastSaveKeys, r.lastSaveKeys == 1 ? "key" : "keys"));
+                    Formatted("%.0f ms, %zu %s", r.lastSaveMs, r.lastSaveKeys, r.lastSaveKeys == 1 ? "key" : "keys"));
                 form.Reading("Your level",
-                    r.level > 0 ? Fmt("%d%s", r.level, r.sitting ? ", sitting" : "") : std::string("unknown"));
+                    r.level > 0 ? Formatted("%d%s", r.level, r.sitting ? ", sitting" : "") : std::string("unknown"));
                 form.EndCard();
             }
         }
@@ -219,7 +210,7 @@ namespace headsup
                         }))
                         free.push_back(window);
                 int chosen = 0;
-                if (form.ListAt((name + " add").c_str(), "+ Add Window", kControlWidth * 0.8f, static_cast<int>(free.size()),
+                if (form.ListAt((name + " add").c_str(), "+ Add Window", kControlWidth * kAddWindowShare, static_cast<int>(free.size()),
                         [&](int i) { return WindowName(free[static_cast<size_t>(i)]); }, -1, chosen))
                 {
                     group.windows.push_back(free[static_cast<size_t>(chosen)]);
@@ -276,7 +267,7 @@ namespace headsup
                       "puts it. Type a number, then Enter.");
             {
                 form.Row("Find", nullptr);
-                form.TextAt("find window", list.text, "Name", kFilterWidth, true, 31);
+                form.TextAt("find window", list.text, "Name", kFilterWidth, true, kMaxFindText);
                 // Which windows are listed is the window's state, and no setting to save.
                 const bool was = form.changed;
                 form.CheckAt("all windows", list.all, "Every window the game has, not only the named ones and yours.");
@@ -368,11 +359,7 @@ namespace headsup
                     "Hover a widget for details; click it to keep them open. The Widgets page has each one's options."))
             {
                 form.Fade(!BarOn(s));
-                int theme = static_cast<int>(s.barTheme);
-                form.NumberDropdown("Theme", theme, 0, kBarThemeCount - 1,
-                    [](int t) { return std::string(BarThemeName(static_cast<BarTheme>(t))); }, nullptr, 0.0f,
-                    [](int t) { return std::string(BarThemeTip(static_cast<BarTheme>(t))); });
-                s.barTheme = static_cast<BarTheme>(theme);
+                form.EnumDropdown("Theme", s.barTheme, kBarThemeCount, BarThemeName, nullptr, BarThemeTip);
                 const char* const separators[kBarSeparatorsCount] = {"Theme's", "Diamonds", "None"};
                 form.Segments("Separators", s.barSeparators, separators, kBarSeparatorsCount, nullptr, kWideSegmentWidth);
                 form.FontDropdown("Title font", s.barTitleFont, fonts, nullptr, kThemeFont);
@@ -382,7 +369,7 @@ namespace headsup
                 if (s.barTextSize == kAutoBarTextSize)
                     textSize = "Auto";
                 else if (readings.barTitlePixels > 0 && readings.barTitlePixels != s.barTextSize)
-                    textSize = Fmt("%%d px (%d fits)", readings.barTitlePixels);
+                    textSize = Formatted("%%d px (%d fits)", readings.barTitlePixels);
                 form.SliderInt("Text size", s.barTextSize, kAutoBarTextSize, kMaxBarTextSize, textSize.c_str(),
                     "Auto follows the height. Too large for two lines, the second line goes as One Line says.");
                 const char* const oneLine[kSubtitlePlaceCount] = {"Hide", "Before", "After"};
@@ -502,7 +489,7 @@ namespace headsup
                     const std::string id = form.Id(kWidgetChip + std::to_string(w));
                     form.Raw("<div class=\"btn raised wchip drag\" id=\"" + id + "\" tip=\"" + EscapedRml(kBarWidgetTips[w]) +
                              "\"><div class=\"dot\"></div>" + EscapedRml(TitleCaseText(kBarWidgetLabels[w])) + "</div>");
-                    form.Set(id, FormValueKind::Class, "off", {}, form.Off());
+                    form.Set(id, FormValueKind::Class, kOffClass, {}, form.Off());
                     if (!form.Off() && form.Clicked(id))
                     {
                         picked  = w;
@@ -740,11 +727,9 @@ namespace headsup
             form.Fade(off);
             if (!form.BeginCard("Ornament", nullptr, "A diamond rule over, under or between the nameplate's lines.")) return;
             const std::string scope = std::string("##") + KindKey(kind) + " ornament";
-            int place               = static_cast<int>(o.place);
-            form.NumberDropdown(("Visibility" + scope).c_str(), place, 0, kOrnamentPlaceCount - 1,
-                [](int p) { return std::string(kOrnamentPlaceLabels[p]); }, "Where the ornament goes, if anywhere.", 0.0f,
-                [](int p) { return std::string(OrnamentPlaceTip(static_cast<OrnamentPlace>(p))); });
-            o.place = static_cast<OrnamentPlace>(place);
+            form.EnumDropdown(("Visibility" + scope).c_str(), o.place, kOrnamentPlaceCount,
+                [](OrnamentPlace p) { return kOrnamentPlaceLabels[static_cast<int>(p)]; }, "Where the ornament goes, if anywhere.",
+                OrnamentPlaceTip);
             form.Fade(off || o.place == OrnamentPlace::Disabled);
             form.SliderInt(("Width" + scope).c_str(), o.width, kMinOrnamentWidth, kMaxOrnamentWidth, "%d px",
                 "The rule's length, before the distance scale.");
@@ -772,8 +757,8 @@ namespace headsup
             if (kind != PlateKind::Self)
             {
                 form.Switch("Fade In", o.fadeIn,
-                    "Nameplates grow fainter with distance: at the opacity above within 10 yalms, almost gone at the range. "
-                    "Your target's never fades.");
+                    ("Nameplates grow fainter with distance: at the opacity above within " + Formatted("%.0f", kFadeNearYalms) +
+                        " yalms, almost gone at the range. Your target's never fades.").c_str());
                 form.Fade(off || !o.fadeIn);
                 form.SliderFloat("Range", o.range, kMinOutlineDistance, kMaxOutlineDistance, "%.0f yalms",
                     "Where a nameplate that fades in is almost gone.");
@@ -939,7 +924,8 @@ namespace headsup
                 form.SliderFloat("Range", s.maxDistance, kMinOutlineDistance, kMaxOutlineDistance, "%.0f yalms",
                     "Anything farther gets no outline.");
                 form.Switch("Fade In", s.outlineFadeIn,
-                    "Outlines grow fainter with distance: whole within 10 yalms, almost gone at the range.");
+                    ("Outlines grow fainter with distance: whole within " + Formatted("%.0f", kFadeNearYalms) +
+                        " yalms, almost gone at the range.").c_str());
                 if (!readings.stencilAvailable) form.Note("Outlines are unavailable: the depth buffer has no stencil bits.");
                 form.EndCard();
             }

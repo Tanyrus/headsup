@@ -16,7 +16,6 @@ namespace headsup
         constexpr const char* kBarContext     = "bar";
         constexpr const char* kOverlayContext = "overlay";
         constexpr int kLeftButton = 0, kRightButton = 1, kMiddleButton = 2; // as RmlUi numbers them
-        constexpr int kKeyDownBit         = 0x8000;                          // GetKeyState: the key is down
         constexpr int kKeyToggledBit      = 0x0001;                          // GetKeyState: a lock is on
         constexpr int kTypedAtMost        = 4;                               // UTF-16 units one key can type
         constexpr wchar_t kFirstPrintable = L' ';

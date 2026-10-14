@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -722,6 +723,147 @@ TEST(every_switch_of_every_page_flips_a_setting_of_its_own_and_flips_it_back)
                 if (flipped[a].second == flipped[b].second)
                     throw test::Failure{"the switches " + flipped[a].first + " and " + flipped[b].first + " set the same setting"};
     }
+}
+
+namespace
+{
+    // The keys a save writes, with their values.
+    class SavedKeys final : public SettingsStore
+    {
+    public:
+        std::map<std::string, std::string> values;
+        bool GetBool(const char*, bool fallback) override { return fallback; }
+        float GetFloat(const char*, float fallback) override { return fallback; }
+        std::string GetString(const char*, const char* fallback) override { return fallback; }
+        void Set(const char* key, const char* value) override { values[key] = value; }
+    };
+    std::map<std::string, std::string> Saved(const Settings& s)
+    {
+        SavedKeys store;
+        SaveSettings(s, store);
+        return store.values;
+    }
+    // The keys whose values differ between two saves, with the second's value.
+    std::map<std::string, std::string> KeysChanged(const std::map<std::string, std::string>& before, const Settings& after)
+    {
+        std::map<std::string, std::string> changed;
+        for (const auto& [key, value] : Saved(after))
+            if (const auto at = before.find(key); at == before.end() || at->second != value) changed[key] = value;
+        return changed;
+    }
+}
+
+TEST(every_dropdown_slider_row_of_choices_and_number_of_every_page_and_tab_sets_a_setting_of_its_own)
+{
+    std::vector<std::pair<std::string, std::map<std::string, std::string>>> set;
+    const auto seen = [&](const std::string& id) {
+        return std::ranges::any_of(set, [&](const auto& done) { return done.first == id; });
+    };
+    for (const PageInfo& info : kPages)
+    {
+        Window window;
+        window.Page(PageKey(info.page).c_str());
+        // Every switch on, so that what a feature switched off on a new install hides is there to work.
+        for (int pass = 0; pass < 3; ++pass)
+            for (Rml::Element* element : window.OfClass("check"))
+                if (!element->GetId().empty() && !element->IsClassSet("on") && window.Shows(element->GetId()) &&
+                    element->GetId() != "userinterface-game-windows-all-windows")
+                    window.Click(element->GetId());
+        const Settings fresh = window.settings;
+        const std::map<std::string, std::string> saved = Saved(fresh);
+        std::vector<std::string> tabs{""};
+        for (Rml::Element* element : window.OfClass("tab"))
+            tabs.push_back(element->GetId());
+        const auto reset = [&](const std::string& tab) {
+            window.settings = fresh;
+            window.Frames(2);
+            if (!tab.empty()) window.Click(tab);
+            window.Frames(2);
+        };
+        for (const std::string& tab : tabs)
+        {
+            reset(tab);
+            std::vector<std::string> dropdowns, sliders, rows, numbers;
+            for (Rml::Element* element : window.OfClass("num"))
+                if (!element->GetId().empty() && !seen(element->GetId())) numbers.push_back(element->GetId());
+            for (Rml::Element* element : window.OfClass("segs"))
+                if (!element->GetId().empty() && !seen(element->GetId())) rows.push_back(element->GetId());
+            for (Rml::Element* element : window.OfClass("dd"))
+                if (!element->GetId().empty() && !seen(element->GetId())) dropdowns.push_back(element->GetId());
+            for (Rml::Element* element : window.OfClass("slider"))
+            {
+                const std::string id = element->GetId().substr(0, element->GetId().size() - std::string("-box").size());
+                if (!seen(id)) sliders.push_back(id);
+            }
+            for (const std::string& id : dropdowns)
+            {
+                reset(tab);
+                if (!window.Shows(id)) continue; // a setting of something that is off on a new install
+                window.Click(id);
+                std::string other;
+                for (int option = 0; window.Find(id + "-o-" + std::to_string(option)) != nullptr && other.empty(); ++option)
+                {
+                    const std::string row = id + "-o-" + std::to_string(option);
+                    if (!window.Find(row)->IsClassSet("picked")) other = row;
+                }
+                if (other.empty() || !window.Click(other) || window.settings == fresh)
+                    throw test::Failure{"the dropdown " + id + " changes no setting"};
+                set.emplace_back(id, KeysChanged(saved, window.settings));
+            }
+            for (const std::string& id : sliders)
+            {
+                reset(tab);
+                if (!window.Shows(id)) continue;
+                window.Drag(id, Rml::Vector2f(60.0f, 0.0f));
+                if (window.settings == fresh)
+                {
+                    reset(tab);
+                    window.Drag(id, Rml::Vector2f(-60.0f, 0.0f));
+                }
+                if (window.settings == fresh) throw test::Failure{"the slider " + id + " changes no setting"};
+                set.emplace_back(id, KeysChanged(saved, window.settings));
+            }
+            for (const std::string& id : rows)
+            {
+                reset(tab);
+                if (!window.Shows(id)) continue;
+                std::string other;
+                for (int option = 0; window.Find(id + "-s-" + std::to_string(option)) != nullptr && other.empty(); ++option)
+                {
+                    const std::string choice = id + "-s-" + std::to_string(option);
+                    if (!window.Find(choice)->IsClassSet("picked")) other = choice;
+                }
+                if (other.empty() || !window.Click(other) || window.settings == fresh)
+                    throw test::Failure{"the row of choices " + id + " changes no setting"};
+                set.emplace_back(id, KeysChanged(saved, window.settings));
+            }
+            for (const std::string& id : numbers)
+            {
+                reset(tab);
+                if (!window.Shows(id)) continue;
+                window.Click(id);
+                window.Key(Rml::Input::KI_END);
+                window.Type("1");
+                window.Click("page-title");
+                if (window.settings == fresh) throw test::Failure{"the number " + id + " changes no setting"};
+                set.emplace_back(id, KeysChanged(saved, window.settings));
+            }
+        }
+    }
+    // Keys that hold many settings in one value, each window's offsets or each section's widgets: two controls
+    // of these are the same setting only when they write the same value.
+    const std::vector<std::string> lists{"windowOffsets", "barLeft", "barCenter", "barRight"};
+    const auto same = [&](const std::map<std::string, std::string>& a, const std::map<std::string, std::string>& b) {
+        if (!std::ranges::equal(a, b, {}, &std::pair<const std::string, std::string>::first,
+                &std::pair<const std::string, std::string>::first))
+            return false;
+        const bool listed = std::ranges::all_of(a, [&](const auto& entry) { return std::ranges::find(lists, entry.first) != lists.end(); });
+        return !listed || a == b;
+    };
+    for (size_t a = 0; a < set.size(); ++a)
+        for (size_t b = a + 1; b < set.size(); ++b)
+            if (same(set[a].second, set[b].second))
+                throw test::Failure{set[a].first + " and " + set[b].first + " set the same setting"};
 }
 
 namespace

@@ -23,9 +23,6 @@ namespace headsup
         constexpr float kTipDrop    = 18.0f; // pixels from the pointer to its tip
         constexpr char kKeySeparator = '\x1f';
         // A design line's box and the stretches of text in it, as menu_document styles them.
-        constexpr const char* kBoxClass    = "linebox";
-        constexpr const char* kRunClass    = "run";
-        constexpr const char* kTypingClass = "typing"; // on a box, while one of its stretches has the keyboard
         constexpr float kCaretRoom         = 0.4f;     // ems past a stretch's last letter: its caret, and a place to click
 
         Rml::Element* WithId(Rml::Element* element)
@@ -257,6 +254,12 @@ namespace headsup
             case FormValueKind::Text: element->SetInnerRML(EscapedRml(value.text)); break;
             case FormValueKind::Markup: element->SetInnerRML(value.text); break;
             case FormValueKind::Property: element->SetProperty(value.name, value.text); break;
+            case FormValueKind::Attribute:
+                if (value.text.empty())
+                    element->RemoveAttribute(value.name);
+                else
+                    element->SetAttribute(value.name, value.text);
+                break;
             case FormValueKind::Value:
             {
                 auto* control = rmlui_dynamic_cast<Rml::ElementFormControl*>(element);
@@ -274,7 +277,7 @@ namespace headsup
     void RmlMenu::ApplyPopup(const std::optional<FormPopup>& popup)
     {
         Rml::Element* anchor = popup ? Find(popup->anchor) : nullptr;
-        m_Popup->SetClass("hidden", anchor == nullptr);
+        m_Popup->SetClass(kHiddenClass, anchor == nullptr);
         m_Popup->SetClass("open", anchor != nullptr);
         if (anchor == nullptr)
         {
@@ -307,7 +310,7 @@ namespace headsup
         while (under != nullptr && !under->HasAttribute(kMenuTipAttribute))
             under = under->GetParentNode();
         const std::string text = under != nullptr ? under->GetAttribute<Rml::String>(kMenuTipAttribute, "") : std::string();
-        m_Tip->SetClass("hidden", text.empty());
+        m_Tip->SetClass(kHiddenClass, text.empty());
         if (text.empty()) return;
         if (text != m_TipShown)
         {
@@ -400,11 +403,11 @@ namespace headsup
             if (id == kMenuCloseId) m_Closed = true;
             // The picker's own ground, between its sliders, is the picker: a click there is one on its control.
             // A click in a line box beside its stretches is a click at its end.
-            if (target->IsClassSet(kBoxClass))
+            if (target->IsClassSet(kLineBoxClass))
                 if (Rml::ElementFormControlInput* last = AsInput(target->GetLastChild()))
                     FocusAt(last, CharacterOf(last->GetValue(), last->GetValue().size()));
             m_Events.push_back(FormEvent{named == m_Popup ? m_State.form.popup + kPopupGround : id, kClickEvent, {}});
-            m_Tip->SetClass("hidden", true);
+            m_Tip->SetClass(kHiddenClass, true);
             break;
         case Rml::EventId::Change:
             if (AsInput(target) != nullptr)
@@ -535,7 +538,7 @@ namespace headsup
         // for the arrows to nudge it: off the window those are the game's, and its camera's keys moved the slider.
         if (!m_Document->IsPseudoClassSet("hover"))
         {
-            m_Tip->SetClass("hidden", true);
+            m_Tip->SetClass(kHiddenClass, true);
             // The keyboard is on a part of the slider, and from any part its keys reach the slider: the window
             // takes it whole.
             for (Rml::Element* part = host.context->GetFocusElement(); part != nullptr && part != m_Document; part = part->GetParentNode())

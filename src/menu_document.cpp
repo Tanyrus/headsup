@@ -1,5 +1,7 @@
 #include "menu_document.h"
 
+#include "form.h"
+
 #include "bar_document.h"
 #include "markup.h"
 #include "menu_sizes.h"
@@ -10,10 +12,8 @@ namespace headsup
 {
     namespace
     {
-        constexpr float kFrame        = 1.6f;  // a control's height: a line of text and its padding above and below
         constexpr float kRunInset     = 0.3f;  // how much shorter a line box's stretches and chips are than the box
         constexpr float kSpacing      = 0.45f; // between rows
-        constexpr float kControlGap   = 0.5f;  // between a row's controls
         constexpr float kPadX         = 0.6f;  // a control's text from its sides
         constexpr float kHeadHeight   = 2.05f; // the window's title row
         constexpr float kScrollbar    = 0.7f;
@@ -52,7 +52,7 @@ namespace headsup
         constexpr const char* kEase  = " 0.16s cubic-out"; // a control between two of its looks
         constexpr const char* kSlide = " 0.18s cubic-out"; // a switch's knob and its track
 
-        uint32_t Faded(uint32_t argb, uint32_t alpha) { return (argb & 0x00FFFFFF) | alpha << 24; }
+        uint32_t Faded(uint32_t argb, uint32_t alpha) { return (argb & ~kAlphaMask) | alpha << kAlphaShift; }
 
         // What is Aurora's alone: glass in place of flat fills, and dark text on the picked choice's bright gradient.
         std::string AuroraMenuRules(const MenuColors& c)
@@ -61,7 +61,7 @@ namespace headsup
             css += "body{decorator:vertical-gradient(#111b2cf2 #090e17f2);background-color:transparent;border-color:" +
                    RcssColor(Faded(c.accent, kAuroraFrame)) + ";}";
             css += ".card{background-color:transparent;decorator:vertical-gradient(#1c283cb8 #131b2ab8);}";
-            css += ".seg.picked,.tab.picked,.btn.accent{color:" + RcssColor(c.inset | 0xFF000000) + ";}";
+            css += ".seg.picked,.tab.picked,.btn.accent{color:" + RcssColor(Opaque(c.inset)) + ";}";
             css += "scrollbarvertical sliderbar{background-color:" + RcssColor(Faded(c.accent, kAuroraFrame)) + ";}";
             css += std::string("#") + kMenuPopupId + ",#" + kMenuTipId + "{border-color:" + RcssColor(Faded(c.accent, kAuroraPopupFrame)) + ";}";
             return css;
@@ -93,7 +93,7 @@ namespace headsup
         css += "@keyframes window-in{from{transform:scale(0.97);}to{transform:scale(1);}}";
         css += "@keyframes window-fade{from{opacity:0;}}";
         css += "div{display:block;}handle{display:block;}";
-        css += ".hidden{display:none;}";
+        css += std::string(".") + kHiddenClass + "{display:none;}";
         // The frame: the title bar moves the window, the corner resizes it.
         css += "#head{position:absolute;left:" + Em(kGutter) + ";right:" + Em(kGutter + kFrame + 0.5f) + ";top:" +
                Em(kGutter) + ";height:" + Em(kHeadHeight) + ";}";
@@ -135,7 +135,7 @@ namespace headsup
         css += "#main{position:relative;flex:1 1 0px;margin-left:" + Em(kGutter) + ";}";
         css += std::string("#") + kMenuPageTitleId + "{font-family:\"" + look.titleFont + "\";font-size:" +
                Em(kPageTitleScale) + ";color:" + color(c.heading) + ";}";
-        css += std::string("#") + kMenuPageId + "{position:absolute;left:0px;right:0px;top:2.4em;bottom:0px;overflow-y:auto;}";
+        css += std::string("#") + kMenuPageId + "{position:absolute;left:0px;right:0px;top:" + Em(kPageTop) + ";bottom:0px;overflow-y:auto;}";
         css += "scrollbarvertical{width:" + Em(kScrollbar) + ";}";
         css += "scrollbarvertical sliderbar{width:" + Em(kScrollbar) + ";min-height:2em;border-radius:" +
                Em(kScrollbar / 2.0f) + ";background-color:" + color(c.control) + ";}";
@@ -263,7 +263,7 @@ namespace headsup
         css += ".dd-arrow{position:absolute;right:0.5em;top:0.6em;width:0px;height:0px;border-left:" + Em(kArrow) +
                " transparent;border-right:" + Em(kArrow) + " transparent;border-top:0.45em " + color(c.text) + ";}";
         css += std::string("#") + kMenuPopupId + "{position:absolute;z-index:50;box-sizing:border-box;padding:0.2em;"
-               "background-color:" + color(c.card | 0xFF000000) + ";border:1px " + color(c.raisedEdge) + ";border-radius:" +
+               "background-color:" + color(Opaque(c.card)) + ";border:1px " + color(c.raisedEdge) + ";border-radius:" +
                radius + ";}";
         // The popup drops in under its control.
         css += std::string("#") + kMenuPopupId + ".open{animation:0.16s cubic-out drop-in;}";
@@ -338,12 +338,12 @@ namespace headsup
         // What a control says under the pointer.
         css += std::string("#") + kMenuTipId + "{position:absolute;z-index:60;box-sizing:border-box;max-width:" +
                Em(kTipWidth) + ";padding:0.4em 0.6em;border-radius:" + radius + ";border:1px " + color(c.raisedEdge) +
-               ";background-color:" + color(c.card | 0xFF000000) + ";pointer-events:none;}";
+               ";background-color:" + color(Opaque(c.card)) + ";pointer-events:none;}";
 
         if (look.theme == MenuTheme::Aurora) css += AuroraMenuRules(c);
         // The settings of what is switched off are not shown. Last, and with the body before it, so that no rule
         // that lays a row or a control out puts it back.
-        css += "body .off{display:none;}";
+        css += std::string("body .") + kOffClass + "{display:none;}";
 
         return "<rml><head><style>" + css + "</style></head><body>"
                "<handle id=\"head\" move_target=\"#document\"><div id=\"title\">HeadsUp</div><div id=\"" +

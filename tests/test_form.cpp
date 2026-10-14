@@ -155,14 +155,41 @@ TEST(a_dropdown_opens_a_popup_of_its_rows_and_takes_the_one_clicked)
     CHECK(open.popup && open.popup->anchor == "page-mouse-pointer-theme");
     // Each row says what it does under the pointer, and the closed control says it of the one picked.
     CHECK(Has(open.popup->rml, "<div class=\"opt\" id=\"page-mouse-pointer-theme-o-2\" tip=\"What theme 2 is.\">Theme 2</div>"));
-    CHECK(Has(open.blocks[0].rml, "<div class=\"dd\" id=\"page-mouse-pointer-theme\" tip=\"What theme 1 is.\""));
+    const FormValue* said = ValueOf(open, "page-mouse-pointer-theme", FormValueKind::Attribute, "tip");
+    CHECK(said != nullptr && said->text == "What theme 1 is.");
     CHECK(ClassOn(open, "page-mouse-pointer-theme-o-1", "picked") && !ClassOn(open, "page-mouse-pointer-theme-o-2", "picked"));
     CHECK(ClassOn(open, "page-mouse-pointer-theme", "open") && !open.changed);
     const Form chose = Pass({{"page-mouse-pointer-theme-o-2", kClickEvent, ""}}, state, b);
     CHECK(b.theme == 2 && chose.changed && state.popup.empty() && !chose.popup);
-    // The closed control reads the new choice from the next pass on.
+    // The closed control reads the new choice from the next pass on, and says what it does, with the card's
+    // markup as it was: a pick builds nothing anew.
     const Form after = Pass({}, state, b);
     CHECK_EQ(TextOf(after, "page-mouse-pointer-theme-val"), "Theme 2");
+    CHECK_EQ(ValueOf(after, "page-mouse-pointer-theme", FormValueKind::Attribute, "tip")->text, "What theme 2 is.");
+    CHECK_EQ(after.blocks[0].rml, open.blocks[0].rml);
+}
+
+TEST(what_is_faded_is_marked_off_by_value_and_its_card_is_built_the_same)
+{
+    FormState state;
+    int value = 3;
+    const auto pass = [&](bool off) {
+        Form form({}, state);
+        form.pageKey = "p";
+        form.BeginCard("C");
+        form.Fade(off);
+        form.Caption("Top Line", "line-name");
+        form.Note("Something to say.");
+        form.NumberAt("X", "x", value, 300);
+        form.EndCard();
+        return form;
+    };
+    const Form shown = pass(false), faded = pass(true);
+    CHECK_EQ(faded.blocks[0].rml, shown.blocks[0].rml);
+    int off = 0;
+    for (const FormValue& v : faded.values)
+        off += v.kind == FormValueKind::Class && v.name == kOffClass && v.on ? 1 : 0;
+    CHECK(off >= 4); // the caption, the note, the number's name and its box
 }
 
 TEST(a_click_elsewhere_closes_the_popup_and_its_own_control_toggles_it)

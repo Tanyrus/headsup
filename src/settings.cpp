@@ -27,7 +27,8 @@ namespace headsup
             const char* key;
             bool Settings::*field;
         };
-        constexpr BoolKey kBools[] = {{"enabled", &Settings::enabled}, {"phTimers", &Settings::phTimers},
+        constexpr const char* kEnabledKey = "enabled"; // in every file any build saved: what tells a file from none
+        constexpr BoolKey kBools[] = {{kEnabledKey, &Settings::enabled}, {"phTimers", &Settings::phTimers},
             {"scaleWithDistance", &Settings::scaleWithDistance}, {"scaleOwnName", &Settings::scaleOwnName},
             {"chocoboPointer", &Settings::chocoboPointer},
             {"fixPointer", &Settings::fixPointer}, {"showRanks", &Settings::showRanks}, {"showBar", &Settings::showBar},
@@ -66,12 +67,11 @@ namespace headsup
 
         // Numbers whose meaning changed and whose key changed with it: saved and bounded as the rest, and read through
         // Rebased, since a typed read of the new key would have Ashita's store hold its default before the old is asked.
-        constexpr IntKey kRebasedInts[] = {{"cursorWidth", &Settings::cursorWidth, kMinCursorSide, kMaxCursorSide},
-            {"cursorHeight", &Settings::cursorHeight, kMinCursorSide, kMaxCursorSide},
-            {"cursorOutlineThickness", &Settings::cursorOutlineThickness, kMinCursorEdge, kMaxCursorEdge}};
-        constexpr const char* kCursorWidthKey  = kRebasedInts[0].key;
-        constexpr const char* kCursorHeightKey = kRebasedInts[1].key;
-        constexpr const char* kCursorEdgeKey   = kRebasedInts[2].key;
+        constexpr const char* kCursorWidthKey = "cursorWidth", *kCursorHeightKey = "cursorHeight";
+        constexpr const char* kCursorEdgeKey  = "cursorOutlineThickness";
+        constexpr IntKey kRebasedInts[] = {{kCursorWidthKey, &Settings::cursorWidth, kMinCursorSide, kMaxCursorSide},
+            {kCursorHeightKey, &Settings::cursorHeight, kMinCursorSide, kMaxCursorSide},
+            {kCursorEdgeKey, &Settings::cursorOutlineThickness, kMinCursorEdge, kMaxCursorEdge}};
         constexpr const char* kDashMarkKey = "dashMark";
         const char* const kDashMarkNames[kDashMarkCount] = {"no", "dot", "square", "diamond"};
         constexpr const char* kCursorStyleKey = "cursorStyle";
@@ -209,6 +209,18 @@ namespace headsup
         constexpr const char* kOldPetRow        = "Pet"; // the pets' one row of before, after kRowInfix
         constexpr const char* kLineInfix        = "Line";
         constexpr const char* kOrnamentInfix    = "Ornament";
+        // A design's keys after their base, a row's, a line's, an ornament's or a kind's opacity's: read and written by
+        // these names alone.
+        constexpr const char *kPlateKey = "Plate", *kOutlineKey = "Outline", *kColorKey = "Color";
+        constexpr const char *kTextKey = "Text", *kSyncKey = "Sync", *kAlwaysKey = "Always", *kWhenKey = "When",
+                             *kAlignKey = "Align", *kFontKey = "Font", *kStyleKey = "Style", *kBoldKey = "Bold",
+                             *kTextSizeKey = "TextSize", *kIconScaleKey = "IconScale", *kIconSizeKey = "IconSize",
+                             *kPaddingKey = "Padding", *kShadowStrengthKey = "ShadowStrength", *kShadowKey = "Shadow",
+                             *kShadowColorKey = "ShadowColor", *kGlowKey = "Glow", *kGlowSizeKey = "GlowSize",
+                             *kGlowColorKey = "GlowColor";
+        constexpr const char *kVisibilityKey = "Visibility", *kWidthKey = "Width", *kHeightKey = "Height";
+        constexpr const char *kNoTargetKey = "NoTarget", *kNotTargetedKey = "NotTargeted", *kTargetedKey = "Targeted",
+                             *kFadeInKey = "FadeIn", *kRangeKey = "Range";
         constexpr const char* kMaxIconsSuffix   = "MaxIcons";
         constexpr const char* kDefaultFontKey   = "defaultFont";
         constexpr const char* kDetectionShownKey = "detectionShown";
@@ -365,48 +377,48 @@ namespace headsup
         void LoadLine(SettingsStore& store, const std::string& base, LineDesign& line, float iconShare)
         {
             auto key = [&](const char* name) { return base + name; };
-            line.text     = store.GetString(key("Text").c_str(), line.text.c_str());
-            line.syncWith = LoadInt(store, key("Sync").c_str(), line.syncWith);
-            line.show.always = store.GetBool(key("Always").c_str(), line.show.always);
-            line.show.when   = LoadHex(store, key("When"), line.show.when);
-            line.align = static_cast<Align>(NameIndex(kAlignNames, kAlignCount, store.GetString(key("Align").c_str(), ""), static_cast<int>(line.align)));
-            line.font     = store.GetString(key("Font").c_str(), line.font.c_str());
+            line.text     = store.GetString(key(kTextKey).c_str(), line.text.c_str());
+            line.syncWith = LoadInt(store, key(kSyncKey).c_str(), line.syncWith);
+            line.show.always = store.GetBool(key(kAlwaysKey).c_str(), line.show.always);
+            line.show.when   = LoadHex(store, key(kWhenKey), line.show.when);
+            line.align = static_cast<Align>(NameIndex(kAlignNames, kAlignCount, store.GetString(key(kAlignKey).c_str(), ""), static_cast<int>(line.align)));
+            line.font     = store.GetString(key(kFontKey).c_str(), line.font.c_str());
             // Bold was a switch of its own before a line had styles.
-            if (store.GetString(key("Style").c_str(), kNoText) != kNoText)
-                line.style = static_cast<uint8_t>(LoadHex(store, key("Style"), line.style));
-            else if (HeldSwitch(store, key("Bold").c_str()).value_or(false))
+            if (store.GetString(key(kStyleKey).c_str(), kNoText) != kNoText)
+                line.style = static_cast<uint8_t>(LoadHex(store, key(kStyleKey), line.style));
+            else if (HeldSwitch(store, key(kBoldKey).c_str()).value_or(false))
                 line.style = StyleBit(FontStyle::Bold);
-            line.textSize = LoadInt(store, key("TextSize").c_str(), line.textSize);
-            line.iconSize = Rebased(store, key("IconScale"), key("IconSize"), line.iconSize,
+            line.textSize = LoadInt(store, key(kTextSizeKey).c_str(), line.textSize);
+            line.iconSize = Rebased(store, key(kIconScaleKey), key(kIconSizeKey), line.iconSize,
                 [&](float before) { return before * iconShare; });
-            line.padding = LoadInt(store, key("Padding").c_str(), line.padding);
-            LoadPick(store, key("Color"), line.color);
-            line.shadow = Rebased(store, key("ShadowStrength"), key("Shadow"), line.shadow, ShadowStrengthOf);
-            LoadPick(store, key("ShadowColor"), line.shadowColor);
-            line.glow     = LoadInt(store, key("Glow").c_str(), line.glow);
-            line.glowSize = LoadInt(store, key("GlowSize").c_str(), line.glowSize);
-            LoadPick(store, key("GlowColor"), line.glowColor);
+            line.padding = LoadInt(store, key(kPaddingKey).c_str(), line.padding);
+            LoadPick(store, key(kColorKey), line.color);
+            line.shadow = Rebased(store, key(kShadowStrengthKey), key(kShadowKey), line.shadow, ShadowStrengthOf);
+            LoadPick(store, key(kShadowColorKey), line.shadowColor);
+            line.glow     = LoadInt(store, key(kGlowKey).c_str(), line.glow);
+            line.glowSize = LoadInt(store, key(kGlowSizeKey).c_str(), line.glowSize);
+            LoadPick(store, key(kGlowColorKey), line.glowColor);
         }
 
         void SaveLine(SettingsStore& store, const std::string& base, const LineDesign& line)
         {
             auto key = [&](const char* name) { return base + name; };
-            store.Set(key("Text").c_str(), line.text.c_str());
-            StoreFloat(store, key("Sync"), static_cast<float>(line.syncWith));
-            StoreBool(store, key("Always"), line.show.always);
-            StoreHex(store, key("When"), line.show.when);
-            store.Set(key("Align").c_str(), kAlignNames[static_cast<int>(line.align)]);
-            store.Set(key("Font").c_str(), line.font.c_str());
-            StoreHex(store, key("Style"), line.style);
-            StoreFloat(store, key("TextSize"), static_cast<float>(line.textSize));
-            StoreFloat(store, key("IconScale"), static_cast<float>(line.iconSize));
-            StoreFloat(store, key("Padding"), static_cast<float>(line.padding));
-            SavePick(store, key("Color"), line.color);
-            StoreFloat(store, key("ShadowStrength"), static_cast<float>(line.shadow));
-            SavePick(store, key("ShadowColor"), line.shadowColor);
-            StoreFloat(store, key("Glow"), static_cast<float>(line.glow));
-            StoreFloat(store, key("GlowSize"), static_cast<float>(line.glowSize));
-            SavePick(store, key("GlowColor"), line.glowColor);
+            store.Set(key(kTextKey).c_str(), line.text.c_str());
+            StoreFloat(store, key(kSyncKey), static_cast<float>(line.syncWith));
+            StoreBool(store, key(kAlwaysKey), line.show.always);
+            StoreHex(store, key(kWhenKey), line.show.when);
+            store.Set(key(kAlignKey).c_str(), kAlignNames[static_cast<int>(line.align)]);
+            store.Set(key(kFontKey).c_str(), line.font.c_str());
+            StoreHex(store, key(kStyleKey), line.style);
+            StoreFloat(store, key(kTextSizeKey), static_cast<float>(line.textSize));
+            StoreFloat(store, key(kIconScaleKey), static_cast<float>(line.iconSize));
+            StoreFloat(store, key(kPaddingKey), static_cast<float>(line.padding));
+            SavePick(store, key(kColorKey), line.color);
+            StoreFloat(store, key(kShadowStrengthKey), static_cast<float>(line.shadow));
+            SavePick(store, key(kShadowColorKey), line.shadowColor);
+            StoreFloat(store, key(kGlowKey), static_cast<float>(line.glow));
+            StoreFloat(store, key(kGlowSizeKey), static_cast<float>(line.glowSize));
+            SavePick(store, key(kGlowColorKey), line.glowColor);
             StoreBool(store, key(kGlowOffSuffix), line.glowOffInCombat);
         }
 
@@ -421,19 +433,19 @@ namespace headsup
             {
                 // Pets had one row before they had four: a row the file has no keys for takes that row's.
                 std::string base = RowBase(kind, r);
-                if (kind == PlateKind::Pets && store.GetString((base + "Plate").c_str(), kNoText) == kNoText)
+                if (kind == PlateKind::Pets && store.GetString((base + kPlateKey).c_str(), kNoText) == kNoText)
                     base = std::string(KindKey(kind)) + kRowInfix + kOldPetRow;
                 RowSettings& row       = k.rows[r];
-                const std::string plate = store.GetString((base + "Plate").c_str(), "");
+                const std::string plate = store.GetString((base + kPlateKey).c_str(), "");
                 row.plate = plate == kExpandingName ? PlateMode::Shown
                                                     : static_cast<PlateMode>(NameIndex(kPlateModeNames, kPlateModeCount, plate, static_cast<int>(row.plate)));
-                row.outline = static_cast<OutlineMode>(NameIndex(kOutlineModeNames, kOutlineModeCount, store.GetString((base + "Outline").c_str(), ""), static_cast<int>(row.outline)));
-                LoadPick(store, base + "Color", row.outlineColor);
+                row.outline = static_cast<OutlineMode>(NameIndex(kOutlineModeNames, kOutlineModeCount, store.GetString((base + kOutlineKey).c_str(), ""), static_cast<int>(row.outline)));
+                LoadPick(store, base + kColorKey, row.outlineColor);
             }
             // Dead mobs had no row before: each went by the row it had alive. Where a file's rows all agree, as
             // with every mob on the game's own names, the dead keep that; rows that differ say nothing for them.
             const int dead = static_cast<int>(Category::Dead);
-            if (kind == PlateKind::Mobs && store.GetString((RowBase(kind, dead) + "Plate").c_str(), kNoText) == kNoText)
+            if (kind == PlateKind::Mobs && store.GetString((RowBase(kind, dead) + kPlateKey).c_str(), kNoText) == kNoText)
             {
                 const auto differs = [&](const RowSettings& row) { return row.plate != k.rows[0].plate; };
                 if (std::none_of(k.rows, k.rows + dead, differs)) k.rows[dead].plate = k.rows[0].plate;
@@ -442,7 +454,7 @@ namespace headsup
                 LoadLine(store, LineBase(kind, n), k.lines[n], iconShare);
             const std::string base = std::string(KindKey(kind)) + kOrnamentInfix;
             OrnamentSettings& o    = k.ornament;
-            const std::string visibility  = store.GetString((base + "Visibility").c_str(), kNoText);
+            const std::string visibility  = store.GetString((base + kVisibilityKey).c_str(), kNoText);
             const std::optional<bool> wasOn = HeldSwitch(store, (base + kOldOrnamentOnSuffix).c_str());
             if (visibility != kNoText)
                 o.place = static_cast<OrnamentPlace>(NameIndex(kOrnamentPlaceNames, kOrnamentPlaceCount, visibility, static_cast<int>(o.place)));
@@ -450,9 +462,9 @@ namespace headsup
                 o.place = !*wasOn ? OrnamentPlace::Disabled
                           : store.GetString((base + kOldOrnamentPlaceSuffix).c_str(), "") == kOldOrnamentUpperPlace ? OrnamentPlace::AboveMiddle
                                                                                                                      : OrnamentPlace::BelowMiddle;
-            o.width  = LoadInt(store, (base + "Width").c_str(), o.width);
-            o.height = LoadInt(store, (base + "Height").c_str(), o.height);
-            LoadPick(store, base + "Color", o.color);
+            o.width  = LoadInt(store, (base + kWidthKey).c_str(), o.width);
+            o.height = LoadInt(store, (base + kHeightKey).c_str(), o.height);
+            LoadPick(store, base + kColorKey, o.color);
         }
 
         // A kind's opacities and its lines' glow in combat, from a file of any age: the kind's own keys, else the two
@@ -461,14 +473,14 @@ namespace headsup
         {
             const std::string base = std::string(KindKey(kind)) + kOpacityInfix;
             OpacitySettings& o     = k.opacity;
-            const std::string notTargeted = base + "NotTargeted";
+            const std::string notTargeted = base + kNotTargetedKey;
             const bool faded              = kind == PlateKind::Mobs || kind == PlateKind::Pets;
-            o.noTarget    = LoadInt(store, (base + "NoTarget").c_str(), o.noTarget);
+            o.noTarget    = LoadInt(store, (base + kNoTargetKey).c_str(), o.noTarget);
             o.notTargeted = Rebased(store, notTargeted, faded ? kOldUntargetedKey : notTargeted, o.notTargeted,
                 [](float before) { return before; });
-            o.targeted    = LoadInt(store, (base + "Targeted").c_str(), o.targeted);
-            o.fadeIn      = store.GetBool((base + "FadeIn").c_str(), o.fadeIn);
-            o.range       = store.GetFloat((base + "Range").c_str(), o.range);
+            o.targeted    = LoadInt(store, (base + kTargetedKey).c_str(), o.targeted);
+            o.fadeIn      = store.GetBool((base + kFadeInKey).c_str(), o.fadeIn);
+            o.range       = store.GetFloat((base + kRangeKey).c_str(), o.range);
             const std::optional<bool> before = kind == PlateKind::Mobs ? HeldSwitch(store, kOldGlowOffKey) : std::nullopt;
             for (int n = 0; n < kPlateLines; ++n)
             {
@@ -483,24 +495,24 @@ namespace headsup
             for (int r = 0; r < RowCountOf(kind); ++r)
             {
                 const std::string base = RowBase(kind, r);
-                store.Set((base + "Plate").c_str(), kPlateModeNames[static_cast<int>(k.rows[r].plate)]);
-                store.Set((base + "Outline").c_str(), kOutlineModeNames[static_cast<int>(k.rows[r].outline)]);
-                SavePick(store, base + "Color", k.rows[r].outlineColor);
+                store.Set((base + kPlateKey).c_str(), kPlateModeNames[static_cast<int>(k.rows[r].plate)]);
+                store.Set((base + kOutlineKey).c_str(), kOutlineModeNames[static_cast<int>(k.rows[r].outline)]);
+                SavePick(store, base + kColorKey, k.rows[r].outlineColor);
             }
             for (int n = 0; n < kPlateLines; ++n)
                 SaveLine(store, LineBase(kind, n), k.lines[n]);
             const std::string base = std::string(KindKey(kind)) + kOrnamentInfix;
-            store.Set((base + "Visibility").c_str(), kOrnamentPlaceNames[static_cast<int>(k.ornament.place)]);
-            StoreFloat(store, base + "Width", static_cast<float>(k.ornament.width));
-            StoreFloat(store, base + "Height", static_cast<float>(k.ornament.height));
-            SavePick(store, base + "Color", k.ornament.color);
+            store.Set((base + kVisibilityKey).c_str(), kOrnamentPlaceNames[static_cast<int>(k.ornament.place)]);
+            StoreFloat(store, base + kWidthKey, static_cast<float>(k.ornament.width));
+            StoreFloat(store, base + kHeightKey, static_cast<float>(k.ornament.height));
+            SavePick(store, base + kColorKey, k.ornament.color);
             if (HasStatusIcons(kind)) StoreFloat(store, std::string(KindKey(kind)) + kMaxIconsSuffix, static_cast<float>(k.maxIcons));
             const std::string opacity = std::string(KindKey(kind)) + kOpacityInfix;
-            StoreFloat(store, opacity + "NoTarget", static_cast<float>(k.opacity.noTarget));
-            StoreFloat(store, opacity + "NotTargeted", static_cast<float>(k.opacity.notTargeted));
-            StoreFloat(store, opacity + "Targeted", static_cast<float>(k.opacity.targeted));
-            StoreBool(store, opacity + "FadeIn", k.opacity.fadeIn);
-            StoreFloat(store, opacity + "Range", k.opacity.range);
+            StoreFloat(store, opacity + kNoTargetKey, static_cast<float>(k.opacity.noTarget));
+            StoreFloat(store, opacity + kNotTargetedKey, static_cast<float>(k.opacity.notTargeted));
+            StoreFloat(store, opacity + kTargetedKey, static_cast<float>(k.opacity.targeted));
+            StoreBool(store, opacity + kFadeInKey, k.opacity.fadeIn);
+            StoreFloat(store, opacity + kRangeKey, k.opacity.range);
         }
 
         void LoadDesigner(SettingsStore& store, Settings& s)
@@ -1143,7 +1155,7 @@ namespace headsup
     {
         // Asked before anything is read: a typed read adds its key. Every build's file holds these two, and a store
         // with neither is a new install, which has today's defaults and no look from before to keep.
-        const bool file = store.GetString(kVersionKey, kNoText) != kNoText || store.GetString(kBools[0].key, kNoText) != kNoText;
+        const bool file = store.GetString(kVersionKey, kNoText) != kNoText || store.GetString(kEnabledKey, kNoText) != kNoText;
         Settings s;
         for (const BoolKey& b : kBools)
             s.*b.field = store.GetBool(b.key, s.*b.field);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "bar_document.h"
 #include "color.h"
 #include "markup.h"
 #include "menu_sizes.h"
@@ -18,6 +19,14 @@
 
 namespace headsup
 {
+    // printf's format of these values as text.
+    std::string Formatted(const char* format, auto... values)
+    {
+        char text[96];
+        std::snprintf(text, sizeof(text), format, values...);
+        return text;
+    }
+
     // Something the player did to a control since the last pass, by the control's id.
     struct FormEvent
     {
@@ -44,7 +53,16 @@ namespace headsup
     constexpr const char* kKillEvent   = "kill";
     constexpr char kKillBack = 'b', kKillForward = 'f';
     // The ids of a line box's parts, after the box's own: a stretch of text and a tag, each with its number.
+    // Classes the kit writes, the window sets and the stylesheet draws: one name each for the three.
+    constexpr const char* kOffClass     = "off";     // a setting of something switched off: not shown
+    constexpr const char* kPickedClass  = "picked";  // the chosen one of a row of choices
+    constexpr const char* kLineBoxClass = "linebox"; // a design line's box
+    constexpr const char* kRunClass     = "run";     // a stretch of text in it
+    constexpr const char* kTypingClass  = "typing";  // on a box while one of its stretches has the keyboard
     constexpr const char* kRunIdInfix  = "-t-";
+    // The ids of a control's parts, after the control's own: a dropdown's option, a row of choices' choice and a tab
+    // strip's tab, each with its number.
+    constexpr const char* kOptionIdInfix = "-o-", *kSegmentIdInfix = "-s-", *kTabIdInfix = "-t-";
     constexpr const char* kChipIdInfix = "-c-";
     constexpr const char* kChipTagInfix = "-"; // after a chip's id and before a tag's number, in a chip of several
 
@@ -57,6 +75,7 @@ namespace headsup
         Markup,   // an element's content, as RML
         Class,    // a class (name) on or off
         Property, // a style property (name)
+        Attribute, // an attribute (name), gone while its text is empty
     };
     struct FormValue
     {
@@ -171,6 +190,15 @@ namespace headsup
         void SliderNamed(const char* label, int& value, const char* const* names, int count, const char* tip);
         // A dropdown of the whole numbers from first to last, either way round, each shown as text gives it.
         // option: what each number does, by the number.
+        // A dropdown of an enum's count values, each named and explained by a function of the value.
+        template <typename Enum, typename Name, typename Tip>
+        void EnumDropdown(const char* label, Enum& value, int count, Name name, const char* tip, Tip explain)
+        {
+            int picked = static_cast<int>(value);
+            NumberDropdown(label, picked, 0, count - 1, [&](int i) { return std::string(name(static_cast<Enum>(i))); }, tip,
+                0.0f, [&](int i) { return std::string(explain(static_cast<Enum>(i))); });
+            value = static_cast<Enum>(picked);
+        }
         template <typename Name>
         void NumberDropdown(const char* label, int& value, int first, int last, Name text, const char* tip,
             float width = 0.0f, const OptionTip& option = {})
@@ -212,18 +240,19 @@ namespace headsup
         void CheckAt(const char* id, bool& on, const char* tip = nullptr);
         void SegmentsAt(const char* id, int& value, const char* const* options, int count, float segment = 0.0f);
         // A dropdown whose list is a popup of rows, the picked one marked. True when another row was chosen. The
-        // closed control's tip is tip, or what option says of the row picked.
+        // closed control's tip is tip, or what option says of the row picked; markup rows are RML, not text.
         template <typename Name>
         bool ListAt(const char* id, const std::string& shown, float width, int count, Name name, int picked, int& chosen,
-            const char* tip = nullptr, const OptionTip& option = {})
+            const char* tip = nullptr, const OptionTip& option = {}, bool markup = false)
         {
             const std::string control = Id(id);
             const bool listed         = picked >= 0 && picked < count;
-            const bool open = ListControl(control, shown, width, tip != nullptr ? tip : option && listed ? option(picked) : std::string());
+            const bool open = ListControl(control, shown, width,
+                tip != nullptr ? tip : option && listed ? option(picked) : std::string(), markup);
             if (!open) return false;
             std::string rml;
             for (int i = 0; i < count; ++i)
-                rml += ListRow(control, i, name(i), i == picked, option ? option(i) : std::string());
+                rml += ListRow(control, i, name(i), i == picked, option ? option(i) : std::string(), markup);
             return ListChoice(control, std::move(rml), count, chosen) && chosen != picked;
         }
         template <typename Name>
@@ -269,8 +298,6 @@ namespace headsup
         // What the player did to a control since the last pass: the newest event of the kind, or nothing.
         const FormEvent* Took(std::string_view id, const char* type) const;
         bool Clicked(std::string_view id) const { return Took(id, kClickEvent) != nullptr; }
-        // The classes of what is emitted now: " off", which hides it, while faded.
-        const char* OffClass() const { return m_Off ? " off" : ""; }
         bool Off() const { return m_Off; }
 
     private:
@@ -279,6 +306,11 @@ namespace headsup
         static std::string Shown(const char* label);
         // A dropdown's closed control: what it shows and its arrow. True while its popup is open.
         // markup: shown, or name, is RML and not words to escape.
+        // A row of joined buttons: press is told of each one clicked, and picked says which are lit.
+        void SegmentRow(const std::string& base, const char* const* options, int count, float segment,
+            const std::function<void(int)>& press, const std::function<bool(int)>& picked);
+        // A click on the control opens its popup, or closes it when it is the one open.
+        void TogglePopup(const std::string& control);
         bool ListControl(const std::string& control, const std::string& shown, float width, const std::string& tip = {},
             bool markup = false);
         std::string ListRow(const std::string& control, int index, const std::string& name, bool picked,

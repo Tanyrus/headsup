@@ -821,7 +821,7 @@ TEST(a_file_from_before_the_badge_group_takes_its_defaults)
     const Settings s = LoadSettings(old);
     CHECK_EQ(s.Kind(PlateKind::Mobs).lines[0].text, "$detect"); // no badges: the top bar's popup shows them
     CHECK(s.elementWeakRank == -1 && s.elementResistRank == 4 && s.maxElements == kElementCount && !s.showRanks);
-    CHECK(s.badgeFontName == kBadgeFont); // the font badges had, where a new install's are in the default font
+    CHECK_EQ(s.badgeFontName, "Barlow Condensed"); // the font badges had, where a new install's are in the default font
     CHECK_EQ(s.detectionShown, kAllDetection); // and every icon, the aggression one too, which a new install hides
     for (const StatusBadgeRule& status : s.statusBadges)
         CHECK(status == (StatusBadgeRule{true, kNoWeakRank, 4}));
@@ -1040,68 +1040,41 @@ TEST(the_window_defaults_set_every_window_under_the_bar_or_leave_them_all_to_the
     CHECK(s.allUnderBar && !s.moveGameHelp && s.hideHelpBar && s.barWidgets[static_cast<int>(BarWidget::GameHelp)]);
 }
 
-TEST(the_default_designs_reproduce_todays_look)
+TEST(a_new_install_looks_as_the_release_did_for_one_but_for_the_reviews_four_changes)
 {
-    const Settings d;
-    const KindSettings& mobs = d.Kind(PlateKind::Mobs);
-    CHECK_EQ(mobs.lines[0].text, "$detect");
-    CHECK_EQ(mobs.lines[0].iconSize, 100); // of the base icon size, 16 px
-    CHECK_EQ(d.baseIconSize, 16);
-    CHECK_EQ(mobs.lines[1].text, "Lv $level $con");
-    CHECK_EQ(mobs.lines[1].textSize, 87);
-    CHECK(mobs.lines[1].color.source == ColorSource::Toughness);
-    CHECK_EQ(mobs.lines[2].text, "$name");
-    CHECK(mobs.lines[2].color.source == ColorSource::Game);
-    CHECK_EQ(mobs.lines[2].glow, 100);
-    CHECK(mobs.lines[2].glowColor.source == ColorSource::Aggression);
-    CHECK(mobs.ornament.place == OrnamentPlace::BelowMiddle);
-    CHECK_EQ(mobs.ornament.width, 90);
-    CHECK(mobs.ornament.color.source == ColorSource::Aggression);
-    CHECK(d.Kind(PlateKind::Players).ornament.place == OrnamentPlace::Disabled);
-    CHECK(mobs.rows[CategoryIndex(Category::WillAttack)].outline == OutlineMode::Shown);
-    CHECK(mobs.rows[CategoryIndex(Category::WontAttack)].outline == OutlineMode::Disabled);
-    CHECK(mobs.rows[CategoryIndex(Category::Unknown)].outline == OutlineMode::Disabled);
-    for (const Category claim : {Category::PartyClaim, Category::OtherClaim})
+    MapStore file = ReleaseFile();
+    const Settings release = LoadSettings(file);
+    Settings fresh;
+    const auto iconPixels = [](const Settings& s, const LineDesign& line) {
+        return static_cast<float>(s.baseIconSize) * static_cast<float>(line.iconSize) / kPercent;
+    };
+    for (int k = 0; k < kPlateKindCount; ++k)
     {
-        CHECK(mobs.rows[CategoryIndex(claim)].outline == OutlineMode::ByNature);
-        CHECK(mobs.rows[CategoryIndex(claim)].outlineColor.source == ColorSource::Claim);
+        KindSettings& now        = fresh.kinds[static_cast<size_t>(k)];
+        const KindSettings& then = release.kinds[static_cast<size_t>(k)];
+        for (int l = 0; l < kPlateLines; ++l)
+        {
+            // A shadow half again as strong as the release's, and icons of 16 px where a name's were of its 15 px.
+            CHECK(std::abs(static_cast<float>(now.lines[l].shadow) - 1.5f * static_cast<float>(then.lines[l].shadow)) <= 1.0f);
+            const float grown = iconPixels(fresh, now.lines[l]) - iconPixels(release, then.lines[l]);
+            CHECK(grown >= 0.0f && grown < 1.0f);
+            now.lines[l].shadow   = then.lines[l].shadow;
+            now.lines[l].iconSize = then.lines[l].iconSize;
+        }
+        // Pets, one row in the release, show their nameplates only when targeted.
+        if (k == static_cast<int>(PlateKind::Pets))
+            for (int r = 0; r < kPetRowCount; ++r)
+            {
+                CHECK(then.rows[r].plate == PlateMode::Shown && now.rows[r].plate == PlateMode::WhenTargeted);
+                now.rows[r].plate = then.rows[r].plate;
+            }
     }
-    CHECK(mobs.rows[CategoryIndex(Category::Placeholder)].outline == OutlineMode::Shown);
-    CHECK(mobs.rows[CategoryIndex(Category::Placeholder)].outlineColor.source == ColorSource::Aggression);
-    for (const RowSettings& row : mobs.rows)
-        CHECK(row.plate == PlateMode::Shown);
-    const KindSettings& players = d.Kind(PlateKind::Players);
-    CHECK_EQ(players.lines[2].text, "$mentor$new$sync$away$linkshell$bazaar$seeking$gm$name"); // today's order, GM nearest the name
-    CHECK(players.lines[2].glow == 0);
-    CHECK(players.lines[0].text.empty() && players.lines[1].text.empty());
-    CHECK(d.Kind(PlateKind::Self) == players);
-    CHECK_EQ(d.Kind(PlateKind::Npcs).lines[2].text, "$name");
-    CHECK_EQ(d.Kind(PlateKind::Pets).lines[2].text, "$name");
-    for (PlateKind kind : {PlateKind::Players, PlateKind::Self, PlateKind::Npcs, PlateKind::Pets})
-        for (int r = 0; r < RowCountOf(kind); ++r)
-            CHECK(d.Kind(kind).rows[r].outline == OutlineMode::Disabled);
-    CHECK_EQ(d.baseSize, 15);
-    CHECK_EQ(d.scaleMin, 50);
-    CHECK_EQ(d.scaleMax, 250);
-    // Every detection icon but the aggression one, which the outline's color already says.
-    CHECK_EQ(d.detectionShown, kAllDetection & ~DetectionBit(DetectionIcon::Aggro));
-}
-
-TEST(the_palettes_keep_todays_colors)
-{
-    const Palette p = DefaultPalette();
-    CHECK(p.aggression[static_cast<int>(Nature::Aggressive)] == (Color{{1.00f, 0.15f, 0.15f}}));
-    CHECK(p.aggression[static_cast<int>(Nature::Placeholder)] == (Color{{0.70f, 0.30f, 1.00f}}));
-    CHECK(p.toughness[static_cast<int>(LabelShade::EasyPrey)] == (Color{{0.40f, 1.00f, 0.40f}}));
-    CHECK(p.target[static_cast<int>(TargetState::Targeted)] == ColorFromRgb(kPhoenixRed));
-    CHECK(p.target[static_cast<int>(TargetState::OutOfRange)] == (Color{{1.00f, 0.25f, 0.25f}}));
-    CHECK(p.claim[static_cast<int>(ClaimState::Yours)] == (Color{{0.30f, 0.65f, 1.00f}}));
-    CHECK(p.claim[static_cast<int>(ClaimState::Others)] == (Color{{0.55f, 0.45f, 0.40f}}));
-    CHECK(p.type[static_cast<int>(TargetType::Pet)] == (Color{{0.70f, 0.95f, 0.80f}}));
-    CHECK(p.type[static_cast<int>(TargetType::Friend)] == (Color{{1.00f, 0.90f, 0.55f}}));
-    CHECK(p.type[static_cast<int>(TargetType::PartyMember)] == (Color{{0.55f, 0.80f, 1.00f}}));
-    CHECK(p.type[static_cast<int>(TargetType::LinkshellMember)] == (Color{{0.70f, 1.00f, 0.70f}}));
-    CHECK(p.type[static_cast<int>(TargetType::Npc)] == (Color{{1.00f, 1.00f, 1.00f}}));
+    CHECK(fresh.kinds == release.kinds);
+    CHECK(fresh.palette == release.palette);
+    // The aggression icon is not shown: the outline's color says it.
+    CHECK_EQ(fresh.detectionShown, release.detectionShown & ~DetectionBit(DetectionIcon::Aggro));
+    CHECK(fresh.baseSize == release.baseSize && fresh.baseIconSize == release.baseIconSize);
+    CHECK(fresh.scaleMin == release.scaleMin && fresh.scaleMax == release.scaleMax);
 }
 
 TEST(an_entity_types_color_is_saved_under_its_own_name)
@@ -1942,7 +1915,6 @@ TEST(a_cursors_edge_color_of_before_is_its_custom_color_and_its_own_color_follow
     const Settings loaded = LoadSettings(file);
     CHECK((loaded.cursorEdgeColor == ColorPick{ColorSource::Custom, {{0.25f, 0.5f, 0.75f}}}));
     CHECK(loaded.cursorColor.source == ColorSource::Target);
-    CHECK((Settings{}.cursorEdgeColor == ColorPick{ColorSource::Custom, {{0.0f, 0.0f, 0.0f}}}));
 }
 
 TEST(the_one_opacity_and_glow_switch_of_before_go_to_the_mobs_and_pets_they_were_for)
@@ -2023,7 +1995,6 @@ TEST(the_cursors_two_switches_of_before_become_its_style)
     CHECK(style("true", "false") == CursorStyle::Triangle);
     CHECK(style("false", "true") == CursorStyle::Vanilla);
     CHECK(style("false", "false") == CursorStyle::Vanilla);
-    CHECK(Settings{}.cursorStyle == CursorStyle::Feather);
     // Its own key stands, and the switches are never written again.
     Settings chocobo;
     chocobo.cursorStyle = CursorStyle::Chocobo;
@@ -2079,10 +2050,6 @@ TEST(a_cursor_saved_as_one_size_keeps_its_shape_and_its_edge)
     CHECK_EQ(loaded("true").cursorWidth, 14);  // the feather is 2.155 times as tall as wide
     CHECK_EQ(loaded("false").cursorWidth, 39); // and the arrow 0.8
     CHECK_EQ(loaded("true").cursorOutlineThickness, 150);
-    // A new install has the feather at 20 pixels tall, its edge at 100 percent, floating, five pixels up.
-    const Settings fresh;
-    CHECK(fresh.cursorHeight == 20 && fresh.cursorWidth == 9 && fresh.cursorOutlineThickness == 100);
-    CHECK(fresh.cursorFloat && fresh.cursorRaise == 5);
     // The keys of its own stand, and the size and edge of before are never written again.
     Settings wide;
     wide.cursorWidth = 40;

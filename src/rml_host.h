@@ -15,6 +15,8 @@
 
 namespace headsup
 {
+    constexpr int kKeyDownBit = 0x8000; // GetKeyState and GetAsyncKeyState: the key is down
+
     // RmlUi inside the plugin: its interfaces, the bundled fonts, and two contexts: the bar's, drawn into the back
     // buffer where the bar is, and the overlay's (popups, the menu, the debugger), drawn over ImGui.
     class RmlHost
