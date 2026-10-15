@@ -1,0 +1,2400 @@
+{
+ "reference": {
+  "menu": [
+   1920,
+   1080
+  ],
+  "bandHelpOn": 64,
+  "bandHelpOff": 38
+ },
+ "views": [
+  {
+   "id": "rest",
+   "name": "No Menu Open",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    }
+   ]
+  },
+  {
+   "id": "status",
+   "name": "Status",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "level",
+     "rect": [
+      16,
+      208,
+      128,
+      296
+     ]
+    },
+    {
+     "key": "statcom2",
+     "rect": [
+      1792,
+      48,
+      1904,
+      266
+     ]
+    },
+    {
+     "key": "persona",
+     "rect": [
+      16,
+      16,
+      128,
+      206
+     ]
+    }
+   ]
+  },
+  {
+   "id": "status/profile",
+   "name": "Status > Profile",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "level",
+     "rect": [
+      16,
+      208,
+      128,
+      296
+     ]
+    },
+    {
+     "key": "statcom2",
+     "rect": [
+      1792,
+      48,
+      1904,
+      266
+     ]
+    },
+    {
+     "key": "persona",
+     "rect": [
+      16,
+      16,
+      128,
+      206
+     ]
+    },
+    {
+     "key": "profile",
+     "rect": [
+      130,
+      48,
+      382,
+      226
+     ]
+    }
+   ]
+  },
+  {
+   "id": "status/job-levels",
+   "name": "Status > Job Levels",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "level",
+     "rect": [
+      16,
+      208,
+      128,
+      296
+     ]
+    },
+    {
+     "key": "statcom2",
+     "rect": [
+      1792,
+      48,
+      1904,
+      266
+     ]
+    },
+    {
+     "key": "persona",
+     "rect": [
+      16,
+      16,
+      128,
+      206
+     ]
+    },
+    {
+     "key": "joblevel",
+     "rect": [
+      130,
+      48,
+      382,
+      126
+     ]
+    }
+   ]
+  },
+  {
+   "id": "status/combat-skl",
+   "name": "Status > Combat Skl.",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "level",
+     "rect": [
+      16,
+      208,
+      128,
+      296
+     ]
+    },
+    {
+     "key": "statcom2",
+     "rect": [
+      1792,
+      48,
+      1904,
+      266
+     ]
+    },
+    {
+     "key": "persona",
+     "rect": [
+      16,
+      16,
+      128,
+      206
+     ]
+    },
+    {
+     "key": "btlskill",
+     "rect": [
+      130,
+      48,
+      382,
+      140
+     ]
+    }
+   ]
+  },
+  {
+   "id": "status/magic-skl",
+   "name": "Status > Magic Skl.",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "level",
+     "rect": [
+      16,
+      208,
+      128,
+      296
+     ]
+    },
+    {
+     "key": "statcom2",
+     "rect": [
+      1792,
+      48,
+      1904,
+      266
+     ]
+    },
+    {
+     "key": "persona",
+     "rect": [
+      16,
+      16,
+      128,
+      206
+     ]
+    },
+    {
+     "key": "mgcskill",
+     "rect": [
+      130,
+      48,
+      382,
+      112
+     ]
+    }
+   ]
+  },
+  {
+   "id": "status/craft-skl",
+   "name": "Status > Craft Skl.",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "level",
+     "rect": [
+      16,
+      208,
+      128,
+      296
+     ]
+    },
+    {
+     "key": "statcom2",
+     "rect": [
+      1792,
+      48,
+      1904,
+      266
+     ]
+    },
+    {
+     "key": "persona",
+     "rect": [
+      16,
+      16,
+      128,
+      206
+     ]
+    },
+    {
+     "key": "trdskill",
+     "rect": [
+      130,
+      48,
+      382,
+      140
+     ]
+    }
+   ]
+  },
+  {
+   "id": "status/currencies",
+   "name": "Status > Currencies",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "statcom2",
+     "rect": [
+      1792,
+      48,
+      1904,
+      266
+     ]
+    },
+    {
+     "key": "evitem",
+     "rect": [
+      16,
+      48,
+      382,
+      296
+     ]
+    }
+   ]
+  },
+  {
+   "id": "status/unity",
+   "name": "Status > Unity",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "level",
+     "rect": [
+      16,
+      208,
+      128,
+      296
+     ]
+    },
+    {
+     "key": "persona",
+     "rect": [
+      16,
+      16,
+      128,
+      206
+     ]
+    },
+    {
+     "key": "ut_menu",
+     "rect": [
+      1792,
+      48,
+      1904,
+      106
+     ]
+    }
+   ]
+  },
+  {
+   "id": "status/unity/unity-info",
+   "name": "Status > Unity > Unity Info",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "ut_menu",
+     "rect": [
+      1792,
+      48,
+      1904,
+      106
+     ]
+    },
+    {
+     "key": "quest00",
+     "rect": [
+      16,
+      48,
+      382,
+      296
+     ]
+    }
+   ]
+  },
+  {
+   "id": "equipment",
+   "name": "Equipment",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "persona",
+     "rect": [
+      16,
+      48,
+      128,
+      238
+     ]
+    },
+    {
+     "key": "money",
+     "rect": [
+      16,
+      240,
+      128,
+      296
+     ]
+    },
+    {
+     "key": "iteminfo",
+     "rect": [
+      130,
+      240,
+      496,
+      296
+     ]
+    },
+    {
+     "key": "inventor",
+     "rect": [
+      314,
+      48,
+      496,
+      238
+     ]
+    },
+    {
+     "key": "equip",
+     "rect": [
+      130,
+      48,
+      312,
+      238
+     ]
+    }
+   ]
+  },
+  {
+   "id": "magic",
+   "name": "Magic",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "mgcmenu",
+     "rect": [
+      1792,
+      48,
+      1904,
+      186
+     ]
+    }
+   ]
+  },
+  {
+   "id": "magic/white-magic",
+   "name": "Magic > White Magic",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "mgcsortw",
+     "rect": [
+      1792,
+      48,
+      1904,
+      106
+     ]
+    }
+   ]
+  },
+  {
+   "id": "magic/blue-magic",
+   "name": "Magic > Blue Magic",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "blusortw",
+     "rect": [
+      1792,
+      48,
+      1904,
+      125
+     ]
+    }
+   ]
+  },
+  {
+   "id": "items",
+   "name": "Items",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "itmsort2",
+     "rect": [
+      1792,
+      48,
+      1904,
+      125
+     ]
+    },
+    {
+     "key": "inventor",
+     "rect": [
+      16,
+      48,
+      198,
+      238
+     ]
+    }
+   ]
+  },
+  {
+   "id": "items/auto",
+   "name": "Items > Auto",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "inventor",
+     "rect": [
+      16,
+      48,
+      198,
+      238
+     ]
+    },
+    {
+     "key": "iuse",
+     "rect": [
+      1792,
+      48,
+      1904,
+      90
+     ]
+    }
+   ]
+  },
+  {
+   "id": "synthesis",
+   "name": "Synthesis",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "cmbmenu",
+     "rect": [
+      1792,
+      48,
+      1904,
+      90
+     ]
+    }
+   ]
+  },
+  {
+   "id": "synthesis/crystal-synthesis",
+   "name": "Synthesis > Crystal Synthesis",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "inventor",
+     "rect": [
+      16,
+      48,
+      198,
+      238
+     ]
+    }
+   ]
+  },
+  {
+   "id": "synthesis/history",
+   "name": "Synthesis > History",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "cmbhwin",
+     "rect": [
+      1792,
+      48,
+      1904,
+      106
+     ]
+    },
+    {
+     "key": "tskill1",
+     "rect": [
+      16,
+      48,
+      198,
+      142
+     ]
+    },
+    {
+     "key": "iteminfo",
+     "rect": [
+      16,
+      240,
+      382,
+      296
+     ]
+    },
+    {
+     "key": "cmbhlst",
+     "rect": [
+      200,
+      48,
+      382,
+      238
+     ]
+    }
+   ]
+  },
+  {
+   "id": "abilities",
+   "name": "Abilities",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "abimenu",
+     "rect": [
+      1792,
+      48,
+      1904,
+      154
+     ]
+    }
+   ]
+  },
+  {
+   "id": "abilities/job-abil",
+   "name": "Abilities > Job Abil.",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "abisortw",
+     "rect": [
+      1792,
+      48,
+      1904,
+      90
+     ]
+    }
+   ]
+  },
+  {
+   "id": "party",
+   "name": "Party",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "prty1",
+     "rect": [
+      1792,
+      48,
+      1904,
+      170
+     ]
+    }
+   ]
+  },
+  {
+   "id": "party/find-member",
+   "name": "Party > Find Member",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "prty1",
+     "rect": [
+      1792,
+      48,
+      1904,
+      170
+     ]
+    },
+    {
+     "key": "scresult",
+     "rect": [
+      16,
+      48,
+      382,
+      296
+     ]
+    }
+   ]
+  },
+  {
+   "id": "party/languages",
+   "name": "Party > Languages",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "prty5us",
+     "rect": [
+      1792,
+      48,
+      1904,
+      138
+     ]
+    }
+   ]
+  },
+  {
+   "id": "party/alarm-type",
+   "name": "Party > Alarm Type",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "alarm",
+     "rect": [
+      1848,
+      48,
+      1904,
+      188
+     ]
+    }
+   ]
+  },
+  {
+   "id": "search",
+   "name": "Search",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "searchma",
+     "rect": [
+      1792,
+      48,
+      1904,
+      330
+     ]
+    }
+   ]
+  },
+  {
+   "id": "search/name",
+   "name": "Search > Name",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "scname",
+     "rect": [
+      1792,
+      48,
+      1904,
+      116
+     ]
+    }
+   ]
+  },
+  {
+   "id": "search/job",
+   "name": "Search > Job",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "searchjo",
+     "rect": [
+      1792,
+      48,
+      1904,
+      410
+     ]
+    }
+   ]
+  },
+  {
+   "id": "search/job/warrior",
+   "name": "Search > Job > Warrior",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "searchma",
+     "rect": [
+      1792,
+      48,
+      1904,
+      330
+     ]
+    },
+    {
+     "key": "scresult",
+     "rect": [
+      16,
+      48,
+      382,
+      296
+     ]
+    }
+   ]
+  },
+  {
+   "id": "search/country",
+   "name": "Search > Country",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "searchna",
+     "rect": [
+      1792,
+      48,
+      1904,
+      106
+     ]
+    }
+   ]
+  },
+  {
+   "id": "search/race",
+   "name": "Search > Race",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "searchra",
+     "rect": [
+      1792,
+      48,
+      1904,
+      138
+     ]
+    }
+   ]
+  },
+  {
+   "id": "search/level",
+   "name": "Search > Level",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "scchar",
+     "rect": [
+      1792,
+      48,
+      1904,
+      132
+     ]
+    }
+   ]
+  },
+  {
+   "id": "search/master-level",
+   "name": "Search > Master Level",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "scmlev",
+     "rect": [
+      1792,
+      48,
+      1904,
+      132
+     ]
+    }
+   ]
+  },
+  {
+   "id": "search/rank",
+   "name": "Search > Rank",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "searchle",
+     "rect": [
+      1792,
+      48,
+      1904,
+      218
+     ]
+    }
+   ]
+  },
+  {
+   "id": "search/comment",
+   "name": "Search > Comment",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "comgenre",
+     "rect": [
+      1792,
+      48,
+      1904,
+      170
+     ]
+    }
+   ]
+  },
+  {
+   "id": "linkshell",
+   "name": "Linkshell",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "menuwind",
+     "rect": [
+      1792,
+      48,
+      1904,
+      250
+     ]
+    },
+    {
+     "key": "link6",
+     "rect": [
+      16,
+      48,
+      382,
+      104
+     ]
+    },
+    {
+     "key": "link5",
+     "rect": [
+      16,
+      106,
+      382,
+      296
+     ]
+    }
+   ]
+  },
+  {
+   "id": "region-info",
+   "name": "Region Info",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "region",
+     "rect": [
+      1792,
+      48,
+      1904,
+      122
+     ]
+    }
+   ]
+  },
+  {
+   "id": "region-info/conquest",
+   "name": "Region Info > Conquest",
+   "windows": [
+    {
+     "key": "cnqframe",
+     "rect": [
+      0,
+      0,
+      106,
+      14
+     ]
+    },
+    {
+     "key": "conquer1",
+     "rect": [
+      1792,
+      48,
+      1904,
+      246
+     ]
+    }
+   ]
+  },
+  {
+   "id": "region-info/besieged",
+   "name": "Region Info > Besieged",
+   "windows": [
+    {
+     "key": "cnqframe",
+     "rect": [
+      0,
+      0,
+      106,
+      14
+     ]
+    },
+    {
+     "key": "beseige1",
+     "rect": [
+      16,
+      48,
+      152,
+      254
+     ]
+    }
+   ]
+  },
+  {
+   "id": "region-info/campaign",
+   "name": "Region Info > Campaign",
+   "windows": [
+    {
+     "key": "cnqframe",
+     "rect": [
+      0,
+      0,
+      106,
+      14
+     ]
+    }
+   ]
+  },
+  {
+   "id": "map",
+   "name": "Map",
+   "windows": [
+    {
+     "key": "mapframe",
+     "rect": [
+      0,
+      0,
+      106,
+      14
+     ]
+    },
+    {
+     "key": "map0",
+     "rect": [
+      1792,
+      48,
+      1904,
+      106
+     ]
+    }
+   ]
+  },
+  {
+   "id": "map/markers",
+   "name": "Map > Markers",
+   "windows": [
+    {
+     "key": "mapframe",
+     "rect": [
+      0,
+      0,
+      106,
+      14
+     ]
+    },
+    {
+     "key": "mapv3",
+     "rect": [
+      1792,
+      48,
+      1904,
+      218
+     ]
+    }
+   ]
+  },
+  {
+   "id": "map/wide-scan",
+   "name": "Map > Wide Scan",
+   "windows": [
+    {
+     "key": "mapframe",
+     "rect": [
+      0,
+      0,
+      106,
+      14
+     ]
+    },
+    {
+     "key": "map0",
+     "rect": [
+      1792,
+      48,
+      1904,
+      106
+     ]
+    },
+    {
+     "key": "scanlist",
+     "rect": [
+      16,
+      48,
+      128,
+      296
+     ]
+    }
+   ]
+  },
+  {
+   "id": "missions",
+   "name": "Missions",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "missionm",
+     "rect": [
+      1792,
+      48,
+      1904,
+      170
+     ]
+    }
+   ]
+  },
+  {
+   "id": "missions/nations",
+   "name": "Missions > Nations",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "missionm",
+     "rect": [
+      1792,
+      48,
+      1904,
+      170
+     ]
+    },
+    {
+     "key": "miss00",
+     "rect": [
+      16,
+      48,
+      382,
+      296
+     ]
+    }
+   ]
+  },
+  {
+   "id": "quests",
+   "name": "Quests",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "socialme",
+     "rect": [
+      1792,
+      48,
+      1904,
+      250
+     ]
+    },
+    {
+     "key": "quest00",
+     "rect": [
+      16,
+      48,
+      382,
+      296
+     ]
+    }
+   ]
+  },
+  {
+   "id": "key-items",
+   "name": "Key Items",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "socialme",
+     "rect": [
+      1792,
+      48,
+      1904,
+      250
+     ]
+    },
+    {
+     "key": "evitem",
+     "rect": [
+      16,
+      48,
+      382,
+      296
+     ]
+    }
+   ]
+  },
+  {
+   "id": "view-house",
+   "name": "View House",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "mogcont",
+     "rect": [
+      1792,
+      48,
+      1904,
+      298
+     ]
+    }
+   ]
+  },
+  {
+   "id": "view-house/mog-safe",
+   "name": "View House > Mog Safe",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "mogcont",
+     "rect": [
+      1792,
+      48,
+      1904,
+      298
+     ]
+    },
+    {
+     "key": "inventor",
+     "rect": [
+      16,
+      48,
+      198,
+      238
+     ]
+    }
+   ]
+  },
+  {
+   "id": "view-house/mog-sack",
+   "name": "View House > Mog Sack",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "iteminfo",
+     "rect": [
+      16,
+      240,
+      382,
+      296
+     ]
+    },
+    {
+     "key": "inventor",
+     "rect": [
+      200,
+      48,
+      382,
+      238
+     ]
+    },
+    {
+     "key": "itmsortw",
+     "rect": [
+      1792,
+      48,
+      1904,
+      125
+     ]
+    },
+    {
+     "key": "bank",
+     "rect": [
+      16,
+      48,
+      198,
+      238
+     ]
+    }
+   ]
+  },
+  {
+   "id": "bazaar",
+   "name": "Bazaar",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "bazaar",
+     "rect": [
+      1792,
+      48,
+      1904,
+      90
+     ]
+    }
+   ]
+  },
+  {
+   "id": "bazaar/set-prices",
+   "name": "Bazaar > Set Prices",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "bazaar",
+     "rect": [
+      1792,
+      48,
+      1904,
+      90
+     ]
+    },
+    {
+     "key": "iteminfo",
+     "rect": [
+      130,
+      240,
+      496,
+      312
+     ]
+    },
+    {
+     "key": "money",
+     "rect": [
+      16,
+      240,
+      128,
+      296
+     ]
+    },
+    {
+     "key": "shop",
+     "rect": [
+      16,
+      48,
+      272,
+      238
+     ]
+    }
+   ]
+  },
+  {
+   "id": "macros",
+   "name": "Macros",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "mcrmenu",
+     "rect": [
+      1792,
+      48,
+      1904,
+      90
+     ]
+    }
+   ]
+  },
+  {
+   "id": "macros/edit-macro",
+   "name": "Macros > Edit Macro",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "mcrselec",
+     "rect": [
+      1792,
+      48,
+      1904,
+      378
+     ]
+    }
+   ]
+  },
+  {
+   "id": "macros/edit-equip-set",
+   "name": "Macros > Edit Equip. Set",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "mcres20",
+     "rect": [
+      1792,
+      48,
+      1904,
+      378
+     ]
+    }
+   ]
+  },
+  {
+   "id": "config",
+   "name": "Config",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "configwi",
+     "rect": [
+      1792,
+      48,
+      1904,
+      266
+     ]
+    }
+   ]
+  },
+  {
+   "id": "config/gameplay",
+   "name": "Config > Gameplay",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "configwi",
+     "rect": [
+      1792,
+      48,
+      1904,
+      266
+     ]
+    },
+    {
+     "key": "conf2win",
+     "rect": [
+      16,
+      48,
+      382,
+      344
+     ]
+    }
+   ]
+  },
+  {
+   "id": "config/chat-filters",
+   "name": "Config > Chat Filters",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "configwi",
+     "rect": [
+      1792,
+      48,
+      1904,
+      266
+     ]
+    },
+    {
+     "key": "cfilter",
+     "rect": [
+      16,
+      48,
+      382,
+      296
+     ]
+    }
+   ]
+  },
+  {
+   "id": "config/font-colors",
+   "name": "Config > Font Colors",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "conftxtc",
+     "rect": [
+      1792,
+      48,
+      1904,
+      138
+     ]
+    }
+   ]
+  },
+  {
+   "id": "config/font-colors/chat",
+   "name": "Config > Font Colors > Chat",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "conftxtc",
+     "rect": [
+      1792,
+      48,
+      1904,
+      138
+     ]
+    },
+    {
+     "key": "textcol2",
+     "rect": [
+      16,
+      48,
+      382,
+      104
+     ]
+    },
+    {
+     "key": "textcol1",
+     "rect": [
+      16,
+      106,
+      382,
+      312
+     ]
+    }
+   ]
+  },
+  {
+   "id": "config/font-colors/default",
+   "name": "Config > Font Colors > Default",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "conftxtc",
+     "rect": [
+      1792,
+      48,
+      1904,
+      138
+     ]
+    },
+    {
+     "key": "confyn",
+     "rect": [
+      1792,
+      140,
+      1904,
+      182
+     ]
+    }
+   ]
+  },
+  {
+   "id": "config/windows",
+   "name": "Config > Windows",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "conf5m",
+     "rect": [
+      1792,
+      48,
+      1904,
+      106
+     ]
+    }
+   ]
+  },
+  {
+   "id": "config/windows/shared",
+   "name": "Config > Windows > Shared",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "conf5m",
+     "rect": [
+      1792,
+      48,
+      1904,
+      106
+     ]
+    },
+    {
+     "key": "conf5win",
+     "rect": [
+      16,
+      48,
+      382,
+      296
+     ]
+    }
+   ]
+  },
+  {
+   "id": "config/windows/window-1",
+   "name": "Config > Windows > Window 1",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "conf5m",
+     "rect": [
+      1792,
+      48,
+      1904,
+      106
+     ]
+    },
+    {
+     "key": "conf5w1",
+     "rect": [
+      16,
+      48,
+      382,
+      296
+     ]
+    }
+   ]
+  },
+  {
+   "id": "config/windows/window-2",
+   "name": "Config > Windows > Window 2",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "conf5m",
+     "rect": [
+      1792,
+      48,
+      1904,
+      106
+     ]
+    },
+    {
+     "key": "conf5w2",
+     "rect": [
+      16,
+      48,
+      382,
+      296
+     ]
+    }
+   ]
+  },
+  {
+   "id": "config/log",
+   "name": "Config > Log",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "conf11m",
+     "rect": [
+      1792,
+      48,
+      1904,
+      106
+     ]
+    }
+   ]
+  },
+  {
+   "id": "config/log/window-1",
+   "name": "Config > Log > Window 1",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "conf11l",
+     "rect": [
+      1792,
+      48,
+      1904,
+      122
+     ]
+    }
+   ]
+  },
+  {
+   "id": "config/log/default",
+   "name": "Config > Log > Default",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "conf11m",
+     "rect": [
+      1792,
+      48,
+      1904,
+      106
+     ]
+    },
+    {
+     "key": "confyn",
+     "rect": [
+      1792,
+      140,
+      1904,
+      182
+     ]
+    }
+   ]
+  },
+  {
+   "id": "config/misc",
+   "name": "Config > Misc.",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "configwi",
+     "rect": [
+      1792,
+      48,
+      1904,
+      266
+     ]
+    },
+    {
+     "key": "conf3win",
+     "rect": [
+      16,
+      48,
+      382,
+      344
+     ]
+    }
+   ]
+  },
+  {
+   "id": "config/misc-2",
+   "name": "Config > Misc. 2",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "configwi",
+     "rect": [
+      1792,
+      48,
+      1904,
+      266
+     ]
+    },
+    {
+     "key": "conf6win",
+     "rect": [
+      16,
+      48,
+      382,
+      360
+     ]
+    }
+   ]
+  },
+  {
+   "id": "config/misc-3",
+   "name": "Config > Misc. 3",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "configwi",
+     "rect": [
+      1792,
+      48,
+      1904,
+      266
+     ]
+    },
+    {
+     "key": "conf12wi",
+     "rect": [
+      16,
+      48,
+      382,
+      332
+     ]
+    }
+   ]
+  },
+  {
+   "id": "config/misc-4",
+   "name": "Config > Misc. 4",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "configwi",
+     "rect": [
+      1792,
+      48,
+      1904,
+      266
+     ]
+    },
+    {
+     "key": "conf13wi",
+     "rect": [
+      16,
+      48,
+      382,
+      296
+     ]
+    }
+   ]
+  },
+  {
+   "id": "config/effects",
+   "name": "Config > Effects",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "configwi",
+     "rect": [
+      1792,
+      48,
+      1904,
+      266
+     ]
+    },
+    {
+     "key": "fxfilter",
+     "rect": [
+      16,
+      48,
+      382,
+      296
+     ]
+    }
+   ]
+  },
+  {
+   "id": "config/mouse-cam",
+   "name": "Config > Mouse/Cam.",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "configwi",
+     "rect": [
+      1792,
+      48,
+      1904,
+      266
+     ]
+    },
+    {
+     "key": "conf7",
+     "rect": [
+      16,
+      48,
+      382,
+      296
+     ]
+    }
+   ]
+  },
+  {
+   "id": "config/global",
+   "name": "Config > Global",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "configwi",
+     "rect": [
+      1792,
+      48,
+      1904,
+      266
+     ]
+    },
+    {
+     "key": "conf4",
+     "rect": [
+      16,
+      48,
+      382,
+      296
+     ]
+    }
+   ]
+  },
+  {
+   "id": "help-desk",
+   "name": "Help Desk",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "socialme",
+     "rect": [
+      1792,
+      48,
+      1904,
+      250
+     ]
+    },
+    {
+     "key": "faqsub",
+     "rect": [
+      16,
+      48,
+      382,
+      296
+     ]
+    }
+   ]
+  },
+  {
+   "id": "communication",
+   "name": "Communication",
+   "windows": [
+    {
+     "key": "buff",
+     "rect": [
+      142,
+      48,
+      382,
+      52
+     ]
+    },
+    {
+     "key": "commenu",
+     "rect": [
+      1792,
+      48,
+      1904,
+      90
+     ]
+    }
+   ]
+  }
+ ]
+}

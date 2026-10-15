@@ -27,6 +27,7 @@ generate() {
     python3 "$ROOT/tools/gen_zones.py"
     python3 "$ROOT/tools/gen_titles.py"
     python3 "$ROOT/tools/gen_window.py"
+    python3 "$ROOT/tools/gen_views.py"
 }
 
 # compile DIR COMPILER [FLAGS...] -- SOURCES...: each source to an object of its own in DIR, as many at a time as there
