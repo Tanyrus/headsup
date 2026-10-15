@@ -401,11 +401,16 @@ namespace
         image.Put(at + 7, kLoopTail);
     }
 
+    // Before the loop, its list: xor bl,bl; mov ecx,list; call First, as the client of 2026-10-13 held it at
+    // 0x15F6E8 with its list at 0x03AE1838.
+    constexpr uint32_t kWindowListMove = 0x15F6E8, kWindowListAt = 0x03AE1838;
+
     Image WindowClient()
     {
         Image image;
         PutWindowLoop(image, kWindowLoop);
         image.Put(kWindowRoutine, {0x83, 0xEC, 0x24, 0x53, 0x55, 0x56, 0x57, 0x8B, 0xE9, 0xE8});
+        image.Put(kWindowListMove, {0x32, 0xDB, 0xB9, 0x38, 0x18, 0xAE, 0x03, 0xE8, 0x0C, 0x6E, 0xFC, 0xFF});
         return image;
     }
 }
@@ -421,6 +426,19 @@ TEST(the_window_draw_call_is_found_by_its_loop_and_checked_by_the_routines_start
     PutWindowLoop(twice, 0x160000);
     CHECK(LocateWindowDraw(twice.Text()).problem == LocateProblem::AmbiguousWindowDraw);
     CHECK(LocateWindowDraw(Image{}.Text()).problem == LocateProblem::NoWindowDraw);
+}
+
+TEST(the_window_list_is_the_one_the_draw_loop_starts_on)
+{
+    CHECK(LocateWindowDraw(WindowClient().Text()).list == kWindowListAt);
+    Image otherRegister = WindowClient();
+    otherRegister.Put(kWindowListMove + 2, {0xBA}); // mov edx: not the list the loop's call is given
+    const WindowDraw without = LocateWindowDraw(otherRegister.Text());
+    CHECK(without.problem == LocateProblem::None && without.list == 0);
+    Image farBack = WindowClient();
+    farBack.Put(kWindowListMove, {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90});
+    farBack.Put(kWindowListMove - 0x40, {0x32, 0xDB, 0xB9, 0x38, 0x18, 0xAE, 0x03, 0xE8, 0x0C, 0x6E, 0xFC, 0xFF});
+    CHECK(LocateWindowDraw(farBack.Text()).list == 0);
 }
 
 TEST(a_window_draw_call_that_leaves_the_code_is_a_changed_client)

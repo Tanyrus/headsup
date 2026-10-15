@@ -137,11 +137,12 @@ namespace headsup
     KeyHide LocateKeyHide(const ImageSection& text);
 
     // The draw loop's call to the menu window draw: a thiscall on the window's MCD with no stack arguments. RVAs of the
-    // five-byte call and of the routine.
+    // five-byte call and of the routine, and the address of the window list the loop walks (0 where it is not found).
     struct WindowDraw
     {
         LocateProblem problem = LocateProblem::None;
         uint32_t call = 0, draw = 0;
+        uint32_t list = 0;
     };
     WindowDraw LocateWindowDraw(const ImageSection& text);
     struct WindowMoveSite

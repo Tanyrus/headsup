@@ -75,6 +75,9 @@ namespace headsup
         constexpr int16_t kWindowLoop[] = {0x8B, 0xCE, 0xE8, -1, -1, -1, -1, 0x8B, 0x44, 0x24, 0x0C, 0x85, 0xC0, 0x75,
             0xC6, 0xFE, 0xC3, 0x80, 0xFB, 0x09, 0x7C, 0xAD};
         constexpr uint32_t kWindowLoopCall = 2;
+        // Before the loop, the list it walks: xor bl,bl; mov ecx,list; call First, within kWindowListReach bytes.
+        constexpr int16_t kWindowListMove[] = {0x32, 0xDB, 0xB9, -1, -1, -1, -1, 0xE8};
+        constexpr uint32_t kWindowListAddress = 3, kWindowListReach = 0x60;
         // The window draw's first ten bytes: sub esp,24h; push ebx, ebp, esi, edi; mov ebp,ecx; call. hudbegone patches
         // it from entry+14, so nothing past these is checked.
         constexpr uint8_t kWindowDrawEntry[] = {0x83, 0xEC, 0x24, 0x53, 0x55, 0x56, 0x57, 0x8B, 0xE9, 0xE8};
@@ -451,7 +454,11 @@ namespace headsup
         // Below the section, draw - text.rva wraps past its end, which Matches rejects.
         if (!Matches(text, draw - text.rva, kWindowDrawEntry, sizeof(kWindowDrawEntry)))
             return WindowDraw{LocateProblem::WindowDrawChanged};
-        return WindowDraw{LocateProblem::None, call, draw};
+        const uint32_t from = found.front() >= kWindowListReach ? found.front() - kWindowListReach : 0;
+        const std::vector<uint32_t> moves =
+            FindAll(kWindowListMove, ImageSection{text.rva + from, text.bytes + from, found.front() - from});
+        const uint32_t list = moves.empty() ? 0 : ReadAt<uint32_t>(text.bytes, from + moves.back() + kWindowListAddress);
+        return WindowDraw{LocateProblem::None, call, draw, list};
     }
 
     NetStats LocateNetStats(const ImageSection& text)
