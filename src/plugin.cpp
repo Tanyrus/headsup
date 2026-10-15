@@ -497,6 +497,14 @@ public:
             {
                 m_WindowLog = OwnFolder(kLogsFolder) + "\\windows.log";
                 m_LastOpen.clear();
+                // The line the windows are placed under, with and without the help bar, in the game's menu pixels.
+                if (const std::optional<headsup::HelpBand> band = HelpBandNow())
+                    if (FILE* log = std::fopen(m_WindowLog->c_str(), "a"))
+                    {
+                        std::fprintf(log, "band %d topBar %d screen %dx%d\n", band->bottom, band->topBar,
+                            band->screenRight, band->screenBottom);
+                        std::fclose(log);
+                    }
                 Print("windowlog: writing which game windows are open to " + *m_WindowLog + "; /hu windowlog stop ends it.");
             }
         }
