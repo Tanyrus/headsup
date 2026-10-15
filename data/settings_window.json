@@ -121,7 +121,8 @@
               "rows": [
                 {"key": "unclaimed", "name": "Unclaimed"},
                 {"key": "claimed-others", "name": "Claimed (Others')"},
-                {"key": "claimed-yours", "name": "Claimed (Yours)"}
+                {"key": "claimed-yours", "name": "Claimed (Yours)"},
+                {"key": "called-for-help", "name": "Called for Help", "tip": "Used when the mob is engaged in combat and the player who claimed it has used the 'Call for Help' feature, allowing anyone to attack it."}
               ]
             }
           ]

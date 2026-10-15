@@ -206,7 +206,7 @@ namespace headsup
         constexpr const char* kOldOrnamentPlaceSuffix = "Place";
         constexpr const char* kOldOrnamentUpperPlace  = "lines12";
         const char* const kNatureKeys[kNatureCount] = {"passive", "aggressive", "passiveNm", "aggressiveNm", "placeholder", "noData"};
-        const char* const kClaimKeys[kClaimStateCount]   = {"unclaimed", "others", "yours"};
+        const char* const kClaimKeys[kClaimStateCount]   = {"unclaimed", "others", "yours", "calledForHelp"};
         const char* const kTargetKeys[kTargetStateCount] = {"none", "targeted", "locked", "subTarget", "outOfRange"};
         const char* const kTypeKeys[kTargetTypeCount]    = {"mob", "player", "friend", "partyMember", "linkshell", "npc", "pet"};
         const char* const kPaletteKeys[]                 = {"paletteAggression", "paletteToughness", "paletteClaim", "paletteTarget", "paletteType"};

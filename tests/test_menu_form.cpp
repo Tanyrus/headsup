@@ -392,6 +392,9 @@ TEST(a_color_off_its_default_has_an_arrow_that_puts_it_back)
     const Form moved = w.Pass();
     CHECK(!ClassOn(moved, arrow, "hidden"));
     CHECK(ClassOn(moved, "entities-colors-claim-status-unclaimed-claim-colors-reset", "hidden")); // each color its own
+    w.settings.palette.claim[static_cast<int>(ClaimState::CalledForHelp)] = Color{{0.1f, 0.2f, 0.3f}};
+    w.Pass({{"entities-colors-claim-status-called-for-help-claim-colors-reset", kClickEvent, ""}});
+    CHECK(w.settings.palette.claim[static_cast<int>(ClaimState::CalledForHelp)] == Settings{}.palette.claim[static_cast<int>(ClaimState::CalledForHelp)]);
     const Form back = w.Pass({{arrow, kClickEvent, ""}});
     CHECK(back.changed && w.settings.palette.claim[static_cast<int>(ClaimState::Yours)] == original);
     CHECK(ClassOn(back, arrow, "hidden"));

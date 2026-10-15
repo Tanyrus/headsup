@@ -128,7 +128,7 @@ PIECES = Pieces(
         'toughness-colors': Setting(unnamed=True, rows=rows(
             'unknown-level', 'too-weak', 'easy-prey', 'decent-challenge', 'even-match', 'tough', 'very-tough',
             'incredibly-tough')),
-        'claim-colors': Setting(unnamed=True, rows=rows('unclaimed', 'claimed-others', 'claimed-yours')),
+        'claim-colors': Setting(unnamed=True, rows=rows('unclaimed', 'claimed-others', 'claimed-yours', 'called-for-help')),
         'targeting-colors': Setting(unnamed=True, rows=rows(
             'not-targeted', 'targeted', 'locked-on', 'sub-target', 'out-of-range')),
         'entity-type-colors': Setting(unnamed=True, rows=rows(

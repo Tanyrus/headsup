@@ -156,6 +156,14 @@ TEST(every_color_source_resolves_from_the_state)
     CHECK_EQ(ResolveColor(ColorPick{ColorSource::Type}, s, p, game), ToArgb(Color{{0.0f, 1.0f, 1.0f}}));
 }
 
+TEST(a_mob_called_for_help_is_neither_unclaimed_nor_anyones_claim)
+{
+    const EntityState s = Mob(Nature::Aggressive, ClaimState::CalledForHelp);
+    for (const ShowCondition c : {ShowCondition::Unclaimed, ShowCondition::YourClaim, ShowCondition::OthersClaim})
+        CHECK(!LineShows(LineShow{false, ConditionBit(c)}, s, false));
+    CHECK(LineShows(LineShow{false, ConditionBit(ShowCondition::Unclaimed)}, Mob(Nature::Aggressive), false));
+}
+
 TEST(always_shows_and_otherwise_any_checked_condition_does)
 {
     EntityState s = Mob(Nature::Aggressive, ClaimState::Yours);

@@ -55,6 +55,7 @@ namespace headsup
         bool linkshell      = false;
         bool engaged        = false;
         bool untargetable   = false; // the server says it cannot be targeted, as a Chigoe until it engages
+        bool calledForHelp  = false; // a mob whose claimer called for help
         bool self           = false;
         std::optional<PlayerJobs> jobs = std::nullopt;
         const char* ownerName          = "";

@@ -57,8 +57,9 @@ namespace headsup
     };
     enum class Nature : uint8_t { Passive, Aggressive, PassiveNm, AggressiveNm, Placeholder, NoData };
     constexpr int kNatureCount = 6;
-    enum class ClaimState : uint8_t { Unclaimed, Others, Yours };
-    constexpr int kClaimStateCount = 3;
+    // CalledForHelp: its claimer called for help, so anyone may fight it (the server drops the claim then).
+    enum class ClaimState : uint8_t { Unclaimed, Others, Yours, CalledForHelp };
+    constexpr int kClaimStateCount = 4;
     enum class TargetState : uint8_t { None, Targeted, Locked, SubTarget, OutOfRange };
     constexpr int kTargetStateCount = 5;
     enum class TargetType : uint8_t { Mob, Player, Friend, PartyMember, LinkshellMember, Npc, Pet }; // the menu's order

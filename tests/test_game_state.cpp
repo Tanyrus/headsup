@@ -448,6 +448,25 @@ namespace
     }
 }
 
+TEST(a_mob_called_for_help_is_known_until_it_says_otherwise)
+{
+    GameState game;
+    CHECK(!game.CalledForHelp(kChigoe));
+    Feed(game, MobUpdate(kChigoe, kGeneral, kCallForHelpFlag));
+    CHECK(game.CalledForHelp(kChigoe) && !game.CalledForHelp(kChigoe + 1) && !game.Untargetable(kChigoe));
+    Feed(game, MobUpdate(kChigoe, kMoved, 0)); // a move carries no flags
+    CHECK(game.CalledForHelp(kChigoe));
+    Feed(game, MobUpdate(kChigoe, kGeneral, 0)); // its fight is over
+    CHECK(!game.CalledForHelp(kChigoe));
+    Feed(game, MobUpdate(kChigoe, kGeneral, kCallForHelpFlag));
+    Feed(game, MobUpdate(kChigoe, kDespawn, 0));
+    CHECK(!game.CalledForHelp(kChigoe));
+    Feed(game, MobUpdate(kChigoe, kGeneral, kCallForHelpFlag | kUntargetableFlag));
+    CHECK(game.CalledForHelp(kChigoe) && game.Untargetable(kChigoe));
+    Feed(game, ZoneIn(kRain));
+    CHECK(!game.CalledForHelp(kChigoe));
+}
+
 TEST(a_mob_the_server_makes_untargetable_is_known_until_it_says_otherwise)
 {
     GameState game;

@@ -73,7 +73,10 @@ namespace headsup
             st.pet       = a.pet;
             st.alive     = a.alive;
             st.target    = TargetStateOf(a.index, targets);
-            st.claim     = a.claimedByParty ? ClaimState::Yours : a.claimed ? ClaimState::Others : ClaimState::Unclaimed;
+            st.claim     = a.calledForHelp    ? ClaimState::CalledForHelp
+                           : a.claimedByParty ? ClaimState::Yours
+                           : a.claimed        ? ClaimState::Others
+                                              : ClaimState::Unclaimed;
             st.playerRow = PlayerRowOf(a.party, a.isFriend, a.linkshell);
             st.petRow    = a.petRow;
             if (a.kind == EntityKind::Mob)
@@ -86,7 +89,8 @@ namespace headsup
                 const Category classified = Classify(mob, a.checked ? a.checked->level : 0, player);
                 st.nature     = NatureOf(classified, placeholder);
                 st.classified = classified;
-                st.row        = MobRowOf(st.nature, a.claimedByParty, a.claimed, a.alive);
+                // Called for help, a mob has lost its claimer and is still fought: the others' claim row has it.
+                st.row        = MobRowOf(st.nature, a.claimedByParty, a.claimed || a.calledForHelp, a.alive);
                 st.toughness  = info.level.shade;
                 st.tooWeak    = info.level.shade == LabelShade::TooWeak;
             }

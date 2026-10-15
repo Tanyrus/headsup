@@ -31,6 +31,7 @@ namespace headsup
         constexpr uint32_t kEntityIndex = 0x08, kEntitySends = 0x0A, kEntityFlags = 0x21;
         constexpr uint8_t kSendsFlags = 0x04, kSendsDespawn = 0x20; // UPDATE_HP and UPDATE_DESPAWN
         constexpr uint32_t kUntargetableFlag = 0x800;                // EntityFlags::Untargetable
+        constexpr uint32_t kCallForHelpFlag  = 0x020;                // EntityFlags::CallForHelp
         constexpr unsigned kCodeBits = 6, kLetters = 26, kDigits = 10, kEndCode = 63, kByteBits = 8;
         constexpr size_t kMostLinkshellLetters = 20;
     }
@@ -130,8 +131,13 @@ namespace headsup
     {
         if (data == nullptr || size < kEntityFlags + sizeof(uint32_t)) return std::nullopt;
         const uint8_t sends = data[kEntitySends];
-        EntityUpdate update{ReadAt<uint16_t>(data, kEntityIndex), (sends & kSendsDespawn) != 0, std::nullopt};
-        if ((sends & kSendsFlags) != 0) update.untargetable = (ReadAt<uint32_t>(data, kEntityFlags) & kUntargetableFlag) != 0;
+        EntityUpdate update{ReadAt<uint16_t>(data, kEntityIndex), (sends & kSendsDespawn) != 0, std::nullopt, std::nullopt};
+        if ((sends & kSendsFlags) != 0)
+        {
+            const uint32_t flags = ReadAt<uint32_t>(data, kEntityFlags);
+            update.untargetable  = (flags & kUntargetableFlag) != 0;
+            update.calledForHelp = (flags & kCallForHelpFlag) != 0;
+        }
         return update;
     }
 

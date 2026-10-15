@@ -235,6 +235,21 @@ TEST(a_placeholder_is_outlined_by_its_own_row_in_its_own_color)
     CHECK(!t.Find(0x2000)->outline && !t.Find(0x4000)->outline); // a placeholder takes its own row, aggressive or not
 }
 
+TEST(a_mob_called_for_help_has_a_claim_state_of_its_own_in_the_claim_row_of_others)
+{
+    Tracker t;
+    Settings s;
+    ActorInput helped    = BountyHunter(0x2000);
+    helped.calledForHelp = true; // the server drops the claim when help is called, and says no more of whose it was
+    t.Update({helped, BountyHunter(0x3000)}, kLevel20, s, CursorTargets{});
+    CHECK(t.Find(0x2000)->state.claim == ClaimState::CalledForHelp && t.Find(0x2000)->state.row == Category::OtherClaim);
+    CHECK(t.Find(0x3000)->state.claim == ClaimState::Unclaimed && t.Find(0x3000)->state.row == Category::WillAttack);
+    // A claim row that outlines by claim draws it in Called for Help's orange.
+    SetMobOutline(s, Category::OtherClaim, OutlineMode::Shown);
+    t.Update({helped}, kLevel20, s, CursorTargets{});
+    CHECK(t.Find(0x2000)->outline && t.Find(0x2000)->argb == 0xFFFF9900u);
+}
+
 TEST(a_claimed_mob_takes_its_claim_rows_mode_and_color)
 {
     Tracker t;

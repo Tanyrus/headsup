@@ -70,6 +70,8 @@ namespace headsup
     static_assert(static_cast<int>(ToughnessColorsRow::IncrediblyTough) == static_cast<int>(LabelShade::IncrediblyTough),
         "gen_window.py: toughness-colors rows in LabelShade's order");
     static_assert(RowCount(SettingPiece::ClaimColors) == kClaimStateCount, "settings_window.json: claim-colors");
+    static_assert(static_cast<int>(ClaimColorsRow::CalledForHelp) == static_cast<int>(ClaimState::CalledForHelp),
+        "gen_window.py: claim-colors rows in ClaimState's order");
     static_assert(RowCount(SettingPiece::TargetingColors) == kTargetStateCount, "settings_window.json: targeting-colors");
     static_assert(RowCount(SettingPiece::EntityTypeColors) == kTargetTypeCount, "settings_window.json: entity-type-colors");
     static_assert(RowCount(SettingPiece::Detection) == kDetectionIconCount, "settings_window.json: detection");

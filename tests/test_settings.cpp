@@ -656,6 +656,19 @@ TEST(a_file_from_before_hide_during_conversation_keeps_plates_in_conversations)
     CHECK(!LoadSettings(file).hideInEvent);
 }
 
+TEST(called_for_help_has_its_own_color_orange_until_one_is_saved)
+{
+    const int help = static_cast<int>(ClaimState::CalledForHelp);
+    MapStore release = ReleaseFile();
+    CHECK_EQ(ToArgb(LoadSettings(release).palette.claim[help]), 0xFFFF9900u);
+    Settings s;
+    s.palette.claim[help] = {{0.25f, 0.5f, 0.75f}};
+    MapStore file;
+    SaveSettings(s, file);
+    CHECK(LoadSettings(file).palette.claim[help] == (Color{{0.25f, 0.5f, 0.75f}}));
+    CHECK(LoadSettings(file).palette.claim[static_cast<int>(ClaimState::Yours)] == Settings{}.palette.claim[static_cast<int>(ClaimState::Yours)]);
+}
+
 TEST(non_finite_values_fall_back_to_defaults)
 {
     // A number that is none reads as a key the file lacks: the file loads as it would without them.
