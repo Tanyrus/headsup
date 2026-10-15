@@ -1,4 +1,6 @@
 #include "nameplate.h"
+
+#include "name_frame.h"
 #include "plate_image.h"
 
 #include <algorithm>
@@ -162,6 +164,12 @@ namespace headsup
         constexpr float kPerYalm = 21.09f, kFarthest = 0.3f;
         if (std::isnan(yalms)) return 1.0f;
         return yalms > 0.0f ? std::clamp(kPerYalm / yalms + kFarthest, minScale, maxScale) : maxScale;
+    }
+
+    float NameScale(float depth, float letterHeight, float screenHeight, float minScale, float maxScale)
+    {
+        const float yalms = YalmsAtDepth(depth);
+        return std::isnan(yalms) ? DistanceScale(letterHeight, screenHeight, minScale, maxScale) : ScaleAtDistance(yalms, minScale, maxScale);
     }
 
     float EaseScale(float shown, float target, double seconds)

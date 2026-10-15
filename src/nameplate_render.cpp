@@ -360,10 +360,10 @@ namespace headsup
                 p.frame  = m_Frame;
 
                 const bool self = info->index == selfIndex;
-                // Yours, and any plate while the camera or you are not known, follows the game's name size.
+                // Yours, and any plate while the camera or you are not known, is sized by its name's distance.
                 const float sized = cameraBack && !self
                                         ? ScaleAtDistance(*cameraBack + Distance(info->feet, you->feet), minScale, maxScale)
-                                        : DistanceScale(gameName.box.Height(), screenHeight, minScale, maxScale);
+                                        : NameScale(gameName.depth, gameName.box.Height(), screenHeight, minScale, maxScale);
                 p.scale                 = EaseScale(p.scale, sized, now - p.scaleTime);
                 p.scaleTime             = now;
                 const bool scales       = ScalesWithDistance(settings, self);

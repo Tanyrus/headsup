@@ -203,6 +203,23 @@ TEST(scale_follows_the_game_name_with_limits)
     CHECK(Near(DistanceScale(8.0f, 1440.0f, 0.8f, 1.2f), 1.0f));
 }
 
+TEST(a_plate_sized_by_its_own_name_follows_the_names_distance_and_not_its_jumps)
+{
+    // From a live watch dump with shadows off (no scene camera): the Hill Lizard's name 11.8 px tall at depth
+    // 0.99436, which is 0.1 / 0.00564 = 17.73 yalms from the camera: 21.09 / 17.73 + 0.3 = 1.49, its height 1.475.
+    CHECK(std::abs(NameScale(0.99436f, 11.8f, 1440.0f, kLeastScale, kMostScale) - 1.4895f) < 0.001f);
+    CHECK(std::abs(NameScale(0.99436f, 11.8f, 1440.0f, kLeastScale, kMostScale) -
+                   DistanceScale(11.8f, 1440.0f, kLeastScale, kMostScale)) < 0.02f);
+    // The game drew a name a third taller for a frame at the same depth: the plate does not follow.
+    CHECK_EQ(NameScale(0.99436f, 15.8f, 1440.0f, kLeastScale, kMostScale), NameScale(0.99436f, 11.8f, 1440.0f, kLeastScale, kMostScale));
+    // A depth that says nothing leaves the name's height.
+    CHECK_EQ(NameScale(0.0f, 11.8f, 1440.0f, kLeastScale, kMostScale), DistanceScale(11.8f, 1440.0f, kLeastScale, kMostScale));
+    CHECK_EQ(NameScale(1.0f, 11.8f, 1440.0f, kLeastScale, kMostScale), DistanceScale(11.8f, 1440.0f, kLeastScale, kMostScale));
+    CHECK_EQ(NameScale(std::nanf(""), 11.8f, 1440.0f, kLeastScale, kMostScale), DistanceScale(11.8f, 1440.0f, kLeastScale, kMostScale));
+    // The limits are the caller's.
+    CHECK_EQ(NameScale(0.99436f, 11.8f, 1440.0f, 0.8f, 1.2f), 1.2f);
+}
+
 TEST(text_is_redrawn_only_when_its_size_moves_a_step)
 {
     CHECK_EQ(RasterHeight(15.0f, 0), 18);  // the first size at or above it: 6 px times 1.25 steps

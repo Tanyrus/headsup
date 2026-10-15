@@ -79,10 +79,15 @@ namespace headsup
         return std::find(text, text + length, kLineBreak) == text + length;
     }
 
+    float YalmsAtDepth(float depth)
+    {
+        return depth > 0.0f && depth < 1.0f ? kNearPlane / (1.0f - depth) : std::nanf("");
+    }
+
     float NameSizeAtDepth(float depth)
     {
-        if (!(depth > 0.0f && depth < 1.0f)) return 1.0f;
-        const float yalms = kNearPlane / (1.0f - depth);
+        const float yalms = YalmsAtDepth(depth);
+        if (std::isnan(yalms)) return 1.0f;
         return std::min(1.0f, std::round((kSizePerYalm / yalms + kSizeFar) * kSizeSteps) / kSizeSteps);
     }
 

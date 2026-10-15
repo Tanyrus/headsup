@@ -98,6 +98,10 @@ namespace headsup
     // its names in eightieths, by its depth from the camera, so they change in jumps and as the camera turns): 1 for
     // a distance that is not a number.
     float ScaleAtDistance(float yalms, float minScale, float maxScale);
+    // A plate sized by its own name, yours or any without the scene camera (shadows off): ScaleAtDistance of the
+    // name's yalms from the camera, which its depth gives, so neither the game's steps nor a frame it draws a name at
+    // another size move it; DistanceScale of the name's height where the depth says nothing.
+    float NameScale(float depth, float letterHeight, float screenHeight, float minScale, float maxScale);
     // The game steps its name size, by 5% at a time far away; a plate eases toward each step. A plate with no size yet
     // (0) takes the size at once.
     float EaseScale(float shown, float target, double seconds);
