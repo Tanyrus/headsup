@@ -983,6 +983,16 @@ TEST(a_card_folds_on_its_title_and_a_switch_takes_a_click)
     CHECK(window.Shows("entities-nameplates-stack-names"));
 }
 
+TEST(hide_during_conversation_is_a_switch_of_the_nameplates_card)
+{
+    Window window;
+    CHECK(window.Click("entities-nameplates-hide-during-conversation"));
+    CHECK(window.settings.hideInEvent);
+    window.Click("entities-nameplates-on");
+    CHECK(!window.settings.nameplates);
+    CHECK(!window.Shows("entities-nameplates-hide-during-conversation"));
+}
+
 TEST(a_color_is_typed_into_the_pickers_hex_box)
 {
     Window window;

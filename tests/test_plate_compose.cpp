@@ -146,7 +146,7 @@ TEST(a_dead_mob_keeps_its_name_alone)
     dead.state.row = Category::Dead;
     d.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::Dead)].plate = PlateMode::Hidden;
     CHECK(ComposePlate(dead, kPlayer, d, kGame).lines.empty());
-    CHECK(HookActionFor(dead.state, d, false, false) == HookAction::Hide);
+    CHECK(HookActionFor(dead.state, d, kPlayer, false, false) == HookAction::Hide);
 }
 
 TEST(a_dead_entitys_text_is_dark_grey_whatever_its_colors)
@@ -176,23 +176,45 @@ TEST(a_dead_entitys_text_is_dark_grey_whatever_its_colors)
     CHECK_EQ(ComposePlate(npc, kPlayer, s, kGame).lines.back().look.color, kGame);
 }
 
-TEST(in_a_cutscene_or_a_dialog_every_plate_keeps_its_name_alone)
+TEST(in_a_conversation_plates_show_whole_unless_hide_during_conversation_is_on)
 {
-    const Settings s; // the default designs
-    PlayerState watching = kPlayer;
-    watching.inEvent     = true;
+    Settings s; // the default designs
+    PlayerState talking = kPlayer;
+    talking.inEvent     = true;
     ActorInfo targeted    = AggressiveMob();
     targeted.state.target = TargetState::Targeted;
-    CHECK_EQ(ComposePlate(targeted, kPlayer, s, kGame).lines.size(), size_t{3});
-    const ComposedPlate mob = ComposePlate(targeted, watching, s, kGame);
-    CHECK_EQ(mob.lines.size(), size_t{1});
-    CHECK_EQ(Rendered(mob.lines[0]), "Young Quadav");
-    CHECK_EQ(OrnamentLineOf(mob).line, kNoOrnament);
-    // A player's icons go with the rest: the linkshell and seeking-party marks beside the name.
-    CHECK(Rendered(ComposePlate(LinkshellPlayer(), kPlayer, s, kGame).lines.back()) != "Chadmage");
-    const ComposedPlate player = ComposePlate(LinkshellPlayer(), watching, s, kGame);
-    CHECK_EQ(player.lines.size(), size_t{1});
-    CHECK_EQ(Rendered(player.lines[0]), "Chadmage");
+    const ComposedPlate mob = ComposePlate(targeted, talking, s, kGame);
+    CHECK_EQ(mob.lines.size(), size_t{3});
+    CHECK_EQ(Rendered(mob.lines[0]), "[3]");
+    CHECK_EQ(OrnamentLineOf(mob).line, 2);
+    CHECK_EQ(Rendered(ComposePlate(LinkshellPlayer(), talking, s, kGame).lines.back()), "[2]Chadmage");
+    s.hideInEvent = true;
+    for (const ActorInfo& info : {targeted, LinkshellPlayer()})
+    {
+        const ComposedPlate hidden = ComposePlate(info, talking, s, kGame);
+        CHECK(hidden.lines.empty());
+        CHECK_EQ(OrnamentLineOf(hidden).line, kNoOrnament);
+    }
+    CHECK_EQ(ComposePlate(targeted, kPlayer, s, kGame).lines.size(), size_t{3}); // and whole again once it ends
+}
+
+TEST(in_a_conversation_the_hook_hides_every_name_only_when_asked)
+{
+    Settings s;
+    PlayerState talking = kPlayer;
+    talking.inEvent     = true;
+    const EntityState mob = AggressiveMob().state;
+    PlateMode& row        = s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WillAttack)].plate;
+    CHECK(HookActionFor(mob, s, talking, false, false) == HookAction::Replace);
+    row = PlateMode::Vanilla;
+    CHECK(HookActionFor(mob, s, talking, false, false) == HookAction::Keep);
+    s.hideInEvent = true;
+    CHECK(HookActionFor(mob, s, talking, false, false) == HookAction::Hide); // the game's own names go too
+    CHECK(HookActionFor(mob, s, kPlayer, false, false) == HookAction::Keep);
+    row = PlateMode::Shown;
+    CHECK(HookActionFor(mob, s, talking, false, true) == HookAction::Hide);
+    s.nameplates = false; // nameplates off: HeadsUp leaves every name to the game
+    CHECK(HookActionFor(mob, s, talking, false, false) == HookAction::Keep);
 }
 
 TEST(a_dead_mobs_name_does_not_glow)
@@ -400,23 +422,23 @@ TEST(the_hook_keeps_vanilla_names_hides_hidden_ones_and_replaces_the_rest)
 {
     Settings s;
     const EntityState mob = AggressiveMob().state;
-    CHECK(HookActionFor(mob, s, false, false) == HookAction::Replace);
+    CHECK(HookActionFor(mob, s, kPlayer, false, false) == HookAction::Replace);
     s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WillAttack)].plate = PlateMode::Vanilla;
-    CHECK(HookActionFor(mob, s, false, false) == HookAction::Keep);
+    CHECK(HookActionFor(mob, s, kPlayer, false, false) == HookAction::Keep);
     s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WillAttack)].plate = PlateMode::Hidden;
-    CHECK(HookActionFor(mob, s, false, false) == HookAction::Hide);
+    CHECK(HookActionFor(mob, s, kPlayer, false, false) == HookAction::Hide);
     s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WillAttack)].plate = PlateMode::WhenTargeted;
-    CHECK(HookActionFor(mob, s, false, false) == HookAction::Hide);
+    CHECK(HookActionFor(mob, s, kPlayer, false, false) == HookAction::Hide);
     EntityState targeted = mob;
     targeted.target      = TargetState::Targeted;
-    CHECK(HookActionFor(targeted, s, false, false) == HookAction::Replace);
+    CHECK(HookActionFor(targeted, s, kPlayer, false, false) == HookAction::Replace);
     s.nameplates = false;
-    CHECK(HookActionFor(targeted, s, false, false) == HookAction::Keep);
-    CHECK(HookActionFor(targeted, s, true, false) == HookAction::Hide);
+    CHECK(HookActionFor(targeted, s, kPlayer, false, false) == HookAction::Keep);
+    CHECK(HookActionFor(targeted, s, kPlayer, true, false) == HookAction::Hide);
     s.nameplates = true;
     s.enabled    = false;
-    CHECK(HookActionFor(targeted, s, false, false) == HookAction::Keep);
-    CHECK(HookActionFor(targeted, s, true, false) == HookAction::Hide); // screenshot mode hides names even after /hu off
+    CHECK(HookActionFor(targeted, s, kPlayer, false, false) == HookAction::Keep);
+    CHECK(HookActionFor(targeted, s, kPlayer, true, false) == HookAction::Hide); // screenshot mode hides names even after /hu off
 }
 
 TEST(a_name_headsup_cannot_draw_goes_back_to_the_game_and_a_hidden_one_stays_hidden)
@@ -427,16 +449,16 @@ TEST(a_name_headsup_cannot_draw_goes_back_to_the_game_and_a_hidden_one_stays_hid
     EntityState targeted  = mob;
     targeted.target       = TargetState::Targeted;
     row = PlateMode::Shown;
-    CHECK(HookActionFor(mob, s, false, true) == HookAction::Keep);
+    CHECK(HookActionFor(mob, s, kPlayer, false, true) == HookAction::Keep);
     row = PlateMode::WhenTargeted;
-    CHECK(HookActionFor(targeted, s, false, true) == HookAction::Keep);
-    CHECK(HookActionFor(mob, s, false, true) == HookAction::Hide); // hidden while it is not your target
+    CHECK(HookActionFor(targeted, s, kPlayer, false, true) == HookAction::Keep);
+    CHECK(HookActionFor(mob, s, kPlayer, false, true) == HookAction::Hide); // hidden while it is not your target
     row = PlateMode::Hidden;
-    CHECK(HookActionFor(mob, s, false, true) == HookAction::Hide);
+    CHECK(HookActionFor(mob, s, kPlayer, false, true) == HookAction::Hide);
     row = PlateMode::Vanilla;
-    CHECK(HookActionFor(mob, s, false, true) == HookAction::Keep);
+    CHECK(HookActionFor(mob, s, kPlayer, false, true) == HookAction::Keep);
     row = PlateMode::Shown;
-    CHECK(HookActionFor(mob, s, true, true) == HookAction::Hide); // screenshot mode still hides every name
+    CHECK(HookActionFor(mob, s, kPlayer, true, true) == HookAction::Hide); // screenshot mode still hides every name
 }
 
 TEST(spaces_at_the_ends_of_a_line_or_beside_text_are_dropped)
@@ -654,14 +676,14 @@ TEST(a_slot_draws_the_first_of_its_tags_that_has_something_to_show)
     CHECK_EQ(Rendered(Compose(info, s).lines[0]), "Chadmage [1]");
     info.title = 266;
     CHECK_EQ(Rendered(Compose(info, s).lines[0]), "Chadmage Looks Sublime in a Subligar");
-    // Where a plate keeps its name alone, a slot that holds the name shows it and any other shows nothing.
-    line = "${title|name} ${sync|bazaar}";
-    PlayerState watching = kPlayer;
-    watching.inEvent     = true;
-    info.status->bazaar  = true;
-    const ComposedPlate alone = ComposePlate(info, watching, s, kGame);
+    // Where a plate keeps its name alone, as a dead mob's, a slot that holds the name shows it and any other nothing.
+    s.Kind(PlateKind::Mobs).lines[2].text = "${level|name} $detect";
+    ActorInfo mob = AggressiveMob();
+    CHECK_EQ(Rendered(ComposePlate(mob, kPlayer, s, kGame).lines.back()), "17-20 [3]");
+    mob.state.alive           = false;
+    const ComposedPlate alone = ComposePlate(mob, kPlayer, s, kGame);
     CHECK_EQ(alone.lines.size(), size_t{1});
-    CHECK_EQ(Rendered(alone.lines[0]), "Chadmage");
+    CHECK_EQ(Rendered(alone.lines[0]), "Young Quadav");
 }
 
 TEST(a_plate_draws_no_more_status_icons_than_its_kind_allows_and_gms_besides)

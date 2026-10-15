@@ -282,10 +282,11 @@ namespace headsup
         return static_cast<float>(s.baseSize) * static_cast<float>(percent) / kPercent;
     }
 
-    HookAction HookActionFor(const EntityState& state, const Settings& s, bool screenshot, bool namesFailed)
+    HookAction HookActionFor(const EntityState& state, const Settings& s, const PlayerState& player, bool screenshot, bool namesFailed)
     {
         if (screenshot) return HookAction::Hide;
         if (!s.enabled || !s.nameplates) return HookAction::Keep;
+        if (player.inEvent && s.hideInEvent) return HookAction::Hide;
         const HookAction drawn = namesFailed ? HookAction::Keep : HookAction::Replace;
         switch (s.Kind(PlateKindOf(state)).rows[RowOf(state)].plate)
         {
@@ -300,7 +301,7 @@ namespace headsup
     {
         ComposedPlate plate;
         const EntityState& st = info.state;
-        if (!s.enabled || !s.nameplates) return plate;
+        if (!s.enabled || !s.nameplates || (player.inEvent && s.hideInEvent)) return plate;
         const KindSettings& kind = s.Kind(PlateKindOf(st));
         const PlateMode mode     = kind.rows[RowOf(st)].plate;
         if (!DrawsPlate(mode)) return plate;
@@ -308,7 +309,6 @@ namespace headsup
         // An NPC has no life to lose, whatever its health reads.
         const bool dead     = !st.alive && st.kind != EntityKind::Npc;
         const bool deadMob  = dead && st.kind == EntityKind::Mob;
-        const bool nameOnly = deadMob || player.inEvent;
         const auto marked   = [dash = DashChar(s.dashMark)](std::string text) {
             std::ranges::replace(text, kDash, dash);
             return text;
@@ -325,14 +325,14 @@ namespace headsup
             {
                 if (atom.slot.empty())
                 {
-                    if (!nameOnly) builder.Literal(marked(atom.text));
+                    if (!deadMob) builder.Literal(marked(atom.text));
                     continue;
                 }
                 // A slot is the first of its tags that has something to show, or as one tag with nothing.
                 bool drawn = false;
                 for (const Tag tag : atom.slot)
                 {
-                    if (drawn || (nameOnly && tag != Tag::Name)) continue;
+                    if (drawn || (deadMob && tag != Tag::Name)) continue;
                     if (IsTextTag(tag))
                     {
                         const std::string text = TagText(tag, info, player);
@@ -347,7 +347,7 @@ namespace headsup
                     if (drawn && counted) ++statusIcons;
                     if (drawn) builder.Icons(std::move(icons), IsBadgeTag(tag));
                 }
-                if (!drawn && !nameOnly) builder.Empty();
+                if (!drawn && !deadMob) builder.Empty();
             }
             builder.Finish();
             if (builder.items.empty()) continue;

@@ -896,6 +896,10 @@ namespace headsup
                 form.Fade(!plates);
                 form.Switch(label.c_str(), s.stackNames, tip);
                 break;
+            case SettingPiece::HideDuringConversation:
+                form.Fade(!plates);
+                form.Switch(label.c_str(), s.hideInEvent, tip);
+                break;
             case SettingPiece::Thickness:
                 form.Fade(!outlines);
                 form.SliderInt(label.c_str(), s.outlineThickness, kMinOutlineThickness, kMaxOutlineThickness, "%d%%", tip);

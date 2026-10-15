@@ -320,6 +320,7 @@ expBar=beside
 jobNames=false
 clock24=false
 stackNames=true
+hideInEvent=true
 barTitleFont=Cinzel
 barTextFont=
 barSubtitle=before
@@ -391,6 +392,7 @@ helpBarY=8.0000
         s.jobNames   = false;
         s.clock24    = false;
         s.stackNames = true;
+        s.hideInEvent = true;
         s.barTitleFont = "Cinzel";
         s.barSubtitle = SubtitlePlace::Before;
         s.cursorOutlineThickness = 120; // 60 of before
@@ -646,6 +648,12 @@ TEST(the_target_cursor_rises_or_sinks_up_to_twenty_pixels)
     Settings s;
     s.cursorRaise = 25;
     CHECK_EQ(Clamp(s).cursorRaise, 20);
+}
+
+TEST(a_file_from_before_hide_during_conversation_keeps_plates_in_conversations)
+{
+    MapStore file = ReleaseFile();
+    CHECK(!LoadSettings(file).hideInEvent);
 }
 
 TEST(non_finite_values_fall_back_to_defaults)
