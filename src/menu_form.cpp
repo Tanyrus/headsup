@@ -821,14 +821,14 @@ namespace headsup
         // A list of HeadsUp's own pictures, named by the layout's options, then the cursors folder's files by name.
         template <typename Style>
         PictureChoice<Style> PictureDropdown(Context& c, const LayoutSetting& e, const std::string& label, const char* tip,
-            Style style, const std::string& file, Style fallback)
+            Style style, const std::string& file)
         {
             static const std::vector<std::string> kNoFiles;
             const auto options = c.layout.OptionsOf(e);
             const std::vector<PictureChoice<Style>> choices =
                 PictureChoices(c.readings.cursorFiles != nullptr ? *c.readings.cursorFiles : kNoFiles, style, file);
             const auto said = [&](int choice) { return options[static_cast<size_t>(choices[static_cast<size_t>(choice)].style)]; };
-            int picked      = PictureChoiceOf(choices, style, file, fallback);
+            int picked      = PictureChoiceOf(choices, style, file);
             c.form.NumberDropdown(label.c_str(), picked, 0, static_cast<int>(choices.size()) - 1,
                 [&](int choice) {
                     const PictureChoice<Style>& shown = choices[static_cast<size_t>(choice)];
@@ -843,7 +843,7 @@ namespace headsup
         {
             Settings& s = c.s;
             c.form.Fade(!s.enabled);
-            const PictureChoice<CursorStyle> choice = PictureDropdown(c, e, label, tip, s.cursorStyle, s.cursorFile, kDefaultCursorStyle);
+            const PictureChoice<CursorStyle> choice = PictureDropdown(c, e, label, tip, s.cursorStyle, s.cursorFile);
             // Another style comes at its own width, or it would be squeezed into the one before's.
             if (choice.style != s.cursorStyle && choice.style != CursorStyle::Vanilla)
                 s.cursorWidth = std::clamp(NaturalCursorWidth(choice.style, s.cursorHeight), kMinCursorSide, kMaxCursorSide);
@@ -1180,7 +1180,7 @@ namespace headsup
             case SettingPiece::PointerIcon:
             {
                 form.Fade(!on);
-                const PictureChoice<PointerIcon> choice = PictureDropdown(c, e, label, tip, s.pointerIcon, s.pointerFile, PointerIcon::Vanilla);
+                const PictureChoice<PointerIcon> choice = PictureDropdown(c, e, label, tip, s.pointerIcon, s.pointerFile);
                 s.pointerIcon = choice.style;
                 s.pointerFile = choice.file;
                 break;

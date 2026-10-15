@@ -14,8 +14,8 @@ namespace headsup
 {
     // PlayOnline's chocobo pointer as the target cursor shows it: its first frame.
     Image ChocoboPicture();
-    // A cursor file's first frame; nothing for bytes that are no .cur or .ani file.
-    std::optional<Image> CursorFilePicture(const uint8_t* data, size_t size);
+    // A cursor file's first frame (ReadCursorFile's); nothing for a file that gave none.
+    std::optional<Image> CursorFilePicture(const std::vector<CursorFrame>& frames);
     // The kinds of file the cursors folder is read for, as their names end.
     constexpr const char* kCursorExtensions[] = {".cur", ".ani"};
     // The cursors a folder holds, from the names of everything in it: each cursor file's name without its ending,

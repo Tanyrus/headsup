@@ -68,6 +68,7 @@ namespace headsup
     std::string PointerSwap::Start(std::vector<CursorFrame> shown)
     {
         if (Running()) return "";
+        if (shown.empty()) return "its picture could not be read";
         HMODULE game = GetModuleHandleA(kGameModule);
         if (game == nullptr) return std::string("the game's ") + kGameModule + " is not loaded";
         char path[MAX_PATH] = {};

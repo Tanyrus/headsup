@@ -118,12 +118,12 @@ namespace headsup
         return choices;
     }
 
-    // Which entry the settings have picked, or the fallback's.
+    // Which entry the settings have picked, which PictureChoices always lists; the first if it ever did not.
     template <typename Style>
-    int PictureChoiceOf(const std::vector<PictureChoice<Style>>& choices, Style saved, const std::string& savedFile, Style fallback)
+    int PictureChoiceOf(const std::vector<PictureChoice<Style>>& choices, Style saved, const std::string& savedFile)
     {
         const PictureChoice<Style> picked{saved, saved == Style::File ? savedFile : std::string()};
         const auto at = std::ranges::find(choices, picked);
-        return at != choices.end() ? static_cast<int>(at - choices.begin()) : static_cast<int>(fallback);
+        return at != choices.end() ? static_cast<int>(at - choices.begin()) : 0;
     }
 }

@@ -44,7 +44,7 @@ namespace headsup
         int widget         = 0;     // the Widgets page's picked widget, by BarWidget
         bool confirmReset  = false; // the reset button was pressed once and asks for a second press
         bool debugRequested = false;
-        bool cursorsRequested = false; // the Cursor Style list was opened: the cursors folder is to be read again
+        bool cursorsRequested = false; // a list of pictures was opened: the cursors folder is to be read again
         KeyCapture keyCapture;      // the Mouse Cursor page's
         KeyCapture shotKeyCapture;  // screenshot mode's
         WindowFilter windows;

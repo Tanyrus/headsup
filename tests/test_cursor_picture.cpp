@@ -117,10 +117,10 @@ TEST(a_cursor_files_bytes_are_its_first_frames_picture_or_nothing)
     const uint8_t header[40] = {40, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 1, 0, 32, 0};
     file.insert(file.end(), header, header + sizeof(header));
     file.insert(file.end(), {0x10, 0x80, 0xFF, 0xFF, 0, 0, 0, 0}); // blue, green, red, alpha; then the mask's row
-    const std::optional<Image> picture = CursorFilePicture(file.data(), file.size());
+    const std::optional<Image> picture = CursorFilePicture(ReadCursorFile(file.data(), file.size()));
     CHECK(picture && picture->width == 1 && picture->height == 1);
     CHECK_EQ(picture->argb[0], 0xFFFF8010u);
     const std::vector<uint8_t> text{'n', 'o', 't', ' ', 'a', ' ', 'c', 'u', 'r', 's', 'o', 'r', '!', '!', '!', '!', '!', '!', '!', '!', '!', '!', '!', '!'};
-    CHECK(!CursorFilePicture(text.data(), text.size()));
-    CHECK(!CursorFilePicture(nullptr, 0));
+    CHECK(!CursorFilePicture(ReadCursorFile(text.data(), text.size())));
+    CHECK(!CursorFilePicture(ReadCursorFile(nullptr, 0)));
 }

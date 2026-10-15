@@ -309,7 +309,7 @@ class HeadsUp final : public IPlugin
     std::optional<std::string> m_WindowLog;   // /hu windowlog's file, while it runs
     std::vector<std::string> m_LastOpen;      // the open windows it wrote last // what the window hook has: the settings' windows and groups
     std::vector<std::string> m_SeenWindows;
-    std::vector<std::string> m_CursorFiles;      // the cursors folder's, as the Cursor Style list offers them
+    std::vector<std::string> m_CursorFiles;      // the cursors folder's, as the Target Cursor and Cursor Icon lists offer them
     std::optional<std::string> m_CursorFileRead; // the File cursor read last, whether or not it was one
     float m_MenuHeight  = 0.0f;
     int m_CaptureLeft   = 0;
@@ -1444,11 +1444,10 @@ private:
         m_PointerFailed = false;
     }
 
-    // Each file of the cursors folder by this name, in the order of the cursor extensions; a missing or oversized one
-    // is left out.
-    std::vector<std::vector<uint8_t>> CursorFileContents(const std::string& name)
+    // The frames of the first file of the cursors folder by this name that has any, in the order of the cursor
+    // extensions; a missing or oversized file is passed over unread.
+    std::vector<headsup::CursorFrame> CursorFileFrames(const std::string& name)
     {
-        std::vector<std::vector<uint8_t>> contents;
         for (const char* extension : headsup::kCursorExtensions)
         {
             std::ifstream in(CursorsFolder() + name + extension, std::ios::binary | std::ios::ate);
@@ -1456,9 +1455,11 @@ private:
             if (!in || size <= 0 || static_cast<uint64_t>(size) > headsup::kMaxCursorFileBytes) continue;
             std::vector<uint8_t> bytes(static_cast<size_t>(size));
             in.seekg(0);
-            if (in.read(reinterpret_cast<char*>(bytes.data()), size)) contents.push_back(std::move(bytes));
+            if (!in.read(reinterpret_cast<char*>(bytes.data()), size)) continue;
+            if (std::vector<headsup::CursorFrame> frames = headsup::ReadCursorFile(bytes.data(), bytes.size()); !frames.empty())
+                return frames;
         }
-        return contents;
+        return {};
     }
 
     // The File cursor's picture, read when the settings come to name another file.
@@ -1467,9 +1468,7 @@ private:
         const bool wanted = m_Settings.cursorStyle == headsup::CursorStyle::File;
         if (!wanted || m_CursorFileRead == m_Settings.cursorFile) return;
         m_CursorFileRead = m_Settings.cursorFile;
-        std::optional<headsup::Image> picture;
-        for (const std::vector<uint8_t>& bytes : CursorFileContents(m_Settings.cursorFile))
-            if ((picture = headsup::CursorFilePicture(bytes.data(), bytes.size()))) break;
+        std::optional<headsup::Image> picture = headsup::CursorFilePicture(CursorFileFrames(m_Settings.cursorFile));
         if (!picture) Print("could not read the cursor " + m_Settings.cursorFile + " in " + CursorsFolder() + "; the feather stands in for it");
         m_Nameplates.SetCursorFile(std::move(picture));
     }
@@ -1627,19 +1626,12 @@ private:
         if (!wanted) return;
         if (!m_Pointer.Running() && !m_PointerFailed)
         {
-            std::vector<headsup::CursorFrame> frames;
-            if (m_Settings.pointerIcon == headsup::PointerIcon::Chocobo)
-                frames = headsup::ChocoboPointer();
-            else
-                for (const std::vector<uint8_t>& bytes : CursorFileContents(m_Settings.pointerFile))
-                    if (!(frames = headsup::ReadCursorFile(bytes.data(), bytes.size())).empty()) break;
-            m_PointerFailed = true;
-            if (frames.empty())
-                Print("could not read the pointer " + m_Settings.pointerFile + " in " + CursorsFolder() + "; the game's pointer stays.");
-            else if (const std::string failure = m_Pointer.Start(std::move(frames)); !failure.empty())
-                Print("the mouse pointer is the game's: " + failure + ".");
-            else
-                m_PointerFailed = false;
+            const bool chocobo        = m_Settings.pointerIcon == headsup::PointerIcon::Chocobo;
+            const std::string failure = m_Pointer.Start(chocobo ? headsup::ChocoboPointer() : CursorFileFrames(m_Settings.pointerFile));
+            m_PointerFailed           = !failure.empty();
+            if (m_PointerFailed)
+                Print("the mouse pointer is the game's, as " + (chocobo ? std::string("the chocobo") : m_Settings.pointerFile + " in " + CursorsFolder()) +
+                      " could not be shown: " + failure + ".");
         }
         m_Pointer.Animate();
     }

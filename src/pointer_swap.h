@@ -17,7 +17,7 @@ namespace headsup
     {
     public:
         ~PointerSwap() { Stop(); }
-        // Returns why it could not start, or an empty string.
+        // Returns why it could not start, or an empty string; with no frames it does not.
         std::string Start(std::vector<CursorFrame> shown);
         void Stop();
         bool Running() const { return m_Slot != nullptr; }
