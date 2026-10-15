@@ -431,12 +431,14 @@ TEST(you_are_in_combat_with_your_weapon_out_or_while_your_party_holds_a_living_m
     ActorInput theirs     = mob;
     theirs.claimedByParty = false;
     CHECK(!PlayerInCombat(std::vector{self, theirs}));
-    // Someone else's weapon, or a pet's, is not yours.
-    ActorInput other = Player(0x300);
-    other.engaged    = true;
-    ActorInput pet   = BountyHunter(0x400);
-    pet.pet          = true;
-    pet.engaged      = true;
+    // Someone else's weapon, or a pet's, is not yours; nor is a charmed pet, which carries its master's claim.
+    ActorInput other   = Player(0x300);
+    other.engaged      = true;
+    ActorInput pet     = BountyHunter(0x400);
+    pet.pet            = true;
+    pet.engaged        = true;
+    pet.claimed        = true;
+    pet.claimedByParty = true;
     CHECK(!PlayerInCombat(std::vector{self, other, pet}));
 }
 
