@@ -1,3 +1,4 @@
+#include "code_patch.h"
 #include "native_locate.h"
 #include "test.h"
 
@@ -24,7 +25,7 @@ namespace
 
     struct Image
     {
-        std::vector<uint8_t> text  = std::vector<uint8_t>(0x180000, 0xCC);
+        std::vector<uint8_t> text  = std::vector<uint8_t>(0x200000, 0xCC);
         std::vector<uint8_t> rdata = std::vector<uint8_t>(0x26000, 0x00);
 
         uint8_t* At(uint32_t rva)
@@ -680,6 +681,37 @@ TEST(the_windows_rectangle_copy_is_found_beside_its_move)
     PutMoveTo(without, kMoveToRva);
     const WindowMoveSite found = LocateWindowMove(without.Text());
     CHECK(found.problem == LocateProblem::None && found.getRect == 0); // the move works without it
+}
+
+namespace
+{
+    // Where Wide Scan draws its grid label, at RVA 0x1FAA75 in the client of 2026-10-13: the strip title's owner from a
+    // global, its window's rectangle by MCD::GetRect, then the label at the left, 3 below the bottom.
+    constexpr uint32_t kScanLabelRva = 0x1FAA75;
+    constexpr uint32_t kScanLabelCall = kScanLabelRva + 17;
+    void PutScanLabel(Image& image, uint32_t at, uint32_t calls)
+    {
+        image.Put(at, {0x8B, 0x15, 0x7C, 0x84, 0xA3, 0x03, 0x83, 0xC4, 0x10, 0x8D, 0x4C, 0x24, 0x04, 0x51, 0x8B, 0x4A,
+                          0x08, 0xE8, 0x00, 0x00, 0x00, 0x00, 0x8B, 0x4C, 0x24, 0x0A, 0x8B, 0x54, 0x24, 0x04, 0x8D, 0x44,
+                          0x24, 0x10, 0x68, 0x80, 0x80, 0x80, 0x80, 0x83, 0xC1, 0x03});
+        image.Put32(at + 18, calls - (at + 17 + kBranchLength));
+    }
+}
+
+TEST(wide_scans_grid_label_takes_the_title_windows_place_from_one_call_to_get_rect)
+{
+    Image image;
+    PutScanLabel(image, kScanLabelRva, kGetRectRva);
+    const ScanLabelSite found = LocateScanLabel(image.Text(), kGetRectRva);
+    CHECK(found.problem == LocateProblem::None);
+    CHECK_EQ(found.call, kScanLabelCall);
+    CHECK(LocateScanLabel(image.Text(), 0).problem == LocateProblem::NoScanLabel); // GetRect itself not found
+    CHECK(LocateScanLabel(Image{}.Text(), kGetRectRva).problem == LocateProblem::NoScanLabel);
+    Image elsewhere;
+    PutScanLabel(elsewhere, kScanLabelRva, kGetRectRva + 0x40);
+    CHECK(LocateScanLabel(elsewhere.Text(), kGetRectRva).problem == LocateProblem::ScanLabelChanged);
+    PutScanLabel(image, 0x100000, kGetRectRva);
+    CHECK(LocateScanLabel(image.Text(), kGetRectRva).problem == LocateProblem::AmbiguousScanLabel);
 }
 
 TEST(a_window_is_known_by_its_name_past_menu_and_written_without_its_padding)

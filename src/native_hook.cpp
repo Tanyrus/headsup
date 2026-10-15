@@ -445,6 +445,11 @@ namespace headsup
 
 namespace headsup
 {
+    namespace
+    {
+        __attribute__((thiscall)) void ScanLabelRect(uintptr_t mcd, int16_t* place);
+    }
+
     std::string WindowHook::Start()
     {
         if (Running()) return "";
@@ -468,6 +473,13 @@ namespace headsup
         const WindowMoveSite move = LocateWindowMove(text);
         g_WindowMoveTo            = move.problem == LocateProblem::None ? Address(base) + move.moveTo : 0;
         g_WindowGetRect           = move.getRect != 0 ? Address(base) + move.getRect : 0;
+        // Without it Wide Scan's grid label stays under the strip's title where the game put it.
+        if (const ScanLabelSite label = LocateScanLabel(text, move.getRect); label.problem == LocateProblem::None)
+        {
+            uint8_t* at         = base + label.call;
+            CodePatch labelCall = Retarget(at, Address(at), Address(&ScanLabelRect));
+            if (PutIn({&labelCall, 1}).empty()) m_LabelCall = labelCall;
+        }
         m_MoveProblem             = move.problem != LocateProblem::None ? Describe(move.problem)
                                     : g_WindowList == 0 ? "the game's list of open windows was not found" : "";
         if (g_WindowList == 0) g_WindowMoveTo = 0;
@@ -495,9 +507,14 @@ namespace headsup
         g_PlannedFrame = 0;
         g_PlannedKeys.Clear();
         g_WindowsBand  = 0;
-        return KeptLoaded(PutBack({&call, 1},
+        const CodePatch label       = std::exchange(m_LabelCall, {});
+        const std::string labelBack = label.at == nullptr ? "" : KeptLoaded(PutBack({&label, 1},
+            "Wide Scan's grid label was changed again after HeadsUp hooked it, so it was left as it is",
+            "Wide Scan's grid label could not be put back"));
+        const std::string drawBack = KeptLoaded(PutBack({&call, 1},
             "the game's window draw was changed again after HeadsUp hooked it, so it was left as it is",
             "the game's window draw could not be put back"));
+        return drawBack.empty() ? labelBack : drawBack;
     }
 
     void WindowHook::Hide(HiddenWindows hidden) { g_HiddenWindows = hidden; }
@@ -783,6 +800,21 @@ namespace headsup
                                 std::memcmp(copy, rect, kWindowRectBytes) == 0;
             reinterpret_cast<WindowMoveToFn>(g_WindowMoveTo)(mcd, to.left, to.top);
             if (copies) reinterpret_cast<WindowGetRectFn>(g_WindowGetRect)(mcd, copy);
+        }
+
+        // In place of the call through which Wide Scan's grid label asks for the strip title's rectangle, inside the
+        // game's draw: the label sat over the list where the game put both, and goes where the list went.
+        __attribute__((thiscall)) void ScanLabelRect(uintptr_t mcd, int16_t* place)
+        {
+            reinterpret_cast<WindowGetRectFn>(g_WindowGetRect)(mcd, place);
+            if (!g_Placing || g_WindowMoveTo == 0) return;
+            const uint32_t descriptor = ReadAt<uint32_t>(reinterpret_cast<const uint8_t*>(mcd + kWindowDescriptor), 0);
+            const std::optional<WindowKey> key =
+                descriptor != 0 ? WindowKeyOf(reinterpret_cast<const char*>(descriptor + kDescriptorName)) : std::nullopt;
+            if (!key) return;
+            const auto* rect = reinterpret_cast<const int16_t*>(mcd + kMcdRect);
+            const WindowSpot now{rect[0], rect[1]};
+            LabelPlace(std::span<int16_t, 4>(place, 4), g_FrameShift, now.top - g_Placements.OriginOf(mcd, *key, now).top);
         }
 
         // HeadsUp's own move of a window. One whose owner puts it back each frame keeps the spot its owner last asked

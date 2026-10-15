@@ -221,3 +221,18 @@ TEST(the_game_s_strip_moved_goes_right_under_the_panel_and_the_windows_under_it_
     CHECK((PlaceStrip(62, strip, true, 3) == StripPlace{46, 95}));       // and under its help line too
     CHECK((PlaceStrip(0, strip, true, 3) == StripPlace{0, 0}));          // the panel off: nothing goes anywhere
 }
+
+TEST(wide_scan_s_label_under_the_strip_s_title_moves_with_the_frame_s_windows_and_not_with_the_title)
+{
+    // The title window as the game puts it; the label is drawn at its left, 3 below its bottom, over the list at 48.
+    const std::array<int16_t, 4> title{16, 16, 128, 46};
+    std::array<int16_t, 4> rect = title;
+    LabelPlace(rect, 16, 0); // the list went down 16 and the strip stayed
+    CHECK((rect == std::array<int16_t, 4>{16, 32, 128, 62}));
+    rect = {16, 38, 128, 68}; // the strip moved 22 under the panel, and the list 46
+    LabelPlace(rect, 46, 22);
+    CHECK((rect == std::array<int16_t, 4>{16, 62, 128, 92}));
+    rect = {16, 38, 128, 68}; // the strip moved, the windows left where the game put them: the label stays too
+    LabelPlace(rect, 0, 22);
+    CHECK(rect == title);
+}

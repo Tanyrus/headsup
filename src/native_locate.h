@@ -59,6 +59,9 @@ namespace headsup
         NetStatsChanged,
         NoWindowMove,
         AmbiguousWindowMove,
+        NoScanLabel,
+        AmbiguousScanLabel,
+        ScanLabelChanged,
         NoWeather,
         AmbiguousWeather,
     };
@@ -151,6 +154,15 @@ namespace headsup
         uint32_t moveTo  = 0; // RVA
         uint32_t getRect = 0; // RVA of MCD::GetRect, 0 when it was not found once
     };
+    struct ScanLabelSite
+    {
+        LocateProblem problem = LocateProblem::None;
+        uint32_t call = 0; // RVA of the call to MCD::GetRect for the strip title's rectangle
+    };
+    // Where Wide Scan's grid label asks for the strip title window's rectangle, which it is drawn under; `getRect` is
+    // MCD::GetRect's RVA, and the call must go there.
+    ScanLabelSite LocateScanLabel(const ImageSection& text, uint32_t getRect);
+
     // A window's MCD holds its descriptor at +0x04, whose 16-byte name is at +0x46, and its owner at +0x0C; the owner
     // holds its MCD at +0x08.
     constexpr uint32_t kWindowDescriptor = 0x04, kDescriptorName = 0x46, kMcdOwner = 0x0C, kOwnerMcd = 0x08;

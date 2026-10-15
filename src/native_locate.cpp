@@ -87,6 +87,12 @@ namespace headsup
             0x18, 0x56, 0x8B, 0xF1, 0x57, 0x33, 0xFF, 0x8D, 0x5E, 0x14, 0x66, 0x89, 0x6E, 0x52, 0x8B, 0xCB, 0x66, 0x89, 0x46,
             0x54};
         // MCD::GetRect's start: sub esp,0Ch; push esi; mov esi,ecx; mov al,[esi+99h]; test al,al; jz.
+        // mov edx,[the strip title's owner]; add esp,10h; lea ecx,[esp+4]; push ecx; mov ecx,[edx+8]; call GetRect; then
+        // the label drawn at the rectangle's left and its bottom plus 3, in 80808080.
+        constexpr int16_t kScanLabel[] = {0x8B, 0x15, -1, -1, -1, -1, 0x83, 0xC4, 0x10, 0x8D, 0x4C, 0x24, 0x04, 0x51,
+            0x8B, 0x4A, 0x08, 0xE8, -1, -1, -1, -1, 0x8B, 0x4C, 0x24, 0x0A, 0x8B, 0x54, 0x24, 0x04, 0x8D, 0x44, 0x24, 0x10,
+            0x68, 0x80, 0x80, 0x80, 0x80, 0x83, 0xC1, 0x03};
+        constexpr uint32_t kScanLabelCall = 17;
         constexpr int16_t kWindowGetRect[] = {0x83, 0xEC, 0x0C, 0x56, 0x8B, 0xF1, 0x8A, 0x86, 0x99, 0x00, 0x00, 0x00,
             0x84, 0xC0, 0x0F, 0x84};
         constexpr char kMenuPrefix[] = "menu    ";
@@ -319,6 +325,9 @@ namespace headsup
         case LocateProblem::AmbiguousWeather: return "the game's weather was found more than once";
         case LocateProblem::NoWindowMove: return "the game's window move was not found";
         case LocateProblem::AmbiguousWindowMove: return "the game's window move was found more than once";
+        case LocateProblem::NoScanLabel: return "where Wide Scan places its grid label was not found";
+        case LocateProblem::AmbiguousScanLabel: return "where Wide Scan places its grid label was found more than once";
+        case LocateProblem::ScanLabelChanged: return "Wide Scan's grid label is placed through an unexpected function";
         case LocateProblem::NoStripText: return "the game's help bar text was not found";
         case LocateProblem::AmbiguousStripText: return "the game's help bar text was found in more places than one";
         case LocateProblem::StripTextChanged: return "the game's help bar text is not laid out as HeadsUp expects";
@@ -506,6 +515,16 @@ namespace headsup
         const std::vector<uint32_t> getRect = FindAll(kWindowGetRect, text);
         return WindowMoveSite{LocateProblem::None, text.rva + found.front(),
             getRect.size() == 1 ? text.rva + getRect.front() : 0};
+    }
+
+    ScanLabelSite LocateScanLabel(const ImageSection& text, uint32_t getRect)
+    {
+        const std::vector<uint32_t> found = FindAll(kScanLabel, text);
+        if (getRect == 0 || found.empty()) return ScanLabelSite{LocateProblem::NoScanLabel};
+        if (found.size() > 1) return ScanLabelSite{LocateProblem::AmbiguousScanLabel};
+        const uint32_t call = text.rva + found.front() + kScanLabelCall;
+        if (CallTarget(call, text) != getRect) return ScanLabelSite{LocateProblem::ScanLabelChanged};
+        return ScanLabelSite{LocateProblem::None, call};
     }
 
     std::optional<WindowKey> WindowKeyOf(const char* name)

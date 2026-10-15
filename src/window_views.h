@@ -98,4 +98,8 @@ namespace headsup
     // From the panel's band (0 while it is off) and the strip when it shows: moved, it goes right under the band and
     // the windows under it; left, the windows go under whichever reaches lower, clearance below the strip.
     StripPlace PlaceStrip(int panelBand, std::optional<StripRows> strip, bool moveGameHelp, int clearance);
+
+    // The strip title window's rectangle as Wide Scan's grid label reads it (the game draws the label 3 below its
+    // bottom, over the list): moved by the frame's shift less the title's own move, so the label goes with the list.
+    void LabelPlace(std::span<int16_t, 4> rect, int frameShift, int titleMoved);
 }

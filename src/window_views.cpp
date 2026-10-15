@@ -144,4 +144,11 @@ namespace headsup
         const int shift = panelBand - strip->top;
         return {shift, strip->bottom + shift + clearance};
     }
+
+    void LabelPlace(std::span<int16_t, 4> rect, int frameShift, int titleMoved)
+    {
+        const int by = frameShift - titleMoved;
+        rect[1]      = static_cast<int16_t>(rect[1] + by);
+        rect[3]      = static_cast<int16_t>(rect[3] + by);
+    }
 }

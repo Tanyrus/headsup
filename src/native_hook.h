@@ -143,6 +143,7 @@ namespace headsup
 
     private:
         CodePatch m_Call;
+        CodePatch m_LabelCall; // Wide Scan's grid label's ask for the strip title's place, when it was found
         std::string m_MoveProblem;
     };
 
