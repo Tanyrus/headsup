@@ -35,8 +35,21 @@ namespace headsup
     {
         MenuTheme theme = MenuTheme::Phoenix;
         std::string textFont, titleFont;
+        int fontPixels = 0; // the window's text
+        int textLift   = 0; // pixels its capitals stand under the middle of their line, which a line in a box is lifted by
         bool operator==(const MenuLook&) const = default;
+        // The same but for the text's size: the style changes and the document stays.
+        bool SameFrame(const MenuLook& other) const
+        {
+            return theme == other.theme && textFont == other.textFont && titleFont == other.titleFont;
+        }
     };
+    // RmlUi gives a font's ascent and descent but no cap height: the bundled fonts and Segoe UI stand their capitals
+    // 0.7 of their size over the baseline.
+    constexpr float kCapHeightShare = 0.7f;
+    // How far under the middle of its line a line of capitals stands, from the font's ascent and descent as RmlUi lays
+    // the line out: in whole pixels, as RmlUi puts each glyph on a whole pixel.
+    int TextLift(float ascent, float descent, int fontPixels);
     const MenuColors& MenuColorsOf(MenuTheme theme);
 
     // The window's ids, which its owner finds its parts by.
@@ -50,7 +63,8 @@ namespace headsup
     constexpr const char* kMenuCardClass   = "card";
     constexpr const char* kMenuTipAttribute = "tip";
 
-    // The settings window's document: its frame, the sidebar and page to fill, the popup and the tip, and the style
-    // of every control the kit writes, sized in ems of the window's text.
+    // The settings window's document: its frame, the sidebar and page to fill, the popup and the tip, and its style.
     std::string MenuDocument(const MenuLook& look);
+    // The style of every control the kit writes, sized in ems of the window's text.
+    std::string MenuStyle(const MenuLook& look);
 }

@@ -8,6 +8,9 @@
 
 #include <RmlUi/Core/Elements/ElementFormControl.h>
 #include <RmlUi/Core/Elements/ElementFormControlInput.h>
+#include <RmlUi/Core/Factory.h>
+#include <RmlUi/Core/FontEngineInterface.h>
+#include <RmlUi/Core/StyleSheetContainer.h>
 
 #include <algorithm>
 #include <array>
@@ -19,6 +22,17 @@ namespace headsup
 {
     namespace
     {
+        // The window's text font's lift at its size, or none while RmlUi has no such font.
+        int LiftOf(const std::string& family, int pixels)
+        {
+            Rml::FontEngineInterface* fonts = Rml::GetFontEngineInterface();
+            const Rml::FontFaceHandle face  = fonts->GetFontFaceHandle(Rml::StringUtilities::ToLower(family),
+                Rml::Style::FontStyle::Normal, Rml::Style::FontWeight::Normal, pixels);
+            if (face == 0) return 0;
+            const Rml::FontMetrics& metrics = fonts->GetFontMetrics(face);
+            return TextLift(metrics.ascent, metrics.descent, pixels);
+        }
+
         constexpr const char* kDocumentName = "settings";
         constexpr float kPopupDrop  = 2.0f;  // pixels between a control and its popup
         constexpr float kTipDrop    = 18.0f; // pixels from the pointer to its tip
@@ -168,8 +182,15 @@ namespace headsup
 
     bool RmlMenu::Document(const MenuHost& host, const Settings& settings)
     {
-        MenuLook look{settings.menuTheme, host.textFont, kMarcellusSC};
+        MenuLook look{settings.menuTheme, host.textFont, kMarcellusSC, settings.menuFontSize, m_Look.textLift};
         if (m_Document != nullptr && look == m_Look) return true;
+        look.textLift = LiftOf(host.textFont, settings.menuFontSize);
+        if (m_Document != nullptr && look.SameFrame(m_Look))
+        {
+            m_Document->SetStyleSheetContainer(Rml::Factory::InstanceStyleSheetString(MenuStyle(look)));
+            m_Look = std::move(look);
+            return true;
+        }
         Close();
         m_Document = host.context->LoadDocumentFromMemory(MenuDocument(look), kDocumentName);
         if (m_Document == nullptr) return false;
