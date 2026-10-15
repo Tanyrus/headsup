@@ -5,6 +5,7 @@
 #include "tracker.h"
 
 #include <cstdint>
+#include <vector>
 
 namespace headsup
 {
@@ -19,4 +20,12 @@ namespace headsup
 
     // FindOwner over the current stack.
     const ActorInfo* FindOwnerOnStack(const Tracker& tracker);
+    // Every entity FindOwnerOnStack's scan meets, nearest first: bytes above the game's return address it starts at,
+    // and the game's return addresses passed on the way (frames). For the developer's draw dump.
+    struct StackOwner
+    {
+        uint16_t index;
+        uint32_t bytes, frames;
+    };
+    std::vector<StackOwner> OwnersOnStack(const Tracker& tracker);
 }
