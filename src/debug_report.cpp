@@ -28,7 +28,7 @@ namespace headsup
 
     const char* const kCaptureHeading =
         "\nframe  dt(ms)  game's names: hooked replaced | nameplates shown, S if drawn into the scene, s<scene to screen scale> | per entity "
-        "with a game name: index m<body meshes> c<name color> (name box: center, top-bottom)\n";
+        "with a game name: index m<body meshes> c<name color> (name box: center, top-bottom) d<name depth> p<plate's name, px>\n";
 
     void WriteDebugReport(const DebugSources& s, const std::optional<NetCounters>& net, std::FILE* out)
     {
@@ -164,8 +164,11 @@ namespace headsup
             const NameFrame* frame = info != nullptr ? s.hook.Drawn(info->index) : nullptr;
             if (frame == nullptr || ++listed > kCapturedPlatesPerFrame) continue;
             const DrawnName name = NameFromFrame(*frame, s.names.TargetScaleX(), s.names.TargetScaleY());
-            std::snprintf(part, sizeof(part), " %u m%u c%06X (%.0f,%.0f-%.0f)", info->index, s.names.MeshDraws(info->index),
-                static_cast<unsigned>(name.color & 0xFFFFFF), name.box.CenterX(), name.box.minY, name.box.maxY);
+            int plate            = 0;
+            for (const NameplateRenderer::Shown& shown : s.plates.LastShown())
+                if (shown.index == info->index) plate = shown.nameHeight;
+            std::snprintf(part, sizeof(part), " %u m%u c%06X (%.0f,%.0f-%.0f) d%.5f p%d", info->index, s.names.MeshDraws(info->index),
+                static_cast<unsigned>(name.color & 0xFFFFFF), name.box.CenterX(), name.box.minY, name.box.maxY, name.depth, plate);
             line += part;
         }
         return line + "\n";
