@@ -7,10 +7,10 @@
 
 using namespace headsup;
 
-TEST(the_bundled_fonts_are_marcellus_cinzel_cormorant_and_barlow_for_badges)
+TEST(the_bundled_fonts_are_montserrat_for_nameplates_then_marcellus_cinzel_cormorant_and_barlow_for_badges)
 {
     const std::vector<std::string> families = BundledFamilies();
-    CHECK(families == std::vector<std::string>({"Marcellus SC", "Cinzel", "Cormorant SC", "Barlow Condensed"}));
+    CHECK(families == std::vector<std::string>({"Montserrat SemiBold", "Marcellus SC", "Cinzel", "Cormorant SC", "Barlow Condensed"}));
     size_t count             = 0;
     const BundledFont* fonts = BundledFonts(count);
     CHECK_EQ(count, families.size());

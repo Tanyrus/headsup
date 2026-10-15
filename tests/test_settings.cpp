@@ -574,7 +574,8 @@ TEST(the_font_list_puts_the_bundled_fonts_first_then_the_installed_ones_sorted_o
 {
     // GDI lists a family once per character set, vertical variants with an @, and a bundled font may be installed too.
     const std::vector<std::string> choices = FontChoices({"Verdana", "arial", "Arial", "@Meiryo", "", "Cinzel"}, "Verdana");
-    const std::vector<std::string> expected{"Marcellus SC", "Cinzel", "Cormorant SC", "Barlow Condensed", "arial", "Verdana"};
+    const std::vector<std::string> expected{"Montserrat SemiBold", "Marcellus SC", "Cinzel", "Cormorant SC", "Barlow Condensed",
+        "arial", "Verdana"};
     CHECK(choices == expected);
 }
 
@@ -582,7 +583,7 @@ TEST(a_font_that_is_not_installed_is_still_offered_so_it_can_be_kept)
 {
     const std::vector<std::string> choices = FontChoices({"Verdana"}, "Papyrus");
     CHECK(std::ranges::find(choices, "Papyrus") != choices.end());
-    CHECK(choices[0] == "Marcellus SC"); // the bundled ones still lead
+    CHECK(choices[0] == "Montserrat SemiBold"); // the bundled ones still lead
 }
 
 TEST(clamp_bounds_every_field)

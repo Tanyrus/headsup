@@ -12,11 +12,13 @@ class Generate(unittest.TestCase):
 
     def test_every_bundled_font_is_embedded_in_order(self):
         text = gen_fonts.generate(self.fonts)
+        self.assertIn('const unsigned char kFontMontserratSemiBold[] = {', text)
         self.assertIn('const unsigned char kFontMarcellusSC[] = {', text)
         self.assertIn('const unsigned char kFontCinzel[] = {', text)
         self.assertIn('const unsigned char kFontCormorantSC[] = {', text)
         self.assertIn('const unsigned char kFontBarlowCondensed[] = {', text)
         table = text[text.index('const BundledFont kBundledFonts[]'):]
+        self.assertLess(table.index('{kMontserratSemiBold, kFontMontserratSemiBold, '), table.index('{kMarcellusSC, '))
         self.assertLess(table.index('{kMarcellusSC, kFontMarcellusSC, '), table.index('{kCinzel, kFontCinzel, '))
         self.assertLess(table.index('{kCinzel, '), table.index('{kCormorantSC, kFontCormorantSC, '))
         self.assertLess(table.index('{kCormorantSC, '), table.index('{kBarlowCondensed, kFontBarlowCondensed, '))
@@ -24,6 +26,7 @@ class Generate(unittest.TestCase):
     def test_each_family_is_named_once_for_the_code_that_asks_gdi_for_it(self):
         families = gen_fonts.generate_families()
         self.assertIn('namespace headsup\n{\n', families)
+        self.assertIn('    constexpr const char* kMontserratSemiBold = "Montserrat SemiBold";\n', families)
         self.assertIn('    constexpr const char* kMarcellusSC = "Marcellus SC";\n', families)
         self.assertIn('    constexpr const char* kCinzel = "Cinzel";\n', families)
         self.assertIn('    constexpr const char* kCormorantSC = "Cormorant SC";\n', families)
@@ -40,4 +43,4 @@ class Generate(unittest.TestCase):
     def test_a_missing_font_file_is_an_error(self):
         with self.assertRaises(gen_fonts.FontError) as raised:
             gen_fonts.generate(pathlib.Path('/nonexistent'))
-        self.assertIn('MarcellusSC-Regular.ttf', str(raised.exception))
+        self.assertIn('Montserrat-SemiBold.ttf', str(raised.exception))
