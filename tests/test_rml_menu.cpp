@@ -1,6 +1,7 @@
 #include "rml_menu.h"
 
 #include "fonts.h"
+#include "layout_edit.h"
 #include "menu_state.h"
 #include "plate_template.h"
 #include "rml_session.h"
@@ -280,12 +281,26 @@ namespace
             return found;
         }
 
+        // The window of a developer's build, which has its layout's Reload and Export buttons.
+        void Developer()
+        {
+            m_Host.developer = true;
+            Frames(2);
+        }
+        // The window takes this layout from its next frame on, as after a reload of the layout's file.
+        void Laid(const WindowLayout& layout)
+        {
+            m_Layout      = layout;
+            m_Host.layout = &m_Layout;
+        }
+
     private:
         static constexpr int kDragSteps    = 6;
         static constexpr int kEaseFrames   = 8; // longer than a control takes between two looks
         static constexpr float kFromTheEnd = 6.0f; // pixels
         test::RmlSession m_Rml; // before the menu: its document is closed while RmlUi still runs
         MenuHost m_Host;
+        WindowLayout m_Layout;
         MenuReadings m_Readings;
         std::vector<std::string> m_Fonts = {"Arial", kBarlowCondensed, kMarcellusSC, kLongFont};
     };
@@ -1321,6 +1336,40 @@ TEST(the_reset_button_stands_under_the_cards_as_wide_as_one_taller_and_in_capita
     CHECK(window.Find(button)->GetComputedValues().text_transform() == Rml::Style::TextTransform::Uppercase);
     window.Click(button);
     CHECK(window.Shows("configmenu-reset-reset-everything"));
+    CHECK_EQ(window.Said(), "");
+}
+
+TEST(a_developers_window_has_reload_and_export_left_of_its_close_button_and_each_asks_once)
+{
+    Window window;
+    CHECK(window.Find(kMenuReloadId) == nullptr && window.Find(kMenuExportId) == nullptr);
+    window.Developer();
+    auto left  = [&](const char* id) { return window.Find(id)->GetAbsoluteOffset(Rml::BoxArea::Border).x; };
+    auto right = [&](const char* id) { return left(id) + window.Find(id)->GetBox().GetSize(Rml::BoxArea::Border).x; };
+    CHECK(window.Shows(kMenuReloadId) && window.Shows(kMenuExportId));
+    CHECK(right(kMenuReloadId) <= left(kMenuCloseId) && left(kMenuCloseId) - right(kMenuReloadId) < kEm);
+    CHECK(right(kMenuExportId) <= left(kMenuReloadId));
+    CHECK(!window.menu.TakeReloadRequest() && !window.menu.TakeExportRequest());
+    window.Click(kMenuReloadId);
+    CHECK(window.menu.TakeReloadRequest() && !window.menu.TakeReloadRequest() && !window.menu.TakeExportRequest());
+    window.Click(kMenuExportId);
+    CHECK(window.menu.TakeExportRequest() && window.menu.open);
+    CHECK_EQ(window.Said(), "");
+}
+
+TEST(a_layout_read_anew_shows_on_the_windows_next_frame)
+{
+    Window window;
+    test::EditedLayout edited;
+    edited.RenamePage("entities", "Everything");
+    edited.MoveCard("target-cursor", "entities", 0);
+    window.Laid(edited.Layout());
+    window.Frames(2);
+    CHECK_EQ(window.Find("nav-entities")->GetInnerRML(), "Everything");
+    CHECK_EQ(window.Find("page")->GetChild(0)->GetId(), "entities-target-cursor");
+    window.menu.Close(); // and from scratch, as a reload builds it
+    window.Frames(2);
+    CHECK_EQ(window.Find("page")->GetChild(0)->GetId(), "entities-target-cursor");
     CHECK_EQ(window.Said(), "");
 }
 

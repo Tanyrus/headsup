@@ -79,6 +79,7 @@ namespace headsup
 
     const WindowLayout kWindowLayout{kLayoutPages, kLayoutCards, kLayoutSettings, kLayoutRows, kLayoutOptions,
         kLayoutLists, kLayoutWords};
+    const std::string_view kWindowFileText = kLayoutText, kWindowFileVersion = kLayoutVersion;
 
     const LayoutPage& WindowLayout::PageOf(Page page) const
     {

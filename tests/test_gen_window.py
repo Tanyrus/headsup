@@ -30,6 +30,7 @@ PIECES = gen.Pieces(
 
 def layout():
     return {
+        'version': '0.65',
         'pages': [
             {'key': 'home', 'name': 'Home', 'cards': [
                 {'key': 'general', 'name': 'General', 'description': 'The whole of it.', 'settings': [
@@ -129,8 +130,21 @@ class Parse(unittest.TestCase):
         self.assertIn('not JSON', str(caught.exception))
 
     def test_a_top_level_that_lacks_a_part(self):
-        self.assertBad('the top level must be an object with pages, entity, lists and words',
+        self.assertBad('the top level must be an object with version, pages, entity, lists and words',
                        lambda t: t.pop('lists'))
+        self.assertBad('the top level must be an object with version, pages, entity, lists and words',
+                       lambda t: t.pop('version'))
+
+    def test_the_file_is_of_the_plugins_version(self):
+        with self.assertRaises(gen.DataError) as caught:
+            gen.parse(json.dumps(fixture()), 'w.json', PIECES, '0.66')
+        self.assertIn('w.json: version 0.65 is not the plugin\'s 0.66: run tools/gen_window.py --format', str(caught.exception))
+        self.assertEqual(gen.parse(json.dumps(fixture()), 'w.json', PIECES, '0.65').version, '0.65')
+        self.assertBad('the version must be text', lambda t: t.update(version=0.65))
+
+    def test_the_plugins_version_is_read_from_its_source(self):
+        source = 'namespace\n{\n    constexpr double kVersion                = 0.71;\n    constexpr int kOther = 2;\n'
+        self.assertEqual(gen.plugin_version(source), '0.71')
 
     def test_an_unknown_field_names_its_entry(self):
         self.assertBad('the setting "size" has an unknown field "tooltip"',
@@ -274,8 +288,23 @@ class Generate(unittest.TestCase):
         # Looks before General now, and their settings in that order.
         looks, general = tables.index('{CardPiece::Looks,'), tables.index('{CardPiece::General,')
         self.assertLess(looks, general)
-        self.assertIn('{CardPiece::Looks, "looks", "Looks", nullptr, kEveryKind, 0, 1},', tables)
-        self.assertIn('{CardPiece::General, "general", "General", "The whole of it.", kEveryKind, 1, 2},', tables)
+        self.assertIn('{CardPiece::Looks, "looks", "Looks", nullptr, kEveryKind, 0, 1, false},', tables)
+        self.assertIn('{CardPiece::General, "general", "General", "The whole of it.", kEveryKind, 1, 2, true},', tables)
+
+    def test_what_a_reader_of_the_file_takes_from_the_code(self):
+        # A row order the code keeps, the kinds the code has a setting on, and each word's key and its setting's.
+        _, tables = gen.generate(parse(fixture()), PIECES)
+        self.assertRegex(tables, r'\{SettingPiece::Palette, "palette", .*, true, kEveryKind\},')
+        self.assertRegex(tables, r'\{SettingPiece::Lines, "lines", .*, false, kEveryKind\},')
+        self.assertRegex(tables, r'\{SettingPiece::MaxIcons, "max-icons", .*, false, 6\},')
+        self.assertIn('{WindowWord::RowsHead, "Nameplates", nullptr, "head", "rows"},', tables)
+        self.assertIn('{WindowWord::EveryWindow, nullptr, "All.", "every-window", nullptr},', tables)
+
+    def test_the_file_itself_and_its_version_go_with_the_tables(self):
+        text = json.dumps(fixture())
+        _, tables = gen.generate(gen.parse(text, 'w.json', PIECES), PIECES, text)
+        self.assertIn('constexpr const char* kLayoutVersion = "0.65";', tables)
+        self.assertIn('constexpr const char* kLayoutText = ' + gen.c_string(text) + ';', tables)
 
     def test_kinds_are_bits_by_the_order_of_the_entity_pages(self):
         _, tables = gen.generate(parse(fixture()), PIECES)
@@ -305,6 +334,11 @@ class Format(unittest.TestCase):
         written = gen.format_file(tree)
         self.assertEqual(json.loads(written), tree)
         self.assertEqual(gen.format_file(json.loads(written)), written)
+
+    def test_the_version_comes_first(self):
+        tree = fixture()
+        tree = {**{k: v for k, v in tree.items() if k != 'version'}, 'version': '0.65'}
+        self.assertTrue(gen.format_file(tree).startswith('{\n  "version": "0.65",\n  "pages": [\n'))
 
     def test_fields_come_key_first_and_each_level_two_spaces_in(self):
         tree = fixture()

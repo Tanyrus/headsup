@@ -37,11 +37,12 @@ namespace headsup
         std::string textFont, titleFont;
         int fontPixels = 0; // the window's text
         int textLift   = 0; // pixels its capitals stand under the middle of their line, which a line in a box is lifted by
+        bool developer = false; // a developer's build: its frame has the layout file's Reload and Export
         bool operator==(const MenuLook&) const = default;
         // The same but for the text's size: the style changes and the document stays.
         bool SameFrame(const MenuLook& other) const
         {
-            return theme == other.theme && textFont == other.textFont && titleFont == other.titleFont;
+            return theme == other.theme && textFont == other.textFont && titleFont == other.titleFont && developer == other.developer;
         }
     };
     // RmlUi gives a font's ascent and descent but no cap height: the bundled fonts and Segoe UI stand their capitals
@@ -58,6 +59,8 @@ namespace headsup
     constexpr const char* kMenuPageTitleId = "page-title";
     constexpr const char* kMenuVersionId   = "version";
     constexpr const char* kMenuCloseId     = "close";
+    constexpr const char* kMenuReloadId    = "reload";
+    constexpr const char* kMenuExportId    = "export";
     constexpr const char* kMenuPopupId     = "popup";
     constexpr const char* kMenuTipId       = "tip";
     constexpr const char* kMenuCardClass   = "card";

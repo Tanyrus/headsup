@@ -1,4 +1,5 @@
 {
+  "version": "0.65",
   "pages": [
     {
       "key": "entities",
@@ -816,6 +817,8 @@
     {"key": "unused-tags-these", "name": "Put the {tags} tag on a line of the design to show these on a nameplate."},
     {"key": "unused-tags-name", "name": "Put the {tags} tag on a line of the design to show a name: the game's own is hidden where HeadsUp draws the nameplate."},
     {"key": "or", "name": "or"},
-    {"key": "slot-tip", "tip": "These share one place, tried from the left: the first that has something to show is drawn. Drop one on another to change their order, or drag one out."}
+    {"key": "slot-tip", "tip": "These share one place, tried from the left: the first that has something to show is drawn. Drop one on another to change their order, or drag one out."},
+    {"key": "reload", "name": "Reload", "tip": "Reads settings_window.json from config/headsup again and builds this window from it, or from the built-in one when there is none."},
+    {"key": "export", "name": "Export", "tip": "Writes the built-in settings_window.json to config/headsup, where it can be edited and read with Reload."}
   ]
 }

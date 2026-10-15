@@ -18,7 +18,7 @@ KINDS = ('mobs', 'players', 'self', 'npcs', 'pets')  # PlateKind's order; also t
 KEY = re.compile(r'[a-z0-9]+(?:-[a-z0-9]+)*\Z')
 ID_MARK = '##'  # what a label holds before the name of its control's id
 SOURCE = 'settings_window.json'
-FIELDS = ('key', 'name', 'child', 'description', 'tip', 'tipOnClaimRows', 'tipBottomLine', 'kinds', 'options',
+FIELDS = ('version', 'key', 'name', 'child', 'description', 'tip', 'tipOnClaimRows', 'tipBottomLine', 'kinds', 'options',
           'rows', 'settings', 'cards', 'pages', 'entity', 'lists', 'words')  # the order --format writes them in
 
 
@@ -84,6 +84,7 @@ class Layout:
     entity: list
     lists: list
     words: list
+    version: str = None  # the plugin's version the file was made for
 
 
 def rows(*keys, kinds=None):
@@ -195,7 +196,8 @@ PIECES = Pieces(
     },
     words={'switched-off': True, 'switch-off': True, 'switch-on': True, 'switched-off-top-panel': True,
            'switched-off-headsup': True, 'key-add': True, 'key-waiting': True, 'always': True, 'never': True, 'conditions': True, 'local': True, 'themes-font': True,
-           'default-font': True, 'unused-tags-these': True, 'unused-tags-name': True, 'or': True, 'slot-tip': False},
+           'default-font': True, 'unused-tags-these': True, 'unused-tags-name': True, 'or': True, 'slot-tip': False,
+           'reload': True, 'export': True},
 )
 
 
@@ -209,9 +211,10 @@ def pascal(key: str) -> str:
 
 
 class Reader:
-    def __init__(self, source: str, pieces: Pieces):
+    def __init__(self, source: str, pieces: Pieces, version: str = None):
         self.source = source
         self.pieces = pieces
+        self.version = version
         self.placed = {}  # setting key: the card it is in, for "used twice"
         self.seen_cards = set()
 
@@ -280,13 +283,18 @@ class Reader:
         return name
 
     def layout(self, top) -> Layout:
-        if not isinstance(top, dict) or set(top) != {'pages', 'entity', 'lists', 'words'}:
-            self.bad('the top level must be an object with pages, entity, lists and words')
+        if not isinstance(top, dict) or set(top) != {'version', 'pages', 'entity', 'lists', 'words'}:
+            self.bad('the top level must be an object with version, pages, entity, lists and words')
+        version = top['version']
+        if not isinstance(version, str) or not version:
+            self.bad('the version must be text')
+        if self.version is not None and version != self.version:
+            self.bad(f'version {version} is not the plugin\'s {self.version}: run tools/gen_window.py --format')
         self.fields(top['entity'], 'the entity part', ('cards',))
         pages = self.pages(top['pages'])
         entity = self.cards(top['entity'].get('cards'), 'the entity cards', in_entity=True)
         self.left_out()
-        return Layout(pages, entity, self.lists(top['lists']), self.window_words(top['words']))
+        return Layout(pages, entity, self.lists(top['lists']), self.window_words(top['words']), version)
 
     def listed(self, value, what: str) -> list:
         if not isinstance(value, list):
@@ -499,20 +507,32 @@ class Reader:
                 self.bad(f'the card "{key}" is left out: its switch is the only one of its setting')
 
 
-def parse(text: str, source: str = SOURCE, pieces: Pieces = PIECES) -> Layout:
+def parse(text: str, source: str = SOURCE, pieces: Pieces = PIECES, version: str = None) -> Layout:
+    """The file's layout; with a version, the file must be of it."""
     try:
         top = json.loads(text)
     except json.JSONDecodeError as error:
         raise DataError(f'{source}: not JSON ({error})') from None
-    return Reader(source, pieces).layout(top)
+    return Reader(source, pieces, version).layout(top)
+
+
+PLUGIN_VERSION = re.compile(r'constexpr double kVersion\s*=\s*([0-9.]+);')
+
+
+def plugin_version(source: str) -> str:
+    """kVersion as src/plugin.cpp writes it."""
+    found = PLUGIN_VERSION.search(source)
+    if found is None:
+        raise DataError('src/plugin.cpp: no kVersion')
+    return found.group(1)
 
 
 def c_text(text) -> str:
     return 'nullptr' if text is None else c_string(text)
 
 
-def generate(layout: Layout, pieces: Pieces = PIECES):
-    """The enums of every piece the code draws, and the file's tables in its order."""
+def generate(layout: Layout, pieces: Pieces = PIECES, text: str = ''):
+    """The enums of every piece the code draws, and the file's tables in its order with the file itself."""
     with_rows = [key for key, setting in pieces.settings.items() if setting.rows]
     words = [(pascal(key), key) for key in pieces.words] + [
         (pascal(setting) + pascal(word), word) for setting in pieces.settings for word in pieces.settings[setting].words]
@@ -557,9 +577,10 @@ def generate(layout: Layout, pieces: Pieces = PIECES):
         lists.append(f'    {{WindowList::{pascal(listed.key)}, "{listed.key}", {first}, {len(listed.options)}}},')
     all_cards = [card for page in layout.pages for card in page.cards] + layout.entity
     for card in all_cards:
+        switched = card.piece is not None and pieces.cards[card.piece].switch
         cards.append(f'    {{CardPiece::{pascal(card.piece) if card.piece else "Plain"}, "{card.key}", '
                      f'{c_text(card.name)}, {c_text(card.description)}, {bits(card.kinds)}, {len(settings)}, '
-                     f'{len(card.settings)}}},')
+                     f'{len(card.settings)}, {"true" if switched else "false"}}},')
         for s in card.settings:
             known = pieces.settings[s.key]
             first_option = add_options(s.options)
@@ -571,10 +592,10 @@ def generate(layout: Layout, pieces: Pieces = PIECES):
             settings.append(f'    {{SettingPiece::{pascal(s.key)}, "{s.key}", {shared(s.name)}, {shared(s.tip)}, '
                             f'{text_by_kind(s.name)}, {text_by_kind(s.tip)}, {bits(s.kinds)}, '
                             f'{"true" if known.entity else "false"}, {first_option}, {len(s.options)}, {first_row}, '
-                            f'{len(s.rows)}}},')
+                            f'{len(s.rows)}, {"true" if known.rows_fixed else "false"}, {bits(known.kinds)}}},')
             for word in s.words:
                 layout_words.append(f'    {{WindowWord::{pascal(s.key) + pascal(word.key)}, {c_text(word.name)}, '
-                                    f'{c_text(word.tip)}}},')
+                                    f'{c_text(word.tip)}, "{word.key}", "{s.key}"}},')
     entity_first = len(cards) - len(layout.entity)
     for page in layout.pages:
         first, count = (entity_first, len(layout.entity)) if page.key in KINDS else (
@@ -582,7 +603,8 @@ def generate(layout: Layout, pieces: Pieces = PIECES):
         pages.append(f'    {{Page::{pieces.pages[page.key]}, "{page.key}", {c_text(page.name)}, '
                      f'{"true" if page.child else "false"}, {first}, {count}}},')
     for word in layout.words:
-        layout_words.append(f'    {{WindowWord::{pascal(word.key)}, {c_text(word.name)}, {c_text(word.tip)}}},')
+        layout_words.append(f'    {{WindowWord::{pascal(word.key)}, {c_text(word.name)}, {c_text(word.tip)}, "{word.key}", '
+                            'nullptr},')
 
     tables = ['// Generated by tools/gen_window.py from data/settings_window.json. Do not edit.']
     tables += [f'constexpr const char* kByKind{i}[] = {array};' for i, array in enumerate(by_kind)]
@@ -591,6 +613,8 @@ def generate(layout: Layout, pieces: Pieces = PIECES):
                               ('kLayoutPages', 'LayoutPage', pages), ('kLayoutLists', 'LayoutList', lists),
                               ('kLayoutWords', 'LayoutWord', layout_words)):
         tables += [f'constexpr {kind} {name}[] = {{'] + lines + ['};']
+    tables += [f'constexpr const char* kLayoutVersion = {c_text(layout.version)};',
+               f'constexpr const char* kLayoutText = {c_string(text)};']
     return '\n'.join(header) + '\n', '\n'.join(tables) + '\n'
 
 
@@ -627,18 +651,22 @@ def main(argv) -> int:
     root = pathlib.Path(__file__).resolve().parent.parent
     path = root / 'data' / 'settings_window.json'
     try:
+        version = plugin_version((root / 'src' / 'plugin.cpp').read_text(encoding='utf-8'))
         text = path.read_text(encoding='utf-8')
         if len(argv) == 2:
             try:
-                path.write_text(format_file(json.loads(text)), encoding='utf-8')
+                tree = json.loads(text)
             except json.JSONDecodeError as error:
                 raise DataError(f'{SOURCE}: not JSON ({error})') from None
+            if isinstance(tree, dict):
+                tree['version'] = version
+            path.write_text(format_file(tree), encoding='utf-8')
             text = path.read_text(encoding='utf-8')
-        layout = parse(text)
+        layout = parse(text, version=version)
     except (OSError, DataError) as error:
         print(f'gen_window: {error}', file=sys.stderr)
         return 1
-    header, tables = generate(layout)
+    header, tables = generate(layout, PIECES, text)
     out = root / 'src' / 'generated'
     out.mkdir(parents=True, exist_ok=True)
     (out / 'window_pieces.h').write_text(header, encoding='utf-8')

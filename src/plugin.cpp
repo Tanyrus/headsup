@@ -31,6 +31,7 @@
 #include "settings.h"
 #include "shot_watch.h"
 #include "tracker.h"
+#include "window_file.h"
 #ifdef HEADSUP_DEV
 #include "codedump.h"
 #include "drawdump.h"
@@ -47,6 +48,7 @@
 #include <deque>
 #include <fstream>
 #include <iterator>
+#include <memory>
 #include <mutex>
 #include <unordered_map>
 #include <cstdio>
@@ -67,6 +69,7 @@ namespace
     constexpr double kVersion                = 0.65;
     constexpr const char* kConfigAlias       = "headsup";
     constexpr const char* kConfigFolder      = "config";
+    constexpr const char* kWindowFile        = "settings_window.json"; // a developer's build reads one in its config folder
     constexpr const char* kLogsFolder        = "logs";
     constexpr const char* kFolder            = "headsup"; // inside Ashita's config and logs folders
     constexpr const char* kCursorsFolder     = "cursors"; // inside HeadsUp's config folder: the player's cursor files
@@ -282,6 +285,9 @@ class HeadsUp final : public IPlugin
 #ifdef HEADSUP_DEV
     headsup::DrawDump m_DrawDump;
     headsup::PointerWatch m_PointerWatch;
+    // config/headsup/settings_window.json, the window's layout in place of the built-in one while one is read.
+    std::unique_ptr<headsup::OwnedLayout> m_WindowFile;
+    headsup::WindowLayout m_WindowFileView;
     // Input played into HeadsUp's own mouse and keyboard handlers as Ashita would hand it over, a step a frame:
     // what /hu play queued, for trying the windows where no real pointer is.
     struct PlayedInput
@@ -363,6 +369,9 @@ public:
         }
         LoadSettings();
         ScanCursors();
+#ifdef HEADSUP_DEV
+        ReadWindowFile(false);
+#endif
         g_Gui       = core->GetGuiManager();
         g_BarClicks = &m_BarClicks;
         core->GetInputManager()->GetMouse()->AddCallback(kName, OnMouse);
@@ -807,6 +816,12 @@ public:
                     OwnFolder(kLogsFolder)));
                 if (stopping) m_LastReport = m_DrawDump.LogPath();
             }
+            if (m_RmlMenu.TakeReloadRequest())
+            {
+                ReadWindowFile(true);
+                m_RmlMenu.Close(); // built anew from the layout on the next frame
+            }
+            if (m_RmlMenu.TakeExportRequest()) ExportWindowFile();
 #endif
             if (m_RmlMenu.TakeCursorsRequest()) ScanCursors();
         }
@@ -1327,8 +1342,55 @@ private:
             host.textFont = font->name;
         for (const headsup::MenuFont& choice : headsup::kMenuFonts)
             if (headsup::MenuFontInstalled(choice)) host.menuFonts.emplace_back(choice.name);
+#ifdef HEADSUP_DEV
+        host.developer = true;
+        if (m_WindowFile != nullptr) host.layout = &m_WindowFileView;
+#endif
         return host;
     }
+
+#ifdef HEADSUP_DEV
+    std::string WindowFilePath() { return OwnFolder(kConfigFolder) + "\\" + kWindowFile; }
+
+    // Takes config/headsup/settings_window.json as the window's layout when it is of this build's version, and the
+    // built-in one when there is none or it does not fit. said: a line in the chat however it went.
+    void ReadWindowFile(bool said)
+    {
+        const std::string path = WindowFilePath();
+        std::ifstream in(path, std::ios::binary);
+        m_WindowFile.reset();
+        if (!in)
+        {
+            if (said) Print("no " + path + "; the window is the built-in one");
+            return;
+        }
+        const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        auto read = std::make_unique<headsup::OwnedLayout>();
+        if (const std::string problem = headsup::ReadWindowFile(text, headsup::kWindowLayout, headsup::kWindowFileVersion, *read);
+            !problem.empty())
+        {
+            Print(std::string(kWindowFile) + ": " + problem + "; the window is the built-in one");
+            return;
+        }
+        m_WindowFile     = std::move(read);
+        m_WindowFileView = m_WindowFile->View();
+        if (said) Print("read " + path);
+    }
+
+    // Writes the built-in layout to config/headsup/settings_window.json, never over a file already there.
+    void ExportWindowFile()
+    {
+        const std::string path = WindowFilePath();
+        if (std::ifstream(path).good())
+        {
+            Print(path + " is already there; move it away to export again");
+            return;
+        }
+        std::ofstream out(path, std::ios::binary);
+        out.write(headsup::kWindowFileText.data(), static_cast<std::streamsize>(headsup::kWindowFileText.size()));
+        Print(out ? "wrote " + path : "could not write " + path);
+    }
+#endif
 
 #ifdef HEADSUP_DEV
     // /hu play click X Y [right] | move X Y | drag X Y TOX TOY | wheel X Y NOTCHES | key NAME | type TEXT
