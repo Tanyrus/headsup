@@ -41,7 +41,7 @@ namespace headsup
     struct FrameWindow
     {
         WindowKey key{};
-        int top = 0;
+        int left = 0, top = 0;
         bool hidden = false;
     };
     // Whether a window the game put at top hangs from the screen's top (above its middle), and so goes with its view;
@@ -57,6 +57,18 @@ namespace headsup
     // How far every window of the frame moves down (up when negative): the player's shift for its view, else what
     // brings its top to placedUnder; keepClear then pushes it down to clear band, and never up.
     int FrameShift(int frameTop, std::optional<int> chosen, int placedUnder, int band, bool keepClear);
+    // The game anchors a window starting past the middle of its menu to the right: the command menus are there.
+    constexpr bool OnLeftSide(int windowLeft, int screenRight) { return windowLeft < screenRight / 2; }
+    struct FrameShifts
+    {
+        int left = 0, right = 0;
+        int For(int windowLeft, int screenRight) const { return OnLeftSide(windowLeft, screenRight) ? left : right; }
+        bool operator==(const FrameShifts&) const = default;
+    };
+    // FrameShift for each side of the screen: the side holding the frame's highest window takes the view's shift, the
+    // other what brings its own top to placedUnder, so the command menus on the right stay put when Status opens.
+    FrameShifts ShiftsOf(std::span<const FrameWindow> frame, std::optional<int> chosen, int placedUnder, int band,
+        bool keepClear, int screenRight, int screenBottom);
 
     // Whether the game's help shows under the panel: the panel's help line, or the game's own strip, moved under it
     // or where the game put it. Each has its own place for the windows and its own shifts.

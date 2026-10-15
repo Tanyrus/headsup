@@ -171,7 +171,8 @@ namespace headsup
         std::array<FrameWindow, kMaxWindowKeys> g_FrameWindows{};
         uint32_t g_PlannedFrame = 0;     // the frame whose first window draw placed its windows
         WindowKeyList g_PlannedKeys;     // the windows shown at the last Present's plan
-        int g_FrameShift = 0, g_StripShift = 0, g_WindowsBand = 0;
+        FrameShifts g_FrameShifts;
+        int g_StripShift = 0, g_WindowsBand = 0;
         using WindowMoveToFn     = void(__attribute__((thiscall))*)(uintptr_t mcd, int x, int y);
         using WindowGetRectFn    = void(__attribute__((thiscall))*)(uintptr_t mcd, int16_t* place);
         uintptr_t g_WindowGetRect = 0;     // MCD::GetRect, or 0 when it was not found
@@ -814,7 +815,8 @@ namespace headsup
             if (!key) return;
             const auto* rect = reinterpret_cast<const int16_t*>(mcd + kMcdRect);
             const WindowSpot now{rect[0], rect[1]};
-            LabelPlace(std::span<int16_t, 4>(place, 4), g_FrameShift, now.top - g_Placements.OriginOf(mcd, *key, now).top);
+            LabelPlace(std::span<int16_t, 4>(place, 4), g_FrameShifts.left,
+                now.top - g_Placements.OriginOf(mcd, *key, now).top);
         }
 
         // HeadsUp's own move of a window. One whose owner puts it back each frame keeps the spot its owner last asked
@@ -883,7 +885,7 @@ namespace headsup
             {
                 const OpenWindow& w     = g_OpenWindows[i];
                 const WindowSpot origin = g_Placements.OriginOf(w.mcd, w.key, WindowSpot{w.left, w.top});
-                g_FrameWindows[i]       = FrameWindow{w.key, origin.top, w.hidden};
+                g_FrameWindows[i]       = FrameWindow{w.key, origin.left, origin.top, w.hidden};
                 opened |= !w.hidden && !g_PlannedKeys.Has(w.key);
                 if (HelpStripWindow(w.key) && !w.hidden && !g_HiddenWindows.helpBar)
                 {
@@ -894,7 +896,7 @@ namespace headsup
             }
             if (present || opened)
             {
-                g_FrameShift = 0;
+                g_FrameShifts = {};
                 const StripPlace placed =
                     PlaceStrip(placing.band.bottom, strip, placing.moveGameHelp, placing.band.clearance);
                 g_StripShift  = placed.shift;
@@ -906,7 +908,8 @@ namespace headsup
                     const std::optional<size_t> view = ViewOf(WindowViews(), frame);
                     const std::optional<int> chosen =
                         view && *view < g_ViewShifts.size() ? g_ViewShifts[*view] : std::nullopt;
-                    g_FrameShift = FrameShift(*top, chosen, placing.placedUnder, placed.band, placing.keepClear);
+                    g_FrameShifts = ShiftsOf(frame, chosen, placing.placedUnder, placed.band, placing.keepClear,
+                        placing.band.screenRight, placing.band.screenBottom);
                 }
             }
             if (present)
@@ -948,7 +951,8 @@ namespace headsup
             const KeyOffset* offset = nullptr;
             for (size_t i = 0; i < g_OffsetCount; ++i)
                 if (g_Offsets[i].key == key) offset = &g_Offsets[i];
-            const int shift = HangsFromTop(origin.top, band.screenBottom) ? g_FrameShift : 0;
+            const int shift =
+                HangsFromTop(origin.top, band.screenBottom) ? g_FrameShifts.For(origin.left, band.screenRight) : 0;
             if (const std::optional<WindowSpot> to = g_Placements.PlaceFor(mcd, key, now, right - left, bottom - top,
                     offset != nullptr ? offset->x : 0, shift + (offset != nullptr ? offset->y : 0), band.screenRight,
                     band.screenBottom))

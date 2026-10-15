@@ -133,13 +133,14 @@ namespace
         {"status/currencies", "Status > Currencies", 48, kCurrencies},
     };
     constexpr int kScreenBottom = 1080;
+    constexpr int kScreenRight  = 1920;
 
     // Status as the game draws it: the strip's windows, the hidden menu it came from, the chat log at the bottom.
     std::vector<FrameWindow> StatusFrame()
     {
-        return {{Key("helpwind"), 16, false}, {Key("titlewin"), 16, true}, {Key("buff"), 48, false},
-            {Key("menuwind"), 48, true}, {Key("level"), 208, false}, {Key("statcom2"), 48, false},
-            {Key("persona"), 16, false}, {Key("logwindo"), 1058, false}};
+        return {{Key("helpwind"), 130, 16, false}, {Key("titlewin"), 16, 16, true}, {Key("buff"), 142, 48, false},
+            {Key("menuwind"), 1792, 48, true}, {Key("level"), 16, 208, false}, {Key("statcom2"), 1792, 48, false},
+            {Key("persona"), 16, 16, false}, {Key("logwindo"), 16, 1058, false}};
     }
 }
 
@@ -147,11 +148,11 @@ TEST(a_frame_is_the_view_holding_most_of_its_shown_windows_and_the_smaller_one_o
 {
     std::vector<FrameWindow> frame = StatusFrame();
     CHECK(ViewOf(kViews, frame) == std::optional<size_t>(1));
-    frame.push_back({Key("profile"), 48, false});
+    frame.push_back({Key("profile"), 130, 48, false});
     CHECK(ViewOf(kViews, frame) == std::optional<size_t>(2));
     frame.back().hidden = true; // a hidden window is not part of what is shown
     CHECK(ViewOf(kViews, frame) == std::optional<size_t>(1));
-    const std::vector<FrameWindow> nothing = {{Key("helpwind"), 16, false}, {Key("logwindo"), 1058, false}};
+    const std::vector<FrameWindow> nothing = {{Key("helpwind"), 130, 16, false}, {Key("logwindo"), 16, 1058, false}};
     CHECK(!ViewOf(kViews, nothing).has_value());
 }
 
@@ -161,11 +162,12 @@ TEST(a_frame_s_top_is_its_highest_shown_window_that_hangs_from_the_top_and_is_no
     std::vector<FrameWindow> currencies = StatusFrame();
     currencies[6].hidden = true; // the portrait, under the list
     CHECK(FrameTop(currencies, kScreenBottom) == std::optional<int>(48));
-    const std::vector<FrameWindow> bottomOnly = {{Key("helpwind"), 16, false}, {Key("iteminfo"), 992, false},
-        {Key("logwindo"), 1058, false}};
+    const std::vector<FrameWindow> bottomOnly = {{Key("helpwind"), 130, 16, false}, {Key("iteminfo"), 16, 992, false},
+        {Key("logwindo"), 16, 1058, false}};
     CHECK(!FrameTop(bottomOnly, kScreenBottom).has_value());
     // The map's corner frame, 106 x 14 at the screen's corner, draws nothing: the map's own windows are the top.
-    const std::vector<FrameWindow> map = {{Key("buff"), 48, false}, {Key("mapframe"), 0, false}, {Key("map0"), 48, false}};
+    const std::vector<FrameWindow> map = {{Key("buff"), 142, 48, false}, {Key("mapframe"), 0, 0, false},
+        {Key("map0"), 1792, 48, false}};
     CHECK(FrameTop(map, kScreenBottom) == std::optional<int>(48));
 }
 
@@ -235,4 +237,19 @@ TEST(wide_scan_s_label_under_the_strip_s_title_moves_with_the_frame_s_windows_an
     rect = {16, 38, 128, 68}; // the strip moved, the windows left where the game put them: the label stays too
     LabelPlace(rect, 0, 22);
     CHECK(rect == title);
+}
+
+TEST(the_side_holding_the_view_s_highest_window_takes_its_shift_and_the_other_hangs_under_the_band_by_its_own)
+{
+    // Status: the status column at 16 on the left, and its menu at 48 on the right, where the Commands menu was.
+    CHECK((ShiftsOf(StatusFrame(), std::nullopt, 64, 64, true, kScreenRight, kScreenBottom) == FrameShifts{48, 16}));
+    CHECK((ShiftsOf(StatusFrame(), 30, 64, 64, false, kScreenRight, kScreenBottom) == FrameShifts{30, 16}));
+    CHECK((ShiftsOf(StatusFrame(), std::nullopt, 64, 80, true, kScreenRight, kScreenBottom) == FrameShifts{64, 32}));
+    // Items: the list on the left and its sort menu on the right start together, so the player's shift moves both.
+    const std::vector<FrameWindow> items = {{Key("buff"), 142, 48, false}, {Key("inventor"), 16, 48, false},
+        {Key("itmsort2"), 1792, 48, false}, {Key("iteminfo"), 16, 992, false}};
+    CHECK((ShiftsOf(items, 20, 64, 64, false, kScreenRight, kScreenBottom) == FrameShifts{20, 20}));
+    // A view on the right alone takes its shift there.
+    const std::vector<FrameWindow> conquest = {{Key("conquer1"), 1792, 48, false}};
+    CHECK(ShiftsOf(conquest, 6, 64, 64, false, kScreenRight, kScreenBottom).right == 6);
 }
