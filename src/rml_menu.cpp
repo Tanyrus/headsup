@@ -1,8 +1,9 @@
 #include "rml_menu.h"
 
 #include "fonts.h"
-#include "menu_fonts.h"
+#include "markup.h"
 #include "menu_sizes.h"
+#include "rml_pure.h"
 #include "utf16.h"
 
 #include <RmlUi/Core/Elements/ElementFormControl.h>
@@ -181,7 +182,7 @@ namespace headsup
         m_Popup      = m_Document->GetElementById(kMenuPopupId);
         m_Tip        = m_Document->GetElementById(kMenuTipId);
         for (const Rml::EventId id : {Rml::EventId::Click, Rml::EventId::Change, Rml::EventId::Dragdrop, Rml::EventId::Dragend,
-                 Rml::EventId::Mouseover, Rml::EventId::Mousemove, Rml::EventId::Animationend})
+                 Rml::EventId::Mouseover, Rml::EventId::Mousemove})
             m_Document->AddEventListener(id, this);
         // On their way down: taking and losing the keyboard do not come back up, and a text box keeps its keys.
         for (const Rml::EventId id : {Rml::EventId::Focus, Rml::EventId::Blur, Rml::EventId::Keydown})
@@ -380,20 +381,19 @@ namespace headsup
         }
     }
 
+    // As a filter, the window is drawn whole into a layer that is laid over the game at this opacity, so its parts do
+    // not show through each other; at full opacity it needs no layer.
     void RmlMenu::ApplyOpacity()
     {
-        m_Document->SetProperty(Rml::PropertyId::Opacity, Rml::Property(static_cast<float>(m_Opacity) / kPercent, Rml::Unit::NUMBER));
+        if (m_Opacity >= kMaxOpacity)
+            m_Document->RemoveProperty(Rml::PropertyId::Filter);
+        else
+            m_Document->SetProperty("filter", std::string(kOpacityFilter) + "(" + RcssNumber(static_cast<float>(m_Opacity) / kPercent) + ")");
     }
 
     void RmlMenu::ProcessEvent(Rml::Event& event)
     {
         if (m_Document == nullptr) return;
-        // The fade the window opens with ends by taking its opacity off the document: it is put back at once.
-        if (event.GetId() == Rml::EventId::Animationend && event.GetTargetElement() == m_Document)
-        {
-            ApplyOpacity();
-            return;
-        }
         Rml::Element* target = event.GetTargetElement();
         Rml::Element* named  = WithId(target);
         const std::string id = named != nullptr ? named->GetId() : std::string();
@@ -489,7 +489,7 @@ namespace headsup
     }
 
     bool RmlMenu::Update(const MenuHost& host, Settings& settings, const MenuReadings& readings,
-        const std::vector<std::string>& fonts, float em, double version)
+        const std::vector<std::string>& fonts, double version)
     {
         m_Layout = host.layout;
         if (std::exchange(m_Closed, false)) open = false;
@@ -512,23 +512,41 @@ namespace headsup
             return changed;
         }
         if (!Document(host, settings)) return false;
-        const MenuFont* font = MenuFontNamed(m_Look.textFont);
-        const float pixels   = std::round(em * static_cast<float>(settings.menuScale) / kPercent * (font != nullptr ? font->scale : 1.0f));
+        const auto pixels = static_cast<float>(settings.menuFontSize);
         if (pixels != m_FontPixels)
         {
             m_FontPixels = pixels;
+            // What the pointer is on, a size arrow just clicked, stays under it as the window grows or shrinks, as
+            // far as the screen lets the window move: the next click lands on the same arrow.
+            Rml::Element* held = m_Visible ? host.context->GetHoverElement() : nullptr;
+            if (held != nullptr && held->GetOwnerDocument() != m_Document) held = nullptr;
+            const Rml::Vector2f before = held != nullptr ? held->GetAbsoluteOffset(Rml::BoxArea::Border) : Rml::Vector2f{};
             SetPx(m_Document, Rml::PropertyId::FontSize, pixels);
+            if (held != nullptr)
+            {
+                m_Document->UpdateDocument();
+                const Rml::Vector2f drift = held->GetAbsoluteOffset(Rml::BoxArea::Border) - before;
+                const Rml::Vector2f at    = m_Document->GetAbsoluteOffset(Rml::BoxArea::Border);
+                SetPx(m_Document, Rml::PropertyId::Left, std::max(0.0f, std::round(at.x - drift.x)));
+                SetPx(m_Document, Rml::PropertyId::Top, std::max(0.0f, std::round(at.y - drift.y)));
+            }
         }
         if (settings.menuOpacity != m_Opacity)
         {
             m_Opacity = settings.menuOpacity;
             ApplyOpacity();
         }
+        if (m_Revealing) m_Document->RemoveProperty(Rml::PropertyId::Visibility);
+        m_Revealing = false;
         if (!m_Visible)
         {
             m_Document->Show(Rml::ModalFlag::None, Rml::FocusFlag::Auto);
+            // RmlUi applies an animation once its clock has passed the start, so the frame that sets one draws the
+            // window whole: hidden that frame, it comes in already fading.
             m_Document->SetClass("open", true);
-            m_Visible = true;
+            m_Document->SetProperty(Rml::PropertyId::Visibility, Rml::Property(Rml::Style::Visibility::Hidden));
+            m_Revealing = true;
+            m_Visible   = true;
             char text[32];
             std::snprintf(text, sizeof(text), "v%g", version);
             if (Rml::Element* shown = m_Document->GetElementById(kMenuVersionId)) shown->SetInnerRML(text);

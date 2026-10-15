@@ -313,9 +313,10 @@ namespace headsup
         // Every plate but yours is sized by how far its owner is from you, with the camera's own distance behind you
         // added: unlike the game's name size, that changes smoothly as you walk and not at all as the camera turns.
         const ActorInfo* you     = tracker.FindIndex(selfIndex);
-        const Camera* sceneView  = names.SceneCamera();
+        const NameFrame* ownName = hook.Drawn(selfIndex);
+        const float ownDepth     = ownName != nullptr ? NameFromFrame(*ownName, names.TargetScaleX(), names.TargetScaleY()).depth : 0.0f;
         const std::optional<float> cameraBack =
-            you != nullptr && sceneView != nullptr ? std::optional<float>(Distance(sceneView->eye, you->feet)) : std::nullopt;
+            you != nullptr ? CameraBehind(ownDepth, names.SteadyCamera(), you->feet) : std::nullopt;
         const float minScale        = static_cast<float>(settings.scaleMin) / kPercent;
         const float maxScale        = static_cast<float>(settings.scaleMax) / kPercent;
         const LineLook timerLook    = TimerLook(settings);
@@ -344,7 +345,7 @@ namespace headsup
                 const DrawnName gameName =
                     NameFromFrame(*frame, names.TargetScaleX(), names.TargetScaleY(), info->index == targets.subTarget);
                 // Checked where our name goes: a seated player's head can be in view with the game's name above the screen.
-                ScreenBox anchor = PlaceName(gameName.box, names.SceneCamera(), info->feet, info->pose);
+                ScreenBox anchor = PlaceName(gameName.box, names.SteadyCamera(), info->feet, info->pose);
                 if (!NameOnScreen(anchor, screenWidth, screenHeight)) continue;
                 // The game drawing the name this frame is all a plate's lines wait for.
                 ComposedPlate composed = ComposePlate(*info, tracker.Player(), settings, gameName.color);
@@ -360,10 +361,10 @@ namespace headsup
                 p.frame  = m_Frame;
 
                 const bool self = info->index == selfIndex;
-                // Yours, and any plate while the camera or you are not known, follows the game's name size.
+                // Yours, and any plate while the camera or you are not known, is sized by its name's distance.
                 const float sized = cameraBack && !self
                                         ? ScaleAtDistance(*cameraBack + Distance(info->feet, you->feet), minScale, maxScale)
-                                        : DistanceScale(gameName.box.Height(), screenHeight, minScale, maxScale);
+                                        : NameScale(gameName.depth, gameName.box.Height(), screenHeight, minScale, maxScale);
                 p.scale                 = EaseScale(p.scale, sized, now - p.scaleTime);
                 p.scaleTime             = now;
                 const bool scales       = ScalesWithDistance(settings, self);
@@ -377,8 +378,7 @@ namespace headsup
                 // A line's text height and a run's badge text height, in the image.
                 auto textShown  = [&](const ComposedLine& line) { return line.look.textSize * scale * toY; };
                 auto badgeShown = [&](const RunShape& run) { return run.iconSize * kBadgeShare * toY; };
-                p.cursorRaster =
-                    settings.scaleCursor ? RasterHeight(cursorShown, p.cursorRaster) : FixedRasterHeight(cursorShown);
+                p.cursorRaster = CursorRaster(cursorShown, p.cursorRaster, settings.scaleCursor, settings.cursorHeight);
                 const OrnamentSettings& ornament = settings.Kind(PlateKindOf(info->state)).ornament;
                 const float ornamentShown        = static_cast<float>(ornament.height) * scale * toY;
 
@@ -689,7 +689,8 @@ namespace headsup
         {
             PlateTexture& t = cursor.under ? m_LoneCursorUnder : m_LoneCursor;
             // A target with no name is no entity HeadsUp knows: a door, read as the NPC or object it is.
-            if (!PrepareCursor(t, CursorState(EntityState{}, cursor.target), FixedRasterHeight(shown), settings)) break;
+            if (!PrepareCursor(t, CursorState(EntityState{}, cursor.target), CursorRaster(shown, 0, false, settings.cursorHeight), settings))
+                break;
             if (t.unfit) continue;
             const float fit       = FitOf(shown, t.raster);
             const float width     = t.width * fit, height = t.height * fit;

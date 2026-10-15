@@ -2,13 +2,19 @@
 
 #include "gpu.h"
 
+#include <RmlUi/Core/Dictionary.h>
+#include <RmlUi/Core/Variant.h>
+
 #include <utility>
+#include <vector>
 
 namespace headsup
 {
     namespace
     {
         constexpr int kVerticesPerTriangle = 3;
+        constexpr const char* kFilterValue   = "value";
+        constexpr DWORD kTransparent         = 0;
     }
 
     void RmlRender::Begin(int width, int height)
@@ -30,8 +36,144 @@ namespace headsup
     {
         if (m_Device == nullptr) return;
         m_Device->SetTexture(0, nullptr);
+        m_Stack.clear();
+        if (m_GameTarget != nullptr)
+        {
+            m_Device->SetRenderTarget(m_GameTarget, m_GameDepth);
+            m_GameTarget->Release();
+            m_GameTarget = nullptr;
+        }
+        if (m_GameDepth != nullptr) m_GameDepth->Release();
+        m_GameDepth = nullptr;
         m_Device->SetViewport(&m_GameViewport);
+        if (ReleaseIdleLayers(m_IdleRenders, std::exchange(m_Pushed, false))) ReleaseLayers();
     }
+
+    void RmlRender::UseTexture(bool textured)
+    {
+        if (textured == m_Textured) return;
+        m_Textured = textured;
+        m_Device->SetTextureStageState(0, D3DTSS_COLOROP, textured ? D3DTOP_MODULATE : D3DTOP_SELECTARG2);
+        m_Device->SetTextureStageState(0, D3DTSS_ALPHAOP, textured ? D3DTOP_MODULATE : D3DTOP_SELECTARG2);
+    }
+
+    bool RmlRender::MakeLayer(size_t index)
+    {
+        if (m_LayersRefused || m_NoLayers) return false;
+        if (m_Layers.size() <= index) m_Layers.resize(index + 1);
+        Layer& layer      = m_Layers[index];
+        const int sideX   = TextureSide(m_Width), sideY = TextureSide(m_Height);
+        if (layer.texture != nullptr && layer.side[0] == sideX && layer.side[1] == sideY) return true;
+        if (layer.surface != nullptr) layer.surface->Release();
+        headsup::ReleaseTexture(layer.texture);
+        layer = Layer{};
+        if (FAILED(m_Device->CreateTexture(static_cast<UINT>(sideX), static_cast<UINT>(sideY), 1, D3DUSAGE_RENDERTARGET,
+                D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &layer.texture)) ||
+            FAILED(layer.texture->GetSurfaceLevel(0, &layer.surface)))
+        {
+            headsup::ReleaseTexture(layer.texture);
+            layer           = Layer{};
+            m_LayersRefused = true;
+            m_Failure = "Direct3D could not make a " + std::to_string(sideX) + "x" + std::to_string(sideY) +
+                        " layer for the settings window's opacity, so it is drawn opaque";
+            return false;
+        }
+        layer.side[0] = sideX;
+        layer.side[1] = sideY;
+        return true;
+    }
+
+    void RmlRender::Bind(size_t depth)
+    {
+        depth = DrawnDepth(m_Stack, depth);
+        if (depth == 0)
+            m_Device->SetRenderTarget(m_GameTarget, m_GameDepth);
+        else
+            m_Device->SetRenderTarget(m_Layers[depth - 1].surface, nullptr);
+        ApplyScissor(); // a new target sets the viewport to the whole of it
+    }
+
+    void RmlRender::WholeTarget()
+    {
+        D3DVIEWPORT8 viewport = m_GameViewport;
+        viewport.X            = 0;
+        viewport.Y            = 0;
+        viewport.Width        = static_cast<DWORD>(m_Width);
+        viewport.Height       = static_cast<DWORD>(m_Height);
+        m_Device->SetViewport(&viewport);
+    }
+
+    Rml::LayerHandle RmlRender::PushLayer()
+    {
+        if (m_Device == nullptr) return 0;
+        if (m_GameTarget == nullptr && FAILED(m_Device->GetRenderTarget(&m_GameTarget))) m_GameTarget = nullptr;
+        if (m_GameTarget != nullptr && m_GameDepth == nullptr && FAILED(m_Device->GetDepthStencilSurface(&m_GameDepth)))
+            m_GameDepth = nullptr;
+        const bool made = m_GameTarget != nullptr && MakeLayer(m_Stack.size());
+        m_Stack.push_back(made);
+        m_Pushed = true;
+        if (made)
+        {
+            Bind(m_Stack.size());
+            // All of it: RmlUi sets the element's scissor only after the push, so the one set now is another's.
+            WholeTarget();
+            m_Device->Clear(0, nullptr, D3DCLEAR_TARGET, kTransparent, 1.0f, 0);
+            ApplyScissor();
+        }
+        return static_cast<Rml::LayerHandle>(m_Stack.size());
+    }
+
+    void RmlRender::CompositeLayers(Rml::LayerHandle source, Rml::LayerHandle destination, Rml::BlendMode,
+        Rml::Span<const Rml::CompiledFilterHandle> filters)
+    {
+        // A layer Direct3D refused had its drawing go straight on; a layer laid on itself has nothing to read from.
+        if (m_Device == nullptr || source == 0 || source > m_Stack.size() || !m_Stack[source - 1] || source == destination) return;
+        float opacity = 1.0f;
+        for (const Rml::CompiledFilterHandle filter : filters)
+            opacity *= *reinterpret_cast<const float*>(filter);
+        const Layer& layer = m_Layers[source - 1];
+        Bind(destination);
+        // Over the whole target and not RmlUi's scissor, the element's own box: what overflows it was drawn into the
+        // layer too, as a list hanging below the window, and is laid down with the rest.
+        WholeTarget();
+        UseTexture(true);
+        m_Device->SetTexture(0, layer.texture);
+        const auto quad = LayerQuad(m_Width, m_Height, static_cast<float>(m_Width) / static_cast<float>(layer.side[0]),
+            static_cast<float>(m_Height) / static_cast<float>(layer.side[1]), LayerTint(opacity));
+        m_Device->DrawPrimitiveUP(D3DPT_TRIANGLELIST, static_cast<UINT>(quad.size() / kVerticesPerTriangle), quad.data(),
+            sizeof(ScreenVertex));
+        m_Device->SetTexture(0, nullptr);
+        Bind(m_Stack.size());
+    }
+
+    void RmlRender::PopLayer()
+    {
+        if (m_Stack.empty()) return;
+        m_Stack.pop_back();
+        if (m_Device != nullptr && m_GameTarget != nullptr) Bind(m_Stack.size());
+    }
+
+    Rml::CompiledFilterHandle RmlRender::CompileFilter(const Rml::String& name, const Rml::Dictionary& parameters)
+    {
+        const auto value = parameters.find(kFilterValue);
+        if (name != kOpacityFilter || value == parameters.end()) return 0;
+        return reinterpret_cast<Rml::CompiledFilterHandle>(new float(value->second.Get<float>()));
+    }
+
+    void RmlRender::ReleaseFilter(Rml::CompiledFilterHandle filter) { delete reinterpret_cast<float*>(filter); }
+
+    void RmlRender::ReleaseLayers()
+    {
+        for (Layer& layer : m_Layers)
+        {
+            if (layer.surface != nullptr) layer.surface->Release();
+            headsup::ReleaseTexture(layer.texture);
+        }
+        m_Layers.clear();
+        m_LayersRefused = false;
+    }
+
+    void RmlRender::RefuseLayers() { m_NoLayers = true; }
 
     Rml::CompiledGeometryHandle RmlRender::CompileGeometry(Rml::Span<const Rml::Vertex> vertices,
         Rml::Span<const int> indices)
@@ -74,12 +216,7 @@ namespace headsup
             v.v *= shareV;
         }
         const bool textured = texture != nullptr;
-        if (textured != m_Textured)
-        {
-            m_Textured = textured;
-            m_Device->SetTextureStageState(0, D3DTSS_COLOROP, textured ? D3DTOP_MODULATE : D3DTOP_SELECTARG2);
-            m_Device->SetTextureStageState(0, D3DTSS_ALPHAOP, textured ? D3DTOP_MODULATE : D3DTOP_SELECTARG2);
-        }
+        UseTexture(textured);
         m_Device->SetTexture(0, textured ? texture->texture : nullptr);
         m_Device->DrawPrimitiveUP(D3DPT_TRIANGLELIST, static_cast<UINT>(m_Placed.size() / kVerticesPerTriangle),
             m_Placed.data(), sizeof(ScreenVertex));

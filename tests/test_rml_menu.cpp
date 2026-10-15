@@ -18,7 +18,7 @@ using namespace headsup;
 
 namespace
 {
-    constexpr float kEm       = 18.0f; // the window's text, in pixels
+    constexpr float kEm       = static_cast<float>(kDefaultMenuFontSize); // the window's text, in pixels
     constexpr double kVersion = 0.65;
     constexpr int kLeftButton = 0;
     constexpr double kFrameSeconds = 1.0 / 30.0; // the game's frame
@@ -45,6 +45,7 @@ namespace
         ~Window() { menu.Close(); }
         // What RmlUi complained of since the window opened.
         std::string Said() const { return m_Rml.Said(); }
+        const test::NoRender& Render() const { return m_Rml.Render(); }
 
         // True when a frame of these changed a setting.
         bool Frames(int count = 1)
@@ -53,7 +54,7 @@ namespace
             for (int i = 0; i < count; ++i)
             {
                 m_Rml.complaints.seconds += kFrameSeconds;
-                changed = menu.Update(m_Host, settings, m_Readings, m_Fonts, kEm, kVersion) || changed;
+                changed = menu.Update(m_Host, settings, m_Readings, m_Fonts, kVersion) || changed;
                 m_Host.context->Update();
                 m_Host.context->Render();
             }
@@ -429,13 +430,13 @@ TEST(the_list_of_pages_scrolls_in_a_window_too_short_for_it)
 {
     Window window;
     window.OpenAt(0, 0, 900, 100); // asked shorter than it goes, so it opens at its least height
-    Rml::Element* body = window.Find("nav-debug")->GetOwnerDocument();
+    Rml::Element* body = window.Find("nav-configmenu")->GetOwnerDocument();
     const float bottom = body->GetAbsoluteOffset(Rml::BoxArea::Border).y + body->GetBox().GetSize(Rml::BoxArea::Border).y;
     // The last page's name is reached inside the window, and takes its click.
-    window.Click("nav-debug");
-    Rml::Element* last = window.Find("nav-debug");
+    window.Click("nav-configmenu");
+    Rml::Element* last = window.Find("nav-configmenu");
     CHECK(last->GetAbsoluteOffset(Rml::BoxArea::Border).y + last->GetBox().GetSize(Rml::BoxArea::Border).y <= bottom);
-    CHECK(window.Shows("debug-headsup-head") || last->IsClassSet("picked"));
+    CHECK(window.Shows("configmenu-headsup-head") || last->IsClassSet("picked"));
 }
 
 TEST(a_dash_mark_is_shown_as_its_shape_in_the_list_and_in_the_closed_control)
@@ -1011,8 +1012,8 @@ TEST(the_window_is_kept_where_it_is_dragged_by_its_title)
     const Rml::Vector2f was = window.Center("title");
     CHECK(window.Drag("head", Rml::Vector2f(-120.0f, 40.0f)));
     const Rml::Vector2f now = window.Center("title");
-    CHECK_EQ(now.x - was.x, -120.0f);
-    CHECK_EQ(now.y - was.y, 40.0f);
+    CHECK(std::abs(now.x - was.x + 120.0f) < 0.01f);
+    CHECK(std::abs(now.y - was.y - 40.0f) < 0.01f);
     CHECK(window.settings.menuWidth > 0 && window.settings.menuHeight > 0);
     CHECK_EQ(window.settings.menuX, static_cast<int>((test::RmlSession::kWidth - window.settings.menuWidth) / 2) - 120);
 }
@@ -1150,31 +1151,118 @@ TEST(a_toggles_knob_slides_across_its_track_in_both_themes)
         };
         const float off = middle(window.Find(box)) - middle(window.Find("entities-nameplates-vertical-offset"));
         CHECK(off > -1.0f && off < 1.0f);
+        // And it is nearly as wide as that slider.
+        const float slider = size(window.Find("entities-nameplates-vertical-offset")).x;
+        CHECK(width > 0.8f * slider && width < slider);
     }
 }
 
-TEST(the_window_is_as_opaque_as_its_setting_from_the_moment_it_opens)
+TEST(a_toggles_word_sits_inside_its_track_clear_of_the_knob_at_either_end)
 {
-    // Opening, it comes in from nothing and never passes its own opacity.
+    Window window;
+    window.Page("mobs");
+    const std::string box = "mobs-detection-icons-links";
+    auto edges = [](Rml::Element* element) {
+        const float x = element->GetAbsoluteOffset(Rml::BoxArea::Border).x;
+        return std::pair{x, x + element->GetBox().GetSize(Rml::BoxArea::Border).x};
+    };
+    Rml::Element* track = window.Find(box);
+    Rml::Element* word  = window.Find(box + "-state");
+    CHECK(track != nullptr && word != nullptr && !word->GetInnerRML().empty());
+    const auto [trackLeft, trackRight] = edges(track);
+    // The word's own letters, wherever its box reaches: they are centered in it.
+    const auto text = [&] {
+        const auto [left, right] = edges(word);
+        const float middle = (left + right) / 2.0f;
+        const float half   = static_cast<float>(Rml::ElementUtilities::GetStringWidth(word, word->GetInnerRML())) / 2.0f;
+        return std::pair{middle - half, middle + half};
+    };
+    for (int flip = 0; flip < 2; ++flip)
+    {
+        const auto [left, right] = text();
+        const auto [knobLeft, knobRight] = edges(window.Find(box)->GetChild(0));
+        CHECK(left > trackLeft && right < trackRight);
+        CHECK(right < knobLeft || left > knobRight);
+        window.Click(box);
+        window.Frames(30);
+    }
+}
+
+TEST(the_debug_report_button_on_the_headsup_config_page_asks_for_one_report)
+{
+    Window window;
+    window.Page("configmenu");
+    CHECK(!window.menu.TakeDebugRequest());
+    window.Click("configmenu-headsup-debug-report");
+    CHECK(window.menu.TakeDebugRequest());
+    CHECK(!window.menu.TakeDebugRequest()); // once
+    CHECK_EQ(window.Said(), "");
+}
+
+TEST(a_font_size_arrow_stays_under_the_pointer_as_the_window_grows_and_shrinks)
+{
+    // The tester's report: the slider ran away from the pointer as the window grew under it. An arrow clicked twice
+    // where it was steps twice.
+    Window window;
+    window.Page("configmenu");
+    const Rml::Vector2f next = window.Center("configmenu-settings-window-size-next");
+    CHECK(window.ClickAt(next));
+    CHECK(window.ClickAt(next));
+    CHECK_EQ(window.settings.menuFontSize, kDefaultMenuFontSize + 2);
+    const Rml::Vector2f previous = window.Center("configmenu-settings-window-size-previous");
+    CHECK(window.ClickAt(previous));
+    CHECK(window.ClickAt(previous));
+    CHECK_EQ(window.settings.menuFontSize, kDefaultMenuFontSize);
+    CHECK_EQ(window.Said(), "");
+}
+
+TEST(the_windows_font_size_is_its_settings_pixels_whatever_its_font_and_its_arrows_step_it)
+{
+    Window window; // in Barlow Condensed, which was drawn larger than the size asked
+    const auto pixels = [&] { return window.Find("page")->GetOwnerDocument()->GetComputedValues().font_size(); };
+    CHECK_EQ(pixels(), 18.0f);
+    window.settings.menuFontSize = 24;
+    window.Frames(2);
+    CHECK_EQ(pixels(), 24.0f);
+    window.Page("configmenu");
+    CHECK(window.Click("configmenu-settings-window-size-next"));
+    CHECK_EQ(window.settings.menuFontSize, 25);
+    window.Frames(2);
+    CHECK_EQ(pixels(), 25.0f);
+    CHECK(window.Click("configmenu-settings-window-size-previous"));
+    CHECK_EQ(window.settings.menuFontSize, 24);
+    CHECK_EQ(window.Said(), "");
+}
+
+TEST(the_window_takes_its_opacity_once_as_a_whole_and_never_more_than_its_setting)
+{
     Window window;
     window.menu.open = false;
     window.Frames(2);
     window.settings.menuOpacity = 50;
     window.menu.open            = true;
-    float most = 0.0f;
+    // Drawn whole into a layer and laid over the game at its opacity once: its own parts are drawn opaque, so an open
+    // list hides the rows under it. Opening, the parts come in from nothing under that.
+    Rml::ElementDocument* document = window.Find("page")->GetOwnerDocument();
     for (int frame = 0; frame < 12; ++frame)
     {
+        const size_t before = window.Render().composited.size();
         window.Frames();
-        most = std::max(most, window.Find("page")->GetOwnerDocument()->GetComputedValues().opacity());
+        // RmlUi starts an animation a frame after it is set: that first frame shows nothing rather than all of it.
+        if (frame == 0) CHECK(!document->IsVisible() && window.Render().composited.size() == before);
+        if (frame > 0) CHECK(window.Render().composited.size() > before && window.Render().composited.back() == 0.5f);
+        if (frame == 1) CHECK(document->IsVisible() && document->GetComputedValues().opacity() < 0.5f);
     }
-    CHECK(most > 0.49f && most < 0.51f);
-    CHECK_EQ(window.Find("page")->GetOwnerDocument()->GetComputedValues().opacity(), 0.5f);
-    // The slider on the Config Menu page sets it, and the window follows while it is dragged.
+    CHECK_EQ(document->GetComputedValues().opacity(), 1.0f);
+    // The slider on the HeadsUp Config page sets it, and at full opacity no layer is drawn.
     window.Page("configmenu");
     CHECK(window.Drag("configmenu-settings-window-window-opacity", Rml::Vector2f(400.0f, 0.0f)));
     CHECK_EQ(window.settings.menuOpacity, 100);
     window.Frames(2);
-    CHECK_EQ(window.Find("page")->GetOwnerDocument()->GetComputedValues().opacity(), 1.0f);
+    const size_t opaque = window.Render().composited.size();
+    window.Frames(2);
+    CHECK_EQ(window.Render().composited.size(), opaque);
+    CHECK_EQ(document->GetComputedValues().opacity(), 1.0f);
     CHECK_EQ(window.Said(), "");
 }
 

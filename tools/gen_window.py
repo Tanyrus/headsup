@@ -99,7 +99,7 @@ VISIBILITY_ROWS = {**rows('aggressive', 'passive', 'nm-aggressive', 'nm-passive'
 PIECES = Pieces(
     pages={'entities': 'Entities', 'mobs': 'Mobs', 'players': 'Players', 'self': 'Self', 'npcs': 'Npcs', 'pets': 'Pets',
            'userinterface': 'UserInterface', 'toppanel': 'TopPanel', 'widgets': 'Widgets', 'mousecursor': 'MouseCursor',
-           'configmenu': 'ConfigMenu', 'debug': 'Debug'},
+           'configmenu': 'ConfigMenu'},
     cards={
         'nameplates': Card(switch=True), 'outline-style': Card(switch=True), 'target-cursor': Card(),
         'colors-aggression': Card(), 'colors-toughness': Card(), 'colors-claim-status': Card(),
@@ -126,7 +126,8 @@ PIECES = Pieces(
         'aggression-colors': Setting(unnamed=True, rows=rows(
             'passive', 'aggressive', 'nm-passive', 'nm-aggressive', 'nm-placeholder', 'no-data')),
         'toughness-colors': Setting(unnamed=True, rows=rows(
-            'unknown-level', 'too-weak', 'easy-prey', 'decent-challenge', 'even-match', 'tough', 'very-tough')),
+            'unknown-level', 'too-weak', 'easy-prey', 'decent-challenge', 'even-match', 'tough', 'very-tough',
+            'incredibly-tough')),
         'claim-colors': Setting(unnamed=True, rows=rows('unclaimed', 'claimed-others', 'claimed-yours')),
         'targeting-colors': Setting(unnamed=True, rows=rows(
             'not-targeted', 'targeted', 'locked-on', 'sub-target', 'out-of-range')),
@@ -177,8 +178,8 @@ PIECES = Pieces(
             'enabled', 'section', 'second-line', 'icons', 'details', 'currency', 'time-zone', 'server-time', '24-hour',
             'seconds', 'layout', 'exp-bar', 'job-names', 'latency')),
         'trays': Setting(unnamed=True), 'reset-layout': Setting(),
-        # Mouse Cursor, Config Menu and Debug
-        'chocobo': Setting(), 'pointer-fix': Setting(), 'keep-pointer': Setting(),
+        # Mouse Cursor and HeadsUp Config
+        'pointer-icon': Setting(options=3, nameless=frozenset({2})), 'pointer-fix': Setting(), 'keep-pointer': Setting(),
         'window-theme': Setting(), 'font': Setting(), 'size': Setting(), 'window-opacity': Setting(),
         'reset-all-settings': Setting(words={'note': True, 'reset-everything': True, 'keep-them': True}),
         'debug-report': Setting(),
@@ -188,7 +189,7 @@ PIECES = Pieces(
     },
     lists={
         'plate-mode': List(4), 'outline-mode': List(4, extra={3: 'tipOnClaimRows'}), 'color-source': List(7),
-        'show-condition': List(12), 'ornament-place': List(5), 'align': List(3), 'font-style': List(3),
+        'show-condition': List(13), 'ornament-place': List(5), 'align': List(3), 'font-style': List(3),
         'smoothness': List(4), 'bar-theme': List(5), 'menu-theme': List(2), 'bar-sections': List(3),
         'bar-widgets': List(14), 'plate-lines': List(3), 'job-layout': List(3), 'exp-bar': List(3), 'tags': List(22),
     },

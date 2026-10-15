@@ -2,6 +2,7 @@
 #include "test.h"
 
 #include <cstring>
+#include <string>
 #include <vector>
 
 using namespace headsup;
@@ -35,15 +36,18 @@ namespace
         return p;
     }
 
-    // GP_SERV_ENTITY_SET (0x067) up to its flags byte, as Phoenix's src/map/packets/char_sync.cpp lays it out for a
-    // character (kind 2) and entity_set_name.cpp for a named entity (kind 3).
-    std::vector<uint8_t> CharSync(uint8_t kind, uint16_t index, uint8_t flags)
+    // GP_SERV_ENTITY_SET (0x067), as Phoenix's src/map/packets/char_sync.cpp lays it out for a character (kind 2):
+    // its main job's level at 0x25 and, while level synced, the level it is synced to at 0x26; entity_set_name.cpp
+    // uses kind 3 for a named entity.
+    std::vector<uint8_t> CharSync(uint8_t kind, uint16_t index, uint8_t flags, uint8_t level = 0, uint8_t syncLevel = 0)
     {
         std::vector<uint8_t> p(0x28, 0);
         p[0]    = 0x67;
         p[0x04] = kind;
         std::memcpy(&p[0x06], &index, 2);
         p[0x10] = flags;
+        p[0x25] = level;
+        p[0x26] = syncLevel;
         return p;
     }
 
@@ -167,6 +171,54 @@ TEST(level_sync_comes_from_a_characters_sync_packet)
     CHECK(!ParseCharSync(named.data(), static_cast<uint32_t>(named.size())));
     CHECK(!ParseCharSync(synced.data(), 0x10)); // too short for the flags
     CHECK(!ParseCharSync(nullptr, 0x28));
+}
+
+TEST(a_players_level_comes_with_their_sync_packet_and_is_the_synced_one_while_synced)
+{
+    const auto plain = CharSync(0x02, 1105, 0x00, 75);
+    CHECK_EQ(int{ParseCharSync(plain.data(), static_cast<uint32_t>(plain.size()))->level}, 75);
+    const auto synced = CharSync(0x02, 1105, 0x04, 75, 30);
+    CHECK_EQ(int{ParseCharSync(synced.data(), static_cast<uint32_t>(synced.size()))->level}, 30);
+    // In a battlefield the server keeps the sync icon off and still sends the level it holds the player to.
+    const auto field = CharSync(0x02, 1105, 0x00, 75, 40);
+    CHECK_EQ(int{ParseCharSync(field.data(), static_cast<uint32_t>(field.size()))->level}, 40);
+    // 0x26 is the party's cap (m_LevelRestriction): a member under it keeps their own level.
+    const auto under = CharSync(0x02, 1105, 0x04, 25, 30);
+    CHECK_EQ(int{ParseCharSync(under.data(), static_cast<uint32_t>(under.size()))->level}, 25);
+    // Whether a cap holds the level, icon or not.
+    CHECK(!ParseCharSync(plain.data(), static_cast<uint32_t>(plain.size()))->held);
+    CHECK(ParseCharSync(synced.data(), static_cast<uint32_t>(synced.size()))->held);
+    CHECK(ParseCharSync(field.data(), static_cast<uint32_t>(field.size()))->held);
+    CHECK(!ParseCharSync(synced.data(), 0x26)); // too short for the levels
+}
+
+TEST(sync_packets_the_test_server_sent_read_as_their_characters_were)
+{
+    const auto bytes = [](const char* hex) {
+        std::vector<uint8_t> out;
+        for (const char* c = hex; c[0] != '\0' && c[1] != '\0'; c += 2)
+            out.push_back(static_cast<uint8_t>(std::stoi(std::string(c, 2), nullptr, 16)));
+        return out;
+    };
+    // Headsup (index 1024) after `setLevel(20)`; Headsuptwo (index 1025), WAR 30, then 37, unsynced each time.
+    const auto self   = bytes("6714530d02090004e9fd000000000000000000000000000000000000000000000000000000140000");
+    const auto second = bytes("6714d14e02090104eafd0000000000000000000000000000000000000000000000000000001e0000");
+    const auto later  = bytes("6714aa4f02090104eafd000000000000000000000000000000000000000000000000000000250000");
+    const auto a = ParseCharSync(self.data(), static_cast<uint32_t>(self.size()));
+    CHECK(a && a->index == 1024 && !a->synced && a->level == 20);
+    const auto b = ParseCharSync(second.data(), static_cast<uint32_t>(second.size()));
+    CHECK(b && b->index == 1025 && !b->synced && b->level == 30);
+    CHECK_EQ(int{ParseCharSync(later.data(), static_cast<uint32_t>(later.size()))->level}, 37);
+}
+
+TEST(an_anonymous_player_says_so_in_their_update)
+{
+    const auto anonymous = OtherPlayer(1105, kGeneral, 1u << 12, 0, 0);
+    const auto update    = ParseOtherPlayer(anonymous.data(), static_cast<uint32_t>(anonymous.size()));
+    CHECK(update && update->status && update->status->anonymous);
+    CHECK(!update->status->seekingParty && !update->status->away); // its neighbors
+    const auto seeking = OtherPlayer(1105, kGeneral, 1u << 11, 0, 0);
+    CHECK(!ParseOtherPlayer(seeking.data(), static_cast<uint32_t>(seeking.size()))->status->anonymous);
 }
 
 TEST(your_level_sync_comes_from_your_buffs)

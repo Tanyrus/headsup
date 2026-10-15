@@ -213,43 +213,41 @@ TEST(a_dead_mobs_name_does_not_glow)
     CHECK_EQ(ComposePlate(player, kPlayer, glowing, kGame).lines[0].look.glow, 1.5f);
 }
 
-TEST(a_mob_your_party_has_claimed_can_lose_its_glow)
+TEST(a_line_can_lose_its_glow_while_you_are_in_combat_whatever_its_entity_does)
 {
     Settings s; // the default design's name glows at full strength; a second line glows here too
     s.Kind(PlateKind::Mobs).lines[1].glow = 50;
-    ActorInfo yours   = AggressiveMob();
-    yours.state.claim = ClaimState::Yours;
-    yours.state.row   = Category::PartyClaim;
-    const ComposedPlate fought = ComposePlate(yours, kPlayer, s, kGame);
+    PlayerState fighting = kPlayer;
+    fighting.inCombat    = true;
+    // A mob nobody has touched loses its glow while you fight another.
+    const ComposedPlate fought = ComposePlate(AggressiveMob(), fighting, s, kGame);
     CHECK_EQ(fought.lines.size(), size_t{3});
     CHECK_EQ(fought.lines[1].look.glow, 0.0f);
     CHECK_EQ(fought.lines[2].look.glow, 0.0f);
     CHECK_EQ(fought.lines[2].look.shadow, kShadowUnit); // the rest of its look stays
-    // Another party's mob, and one nobody has touched, keep theirs.
-    ActorInfo theirs   = AggressiveMob();
-    theirs.state.claim = ClaimState::Others;
-    theirs.state.row   = Category::OtherClaim;
-    CHECK_EQ(ComposePlate(theirs, kPlayer, s, kGame).lines[2].look.glow, 1.0f);
-    CHECK_EQ(ComposePlate(AggressiveMob(), kPlayer, s, kGame).lines[1].look.glow, 0.5f);
+    // Out of combat, even the mob your party has claimed keeps it.
+    ActorInfo yours   = AggressiveMob();
+    yours.state.claim = ClaimState::Yours;
+    yours.state.row   = Category::PartyClaim;
+    CHECK_EQ(ComposePlate(yours, kPlayer, s, kGame).lines[1].look.glow, 0.5f);
+    CHECK_EQ(ComposePlate(yours, kPlayer, s, kGame).lines[2].look.glow, 1.0f);
     // Each line has the switch for itself.
     s.Kind(PlateKind::Mobs).lines[1].glowOffInCombat = false;
-    const ComposedPlate kept = ComposePlate(yours, kPlayer, s, kGame);
+    const ComposedPlate kept = ComposePlate(AggressiveMob(), fighting, s, kGame);
     CHECK_EQ(kept.lines[1].look.glow, 0.5f);
     CHECK_EQ(kept.lines[2].look.glow, 0.0f);
     // A line that takes its style from another takes that line's switch with it.
     s.Kind(PlateKind::Mobs).lines[2].syncWith = 1;
-    CHECK_EQ(ComposePlate(yours, kPlayer, s, kGame).lines[2].look.glow, 0.5f);
-    // A player's line has it too, off by default: with it on, their name stops glowing while their weapon is out.
+    CHECK_EQ(ComposePlate(AggressiveMob(), fighting, s, kGame).lines[2].look.glow, 0.5f);
+    // A player's line has it too, off by default: with it on, a player's name stops glowing while you fight.
     Settings glowing;
     LineDesign& name = glowing.Kind(PlateKind::Players).lines[2];
     name.glow        = 150;
-    ActorInfo fighter      = LinkshellPlayer();
-    fighter.state.engaged  = true;
-    CHECK_EQ(ComposePlate(fighter, kPlayer, glowing, kGame).lines[0].look.glow, 1.5f);
+    const ActorInfo fighter = LinkshellPlayer();
+    CHECK_EQ(ComposePlate(fighter, fighting, glowing, kGame).lines[0].look.glow, 1.5f);
     name.glowOffInCombat = true;
-    CHECK_EQ(ComposePlate(fighter, kPlayer, glowing, kGame).lines[0].look.glow, 0.0f);
-    fighter.state.engaged = false;
     CHECK_EQ(ComposePlate(fighter, kPlayer, glowing, kGame).lines[0].look.glow, 1.5f);
+    CHECK_EQ(ComposePlate(fighter, fighting, glowing, kGame).lines[0].look.glow, 0.0f);
 }
 
 TEST(the_ornament_needs_both_of_the_lines_it_sits_between)
@@ -316,6 +314,11 @@ TEST(a_lines_conditions_can_hide_it)
     claimed.state.claim = ClaimState::Yours;
     claimed.state.row   = Category::PartyClaim;
     CHECK_EQ(ComposePlate(claimed, kPlayer, s, kGame).lines.size(), size_t{3});
+    s.Kind(PlateKind::Mobs).lines[1].show = LineShow{false, ConditionBit(ShowCondition::Engaged)};
+    CHECK_EQ(ComposePlate(AggressiveMob(), kPlayer, s, kGame).lines.size(), size_t{2});
+    PlayerState fighting = kPlayer;
+    fighting.inCombat    = true;
+    CHECK_EQ(ComposePlate(AggressiveMob(), fighting, s, kGame).lines.size(), size_t{3});
 }
 
 TEST(each_mob_tag_renders_its_text_or_icons)
@@ -335,7 +338,7 @@ TEST(each_mob_tag_renders_its_text_or_icons)
     CHECK_EQ(Rendered(ComposePlate(AggressiveMob(), kPlayer, s, kGame).lines[0]), "[006] [17190918]");
 }
 
-TEST(a_dash_in_a_design_or_between_a_levels_ends_is_drawn_as_the_mark_chosen)
+TEST(only_a_dash_typed_in_a_design_is_drawn_as_the_mark_chosen)
 {
     Settings s; // a new install's dashes are diamonds
     s.Kind(PlateKind::Mobs).lines[1].text = "Lv $level - $con";
@@ -343,11 +346,11 @@ TEST(a_dash_in_a_design_or_between_a_levels_ends_is_drawn_as_the_mark_chosen)
     std::snprintf(mob.name, sizeof(mob.name), "Ga-Bhu");
     const auto level = [&] { return ComposePlate(mob, kPlayer, s, kGame).lines[1].items[0].text; };
     const std::string diamond(1, DashChar(DashMark::Diamond)), dot(1, DashChar(DashMark::Dot));
-    CHECK_EQ(level(), "Lv 17" + diamond + "20 " + diamond + " EP" + diamond + "EM");
-    // A name's dash is part of the name: it stays a dash.
+    // The dashes between a range's ends are the tags' own text, not the design's.
+    CHECK_EQ(level(), "Lv 17-20 " + diamond + " EP-EM");
     CHECK_EQ(ComposePlate(mob, kPlayer, s, kGame).lines[2].items[0].text, "Ga-Bhu");
     s.dashMark = DashMark::Dot;
-    CHECK_EQ(level(), "Lv 17" + dot + "20 " + dot + " EP" + dot + "EM");
+    CHECK_EQ(level(), "Lv 17-20 " + dot + " EP-EM");
     s.dashMark = DashMark::None;
     CHECK_EQ(level(), "Lv 17-20 - EP-EM");
     // Each mark has a character of its own, none of them a dash, and a report reads them as dashes.
@@ -603,6 +606,9 @@ TEST(jobs_show_alone_when_there_is_no_sub_job_and_nothing_when_unknown)
     CHECK_EQ(Rendered(Compose(info, s).lines[0]), "Chadmage WAR 75");
     info.jobs = PlayerJobs{0, 0, 0, 0};
     CHECK_EQ(Rendered(Compose(info, s).lines[0]), "Chadmage");
+    // A level the server sent without a check comes with no job.
+    info.jobs = PlayerJobs{0, 75, 0, 0};
+    CHECK_EQ(Rendered(Compose(info, s).lines[0]), "Chadmage 75");
 }
 
 TEST(a_players_title_shows_once_known_and_takes_its_space_with_it_when_not)

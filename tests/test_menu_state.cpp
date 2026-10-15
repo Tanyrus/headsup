@@ -54,7 +54,7 @@ TEST(the_kind_pages_know_their_kind)
     for (const auto& [page, kind] : kinds)
         CHECK(KindOfPage(page) == kind);
     for (const Page page : {Page::Entities, Page::UserInterface, Page::TopPanel, Page::Widgets, Page::MouseCursor,
-             Page::ConfigMenu, Page::Debug})
+             Page::ConfigMenu})
         CHECK(!KindOfPage(page));
 }
 
@@ -81,7 +81,7 @@ TEST(the_show_dropdown_reads_always_one_condition_how_many_or_never)
     const auto NameOfCondition = [](ShowCondition c) {
         return std::string(kWindowLayout.OptionsOf(WindowList::ShowCondition)[static_cast<size_t>(c)].name);
     };
-    const std::vector<ShowCondition> mobs = ConditionsFor(PlateKind::Mobs);
+    const std::span<const ShowCondition> mobs = ConditionsFor(PlateKind::Mobs);
     LineShow show;
     const std::string always = ShowSummary(show, mobs, kWindowLayout);
     show.when = ConditionBit(ShowCondition::YourClaim);
@@ -98,6 +98,8 @@ TEST(the_show_dropdown_reads_always_one_condition_how_many_or_never)
     CHECK_EQ(ShowSummary(show, mobs, kWindowLayout), NameOfCondition(ShowCondition::Unclaimed));
     CHECK_EQ(ShowSummary(show, ConditionsFor(PlateKind::Players), kWindowLayout), NameOfCondition(ShowCondition::Friend));
     CHECK_EQ(ShowSummary(show, ConditionsFor(PlateKind::Npcs), kWindowLayout), never);
+    show.when = ConditionBit(ShowCondition::Generally);
+    CHECK_EQ(ShowSummary(show, ConditionsFor(PlateKind::Npcs), kWindowLayout), NameOfCondition(ShowCondition::Generally));
 }
 
 TEST(a_font_dropdowns_arrows_step_through_its_list_and_around_its_ends)
@@ -177,30 +179,38 @@ TEST(a_line_may_sync_with_any_other_line_that_does_not_borrow_from_it)
 
 TEST(unchecking_a_condition_under_always_turns_always_off_and_keeps_the_rest)
 {
-    const std::vector<ShowCondition> offered = ConditionsFor(PlateKind::Players);
-    const uint32_t all = ConditionBit(ShowCondition::Targeted) | ConditionBit(ShowCondition::PartyMember) |
-                         ConditionBit(ShowCondition::Friend) | ConditionBit(ShowCondition::LinkshellMember);
+    const std::span<const ShowCondition> offered = ConditionsFor(PlateKind::Players);
+    const uint32_t all = ConditionBit(ShowCondition::Generally) | ConditionBit(ShowCondition::Targeted) |
+                         ConditionBit(ShowCondition::PartyMember) | ConditionBit(ShowCondition::Friend) |
+                         ConditionBit(ShowCondition::LinkshellMember);
     LineShow show; // Always, nothing checked under it
-    CHECK(ToggleCondition(show, offered, 2)); // the list's third row: Party Member
+    CHECK(ToggleCondition(show, offered, 3)); // the list's fourth row: Party Member
     CHECK(!show.always);
     CHECK_EQ(show.when, all & ~ConditionBit(ShowCondition::PartyMember));
-    CHECK(ToggleCondition(show, offered, 2)); // checked again: every condition, and still not Always
+    CHECK(ToggleCondition(show, offered, 3)); // checked again: every condition, and still not Always
     CHECK(!show.always && show.when == all);
     CHECK(ToggleCondition(show, offered, 0));
     CHECK(show.always && show.when == all);
     CHECK(ToggleCondition(show, offered, 0)); // Always off leaves what was checked
     CHECK(!show.always && show.when == all);
-    CHECK(!ToggleCondition(show, offered, 5) && !ToggleCondition(show, offered, -1)); // no such row
+    CHECK(!ToggleCondition(show, offered, 6) && !ToggleCondition(show, offered, -1)); // no such row
     // The last row is a row like the others: on a pet's page it is the one that asks whose pet it is.
-    const std::vector<ShowCondition> pets = ConditionsFor(PlateKind::Pets);
+    const std::span<const ShowCondition> pets = ConditionsFor(PlateKind::Pets);
     LineShow whose{false, 0};
     CHECK(ToggleCondition(whose, pets, static_cast<int>(pets.size())));
     CHECK_EQ(whose.when, ConditionBit(ShowCondition::OwnerIsYou));
     CHECK(!show.always && show.when == all);
     // A condition another kind's lines have, saved in the file, is not carried into what Always leaves checked.
     LineShow stray{true, ConditionBit(ShowCondition::Aggressive)};
-    ToggleCondition(stray, offered, 1);
+    ToggleCondition(stray, offered, 2);
     CHECK_EQ(stray.when, all & ~ConditionBit(ShowCondition::Targeted));
+    // On every kind's page Generally is the row right under Always.
+    for (int kind = 0; kind < kPlateKindCount; ++kind)
+    {
+        LineShow first{false, 0};
+        CHECK(ToggleCondition(first, ConditionsFor(static_cast<PlateKind>(kind)), 1));
+        CHECK_EQ(first.when, ConditionBit(ShowCondition::Generally));
+    }
 }
 
 TEST(the_sync_dropdown_lists_no_then_its_targets)

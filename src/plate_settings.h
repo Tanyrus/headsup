@@ -4,6 +4,7 @@
 #include "generated/mobflags.h"
 #include "labels.h"
 
+#include <span>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -82,10 +83,17 @@ namespace headsup
     enum class ShowCondition : uint8_t
     {
         Targeted, Unclaimed, YourClaim, OthersClaim, Engaged, TooWeak, Aggressive, Passive, PartyMember, Friend, LinkshellMember,
-        OwnerIsYou
+        OwnerIsYou, Generally
     };
-    constexpr int kShowConditionCount = 12;
+    constexpr int kShowConditionCount = static_cast<int>(ShowCondition::Generally) + 1;
     constexpr uint32_t ConditionBit(ShowCondition c) { return 1u << static_cast<int>(c); }
+    // What Generally holds without. Every mob is unclaimed or claimed and aggressive or passive, and your fight is
+    // true of every one at once, so those are not.
+    constexpr bool IsSpecialState(ShowCondition c)
+    {
+        return c != ShowCondition::Unclaimed && c != ShowCondition::Aggressive && c != ShowCondition::Passive &&
+               c != ShowCondition::Engaged && c != ShowCondition::Generally;
+    }
     struct LineShow
     {
         bool always   = true;
@@ -155,7 +163,7 @@ namespace headsup
         int glow     = 0;
         int glowSize = 100;
         ColorPick glowColor{ColorSource::Aggression};
-        bool glowOffInCombat = false; // no glow while its entity fights: on for a mob's lines
+        bool glowOffInCombat = false; // no glow while you fight: on for a mob's lines
         bool operator==(const LineDesign&) const = default;
     };
 
@@ -208,7 +216,7 @@ namespace headsup
     const char* RowKey(PlateKind kind, int row);   // "aggressive", "partyMember", "self", ...: settings keys
     const char* KindKey(PlateKind kind);           // "mobs", "players", "self", "npcs", "pets"
     // The conditions a kind's lines may be shown by, in the menu's order.
-    std::vector<ShowCondition> ConditionsFor(PlateKind kind);
+    std::span<const ShowCondition> ConditionsFor(PlateKind kind);
     // The color sources a kind's picks offer, in the menu's order: text is true for a text color, which may take the
     // game's own, last.
     std::vector<ColorSource> SourcesFor(PlateKind kind, bool text);

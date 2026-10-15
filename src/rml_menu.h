@@ -35,15 +35,14 @@ namespace headsup
     public:
         bool open = false;
 
-        // True when a setting changed and should be saved. em: the size of the window's text in pixels, before the
-        // window's own scale. fonts: FontChoices for the nameplates' and the bar's fonts.
+        // True when a setting changed and should be saved. fonts: FontChoices for the nameplates' and the bar's fonts.
         bool Update(const MenuHost& host, Settings& settings, const MenuReadings& readings,
-            const std::vector<std::string>& fonts, float em, double version);
+            const std::vector<std::string>& fonts, double version);
         // Closes the window's document; before the host stops.
         void Close();
-        // True once after the Debug page's button was pressed: write the /hu debug report.
+        // True once after the Debug Report button was pressed: write the /hu debug report.
         bool TakeDebugRequest();
-        // True once after the Cursor Style list was opened: read the cursors folder again.
+        // True once after a list of pictures (Target Cursor, Cursor Icon) was opened: read the cursors folder again.
         bool TakeCursorsRequest();
         // Opens the window at the page named, as its sidebar spells it in lower case without spaces ("toppanel");
         // false for a name no page has.
@@ -93,6 +92,7 @@ namespace headsup
         float m_FontPixels = 0.0f;
         int m_Opacity      = 0; // the percent the document was last given; 0 for none yet
         bool m_Visible     = false;
+        bool m_Revealing   = false; // shown this frame, hidden until the next
         bool m_Placed      = false;   // it has its first place
         std::optional<std::array<int, 4>> m_OpenedAt; // where it was first laid out: left, top, width, height
         Rml::Element* m_Sidebar   = nullptr;

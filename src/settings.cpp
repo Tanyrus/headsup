@@ -30,7 +30,6 @@ namespace headsup
         constexpr const char* kEnabledKey = "enabled"; // in every file any build saved: what tells a file from none
         constexpr BoolKey kBools[] = {{kEnabledKey, &Settings::enabled}, {"phTimers", &Settings::phTimers},
             {"scaleWithDistance", &Settings::scaleWithDistance}, {"scaleOwnName", &Settings::scaleOwnName},
-            {"chocoboPointer", &Settings::chocoboPointer},
             {"fixPointer", &Settings::fixPointer}, {"showRanks", &Settings::showRanks}, {"showBar", &Settings::showBar},
             {"hideHelpBar", &Settings::hideHelpBar}, {"hideNetstat", &Settings::hideNetstat},
             {"screenshotHidesGame", &Settings::screenshotHidesGame},
@@ -69,7 +68,13 @@ namespace headsup
         // Rebased, since a typed read of the new key would have Ashita's store hold its default before the old is asked.
         constexpr const char* kCursorWidthKey = "cursorWidth", *kCursorHeightKey = "cursorHeight";
         constexpr const char* kCursorEdgeKey  = "cursorOutlineThickness";
+        constexpr const char* kMenuFontSizeKey = "menuFontSize";
+        constexpr const char* kOldMenuScaleKey = "menuScale"; // a percent of Ashita's own font size
+        constexpr float kOldMinMenuScale = 70.0f, kOldMaxMenuScale = 160.0f; // percent, the old key's range
+        // Ashita's own font size, which the window's old size was a percent of: GetFontSize() in the game, 2026-10-14.
+        constexpr float kAshitaFontPixels = 18.0f;
         constexpr IntKey kRebasedInts[] = {{kCursorWidthKey, &Settings::cursorWidth, kMinCursorSide, kMaxCursorSide},
+            {kMenuFontSizeKey, &Settings::menuFontSize, kMinMenuFontSize, kMaxMenuFontSize},
             {kCursorHeightKey, &Settings::cursorHeight, kMinCursorSide, kMaxCursorSide},
             {kCursorEdgeKey, &Settings::cursorOutlineThickness, kMinCursorEdge, kMaxCursorEdge}};
         constexpr const char* kDashMarkKey = "dashMark";
@@ -77,6 +82,10 @@ namespace headsup
         constexpr const char* kCursorStyleKey = "cursorStyle";
         constexpr const char* kCursorFileKey  = "cursorFile";
         const char* const kCursorStyleNames[kCursorStyleCount] = {"vanilla", "triangle", "feather", "chocobo", "file"};
+        constexpr const char* kPointerIconKey        = "pointerIcon";
+        constexpr const char* kPointerFileKey        = "pointerFile";
+        constexpr const char* kOldChocoboPointerKey  = "chocoboPointer";
+        const char* const kPointerIconNames[kPointerIconCount] = {"vanilla", "chocobo", "file"};
         // Before it had a style the cursor was on or off, and Phoenix's feather or an arrow.
         constexpr const char* kOldReplaceCursorKey = "replaceCursor";
         constexpr const char* kOldCursorFeatherKey = "cursorFeather";
@@ -150,7 +159,6 @@ namespace headsup
         const char* const kJobLayoutNames[kJobLayoutCount] = {"jobsFirst", "expFirst", "expOnly"};
         constexpr const char* kTargetDetailsKey = "barTargetDetails";
         constexpr const char* kMenuFontKey      = "menuFont";
-        constexpr const char* kMenuScaleKey     = "menuScale";
         constexpr const char* kMenuThemeKey     = "menuTheme";
         const char* const kMenuThemeNames[kMenuThemeCount] = {"phoenix", "aurora"};
         constexpr const char* kMenuXKey = "menuX", *kMenuYKey = "menuY", *kMenuWidthKey = "menuWidth",
@@ -182,7 +190,7 @@ namespace headsup
         constexpr const char* kWeakRankSuffix     = "WeakRank";
         constexpr const char* kResistRankSuffix   = "ResistRank";
         const char* const kLabelShadeKeys[kLabelShadeCount] = {"labelUnknown", "labelTooWeak", "labelEasyPrey",
-            "labelDecentChallenge", "labelEvenMatch", "labelTough", "labelVeryTough"};
+            "labelDecentChallenge", "labelEvenMatch", "labelTough", "labelVeryTough", "labelIncrediblyTough"};
 
         const char* const kPlateModeNames[kPlateModeCount]       = {"hidden", "shown", "whenTargeted", "vanilla"};
         // A mode that is gone: its name alone, and the whole nameplate for a target. Such a row is Shown.
@@ -567,6 +575,7 @@ namespace headsup
         }
 
         constexpr int kOldCategoryCount = static_cast<int>(Category::OtherClaim) + 1;
+        constexpr int kOldLabelShadeCount = static_cast<int>(LabelShade::VeryTough) + 1; // Incredibly Tough came later
         struct OldSettings
         {
             bool showLabels = true, replaceMobNames = true, replacePlayerNames = true, replaceNpcNames = true;
@@ -599,7 +608,7 @@ namespace headsup
             Color outOfRangeCursorColor = {{1.00f, 0.25f, 0.25f}};
             bool ownNameColor = false;
             Color nameColor   = {{1.00f, 1.00f, 1.00f}};
-            Color labelColor[kLabelShadeCount] = {
+            Color labelColor[kOldLabelShadeCount] = {
                 {{0.60f, 0.60f, 0.60f}}, // unknown
                 {{0.60f, 0.60f, 0.60f}}, // Too Weak
                 {{0.40f, 1.00f, 0.40f}}, // Easy Prey
@@ -705,7 +714,7 @@ namespace headsup
             o.labelFontBold    = store.GetBool(kOldLabelBoldKey, o.fontBold);
             o.labelShadowColor = o.textOutline;
             LoadColor(store, kOldLabelShadowColorKey, o.labelShadowColor);
-            for (int k = 0; k < kLabelShadeCount; ++k)
+            for (int k = 0; k < kOldLabelShadeCount; ++k)
                 LoadColor(store, kLabelShadeKeys[k], o.labelColor[k]);
             for (int c = 0; c < kOldCategoryCount; ++c)
             {
@@ -1127,6 +1136,10 @@ namespace headsup
         if (!named) s.cursorFile.clear();
         if (static_cast<int>(s.cursorStyle) >= kCursorStyleCount || (s.cursorStyle == CursorStyle::File && !named))
             s.cursorStyle = d.cursorStyle;
+        const bool pointerNamed = IsCursorFileName(s.pointerFile);
+        if (!pointerNamed) s.pointerFile.clear();
+        if (static_cast<int>(s.pointerIcon) >= kPointerIconCount || (s.pointerIcon == PointerIcon::File && !pointerNamed))
+            s.pointerIcon = d.pointerIcon;
         if (static_cast<int>(s.dashMark) >= kDashMarkCount) s.dashMark = d.dashMark;
         ClampPick(s.cursorColor, d.cursorColor, CursorSources());
         ClampPick(s.cursorEdgeColor, d.cursorEdgeColor, CursorSources());
@@ -1137,7 +1150,6 @@ namespace headsup
         if (static_cast<int>(s.jobLayout) >= kJobLayoutCount) s.jobLayout = d.jobLayout;
         if (static_cast<int>(s.barSubtitle) >= kSubtitlePlaceCount) s.barSubtitle = d.barSubtitle;
         if (MenuFontNamed(s.menuFont) == nullptr) s.menuFont = d.menuFont;
-        s.menuScale = std::clamp(s.menuScale, kMinMenuScale, kMaxMenuScale);
         if (static_cast<int>(s.menuTheme) >= kMenuThemeCount) s.menuTheme = d.menuTheme;
         for (int* side : {&s.menuX, &s.menuY, &s.menuWidth, &s.menuHeight})
             *side = std::clamp(*side, 0, kMaxMenuSide);
@@ -1171,6 +1183,12 @@ namespace headsup
         else if (wasArrow)
             s.cursorStyle = CursorStyle::Triangle;
         s.cursorFile   = store.GetString(kCursorFileKey, "");
+        const std::string icon = store.GetString(kPointerIconKey, kNoText);
+        if (icon != kNoText)
+            s.pointerIcon = static_cast<PointerIcon>(NameIndex(kPointerIconNames, kPointerIconCount, icon, static_cast<int>(s.pointerIcon)));
+        else if (HeldSwitch(store, kOldChocoboPointerKey).value_or(false))
+            s.pointerIcon = PointerIcon::Chocobo;
+        s.pointerFile = store.GetString(kPointerFileKey, "");
         s.dashMark     = static_cast<DashMark>(
             NameIndex(kDashMarkNames, kDashMarkCount, store.GetString(kDashMarkKey, ""), static_cast<int>(s.dashMark)));
         s.cursorHeight = Rebased(store, kCursorHeightKey, kOldCursorSizeKey, s.cursorHeight, [](float size) { return size; });
@@ -1212,7 +1230,12 @@ namespace headsup
             s.barCurrency = *currency;
         s.barTargetDetails = store.GetBool(kTargetDetailsKey, s.barTargetDetails);
         s.menuFont         = store.GetString(kMenuFontKey, s.menuFont.c_str());
-        s.menuScale        = LoadInt(store, kMenuScaleKey, s.menuScale);
+        // By the font named: one whose Windows file was missing was drawn in Barlow Condensed, which nothing here knows.
+        s.menuFontSize     = Rebased(store, kMenuFontSizeKey, kOldMenuScaleKey, s.menuFontSize, [&](float percent) {
+            const MenuFont* font = MenuFontNamed(s.menuFont);
+            return kAshitaFontPixels * std::clamp(percent, kOldMinMenuScale, kOldMaxMenuScale) / kPercent *
+                   (font != nullptr ? font->oldScale : 1.0f);
+        });
         const std::string menuTheme = store.GetString(kMenuThemeKey, "");
         for (int t = 0; t < kMenuThemeCount; ++t)
             if (menuTheme == kMenuThemeNames[t]) s.menuTheme = static_cast<MenuTheme>(t);
@@ -1290,6 +1313,8 @@ namespace headsup
             setColor(c.key, s.*c.field);
         store.Set(kCursorStyleKey, CursorStyleName(s.cursorStyle));
         store.Set(kCursorFileKey, s.cursorFile.c_str());
+        store.Set(kPointerIconKey, kPointerIconNames[static_cast<int>(s.pointerIcon)]);
+        store.Set(kPointerFileKey, s.pointerFile.c_str());
         store.Set(kDashMarkKey, kDashMarkNames[static_cast<int>(s.dashMark)]);
         SavePick(store, kCursorPickKey, s.cursorColor);
         SavePick(store, kCursorEdgePickKey, s.cursorEdgeColor);
@@ -1318,7 +1343,6 @@ namespace headsup
         store.Set(kClockZoneKey, s.clockZone ? kClockZoneNames[static_cast<int>(*s.clockZone)] : kLocalZone);
         setBool(kTargetDetailsKey, s.barTargetDetails);
         store.Set(kMenuFontKey, s.menuFont.c_str());
-        setFloat(kMenuScaleKey, static_cast<float>(s.menuScale));
         store.Set(kMenuThemeKey, kMenuThemeNames[static_cast<int>(s.menuTheme)]);
         setFloat(kMenuXKey, static_cast<float>(s.menuX));
         setFloat(kMenuYKey, static_cast<float>(s.menuY));

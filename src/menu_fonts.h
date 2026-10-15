@@ -5,13 +5,13 @@
 namespace headsup
 {
     // The fonts the settings window can draw its text in: Windows' own, by their file in its Fonts folder, and the
-    // ones HeadsUp bundles (file nullptr), each with the size it is drawn at over Ashita's, as condensed faces run
-    // small.
+    // ones HeadsUp bundles (file nullptr), each with the size it was drawn at over Ashita's when the window's size was
+    // a percent of Ashita's, as condensed faces run small: an old file's size is converted by it.
     struct MenuFont
     {
         const char* name;
         const char* file;
-        float scale;
+        float oldScale;
     };
     inline constexpr MenuFont kMenuFonts[] = {
         {"Segoe UI", "segoeui.ttf", 1.0f},

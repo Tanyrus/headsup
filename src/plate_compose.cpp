@@ -84,10 +84,6 @@ namespace headsup
             return draw;
         }
 
-        // The tags whose text joins two ends with a dash, which is drawn as a design's own dashes are. A name's dash
-        // is part of the name.
-        bool DashesAreMarks(Tag tag) { return tag == Tag::Level || tag == Tag::Con; }
-
         bool IsMob(const ActorInfo& info) { return info.state.kind == EntityKind::Mob; }
         bool IsPlayer(const ActorInfo& info) { return info.state.kind == EntityKind::Player; }
 
@@ -109,7 +105,7 @@ namespace headsup
                 return info.ownerName;
             case Tag::Level:
                 if (IsMob(info)) return LevelText(info.mob, checked);
-                if (IsPlayer(info) && info.jobs && info.jobs->mainJob != 0) return std::to_string(info.jobs->mainLevel);
+                if (IsPlayer(info) && info.jobs && info.jobs->mainLevel != 0) return std::to_string(info.jobs->mainLevel);
                 return {};
             case Tag::Con:
                 return IsMob(info) ? ConText(info.mob, checked, player.level) : std::string();
@@ -312,7 +308,6 @@ namespace headsup
         // An NPC has no life to lose, whatever its health reads.
         const bool dead     = !st.alive && st.kind != EntityKind::Npc;
         const bool deadMob  = dead && st.kind == EntityKind::Mob;
-        const bool fought   = InCombat(st);
         const bool nameOnly = deadMob || player.inEvent;
         const auto marked   = [dash = DashChar(s.dashMark)](std::string text) {
             std::ranges::replace(text, kDash, dash);
@@ -324,7 +319,7 @@ namespace headsup
         for (int i = 0; i < kPlateLines; ++i)
         {
             const LineDesign& style = StyleLine(kind, i);
-            if (!LineShows(style.show, st)) continue;
+            if (!LineShows(style.show, st, player.inCombat)) continue;
             LineBuilder builder;
             for (const Atom& atom : ParseTemplate(kind.lines[i].text))
             {
@@ -342,7 +337,7 @@ namespace headsup
                     {
                         const std::string text = TagText(tag, info, player);
                         drawn                  = !text.empty();
-                        if (drawn) builder.Text(DashesAreMarks(tag) ? marked(text) : text, tag == Tag::Name);
+                        if (drawn) builder.Text(text, tag == Tag::Name);
                         continue;
                     }
                     const bool counted = IsCountedIcon(tag);
@@ -357,7 +352,7 @@ namespace headsup
             builder.Finish();
             if (builder.items.empty()) continue;
             plate.lines.push_back(ComposedLine{i, std::move(builder.items), LookOf(style, st, s, gameArgb)});
-            if (deadMob || (fought && style.glowOffInCombat)) plate.lines.back().look.glow = 0.0f;
+            if (deadMob || (player.inCombat && style.glowOffInCombat)) plate.lines.back().look.glow = 0.0f;
             if (dead) plate.lines.back().look.color = kDeadTextArgb;
         }
         plate.ornament      = kind.ornament.place;

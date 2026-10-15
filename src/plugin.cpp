@@ -136,6 +136,19 @@ namespace
         return g_RealPresent(device, source, dest, window, dirty);
     }
 
+    // The game's Reset fails while anything holds a default-pool resource, as the settings window's layer is.
+    using ResetFn               = HRESULT(__attribute__((stdcall))*)(IDirect3DDevice8*, D3DPRESENT_PARAMETERS*);
+    constexpr size_t kResetSlot = 14;
+    void** g_ResetSlot          = nullptr;
+    ResetFn g_RealReset         = nullptr;
+    void (*g_BeforeReset)()     = nullptr; // lets go of the plugin's default-pool resources, while it is loaded
+
+    HRESULT __attribute__((stdcall)) HookedReset(IDirect3DDevice8* device, D3DPRESENT_PARAMETERS* parameters)
+    {
+        if (g_BeforeReset != nullptr) g_BeforeReset();
+        return g_RealReset(device, parameters);
+    }
+
     // Writes a vtable slot, which lives in read-only memory.
     bool WriteSlot(void** slot, void* value)
     {
@@ -236,7 +249,8 @@ class HeadsUp final : public IPlugin
     std::optional<double> m_CountersReadAt;
     headsup::ConnectionMeter m_Connection;
     bool m_HooksTried = false;
-    bool m_PointerFailed = false; // said once; tried again when the setting changes
+    bool m_PointerFailed = false; // said once; tried again when the setting changes or the folder is read again
+    std::pair<headsup::PointerIcon, std::string> m_PointerFor; // the icon and file the pointer was started for
     headsup::InstalledFonts m_Fonts;
     headsup::PlayerState m_Player;
     headsup::CheckResults m_Checks;
@@ -295,7 +309,7 @@ class HeadsUp final : public IPlugin
     std::optional<std::string> m_WindowLog;   // /hu windowlog's file, while it runs
     std::vector<std::string> m_LastOpen;      // the open windows it wrote last // what the window hook has: the settings' windows and groups
     std::vector<std::string> m_SeenWindows;
-    std::vector<std::string> m_CursorFiles;      // the cursors folder's, as the Cursor Style list offers them
+    std::vector<std::string> m_CursorFiles;      // the cursors folder's, as the Target Cursor and Cursor Icon lists offer them
     std::optional<std::string> m_CursorFileRead; // the File cursor read last, whether or not it was one
     float m_MenuHeight  = 0.0f;
     int m_CaptureLeft   = 0;
@@ -374,6 +388,7 @@ public:
         m_Fonts.Wait();
         m_Nameplates.Release();
         UnhookPresent();
+        UnhookReset();
         g_Plugin = nullptr;
         m_RmlBar.Release();
         m_RmlMenu.Close();
@@ -393,6 +408,7 @@ public:
     {
         m_Device = device;
         HookPresent(device);
+        HookReset(device);
         m_Outline.SetDevice(device);
         m_Names.SetDevice(device);
         m_Nameplates.SetDevice(device);
@@ -753,8 +769,7 @@ public:
                 .seenWindows      = &m_SeenWindows,
                 .cursorFiles      = &m_CursorFiles,
             };
-            if (m_RmlMenu.Update(MenuHostNow(), m_Settings, readings, m_Fonts.Choices(m_Settings.defaultFont),
-                    m_AshitaCore->GetGuiManager()->GetFontSize(), kVersion))
+            if (m_RmlMenu.Update(MenuHostNow(), m_Settings, readings, m_Fonts.Choices(m_Settings.defaultFont), kVersion))
                 m_SettingsChangedAt = now;
             if (m_RmlMenu.TakeDebugRequest()) m_DebugPending = true;
             if (m_RmlMenu.TakeCursorsRequest()) ScanCursors();
@@ -1222,6 +1237,31 @@ private:
         g_PresentSlot = slot;
     }
 
+    void HookReset(IDirect3DDevice8* device)
+    {
+        if (g_ResetSlot != nullptr || device == nullptr) return;
+        void** slot = *reinterpret_cast<void***>(device) + kResetSlot;
+        if (*slot == reinterpret_cast<void*>(&HookedReset)) return;
+        g_RealReset = reinterpret_cast<ResetFn>(*slot);
+        if (!WriteSlot(slot, reinterpret_cast<void*>(&HookedReset)))
+        {
+            m_Rml.RefuseLayers();
+            Print("the settings window is drawn opaque: Reset could not be hooked.");
+            return;
+        }
+        g_ResetSlot   = slot;
+        g_BeforeReset = [] { if (g_Plugin != nullptr) g_Plugin->BeforeReset(); };
+    }
+
+    // As UnhookPresent.
+    void UnhookReset()
+    {
+        g_BeforeReset = nullptr;
+        if (g_ResetSlot == nullptr) return;
+        if (*g_ResetSlot == reinterpret_cast<void*>(&HookedReset)) WriteSlot(g_ResetSlot, reinterpret_cast<void*>(g_RealReset));
+        g_ResetSlot = nullptr;
+    }
+
     // Puts Present back, unless something hooked it over HeadsUp, whose calls would then still come through here.
     void UnhookPresent()
     {
@@ -1231,6 +1271,8 @@ private:
             WriteSlot(g_PresentSlot, reinterpret_cast<void*>(g_RealPresent));
         g_PresentSlot = nullptr;
     }
+
+    void BeforeReset() { m_Rml.ReleaseLayers(); }
 
     // RmlUi's overlay (the popups and the settings window), over every ImGui window: in a scene of its own.
     void DrawOverGui()
@@ -1399,6 +1441,25 @@ private:
         }
         m_CursorFiles = headsup::CursorFileNames(entries);
         m_CursorFileRead.reset(); // a file that could not be read may have been put right since
+        m_PointerFailed = false;
+    }
+
+    // The frames of the first file of the cursors folder by this name that has any, in the order of the cursor
+    // extensions; a missing or oversized file is passed over unread.
+    std::vector<headsup::CursorFrame> CursorFileFrames(const std::string& name)
+    {
+        for (const char* extension : headsup::kCursorExtensions)
+        {
+            std::ifstream in(CursorsFolder() + name + extension, std::ios::binary | std::ios::ate);
+            const std::streamoff size = in.tellg();
+            if (!in || size <= 0 || static_cast<uint64_t>(size) > headsup::kMaxCursorFileBytes) continue;
+            std::vector<uint8_t> bytes(static_cast<size_t>(size));
+            in.seekg(0);
+            if (!in.read(reinterpret_cast<char*>(bytes.data()), size)) continue;
+            if (std::vector<headsup::CursorFrame> frames = headsup::ReadCursorFile(bytes.data(), bytes.size()); !frames.empty())
+                return frames;
+        }
+        return {};
     }
 
     // The File cursor's picture, read when the settings come to name another file.
@@ -1407,18 +1468,7 @@ private:
         const bool wanted = m_Settings.cursorStyle == headsup::CursorStyle::File;
         if (!wanted || m_CursorFileRead == m_Settings.cursorFile) return;
         m_CursorFileRead = m_Settings.cursorFile;
-        std::optional<headsup::Image> picture;
-        for (const char* extension : headsup::kCursorExtensions)
-        {
-            std::ifstream in(CursorsFolder() + m_Settings.cursorFile + extension, std::ios::binary | std::ios::ate);
-            const std::streamoff size = in.tellg();
-            if (!in || size <= 0 || static_cast<uint64_t>(size) > headsup::kMaxCursorFileBytes) continue;
-            std::vector<uint8_t> bytes(static_cast<size_t>(size));
-            in.seekg(0);
-            if (!in.read(reinterpret_cast<char*>(bytes.data()), size)) continue;
-            picture = headsup::CursorFilePicture(bytes.data(), bytes.size());
-            if (picture) break;
-        }
+        std::optional<headsup::Image> picture = headsup::CursorFilePicture(CursorFileFrames(m_Settings.cursorFile));
         if (!picture) Print("could not read the cursor " + m_Settings.cursorFile + " in " + CursorsFolder() + "; the feather stands in for it");
         m_Nameplates.SetCursorFile(std::move(picture));
     }
@@ -1559,25 +1609,29 @@ private:
         const headsup::PlayerStatus memory = headsup::StatusFromRender(entity->GetRenderFlags1(index), entity->GetRenderFlags2(index),
             entity->GetLinkshellColor(index));
         headsup::PlayerStatus status = headsup::WithPacketStatus(memory, m_GameState.PlayerStatusOf(index, m_SelfIndex));
-        status.levelSync             = m_GameState.LevelSynced(index) || m_BuffSynced.count(index) != 0;
+        status.levelSync             = m_GameState.SyncOf(index).synced || m_BuffSynced.count(index) != 0;
         return status;
     }
 
     void UpdatePointer()
     {
-        if (!m_Settings.enabled || !m_Settings.chocoboPointer)
+        const bool wanted = m_Settings.enabled && m_Settings.pointerIcon != headsup::PointerIcon::Vanilla;
+        const std::pair<headsup::PointerIcon, std::string> pick{m_Settings.pointerIcon, m_Settings.pointerFile};
+        if (!wanted || pick != m_PointerFor)
         {
             m_PointerFailed = false;
+            m_PointerFor    = pick;
             if (m_Pointer.Running()) m_Pointer.Stop();
-            return;
         }
+        if (!wanted) return;
         if (!m_Pointer.Running() && !m_PointerFailed)
         {
-            if (const std::string failure = m_Pointer.Start(); !failure.empty())
-            {
-                m_PointerFailed = true;
-                Print("the chocobo pointer is off: " + failure + ".");
-            }
+            const bool chocobo        = m_Settings.pointerIcon == headsup::PointerIcon::Chocobo;
+            const std::string failure = m_Pointer.Start(chocobo ? headsup::ChocoboPointer() : CursorFileFrames(m_Settings.pointerFile));
+            m_PointerFailed           = !failure.empty();
+            if (m_PointerFailed)
+                Print("the mouse pointer is the game's, as " + (chocobo ? std::string("the chocobo") : m_Settings.pointerFile + " in " + CursorsFolder()) +
+                      " could not be shown: " + failure + ".");
         }
         m_Pointer.Animate();
     }
@@ -1779,8 +1833,10 @@ private:
     {
         const auto member                 = m_PartyJobs.find(serverId);
         const headsup::PlayerCheck* check = m_GameState.PlayerCheckOf(serverId);
+        const headsup::PlayerSync sync    = m_GameState.SyncOf(index);
         return headsup::KnownJobs(index == m_SelfIndex ? &m_OwnJobs : nullptr,
-            member != m_PartyJobs.end() ? &member->second : nullptr, check != nullptr ? &check->general : nullptr);
+            member != m_PartyJobs.end() ? &member->second : nullptr, check != nullptr ? &check->general : nullptr,
+            headsup::SeenLevel(m_Settings.autoCheck, sync.level, m_GameState.PlayerStatusOf(index, m_SelfIndex)), sync.held);
     }
 
     // Your own title is the client's; another player's comes with a check of them.
@@ -1892,6 +1948,7 @@ private:
         // The status the server gave you says an event runs: your own stayed 0 through an NPC's dialog, a cutscene
         // and one begun at zone-in.
         m_Player.inEvent = headsup::IsEventStatus(entity->GetStatusServer(m_SelfIndex));
+        m_Player.inCombat = headsup::PlayerInCombat(inputs);
         m_Tracker.Update(inputs, m_Player, m_Settings, m_CursorTargets);
         if (headsup::MayAutoCheck(autoChecks, player->GetIsZoning() != 0, m_Player.inEvent, m_Player.level))
             if (const std::optional<headsup::CheckCandidate> mob = m_AutoCheck.Due(checkable, now))

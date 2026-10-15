@@ -47,15 +47,13 @@ TEST(every_setting_the_code_draws_is_in_one_card_of_the_layout)
 
 TEST(a_text_by_kind_is_the_kinds_own_and_the_shared_text_otherwise)
 {
-    const LayoutSetting* styles = kWindowLayout.SettingOf(SettingPiece::LineStyles);
-    CHECK(styles != nullptr);
-    const auto rows = kWindowLayout.RowsOf(*styles);
-    const auto glow = std::ranges::find(rows, static_cast<uint16_t>(LineStylesRow::DisableGlowInCombat), &LayoutRow::row);
-    const auto font = std::ranges::find(rows, static_cast<uint16_t>(LineStylesRow::Font), &LayoutRow::row);
-    CHECK(glow != rows.end() && font != rows.end());
-    const std::string mobs = TipOf(*glow, PlateKind::Mobs), players = TipOf(*glow, PlateKind::Players);
-    CHECK(!mobs.empty() && !players.empty() && mobs != players);
-    CHECK(TipOf(*font, PlateKind::Mobs) == font->tip && TipOf(*font, PlateKind::Pets) == font->tip);
+    const char* const byKind[kPlateKindCount] = {"for mobs", "for players", nullptr, nullptr, nullptr};
+    const LayoutRow row{0, "row", "Row", "shared", nullptr, byKind, nullptr, kEveryKind};
+    CHECK_EQ(std::string(TipOf(row, PlateKind::Mobs)), "for mobs");
+    CHECK_EQ(std::string(TipOf(row, PlateKind::Players)), "for players");
+    CHECK_EQ(std::string(TipOf(row, PlateKind::Pets)), "shared");
+    CHECK_EQ(std::string(TipOf(row, std::nullopt)), "shared");
+    CHECK_EQ(std::string(NameOf(row, PlateKind::Mobs)), "Row");
 }
 
 TEST(a_list_and_a_word_are_found_by_their_piece)
@@ -69,14 +67,14 @@ TEST(a_list_and_a_word_are_found_by_their_piece)
 TEST(a_setting_moved_in_an_edited_layout_is_in_the_other_cards_range)
 {
     test::EditedLayout edited;
-    edited.MoveSetting("chocobo", "settings-window", 0);
+    edited.MoveSetting("pointer-fix", "settings-window", 0);
     const WindowLayout layout = edited.Layout();
     const auto cardOf = [&](const char* key) {
         return std::ranges::find_if(layout.cards, [&](const LayoutCard& c) { return std::string(c.key) == key; });
     };
     const auto settings = layout.SettingsOf(*cardOf("settings-window"));
-    CHECK(std::string(settings.front().key) == "chocobo");
+    CHECK(std::string(settings.front().key) == "pointer-fix");
     const auto pointer = layout.SettingsOf(*cardOf("mouse-pointer"));
-    CHECK(std::ranges::none_of(pointer, [](const LayoutSetting& s) { return std::string(s.key) == "chocobo"; }));
+    CHECK(std::ranges::none_of(pointer, [](const LayoutSetting& s) { return std::string(s.key) == "pointer-fix"; }));
     CHECK_EQ(layout.settings.size(), kWindowLayout.settings.size());
 }

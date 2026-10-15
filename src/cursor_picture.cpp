@@ -25,9 +25,8 @@ namespace headsup
 
     Image ChocoboPicture() { return PictureOf(ChocoboPointer().front().image); }
 
-    std::optional<Image> CursorFilePicture(const uint8_t* data, size_t size)
+    std::optional<Image> CursorFilePicture(const std::vector<CursorFrame>& frames)
     {
-        const std::vector<CursorFrame> frames = ReadCursorFile(data, size);
         return frames.empty() ? std::nullopt : std::optional<Image>(PictureOf(frames.front().image));
     }
 

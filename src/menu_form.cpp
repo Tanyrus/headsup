@@ -818,25 +818,32 @@ namespace headsup
             }
         }
 
-        void TargetCursorStyle(Context& c, const LayoutSetting& e, const std::string& label, const char* tip)
+        // A list of HeadsUp's own pictures, named by the layout's options, then the cursors folder's files by name.
+        template <typename Style>
+        PictureChoice<Style> PictureDropdown(Context& c, const LayoutSetting& e, const std::string& label, const char* tip,
+            Style style, const std::string& file)
         {
-            Form& form  = c.form;
-            Settings& s = c.s;
-            form.Fade(!s.enabled);
             static const std::vector<std::string> kNoFiles;
             const auto options = c.layout.OptionsOf(e);
-            const std::vector<CursorChoice> choices =
-                CursorChoices(c.readings.cursorFiles != nullptr ? *c.readings.cursorFiles : kNoFiles, s);
+            const std::vector<PictureChoice<Style>> choices =
+                PictureChoices(c.readings.cursorFiles != nullptr ? *c.readings.cursorFiles : kNoFiles, style, file);
             const auto said = [&](int choice) { return options[static_cast<size_t>(choices[static_cast<size_t>(choice)].style)]; };
-            int picked      = CursorChoiceOf(choices, s);
-            form.NumberDropdown(label.c_str(), picked, 0, static_cast<int>(choices.size()) - 1,
+            int picked      = PictureChoiceOf(choices, style, file);
+            c.form.NumberDropdown(label.c_str(), picked, 0, static_cast<int>(choices.size()) - 1,
                 [&](int choice) {
-                    const CursorChoice& shown = choices[static_cast<size_t>(choice)];
-                    return shown.style == CursorStyle::File ? shown.file : Words(said(choice).name);
+                    const PictureChoice<Style>& shown = choices[static_cast<size_t>(choice)];
+                    return shown.style == Style::File ? shown.file : Words(said(choice).name);
                 },
                 tip, 0.0f, [&](int choice) { return Words(said(choice).tip); });
-            if (form.Opened(label)) c.state.cursorsRequested = true;
-            const CursorChoice& choice = choices[static_cast<size_t>(picked)];
+            if (c.form.Opened(label)) c.state.cursorsRequested = true;
+            return choices[static_cast<size_t>(picked)];
+        }
+
+        void TargetCursorStyle(Context& c, const LayoutSetting& e, const std::string& label, const char* tip)
+        {
+            Settings& s = c.s;
+            c.form.Fade(!s.enabled);
+            const PictureChoice<CursorStyle> choice = PictureDropdown(c, e, label, tip, s.cursorStyle, s.cursorFile);
             // Another style comes at its own width, or it would be squeezed into the one before's.
             if (choice.style != s.cursorStyle && choice.style != CursorStyle::Vanilla)
                 s.cursorWidth = std::clamp(NaturalCursorWidth(choice.style, s.cursorHeight), kMinCursorSide, kMaxCursorSide);
@@ -1169,11 +1176,15 @@ namespace headsup
                     form.changed  = true;
                 }
                 break;
-            // Mouse Cursor, Config Menu and Debug
-            case SettingPiece::Chocobo:
+            // Mouse Cursor and HeadsUp Config
+            case SettingPiece::PointerIcon:
+            {
                 form.Fade(!on);
-                form.Switch(label.c_str(), s.chocoboPointer, tip);
+                const PictureChoice<PointerIcon> choice = PictureDropdown(c, e, label, tip, s.pointerIcon, s.pointerFile);
+                s.pointerIcon = choice.style;
+                s.pointerFile = choice.file;
                 break;
+            }
             case SettingPiece::PointerFix:
                 form.Fade(!on);
                 form.Switch(label.c_str(), s.fixPointer, tip);
@@ -1192,7 +1203,7 @@ namespace headsup
                 break;
             case SettingPiece::Size:
                 form.Fade(false);
-                form.SliderInt(label.c_str(), s.menuScale, kMinMenuScale, kMaxMenuScale, "%d%%", tip);
+                form.Stepper(label.c_str(), s.menuFontSize, kMinMenuFontSize, kMaxMenuFontSize, "%d px", tip);
                 break;
             case SettingPiece::WindowOpacity:
                 form.Fade(false);

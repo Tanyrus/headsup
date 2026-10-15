@@ -27,7 +27,7 @@ namespace headsup
         const Color aggression[kNatureCount] = {{{0.20f, 1.00f, 0.30f}}, {{1.00f, 0.15f, 0.15f}}, {{1.00f, 0.84f, 0.00f}},
             {{1.00f, 0.60f, 0.10f}}, {{0.70f, 0.30f, 1.00f}}, {{0.70f, 0.70f, 0.70f}}};
         const Color toughness[kLabelShadeCount] = {{{0.60f, 0.60f, 0.60f}}, {{0.60f, 0.60f, 0.60f}}, {{0.40f, 1.00f, 0.40f}},
-            {{0.45f, 0.70f, 1.00f}}, {{1.00f, 1.00f, 1.00f}}, {{1.00f, 1.00f, 0.35f}}, {{1.00f, 0.35f, 0.35f}}};
+            {{0.45f, 0.70f, 1.00f}}, {{1.00f, 1.00f, 1.00f}}, {{1.00f, 1.00f, 0.35f}}, {{1.00f, 0.35f, 0.35f}}, {{0.72f, 0.08f, 0.08f}}};
         const Color claim[kClaimStateCount] = {{{1.00f, 0.95f, 0.60f}}, {{0.55f, 0.45f, 0.40f}}, {{0.30f, 0.65f, 1.00f}}};
         const Color target[kTargetStateCount] = {{{1.00f, 1.00f, 1.00f}}, ColorFromRgb(kPhoenixRed), {{0.65f, 0.40f, 1.00f}},
             {{0.99f, 0.82f, 0.09f}}, {{1.00f, 0.25f, 0.25f}}};
@@ -104,18 +104,23 @@ namespace headsup
 
     const char* KindKey(PlateKind kind) { return kKindKeys[static_cast<int>(kind)]; }
 
-    std::vector<ShowCondition> ConditionsFor(PlateKind kind)
+    std::span<const ShowCondition> ConditionsFor(PlateKind kind)
     {
+        static constexpr ShowCondition kMobs[] = {ShowCondition::Generally, ShowCondition::Targeted, ShowCondition::Unclaimed,
+            ShowCondition::YourClaim, ShowCondition::OthersClaim, ShowCondition::Engaged, ShowCondition::TooWeak,
+            ShowCondition::Aggressive, ShowCondition::Passive};
+        static constexpr ShowCondition kPlayers[] = {ShowCondition::Generally, ShowCondition::Targeted,
+            ShowCondition::PartyMember, ShowCondition::Friend, ShowCondition::LinkshellMember};
+        static constexpr ShowCondition kSelf[] = {ShowCondition::Generally, ShowCondition::Targeted, ShowCondition::Engaged};
+        static constexpr ShowCondition kPets[] = {ShowCondition::Generally, ShowCondition::Targeted, ShowCondition::OwnerIsYou};
+        static constexpr ShowCondition kOthers[] = {ShowCondition::Generally, ShowCondition::Targeted};
         switch (kind)
         {
-        case PlateKind::Mobs:
-            return {ShowCondition::Targeted, ShowCondition::Unclaimed, ShowCondition::YourClaim, ShowCondition::OthersClaim,
-                ShowCondition::Engaged, ShowCondition::TooWeak, ShowCondition::Aggressive, ShowCondition::Passive};
-        case PlateKind::Players:
-            return {ShowCondition::Targeted, ShowCondition::PartyMember, ShowCondition::Friend, ShowCondition::LinkshellMember};
-        case PlateKind::Self: return {ShowCondition::Targeted, ShowCondition::Engaged};
-        case PlateKind::Pets: return {ShowCondition::Targeted, ShowCondition::OwnerIsYou};
-        default: return {ShowCondition::Targeted};
+        case PlateKind::Mobs: return kMobs;
+        case PlateKind::Players: return kPlayers;
+        case PlateKind::Self: return kSelf;
+        case PlateKind::Pets: return kPets;
+        default: return kOthers;
         }
     }
 

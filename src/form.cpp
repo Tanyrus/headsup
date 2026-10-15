@@ -22,8 +22,10 @@ namespace headsup
         constexpr float kColorFull        = 255.0f;
         constexpr int kHexDigits          = 6;
         constexpr int kNumberDigits       = 6; // a number box holds a sign and five digits
-        // The room a square button takes beside a dropdown: the swatch, and each of a font's two arrows.
+        // The room a square button takes beside a dropdown: the swatch, and each of two step arrows.
         constexpr float kSquareRoom = kFrame + kControlGap;
+        // Between two step arrows (the font's, the window's size), so the row ends where a slider's does.
+        constexpr float kBetweenArrows = kControlWidth - 2.0f * kSquareRoom;
         constexpr int kHexBase            = 16;
         constexpr const char* kNoteName      = "note";     // a note's id, as its card's controls are named
         constexpr const char* kCaptionSuffix = " caption"; // a caption's, after its text
@@ -150,7 +152,7 @@ namespace headsup
                 *enabled = !*enabled;
                 changed  = true;
             }
-            Out() += "<div class=\"check card-on\" id=\"" + check + "\"><div class=\"mark\"></div></div>";
+            Out() += std::string("<div class=\"") + kCardCheck + "\" id=\"" + check + "\"><div class=\"mark\"></div></div>";
             Set(check, FormValueKind::Class, "on", {}, *enabled);
         }
         Out() += "</div>";
@@ -184,7 +186,7 @@ namespace headsup
     void Form::Line(const char* classes) { Out() += std::string("<div class=\"") + classes + "\">"; }
     void Form::EndLine() { Out() += "</div>"; }
 
-    std::string Form::Check(const char* id, bool& on, const char* tip)
+    std::string Form::Check(const char* id, bool& on, const char* tip, const char* classes)
     {
         const std::string check = Id(id);
         if (!m_Off && Clicked(check))
@@ -192,7 +194,7 @@ namespace headsup
             on      = !on;
             changed = true;
         }
-        Out() += "<div class=\"check\" id=\"" + check + "\"" + TipAttribute(tip) + "><div class=\"mark\"></div></div>";
+        Out() += "<div class=\"" + std::string(classes) + "\" id=\"" + check + "\"" + TipAttribute(tip) + "><div class=\"mark\"></div></div>";
         Set(check, FormValueKind::Class, "on", {}, on);
         Set(check, FormValueKind::Class, kOffClass, {}, m_Off);
         return check;
@@ -204,7 +206,7 @@ namespace headsup
     {
         Row(label, tip);
         Out() += "<div class=\"switch-room\">";
-        const std::string check = Check(label, on, nullptr);
+        const std::string check = Check(label, on, nullptr, kWideCheck);
         if (offWord != nullptr && onWord != nullptr)
         {
             Out() += "<div class=\"state\" id=\"" + check + "-state\"></div>";
@@ -277,6 +279,25 @@ namespace headsup
         TakeWhole(slider, value, lo, hi);
         Slider(slider, label, static_cast<float>(value), static_cast<float>(lo), static_cast<float>(hi), 1.0f,
             Formatted(format, value), tip);
+    }
+
+    void Form::Stepper(const char* label, int& value, int lo, int hi, const char* format, const char* tip)
+    {
+        Row(label, tip);
+        const std::string name  = label;
+        const std::string shown = Id(label) + "-val";
+        int stepped             = value;
+        if (StepArrow(name, false)) --stepped;
+        Out() += "<div class=\"stepval\" id=\"" + shown + "\" style=\"width:" + Em(kBetweenArrows) + ";\"></div>";
+        if (StepArrow(name, true)) ++stepped;
+        stepped = std::clamp(stepped, lo, hi);
+        if (stepped != value)
+        {
+            value   = stepped;
+            changed = true;
+        }
+        Set(shown, FormValueKind::Text, {}, Formatted(format, value));
+        EndRow();
     }
 
     void Form::SliderNamed(const char* label, int& value, const char* const* names, int count, const char* tip)
@@ -386,18 +407,15 @@ namespace headsup
         const int picked = FontEntry(choices, unset, font);
         int chosen       = picked;
         const std::string name = label;
-        if (Pressable("<div class=\"tri left\"></div>", (name + " previous").c_str(), "btn step", nullptr))
-            chosen = StepFontEntry(count, picked, -1);
+        if (StepArrow(name, false)) chosen = StepFontEntry(count, picked, -1);
         int listed = 0;
         // A long family's name is cut in the list and in the closed control: both say it whole under the pointer.
         const std::string shown = FontShown(choices, unset, font);
-        // The arrows take their room from the dropdown, so the row ends where a slider's does.
-        if (ListAt(label, shown, kControlWidth - 2.0f * kSquareRoom, count,
+        if (ListAt(label, shown, kBetweenArrows, count,
                 [&](int entry) { return FontEntryLabel(choices, unset, entry); }, picked, listed, shown.c_str(),
                 [&](int entry) { return FontEntryLabel(choices, unset, entry); }))
             chosen = listed;
-        if (Pressable("<div class=\"tri right\"></div>", (name + " next").c_str(), "btn step", nullptr))
-            chosen = StepFontEntry(count, picked, 1);
+        if (StepArrow(name, true)) chosen = StepFontEntry(count, picked, 1);
         if (chosen != picked && chosen != kNoFontEntry)
         {
             font    = FontOfEntry(choices, unset, chosen);
@@ -499,7 +517,7 @@ namespace headsup
         EndRow();
     }
 
-    void Form::ChecksDropdown(const char* label, LineShow& show, const std::vector<ShowCondition>& conditions,
+    void Form::ChecksDropdown(const char* label, LineShow& show, std::span<const ShowCondition> conditions,
         const char* tip)
     {
         Row(label, tip);
@@ -588,6 +606,12 @@ namespace headsup
         const std::string note = Id(kNoteName);
         Out() += "<div class=\"note\" id=\"" + note + "\">" + EscapedRml(text) + "</div>";
         Set(note, FormValueKind::Class, kOffClass, {}, m_Off);
+    }
+
+    bool Form::StepArrow(const std::string& label, bool next)
+    {
+        return Pressable(next ? "<div class=\"tri right\"></div>" : "<div class=\"tri left\"></div>",
+            (label + (next ? " next" : " previous")).c_str(), "btn step", nullptr);
     }
 
     bool Form::Pressable(const std::string& inside, const char* id, const char* classes, const char* tip)

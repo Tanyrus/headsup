@@ -4,6 +4,7 @@
 #include "game_packets.h"
 #include "labels.h"
 #include "plate_settings.h"
+#include "player_status.h"
 #include "settings.h"
 
 #include <cstdint>
@@ -32,7 +33,7 @@ namespace headsup
     struct EntityState
     {
         EntityKind kind     = EntityKind::Npc;
-        bool self = false, pet = false, alive = false, engaged = false, tooWeak = false;
+        bool self = false, pet = false, alive = false, tooWeak = false;
         Nature nature       = Nature::NoData;
         Category row        = Category::Unknown; // mobs
         Category classified = Category::Unknown; // the row its aggression alone gives, under any claim or placeholder row
@@ -59,9 +60,6 @@ namespace headsup
     TargetState TargetUnderPick(uint16_t index, const CursorTargets& targets);
     // A pick's color for this entity: a custom color, the game's name color, or the palette entry its state picks.
     uint32_t ResolveColor(const ColorPick& pick, const EntityState& state, const Palette& palette, uint32_t gameArgb);
-    // Fighting, for a line that drops its glow then: a mob once you or your party has claimed it, and anyone else,
-    // a pet too, while their weapon is out.
-    bool InCombat(const EntityState& state);
     // The cursor's color over an entity: the pick's, or the Targeting color where the pick reads what that kind of
     // entity has none of, as a player's aggression.
     uint32_t CursorColorOf(const ColorPick& pick, const EntityState& state, const Palette& palette);
@@ -71,7 +69,7 @@ namespace headsup
     // The color that row's outline pick gives, whether or not the outline is drawn. Once the chain has fallen through to
     // the row the mob's aggression gives, an Aggression pick takes that row's nature.
     uint32_t RowColor(const EntityState& state, const Settings& settings);
-    bool LineShows(const LineShow& show, const EntityState& state);
+    bool LineShows(const LineShow& show, const EntityState& state, bool inCombat);
     // Whether a player is in your party or alliance: among the members' server IDs, and not you.
     bool InYourParty(uint32_t serverId, bool self, std::span<const uint32_t> memberIds);
 
@@ -87,6 +85,12 @@ namespace headsup
     std::unordered_map<uint16_t, uint16_t> PetOwners(std::span<const PetLink> links);
 
     // A player's jobs from the first source that knows them: the game's for you, the party list's, then their last
-    // check. Null for a source the player has none of; a main job of 0 (zoning, another zone, anonymous) knows nothing.
-    std::optional<PlayerJobs> KnownJobs(const PlayerJobs* own, const PlayerJobs* member, const InspectGeneral* checked);
+    // check, then a level alone that the server sent since that check (0 for none), which wins over the check's level
+    // and, not held to a sync's cap (seenHeld) and other than the check's, leaves its job unknown.
+    // Null for a source the player has none of; a main job of 0 (zoning, another zone, anonymous) knows nothing.
+    std::optional<PlayerJobs> KnownJobs(const PlayerJobs* own, const PlayerJobs* member, const InspectGeneral* checked,
+        uint8_t seenLevel, bool seenHeld);
+    // The level a player's sync packet gave, shown only with Auto-Check on and once their update has said they are
+    // not anonymous: the game hides an anonymous player's level.
+    uint8_t SeenLevel(bool autoCheck, uint8_t level, const PlayerStatus* status);
 }

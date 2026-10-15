@@ -28,7 +28,7 @@
             {"key": "min-size", "name": "Min Scale", "tip": "The minimum scale for the nameplate. This affects its size when far away."},
             {"key": "max-size", "name": "Max Size", "tip": "The maximum scale for the nameplate. This affects its size when very close."},
             {"key": "scale-your-own-name", "name": "Scale Your Own Name", "tip": "If enabled, the player's name is scaled by how close the camera is to the player character."},
-            {"key": "auto-check", "name": "Auto-Check", "tip": "Automatically checks all nearby enemies to get their exact level and difficulty."},
+            {"key": "auto-check", "name": "Auto-Check", "tip": "Automatically checks all nearby enemies to get their exact level and difficulty. Players are never checked: their level is read from what the server already sends, unless they are anonymous."},
             {"key": "stack-names", "name": "Stack Names", "tip": "If enabled, when nameplates would overlap, they instead stack on top of each other. NOTE: Your target's nameplate will be prioritized and stay in place."}
           ]
         },
@@ -104,7 +104,8 @@
                 {"key": "decent-challenge", "name": "Decent Challenge"},
                 {"key": "even-match", "name": "Even Match"},
                 {"key": "tough", "name": "Tough"},
-                {"key": "very-tough", "name": "Very Tough"}
+                {"key": "very-tough", "name": "Very Tough"},
+                {"key": "incredibly-tough", "name": "Incredibly Tough"}
               ]
             }
           ]
@@ -325,7 +326,16 @@
           "key": "mouse-pointer",
           "name": "Mouse Pointer",
           "settings": [
-            {"key": "chocobo", "name": "Chocobo", "tip": "Changes the mouse cursor to the PlayOnline chocobo cursor."},
+            {
+              "key": "pointer-icon",
+              "name": "Cursor Icon",
+              "tip": "What the mouse cursor looks like. You can place cursor files in the config/headsup/cursors folder and they will appear in the drop-down menu as options.",
+              "options": [
+                {"name": "Vanilla", "tip": "Changes nothing about the mouse cursor, keeping its vanilla appearance."},
+                {"name": "Chocobo", "tip": "Replaces the mouse cursor with the Chocobo cursor from PlayOnline."},
+                {"tip": "Replaces the mouse cursor with this file from the config/headsup/cursors folder."}
+              ]
+            },
             {"key": "pointer-fix", "name": "Pointer Fix", "tip": "Keeps the game's pointer under yours after a resize, and clicks where you click. It also shows the pointer again over Ashita's windows."},
             {"key": "keep-pointer", "name": "Keep Pointer", "tip": "The game hides its pointer when a key runs a command. While only these keys are held, it stays."}
           ]
@@ -337,13 +347,36 @@
       "name": "HeadsUp Config",
       "cards": [
         {
+          "key": "headsup",
+          "name": "HeadsUp",
+          "description": "All of HeadsUp, as /hu on and /hu off.",
+          "settings": [
+            {"key": "debug-report", "name": "Debug Report", "tip": "As /hu debug: writes a report to logs/headsup."}
+          ]
+        },
+        {
           "key": "settings-window",
           "name": "Config Window",
           "settings": [
             {"key": "window-theme", "name": "Window Theme", "tip": "The color and style of this config window."},
             {"key": "font", "name": "Font", "tip": "The font used for this config window."},
-            {"key": "size", "name": "Font Size", "tip": "The font size used for this config window."},
+            {"key": "size", "name": "Font Size", "tip": "The font size used for this config window, in pixels."},
             {"key": "window-opacity", "name": "Window Opacity", "tip": "The opacity of this config window."}
+          ]
+        },
+        {
+          "key": "this-frame",
+          "name": "This Frame",
+          "settings": [
+            {"key": "mobs-outlined", "name": "Mobs Outlined"},
+            {"key": "meshes-outlined", "name": "Meshes Outlined"},
+            {"key": "stencil-buffer", "name": "Stencil Buffer"},
+            {"key": "nameplates", "name": "Nameplates"},
+            {"key": "drawn", "name": "Drawn"},
+            {"key": "game-s-names", "name": "Game's Names"},
+            {"key": "frame-time", "name": "Frame Time"},
+            {"key": "last-save", "name": "Last Save"},
+            {"key": "your-level", "name": "Your Level"}
           ]
         },
         {
@@ -360,35 +393,6 @@
                 {"key": "keep-them", "name": "Keep Them"}
               ]
             }
-          ]
-        }
-      ]
-    },
-    {
-      "key": "debug",
-      "name": "Debug",
-      "cards": [
-        {
-          "key": "headsup",
-          "name": "HeadsUp",
-          "description": "All of HeadsUp, as /hu on and /hu off.",
-          "settings": [
-            {"key": "debug-report", "name": "Debug Report", "tip": "As /hu debug: writes a report to logs/headsup."}
-          ]
-        },
-        {
-          "key": "this-frame",
-          "name": "This Frame",
-          "settings": [
-            {"key": "mobs-outlined", "name": "Mobs Outlined"},
-            {"key": "meshes-outlined", "name": "Meshes Outlined"},
-            {"key": "stencil-buffer", "name": "Stencil Buffer"},
-            {"key": "nameplates", "name": "Nameplates"},
-            {"key": "drawn", "name": "Drawn"},
-            {"key": "game-s-names", "name": "Game's Names"},
-            {"key": "frame-time", "name": "Frame Time"},
-            {"key": "last-save", "name": "Last Save"},
-            {"key": "your-level", "name": "Your Level"}
           ]
         }
       ]
@@ -479,11 +483,7 @@
               {"key": "glow-strength", "name": "Glow Strength", "tip": "A strength of a colored glow behind and around the text on this line. If set to 0%, the glow is disabled."},
               {"key": "glow-size", "name": "Glow Size", "tip": "How far from the text the glow extends."},
               {"key": "glow-color", "name": "Glow Color", "tip": "The color of the glow."},
-              {
-                "key": "disable-glow-in-combat",
-                "name": "Disable Glow In Combat",
-                "tip": {"mobs": "No glow on this line once you or your party has claimed the mob.", "players": "No glow on this line while the player has their weapon out.", "self": "No glow on this line while you have your weapon out.", "npcs": "No glow on this line while the NPC is fighting.", "pets": "No glow on this line while the pet is fighting."}
-              }
+              {"key": "disable-glow-in-combat", "name": "Disable Glow In Combat", "tip": "No glow on this line while you are in combat: your weapon is out, or a mob is claimed by you or your party."}
             ],
             "words": [
               {"key": "do-not-sync", "name": "Do Not Sync", "tip": "Line style is not synced, meaning it has its own unique appearance."},
@@ -657,7 +657,8 @@
         {"name": "Party Member", "tip": "Visible when the entity is a party member."},
         {"name": "Friend", "tip": "Visible when the entity is a friend."},
         {"name": "Linkshell Member", "tip": "Visible when the entity is a member of your linkshell."},
-        {"name": "You Are Owner", "tip": "Visible even if the owner of the pet is you."}
+        {"name": "You Are Owner", "tip": "Visible even if the owner of the pet is you."},
+        {"name": "Generally", "tip": "Visible generally, when other conditions below do not apply."}
       ]
     },
     {
@@ -767,7 +768,7 @@
       "key": "tags",
       "options": [
         {"name": "Name", "tip": "The name of the entity."},
-        {"name": "Level", "tip": "Shows the entity's current level. NOTE: For mobs, this will show a range until you /check the mob. You can also enable the Auto-Check feature in the 'Entities/Nameplates' section. For players, this will not show at all until you /check them, even with the Auto-Check feature."},
+        {"name": "Level", "tip": "Shows the entity's current level. NOTE: For mobs, this will show a range until you /check the mob. You can also enable the Auto-Check feature in the 'Entities/Nameplates' section. For players, this shows once you /check them, or with the Auto-Check feature on once the server has sent it (it does when you come upon them, not when they arrive beside you), unless they are anonymous."},
         {"name": "Difficulty", "tip": "Shows initials indicating the mob's difficulty for your current level (TW for Too Weak, EP for Easy Prey, and so on). NOTE: Shows a range of possibilities until you /check the mob, unless you have the Auto-Check feature enabled in the 'Entities/Nameplates' section."},
         {"name": "ID", "tip": "The last three hex digits of the mob's ID. Example: [106]."},
         {"name": "Server ID", "tip": "The mob's full server ID in decimal. Example: [17190918]."},
@@ -785,16 +786,16 @@
         {"name": "Linkshell", "tip": "Shows an icon representing the player's equipped linkshell."},
         {"name": "Bazaar", "tip": "Shows an icon indicating the player is selling items in their bazaar."},
         {"name": "Seeking Party", "tip": "Shows an icon indicating the player is looking to join a party."},
-        {"name": "Job", "tip": "Shows the player's job and subjob (example: WAR/NIN). NOTE: Only shows after you use /check on the player. Unaffected by the Auto-Check feature, which does not apply to players."},
+        {"name": "Job", "tip": "Shows the player's job and subjob (example: WAR/NIN). NOTE: Only shows after you use /check on the player."},
         {"name": "Owner", "tip": "Shows the name of the pet's owner."},
-        {"name": "Title", "tip": "Shows the player's title. NOTE: Only shows after you use /check on the player. Unaffected by the Auto-Check feature, which does not apply to players."}
+        {"name": "Title", "tip": "Shows the player's title. NOTE: Only shows after you use /check on the player."}
       ]
     }
   ],
   "words": [
     {"key": "switched-off", "name": "Switched Off"},
     {"key": "switched-off-top-panel", "name": "These settings are the top panel's, which is off: the Top Panel page switches it on."},
-    {"key": "switched-off-headsup", "name": "HeadsUp is off: the Debug page switches it on."},
+    {"key": "switched-off-headsup", "name": "HeadsUp is off: the HeadsUp Config page switches it on."},
     {"key": "key-add", "name": "+ Add Key"},
     {"key": "key-waiting", "name": "Press a Key..."},
     {"key": "always", "name": "Always", "tip": "This line is always visible as long as the nameplate as a whole is visible."},

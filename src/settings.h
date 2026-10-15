@@ -53,6 +53,9 @@ namespace headsup
     // this long, and with nothing in it that would lead out of the folder.
     constexpr size_t kMaxCursorFileName = 64;
     bool IsCursorFileName(std::string_view name);
+    // The mouse pointer: the game's own, PlayOnline's chocobo, or a cursor file of the player's.
+    enum class PointerIcon : uint8_t { Vanilla, Chocobo, File };
+    constexpr int kPointerIconCount = 3;
     constexpr int kMinCursorSide = 4, kMaxCursorSide = 64; // pixels: the target cursor's width and height
     constexpr int kDefaultCursorHeight = 20;
     int DefaultCursorWidth(); // the default style's at that height
@@ -60,7 +63,7 @@ namespace headsup
     constexpr int kMaxCursorRaise = 10; // pixels, up or down
     constexpr int kMinOpacity = 10, kMaxOpacity = 100; // percent
 
-    constexpr int kMinMenuScale = 70, kMaxMenuScale = 160; // percent
+    constexpr int kMinMenuFontSize = 10, kMaxMenuFontSize = 40, kDefaultMenuFontSize = 18; // pixels
     constexpr int kMinMenuOpacity = 30; // percent: fainter, the window could not be found to set it back
     constexpr int kMaxMenuSide  = 16384; // pixels: more than any screen is across
 
@@ -99,7 +102,7 @@ namespace headsup
         int helpBarX = 0, helpBarY = 0;          // back-buffer pixels from the help bar's place under the top bar
         bool helpBarBackground = true;           // off, the help text alone
         std::string menuFont = kDefaultMenuFont; // the settings window's text, by its kMenuFonts name
-        int menuScale        = 100;              // percent: the settings window's text and everything sized by it
+        int menuFontSize     = kDefaultMenuFontSize; // pixels: the settings window's text and everything sized by it
         int menuOpacity      = 100;              // percent
         MenuTheme menuTheme  = MenuTheme::Phoenix;
         // Where the player left the settings window, in pixels; no width for one never moved, which opens in the
@@ -130,7 +133,8 @@ namespace headsup
         std::vector<uint8_t> keepPointerKeys; // keys that set off a command without hiding the game's pointer
         CursorStyle cursorStyle = kDefaultCursorStyle;
         std::string cursorFile; // a File cursor's name in the cursors folder, without its extension
-        bool chocoboPointer    = false; // PlayOnline's chocobo in place of the game's mouse pointer
+        PointerIcon pointerIcon = PointerIcon::Vanilla;
+        std::string pointerFile; // a File pointer's name in the cursors folder, without its extension
         bool fixPointer        = true;  // the game reads the mouse in its true client area and syncs its pointer before clicks
         int cursorWidth        = DefaultCursorWidth(); // pixels
         int cursorHeight       = kDefaultCursorHeight;
@@ -147,7 +151,7 @@ namespace headsup
         bool outlines   = true;
         int baseSize    = 15; // pixels: a line's text at 100 percent
         int baseIconSize = kDefaultIconSize; // and its icons
-        DashMark dashMark = DashMark::Diamond; // what a dash in a design, or between a level's ends, is drawn as
+        DashMark dashMark = DashMark::Diamond; // what a dash typed in a design is drawn as
         bool autoCheck    = false; // every mob that comes near is checked by HeadsUp, for its exact level
         std::string defaultFont = kDefaultFont;
         int scaleMin = 50, scaleMax = 250; // percent: the distance scale's limits

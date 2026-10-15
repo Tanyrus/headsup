@@ -132,11 +132,6 @@ namespace headsup
         return ToArgb(pick.custom);
     }
 
-    bool InCombat(const EntityState& state)
-    {
-        return PlateKindOf(state) == PlateKind::Mobs ? state.claim == ClaimState::Yours : state.engaged;
-    }
-
     uint32_t CursorColorOf(const ColorPick& pick, const EntityState& state, const Palette& palette)
     {
         const std::vector<ColorSource> readable = SourcesFor(PlateKindOf(state), false);
@@ -193,7 +188,7 @@ namespace headsup
 
     namespace
     {
-        bool Holds(ShowCondition c, const EntityState& s)
+        bool Holds(ShowCondition c, const EntityState& s, bool inCombat)
         {
             const bool player = s.kind == EntityKind::Player && !s.pet;
             // By its aggression alone: a placeholder's nature does not say whether it would attack.
@@ -204,7 +199,7 @@ namespace headsup
             case ShowCondition::Unclaimed: return s.kind == EntityKind::Mob && s.claim == ClaimState::Unclaimed;
             case ShowCondition::YourClaim: return s.claim == ClaimState::Yours;
             case ShowCondition::OthersClaim: return s.claim == ClaimState::Others;
-            case ShowCondition::Engaged: return s.engaged;
+            case ShowCondition::Engaged: return inCombat;
             case ShowCondition::TooWeak: return s.tooWeak;
             case ShowCondition::Aggressive: return attacks;
             case ShowCondition::Passive: return s.kind == EntityKind::Mob && !attacks;
@@ -212,16 +207,18 @@ namespace headsup
             case ShowCondition::Friend: return player && s.playerRow == PlayerRow::Friend;
             case ShowCondition::LinkshellMember: return player && s.playerRow == PlayerRow::LinkshellMember;
             case ShowCondition::OwnerIsYou: return s.pet && s.petRow == PetRow::Yours;
+            case ShowCondition::Generally:
+                return std::ranges::none_of(ConditionsFor(PlateKindOf(s)), [&](ShowCondition c) { return IsSpecialState(c) && Holds(c, s, inCombat); });
             }
             return false;
         }
     }
 
-    bool LineShows(const LineShow& show, const EntityState& s)
+    bool LineShows(const LineShow& show, const EntityState& s, bool inCombat)
     {
         if (show.always) return true;
         for (int c = 0; c < kShowConditionCount; ++c)
-            if ((show.when & ConditionBit(static_cast<ShowCondition>(c))) != 0 && Holds(static_cast<ShowCondition>(c), s)) return true;
+            if ((show.when & ConditionBit(static_cast<ShowCondition>(c))) != 0 && Holds(static_cast<ShowCondition>(c), s, inCombat)) return true;
         return false;
     }
 
@@ -239,12 +236,23 @@ namespace headsup
         return owners;
     }
 
-    std::optional<PlayerJobs> KnownJobs(const PlayerJobs* own, const PlayerJobs* member, const InspectGeneral* checked)
+    uint8_t SeenLevel(bool autoCheck, uint8_t level, const PlayerStatus* status)
+    {
+        return autoCheck && status != nullptr && !status->anonymous ? level : 0;
+    }
+
+    std::optional<PlayerJobs> KnownJobs(const PlayerJobs* own, const PlayerJobs* member, const InspectGeneral* checked,
+        uint8_t seenLevel, bool seenHeld)
     {
         for (const PlayerJobs* jobs : {own, member})
             if (jobs != nullptr && jobs->mainJob != 0) return *jobs;
         if (checked != nullptr && checked->mainJob != 0)
-            return PlayerJobs{checked->mainJob, checked->mainLevel, checked->subJob, checked->subLevel};
+        {
+            // A job changes only in a Mog House, which their next sync packet follows with that job's level.
+            if (seenLevel != 0 && !seenHeld && seenLevel != checked->mainLevel) return PlayerJobs{0, seenLevel, 0, 0};
+            return PlayerJobs{checked->mainJob, seenLevel != 0 ? seenLevel : checked->mainLevel, checked->subJob, checked->subLevel};
+        }
+        if (seenLevel != 0) return PlayerJobs{0, seenLevel, 0, 0};
         return std::nullopt;
     }
 }

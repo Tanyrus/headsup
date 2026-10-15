@@ -75,7 +75,7 @@ namespace headsup
                ";background-color:" + color(c.background) + ";border:1px " + color(c.border) + ";border-radius:" +
                Em(kCardRadius * 1.5f) + ";color:" + color(c.text) + ";font-family:\"" + look.textFont + "\";z-index:5;}";
         // The window comes in a little small and grows to its size.
-        // Its fade has no end of its own: it ends at the opacity the window is set to.
+        // Its fade has no end of its own: it ends at the element's own opacity, under the window's filter.
         css += "body.open{animation:0.22s cubic-out window-in, 0.22s cubic-out window-fade;}";
         css += "@keyframes window-in{from{transform:scale(0.97);}to{transform:scale(1);}}";
         css += "@keyframes window-fade{from{opacity:0;}}";
@@ -182,8 +182,9 @@ namespace headsup
         // its own it has a cell its own width. The word beside it, when it has one, does not move it.
         css += ".switch-room{position:relative;display:flex;flex-direction:row;justify-content:center;width:" + control + ";}";
         css += ".switch-cell{display:flex;flex-direction:row;justify-content:center;width:" + Em(kToggleWidth) + ";}";
-        css += ".state{position:absolute;left:50%;top:0px;margin-left:" + Em(kToggleWidth / 2.0f + kControlGap) +
-               ";line-height:" + Em(kToggleHeight) + ";color:" + color(c.muted) + ";}";
+        // The word stands in the middle of the wide track, where the knob never goes.
+        css += ".state{position:absolute;left:0px;top:0px;width:100%;text-align:center;pointer-events:none;line-height:" +
+               Em(kToggleHeight) + ";color:" + color(c.muted) + ";}";
         css += ".check{position:relative;width:" + Em(kToggleWidth) + ";height:" + Em(kToggleHeight) + ";border-radius:" +
                Em(kToggleHeight / 2.0f) + ";background-color:" + color(c.control) + ";transition:background-color" + kSlide + ";}";
         css += ".check:hover{background-color:" + color(c.hover) + ";}";
@@ -195,6 +196,8 @@ namespace headsup
                ";height:" + Em(kToggleKnob) + ";border-radius:" + Em(kToggleKnob / 2.0f) + ";background-color:" +
                color(c.muted) + ";transition:left" + kSlide + ",background-color" + kSlide + ";}";
         css += ".check.on .mark{left:" + Em(kToggleWidth - kToggleKnob - kToggleInset) + ";background-color:" + color(c.accent) + ";}";
+        css += ".check.wide{width:" + Em(kSwitchWidth) + ";}";
+        css += ".check.wide.on .mark{left:" + Em(kSwitchWidth - kToggleKnob - kToggleInset) + ";}";
         // Joined choices. These, tabs, buttons and lists ease between their looks, and the picked one is the gradient.
         css += std::string(".seg,.tab,.btn,.dd,.opt,.wchip{transition:background-color") + kEase + ",border-color" + kEase +
                ",color" + kEase + ";}";
@@ -292,6 +295,8 @@ namespace headsup
         css += ".btn.step{position:relative;width:" + frame + ";padding:0px;border-radius:" + radius + ";background-color:" +
                color(c.control) + ";}";
         css += ".btn.step:hover{background-color:" + color(c.hover) + ";}";
+        css += ".stepval{margin:0px " + Em(kControlGap) + ";line-height:" + frame + ";text-align:center;border-radius:" + radius +
+               ";background-color:" + color(c.control) + ";}";
         css += ".tri{position:absolute;top:" + Em(kFrame / 2.0f - kArrow) + ";width:0px;height:0px;border-top:" + Em(kArrow) +
                " transparent;border-bottom:" + Em(kArrow) + " transparent;}";
         css += ".tri.left{left:0.5em;border-right:0.45em " + color(c.text) + ";}";

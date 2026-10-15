@@ -56,11 +56,11 @@ TEST(a_claim_wins_over_the_placeholder_which_wins_over_the_nature)
     CHECK_EQ(RowOf(friendsPet), static_cast<int>(PetRow::Friend));
     // Only your own pet's lines show by "When Owner is You", and no player's or mob's.
     const LineShow yours{false, ConditionBit(ShowCondition::OwnerIsYou)};
-    CHECK(!LineShows(yours, friendsPet));
+    CHECK(!LineShows(yours, friendsPet, false));
     friendsPet.petRow = PetRow::Yours;
-    CHECK(LineShows(yours, friendsPet));
+    CHECK(LineShows(yours, friendsPet, false));
     friendsPet.pet = false;
-    CHECK(!LineShows(yours, friendsPet));
+    CHECK(!LineShows(yours, friendsPet, false));
     // Dead, it is in the Dead row whatever it was and whoever claimed it.
     CHECK(MobRowOf(Nature::Aggressive, false, false, false) == Category::Dead);
     CHECK(MobRowOf(Nature::Placeholder, true, true, false) == Category::Dead);
@@ -160,17 +160,16 @@ TEST(always_shows_and_otherwise_any_checked_condition_does)
 {
     EntityState s = Mob(Nature::Aggressive, ClaimState::Yours);
     s.target      = TargetState::Targeted;
-    s.engaged     = true;
-    CHECK(LineShows(LineShow{true, 0}, s));
-    CHECK(!LineShows(LineShow{false, 0}, s));
-    CHECK(LineShows(LineShow{false, ConditionBit(ShowCondition::YourClaim)}, s));
-    CHECK(!LineShows(LineShow{false, ConditionBit(ShowCondition::Unclaimed) | ConditionBit(ShowCondition::OthersClaim)}, s));
-    CHECK(LineShows(LineShow{false, ConditionBit(ShowCondition::Unclaimed) | ConditionBit(ShowCondition::Targeted)}, s));
+    CHECK(LineShows(LineShow{true, 0}, s, false));
+    CHECK(!LineShows(LineShow{false, 0}, s, false));
+    CHECK(LineShows(LineShow{false, ConditionBit(ShowCondition::YourClaim)}, s, false));
+    CHECK(!LineShows(LineShow{false, ConditionBit(ShowCondition::Unclaimed) | ConditionBit(ShowCondition::OthersClaim)}, s, false));
+    CHECK(LineShows(LineShow{false, ConditionBit(ShowCondition::Unclaimed) | ConditionBit(ShowCondition::Targeted)}, s, false));
 }
 
 TEST(each_condition_holds_for_its_state_alone)
 {
-    const auto holds = [](ShowCondition c, const EntityState& s) { return LineShows(LineShow{false, ConditionBit(c)}, s); };
+    const auto holds = [](ShowCondition c, const EntityState& s, bool inCombat = false) { return LineShows(LineShow{false, ConditionBit(c)}, s, inCombat); };
     EntityState unclaimed = Mob(Nature::Passive);
     EntityState yours     = Mob(Nature::Aggressive, ClaimState::Yours);
     EntityState others    = Mob(Nature::Aggressive, ClaimState::Others);
@@ -189,8 +188,9 @@ TEST(each_condition_holds_for_its_state_alone)
         CHECK(holds(ShowCondition::Passive, Placeholder(ignores)) && !holds(ShowCondition::Aggressive, Placeholder(ignores)));
     unclaimed.tooWeak = true;
     CHECK(holds(ShowCondition::TooWeak, unclaimed) && !holds(ShowCondition::TooWeak, yours));
-    yours.engaged = true;
-    CHECK(holds(ShowCondition::Engaged, yours) && !holds(ShowCondition::Engaged, others));
+    // Your own combat, as its tip says, whatever this entity does.
+    CHECK(!holds(ShowCondition::Engaged, yours));
+    CHECK(holds(ShowCondition::Engaged, others, true) && holds(ShowCondition::Engaged, unclaimed, true));
     yours.target = TargetState::SubTarget;
     CHECK(holds(ShowCondition::Targeted, yours) && !holds(ShowCondition::Targeted, others));
     EntityState party;
@@ -202,6 +202,55 @@ TEST(each_condition_holds_for_its_state_alone)
     party.playerRow = PlayerRow::LinkshellMember;
     CHECK(holds(ShowCondition::LinkshellMember, party));
     CHECK(!holds(ShowCondition::PartyMember, yours)); // a mob is never a party member
+}
+
+TEST(generally_holds_while_the_entity_is_in_none_of_its_kinds_special_states)
+{
+    const LineShow generally{false, ConditionBit(ShowCondition::Generally)};
+    const LineShow orTargeted{false, ConditionBit(ShowCondition::Generally) | ConditionBit(ShowCondition::Targeted)};
+    // The user's example, a mob line with Generally and Targeted.
+    const EntityState mob = Mob(Nature::Aggressive);
+    EntityState target    = mob;
+    target.target         = TargetState::Targeted;
+    EntityState weak      = mob;
+    weak.tooWeak          = true;
+    CHECK(LineShows(orTargeted, mob, false));
+    CHECK(LineShows(orTargeted, target, false));
+    CHECK(!LineShows(orTargeted, Mob(Nature::Aggressive, ClaimState::Others), false));
+    CHECK(!LineShows(orTargeted, weak, false));
+    CHECK(!LineShows(generally, target, false));
+    CHECK(!LineShows(generally, Mob(Nature::Passive, ClaimState::Yours), false));
+    // Your fight is true of every mob at once, so it says nothing against this one: the user's example holds in combat.
+    CHECK(LineShows(generally, Mob(Nature::Passive), true));
+    CHECK(LineShows(orTargeted, mob, true) && !LineShows(orTargeted, weak, true));
+    // Every mob is unclaimed or claimed and aggressive or passive: those say nothing against it.
+    CHECK(LineShows(generally, Mob(Nature::Passive), false));
+    CHECK(LineShows(generally, Placeholder(Category::WillAttack), false));
+    EntityState player;
+    player.kind  = EntityKind::Player;
+    player.alive = true;
+    CHECK(LineShows(generally, player, false));
+    for (const PlayerRow row : {PlayerRow::PartyMember, PlayerRow::Friend, PlayerRow::LinkshellMember})
+    {
+        player.playerRow = row;
+        CHECK(!LineShows(generally, player, false));
+    }
+    EntityState self = player;
+    self.self        = true;
+    self.playerRow   = PlayerRow::Player;
+    CHECK(LineShows(generally, self, false));
+    CHECK(LineShows(generally, self, true));
+    EntityState pet = Mob(Nature::Passive);
+    pet.pet         = true;
+    pet.petRow      = PetRow::Party;
+    CHECK(LineShows(generally, pet, false));
+    pet.petRow = PetRow::Yours;
+    CHECK(!LineShows(generally, pet, false));
+    EntityState npc;
+    npc.kind = EntityKind::Npc;
+    CHECK(LineShows(generally, npc, false));
+    npc.target = TargetState::Targeted;
+    CHECK(!LineShows(generally, npc, false));
 }
 
 TEST(the_cursor_takes_its_picks_color_and_the_targeting_color_where_the_pick_has_nothing_to_read)
@@ -235,30 +284,6 @@ TEST(the_cursor_takes_its_picks_color_and_the_targeting_color_where_the_pick_has
     CHECK(std::ranges::find(offered, ColorSource::Game) == offered.end());
     CHECK(std::ranges::find(offered, ColorSource::Aggression) != offered.end());
     CHECK(std::ranges::find(offered, ColorSource::Target) != offered.end());
-}
-
-TEST(a_mob_is_in_combat_once_your_party_has_claimed_it_and_anyone_else_while_engaged)
-{
-    EntityState mob;
-    mob.kind = EntityKind::Mob;
-    CHECK(!InCombat(mob));
-    mob.claim = ClaimState::Others;
-    mob.engaged = true; // fighting someone, but not yours to fight
-    CHECK(!InCombat(mob));
-    mob.claim = ClaimState::Yours;
-    CHECK(InCombat(mob));
-    EntityState player;
-    player.kind = EntityKind::Player;
-    CHECK(!InCombat(player));
-    player.engaged = true;
-    CHECK(InCombat(player));
-    // A pet is a mob to the game, and fights as its owner does: with its weapon out.
-    EntityState pet = mob;
-    pet.pet     = true;
-    pet.engaged = false;
-    CHECK(!InCombat(pet));
-    pet.engaged = true;
-    CHECK(InCombat(pet));
 }
 
 TEST(a_rows_color_is_what_its_outline_pick_resolves_to)
@@ -386,22 +411,40 @@ namespace
     }
 }
 
-TEST(a_players_jobs_come_from_the_game_then_the_party_list_then_the_last_check)
+TEST(a_players_jobs_come_from_the_game_then_the_party_list_then_the_last_check_or_sync)
 {
     const PlayerJobs own{1, 75, 13, 37}, member{4, 60, 3, 30};
     const InspectGeneral checked = CheckedRedMage();
-    CHECK(KnownJobs(&own, &member, &checked) == own);
-    CHECK(KnownJobs(nullptr, &member, &checked) == member);
-    CHECK(KnownJobs(nullptr, nullptr, &checked) == (PlayerJobs{5, 52, 4, 26}));
-    CHECK(!KnownJobs(nullptr, nullptr, nullptr).has_value());
+    CHECK(KnownJobs(&own, &member, &checked, 0, false) == own);
+    CHECK(KnownJobs(nullptr, &member, &checked, 0, false) == member);
+    CHECK(KnownJobs(nullptr, nullptr, &checked, 0, false) == (PlayerJobs{5, 52, 4, 26}));
+    CHECK(!KnownJobs(nullptr, nullptr, nullptr, 0, false).has_value());
+    // A level the server sent since the check wins. It has no job: held to a sync's cap, or the check's level still,
+    // the check's job stays; another level of their own may come with another job, changed in their Mog House.
+    CHECK(KnownJobs(nullptr, nullptr, nullptr, 75, false) == (PlayerJobs{0, 75, 0, 0}));
+    CHECK(KnownJobs(nullptr, nullptr, &checked, 30, true) == (PlayerJobs{5, 30, 4, 26}));
+    CHECK(KnownJobs(nullptr, nullptr, &checked, 52, false) == (PlayerJobs{5, 52, 4, 26}));
+    CHECK(KnownJobs(nullptr, nullptr, &checked, 30, false) == (PlayerJobs{0, 30, 0, 0}));
+    CHECK(KnownJobs(nullptr, &member, nullptr, 75, false) == member);
+}
+
+TEST(a_players_level_the_server_sends_shows_with_auto_check_on_unless_they_are_anonymous)
+{
+    PlayerStatus open, hidden;
+    hidden.anonymous = true;
+    CHECK_EQ(int{SeenLevel(true, 75, &open)}, 75);
+    CHECK_EQ(int{SeenLevel(false, 75, &open)}, 0);
+    CHECK_EQ(int{SeenLevel(true, 75, &hidden)}, 0);
+    CHECK_EQ(int{SeenLevel(true, 75, nullptr)}, 0); // whether they are anonymous is not known yet
+    CHECK_EQ(int{SeenLevel(true, 0, &open)}, 0);
 }
 
 TEST(a_main_job_of_0_knows_nothing_so_the_next_source_is_asked)
 {
     const PlayerJobs unknown{}, member{4, 60, 3, 30};
     const InspectGeneral checked = CheckedRedMage(), anonymous{};
-    CHECK(KnownJobs(&unknown, &member, nullptr) == member);                      // you, while zoning
-    CHECK(KnownJobs(nullptr, &unknown, &checked) == (PlayerJobs{5, 52, 4, 26})); // a member in another zone
-    CHECK(!KnownJobs(nullptr, nullptr, &anonymous).has_value());                 // an anonymous player's check
-    CHECK(!KnownJobs(&unknown, &unknown, &anonymous).has_value());
+    CHECK(KnownJobs(&unknown, &member, nullptr, 0, false) == member);                      // you, while zoning
+    CHECK(KnownJobs(nullptr, &unknown, &checked, 0, false) == (PlayerJobs{5, 52, 4, 26})); // a member in another zone
+    CHECK(!KnownJobs(nullptr, nullptr, &anonymous, 0, false).has_value());                 // an anonymous player's check
+    CHECK(!KnownJobs(&unknown, &unknown, &anonymous, 0, false).has_value());
 }

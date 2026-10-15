@@ -1,4 +1,6 @@
 #include "nameplate.h"
+
+#include "name_frame.h"
 #include "plate_image.h"
 
 #include <algorithm>
@@ -164,6 +166,19 @@ namespace headsup
         return yalms > 0.0f ? std::clamp(kPerYalm / yalms + kFarthest, minScale, maxScale) : maxScale;
     }
 
+    float NameScale(float depth, float letterHeight, float screenHeight, float minScale, float maxScale)
+    {
+        const float yalms = YalmsAtDepth(depth);
+        return std::isnan(yalms) ? DistanceScale(letterHeight, screenHeight, minScale, maxScale) : ScaleAtDistance(yalms, minScale, maxScale);
+    }
+
+    std::optional<float> CameraBehind(float ownNameDepth, const Camera* camera, const WorldPoint& yourFeet)
+    {
+        if (const float yalms = YalmsAtDepth(ownNameDepth); !std::isnan(yalms)) return yalms;
+        if (camera == nullptr) return std::nullopt;
+        return Distance(camera->eye, yourFeet);
+    }
+
     float EaseScale(float shown, float target, double seconds)
     {
         if (shown <= 0.0f) return target;
@@ -213,6 +228,11 @@ namespace headsup
     int FixedRasterHeight(float pixels)
     {
         return WholePixels(std::min(pixels, static_cast<float>(kRasterTallest)));
+    }
+
+    int CursorRaster(float shown, int current, bool scales, int height)
+    {
+        return std::max(scales ? RasterHeight(shown, current) : FixedRasterHeight(shown), height);
     }
 
     bool FitsTexture(int width, int height, int halo, int side)

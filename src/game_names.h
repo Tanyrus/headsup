@@ -50,6 +50,8 @@ namespace headsup
         {
             return m_HaveCamera && CameraStillSeen(m_Frame, m_CameraFrame) ? &m_Camera : nullptr;
         }
+        // The scene camera once it has stayed (CameraSteady), which is what may move a seated name.
+        const Camera* SteadyCamera() const { return CameraSteady(m_CameraRun) ? SceneCamera() : nullptr; }
 
         uint32_t MeshDraws(uint16_t index) const;
 
@@ -82,5 +84,6 @@ namespace headsup
         Camera m_Camera{};
         bool m_HaveCamera      = false;
         uint32_t m_CameraFrame = 0; // the frame a draw last gave it in
+        uint32_t m_CameraRun   = 0; // CameraRun, counted at each new frame
     };
 }

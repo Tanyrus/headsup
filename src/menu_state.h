@@ -7,6 +7,8 @@
 #include "settings.h"
 #include "window_layout.h"
 
+#include <algorithm>
+#include <span>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -40,10 +42,10 @@ namespace headsup
 
     // What the Show dropdown reads when closed: Always, the one condition checked, how many are, or Never. Only the
     // conditions the kind is offered count.
-    std::string ShowSummary(const LineShow& show, const std::vector<ShowCondition>& offered, const WindowLayout& layout);
+    std::string ShowSummary(const LineShow& show, std::span<const ShowCondition> offered, const WindowLayout& layout);
     // A click on a row of the Line Visibility list: 0 is Always, then the conditions offered. Unchecking one under
     // Always turns Always off and leaves the others checked. False for no such row.
-    bool ToggleCondition(LineShow& show, const std::vector<ShowCondition>& offered, int row);
+    bool ToggleCondition(LineShow& show, std::span<const ShowCondition> offered, int row);
 
     // A design line's box: its caret, kept between frames for where a clicked tag goes, and whether one of its
     // stretches has the keyboard this frame.
@@ -92,15 +94,36 @@ namespace headsup
     std::string SyncEntryLabel(const std::vector<int>& targets, int entry, const WindowLayout& layout);
     std::string SyncEntryTip(const std::vector<int>& targets, int entry, const WindowLayout& layout);
 
-    // One entry of the Cursor Style list: one of HeadsUp's own styles, or a file of the cursors folder.
-    struct CursorChoice
+    // One entry of a list of pictures (the Target Cursor's styles, the Cursor Icon): one of HeadsUp's own, or a file of
+    // the cursors folder. Style's last value is File.
+    template <typename Style>
+    struct PictureChoice
     {
-        CursorStyle style = kDefaultCursorStyle;
+        Style style{};
         std::string file; // a File's name
-        bool operator==(const CursorChoice&) const = default;
+        bool operator==(const PictureChoice&) const = default;
     };
-    // The list: HeadsUp's styles, then each file, then the file the settings name when the folder has none such.
-    std::vector<CursorChoice> CursorChoices(const std::vector<std::string>& files, const Settings& settings);
-    // Which entry the settings have picked.
-    int CursorChoiceOf(const std::vector<CursorChoice>& choices, const Settings& settings);
+
+    // The list: HeadsUp's own, then each file, then the file the settings name when the folder has none such.
+    template <typename Style>
+    std::vector<PictureChoice<Style>> PictureChoices(const std::vector<std::string>& files, Style saved, const std::string& savedFile)
+    {
+        std::vector<PictureChoice<Style>> choices;
+        for (int style = 0; style < static_cast<int>(Style::File); ++style)
+            choices.push_back(PictureChoice<Style>{static_cast<Style>(style), {}});
+        for (const std::string& file : files)
+            choices.push_back(PictureChoice<Style>{Style::File, file});
+        const PictureChoice<Style> kept{Style::File, savedFile};
+        if (saved == Style::File && std::ranges::find(choices, kept) == choices.end()) choices.push_back(kept);
+        return choices;
+    }
+
+    // Which entry the settings have picked, which PictureChoices always lists; the first if it ever did not.
+    template <typename Style>
+    int PictureChoiceOf(const std::vector<PictureChoice<Style>>& choices, Style saved, const std::string& savedFile)
+    {
+        const PictureChoice<Style> picked{saved, saved == Style::File ? savedFile : std::string()};
+        const auto at = std::ranges::find(choices, picked);
+        return at != choices.end() ? static_cast<int>(at - choices.begin()) : 0;
+    }
 }

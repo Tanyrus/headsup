@@ -9,6 +9,7 @@
 #include "plate_template.h"
 #include "window_layout.h"
 
+#include <span>
 #include <cstdint>
 #include <cstdio>
 #include <functional>
@@ -56,6 +57,9 @@ namespace headsup
     // The ids of a line box's parts, after the box's own: a stretch of text and a tag, each with its number.
     // Classes the kit writes, the window sets and the stylesheet draws: one name each for the three.
     constexpr const char* kOffClass     = "off";     // a setting of something switched off: not shown
+    constexpr const char* kCompactCheck = "check";       // a toggle among other controls
+    constexpr const char* kWideCheck    = "check wide";  // a row's toggle, nearly as wide as a slider
+    constexpr const char* kCardCheck    = "check card-on"; // a card title's switch, compact
     constexpr const char* kPickedClass  = "picked";  // the chosen one of a row of choices
     constexpr const char* kLineBoxClass = "linebox"; // a design line's box
     constexpr const char* kRunClass     = "run";     // a stretch of text in it
@@ -188,6 +192,9 @@ namespace headsup
             EndRow();
         }
         void SliderInt(const char* label, int& value, int lo, int hi, const char* format, const char* tip);
+        // A number stepped one at a time by the arrows either side of it, for one whose change moves the window under
+        // the pointer, as a slider's would.
+        void Stepper(const char* label, int& value, int lo, int hi, const char* format, const char* tip);
         void SliderFloat(const char* label, float& value, float lo, float hi, const char* format, const char* tip);
         // A slider over a few named steps, the first being 0: it shows the name of the one it is on.
         void SliderNamed(const char* label, int& value, const char* const* names, int count, const char* tip);
@@ -217,7 +224,7 @@ namespace headsup
         void ColorPickRow(const char* label, ColorPick& pick, const std::vector<ColorSource>& sources, const char* tip);
         // When a line shows, as a dropdown of checks: Always, under which every condition reads checked, then each
         // condition.
-        void ChecksDropdown(const char* label, LineShow& show, const std::vector<ShowCondition>& conditions,
+        void ChecksDropdown(const char* label, LineShow& show, std::span<const ShowCondition> conditions,
             const char* tip);
         // An X and a Y to type, side by side.
         void Offset(const char* label, int& x, int& y, int limit, const char* tip);
@@ -315,10 +322,12 @@ namespace headsup
         void TakeWhole(const std::string& slider, int& value, int lo, int hi);
         void Slider(const std::string& slider, const char* label, float value, float lo, float hi, float step,
             const std::string& shown, const char* tip);
-        // A toggle, and its id.
-        std::string Check(const char* id, bool& on, const char* tip);
+        // A toggle, and its id: a row's is wide, one among other controls compact.
+        std::string Check(const char* id, bool& on, const char* tip, const char* classes = kCompactCheck);
         // A button of any markup inside. True when clicked.
         bool Pressable(const std::string& inside, const char* id, const char* classes, const char* tip);
+        // The left (previous) or right (next) arrow beside a control, its id the label's with that word.
+        bool StepArrow(const std::string& label, bool next);
 
         std::vector<FormEvent> m_Events;
         FormState& m_State;

@@ -65,6 +65,7 @@ namespace headsup
     {
         if (m_Overlay != nullptr) Rml::Debugger::Shutdown();
         Rml::Shutdown();
+        m_Render.ReleaseLayers();
         m_Bar     = nullptr;
         m_Overlay = nullptr;
         m_System.reset();

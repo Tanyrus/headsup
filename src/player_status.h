@@ -21,6 +21,7 @@ namespace headsup
         bool newAdventurer = false;
         bool gm            = false;
         bool levelSync     = false;
+        bool anonymous     = false; // the game hides their jobs and levels
         uint32_t linkshellArgb = kWhite;
     };
 
@@ -31,17 +32,19 @@ namespace headsup
         std::optional<PlayerStatus> status; // when the update carries it
     };
 
-    struct LevelSyncUpdate
+    struct CharSyncUpdate
     {
         uint16_t index; // entity target index, yours included
-        bool synced;
+        bool synced;   // the sync icon: 0x10's bit, off in battlefields
+        bool held;     // a cap holds the level, in battlefields too
+        uint8_t level; // the main job's, held to the cap
     };
 
     // Layouts from Phoenix's src/map/packets/char_update.cpp (0x00D), char_status.cpp (0x037) and char_sync.cpp (0x067,
     // which also names other kinds of entity: those give nullopt).
     std::optional<PlayerUpdate> ParseOtherPlayer(const uint8_t* data, uint32_t size);
     std::optional<PlayerStatus> ParseOwnStatus(const uint8_t* data, uint32_t size);
-    std::optional<LevelSyncUpdate> ParseCharSync(const uint8_t* data, uint32_t size);
+    std::optional<CharSyncUpdate> ParseCharSync(const uint8_t* data, uint32_t size);
 
     // The game keeps these for every player, so they show as soon as HeadsUp loads; the bits were matched against the
     // same players' packets in a capture.

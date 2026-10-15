@@ -8,7 +8,7 @@ namespace headsup
     {
         constexpr LabelShade kConShades[kConCount] = {LabelShade::TooWeak, LabelShade::EasyPrey, LabelShade::EasyPrey,
             LabelShade::DecentChallenge, LabelShade::EvenMatch, LabelShade::Tough, LabelShade::VeryTough,
-            LabelShade::VeryTough};
+            LabelShade::IncrediblyTough};
     }
 
     std::string IdText(uint32_t serverId)

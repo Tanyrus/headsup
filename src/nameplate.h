@@ -98,6 +98,15 @@ namespace headsup
     // its names in eightieths, by its depth from the camera, so they change in jumps and as the camera turns): 1 for
     // a distance that is not a number.
     float ScaleAtDistance(float yalms, float minScale, float maxScale);
+    // A plate sized by its own name, yours or any without the scene camera (shadows off): ScaleAtDistance of the
+    // name's yalms from the camera, which its depth gives, so neither the game's steps nor a frame it draws a name at
+    // another size move it; DistanceScale of the name's height where the depth says nothing.
+    float NameScale(float depth, float letterHeight, float screenHeight, float minScale, float maxScale);
+    // How far the camera sits behind you, in yalms, which every other plate adds to its owner's distance from you:
+    // your own name's distance from the camera, which its depth gives and which the game draws every frame, else the
+    // scene camera's distance to your feet; nothing without either. The shadows' camera comes and goes with shadows
+    // off, and the two measures differ, so the name wins whenever it is there.
+    std::optional<float> CameraBehind(float ownNameDepth, const Camera* camera, const WorldPoint& yourFeet);
     // The game steps its name size, by 5% at a time far away; a plate eases toward each step. A plate with no size yet
     // (0) takes the size at once.
     float EaseScale(float shown, float target, double seconds);
@@ -121,6 +130,10 @@ namespace headsup
     int RasterHeight(float pixels, int current);
     // The height text that keeps its size is drawn at: the size in whole pixels, to RasterHeight's tallest.
     int FixedRasterHeight(float pixels);
+    // The height the target cursor's picture is drawn at, shown pixels tall: RasterHeight's (current, the one drawn
+    // now) when it scales with distance, else FixedRasterHeight's, and never below its height setting, so that each
+    // step of its width is a pixel of the picture and none rounds to the width before it.
+    int CursorRaster(float shown, int current, bool scales, int height);
     // Whether an image whose ink is width by height, with halo pixels around it, fits a texture of this side.
     bool FitsTexture(int width, int height, int halo, int side);
     // The height to try so the image fits: raster when the image drawn at it fits, else raster scaled down by what the

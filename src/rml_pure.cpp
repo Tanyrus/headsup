@@ -67,6 +67,39 @@ namespace headsup
             u * shareU, v * shareV};
     }
 
+    uint32_t LayerTint(float opacity)
+    {
+        constexpr float kMax = 255.0f;
+        const auto level     = static_cast<uint32_t>(std::lround(std::clamp(opacity, 0.0f, 1.0f) * kMax));
+        return Argb(static_cast<uint8_t>(level), static_cast<uint8_t>(level), static_cast<uint8_t>(level), static_cast<uint8_t>(level));
+    }
+
+    size_t DrawnDepth(const std::vector<bool>& made, size_t depth)
+    {
+        while (depth > 0 && !made[depth - 1])
+            --depth;
+        return depth;
+    }
+
+    bool ReleaseIdleLayers(int& idleRenders, bool pushed)
+    {
+        idleRenders = pushed ? 0 : idleRenders + 1;
+        return idleRenders == kIdleRendersBeforeRelease;
+    }
+
+    std::array<ScreenVertex, 6> LayerQuad(int width, int height, float shareU, float shareV, uint32_t tint)
+    {
+        const auto corner = [&](float x, float y) {
+            ScreenVertex v = PlacedVertex(x, y, 0, 0, 0, 0, x == 0.0f ? 0.0f : 1.0f, y == 0.0f ? 0.0f : 1.0f, 0.0f, 0.0f, shareU, shareV);
+            v.color        = tint;
+            return v;
+        };
+        const float w = static_cast<float>(width), h = static_cast<float>(height);
+        const ScreenVertex topLeft = corner(0.0f, 0.0f), topRight = corner(w, 0.0f), bottomLeft = corner(0.0f, h),
+                           bottomRight = corner(w, h);
+        return {topLeft, topRight, bottomRight, topLeft, bottomRight, bottomLeft};
+    }
+
     void Transformed(const float* m, float& x, float& y)
     {
         constexpr int kColumn = 4; // floats in a column

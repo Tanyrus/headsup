@@ -359,7 +359,7 @@ helpBarY=8.0000
         s.scaleOwnName      = false;
         s.scaleCursor       = true; // apart from the names': a dropped key would take theirs
         s.cursorStyle = CursorStyle::Vanilla; // the cursor was switched off
-        s.chocoboPointer = true;
+        s.pointerIcon    = PointerIcon::Chocobo;
         s.fixPointer     = false;
         s.smoothness     = 12;
         s.cursorHeight   = 31;
@@ -379,7 +379,7 @@ helpBarY=8.0000
         s.clockServerTime = true; // the file's Server time widget was on
         s.barTargetDetails = true;
         s.menuFont         = "Tahoma";
-        s.menuScale        = 125;
+        s.menuFontSize     = 21; // 125 percent of Ashita's 18 pixels, in Tahoma, which was drawn at 0.95 of its size
         s.windowOffsets    = {WindowOffset{"equip", 10, -20}};
         s.windowGroups     = {WindowGroup{"Bags", 0, 30, true, {"inventor", "iteminfo"}}};
         s.allUnderBar      = true;
@@ -423,7 +423,7 @@ helpBarY=8.0000
 
     // The keys of kSavedFile that only an older build's file carries: a migration reads them, or nothing does, and
     // nothing writes them.
-    const char* const kOldKeys[] = {"untargetedOpacity", "glowOffWhenFighting", "thickness", "cursorSize", "cursorOutline", "replaceCursor", "cursorFeather", "barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
+    const char* const kOldKeys[] = {"menuScale", "chocoboPointer", "untargetedOpacity", "glowOffWhenFighting", "thickness", "cursorSize", "cursorOutline", "replaceCursor", "cursorFeather", "barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
         "serverClockZone", "showLabels", "replaceMobNames", "showIcons", "hideInCombat", "hideClaimed", "hideTooWeak",
         "hideWhileEngaged", "markPlaceholders", "fontBold", "nameGlow", "scalePlayerNames",
         "labelFontBold", "showOrnament", "ownGlowColor", "ownOrnamentColor", "labelFontName", "glowSize",
@@ -489,6 +489,18 @@ TEST(players_and_npcs_take_the_mob_name_font_from_a_file_saved_before_they_had_t
     const Settings s = LoadSettings(old);
     for (const PlateKind kind : {PlateKind::Players, PlateKind::Self, PlateKind::Npcs})
         CHECK(s.Kind(kind).lines[2].font == "Georgia" && s.Kind(kind).lines[2].style == StyleBit(FontStyle::Bold));
+}
+
+TEST(a_file_from_before_incredibly_tough_had_its_own_color_gains_no_key_for_it)
+{
+    // No build ever wrote labelIncrediblyTough: a typed read of it would add it to a version 2 file for nothing.
+    MapStore file     = Parse(kSavedFile);
+    file.addsDefaults = true;
+    const Settings s  = LoadSettings(file);
+    for (const char* channel : {"R", "G", "B"})
+        CHECK(!file.values.contains(std::string("labelIncrediblyTough") + channel));
+    const int deep = static_cast<int>(LabelShade::IncrediblyTough);
+    CHECK(s.palette.toughness[deep] == Settings{}.palette.toughness[deep]);
 }
 
 TEST(a_saved_file_loads_every_setting_and_saves_back_the_same)
@@ -1019,10 +1031,35 @@ TEST(a_menu_font_the_list_lacks_or_a_size_past_its_ends_keeps_the_defaults)
 {
     MapStore store;
     store.values["menuFont"]  = "Comic Sans";
-    store.values["menuScale"] = "400";
-    const Settings s          = LoadSettings(store);
-    CHECK(s.menuFont == kDefaultMenuFont && s.menuScale == kMaxMenuScale);
+    store.values["menuFontSize"] = "400";
+    const Settings s             = LoadSettings(store);
+    CHECK(s.menuFont == kDefaultMenuFont && s.menuFontSize == kMaxMenuFontSize);
     CHECK(MenuFontNamed("Segoe UI") != nullptr && MenuFontNamed("Barlow Condensed")->file == nullptr);
+}
+
+TEST(the_windows_font_size_is_pixels_and_an_old_percent_becomes_the_pixels_it_drew)
+{
+    // A percent of Ashita's own font size, 18 pixels, times the font's own scale for faces that run small.
+    const auto loaded = [](std::initializer_list<std::pair<const char*, const char*>> keys) {
+        MapStore file = ReleaseFile(keys);
+        return LoadSettings(file).menuFontSize;
+    };
+    CHECK_EQ(loaded({{"menuFont", "Segoe UI"}, {"menuScale", "125.0000"}}), 23);
+    CHECK_EQ(loaded({{"menuFont", "Barlow Condensed"}, {"menuScale", "125.0000"}}), 26);
+    CHECK_EQ(loaded({{"menuFont", "Segoe UI"}, {"menuScale", "100.0000"}}), 18);
+    // A percent edited past the old range was drawn at its end: 160 percent, 28.8 pixels.
+    CHECK_EQ(loaded({{"menuFont", "Segoe UI"}, {"menuScale", "400.0000"}}), 29);
+    CHECK_EQ(loaded({{"menuFont", "Segoe UI"}, {"menuScale", "10.0000"}}), 13); // 70 percent
+    // Its own key wins, and the percent is never written again.
+    CHECK_EQ(loaded({{"menuScale", "150.0000"}, {"menuFontSize", "20.0000"}}), 20);
+    MapStore fresh; // a new install has no percent to convert
+    CHECK_EQ(LoadSettings(fresh).menuFontSize, Settings{}.menuFontSize);
+    Settings s;
+    s.menuFontSize = 30;
+    MapStore file  = OwnFileWith(s, {{"menuScale", "80.0000"}});
+    CHECK_EQ(LoadSettings(file).menuFontSize, 30);
+    SaveSettings(s, file);
+    CHECK(std::ranges::find(file.sets, "menuScale") == file.sets.end());
 }
 
 TEST(the_window_defaults_set_every_window_under_the_bar_or_leave_them_all_to_the_game)
@@ -1097,6 +1134,27 @@ TEST(an_entity_types_color_is_saved_under_its_own_name)
     CHECK_EQ(p.type[static_cast<int>(TargetType::Player)].v[2], 0.75f);
 }
 
+TEST(incredibly_tough_has_a_color_of_its_own_which_a_file_without_it_takes_from_the_defaults)
+{
+    const Palette defaults = Settings{}.palette;
+    const Color& deep = defaults.toughness[static_cast<int>(LabelShade::IncrediblyTough)];
+    const Color& very = defaults.toughness[static_cast<int>(LabelShade::VeryTough)];
+    // Deep red: red alone, darker than Very Tough's.
+    CHECK(deep.v[0] > 4 * deep.v[1] && deep.v[0] > 4 * deep.v[2] && deep.v[0] < very.v[0]);
+    Settings s;
+    s.palette.toughness[static_cast<int>(LabelShade::VeryTough)] = {{0.25f, 0.5f, 0.75f}};
+    MapStore file;
+    SaveSettings(s, file);
+    CHECK(file.values.contains("paletteToughnessIncrediblyToughR"));
+    for (const char* key : {"paletteToughnessIncrediblyToughR", "paletteToughnessIncrediblyToughG", "paletteToughnessIncrediblyToughB"})
+        file.values.erase(key);
+    const Palette loaded = LoadSettings(file).palette;
+    CHECK(loaded.toughness[static_cast<int>(LabelShade::IncrediblyTough)] == deep);
+    CHECK(loaded.toughness[static_cast<int>(LabelShade::VeryTough)] == (Color{{0.25f, 0.5f, 0.75f}}));
+    MapStore release = ReleaseFile();
+    CHECK(LoadSettings(release).palette.toughness[static_cast<int>(LabelShade::IncrediblyTough)] == deep);
+}
+
 TEST(every_designer_key_round_trips)
 {
     Settings s;
@@ -1140,6 +1198,8 @@ TEST(every_designer_key_round_trips)
     s.cursorStyle     = CursorStyle::File;
     s.cursorFile      = "My Cursor";
     s.dashMark        = DashMark::Square;
+    s.pointerIcon     = PointerIcon::File;
+    s.pointerFile     = "Gold Arrow";
     MapStore store;
     SaveSettings(s, store);
     CHECK(LoadSettings(store) == s);
@@ -2038,6 +2098,37 @@ TEST(a_cursor_file_is_a_name_and_never_a_path)
     CHECK(LoadSettings(file).dashMark == DashMark::None);
 }
 
+TEST(the_mouse_pointer_is_one_icon_and_the_chocobo_switch_of_before_picks_the_chocobo)
+{
+    const auto loaded = [](std::initializer_list<std::pair<const char*, const char*>> keys) {
+        MapStore file = ReleaseFile(keys);
+        return LoadSettings(file);
+    };
+    CHECK(loaded({{"chocoboPointer", "true"}}).pointerIcon == PointerIcon::Chocobo);
+    CHECK(loaded({{"chocoboPointer", "false"}}).pointerIcon == PointerIcon::Vanilla);
+    MapStore fresh;
+    CHECK(LoadSettings(fresh).pointerIcon == PointerIcon::Vanilla);
+    // The key of its own wins over the switch of before.
+    const Settings file = loaded({{"chocoboPointer", "true"}, {"pointerIcon", "file"}, {"pointerFile", "sword"}});
+    CHECK(file.pointerIcon == PointerIcon::File && file.pointerFile == "sword");
+    CHECK(loaded({{"chocoboPointer", "true"}, {"pointerIcon", "vanilla"}}).pointerIcon == PointerIcon::Vanilla);
+    // A file that cannot be in the folder is no pick: the game's own pointer.
+    Settings wild;
+    wild.pointerIcon = PointerIcon::File;
+    wild.pointerFile = "..\\outside";
+    CHECK(Clamp(wild).pointerIcon == PointerIcon::Vanilla && Clamp(wild).pointerFile.empty());
+    wild.pointerIcon = static_cast<PointerIcon>(9);
+    CHECK(Clamp(wild).pointerIcon == PointerIcon::Vanilla);
+    // The switch of before is never written again.
+    Settings chocobo;
+    chocobo.pointerIcon = PointerIcon::Chocobo;
+    MapStore saved      = OwnFileWith(chocobo, {{"chocoboPointer", "false"}});
+    CHECK(LoadSettings(saved) == chocobo);
+    SaveSettings(chocobo, saved);
+    CHECK(std::ranges::find(saved.sets, "chocoboPointer") == saved.sets.end());
+    CHECK_EQ(saved.values.at("pointerIcon"), "chocobo");
+}
+
 TEST(a_cursor_saved_as_one_size_keeps_its_shape_and_its_edge)
 {
     // The cursor had a height and took its width from its shape. It has both now, and its edge's 100 percent is
@@ -2249,6 +2340,14 @@ TEST(a_lines_conditions_are_the_ones_its_kind_offers)
     CHECK(c.Kind(PlateKind::Pets).lines[1].show == (LineShow{false, ConditionBit(ShowCondition::Targeted)}));
     CHECK(c.Kind(PlateKind::Players).lines[2].show == (LineShow{false, ConditionBit(ShowCondition::Friend)}));
     CHECK(c.Kind(PlateKind::Mobs).lines[2].show == (LineShow{false, ConditionBit(ShowCondition::Passive)}));
+    // Every kind's lines offer Generally, and it is saved with the rest.
+    for (int kind = 0; kind < kPlateKindCount; ++kind)
+        s.Kind(static_cast<PlateKind>(kind)).lines[0].show = LineShow{false, ConditionBit(ShowCondition::Generally)};
+    MapStore store;
+    SaveSettings(Clamp(s), store);
+    const Settings loaded = LoadSettings(store);
+    for (int kind = 0; kind < kPlateKindCount; ++kind)
+        CHECK(loaded.Kind(static_cast<PlateKind>(kind)).lines[0].show == (LineShow{false, ConditionBit(ShowCondition::Generally)}));
 }
 
 TEST(a_font_name_of_31_characters_is_kept_and_one_of_32_refused)

@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -22,6 +23,7 @@ namespace headsup
         int level    = 0;     // main job level; 0 while unknown (zoning, logging in)
         bool sitting = false; // resting, /sit or a chair: Phoenix lets Too Weak aggressive mobs aggro then
         bool inEvent = false; // a cutscene or an NPC's dialog is running
+        bool inCombat = false; // PlayerInCombat
     };
 
     // Phoenix's CZoneEntities::tapMobAggro with its mob data. checkedLevel is the level a /check reported for this
@@ -90,6 +92,9 @@ namespace headsup
     bool IsClaimed(uint32_t claimStatus);
     // Held by you or a member of your party or alliance.
     bool ClaimedByParty(uint32_t claimStatus, const std::vector<uint32_t>& partyServerIds);
+
+    // Your weapon is out, or a living mob is claimed by you or your party, as the game's party battle music has it.
+    bool PlayerInCombat(std::span<const ActorInput> actors);
 
     // Every entity's actor pointer, name and state, and each mob's level and outline, as of the last Update.
     class Tracker

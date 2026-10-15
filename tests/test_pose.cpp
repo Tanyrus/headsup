@@ -31,6 +31,21 @@ TEST(a_camera_no_draw_gives_any_more_stops_counting)
     CHECK(!CameraStillSeen(90000, 500));
 }
 
+TEST(a_camera_counts_for_seated_names_once_it_has_stayed)
+{
+    // A live client with shadows off had cameras from other draws for 9 to 42 frames at a time: none of those moves
+    // a seated name, while a client that draws shadows has one every frame and lowers them after three seconds.
+    uint32_t run = 0;
+    for (int frame = 0; frame < 42; ++frame)
+        run = CameraRun(run, true);
+    CHECK(!CameraSteady(run));
+    run = CameraRun(run, false);
+    CHECK_EQ(run, 0u);
+    for (int frame = 0; frame < 90; ++frame)
+        run = CameraRun(run, true);
+    CHECK(CameraSteady(run));
+}
+
 TEST(statuses_give_the_pose)
 {
     CHECK(PoseFromStatus(0) == Pose::Standing);

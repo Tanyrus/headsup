@@ -14,7 +14,8 @@ namespace headsup
     constexpr float kCardPad        = 0.9f;  // a card's content from its edges
     constexpr float kCardRadius     = 0.6f;
     constexpr float kRadius         = 0.4f;  // controls
-    constexpr float kToggleWidth    = 3.2f;  // a yes or no: a track twice as wide as it is tall, and its knob
+    constexpr float kToggleWidth    = 3.2f;  // a yes or no among other controls: a track twice as wide as it is tall
+    constexpr float kSwitchWidth    = 13.0f; // a row's yes or no: a little narrower than a slider
     constexpr float kToggleHeight   = 1.4f;
     constexpr float kSegmentWidth   = 4.6f;
     constexpr float kControlWidth   = 15.0f; // sliders and dropdowns

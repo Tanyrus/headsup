@@ -24,14 +24,13 @@ opens them at a page, such as `/hu menu entities`, `/hu menu mobs` or `/hu menu 
 ## Settings
 
 `/hu` opens the settings window. `/hu menu <page>` opens it at a page: `entities`, `mobs`, `players`, `self`, `npcs`,
-`pets`, `userinterface`, `toppanel`, `widgets`, `mousecursor`, `configmenu` or `debug`. The pages, in the order of the window's list:
+`pets`, `userinterface`, `toppanel`, `widgets`, `mousecursor` or `configmenu`. The pages, in the order of the window's list:
 
 | Page | Holds |
 |---|---|
 | Entities | What every kind shares: the Nameplates card, the outline style, the target cursor and the five color palettes. Under it, a page for each kind: Mobs, Players, Self, NPCs and Pets |
 | User Interface | Screenshot mode and the Window Groups and Game Windows cards, which move the game's windows. Under it, the Top Panel, Widgets and Mouse Cursor pages |
-| Config Menu | The settings window's own theme, font, size and opacity, and the button that puts every setting back to its default |
-| Debug | Switches HeadsUp off as a whole, and writes a report for bug reports |
+| HeadsUp Config | Switches HeadsUp off as a whole, writes a report for bug reports, sets the settings window's own theme, font, size and opacity, and holds the button that puts every setting back to its default |
 
 A switch is a toggle. Settings that belong to something switched off are not shown until it is on, and every option of
 a dropdown says what it does when the pointer is over it.
@@ -178,10 +177,11 @@ The Nameplates card, on the Entities page, sets what every nameplate shares:
 
 - **Base Font Size, Default Font and Base Icon Size:** what the lines' percents are of, and any font installed in Windows
 - **Auto-Check:** HeadsUp checks each mob that comes near by itself, so its exact level and difficulty show without a
-  `/check`, and keeps the check's line out of the chat log. Players are never checked: the server tells a player who
-  examined them
-- **Replace Dashes (-):** draws each dash typed in a nameplate, and the one in a level range such as 20-23, as a dot,
-  a square or a diamond. A name's own dash stays
+  `/check`, and keeps the check's line out of the chat log. Players are never checked, as the server tells a player who
+  examined them: a player's level is read from what the server already sends about them, and an anonymous player
+  shows none
+- **Replace Dashes (-):** draws each dash typed in a nameplate's design as a dot, a square or a diamond. The dashes
+  HeadsUp writes itself, as in a level range such as 20-23, and a name's own dash stay
 - **Scale with Distance:** names grow and shrink with distance between a Min Size and a Max Size; with Scale Your Own
   Name off, your own nameplate stays one size
 - **Vertical Offset and Stack Names:** how far over the game's own spot names sit, and whether names that would cover
@@ -243,9 +243,9 @@ During cutscenes and NPC dialogs the top panel hides itself and every nameplate 
 
 ## Mouse pointer
 
-The Mouse Cursor page puts PlayOnline's chocobo back as your mouse pointer, the one the PlayOnline Viewer had. It also
-holds a fix for the game's pointer after a resize and over Ashita's windows, and the keys that do not make the game hide
-its pointer.
+The Mouse Cursor page's Cursor Icon puts PlayOnline's chocobo back as your mouse pointer, the one the PlayOnline Viewer
+had, or any `.cur` or `.ani` file you put in `config/headsup/cursors`. It also holds a fix for the game's pointer after a
+resize and over Ashita's windows, and the keys that do not make the game hide its pointer.
 
 ## Top panel
 
