@@ -12,8 +12,9 @@ using namespace headsup;
 
 namespace
 {
-    // The client's window list as its draw loop walks it (RVA 0x15F6E8 in the client of 2026-10-13): the list object's
-    // first dword is the first link; a link holds the next at +0, its window's record at +0x10 and a skip byte at +0x14.
+    // The client's window list as its draw loop walks it (RVA 0x15F6E8 in the client of 2026-10-13): the list
+    // object's first dword is the first link; a link holds the next at +0, its window's record at +0x10 and a skip
+    // byte at +0x14.
     // A record holds its descriptor at +0x04 (the 16-byte name at +0x46), its type at +0x10 (0x0E hidden) and its
     // rectangle as four int16 from +0x3A.
     constexpr uint32_t kList = 0x036E1838, kLinkBytes = 0x18, kRecordBytes = 0xA0, kDescriptorBytes = 0x58;
@@ -163,6 +164,9 @@ TEST(a_frame_s_top_is_its_highest_shown_window_that_hangs_from_the_top_and_is_no
     const std::vector<FrameWindow> bottomOnly = {{Key("helpwind"), 16, false}, {Key("iteminfo"), 992, false},
         {Key("logwindo"), 1058, false}};
     CHECK(!FrameTop(bottomOnly, kScreenBottom).has_value());
+    // The map's corner frame, 106 x 14 at the screen's corner, draws nothing: the map's own windows are the top.
+    const std::vector<FrameWindow> map = {{Key("buff"), 48, false}, {Key("mapframe"), 0, false}, {Key("map0"), 48, false}};
+    CHECK(FrameTop(map, kScreenBottom) == std::optional<int>(48));
 }
 
 TEST(a_frame_goes_down_or_up_by_its_view_s_shift_and_no_overlap_pushes_it_down_only)
@@ -175,4 +179,45 @@ TEST(a_frame_goes_down_or_up_by_its_view_s_shift_and_no_overlap_pushes_it_down_o
     CHECK(FrameShift(16, 20, 62, 62, true) == 46);    // pushed clear of the band
     CHECK(FrameShift(48, std::nullopt, 62, 80, true) == 32); // the bar grew past where the views were placed
     CHECK(FrameShift(48, std::nullopt, 62, 30, true) == 14); // and a smaller bar leaves them where they are
+}
+
+TEST(view_shifts_read_back_what_they_wrote_and_drop_what_no_view_could_take)
+{
+    const std::vector<ViewShift> shifts = {{"status", 20}, {"status/profile", -6}};
+    CHECK(ViewShiftsFrom(ViewShiftsText(shifts), kViews) == shifts);
+    CHECK(ViewShiftsText(shifts) == "status:20|status/profile:-6");
+    const std::vector<ViewShift> read = ViewShiftsFrom("status:20|nowhere:5|status:9|rest:x|rest:99999", kViews);
+    CHECK((read == std::vector<ViewShift>{{"status", 20}, {"rest", kMaxWindowOffset}}));
+    CHECK(ViewShiftsFrom("", kViews).empty());
+}
+
+TEST(the_help_is_on_while_the_panel_shows_it_or_the_game_s_own_strip_is_not_hidden)
+{
+    CHECK(ModeOf(true, true) == HelpMode::On);   // the panel's help line, the game's strip hidden
+    CHECK(ModeOf(false, false) == HelpMode::On); // the game's strip, moved under the panel or where the game put it
+    CHECK(ModeOf(false, true) == HelpMode::Off); // neither
+}
+
+TEST(the_views_shipped_are_named_once_each_and_the_reference_places_clear_their_bands)
+{
+    const std::span<const WindowView> views = WindowViews();
+    CHECK(!views.empty());
+    for (size_t a = 0; a < views.size(); ++a)
+    {
+        CHECK(!views[a].windows.empty());
+        for (size_t b = a + 1; b < views.size(); ++b)
+            CHECK(views[a].id != views[b].id);
+    }
+    CHECK(ReferenceBand(HelpMode::On) > ReferenceBand(HelpMode::Off) && ReferenceBand(HelpMode::Off) > 0);
+}
+
+TEST(the_game_s_strip_moved_goes_right_under_the_panel_and_the_windows_under_it_and_left_it_is_cleared)
+{
+    const StripRows strip{16, 46}; // the help and title windows as the game puts them
+    CHECK((PlaceStrip(38, std::nullopt, true, 3) == StripPlace{0, 38})); // hidden: the panel's band alone
+    CHECK((PlaceStrip(38, strip, false, 3) == StripPlace{0, 49}));       // left where it is, half under the panel
+    CHECK((PlaceStrip(62, strip, false, 3) == StripPlace{0, 62}));       // the panel's help line reaches further
+    CHECK((PlaceStrip(38, strip, true, 3) == StripPlace{22, 71}));       // moved: right under the panel
+    CHECK((PlaceStrip(62, strip, true, 3) == StripPlace{46, 95}));       // and under its help line too
+    CHECK((PlaceStrip(0, strip, true, 3) == StripPlace{0, 0}));          // the panel off: nothing goes anywhere
 }

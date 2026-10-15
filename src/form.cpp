@@ -478,20 +478,23 @@ namespace headsup
     void Form::Swatch(const char* label, Color& color, const char* tip, const Color* original)
     {
         Row(label, tip);
-        if (original != nullptr)
+        if (original != nullptr && ResetAt((std::string(label) + " reset").c_str(), color != *original))
         {
-            const std::string reset = Id(std::string(label) + " reset");
-            if (!m_Off && Clicked(reset) && color != *original)
-            {
-                color   = *original;
-                changed = true;
-            }
-            // In the markup either way, hidden while there is nothing to put back: a color changed builds nothing.
-            Out() += "<div class=\"reset\" id=\"" + reset + "\" tip=\"Back to its default.\"></div>";
-            Set(reset, FormValueKind::Class, kHiddenClass, {}, color == *original);
+            color   = *original;
+            changed = true;
         }
         SwatchAt(label, color);
         EndRow();
+    }
+
+    bool Form::ResetAt(const char* id, bool differs)
+    {
+        const std::string reset = Id(id);
+        const bool clicked      = !m_Off && differs && Clicked(reset);
+        // In the markup either way, hidden while there is nothing to put back: a value changed builds nothing.
+        Out() += "<div class=\"reset\" id=\"" + reset + "\" tip=\"Back to its default.\"></div>";
+        Set(reset, FormValueKind::Class, kHiddenClass, {}, !differs || clicked);
+        return clicked;
     }
 
     void Form::ColorPickRow(const char* label, ColorPick& pick, const std::vector<ColorSource>& sources, const char* tip)

@@ -692,12 +692,6 @@ TEST(every_switch_of_every_page_flips_a_setting_of_its_own_and_flips_it_back)
 {
     // Not settings: what the window itself is showing.
     const std::vector<std::string> windowsOwn{"userinterface-game-windows-all-windows"};
-    // The windows moved under the panel are a set: one taken out and put back stands last in the list.
-    const auto same = [](Settings a, Settings b) {
-        std::ranges::sort(a.movedWindows);
-        std::ranges::sort(b.movedWindows);
-        return a == b;
-    };
     for (const LayoutPage& info : kWindowLayout.pages)
     {
         Window window;
@@ -717,7 +711,7 @@ TEST(every_switch_of_every_page_flips_a_setting_of_its_own_and_flips_it_back)
             flipped.emplace_back(id, window.settings);
             if (!window.Shows(id)) continue; // it switched off what it stands in
             window.Click(id);
-            if (!same(window.settings, fresh)) throw test::Failure{"the switch " + id + " does not flip back"};
+            if (window.settings != fresh) throw test::Failure{"the switch " + id + " does not flip back"};
         }
         for (size_t a = 0; a < flipped.size(); ++a)
             for (size_t b = a + 1; b < flipped.size(); ++b)
@@ -851,9 +845,10 @@ TEST(every_dropdown_slider_row_of_choices_and_number_of_every_page_and_tab_sets_
             }
         }
     }
-    // Keys that hold many settings in one value, each window's offsets or each section's widgets: two controls
-    // of these are the same setting only when they write the same value.
-    const std::vector<std::string> lists{"windowOffsets", "barLeft", "barCenter", "barRight"};
+    // Keys that hold many settings in one value, each window's offsets, each view's shift or each section's widgets:
+    // two controls of these are the same setting only when they write the same value.
+    const std::vector<std::string> lists{"windowOffsets", "viewShiftsHelpOn", "viewShiftsHelpOff", "barLeft", "barCenter",
+        "barRight"};
     const auto same = [&](const std::map<std::string, std::string>& a, const std::map<std::string, std::string>& b) {
         if (!std::ranges::equal(a, b, {}, &std::pair<const std::string, std::string>::first,
                 &std::pair<const std::string, std::string>::first))

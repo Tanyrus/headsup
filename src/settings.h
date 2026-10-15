@@ -15,6 +15,7 @@
 #include "native_locate.h"
 #include "outline_math.h"
 #include "plate_settings.h"
+#include "window_views.h"
 
 #include <array>
 #include <cstddef>
@@ -96,8 +97,11 @@ namespace headsup
         int barCurrency = kGilCurrency; // the Gil widget's, by kCurrencyTable
         std::optional<ClockZone> clockZone;           // the Clock widget's; none for the computer's own
         std::vector<WindowOffset> windowOffsets; // each game window's move from where the game puts it
-        std::vector<WindowGroup> windowGroups;   // windows moved together
-        bool allUnderBar  = false; // every game window opening in the screen's upper half goes under the bar
+        bool moveWindows  = true;  // the game's windows that hang from the top go under the panel, a view at a time
+        bool keepClear    = true;  // and none is left under it, whatever a view's shift says
+        // By HelpMode: where a view's highest window goes, in the game's menu pixels, and the player's own shifts.
+        std::array<int, kHelpModes> placedUnder = {ReferenceBand(HelpMode::Off), ReferenceBand(HelpMode::On)};
+        std::array<std::vector<ViewShift>, kHelpModes> viewShifts;
         bool moveGameHelp = false; // the game's own help bar goes under the top bar, and the windows under it
         int helpBarX = 0, helpBarY = 0;          // back-buffer pixels from the help bar's place under the top bar
         bool helpBarBackground = true;           // off, the help text alone
@@ -124,8 +128,6 @@ namespace headsup
         bool hideNetstat = false; // and its connection readout (S, R and %) at the top right
         int screenshotKey        = 0;    // the virtual-key code that turns screenshot mode on and off, 0 for none
         bool screenshotHidesGame = true; // screenshot mode takes the game's own windows and chat too
-        // The game's windows moved out from under Game help's bar, by short name (native_locate.h's ShortName).
-        std::vector<std::string> movedWindows = DefaultMovedWindows();
         bool phTimers          = false; // above your name, a respawn timer for each placeholder or NM that dies near you
         bool scaleWithDistance = true;  // sizes follow how far a name's owner is from you
         bool scaleOwnName      = true;  // your own plate too
@@ -167,14 +169,20 @@ namespace headsup
     };
 
     bool NameplatesOn(const Settings& s);
-    // How game windows move: HeadsUp's way, every window under the bar in the groups the game opens them in, or the
-    // game's, where it puts them. Each clears the windows' own offsets.
+    // How game windows move: HeadsUp's way, every view under the panel at its reference place with nothing of the
+    // player's, or the game's, where it puts them. Each clears the windows' own offsets.
     void UseHeadsUpWindowDefaults(Settings& s);
     void UseGameWindowDefaults(Settings& s);
-    // HeadsUp's help text in place of the game's help bar, which is hidden, and every window under it as the HeadsUp
-    // defaults have them.
+    // HeadsUp's help text in place of the game's help bar, which is hidden, and the windows as the HeadsUp defaults
+    // have them.
     void UseHelpTextDefaults(Settings& s);
     bool BarOn(const Settings& s);
+    // Whether the game's help shows under the panel, for the windows: the panel's help line or the game's own strip.
+    HelpMode WindowHelpMode(const Settings& s);
+    // Places every view under the band of now (in the game's menu pixels; 0 while the panel is off): band for the
+    // mode the help is in, and barOnly, the panel's own, for the mode without help. The player's shifts for each mode
+    // placed go.
+    void AutoAdjustWindows(Settings& s, int band, int barOnly);
     // IPlayer::GetLoginStatus() once the character is in the world; 0 and 1 are the title screen and character select.
     inline constexpr uint8_t kLoginInGame = 2;
     // The bar's settings are on and the character is in game.

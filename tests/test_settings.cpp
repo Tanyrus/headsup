@@ -381,8 +381,6 @@ helpBarY=8.0000
         s.menuFont         = "Tahoma";
         s.menuFontSize     = 21; // 125 percent of Ashita's 18 pixels, in Tahoma, which was drawn at 0.95 of its size
         s.windowOffsets    = {WindowOffset{"equip", 10, -20}};
-        s.windowGroups     = {WindowGroup{"Bags", 0, 30, true, {"inventor", "iteminfo"}}};
-        s.allUnderBar      = true;
         s.moveGameHelp     = true;
         s.helpBarBackground = false;
         s.helpBarX         = 12;
@@ -405,7 +403,6 @@ helpBarY=8.0000
         s.hideNetstat  = true;
         s.screenshotKey       = 0x79; // F10
         s.screenshotHidesGame = false;
-        s.movedWindows = {"equip", "levmerit"};
         for (int w = 0; w < kBarWidgetCount; ++w)
             s.barWidgets[w] = !kBarWidgetDefaults[w];
         s.barSections = DefaultPlacement();
@@ -423,7 +420,7 @@ helpBarY=8.0000
 
     // The keys of kSavedFile that only an older build's file carries: a migration reads them, or nothing does, and
     // nothing writes them.
-    const char* const kOldKeys[] = {"menuScale", "chocoboPointer", "untargetedOpacity", "glowOffWhenFighting", "thickness", "cursorSize", "cursorOutline", "replaceCursor", "cursorFeather", "barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
+    const char* const kOldKeys[] = {"movedWindows", "windowGroups", "allUnderBar", "menuScale", "chocoboPointer", "untargetedOpacity", "glowOffWhenFighting", "thickness", "cursorSize", "cursorOutline", "replaceCursor", "cursorFeather", "barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
         "serverClockZone", "showLabels", "replaceMobNames", "showIcons", "hideInCombat", "hideClaimed", "hideTooWeak",
         "hideWhileEngaged", "markPlaceholders", "fontBold", "nameGlow", "scalePlayerNames",
         "labelFontBold", "showOrnament", "ownGlowColor", "ownOrnamentColor", "labelFontName", "glowSize",
@@ -840,13 +837,68 @@ TEST(a_file_from_before_the_badge_group_takes_its_defaults)
     CHECK(s.weakBadgeColor == Settings{}.weakBadgeColor && s.immuneBadgeColor == Settings{}.immuneBadgeColor);
 }
 
-TEST(a_file_from_before_windows_moved_moves_the_equipment_group_and_an_empty_list_moves_none)
+TEST(the_window_placement_saves_and_loads_back_its_switches_places_and_each_modes_shifts)
 {
-    MapStore old;
-    CHECK(LoadSettings(old).movedWindows == DefaultMovedWindows());
-    MapStore none;
-    none.values["movedWindows"] = "";
-    CHECK(LoadSettings(none).movedWindows.empty());
+    const std::string_view first = WindowViews()[0].id, second = WindowViews()[1].id;
+    Settings s;
+    s.moveWindows = false;
+    s.keepClear   = false;
+    s.placedUnder = {30, 70};
+    s.viewShifts[static_cast<int>(HelpMode::On)]  = {ViewShift{std::string(first), 20}};
+    s.viewShifts[static_cast<int>(HelpMode::Off)] = {
+        ViewShift{std::string(second), -6}, ViewShift{std::string(first), 3}};
+    MapStore file;
+    SaveSettings(s, file);
+    CHECK(LoadSettings(file) == s);
+    file.values["viewShiftsHelpOn"]   = "nowhere:4|" + std::string(first) + ":5000";
+    file.values["placedUnderHelpOff"] = "99999.0000";
+    const Settings read = LoadSettings(file);
+    const std::vector<ViewShift> clamped = {{std::string(first), kMaxWindowOffset}};
+    CHECK(read.viewShifts[static_cast<int>(HelpMode::On)] == clamped);
+    CHECK_EQ(read.placedUnder[static_cast<int>(HelpMode::Off)], kMaxWindowOffset);
+}
+
+TEST(the_windows_help_mode_follows_the_panels_help_line_and_the_games_own_strip)
+{
+    Settings s;
+    s.barWidgets[static_cast<int>(BarWidget::GameHelp)] = true;
+    s.hideHelpBar = true;
+    CHECK(WindowHelpMode(s) == HelpMode::On);
+    s.showBar = false; // no panel, no help line on it
+    CHECK(WindowHelpMode(s) == HelpMode::Off);
+    s.hideHelpBar = false;
+    CHECK(WindowHelpMode(s) == HelpMode::On);
+}
+
+TEST(auto_adjust_places_the_views_under_the_band_of_now_and_drops_the_players_shifts_for_it)
+{
+    Settings s;
+    s.barWidgets[static_cast<int>(BarWidget::GameHelp)] = true;
+    s.hideHelpBar = true;
+    const std::string id(WindowViews()[0].id);
+    s.viewShifts = {std::vector<ViewShift>{{id, 4}}, std::vector<ViewShift>{{id, 9}}};
+    AutoAdjustWindows(s, 80, 50); // a taller panel: its help line ends at 80, the panel itself at 50
+    CHECK(s.placedUnder[static_cast<int>(HelpMode::On)] == 80 && s.placedUnder[static_cast<int>(HelpMode::Off)] == 50);
+    CHECK(s.viewShifts[0].empty() && s.viewShifts[1].empty());
+    s.hideHelpBar = false;
+    s.barWidgets[static_cast<int>(BarWidget::GameHelp)] = false;
+    s.viewShifts[static_cast<int>(HelpMode::Off)] = {{id, 2}};
+    AutoAdjustWindows(s, 71, 38); // the game's own strip moved under the panel, under which the windows go
+    CHECK(s.placedUnder[static_cast<int>(HelpMode::On)] == 71 && s.placedUnder[static_cast<int>(HelpMode::Off)] == 38);
+    CHECK(s.viewShifts[static_cast<int>(HelpMode::Off)].empty());
+    const Settings before = s;
+    AutoAdjustWindows(s, 0, 0); // the panel off: nothing to place under
+    CHECK(s == before);
+}
+
+TEST(a_new_install_places_the_windows_under_the_panel_at_its_reference_band_and_keeps_them_clear)
+{
+    MapStore fresh;
+    const Settings s = LoadSettings(fresh);
+    CHECK(s.moveWindows && s.keepClear);
+    CHECK_EQ(s.placedUnder[static_cast<int>(HelpMode::On)], ReferenceBand(HelpMode::On));
+    CHECK_EQ(s.placedUnder[static_cast<int>(HelpMode::Off)], ReferenceBand(HelpMode::Off));
+    CHECK(s.viewShifts[0].empty() && s.viewShifts[1].empty());
 }
 
 TEST(a_theme_that_is_not_one_keeps_the_default_and_old_files_get_the_bar)
@@ -1062,19 +1114,25 @@ TEST(the_windows_font_size_is_pixels_and_an_old_percent_becomes_the_pixels_it_dr
     CHECK(std::ranges::find(file.sets, "menuScale") == file.sets.end());
 }
 
-TEST(the_window_defaults_set_every_window_under_the_bar_or_leave_them_all_to_the_game)
+TEST(the_window_defaults_place_every_view_by_headsups_defaults_or_leave_them_all_to_the_game)
 {
     Settings s;
     s.windowOffsets = {WindowOffset{"equip", 10, -20}};
+    s.viewShifts[static_cast<int>(HelpMode::On)] = {ViewShift{std::string(WindowViews()[0].id), 20}};
+    s.placedUnder = {1, 2};
+    s.keepClear   = false;
+    s.moveWindows = false;
     UseHeadsUpWindowDefaults(s);
-    CHECK(s.allUnderBar && s.moveGameHelp && s.windowOffsets.empty() && s.windowGroups == DefaultWindowGroups());
-    CHECK(s.movedWindows == DefaultMovedWindows());
+    CHECK(s.moveWindows && s.keepClear && s.windowOffsets.empty() && s.viewShifts == Settings{}.viewShifts);
+    CHECK(s.placedUnder == Settings{}.placedUnder);
+    s.windowOffsets = {WindowOffset{"equip", 10, -20}};
+    s.moveGameHelp  = true;
     UseGameWindowDefaults(s);
-    CHECK(!s.allUnderBar && !s.moveGameHelp && s.movedWindows.empty() && s.windowGroups.empty());
+    CHECK(!s.moveWindows && !s.moveGameHelp && s.windowOffsets.empty());
     s.hideHelpBar = false;
     s.barWidgets[static_cast<int>(BarWidget::GameHelp)] = false;
     UseHelpTextDefaults(s);
-    CHECK(s.allUnderBar && !s.moveGameHelp && s.hideHelpBar && s.barWidgets[static_cast<int>(BarWidget::GameHelp)]);
+    CHECK(s.moveWindows && !s.moveGameHelp && s.hideHelpBar && s.barWidgets[static_cast<int>(BarWidget::GameHelp)]);
 }
 
 TEST(a_new_install_looks_as_the_release_did_for_one_but_for_the_reviews_four_changes)

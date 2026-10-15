@@ -4,11 +4,15 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 
 namespace headsup
 {
+#include "generated/views.inc"
+
     namespace
     {
+        constexpr char kShiftSeparator = '|', kShiftColon = ':';
         constexpr uint32_t kLinkNext = 0x00, kLinkWindow = 0x10, kLinkSkip = 0x14, kLinkBytes = kLinkSkip + 1;
         constexpr uint32_t kRecordBytes = kMcdVirtual + 1;
 
@@ -29,7 +33,9 @@ namespace headsup
                 return false;
             const std::optional<WindowKey> key = WindowKeyOf(name.data());
             if (!key) return false;
-            const auto edge = [&](int side) { return static_cast<int>(ReadAt<int16_t>(record.data(), kMcdRect + 2 * side)); };
+            const auto edge = [&](int side) {
+                return static_cast<int>(ReadAt<int16_t>(record.data(), kMcdRect + 2 * side));
+            };
             out = OpenWindow{mcd, *key, edge(0), edge(1), edge(2), edge(3),
                 ReadAt<uint32_t>(record.data(), kMcdType) == kWindowOpening};
             return true;
@@ -45,11 +51,14 @@ namespace headsup
         {
             std::array<uint8_t, kLinkBytes> raw;
             if (!Copy(memory, link, raw.data(), raw.size())) break;
-            if (raw[kLinkSkip] == 0 && ReadWindow(memory, ReadAt<uint32_t>(raw.data(), kLinkWindow), out[count])) ++count;
+            if (raw[kLinkSkip] == 0 && ReadWindow(memory, ReadAt<uint32_t>(raw.data(), kLinkWindow), out[count]))
+                ++count;
             link = ReadAt<uint32_t>(raw.data(), kLinkNext);
         }
         return count;
     }
+
+    bool HangsFromTop(int top, int screenBottom) { return top < screenBottom / 2; }
 
     std::optional<size_t> ViewOf(std::span<const WindowView> views, std::span<const FrameWindow> frame)
     {
@@ -60,7 +69,8 @@ namespace headsup
             const size_t held = static_cast<size_t>(std::ranges::count_if(views[v].windows, [&](const WindowKey& key) {
                 return std::ranges::any_of(frame, [&](const FrameWindow& w) { return !w.hidden && w.key == key; });
             }));
-            if (held > bestHeld || (held == bestHeld && held > 0 && views[v].windows.size() < views[*best].windows.size()))
+            const bool smaller = held == bestHeld && held > 0 && views[v].windows.size() < views[*best].windows.size();
+            if (held > bestHeld || smaller)
             {
                 best     = v;
                 bestHeld = held;
@@ -73,7 +83,8 @@ namespace headsup
     {
         std::optional<int> top;
         for (const FrameWindow& w : frame)
-            if (!w.hidden && MovableWindow(w.key) && w.top < screenBottom / 2) top = std::min(top.value_or(w.top), w.top);
+            if (!w.hidden && MovableWindow(w.key) && w.top >= kGameTopRow && HangsFromTop(w.top, screenBottom))
+                top = std::min(top.value_or(w.top), w.top);
         return top;
     }
 
@@ -81,5 +92,56 @@ namespace headsup
     {
         const int shift = chosen.value_or(placedUnder - frameTop);
         return keepClear ? std::max(shift, band - frameTop) : shift;
+    }
+
+    HelpMode ModeOf(bool panelHelp, bool hideGameHelp)
+    {
+        return panelHelp || !hideGameHelp ? HelpMode::On : HelpMode::Off;
+    }
+
+    std::span<const WindowView> WindowViews() { return kWindowViews; }
+
+    int ReferenceBand(HelpMode mode) { return mode == HelpMode::On ? kReferenceBandHelpOn : kReferenceBandHelpOff; }
+
+    std::vector<ViewShift> ViewShiftsFrom(std::string_view text, std::span<const WindowView> views)
+    {
+        std::vector<ViewShift> shifts;
+        while (!text.empty())
+        {
+            const size_t end       = std::min(text.find(kShiftSeparator), text.size());
+            const std::string_view entry = text.substr(0, end);
+            text.remove_prefix(std::min(end + 1, text.size()));
+            const size_t colon = entry.rfind(kShiftColon);
+            if (colon == std::string_view::npos) continue;
+            const std::string_view id = entry.substr(0, colon), number = entry.substr(colon + 1);
+            int dy = 0;
+            const auto [rest, error] = std::from_chars(number.data(), number.data() + number.size(), dy);
+            if (error != std::errc{} || rest != number.data() + number.size() ||
+                std::ranges::none_of(views, [&](const WindowView& v) { return v.id == id; }) ||
+                std::ranges::any_of(shifts, [&](const ViewShift& s) { return s.id == id; }))
+                continue;
+            shifts.push_back(ViewShift{std::string(id), std::clamp(dy, -kMaxWindowOffset, kMaxWindowOffset)});
+        }
+        return shifts;
+    }
+
+    std::string ViewShiftsText(const std::vector<ViewShift>& shifts)
+    {
+        std::string text;
+        for (const ViewShift& s : shifts)
+        {
+            if (!text.empty()) text += kShiftSeparator;
+            text += s.id + kShiftColon + std::to_string(s.dy);
+        }
+        return text;
+    }
+
+    StripPlace PlaceStrip(int panelBand, std::optional<StripRows> strip, bool moveGameHelp, int clearance)
+    {
+        if (panelBand == 0) return {};
+        if (!strip) return {0, panelBand};
+        if (!moveGameHelp) return {0, std::max(panelBand, strip->bottom + clearance)};
+        const int shift = panelBand - strip->top;
+        return {shift, strip->bottom + shift + clearance};
     }
 }

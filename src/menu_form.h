@@ -25,6 +25,9 @@ namespace headsup
         int level = 0;             // yours; 0 while unknown
         bool sitting = false;
         int barTitlePixels = 0;    // the title size the bar drew last frame, 0 when it is off
+        // In the game's menu pixels: the line the game's windows went under last frame, and the panel's own lowest
+        // reach without its help line; 0 while the panel is off.
+        int windowsBand = 0, barBand = 0;
         const std::vector<std::string>* seenWindows = nullptr; // the game's windows seen under Game help's bar
         const std::vector<std::string>* cursorFiles = nullptr; // the cursors folder's files, without their extensions
     };
@@ -48,6 +51,7 @@ namespace headsup
         KeyCapture keyCapture;      // the Mouse Cursor page's
         KeyCapture shotKeyCapture;  // screenshot mode's
         WindowFilter windows;
+        std::optional<HelpMode> shiftsFor; // the Window Groups card's mode shown; none for the one the help is in
         DesignEditor design;
 
         // What a page was in the middle of is dropped when it is left, by another page or by the window closing: a

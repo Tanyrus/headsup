@@ -7,6 +7,7 @@
 #include "plate_settings.h"
 #include "strip_text.h"
 #include "weather.h"
+#include "window_views.h"
 
 #include <array>
 #include <cstdint>
@@ -99,6 +100,16 @@ namespace headsup
 
     // Skips the game's help bar and connection readout while asked: the draw loop's call to the menu window draw
     // (native_locate.h) goes to HeadsUp, which passes every window but those hidden on to the game.
+    // How the game's windows are placed this frame: the panel's band, and the settings for the help's mode.
+    struct WindowPlacing
+    {
+        HelpBand band;
+        int placedUnder   = 0;
+        bool moveWindows  = false;
+        bool keepClear    = false;
+        bool moveGameHelp = false; // the game's strip goes right under the panel, and the windows under it
+    };
+
     class WindowHook
     {
     public:
@@ -112,14 +123,16 @@ namespace headsup
         void Hide(HiddenWindows hidden);
         // Once a frame, before the game draws its windows: Stop puts back those that drew in the last two.
         void NewFrame();
-        // While band is set, the windows Move names go down as they draw, all by the shift from the game's strip to
-        // under band's bottom (WindowShift, WindowPlacements), those Offset names move by their offsets, and every
-        // window that opens is noted.
-        void MoveFrom(std::optional<HelpBand> band);
+        // While placing is set, the game's windows are placed as they draw: at the first, the frame's windows are read
+        // from the game's own list and its view picked (window_views.h); each that hangs from the top then moves by
+        // the view's shift and its own offset, the strip by its own rule, and every window that opens is noted.
+        void Place(std::optional<WindowPlacing> placing);
+        // The player's shifts for the views of the help's mode now.
+        void Shift(const std::vector<ViewShift>& shifts);
         // Each window's offset from where the game puts it.
         void Offset(const std::vector<WindowOffset>& offsets);
-        // Which windows are moved, by short name (ShortName); those no window could have are left out.
-        void Move(const std::vector<std::string>& windows);
+        // The line the windows went under in the last frame placed, in the game's menu pixels; 0 before one.
+        int WindowsBand() const;
         // The windows that drew since the last call, by short name, sorted: those open now.
         std::vector<std::string> TakeOpen();
         // The windows noted since HeadsUp loaded, by short name, in the order they came.

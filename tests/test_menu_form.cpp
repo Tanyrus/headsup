@@ -547,3 +547,60 @@ TEST(a_card_kept_to_some_kinds_shows_on_their_pages_alone)
     w.state.page = Page::Self;
     CHECK(Block(w.Pass(), "self-placeholder-timers") == nullptr);
 }
+
+namespace
+{
+    // The text the window gives a control this pass.
+    std::string ValueOn(const Form& form, const std::string& id)
+    {
+        for (const FormValue& v : form.values)
+            if (v.id == id && v.kind == FormValueKind::Value) return v.text;
+        return {};
+    }
+    // Status, whose highest window, the portrait, the game puts at 16.
+    const std::string kStatusShift = "userinterface-window-groups-status-shift";
+    const std::string kStatusReset = "userinterface-window-groups-status-reset";
+    constexpr int kPortraitTop     = 16;
+    constexpr auto kOn = static_cast<size_t>(HelpMode::On), kOff = static_cast<size_t>(HelpMode::Off);
+}
+
+TEST(a_views_shift_shows_its_default_until_one_is_typed_for_the_help_mode_shown_and_its_arrow_puts_it_back)
+{
+    Window w;
+    w.state.page = Page::UserInterface;
+    const int on = w.settings.placedUnder[kOn], off = w.settings.placedUnder[kOff];
+    CHECK(WindowHelpMode(w.settings) == HelpMode::On);
+    CHECK_EQ(ValueOn(w.Pass(), kStatusShift), std::to_string(on - kPortraitTop));
+    CHECK(ClassOn(w.Pass(), kStatusReset.c_str(), "hidden"));
+    CHECK(w.Pass({{kStatusShift, kCommitEvent, "30"}}).changed);
+    const std::vector<ViewShift> typed = {{"status", 30}};
+    CHECK(w.settings.viewShifts[kOn] == typed && w.settings.viewShifts[kOff].empty());
+    CHECK(!ClassOn(w.Pass(), kStatusReset.c_str(), "hidden"));
+    // The other mode's shifts, picked by its button, are its own.
+    w.Pass({{"userinterface-window-groups-help-off", kClickEvent, ""}});
+    CHECK_EQ(ValueOn(w.Pass(), kStatusShift), std::to_string(off - kPortraitTop));
+    w.Pass({{"userinterface-window-groups-help-on", kClickEvent, ""}});
+    CHECK(w.Pass({{kStatusReset, kClickEvent, ""}}).changed);
+    CHECK(w.settings.viewShifts[kOn].empty());
+    // The default typed is no shift of the player's.
+    w.Pass({{kStatusShift, kCommitEvent, "30"}});
+    w.Pass({{kStatusShift, kCommitEvent, std::to_string(on - kPortraitTop)}});
+    CHECK(w.settings.viewShifts[kOn].empty());
+}
+
+TEST(auto_adjust_places_the_views_under_the_line_the_windows_last_went_under)
+{
+    Window w;
+    w.state.page = Page::UserInterface;
+    const char* button = "userinterface-game-windows-auto-adjust";
+    const Settings before = w.settings;
+    w.Pass({{button, kClickEvent, ""}}); // no frame of windows placed yet
+    CHECK(w.settings == before);
+    w.readings.windowsBand = 80; // a taller panel's help line
+    w.readings.barBand     = 50;
+    w.settings.viewShifts[kOn] = {{"status", 3}};
+    CHECK(w.Pass({{button, kClickEvent, ""}}).changed);
+    CHECK(w.settings.placedUnder[kOn] == 80 && w.settings.placedUnder[kOff] == 50);
+    CHECK(w.settings.viewShifts[kOn].empty());
+    CHECK_EQ(ValueOn(w.Pass(), kStatusShift), std::to_string(80 - kPortraitTop));
+}

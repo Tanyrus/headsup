@@ -173,72 +173,59 @@ namespace headsup
             form.EndLine();
         }
 
-        // Each group: its name to type, its Under Bar switch and offset, a remove button, then its windows as chips a
-        // click takes out and a dropdown that adds one no group has.
+        // The views of the game's windows for one of the help's modes, the one it is in at first: where a view's
+        // highest window goes, then each view with its shift (the default unless the player typed another) and the
+        // windows it holds.
         void WindowGroups(Context& c)
         {
             Form& form  = c.form;
             Settings& s = c.s;
-            form.Fade(false);
+            form.Fade(!s.moveWindows);
             form.Note(Word(c, WindowWord::GroupsNote));
-            std::optional<size_t> removed;
-            for (size_t g = 0; g < s.windowGroups.size(); ++g)
+            const HelpMode mode = c.state.shiftsFor.value_or(WindowHelpMode(s));
+            form.Line();
+            for (const auto& [shown, word] : {std::pair{HelpMode::On, WindowWord::GroupsHelpOn},
+                     std::pair{HelpMode::Off, WindowWord::GroupsHelpOff}})
+                if (form.Button(Word(c, word), word == WindowWord::GroupsHelpOn ? "help on" : "help off",
+                        shown == mode ? kRaisedPill : kFlatPill, WordTip(c, word)))
+                    c.state.shiftsFor = shown;
+            form.EndLine();
+            const auto m = static_cast<size_t>(mode);
+            form.Row(Labeled(Word(c, WindowWord::GroupsStartsAt), "starts-at").c_str(),
+                WordTip(c, WindowWord::GroupsStartsAt));
+            form.NumberAt("Y", "starts at", s.placedUnder[m], kMaxWindowOffset);
+            s.placedUnder[m] = std::max(s.placedUnder[m], 0);
+            form.EndRow();
+            std::vector<ViewShift>& shifts = s.viewShifts[m];
+            for (const WindowView& view : WindowViews())
             {
-                WindowGroup& group     = s.windowGroups[g];
-                const std::string name = "group " + std::to_string(g);
-                form.Line("line group");
-                std::string typed = group.name;
-                if (form.TextAt((name + " name").c_str(), typed, nullptr, kGroupNameWidth, false, kMaxGroupName) &&
-                    !typed.empty())
+                const std::string id = std::string(view.id);
+                const int fallback   = s.placedUnder[m] - view.top;
+                const auto own       = std::ranges::find(shifts, id, &ViewShift::id);
+                int dy               = own != shifts.end() ? own->dy : fallback;
+                const int was        = dy;
+                std::string windows;
+                for (const WindowKey& key : view.windows)
+                    windows += (windows.empty() ? "" : ", ") + WindowName(ShortName(key));
+                form.Row((std::string(view.name) + "##view " + id).c_str(), WordTip(c, WindowWord::GroupsRowTip));
+                // Named after the view: a box's own label is the box's id and -name, which "y search" would give
+                // the box of the view "search/name".
+                const bool reset = form.ResetAt((id + " reset").c_str(), own != shifts.end());
+                form.NumberAt("Y", (id + " shift").c_str(), dy, kMaxWindowOffset);
+                form.Caption(windows.c_str());
+                form.EndRow();
+                if (reset || (dy != was && dy == fallback))
                 {
-                    group.name   = typed;
+                    shifts.erase(own);
                     form.changed = true;
                 }
-                form.Raw("<div class=\"gap\"></div>");
-                form.CheckAt((name + " under").c_str(), group.underBar, WordTip(c, WindowWord::GroupsUnderBar));
-                form.NumberAt("X", (name + " x").c_str(), group.x, kMaxWindowOffset);
-                form.NumberAt("Y", (name + " y").c_str(), group.y, kMaxWindowOffset);
-                if (form.Button("x", (name + " remove").c_str(), "btn raised round", WordTip(c, WindowWord::GroupsRemove)))
-                    removed = g;
-                form.EndLine();
-                // Its windows, then the one to add.
-                form.Line("line chips indent");
-                std::optional<size_t> taken;
-                for (size_t w = 0; w < group.windows.size(); ++w)
-                    if (form.Button((WindowName(group.windows[w]) + "  x").c_str(),
-                            (name + " member " + std::to_string(w)).c_str(), kChip))
-                        taken = w;
-                std::vector<std::string> free;
-                for (const std::string& window : AllWindows())
-                    if (std::ranges::none_of(s.windowGroups, [&](const WindowGroup& other) {
-                            return std::ranges::find(other.windows, window) != other.windows.end();
-                        }))
-                        free.push_back(window);
-                int chosen = 0;
-                if (form.ListAt((name + " add").c_str(), Word(c, WindowWord::GroupsAddWindow), kControlWidth * kAddWindowShare,
-                        static_cast<int>(free.size()), [&](int i) { return WindowName(free[static_cast<size_t>(i)]); }, -1,
-                        chosen))
+                else if (dy != was)
                 {
-                    group.windows.push_back(free[static_cast<size_t>(chosen)]);
-                    form.changed = true;
+                    if (own == shifts.end())
+                        shifts.push_back(ViewShift{id, dy});
+                    else
+                        own->dy = dy;
                 }
-                form.EndLine();
-                if (taken)
-                {
-                    group.windows.erase(group.windows.begin() + static_cast<std::ptrdiff_t>(*taken));
-                    form.changed = true;
-                }
-            }
-            if (removed)
-            {
-                s.windowGroups.erase(s.windowGroups.begin() + static_cast<std::ptrdiff_t>(*removed));
-                form.changed = true;
-            }
-            if (s.windowGroups.size() < kMaxWindowGroups &&
-                form.Action(Labeled(Word(c, WindowWord::GroupsNewGroup), "new-group").c_str()))
-            {
-                s.windowGroups.push_back(WindowGroup{"Group " + std::to_string(s.windowGroups.size() + 1), 0, 0, false, {}});
-                form.changed = true;
             }
         }
 
@@ -295,7 +282,7 @@ namespace headsup
             for (const std::string& name : AllWindows())
             {
                 const char* label = WindowLabel(name);
-                if (!(list.all || label != nullptr || has(s.movedWindows, name) ||
+                if (!(list.all || label != nullptr ||
                         std::ranges::any_of(s.windowOffsets, [&](const WindowOffset& o) { return o.name == name; }) ||
                         (c.readings.seenWindows != nullptr && has(*c.readings.seenWindows, name))))
                     continue;
@@ -304,26 +291,15 @@ namespace headsup
             }
             for (const std::string& window : listed)
             {
-                const auto at          = std::ranges::find(s.movedWindows, window);
-                bool moved             = at != s.movedWindows.end();
-                const bool was         = moved;
                 const char* label      = WindowLabel(window);
                 const std::string name = TitleCaseText(label != nullptr ? std::string(label) : window); // the game's own
                 form.Row((name + "##" + name + " window " + window).c_str(), WordTip(c, WindowWord::WindowListRowTip));
-                form.CheckAt(("under " + window).c_str(), moved);
                 auto offset = std::ranges::find(s.windowOffsets, window, &WindowOffset::name);
                 int dx = offset != s.windowOffsets.end() ? offset->x : 0, dy = offset != s.windowOffsets.end() ? offset->y : 0;
                 const int oldX = dx, oldY = dy;
                 form.NumberAt("X", ("x " + window).c_str(), dx, kMaxWindowOffset);
                 form.NumberAt("Y", ("y " + window).c_str(), dy, kMaxWindowOffset);
                 form.EndRow();
-                if (moved != was)
-                {
-                    if (moved)
-                        s.movedWindows.push_back(window);
-                    else
-                        s.movedWindows.erase(std::ranges::find(s.movedWindows, window));
-                }
                 if (dx == oldX && dy == oldY) continue;
                 offset = std::ranges::find(s.windowOffsets, window, &WindowOffset::name);
                 if (offset == s.windowOffsets.end())
@@ -1093,9 +1069,21 @@ namespace headsup
                 form.Switch(label.c_str(), s.screenshotHidesGame, tip);
                 break;
             case SettingPiece::Groups: WindowGroups(c); break;
-            case SettingPiece::EveryWindow:
+            case SettingPiece::MoveWindows:
                 form.Fade(false);
-                form.Switch(label.c_str(), s.allUnderBar, tip);
+                form.Switch(label.c_str(), s.moveWindows, tip);
+                break;
+            case SettingPiece::KeepClear:
+                form.Fade(!s.moveWindows);
+                form.Switch(label.c_str(), s.keepClear, tip);
+                break;
+            case SettingPiece::AutoAdjust:
+                form.Fade(!s.moveWindows || r.windowsBand == 0);
+                if (form.Action(label.c_str(), tip))
+                {
+                    AutoAdjustWindows(s, r.windowsBand, r.barBand);
+                    form.changed = true;
+                }
                 break;
             case SettingPiece::GameHelp:
                 form.Fade(false);

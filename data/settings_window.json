@@ -182,43 +182,45 @@
           ]
         },
         {
+          "key": "game-windows",
+          "name": "Game Windows",
+          "settings": [
+            {"key": "move-windows", "name": "Move Game Windows", "tip": "The game's windows that open under the top panel go below it, each menu's together."},
+            {"key": "keep-clear", "name": "Don't Allow Overlap", "tip": "No window is left under the top panel, whatever a shift says: a taller panel takes them further down."},
+            {"key": "game-help", "name": "Game Help", "tip": "The game's own help bar goes under the top panel, and the windows under it. Off while it is hidden."},
+            {"key": "auto-adjust", "name": "Auto Adjust Windows", "tip": "Places every menu's windows right under the top panel as it is now, for the game help on and off. Your own shifts go."},
+            {
+              "key": "window-defaults",
+              "words": [
+                {"key": "headsup-defaults", "name": "HeadsUp Defaults", "tip": "Every menu's windows under the top panel as HeadsUp places them. Your shifts and offsets are cleared."},
+                {"key": "headsup-help", "name": "HeadsUp Help", "tip": "HeadsUp's help text in place of the game's help bar, which is hidden, and the windows as HeadsUp places them."},
+                {"key": "game-defaults", "name": "Game Defaults", "tip": "Every window where the game puts it: nothing moved, no offsets."}
+              ]
+            },
+            {
+              "key": "window-list",
+              "words": [
+                {"key": "note", "name": "X and Y move one window further, after its menu's shift. Type a number, then Enter."},
+                {"key": "find", "name": "Find"},
+                {"key": "name-hint", "name": "Name"},
+                {"key": "all-windows", "tip": "Every window the game has, not only the named ones and yours."},
+                {"key": "row-tip", "tip": "Its X and Y offset."}
+              ]
+            }
+          ]
+        },
+        {
           "key": "window-groups",
           "name": "Window Groups",
           "settings": [
             {
               "key": "groups",
               "words": [
-                {"key": "note", "name": "Windows in a group move by its offset together, keeping their places beside each other. Each window's own X and Y below still moves it within the group."},
-                {"key": "under-bar", "tip": "Under Bar: the whole group goes below the help bar."},
-                {"key": "remove", "tip": "Removes the group; its windows stay where the game puts them."},
-                {"key": "add-window", "name": "+ Add Window"},
-                {"key": "new-group", "name": "+ New Group"}
-              ]
-            }
-          ]
-        },
-        {
-          "key": "game-windows",
-          "name": "Game Windows",
-          "settings": [
-            {"key": "every-window", "name": "Every Window", "tip": "Every window that opens under the bar goes below it, not only those switched on or grouped."},
-            {"key": "game-help", "name": "Game Help", "tip": "The game's own help bar goes under the top panel, and the windows under it. Off while it is hidden."},
-            {
-              "key": "window-defaults",
-              "words": [
-                {"key": "headsup-defaults", "name": "HeadsUp Defaults", "tip": "Every window under the bar, the game's help too, in the groups the game opens them in. Offsets are cleared."},
-                {"key": "headsup-help", "name": "HeadsUp Help", "tip": "HeadsUp's help text in place of the game's help bar, which is hidden, and every window under it."},
-                {"key": "game-defaults", "name": "Game Defaults", "tip": "Every window where the game puts it: nothing moved, no groups, no offsets."}
-              ]
-            },
-            {
-              "key": "window-list",
-              "words": [
-                {"key": "note", "name": "Under Bar takes a window below the help bar, all together; X and Y move it from where the game puts it. Type a number, then Enter."},
-                {"key": "find", "name": "Find"},
-                {"key": "name-hint", "name": "Name"},
-                {"key": "all-windows", "tip": "Every window the game has, not only the named ones and yours."},
-                {"key": "row-tip", "tip": "Under Bar, then its X and Y offset."}
+                {"key": "note", "name": "The windows each menu opens move together by one shift, so they keep their places beside each other. Your own shift replaces the default, which brings the menu's highest window to Windows Start At. Type a number, then Enter."},
+                {"key": "help-on", "name": "Game Help On", "tip": "The shifts while the game's help shows under the top panel: its help line, or the game's own help bar."},
+                {"key": "help-off", "name": "Game Help Off", "tip": "The shifts while no help shows under the top panel."},
+                {"key": "starts-at", "name": "Windows Start At", "tip": "Where each menu's highest window goes, in the game's menu pixels from the top of the screen."},
+                {"key": "row-tip", "tip": "Its shift down from where the game puts its windows, up when below zero."}
               ]
             }
           ]

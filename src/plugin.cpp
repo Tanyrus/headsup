@@ -305,7 +305,8 @@ class HeadsUp final : public IPlugin
     headsup::CursorTargets m_CursorTargets;
     float m_MenuWidth   = 0.0f;
     // The windows the hook moves, as last given it (none until the first frame), and those it has seen.
-    std::optional<headsup::WindowMoves> m_WindowMoves;
+    std::vector<headsup::ViewShift> m_PlacedShifts;      // what the window hook was last given
+    std::vector<headsup::WindowOffset> m_PlacedOffsets;
     std::optional<std::string> m_WindowLog;   // /hu windowlog's file, while it runs
     std::vector<std::string> m_LastOpen;      // the open windows it wrote last // what the window hook has: the settings' windows and groups
     std::vector<std::string> m_SeenWindows;
@@ -716,8 +717,9 @@ public:
         const headsup::HiddenWindows hidden{.helpBar = m_Settings.enabled && helpGone,
             .netstat = m_Settings.enabled && m_Settings.hideNetstat};
         const std::optional<headsup::HelpBand> band = HelpBandNow();
-        const bool movesWindows = (band && band->bottom != 0) || !m_Settings.windowOffsets.empty() ||
-                                  !m_Settings.windowGroups.empty() || m_Settings.allUnderBar || m_Settings.moveGameHelp;
+        const auto mode         = static_cast<size_t>(headsup::WindowHelpMode(m_Settings));
+        const bool movesWindows = (band && band->bottom != 0 && m_Settings.moveWindows) ||
+                                  !m_Settings.windowOffsets.empty() || m_Settings.moveGameHelp;
         if ((hidden.Any() || movesWindows) && !std::exchange(m_WindowHookTried, true))
         {
             if (const std::string failure = m_WindowHook.Start(); !failure.empty())
@@ -730,14 +732,22 @@ public:
         m_LoneCursorsDrawn = false;
         m_WindowHook.Hide(hidden);
         m_WindowHook.NewFrame();
-        m_WindowHook.MoveFrom(band);
-        if (headsup::WindowMoves moves =
-                headsup::CombinedMoves(m_Settings.movedWindows, m_Settings.windowOffsets, m_Settings.windowGroups);
-            moves != m_WindowMoves)
+        m_WindowHook.Place(band ? std::optional<headsup::WindowPlacing>(headsup::WindowPlacing{
+                                      .band         = *band,
+                                      .placedUnder  = m_Settings.placedUnder[mode],
+                                      .moveWindows  = m_Settings.moveWindows,
+                                      .keepClear    = m_Settings.keepClear,
+                                      .moveGameHelp = m_Settings.moveGameHelp && !m_Settings.hideHelpBar})
+                                : std::nullopt);
+        if (m_Settings.viewShifts[mode] != m_PlacedShifts)
         {
-            m_WindowHook.Move(moves.underBar);
-            m_WindowHook.Offset(moves.offsets);
-            m_WindowMoves = std::move(moves);
+            m_PlacedShifts = m_Settings.viewShifts[mode];
+            m_WindowHook.Shift(m_PlacedShifts);
+        }
+        if (m_Settings.windowOffsets != m_PlacedOffsets)
+        {
+            m_PlacedOffsets = m_Settings.windowOffsets;
+            m_WindowHook.Offset(m_PlacedOffsets);
         }
         if (m_WindowHook.SeenCount() != m_SeenWindows.size()) m_SeenWindows = m_WindowHook.SeenWindows();
         if (std::vector<std::string> open = m_WindowHook.TakeOpen(); m_WindowLog && open != m_LastOpen)
@@ -774,6 +784,8 @@ public:
                 .level            = m_Player.level,
                 .sitting          = m_Player.sitting,
                 .barTitlePixels   = m_RmlBar.TitlePixels(),
+                .windowsBand      = m_WindowHook.WindowsBand(),
+                .barBand          = HelpBandNow().value_or(headsup::HelpBand{}).topBar,
                 .seenWindows      = &m_SeenWindows,
                 .cursorFiles      = &m_CursorFiles,
             };
@@ -899,11 +911,10 @@ private:
         };
         return headsup::HelpBand{
             .bottom       = menuUnits(reach ? reach->y + reach->height : barBottom),
+            .clearance    = static_cast<int>(std::ceil(kWindowClearance * down)),
             .screenRight  = static_cast<int>(m_MenuWidth),
             .screenBottom = static_cast<int>(m_MenuHeight),
             .topBar       = menuUnits(barBottom),
-            .allUnderBar  = m_Settings.allUnderBar,
-            .moveGameHelp = m_Settings.moveGameHelp && !m_Settings.hideHelpBar,
         };
     }
 
@@ -1371,10 +1382,12 @@ private:
             m_Played.push_back(PlayedInput{true, 0, kKeys.at(args[3]), 1});
             m_Played.push_back(PlayedInput{true, 0, kKeys.at(args[3]), static_cast<LPARAM>(kUp)});
         }
-        else if (what == "theme" || what == "height" || what == "seps" || what == "text" || what == "popuptext")
+        else if (what == "theme" || what == "height" || what == "seps" || what == "text" || what == "popuptext" ||
+                 what == "moves")
         {
             // A bar setting by number, saved as a change in the window is.
             const int value = static_cast<int>(number(3));
+            if (what == "moves") m_Settings.moveWindows = value != 0;
             if (what == "theme") m_Settings.barTheme = static_cast<headsup::BarTheme>(value);
             if (what == "height") m_Settings.barHeight = value;
             if (what == "seps") m_Settings.barSeparators = static_cast<headsup::BarSeparators>(value);

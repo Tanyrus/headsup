@@ -121,10 +121,12 @@ namespace headsup
         // Saved files from before the cursor scaled on its own, when it scaled with the names, take the names'.
         constexpr const char* kScaleCursorKey = "scaleCursor";
         constexpr const char* kKeepPointerKey = "keepPointerKeys"; // hex virtual-key codes, a space apart
-        constexpr const char* kMovedWindowsKey = "movedWindows";   // short window names, a space apart
         constexpr const char* kWindowOffsetsKey = "windowOffsets"; // "equip:10,-20 statcom:0,40"
-        constexpr const char* kWindowGroupsKey  = "windowGroups";  // "Equipment:20,-10,1:equip+inventor|..."
-        constexpr const char* kAllUnderBarKey   = "allUnderBar";
+        constexpr const char* kMoveWindowsKey   = "moveWindows";
+        constexpr const char* kKeepClearKey     = "keepClear";
+        // By HelpMode. movedWindows, windowGroups and allUnderBar, the picks before views, are never read again.
+        constexpr const char* kPlacedUnderKeys[kHelpModes] = {"placedUnderHelpOff", "placedUnderHelpOn"};
+        constexpr const char* kViewShiftsKeys[kHelpModes]  = {"viewShiftsHelpOff", "viewShiftsHelpOn"}; // "status:20"
         constexpr const char* kMoveGameHelpKey  = "moveGameHelp";
         constexpr const char* kHelpBarXKey = "helpBarX";
         constexpr const char* kHelpBarBackgroundKey = "helpBarBackground";
@@ -938,20 +940,19 @@ namespace headsup
 
     void UseHeadsUpWindowDefaults(Settings& s)
     {
-        s.allUnderBar   = true;
-        s.moveGameHelp  = true;
-        s.movedWindows  = DefaultMovedWindows();
+        const Settings d;
+        s.moveWindows   = true;
+        s.keepClear     = d.keepClear;
+        s.placedUnder   = d.placedUnder;
+        s.viewShifts    = d.viewShifts;
         s.windowOffsets = {};
-        s.windowGroups  = DefaultWindowGroups();
     }
 
     void UseGameWindowDefaults(Settings& s)
     {
-        s.allUnderBar   = false;
+        s.moveWindows   = false;
         s.moveGameHelp  = false;
-        s.movedWindows  = {};
         s.windowOffsets = {};
-        s.windowGroups  = {};
     }
 
     void UseHelpTextDefaults(Settings& s)
@@ -960,6 +961,22 @@ namespace headsup
         s.moveGameHelp = false;
         s.hideHelpBar  = true;
         s.barWidgets[static_cast<int>(BarWidget::GameHelp)] = true;
+    }
+
+    HelpMode WindowHelpMode(const Settings& s)
+    {
+        return ModeOf(s.showBar && s.barWidgets[static_cast<int>(BarWidget::GameHelp)], s.hideHelpBar);
+    }
+
+    void AutoAdjustWindows(Settings& s, int band, int barOnly)
+    {
+        if (band == 0) return;
+        const auto place = [&](HelpMode mode, int under) {
+            s.placedUnder[static_cast<size_t>(mode)] = std::clamp(under, 0, kMaxWindowOffset);
+            s.viewShifts[static_cast<size_t>(mode)].clear();
+        };
+        place(HelpMode::Off, barOnly);
+        place(WindowHelpMode(s), band);
     }
 
     bool BarOn(const Settings& s)
@@ -1125,9 +1142,12 @@ namespace headsup
         }
         s.keepPointerKeys = std::move(keys);
         s.screenshotKey   = BindableKey(s.screenshotKey);
-        s.movedWindows    = MovedWindowsFrom(MovedWindowNames(s.movedWindows));
         s.windowOffsets   = WindowOffsetsFrom(WindowOffsetText(s.windowOffsets));
-        s.windowGroups    = WindowGroupsFrom(WindowGroupsText(s.windowGroups));
+        for (size_t m = 0; m < kHelpModes; ++m)
+        {
+            s.placedUnder[m] = std::clamp(s.placedUnder[m], 0, kMaxWindowOffset);
+            s.viewShifts[m]  = ViewShiftsFrom(ViewShiftsText(s.viewShifts[m]), WindowViews());
+        }
         s.helpBarX        = std::clamp(s.helpBarX, -kMaxHelpBarOffset, kMaxHelpBarOffset);
         s.helpBarY        = std::clamp(s.helpBarY, -kMaxHelpBarOffset, kMaxHelpBarOffset);
         for (const ColorKey& c : kColors)
@@ -1275,10 +1295,14 @@ namespace headsup
         for (int i = 0; i < kBarSectionCount; ++i)
             sections[i] = store.GetString(kBarSectionKeys[i], "");
         s.barSections = PlacementFrom(sections);
-        s.movedWindows = MovedWindowsFrom(store.GetString(kMovedWindowsKey, MovedWindowNames(s.movedWindows).c_str()));
         s.windowOffsets = WindowOffsetsFrom(store.GetString(kWindowOffsetsKey, ""));
-        s.windowGroups  = WindowGroupsFrom(store.GetString(kWindowGroupsKey, ""));
-        s.allUnderBar   = store.GetBool(kAllUnderBarKey, s.allUnderBar);
+        s.moveWindows   = store.GetBool(kMoveWindowsKey, s.moveWindows);
+        s.keepClear     = store.GetBool(kKeepClearKey, s.keepClear);
+        for (size_t m = 0; m < kHelpModes; ++m)
+        {
+            s.placedUnder[m] = LoadInt(store, kPlacedUnderKeys[m], s.placedUnder[m]);
+            s.viewShifts[m]  = ViewShiftsFrom(store.GetString(kViewShiftsKeys[m], ""), WindowViews());
+        }
         s.moveGameHelp  = store.GetBool(kMoveGameHelpKey, s.moveGameHelp);
         s.helpBarX      = LoadInt(store, kHelpBarXKey, s.helpBarX);
         s.helpBarBackground = store.GetBool(kHelpBarBackgroundKey, s.helpBarBackground);
@@ -1364,10 +1388,14 @@ namespace headsup
         setBool(kLatencyKey, s.barLatency);
         for (int i = 0; i < kBarSectionCount; ++i)
             store.Set(kBarSectionKeys[i], PlacementNames(s.barSections[i]).c_str());
-        store.Set(kMovedWindowsKey, MovedWindowNames(s.movedWindows).c_str());
         store.Set(kWindowOffsetsKey, WindowOffsetText(s.windowOffsets).c_str());
-        store.Set(kWindowGroupsKey, WindowGroupsText(s.windowGroups).c_str());
-        setBool(kAllUnderBarKey, s.allUnderBar);
+        setBool(kMoveWindowsKey, s.moveWindows);
+        setBool(kKeepClearKey, s.keepClear);
+        for (size_t m = 0; m < kHelpModes; ++m)
+        {
+            setFloat(kPlacedUnderKeys[m], static_cast<float>(s.placedUnder[m]));
+            store.Set(kViewShiftsKeys[m], ViewShiftsText(s.viewShifts[m]).c_str());
+        }
         setBool(kMoveGameHelpKey, s.moveGameHelp);
         setFloat(kHelpBarXKey, static_cast<float>(s.helpBarX));
         setBool(kHelpBarBackgroundKey, s.helpBarBackground);

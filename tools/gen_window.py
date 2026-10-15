@@ -162,9 +162,9 @@ PIECES = Pieces(
         'respawn-timers': Setting(), 'timer-size': Setting(),
         # User Interface
         'key': Setting(), 'hide-game-windows': Setting(),
-        'groups': Setting(unnamed=True, words={'note': True, 'under-bar': False, 'remove': False, 'add-window': True,
-                                               'new-group': True}),
-        'every-window': Setting(), 'game-help': Setting(),
+        'groups': Setting(unnamed=True, words={'note': True, 'help-on': True, 'help-off': True, 'starts-at': True,
+                                               'row-tip': False}),
+        'move-windows': Setting(), 'keep-clear': Setting(), 'game-help': Setting(), 'auto-adjust': Setting(),
         'window-defaults': Setting(unnamed=True, words={'headsup-defaults': True, 'headsup-help': True,
                                                         'game-defaults': True}),
         'window-list': Setting(unnamed=True, words={'note': True, 'find': True, 'name-hint': True, 'all-windows': False,
