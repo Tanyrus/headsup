@@ -838,7 +838,7 @@ namespace headsup
             if (owner == 0 || !Readable(reinterpret_cast<const uint8_t*>(owner), kOwnerMcd + sizeof(uint32_t)) ||
                 ReadAt<uint32_t>(reinterpret_cast<const uint8_t*>(owner) + kOwnerMcd, 0) != placed.mcd ||
                 ReadAt<uint32_t>(mcd + kMcdType, 0) == kWindowOpening || mcd[kMcdVirtual] != 0 ||
-                ReadAt<int32_t>(mcd + kMcdMove, 0) != kMoveIdle)
+                MoveUnderWay(ReadAt<int32_t>(mcd + kMcdMove, 0)))
                 return;
             const auto edge = [&](int side) { return static_cast<int>(ReadAt<int16_t>(mcd + kMcdRect, 2 * side)); };
             const WindowSpot now{edge(0), edge(1)};
@@ -923,7 +923,7 @@ namespace headsup
         {
             const auto field = [mcd](uint32_t at) { return reinterpret_cast<const uint8_t*>(mcd + at); };
             if (ReadAt<uint32_t>(field(kMcdOwner), 0) == 0 || ReadAt<uint32_t>(field(kMcdType), 0) == kWindowOpening ||
-                *field(kMcdVirtual) != 0 || ReadAt<int32_t>(field(kMcdMove), 0) != kMoveIdle)
+                *field(kMcdVirtual) != 0 || MoveUnderWay(ReadAt<int32_t>(field(kMcdMove), 0)))
                 return;
             const auto edge = [&](int side) { return static_cast<int>(ReadAt<int16_t>(field(kMcdRect), 2 * side)); };
             const int left = edge(0), top = edge(1), right = edge(2), bottom = edge(3);

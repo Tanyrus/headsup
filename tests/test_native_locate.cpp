@@ -714,6 +714,14 @@ TEST(wide_scans_grid_label_takes_the_title_windows_place_from_one_call_to_get_re
     CHECK(LocateScanLabel(image.Text(), kGetRectRva).problem == LocateProblem::AmbiguousScanLabel);
 }
 
+TEST(only_a_countdown_above_zero_is_a_move_under_way)
+{
+    CHECK(!MoveUnderWay(kMoveIdle));
+    CHECK(!MoveUnderWay(0)); // the frame the game laid the window out, as a window opening is: it may be placed
+    CHECK(MoveUnderWay(1));
+    CHECK(MoveUnderWay(12));
+}
+
 TEST(a_window_is_known_by_its_name_past_menu_and_written_without_its_padding)
 {
     const std::optional<WindowKey> equip = WindowKeyOf("menu    equip   ");

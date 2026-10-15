@@ -517,6 +517,8 @@ namespace headsup
             getRect.size() == 1 ? text.rva + getRect.front() : 0};
     }
 
+    bool MoveUnderWay(int32_t move) { return move > 0; }
+
     ScanLabelSite LocateScanLabel(const ImageSection& text, uint32_t getRect)
     {
         const std::vector<uint32_t> found = FindAll(kScanLabel, text);

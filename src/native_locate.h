@@ -188,7 +188,7 @@ namespace headsup
     constexpr uint32_t kOwnerPlaceCopy = 0x14;
     constexpr size_t kWindowRectBytes  = 4 * sizeof(int16_t);
     // An MCD's rectangle in the game's menu resolution: int16 left, top, right and bottom from +0x3A. +0x94 is a move's
-    // countdown, kMoveIdle while none is under way; +0x99 is set for windows kept in a 640 x 480 space instead; +0x10 is
+    // countdown (MoveUnderWay); +0x99 is set for windows kept in a 640 x 480 space instead; +0x10 is
     // kWindowOpening while the window has no owner to lay out yet.
     constexpr uint32_t kMcdType = 0x10, kMcdRect = 0x3A, kMcdMove = 0x94, kMcdVirtual = 0x99;
     // Where the window was last moved to (int16 x, y), which its move routine writes before it lays the window out.
@@ -196,6 +196,9 @@ namespace headsup
     // with their own spot every frame and move the window back when it differs.
     constexpr uint32_t kMcdAsked = 0x52;
     constexpr int32_t kMoveIdle      = -999;
+    // Whether the game is moving the window: its countdown above 0. Its layout sets 0 (RVA 0x11A6AE), which the next
+    // update turns into kMoveIdle (0x11774F), so a window drawn for the first time, opening, still shows 0.
+    bool MoveUnderWay(int32_t move);
     constexpr uint32_t kWindowOpening = 0x0E;
     // A menu window's name past its "menu    ", padded with spaces as the game's 16-byte names are: "equip   ".
     constexpr size_t kWindowKeyLength = 8;
