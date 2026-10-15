@@ -56,6 +56,7 @@ namespace headsup
         bool DebuggerVisible() const;
         std::string TakeFailure() { return m_Render.TakeFailure(); }
         void ReleaseLayers() { m_Render.ReleaseLayers(); }
+        void RefuseLayers() { m_Render.RefuseLayers(); }
 
     private:
         void Render(Rml::Context* context);

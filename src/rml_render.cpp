@@ -13,7 +13,6 @@ namespace headsup
     namespace
     {
         constexpr int kVerticesPerTriangle = 3;
-        constexpr const char* kOpacityFilter = "opacity";
         constexpr const char* kFilterValue   = "value";
         constexpr DWORD kTransparent         = 0;
     }
@@ -37,16 +36,17 @@ namespace headsup
     {
         if (m_Device == nullptr) return;
         m_Device->SetTexture(0, nullptr);
+        m_Stack.clear();
         if (m_GameTarget != nullptr)
         {
-            m_Stack.clear();
             m_Device->SetRenderTarget(m_GameTarget, m_GameDepth);
             m_GameTarget->Release();
-            if (m_GameDepth != nullptr) m_GameDepth->Release();
             m_GameTarget = nullptr;
-            m_GameDepth  = nullptr;
         }
+        if (m_GameDepth != nullptr) m_GameDepth->Release();
+        m_GameDepth = nullptr;
         m_Device->SetViewport(&m_GameViewport);
+        if (ReleaseIdleLayers(m_IdleRenders, std::exchange(m_Pushed, false))) ReleaseLayers();
     }
 
     void RmlRender::UseTexture(bool textured)
@@ -59,7 +59,7 @@ namespace headsup
 
     bool RmlRender::MakeLayer(size_t index)
     {
-        if (m_LayersRefused) return false;
+        if (m_LayersRefused || m_NoLayers) return false;
         if (m_Layers.size() <= index) m_Layers.resize(index + 1);
         Layer& layer      = m_Layers[index];
         const int sideX   = TextureSide(m_Width), sideY = TextureSide(m_Height);
@@ -85,8 +85,7 @@ namespace headsup
 
     void RmlRender::Bind(size_t depth)
     {
-        while (depth > 0 && !m_Stack[depth - 1])
-            --depth;
+        depth = DrawnDepth(m_Stack, depth);
         if (depth == 0)
             m_Device->SetRenderTarget(m_GameTarget, m_GameDepth);
         else
@@ -94,46 +93,56 @@ namespace headsup
         ApplyScissor(); // a new target sets the viewport to the whole of it
     }
 
+    void RmlRender::WholeTarget()
+    {
+        D3DVIEWPORT8 viewport = m_GameViewport;
+        viewport.X            = 0;
+        viewport.Y            = 0;
+        viewport.Width        = static_cast<DWORD>(m_Width);
+        viewport.Height       = static_cast<DWORD>(m_Height);
+        m_Device->SetViewport(&viewport);
+    }
+
     Rml::LayerHandle RmlRender::PushLayer()
     {
         if (m_Device == nullptr) return 0;
-        if (m_GameTarget == nullptr)
-        {
-            if (FAILED(m_Device->GetRenderTarget(&m_GameTarget))) m_GameTarget = nullptr;
-            if (FAILED(m_Device->GetDepthStencilSurface(&m_GameDepth))) m_GameDepth = nullptr;
-        }
+        if (m_GameTarget == nullptr && FAILED(m_Device->GetRenderTarget(&m_GameTarget))) m_GameTarget = nullptr;
+        if (m_GameTarget != nullptr && m_GameDepth == nullptr && FAILED(m_Device->GetDepthStencilSurface(&m_GameDepth)))
+            m_GameDepth = nullptr;
         const bool made = m_GameTarget != nullptr && MakeLayer(m_Stack.size());
         m_Stack.push_back(made);
+        m_Pushed = true;
         if (made)
         {
             Bind(m_Stack.size());
-            m_Device->Clear(0, nullptr, D3DCLEAR_TARGET, kTransparent, 1.0f, 0); // within the viewport: the scissor
+            // All of it: RmlUi sets the element's scissor only after the push, so the one set now is another's.
+            WholeTarget();
+            m_Device->Clear(0, nullptr, D3DCLEAR_TARGET, kTransparent, 1.0f, 0);
+            ApplyScissor();
         }
         return static_cast<Rml::LayerHandle>(m_Stack.size());
     }
 
-    void RmlRender::CompositeLayers(Rml::LayerHandle source, Rml::LayerHandle destination, Rml::BlendMode blendMode,
+    void RmlRender::CompositeLayers(Rml::LayerHandle source, Rml::LayerHandle destination, Rml::BlendMode,
         Rml::Span<const Rml::CompiledFilterHandle> filters)
     {
         // A layer Direct3D refused had its drawing go straight on; a layer laid on itself has nothing to read from.
         if (m_Device == nullptr || source == 0 || source > m_Stack.size() || !m_Stack[source - 1] || source == destination) return;
-        std::vector<float> opacities;
+        float opacity = 1.0f;
         for (const Rml::CompiledFilterHandle filter : filters)
-            opacities.push_back(*reinterpret_cast<const float*>(filter));
+            opacity *= *reinterpret_cast<const float*>(filter);
         const Layer& layer = m_Layers[source - 1];
         Bind(destination);
-        if (!m_NothingVisible)
-        {
-            UseTexture(true);
-            m_Device->SetTexture(0, layer.texture);
-            if (blendMode == Rml::BlendMode::Replace) m_Device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
-            const auto quad = LayerQuad(m_Width, m_Height, static_cast<float>(m_Width) / static_cast<float>(layer.side[0]),
-                static_cast<float>(m_Height) / static_cast<float>(layer.side[1]), LayerTint(FilterOpacity(opacities)));
-            m_Device->DrawPrimitiveUP(D3DPT_TRIANGLELIST, static_cast<UINT>(quad.size() / kVerticesPerTriangle), quad.data(),
-                sizeof(ScreenVertex));
-            if (blendMode == Rml::BlendMode::Replace) m_Device->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
-            m_Device->SetTexture(0, nullptr);
-        }
+        // Over the whole target and not RmlUi's scissor, the element's own box: what overflows it was drawn into the
+        // layer too, as a list hanging below the window, and is laid down with the rest.
+        WholeTarget();
+        UseTexture(true);
+        m_Device->SetTexture(0, layer.texture);
+        const auto quad = LayerQuad(m_Width, m_Height, static_cast<float>(m_Width) / static_cast<float>(layer.side[0]),
+            static_cast<float>(m_Height) / static_cast<float>(layer.side[1]), LayerTint(opacity));
+        m_Device->DrawPrimitiveUP(D3DPT_TRIANGLELIST, static_cast<UINT>(quad.size() / kVerticesPerTriangle), quad.data(),
+            sizeof(ScreenVertex));
+        m_Device->SetTexture(0, nullptr);
         Bind(m_Stack.size());
     }
 
@@ -163,6 +172,8 @@ namespace headsup
         m_Layers.clear();
         m_LayersRefused = false;
     }
+
+    void RmlRender::RefuseLayers() { m_NoLayers = true; }
 
     Rml::CompiledGeometryHandle RmlRender::CompileGeometry(Rml::Span<const Rml::Vertex> vertices,
         Rml::Span<const int> indices)

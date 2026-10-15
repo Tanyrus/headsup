@@ -92,6 +92,7 @@ namespace headsup
         float m_FontPixels = 0.0f;
         int m_Opacity      = 0; // the percent the document was last given; 0 for none yet
         bool m_Visible     = false;
+        bool m_Revealing   = false; // shown this frame, hidden until the next
         bool m_Placed      = false;   // it has its first place
         std::optional<std::array<int, 4>> m_OpenedAt; // where it was first laid out: left, top, width, height
         Rml::Element* m_Sidebar   = nullptr;

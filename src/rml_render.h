@@ -60,6 +60,8 @@ namespace headsup
         // Layers are default-pool render targets, kept from frame to frame: they must be let go before the device's
         // Reset, or the game's Reset fails.
         void ReleaseLayers();
+        // For good: the device's Reset could not be hooked, and a default-pool layer held through a Reset fails it.
+        void RefuseLayers();
 
         // A texture Direct3D refused, once.
         std::string TakeFailure();
@@ -88,6 +90,7 @@ namespace headsup
         // Draws into the layer at this depth of the stack, or the nearest one under it that Direct3D gave; 0 is the
         // game's target.
         void Bind(size_t depth);
+        void WholeTarget(); // the viewport, which is the scissor, over the whole of the bound target
         void UseTexture(bool textured);
 
         IDirect3DDevice8* m_Device = nullptr;
@@ -107,6 +110,9 @@ namespace headsup
         std::vector<Layer> m_Layers;   // one for each depth the stack has reached
         std::vector<bool> m_Stack;     // the layers pushed: false for one Direct3D refused
         bool m_LayersRefused = false;  // not asked again until the layers are let go
+        bool m_NoLayers      = false;  // RefuseLayers
+        bool m_Pushed        = false;  // a layer was pushed since Begin
+        int m_IdleRenders    = 0;      // ReleaseIdleLayers
         IDirect3DSurface8* m_GameTarget = nullptr; // while a layer is drawn into this frame
         IDirect3DSurface8* m_GameDepth  = nullptr;
     };

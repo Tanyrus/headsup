@@ -1245,6 +1245,7 @@ private:
         g_RealReset = reinterpret_cast<ResetFn>(*slot);
         if (!WriteSlot(slot, reinterpret_cast<void*>(&HookedReset)))
         {
+            m_Rml.RefuseLayers();
             Print("the settings window is drawn opaque: Reset could not be hooked.");
             return;
         }

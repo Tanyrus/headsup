@@ -1,8 +1,9 @@
 #include "rml_menu.h"
 
 #include "fonts.h"
-#include "menu_fonts.h"
+#include "markup.h"
 #include "menu_sizes.h"
+#include "rml_pure.h"
 #include "utf16.h"
 
 #include <RmlUi/Core/Elements/ElementFormControl.h>
@@ -387,7 +388,7 @@ namespace headsup
         if (m_Opacity >= kMaxOpacity)
             m_Document->RemoveProperty(Rml::PropertyId::Filter);
         else
-            m_Document->SetProperty("filter", "opacity(" + std::to_string(static_cast<float>(m_Opacity) / kPercent) + ")");
+            m_Document->SetProperty("filter", std::string(kOpacityFilter) + "(" + RcssNumber(static_cast<float>(m_Opacity) / kPercent) + ")");
     }
 
     void RmlMenu::ProcessEvent(Rml::Event& event)
@@ -522,11 +523,17 @@ namespace headsup
             m_Opacity = settings.menuOpacity;
             ApplyOpacity();
         }
+        if (m_Revealing) m_Document->RemoveProperty(Rml::PropertyId::Visibility);
+        m_Revealing = false;
         if (!m_Visible)
         {
             m_Document->Show(Rml::ModalFlag::None, Rml::FocusFlag::Auto);
+            // RmlUi applies an animation once its clock has passed the start, so the frame that sets one draws the
+            // window whole: hidden that frame, it comes in already fading.
             m_Document->SetClass("open", true);
-            m_Visible = true;
+            m_Document->SetProperty(Rml::PropertyId::Visibility, Rml::Property(Rml::Style::Visibility::Hidden));
+            m_Revealing = true;
+            m_Visible   = true;
             char text[32];
             std::snprintf(text, sizeof(text), "v%g", version);
             if (Rml::Element* shown = m_Document->GetElementById(kMenuVersionId)) shown->SetInnerRML(text);

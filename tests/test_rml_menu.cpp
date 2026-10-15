@@ -1220,8 +1220,10 @@ TEST(the_window_takes_its_opacity_once_as_a_whole_and_never_more_than_its_settin
     {
         const size_t before = window.Render().composited.size();
         window.Frames();
-        CHECK(window.Render().composited.size() > before && window.Render().composited.back() == 0.5f);
-        CHECK(document->GetComputedValues().opacity() <= 1.0f);
+        // RmlUi starts an animation a frame after it is set: that first frame shows nothing rather than all of it.
+        if (frame == 0) CHECK(!document->IsVisible() && window.Render().composited.size() == before);
+        if (frame > 0) CHECK(window.Render().composited.size() > before && window.Render().composited.back() == 0.5f);
+        if (frame == 1) CHECK(document->IsVisible() && document->GetComputedValues().opacity() < 0.5f);
     }
     CHECK_EQ(document->GetComputedValues().opacity(), 1.0f);
     // The slider on the HeadsUp Config page sets it, and at full opacity no layer is drawn.

@@ -74,12 +74,17 @@ namespace headsup
         return Argb(static_cast<uint8_t>(level), static_cast<uint8_t>(level), static_cast<uint8_t>(level), static_cast<uint8_t>(level));
     }
 
-    float FilterOpacity(std::span<const float> opacities)
+    size_t DrawnDepth(const std::vector<bool>& made, size_t depth)
     {
-        float opacity = 1.0f;
-        for (const float each : opacities)
-            opacity *= each;
-        return opacity;
+        while (depth > 0 && !made[depth - 1])
+            --depth;
+        return depth;
+    }
+
+    bool ReleaseIdleLayers(int& idleRenders, bool pushed)
+    {
+        idleRenders = pushed ? 0 : idleRenders + 1;
+        return idleRenders == kIdleRendersBeforeRelease;
     }
 
     std::array<ScreenVertex, 6> LayerQuad(int width, int height, float shareU, float shareV, uint32_t tint)

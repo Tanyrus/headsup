@@ -2,6 +2,7 @@
 #include "test.h"
 
 #include <algorithm>
+#include <cmath>
 #include <vector>
 
 using namespace headsup;
@@ -27,29 +28,53 @@ TEST(a_layer_is_laid_over_the_target_at_its_opacity_in_premultiplied_color)
     CHECK_EQ(LayerTint(0.5f), 0x80808080u);
     CHECK_EQ(LayerTint(0.0f), 0u);
     CHECK_EQ(LayerTint(2.0f), 0xFFFFFFFFu);
-    const float opacities[] = {0.5f, 0.5f};
-    CHECK_EQ(FilterOpacity(opacities), 0.25f);
-    CHECK_EQ(FilterOpacity({}), 1.0f);
     // Two triangles over the whole target, their texture coordinates the target's share of the padded layer, each
-    // pixel's center on its texel's.
-    const auto quad = LayerQuad(2560, 1440, 0.625f, 0.703125f, 0x80808080u);
-    float left = 1e9f, top = 1e9f, right = -1e9f, bottom = -1e9f, uMax = 0.0f, vMax = 0.0f;
+    // pixel's center on its texel's: a vertex at a pixel's x reads the layer at that x, never mirrored.
+    constexpr float kWidth = 2560.0f, kHeight = 1440.0f, kShareU = 0.625f, kShareV = 0.703125f;
+    const auto quad = LayerQuad(2560, 1440, kShareU, kShareV, 0x80808080u);
+    float area = 0.0f;
+    for (size_t t = 0; t < quad.size(); t += 3)
+    {
+        const ScreenVertex &a = quad[t], &b = quad[t + 1], &c = quad[t + 2];
+        area += std::abs((b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y)) / 2.0f;
+    }
+    CHECK_EQ(area, kWidth * kHeight);
+    for (const float x : {-kPixelCenter, kWidth - kPixelCenter}) // both halves, not one twice: all four corners
+        for (const float y : {-kPixelCenter, kHeight - kPixelCenter})
+            CHECK(std::ranges::any_of(quad, [&](const ScreenVertex& v) { return v.x == x && v.y == y; }));
     for (const ScreenVertex& v : quad)
     {
-        left   = std::min(left, v.x);
-        top    = std::min(top, v.y);
-        right  = std::max(right, v.x);
-        bottom = std::max(bottom, v.y);
-        uMax   = std::max(uMax, v.u);
-        vMax   = std::max(vMax, v.v);
+        CHECK(v.x == -kPixelCenter || v.x == kWidth - kPixelCenter);
+        CHECK(v.y == -kPixelCenter || v.y == kHeight - kPixelCenter);
+        CHECK_EQ(v.u, (v.x + kPixelCenter) / kWidth * kShareU);
+        CHECK_EQ(v.v, (v.y + kPixelCenter) / kHeight * kShareV);
         CHECK_EQ(v.color, 0x80808080u);
     }
-    CHECK_EQ(left, -kPixelCenter);
-    CHECK_EQ(top, -kPixelCenter);
-    CHECK_EQ(right, 2560.0f - kPixelCenter);
-    CHECK_EQ(bottom, 1440.0f - kPixelCenter);
-    CHECK_EQ(uMax, 0.625f);
-    CHECK_EQ(vMax, 0.703125f);
+}
+
+TEST(drawing_goes_into_the_highest_layer_direct3d_made)
+{
+    // A refused layer's drawing goes on into the one under it, down to the game's own target at 0.
+    const std::vector<bool> stack = {true, false, true, false};
+    CHECK_EQ(DrawnDepth(stack, 4), size_t{3});
+    CHECK_EQ(DrawnDepth(stack, 3), size_t{3});
+    CHECK_EQ(DrawnDepth(stack, 2), size_t{1});
+    CHECK_EQ(DrawnDepth(stack, 0), size_t{0});
+    const std::vector<bool> refused = {false, false};
+    CHECK_EQ(DrawnDepth(refused, 2), size_t{0});
+}
+
+TEST(layers_are_let_go_once_none_was_drawn_into_for_a_while)
+{
+    int idle = 0;
+    for (int render = 1; render < kIdleRendersBeforeRelease; ++render)
+        CHECK(!ReleaseIdleLayers(idle, false));
+    CHECK(ReleaseIdleLayers(idle, false));
+    CHECK(!ReleaseIdleLayers(idle, false)); // once, not every render after
+    CHECK(!ReleaseIdleLayers(idle, true));
+    for (int render = 1; render < kIdleRendersBeforeRelease; ++render)
+        CHECK(!ReleaseIdleLayers(idle, false)); // a layer drawn into starts the count again
+    CHECK(ReleaseIdleLayers(idle, false));
 }
 
 TEST(rgba_bytes_become_argb_words)
