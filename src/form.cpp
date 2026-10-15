@@ -22,8 +22,10 @@ namespace headsup
         constexpr float kColorFull        = 255.0f;
         constexpr int kHexDigits          = 6;
         constexpr int kNumberDigits       = 6; // a number box holds a sign and five digits
-        // The room a square button takes beside a dropdown: the swatch, and each of a font's two arrows.
+        // The room a square button takes beside a dropdown: the swatch, and each of two step arrows.
         constexpr float kSquareRoom = kFrame + kControlGap;
+        // Between two step arrows (the font's, the window's size), so the row ends where a slider's does.
+        constexpr float kBetweenArrows = kControlWidth - 2.0f * kSquareRoom;
         constexpr int kHexBase            = 16;
         constexpr const char* kNoteName      = "note";     // a note's id, as its card's controls are named
         constexpr const char* kCaptionSuffix = " caption"; // a caption's, after its text
@@ -150,7 +152,7 @@ namespace headsup
                 *enabled = !*enabled;
                 changed  = true;
             }
-            Out() += "<div class=\"check card-on\" id=\"" + check + "\"><div class=\"mark\"></div></div>";
+            Out() += std::string("<div class=\"") + kCardCheck + "\" id=\"" + check + "\"><div class=\"mark\"></div></div>";
             Set(check, FormValueKind::Class, "on", {}, *enabled);
         }
         Out() += "</div>";
@@ -285,11 +287,9 @@ namespace headsup
         const std::string name  = label;
         const std::string shown = Id(label) + "-val";
         int stepped             = value;
-        if (Pressable("<div class=\"tri left\"></div>", (name + " previous").c_str(), "btn step", nullptr)) --stepped;
-        // The arrows take their room from the number, so the row ends where a slider's does.
-        Out() += "<div class=\"stepval\" id=\"" + shown + "\" style=\"width:" + Em(kControlWidth - 2.0f * kSquareRoom) +
-                 ";\"></div>";
-        if (Pressable("<div class=\"tri right\"></div>", (name + " next").c_str(), "btn step", nullptr)) ++stepped;
+        if (StepArrow(name, false)) --stepped;
+        Out() += "<div class=\"stepval\" id=\"" + shown + "\" style=\"width:" + Em(kBetweenArrows) + ";\"></div>";
+        if (StepArrow(name, true)) ++stepped;
         stepped = std::clamp(stepped, lo, hi);
         if (stepped != value)
         {
@@ -407,18 +407,15 @@ namespace headsup
         const int picked = FontEntry(choices, unset, font);
         int chosen       = picked;
         const std::string name = label;
-        if (Pressable("<div class=\"tri left\"></div>", (name + " previous").c_str(), "btn step", nullptr))
-            chosen = StepFontEntry(count, picked, -1);
+        if (StepArrow(name, false)) chosen = StepFontEntry(count, picked, -1);
         int listed = 0;
         // A long family's name is cut in the list and in the closed control: both say it whole under the pointer.
         const std::string shown = FontShown(choices, unset, font);
-        // The arrows take their room from the dropdown, so the row ends where a slider's does.
-        if (ListAt(label, shown, kControlWidth - 2.0f * kSquareRoom, count,
+        if (ListAt(label, shown, kBetweenArrows, count,
                 [&](int entry) { return FontEntryLabel(choices, unset, entry); }, picked, listed, shown.c_str(),
                 [&](int entry) { return FontEntryLabel(choices, unset, entry); }))
             chosen = listed;
-        if (Pressable("<div class=\"tri right\"></div>", (name + " next").c_str(), "btn step", nullptr))
-            chosen = StepFontEntry(count, picked, 1);
+        if (StepArrow(name, true)) chosen = StepFontEntry(count, picked, 1);
         if (chosen != picked && chosen != kNoFontEntry)
         {
             font    = FontOfEntry(choices, unset, chosen);
@@ -609,6 +606,12 @@ namespace headsup
         const std::string note = Id(kNoteName);
         Out() += "<div class=\"note\" id=\"" + note + "\">" + EscapedRml(text) + "</div>";
         Set(note, FormValueKind::Class, kOffClass, {}, m_Off);
+    }
+
+    bool Form::StepArrow(const std::string& label, bool next)
+    {
+        return Pressable(next ? "<div class=\"tri right\"></div>" : "<div class=\"tri left\"></div>",
+            (label + (next ? " next" : " previous")).c_str(), "btn step", nullptr);
     }
 
     bool Form::Pressable(const std::string& inside, const char* id, const char* classes, const char* tip)

@@ -11,7 +11,7 @@ namespace headsup
     {
         const char* name;
         const char* file;
-        float scale;
+        float oldScale;
     };
     inline constexpr MenuFont kMenuFonts[] = {
         {"Segoe UI", "segoeui.ttf", 1.0f},

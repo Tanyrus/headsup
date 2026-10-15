@@ -18,7 +18,7 @@ using namespace headsup;
 
 namespace
 {
-    constexpr float kEm       = 18.0f; // the window's text, in pixels
+    constexpr float kEm       = static_cast<float>(kDefaultMenuFontSize); // the window's text, in pixels
     constexpr double kVersion = 0.65;
     constexpr int kLeftButton = 0;
     constexpr double kFrameSeconds = 1.0 / 30.0; // the game's frame
@@ -1186,6 +1186,34 @@ TEST(a_toggles_word_sits_inside_its_track_clear_of_the_knob_at_either_end)
         window.Click(box);
         window.Frames(30);
     }
+}
+
+TEST(the_debug_report_button_on_the_headsup_config_page_asks_for_one_report)
+{
+    Window window;
+    window.Page("configmenu");
+    CHECK(!window.menu.TakeDebugRequest());
+    window.Click("configmenu-headsup-debug-report");
+    CHECK(window.menu.TakeDebugRequest());
+    CHECK(!window.menu.TakeDebugRequest()); // once
+    CHECK_EQ(window.Said(), "");
+}
+
+TEST(a_font_size_arrow_stays_under_the_pointer_as_the_window_grows_and_shrinks)
+{
+    // The tester's report: the slider ran away from the pointer as the window grew under it. An arrow clicked twice
+    // where it was steps twice.
+    Window window;
+    window.Page("configmenu");
+    const Rml::Vector2f next = window.Center("configmenu-settings-window-size-next");
+    CHECK(window.ClickAt(next));
+    CHECK(window.ClickAt(next));
+    CHECK_EQ(window.settings.menuFontSize, kDefaultMenuFontSize + 2);
+    const Rml::Vector2f previous = window.Center("configmenu-settings-window-size-previous");
+    CHECK(window.ClickAt(previous));
+    CHECK(window.ClickAt(previous));
+    CHECK_EQ(window.settings.menuFontSize, kDefaultMenuFontSize);
+    CHECK_EQ(window.Said(), "");
 }
 
 TEST(the_windows_font_size_is_its_settings_pixels_whatever_its_font_and_its_arrows_step_it)

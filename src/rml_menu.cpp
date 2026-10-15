@@ -516,7 +516,20 @@ namespace headsup
         if (pixels != m_FontPixels)
         {
             m_FontPixels = pixels;
+            // What the pointer is on, a size arrow just clicked, stays under it as the window grows or shrinks, as
+            // far as the screen lets the window move: the next click lands on the same arrow.
+            Rml::Element* held = m_Visible ? host.context->GetHoverElement() : nullptr;
+            if (held != nullptr && held->GetOwnerDocument() != m_Document) held = nullptr;
+            const Rml::Vector2f before = held != nullptr ? held->GetAbsoluteOffset(Rml::BoxArea::Border) : Rml::Vector2f{};
             SetPx(m_Document, Rml::PropertyId::FontSize, pixels);
+            if (held != nullptr)
+            {
+                m_Document->UpdateDocument();
+                const Rml::Vector2f drift = held->GetAbsoluteOffset(Rml::BoxArea::Border) - before;
+                const Rml::Vector2f at    = m_Document->GetAbsoluteOffset(Rml::BoxArea::Border);
+                SetPx(m_Document, Rml::PropertyId::Left, std::max(0.0f, std::round(at.x - drift.x)));
+                SetPx(m_Document, Rml::PropertyId::Top, std::max(0.0f, std::round(at.y - drift.y)));
+            }
         }
         if (settings.menuOpacity != m_Opacity)
         {

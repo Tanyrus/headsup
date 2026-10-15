@@ -1047,10 +1047,13 @@ TEST(the_windows_font_size_is_pixels_and_an_old_percent_becomes_the_pixels_it_dr
     CHECK_EQ(loaded({{"menuFont", "Segoe UI"}, {"menuScale", "125.0000"}}), 23);
     CHECK_EQ(loaded({{"menuFont", "Barlow Condensed"}, {"menuScale", "125.0000"}}), 26);
     CHECK_EQ(loaded({{"menuFont", "Segoe UI"}, {"menuScale", "100.0000"}}), 18);
+    // A percent edited past the old range was drawn at its end: 160 percent, 28.8 pixels.
+    CHECK_EQ(loaded({{"menuFont", "Segoe UI"}, {"menuScale", "400.0000"}}), 29);
+    CHECK_EQ(loaded({{"menuFont", "Segoe UI"}, {"menuScale", "10.0000"}}), 13); // 70 percent
     // Its own key wins, and the percent is never written again.
     CHECK_EQ(loaded({{"menuScale", "150.0000"}, {"menuFontSize", "20.0000"}}), 20);
-    MapStore fresh;
-    CHECK_EQ(LoadSettings(fresh).menuFontSize, 18);
+    MapStore fresh; // a new install has no percent to convert
+    CHECK_EQ(LoadSettings(fresh).menuFontSize, Settings{}.menuFontSize);
     Settings s;
     s.menuFontSize = 30;
     MapStore file  = OwnFileWith(s, {{"menuScale", "80.0000"}});

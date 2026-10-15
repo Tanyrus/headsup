@@ -70,6 +70,7 @@ namespace headsup
         constexpr const char* kCursorEdgeKey  = "cursorOutlineThickness";
         constexpr const char* kMenuFontSizeKey = "menuFontSize";
         constexpr const char* kOldMenuScaleKey = "menuScale"; // a percent of Ashita's own font size
+        constexpr float kOldMinMenuScale = 70.0f, kOldMaxMenuScale = 160.0f; // percent, the old key's range
         // Ashita's own font size, which the window's old size was a percent of: GetFontSize() in the game, 2026-10-14.
         constexpr float kAshitaFontPixels = 18.0f;
         constexpr IntKey kRebasedInts[] = {{kCursorWidthKey, &Settings::cursorWidth, kMinCursorSide, kMaxCursorSide},
@@ -1229,9 +1230,11 @@ namespace headsup
             s.barCurrency = *currency;
         s.barTargetDetails = store.GetBool(kTargetDetailsKey, s.barTargetDetails);
         s.menuFont         = store.GetString(kMenuFontKey, s.menuFont.c_str());
+        // By the font named: one whose Windows file was missing was drawn in Barlow Condensed, which nothing here knows.
         s.menuFontSize     = Rebased(store, kMenuFontSizeKey, kOldMenuScaleKey, s.menuFontSize, [&](float percent) {
             const MenuFont* font = MenuFontNamed(s.menuFont);
-            return kAshitaFontPixels * percent / kPercent * (font != nullptr ? font->scale : 1.0f);
+            return kAshitaFontPixels * std::clamp(percent, kOldMinMenuScale, kOldMaxMenuScale) / kPercent *
+                   (font != nullptr ? font->oldScale : 1.0f);
         });
         const std::string menuTheme = store.GetString(kMenuThemeKey, "");
         for (int t = 0; t < kMenuThemeCount; ++t)
