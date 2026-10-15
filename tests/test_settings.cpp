@@ -321,6 +321,7 @@ jobNames=false
 clock24=false
 stackNames=true
 hideInEvent=true
+debugMode=true
 barTitleFont=Cinzel
 barTextFont=
 barSubtitle=before
@@ -393,6 +394,7 @@ helpBarY=8.0000
         s.clock24    = false;
         s.stackNames = true;
         s.hideInEvent = true;
+        s.debugMode = true;
         s.barTitleFont = "Cinzel";
         s.barSubtitle = SubtitlePlace::Before;
         s.cursorOutlineThickness = 120; // 60 of before
@@ -654,6 +656,7 @@ TEST(a_file_from_before_hide_during_conversation_keeps_plates_in_conversations)
 {
     MapStore file = ReleaseFile();
     CHECK(!LoadSettings(file).hideInEvent);
+    CHECK(!LoadSettings(file).debugMode); // nor had it a debug mode
 }
 
 TEST(called_for_help_has_its_own_color_orange_until_one_is_saved)

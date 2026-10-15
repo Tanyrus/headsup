@@ -95,6 +95,7 @@ namespace headsup
     struct FormBlock
     {
         std::string id, rml;
+        bool bare = false; // on the page itself under the cards, with no card around it
         bool operator==(const FormBlock&) const = default;
     };
     constexpr const char* kSidebarBlock = "sidebar";
@@ -128,6 +129,7 @@ namespace headsup
     constexpr const char* kRaisedPill = "btn raised";
     constexpr const char* kFlatPill   = "btn flat";
     constexpr const char* kAccentPill = "btn accent";
+    constexpr const char* kWashPill   = "btn wash"; // a slider's filled part
 
     // The settings window's kit. A pass runs the page's code against it, as an immediate-mode window is drawn:
     // each call takes what the player did to its control since the last pass from the events, changes what it is
@@ -165,6 +167,8 @@ namespace headsup
         // A card, its title row folding it; an enabled checkbox sits at the title's right, and what the card is for
         // is written under the title. False when it is folded, with nothing more to do; true, with EndCard to call.
         bool BeginCard(const char* title, bool* enabled = nullptr, const char* about = nullptr);
+        // A block with the id a card of that title would have and no title or card of its own; EndCard ends it.
+        void BeginBare(const char* title);
         void EndCard();
 
         // A row: its label at the left, with its tip, and the controls that follow at the right, until EndRow.

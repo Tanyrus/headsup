@@ -491,7 +491,7 @@ TEST(the_list_of_pages_scrolls_in_a_window_too_short_for_it)
     window.Click("nav-configmenu");
     Rml::Element* last = window.Find("nav-configmenu");
     CHECK(last->GetAbsoluteOffset(Rml::BoxArea::Border).y + last->GetBox().GetSize(Rml::BoxArea::Border).y <= bottom);
-    CHECK(window.Shows("configmenu-headsup-head") || last->IsClassSet("picked"));
+    CHECK(window.Shows("configmenu-settings-window-head") || last->IsClassSet("picked"));
 }
 
 TEST(a_dash_mark_is_shown_as_its_shape_in_the_list_and_in_the_closed_control)
@@ -1301,10 +1301,26 @@ TEST(the_debug_report_button_on_the_headsup_config_page_asks_for_one_report)
 {
     Window window;
     window.Page("configmenu");
+    window.Click("configmenu-debug-mode-on");
     CHECK(!window.menu.TakeDebugRequest());
-    window.Click("configmenu-headsup-debug-report");
+    window.Click("configmenu-debug-mode-debug-report");
     CHECK(window.menu.TakeDebugRequest());
     CHECK(!window.menu.TakeDebugRequest()); // once
+    CHECK_EQ(window.Said(), "");
+}
+
+TEST(the_reset_button_stands_under_the_cards_as_wide_as_one_taller_and_in_capitals)
+{
+    Window window;
+    window.Page("configmenu");
+    auto size = [&](const char* id) { return window.Find(id)->GetBox().GetSize(Rml::BoxArea::Border); };
+    const char* button = "configmenu-reset-reset-all-settings";
+    CHECK(!window.Find("configmenu-reset")->IsClassSet(kMenuCardClass));
+    CHECK(std::abs(size(button).x - size("configmenu-settings-window").x) < 1.0f);
+    CHECK(size(button).y > size("configmenu-settings-window-size-next").y);
+    CHECK(window.Find(button)->GetComputedValues().text_transform() == Rml::Style::TextTransform::Uppercase);
+    window.Click(button);
+    CHECK(window.Shows("configmenu-reset-reset-everything"));
     CHECK_EQ(window.Said(), "");
 }
 

@@ -23,6 +23,7 @@ namespace headsup
     {
         constexpr const char* kChip        = "btn raised chip";
         constexpr const char* kQuietChip   = "btn flat chip";
+        constexpr const char* kResetPill   = "btn wash reset-all"; // a card's width, under the cards
         constexpr const char* kNavStart    = "nav-";
         constexpr const char* kWidgetChip  = "chip "; // a tray chip's name in its card, before its widget's number
         constexpr float kAddWindowShare    = 0.8f;    // of a dropdown's width: a group's "+ Add Window"
@@ -54,6 +55,7 @@ namespace headsup
         }
         const char* Word(const Context& c, WindowWord word) { return c.layout.WordOf(word).name; }
         const char* WordTip(const Context& c, WindowWord word) { return c.layout.WordOf(word).tip; }
+        std::string_view FileName(std::string_view path) { return path.substr(path.find_last_of("\\/") + 1); }
 
         // A tip that says how near a fade begins.
         std::string Near(const char* tip) { return Filled(Said(tip), kNearMark, Formatted("%.0f", kFadeNearYalms)); }
@@ -158,7 +160,8 @@ namespace headsup
             form.Fade(false);
             if (!c.state.confirmReset)
             {
-                if (form.Action(Labeled(e.name, e.key).c_str(), e.tip)) c.state.confirmReset = true;
+                const std::string label = Labeled(e.name, e.key);
+                if (form.Button(label.c_str(), label.c_str(), kResetPill, e.tip)) c.state.confirmReset = true;
                 return;
             }
             form.Note(Word(c, WindowWord::ResetAllSettingsNote));
@@ -1202,46 +1205,58 @@ namespace headsup
                 form.SliderPercent(label.c_str(), s.menuOpacity, kMinMenuOpacity, kMaxOpacity, tip);
                 break;
             case SettingPiece::ResetAllSettings: ResetAll(c, e); break;
-            case SettingPiece::DebugReport:
+            case SettingPiece::EnableHeadsup:
                 form.Fade(false);
-                if (form.Action(label.c_str(), tip)) c.state.debugRequested = true;
+                form.Switch(label.c_str(), s.enabled, tip);
+                break;
+            case SettingPiece::DebugReport:
+                form.Fade(!s.debugMode);
+                form.Line(s.debugMode ? "line" : (std::string("line ") + kOffClass).c_str());
+                if (form.Button(label.c_str(), label.c_str(), kWashPill, tip)) c.state.debugRequested = true;
+                if (r.watching.has_value() &&
+                    form.Button(Labeled(Word(c, *r.watching ? WindowWord::DebugReportStop : WindowWord::DebugReportWatch), "watch").c_str(),
+                        "watch", kWashPill, WordTip(c, WindowWord::DebugReportWatch)))
+                    c.state.watchRequested = true;
+                form.EndLine();
+                if (r.lastReport != nullptr && !r.lastReport->empty())
+                    form.Note(Filled(Word(c, WindowWord::DebugReportSaved), kFileMark, FileName(*r.lastReport)).c_str());
                 break;
             case SettingPiece::MobsOutlined:
-                form.Fade(false);
+                form.Fade(!s.debugMode);
                 form.Reading(label.c_str(), std::to_string(r.outlinedMobs));
                 break;
             case SettingPiece::MeshesOutlined:
-                form.Fade(false);
+                form.Fade(!s.debugMode);
                 form.Reading(label.c_str(), std::to_string(r.meshes));
                 break;
             case SettingPiece::StencilBuffer:
-                form.Fade(false);
+                form.Fade(!s.debugMode);
                 form.Reading(label.c_str(), r.stencilAvailable ? "available" : "missing: no outlines");
                 break;
             case SettingPiece::Nameplates:
-                form.Fade(false);
+                form.Fade(!s.debugMode);
                 form.Reading(label.c_str(), std::to_string(r.nameplates));
                 break;
             case SettingPiece::Drawn:
-                form.Fade(false);
+                form.Fade(!s.debugMode);
                 form.Reading(label.c_str(), r.drewInScene ? "into the scene" : "on top");
                 break;
             case SettingPiece::GameSNames:
-                form.Fade(false);
+                form.Fade(!s.debugMode);
                 form.Reading(label.c_str(),
                     r.hooked ? Formatted("%u, %u by HeadsUp, %u hidden", r.names, r.replaced, r.hidden) : "not hooked");
                 break;
             case SettingPiece::FrameTime:
-                form.Fade(false);
+                form.Fade(!s.debugMode);
                 form.Reading(label.c_str(), Formatted("%.2f ms (%.0f fps)", r.frameMs, r.frameMs > 0.0 ? 1000.0 / r.frameMs : 0.0));
                 break;
             case SettingPiece::LastSave:
-                form.Fade(false);
+                form.Fade(!s.debugMode);
                 form.Reading(label.c_str(),
                     Formatted("%.0f ms, %zu %s", r.lastSaveMs, r.lastSaveKeys, r.lastSaveKeys == 1 ? "key" : "keys"));
                 break;
             case SettingPiece::YourLevel:
-                form.Fade(false);
+                form.Fade(!s.debugMode);
                 form.Reading(label.c_str(),
                     r.level > 0 ? Formatted("%d%s", r.level, r.sitting ? ", sitting" : "") : std::string("unknown"));
                 break;
@@ -1255,6 +1270,7 @@ namespace headsup
             bool skipped  = false;
             bool off      = false;
             bool* enabled = nullptr;
+            bool bare     = false; // drawn under the cards with no card of its own
         };
         CardState CardStateOf(CardPiece piece, Context& c)
         {
@@ -1267,9 +1283,8 @@ namespace headsup
             case CardPiece::ScreenshotMode:
             case CardPiece::WindowGroups:
             case CardPiece::GameWindows:
-            case CardPiece::SettingsWindow:
-            case CardPiece::Reset:
-            case CardPiece::ThisFrame: return {};
+            case CardPiece::SettingsWindow: return {};
+            case CardPiece::Reset: return {.bare = true};
             case CardPiece::Nameplates: return {false, !on, &s.nameplates};
             case CardPiece::OutlineStyle: return {false, !on, &s.outlines};
             case CardPiece::TargetCursor:
@@ -1294,7 +1309,7 @@ namespace headsup
             case CardPiece::HelpBar: return {false, !BarOn(s), &s.barWidgets[kHelpWidget]};
             case CardPiece::Widgets:
             case CardPiece::Layout: return {false, !BarOn(s)};
-            case CardPiece::Headsup: return {false, false, &s.enabled};
+            case CardPiece::DebugMode: return {false, false, &s.debugMode};
             }
             return {};
         }
@@ -1342,7 +1357,10 @@ namespace headsup
             const CardState own = CardStateOf(card.piece, c);
             if (own.skipped) continue;
             form.Fade(own.off);
-            if (!form.BeginCard(Labeled(card.name, card.key).c_str(), own.enabled, card.about)) continue;
+            if (own.bare)
+                form.BeginBare(Labeled(card.name, card.key).c_str());
+            else if (!form.BeginCard(Labeled(card.name, card.key).c_str(), own.enabled, card.about))
+                continue;
             CardNote(card.piece, c);
             for (const LayoutSetting& setting : layout.SettingsOf(card))
                 if ((setting.kinds & kinds) != 0 && (!setting.entity || c.kind)) DrawSetting(c, setting);

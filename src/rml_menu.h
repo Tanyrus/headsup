@@ -42,6 +42,7 @@ namespace headsup
         void Close();
         // True once after the Debug Report button was pressed: write the /hu debug report.
         bool TakeDebugRequest();
+        bool TakeWatchRequest();
         // True once after a list of pictures (Target Cursor, Cursor Icon) was opened: read the cursors folder again.
         bool TakeCursorsRequest();
         // Opens the window at the page named, as its sidebar spells it in lower case without spaces ("toppanel");

@@ -351,17 +351,10 @@
       "name": "HeadsUp Config",
       "cards": [
         {
-          "key": "headsup",
-          "name": "HeadsUp",
-          "description": "All of HeadsUp, as /hu on and /hu off.",
-          "settings": [
-            {"key": "debug-report", "name": "Debug Report", "tip": "As /hu debug: writes a report to logs/headsup."}
-          ]
-        },
-        {
           "key": "settings-window",
           "name": "Config Window",
           "settings": [
+            {"key": "enable-headsup", "name": "Enable HeadsUp", "tip": "If turned off, all HeadsUp features will be disabled."},
             {"key": "window-theme", "name": "Window Theme", "tip": "The color and style of this config window."},
             {"key": "font", "name": "Font", "tip": "The font used for this config window."},
             {"key": "size", "name": "Font Size", "tip": "The font size used for this config window, in pixels."},
@@ -369,9 +362,19 @@
           ]
         },
         {
-          "key": "this-frame",
-          "name": "This Frame",
+          "key": "debug-mode",
+          "name": "Debug Mode",
           "settings": [
+            {
+              "key": "debug-report",
+              "name": "Generate Report",
+              "tip": "As /hu debug: writes a report to logs/headsup.",
+              "words": [
+                {"key": "watch", "name": "Start Watching", "tip": "As /hu drawdump watch: watches every frame for names that jump, flicker or vanish, and writes what it finds to logs/headsup until stopped."},
+                {"key": "stop", "name": "Stop Watching"},
+                {"key": "saved", "name": "Report saved to: {file}"}
+              ]
+            },
             {"key": "mobs-outlined", "name": "Mobs Outlined"},
             {"key": "meshes-outlined", "name": "Meshes Outlined"},
             {"key": "stencil-buffer", "name": "Stencil Buffer"},

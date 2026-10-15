@@ -35,6 +35,7 @@ namespace headsup
             {"screenshotHidesGame", &Settings::screenshotHidesGame},
             {"clockSeconds", &Settings::clockSeconds},
             {"stackNames", &Settings::stackNames}, {"hideInEvent", &Settings::hideInEvent},
+            {"debugMode", &Settings::debugMode},
             {"nameplates", &Settings::nameplates}, {"outlines", &Settings::outlines},
             {"outlineFadeIn", &Settings::outlineFadeIn}, {"cursorFloat", &Settings::cursorFloat},
             {"autoCheck", &Settings::autoCheck}};

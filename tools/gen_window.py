@@ -109,8 +109,7 @@ PIECES = Pieces(
         'weaknesses': Card(), 'statuses': Card(), 'placeholder-timers': Card(),
         'screenshot-mode': Card(), 'window-groups': Card(), 'game-windows': Card(),
         'top-panel': Card(switch=True), 'help-bar': Card(switch=True), 'widgets': Card(), 'layout': Card(),
-        'mouse-pointer': Card(), 'settings-window': Card(), 'reset': Card(), 'headsup': Card(switch=True),
-        'this-frame': Card(),
+        'mouse-pointer': Card(), 'settings-window': Card(), 'reset': Card(), 'debug-mode': Card(switch=True),
     },
     settings={
         # Entities
@@ -180,9 +179,10 @@ PIECES = Pieces(
         'trays': Setting(unnamed=True), 'reset-layout': Setting(),
         # Mouse Cursor and HeadsUp Config
         'pointer-icon': Setting(options=3, nameless=frozenset({2})), 'pointer-fix': Setting(), 'keep-pointer': Setting(),
-        'window-theme': Setting(), 'font': Setting(), 'size': Setting(), 'window-opacity': Setting(),
+        'enable-headsup': Setting(), 'window-theme': Setting(), 'font': Setting(), 'size': Setting(),
+        'window-opacity': Setting(),
         'reset-all-settings': Setting(words={'note': True, 'reset-everything': True, 'keep-them': True}),
-        'debug-report': Setting(),
+        'debug-report': Setting(words={'watch': True, 'stop': True, 'saved': True}),
         'mobs-outlined': Setting(), 'meshes-outlined': Setting(), 'stencil-buffer': Setting(), 'nameplates': Setting(),
         'drawn': Setting(), 'game-s-names': Setting(), 'frame-time': Setting(), 'last-save': Setting(),
         'your-level': Setting(),
@@ -193,8 +193,8 @@ PIECES = Pieces(
         'smoothness': List(4), 'bar-theme': List(5), 'menu-theme': List(2), 'bar-sections': List(3),
         'bar-widgets': List(14), 'plate-lines': List(3), 'job-layout': List(3), 'exp-bar': List(3), 'tags': List(22),
     },
-    words={'switched-off': True, 'switch-off': True, 'switch-on': True, 'switched-off-top-panel': True, 'switched-off-headsup': True, 'key-add': True,
-           'key-waiting': True, 'always': True, 'never': True, 'conditions': True, 'local': True, 'themes-font': True,
+    words={'switched-off': True, 'switch-off': True, 'switch-on': True, 'switched-off-top-panel': True,
+           'switched-off-headsup': True, 'key-add': True, 'key-waiting': True, 'always': True, 'never': True, 'conditions': True, 'local': True, 'themes-font': True,
            'default-font': True, 'unused-tags-these': True, 'unused-tags-name': True, 'or': True, 'slot-tip': False},
 )
 

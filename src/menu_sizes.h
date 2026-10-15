@@ -22,6 +22,7 @@ namespace headsup
     constexpr float kSegmentWidth   = 4.6f;
     constexpr float kControlWidth   = 15.0f; // sliders and dropdowns
     constexpr float kFrame          = 1.6f;  // a control's height: a line of text and its padding above and below
+    constexpr float kTallButton     = 2.0f;  // a page's own wide button, a little taller than a control
     constexpr float kControlGap     = 0.5f;  // between a row's controls
     constexpr float kPageTop        = 2.4f;  // where a page's cards start under its title
     constexpr float kCutoffWidth    = 5.2f;  // a status badge's cutoff dropdowns

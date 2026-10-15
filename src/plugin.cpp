@@ -315,6 +315,7 @@ class HeadsUp final : public IPlugin
     float m_MenuHeight  = 0.0f;
     int m_CaptureLeft   = 0;
     std::string m_CapturePath;
+    std::string m_LastReport; // the file the last report or watch went to, which the settings window names
     std::string m_Capture;
     double m_CaptureLast = 0.0;
     LARGE_INTEGER m_QpcFrequency{};
@@ -788,10 +789,25 @@ public:
                 .barBand          = HelpBandNow().value_or(headsup::HelpBand{}).topBar,
                 .seenWindows      = &m_SeenWindows,
                 .cursorFiles      = &m_CursorFiles,
+#ifdef HEADSUP_DEV
+                .watching         = m_DrawDump.Watching(),
+#else
+                .watching         = std::nullopt,
+#endif
+                .lastReport       = &m_LastReport,
             };
             if (m_RmlMenu.Update(MenuHostNow(), m_Settings, readings, m_Fonts.Choices(m_Settings.defaultFont), kVersion))
                 m_SettingsChangedAt = now;
             if (m_RmlMenu.TakeDebugRequest()) m_DebugPending = true;
+#ifdef HEADSUP_DEV
+            if (m_RmlMenu.TakeWatchRequest())
+            {
+                const bool stopping = m_DrawDump.Watching();
+                Print(m_DrawDump.Start(stopping ? headsup::kDrawDumpStop : headsup::kDrawDumpWatch, Now(), m_AshitaCore,
+                    OwnFolder(kLogsFolder)));
+                if (stopping) m_LastReport = m_DrawDump.LogPath();
+            }
+#endif
             if (m_RmlMenu.TakeCursorsRequest()) ScanCursors();
         }
         if (headsup::SaveDue(m_SettingsChangedAt, now, m_RmlMenu.open)) SaveSettings();
@@ -2000,6 +2016,7 @@ private:
         std::fclose(out);
         Print("wrote " + path + "; recording " + std::to_string(kCaptureFrames) + " frames");
         m_CapturePath = path;
+        m_LastReport  = path;
         m_Capture     = headsup::kCaptureHeading;
         m_CaptureLeft = kCaptureFrames;
         m_CaptureLast = Now();

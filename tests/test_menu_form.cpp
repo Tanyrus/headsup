@@ -159,6 +159,51 @@ TEST(the_reset_card_asks_twice)
     CHECK(w.state.confirmReset && w.settings.barHeight == 60);
     const Form form = w.Pass({{"configmenu-reset-reset-everything", kClickEvent, ""}});
     CHECK(form.changed && !w.state.confirmReset && w.settings.barHeight == Settings{}.barHeight);
+    // It stands under the cards on its own, with no card around it.
+    const FormBlock* reset = Block(form, "configmenu-reset");
+    CHECK(reset != nullptr && reset->bare && !Has(reset->rml, "card-head"));
+    CHECK(!Block(form, "configmenu-settings-window")->bare);
+}
+
+TEST(the_debug_mode_card_shows_its_switch_alone_until_debug_mode_is_on)
+{
+    Window w;
+    w.state.page   = Page::ConfigMenu;
+    const Form off = w.Pass();
+    CHECK(ClassOn(off, "configmenu-debug-mode-debug-report", kOffClass));
+    CHECK(ClassOn(off, "configmenu-debug-mode-mobs-outlined-label-row", kOffClass));
+    w.Pass({{"configmenu-debug-mode-debug-report", kClickEvent, ""}});
+    CHECK(!w.state.debugRequested);
+    const Form on = w.Pass({{"configmenu-debug-mode-on", kClickEvent, ""}});
+    CHECK(w.settings.debugMode && on.changed);
+    CHECK(!ClassOn(on, "configmenu-debug-mode-mobs-outlined-label-row", kOffClass));
+    const Form asked = w.Pass({{"configmenu-debug-mode-debug-report", kClickEvent, ""}});
+    CHECK(w.state.debugRequested);
+    // What this frame read comes after the buttons.
+    const FormBlock* card = Block(asked, "configmenu-debug-mode");
+    CHECK(At(card, "configmenu-debug-mode-debug-report") < At(card, "configmenu-debug-mode-mobs-outlined"));
+}
+
+TEST(a_build_that_watches_has_a_watch_button_and_the_card_says_where_the_last_report_went)
+{
+    Window w;
+    w.state.page         = Page::ConfigMenu;
+    w.settings.debugMode = true;
+    const char* watch    = "configmenu-debug-mode-watch";
+    CHECK(!Has(Block(w.Pass(), "configmenu-debug-mode")->rml, watch)); // a build with nothing to watch
+    w.readings.watching = false;
+    const std::string start = Block(w.Pass(), "configmenu-debug-mode")->rml;
+    CHECK(Has(start, w.layout.WordOf(WindowWord::DebugReportWatch).name));
+    w.Pass({{watch, kClickEvent, ""}});
+    CHECK(w.state.watchRequested);
+    w.readings.watching = true;
+    CHECK(Has(Block(w.Pass(), "configmenu-debug-mode")->rml, w.layout.WordOf(WindowWord::DebugReportStop).name));
+    // No report yet, no line for one; then the file's name.
+    CHECK(!Has(start, "debug-20261015"));
+    const std::string report = "C:\\PhoenixXI\\logs\\headsup\\debug-20261015-101500.txt";
+    w.readings.lastReport    = &report;
+    const std::string saved  = Block(w.Pass(), "configmenu-debug-mode")->rml;
+    CHECK(Has(saved, "debug-20261015-101500.txt") && !Has(saved, "PhoenixXI"));
 }
 
 TEST(a_key_row_takes_the_next_key_pressed_that_was_not_held)
@@ -216,7 +261,7 @@ TEST(a_page_whose_cards_are_all_switched_off_says_what_switches_them_on)
     CHECK_EQ(off.size(), size_t{1}); // the one card that says HeadsUp is off
     // The HeadsUp Config page, which switches HeadsUp on, keeps its cards.
     w.state.page = Page::ConfigMenu;
-    const Form config = w.Pass({{"configmenu-headsup-on", kClickEvent, ""}});
+    const Form config = w.Pass({{"configmenu-settings-window-enable-headsup", kClickEvent, ""}});
     CHECK(w.settings.enabled && config.changed);
     // With the top panel off, its widgets' page has nothing to set either.
     w.settings.showBar = false;
@@ -468,15 +513,15 @@ TEST(a_setting_moved_to_another_card_works_there_and_sets_only_its_own_key)
 TEST(a_setting_moved_to_another_page_hides_as_it_would_at_home)
 {
     test::EditedLayout edited;
-    edited.MoveSetting("min-size", "this-frame", 0);
+    edited.MoveSetting("min-size", "debug-mode", 0);
     Window w;
     w.layout                     = edited.Layout();
     w.state.page                 = Page::ConfigMenu;
     w.settings.scaleWithDistance = false;
-    CHECK(ClassOn(w.Pass(), "configmenu-this-frame-min-size-label-row", kOffClass));
+    CHECK(ClassOn(w.Pass(), "configmenu-debug-mode-min-size-label-row", kOffClass));
     w.settings.scaleWithDistance = true;
-    const Form form = w.Pass({{"configmenu-this-frame-min-size", kChangeEvent, "75"}});
-    CHECK(!ClassOn(form, "configmenu-this-frame-min-size-label-row", kOffClass));
+    const Form form = w.Pass({{"configmenu-debug-mode-min-size", kChangeEvent, "75"}});
+    CHECK(!ClassOn(form, "configmenu-debug-mode-min-size-label-row", kOffClass));
     CHECK(form.changed && w.settings.scaleMin == 75);
 }
 

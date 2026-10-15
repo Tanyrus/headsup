@@ -126,14 +126,14 @@ namespace headsup
 
     void Form::BeginBlock(const char* id)
     {
-        blocks.push_back(FormBlock{id, {}});
+        blocks.push_back(FormBlock{id, {}, false});
         m_CardId = id;
     }
 
     bool Form::BeginCard(const char* title, bool* enabled, const char* about)
     {
         m_CardId = Slug(pageKey + "/" + std::string(IdName(title)));
-        blocks.push_back(FormBlock{m_CardId, {}});
+        blocks.push_back(FormBlock{m_CardId, {}, false});
         m_CardOff       = values.size();
         m_CardSwitched  = enabled != nullptr;
         m_ShownInCard   = 0;
@@ -163,6 +163,18 @@ namespace headsup
         Out() += "<div class=\"card-body\">";
         if (about != nullptr && *about != '\0') Out() += "<div class=\"note\">" + EscapedRml(about) + "</div>";
         return true;
+    }
+
+    void Form::BeginBare(const char* title)
+    {
+        m_CardId = Slug(pageKey + "/" + std::string(IdName(title)));
+        blocks.push_back(FormBlock{m_CardId, {}, true});
+        m_CardOff      = values.size();
+        m_CardSwitched = false;
+        m_ShownInCard  = 0;
+        Set(m_CardId, FormValueKind::Class, kOffClass, {}, m_Off);
+        if (!m_Off) ++m_CardsShown;
+        Out() += "<div>";
     }
 
     void Form::EndCard()

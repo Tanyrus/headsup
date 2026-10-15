@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -30,6 +31,8 @@ namespace headsup
         int windowsBand = 0, barBand = 0;
         const std::vector<std::string>* seenWindows = nullptr; // the game's windows seen under Game help's bar
         const std::vector<std::string>* cursorFiles = nullptr; // the cursors folder's files, without their extensions
+        std::optional<bool> watching;            // whether the debug watch runs; none in a build without one
+        const std::string* lastReport = nullptr; // the file the last report went to, empty before one
     };
 
     // The Game Windows card's own state: its filter and whether it lists every window.
@@ -47,6 +50,7 @@ namespace headsup
         int widget         = 0;     // the Widgets page's picked widget, by BarWidget
         bool confirmReset  = false; // the reset button was pressed once and asks for a second press
         bool debugRequested = false;
+        bool watchRequested = false; // the debug watch is to start, or stop
         bool cursorsRequested = false; // a list of pictures was opened: the cursors folder is to be read again
         KeyCapture keyCapture;      // the Mouse Cursor page's
         KeyCapture shotKeyCapture;  // screenshot mode's

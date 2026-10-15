@@ -122,6 +122,7 @@ namespace headsup
     // In a word of the layout, where the code puts what it stands for: a line's name, a count, the yalms a fade starts
     // at, the tags a note names.
     constexpr std::string_view kLineMark = "{line}", kCountMark = "{count}", kNearMark = "{near}", kTagsMark = "{tags}";
+    constexpr std::string_view kFileMark = "{file}";
     // The text with every mark in it replaced by what it stands for.
     std::string Filled(std::string_view text, std::string_view mark, std::string_view with);
 

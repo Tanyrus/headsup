@@ -143,9 +143,11 @@ namespace headsup
         css += "scrollbarvertical sliderbar:active{background-color:" + color(c.accent) + ";}";
         css += "scrollbarvertical sliderarrowdec,scrollbarvertical sliderarrowinc{width:0px;height:0px;}";
         // Cards: the edge lights under the pointer, the arrow turns into place and the rows fade in as one opens.
+        const std::string cardSpacing = "margin-bottom:" + Em(kGutter * 0.7f) + ";margin-right:" + Em(kScrollbar + 0.3f) + ";";
         css += std::string(".") + kMenuCardClass + "{background-color:" + color(c.card) + ";border:1px " + color(c.border) +
-               ";border-radius:" + Em(kCardRadius) + ";margin-bottom:" + Em(kGutter * 0.7f) + ";margin-right:" +
-               Em(kScrollbar + 0.3f) + ";transition:border-color 0.2s cubic-out;}";
+               ";border-radius:" + Em(kCardRadius) + ";" + cardSpacing + "transition:border-color 0.2s cubic-out;}";
+        // A block under the cards, as wide as one.
+        css += std::string(".") + kMenuFootClass + "{" + cardSpacing + "}";
         css += std::string(".") + kMenuCardClass + ":hover{border-color:" + color(Faded(c.accent, kWash)) + ";}";
         css += ".card-head{position:relative;height:" + Em(kHeaderRow) + ";}";
         css += ".arrow{position:absolute;left:0.95em;top:" + Em(kHeaderRow / 2.0f - kArrow) + ";width:0px;height:0px;"
@@ -302,6 +304,13 @@ namespace headsup
         css += ".btn.flat:hover{background-color:" + color(c.accentSoft) + ";}";
         css += ".btn.accent{background-color:" + color(c.accent) + ";}";
         css += ".btn.accent:hover{background-color:" + color(c.accentHover) + ";}";
+        // A button in the red of a slider's filled part.
+        css += ".btn.wash{background-color:transparent;decorator:" + wash + ";border-color:" + color(c.raisedEdge) + ";color:" +
+               color(c.text) + ";}";
+        css += ".btn.wash:hover{decorator:horizontal-gradient(" + color(Faded(c.accent, kGlow)) + " " + color(Faded(c.accentEnd, kGlow)) +
+               ");}";
+        css += ".btn.reset-all{height:" + Em(kTallButton) + ";" + line(kTallButton, kPillEdge) + "border-radius:" +
+               Em(kTallButton / 2.0f) + ";text-transform:uppercase;}";
         css += ".btn.waiting{border-color:" + color(c.accent) + ";color:" + color(c.muted) + ";}";
         css += ".btn.round{width:" + frame + ";padding:0px;color:" + color(c.muted) + ";}";
         css += ".btn.step{position:relative;width:" + frame + ";padding:0px;border-radius:" + radius + ";background-color:" +

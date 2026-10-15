@@ -131,6 +131,7 @@ namespace headsup
     }
 
     bool RmlMenu::TakeDebugRequest() { return std::exchange(m_State.debugRequested, false); }
+    bool RmlMenu::TakeWatchRequest() { return std::exchange(m_State.watchRequested, false); }
     bool RmlMenu::TakeCursorsRequest() { return std::exchange(m_State.cursorsRequested, false); }
 
     bool RmlMenu::OpenPage(const std::string& name)
@@ -237,7 +238,8 @@ namespace headsup
             }
             if (!same)
             {
-                page += std::string("<div class=\"") + kMenuCardClass + "\" id=\"" + block.id + "\">" + block.rml + "</div>";
+                page += std::string("<div class=\"") + (block.bare ? kMenuFootClass : kMenuCardClass) + "\" id=\"" + block.id + "\">" +
+                        block.rml + "</div>";
                 continue;
             }
             Card& shown = m_Cards[card++];
