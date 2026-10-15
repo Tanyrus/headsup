@@ -30,12 +30,14 @@ namespace headsup
 
     constexpr float kFadeNearYalms = 10.0f; // what fades in is whole from here in
     constexpr float kFadeFarShare  = 0.01f; // and this share of itself at its range and beyond
-    // The share of its opacity that an outline or a nameplate fading in has at a distance, even between the two.
+    // The share of its opacity that an outline or a nameplate fading in has at a distance: coming in from the range
+    // it gains most of itself early, then settles to whole near the player.
     constexpr float FadeShare(float distance, float range)
     {
         if (distance <= kFadeNearYalms) return 1.0f;
         if (distance >= range) return kFadeFarShare;
-        return 1.0f + (kFadeFarShare - 1.0f) * (distance - kFadeNearYalms) / (range - kFadeNearYalms);
+        const float out = (distance - kFadeNearYalms) / (range - kFadeNearYalms);
+        return kFadeFarShare + (1.0f - kFadeFarShare) * (1.0f - out * out);
     }
     // An outline's alpha out of 255, from its opacity in percent.
     uint8_t OutlineAlpha(int opacityPercent, float distance, float range, bool fadeIn);

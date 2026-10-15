@@ -416,19 +416,19 @@ TEST(a_nameplates_opacity_goes_by_what_you_target_and_by_distance_when_it_fades_
     CHECK_EQ(PlateAlpha(o, kPickedRank, true, 5.0f), 230u); // or this is the one you are picking
     CHECK_EQ(PlateAlpha(o, kPickedRank, false, 5.0f), 230u);
     CHECK_EQ(PlateAlpha(o, kPlainRank, true, 45.0f), 102u); // distance counts for nothing unless it fades in
-    // Fading in, what you do not target is whole within 10 yalms and a hundredth at the range, evenly between.
+    // Fading in, what you do not target is whole within 10 yalms and a hundredth at the range, quick to come in.
     o.fadeIn = true;
     o.range  = 50.0f;
     CHECK_EQ(PlateAlpha(o, kPlainRank, true, 8.0f), 102u);
-    CHECK_EQ(PlateAlpha(o, kPlainRank, true, 30.0f), 52u); // 102 * 0.505
+    CHECK_EQ(PlateAlpha(o, kPlainRank, true, 30.0f), 77u); // 102 * 0.7525
     CHECK_EQ(PlateAlpha(o, kPlainRank, true, 50.0f), 1u);
-    CHECK_EQ(PlateAlpha(o, kPlainRank, false, 30.0f), 103u); // 204 * 0.505
+    CHECK_EQ(PlateAlpha(o, kPlainRank, false, 30.0f), 154u); // 204 * 0.7525
     // Your target's, and the one you are picking, never fades with distance: it is as opaque as Is Targeted says.
     CHECK_EQ(PlateAlpha(o, kTargetRank, true, 30.0f), 230u);
     CHECK_EQ(PlateAlpha(o, kTargetRank, true, 50.0f), 230u);
     CHECK_EQ(PlateAlpha(o, kPickedRank, true, 45.0f), 230u);
     o.range = 30.0f;
-    CHECK_EQ(PlateAlpha(o, kPlainRank, false, 20.0f), 103u); // half way to a nearer range
+    CHECK_EQ(PlateAlpha(o, kPlainRank, false, 20.0f), 154u); // half way to a nearer range
     CHECK_EQ(PlateAlpha(OpacitySettings{}, kPlainRank, true, 45.0f), kOpaqueAlpha); // a new install's: whole
     CHECK_EQ(WithAlpha(0xFF123456, 102), 0x66123456u);
     CHECK_EQ(WithAlpha(0x80123456, kOpaqueAlpha), 0x80123456u);

@@ -302,11 +302,11 @@ TEST(an_outline_is_as_opaque_as_the_setting_and_fainter_with_distance_only_when_
     t.Update({BountyHunter(0x2000, 8.0f), BountyHunter(0x3000, 30.0f), BountyHunter(0x4000, s.maxDistance)}, kLevel20, s,
         CursorTargets{});
     CHECK_EQ(t.Find(0x2000)->outlineAlpha, 255);
-    CHECK_EQ(t.Find(0x3000)->outlineAlpha, 129); // half way from 10 yalms to the range of 50
+    CHECK_EQ(t.Find(0x3000)->outlineAlpha, 192); // half way from 10 yalms to the range of 50: 255 * 0.7525
     CHECK_EQ(t.Find(0x4000)->outlineAlpha, 3);   // a hundredth, at the range
     s.maxDistance = 30.0f;
     t.Update({BountyHunter(0x3000, 20.0f)}, kLevel20, s, CursorTargets{});
-    CHECK_EQ(t.Find(0x3000)->outlineAlpha, 129); // the fade ends at the range, wherever that is set
+    CHECK_EQ(t.Find(0x3000)->outlineAlpha, 192); // the fade ends at the range, wherever that is set
 }
 
 TEST(disabled_outlines_nothing)
