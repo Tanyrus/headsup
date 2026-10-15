@@ -61,7 +61,7 @@ namespace headsup
     constexpr int kDefaultCursorHeight = 20;
     int DefaultCursorWidth(); // the default style's at that height
     constexpr int kMinCursorEdge = 50, kMaxCursorEdge = 400; // percent
-    constexpr int kMaxCursorRaise = 10; // pixels, up or down
+    constexpr int kMaxCursorRaise = 20; // pixels, up or down
     constexpr int kMinOpacity = 10, kMaxOpacity = 100; // percent
 
     constexpr int kMinMenuFontSize = 10, kMaxMenuFontSize = 40, kDefaultMenuFontSize = 18; // pixels

@@ -638,6 +638,16 @@ TEST(clamp_bounds_every_field)
     CHECK(c.barTheme == BarTheme::PhoenixGold && c.barCurrency == kGilCurrency);
 }
 
+TEST(the_target_cursor_rises_or_sinks_up_to_twenty_pixels)
+{
+    MapStore up = ReleaseFile({{"cursorRaise", "15.0000"}}), down = ReleaseFile({{"cursorRaise", "-18.0000"}});
+    CHECK_EQ(LoadSettings(up).cursorRaise, 15);
+    CHECK_EQ(LoadSettings(down).cursorRaise, -18);
+    Settings s;
+    s.cursorRaise = 25;
+    CHECK_EQ(Clamp(s).cursorRaise, 20);
+}
+
 TEST(non_finite_values_fall_back_to_defaults)
 {
     // A number that is none reads as a key the file lacks: the file loads as it would without them.
