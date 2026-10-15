@@ -16,6 +16,7 @@ from gen_mobdata import c_string  # noqa: E402
 
 MENU = [1920, 1080]
 HIDDEN = 0x0E                                 # a window's type while it is hidden or closing
+GAME_TOP_ROW = 16                             # window_views.h's kGameTopRow: what sits higher draws nothing
 STRIP = ('helpwind', 'titlewin', 'netstat')   # the game's strip, which moves by its own rules
 KEY = re.compile(r'[!-~]{1,8}')               # a window's short name: up to 8 of the name's printable letters
 KEY_LENGTH = 8
@@ -29,10 +30,11 @@ class DataError(ValueError):
 
 
 def view_windows(windows: list, screen_bottom: int) -> list:
-    """The shown windows that hang from the top (above the screen's middle), the strip left out."""
+    """The shown windows that hang from the top (above the screen's middle), the strip and what sits above its row
+    left out."""
     return [{'key': w['short'], 'rect': w['rect']} for w in windows
             if w['type'] != HIDDEN and not w['closed'] and not w['virtual'] and w['short'] not in STRIP
-            and w['rect'][1] < screen_bottom // 2]
+            and GAME_TOP_ROW <= w['rect'][1] < screen_bottom // 2]
 
 
 def name_of(node: str, labels: dict) -> str:

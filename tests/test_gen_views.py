@@ -27,11 +27,13 @@ SWEEP = {
                                            window('profile', [130, 48, 382, 226])]},
     'items': {'windows': STRIP + [window('iteminfo', [16, 992, 382, 1064]), window('itmsort2', [1792, 48, 1904, 125]),
                                   window('inventor', [16, 48, 198, 238])]},
+    'map': {'windows': STRIP + [window('mapframe', [0, 0, 106, 14]), window('map0', [1792, 48, 1904, 106])]},
     'items/sort': {'windows': STRIP + [window('iteminfo', [16, 992, 382, 1064]),
                                        window('itmsort2', [1792, 48, 1904, 125]),
                                        window('inventor', [16, 48, 198, 238])]},
 }
-MENUS = {'nodes': [{'id': 'status', 'label': 'Status'}, {'id': 'status/profile', 'label': 'Profile'},
+MENUS = {'nodes': [{'id': 'map', 'label': 'Map'}, {'id': 'status', 'label': 'Status'},
+                   {'id': 'status/profile', 'label': 'Profile'},
                    {'id': 'items', 'label': 'Items'}, {'id': 'items/sort', 'label': 'Sort'}]}
 REFERENCE = {'menu': [1920, 1080], 'bandHelpOn': 62, 'bandHelpOff': 38}
 
@@ -45,6 +47,8 @@ class FromSweep(unittest.TestCase):
         self.assertEqual([w['key'] for w in self.views['status']['windows']], ['buff', 'level', 'statcom2', 'persona'])
         self.assertEqual(self.views['status']['windows'][3]['rect'], [16, 16, 128, 206])
         self.assertEqual([w['key'] for w in self.views['items']['windows']], ['buff', 'itmsort2', 'inventor'])
+        # The map's corner frame at 0 draws nothing and sets no view's top.
+        self.assertEqual([w['key'] for w in self.views['map']['windows']], ['buff', 'map0'])
 
     def test_views_are_named_by_their_way_through_the_menu_and_the_same_windows_are_one_view(self):
         self.assertEqual(self.views['status/profile']['name'], 'Status > Profile')

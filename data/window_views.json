@@ -1198,15 +1198,6 @@
    "name": "Region Info > Conquest",
    "windows": [
     {
-     "key": "cnqframe",
-     "rect": [
-      0,
-      0,
-      106,
-      14
-     ]
-    },
-    {
      "key": "conquer1",
      "rect": [
       1792,
@@ -1222,15 +1213,6 @@
    "name": "Region Info > Besieged",
    "windows": [
     {
-     "key": "cnqframe",
-     "rect": [
-      0,
-      0,
-      106,
-      14
-     ]
-    },
-    {
      "key": "beseige1",
      "rect": [
       16,
@@ -1242,33 +1224,9 @@
    ]
   },
   {
-   "id": "region-info/campaign",
-   "name": "Region Info > Campaign",
-   "windows": [
-    {
-     "key": "cnqframe",
-     "rect": [
-      0,
-      0,
-      106,
-      14
-     ]
-    }
-   ]
-  },
-  {
    "id": "map",
    "name": "Map",
    "windows": [
-    {
-     "key": "mapframe",
-     "rect": [
-      0,
-      0,
-      106,
-      14
-     ]
-    },
     {
      "key": "map0",
      "rect": [
@@ -1285,15 +1243,6 @@
    "name": "Map > Markers",
    "windows": [
     {
-     "key": "mapframe",
-     "rect": [
-      0,
-      0,
-      106,
-      14
-     ]
-    },
-    {
      "key": "mapv3",
      "rect": [
       1792,
@@ -1308,15 +1257,6 @@
    "id": "map/wide-scan",
    "name": "Map > Wide Scan",
    "windows": [
-    {
-     "key": "mapframe",
-     "rect": [
-      0,
-      0,
-      106,
-      14
-     ]
-    },
     {
      "key": "map0",
      "rect": [
