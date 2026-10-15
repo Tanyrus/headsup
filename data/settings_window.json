@@ -546,8 +546,8 @@
             ],
             "words": [
               {"key": "senses", "name": "Senses:"},
-              {"key": "hide", "name": "Hide"},
-              {"key": "show", "name": "Show"}
+              {"key": "hide", "name": "Hidden"},
+              {"key": "show", "name": "Shown"}
             ]
           }
         ]
@@ -798,6 +798,8 @@
   ],
   "words": [
     {"key": "switched-off", "name": "Switched Off"},
+    {"key": "switch-off", "name": "Off"},
+    {"key": "switch-on", "name": "On"},
     {"key": "switched-off-top-panel", "name": "These settings are the top panel's, which is off: the Top Panel page switches it on."},
     {"key": "switched-off-headsup", "name": "HeadsUp is off: the HeadsUp Config page switches it on."},
     {"key": "key-add", "name": "+ Add Key"},

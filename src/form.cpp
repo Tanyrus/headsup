@@ -152,7 +152,10 @@ namespace headsup
                 *enabled = !*enabled;
                 changed  = true;
             }
-            Out() += std::string("<div class=\"") + kCardCheck + "\" id=\"" + check + "\"><div class=\"mark\"></div></div>";
+            const char* word = layout->WordOf(*enabled ? WindowWord::SwitchOn : WindowWord::SwitchOff).name;
+            Out() += std::string("<div class=\"") + kCardCheck + "\" id=\"" + check + "\"><div class=\"mark\"></div><div class=\"state\" id=\"" +
+                     check + "-state\"></div></div>";
+            Set(check + "-state", FormValueKind::Text, {}, word);
             Set(check, FormValueKind::Class, "on", {}, *enabled);
         }
         Out() += "</div>";
@@ -186,7 +189,8 @@ namespace headsup
     void Form::Line(const char* classes) { Out() += std::string("<div class=\"") + classes + "\">"; }
     void Form::EndLine() { Out() += "</div>"; }
 
-    std::string Form::Check(const char* id, bool& on, const char* tip, const char* classes)
+    std::string Form::Check(const char* id, bool& on, const char* tip, const char* classes, const char* offWord,
+        const char* onWord)
     {
         const std::string check = Id(id);
         if (!m_Off && Clicked(check))
@@ -194,7 +198,13 @@ namespace headsup
             on      = !on;
             changed = true;
         }
-        Out() += "<div class=\"" + std::string(classes) + "\" id=\"" + check + "\"" + TipAttribute(tip) + "><div class=\"mark\"></div></div>";
+        Out() += "<div class=\"" + std::string(classes) + "\" id=\"" + check + "\"" + TipAttribute(tip) + "><div class=\"mark\"></div>";
+        if (offWord != nullptr && onWord != nullptr)
+        {
+            Out() += "<div class=\"state\" id=\"" + check + "-state\"></div>";
+            Set(check + "-state", FormValueKind::Text, {}, on ? onWord : offWord);
+        }
+        Out() += "</div>";
         Set(check, FormValueKind::Class, "on", {}, on);
         Set(check, FormValueKind::Class, kOffClass, {}, m_Off);
         return check;
@@ -205,14 +215,8 @@ namespace headsup
     void Form::Switch(const char* label, bool& on, const char* tip, const char* offWord, const char* onWord)
     {
         Row(label, tip);
-        Out() += "<div class=\"switch-room\">";
-        const std::string check = Check(label, on, nullptr, kWideCheck);
-        if (offWord != nullptr && onWord != nullptr)
-        {
-            Out() += "<div class=\"state\" id=\"" + check + "-state\"></div>";
-            Set(check + "-state", FormValueKind::Text, {}, on ? onWord : offWord);
-        }
-        Out() += "</div>";
+        Check(label, on, nullptr, kWideCheck, offWord != nullptr ? offWord : layout->WordOf(WindowWord::SwitchOff).name,
+            onWord != nullptr ? onWord : layout->WordOf(WindowWord::SwitchOn).name);
         EndRow();
     }
 

@@ -21,8 +21,7 @@ namespace headsup
         constexpr float kNavHeight    = 2.0f;
         constexpr float kNavGap       = 0.2f;  // between two pages of the sidebar
         constexpr float kNavSlide     = 0.35f; // how far a page's name moves under the pointer
-        constexpr float kToggleInset  = 0.2f;  // a toggle's knob from its track's edge
-        constexpr float kToggleKnob   = kToggleHeight - 2.0f * kToggleInset;
+        constexpr float kToggleKnob   = kToggleHeight - 2.0f * kToggleInset; // its peg's height
         constexpr float kArrow        = 0.35f; // half an arrow's base
         constexpr float kKnob         = 0.35f; // a slider's knob: a bright bar as tall as its track
         constexpr float kCrossLength  = 0.85f; // the close button's cross: each of its two bars
@@ -148,7 +147,8 @@ namespace headsup
                ";font-family:\"" + look.titleFont + "\";font-size:" + Em(kCardTitleScale) + ";color:" + color(c.heading) +
                ";transition:color" + kEase + ";}";
         css += ".card-head:hover .card-title{color:" + color(c.accent) + ";}";
-        css += ".check.card-on{position:absolute;right:" + Em(kCardPad) + ";top:" + Em((kHeaderRow - kToggleHeight) / 2.0f) + ";}";
+        css += ".check.card-on{position:absolute;right:" + Em(kCardPad) + ";top:" + Em((kHeaderRow - kToggleHeight) / 2.0f) +
+               ";width:" + Em(kCardToggleWidth) + ";}";
         css += ".card-body{padding:0px " + Em(kCardPad) + " " + Em(kCardPad * 0.6f) + " " + Em(kCardPad) +
                ";animation:0.2s cubic-out fade-in;}";
         css += "@keyframes fade-in{from{opacity:0;}to{opacity:1;}}";
@@ -178,26 +178,26 @@ namespace headsup
         css += ".column{flex:1 1 0px;min-width:0px;}";
         css += ".column.second{margin-left:" + Em(kCardPad) + ";padding-left:" + Em(kCardPad) + ";border-left:1px " + color(c.border) + ";}";
         css += ".reading{width:" + control + ";line-height:" + frame + ";}";
-        // A yes or no is a toggle in the middle of the controls' column, where a slider's middle is; in a column of
-        // its own it has a cell its own width. The word beside it, when it has one, does not move it.
-        css += ".switch-room{position:relative;display:flex;flex-direction:row;justify-content:center;width:" + control + ";}";
+        // A yes or no is a toggle as wide as a slider; in a table's column it is a small one in a cell its own width.
         css += ".switch-cell{display:flex;flex-direction:row;justify-content:center;width:" + Em(kToggleWidth) + ";}";
-        // The word stands in the middle of the wide track, where the knob never goes.
+        // Its state stands in its middle in capitals, where the peg never goes.
         css += ".state{position:absolute;left:0px;top:0px;width:100%;text-align:center;pointer-events:none;line-height:" +
-               Em(kToggleHeight) + ";color:" + color(c.muted) + ";}";
+               Em(kToggleHeight) + ";text-transform:uppercase;color:" + color(c.text) + ";}";
         css += ".check{position:relative;width:" + Em(kToggleWidth) + ";height:" + Em(kToggleHeight) + ";border-radius:" +
-               Em(kToggleHeight / 2.0f) + ";background-color:" + color(c.control) + ";transition:background-color" + kSlide + ";}";
+               radius + ";background-color:" + color(c.control) + ";transition:background-color" + kSlide + ";}";
         css += ".check:hover{background-color:" + color(c.hover) + ";}";
         css += ".check.on{background-color:" + color(Faded(c.accent, kWash)) + ";}";
-        // The knob takes no click of its own: pressed while it slides under the pointer and let go once it has
+        // The peg takes no click of its own: pressed while it slides under the pointer and let go once it has
         // passed, a click would be on two elements and so on neither.
         css += ".mark{pointer-events:none;}";
-        css += ".mark{position:absolute;left:" + Em(kToggleInset) + ";top:" + Em(kToggleInset) + ";width:" + Em(kToggleKnob) +
-               ";height:" + Em(kToggleKnob) + ";border-radius:" + Em(kToggleKnob / 2.0f) + ";background-color:" +
+        css += ".mark{position:absolute;left:" + Em(kToggleInset) + ";top:" + Em(kToggleInset) + ";width:" + Em(kTogglePeg) +
+               ";height:" + Em(kToggleKnob) + ";border-radius:" + Em(kRadius - kToggleInset) + ";background-color:" +
                color(c.muted) + ";transition:left" + kSlide + ",background-color" + kSlide + ";}";
-        css += ".check.on .mark{left:" + Em(kToggleWidth - kToggleKnob - kToggleInset) + ";background-color:" + color(c.accent) + ";}";
-        css += ".check.wide{width:" + Em(kSwitchWidth) + ";}";
-        css += ".check.wide.on .mark{left:" + Em(kSwitchWidth - kToggleKnob - kToggleInset) + ";}";
+        css += ".check.on .mark{background-color:" + color(c.accent) + ";}";
+        for (const auto& [track, width] : {std::pair{".check", kToggleWidth}, std::pair{".check.wide", kControlWidth},
+                 std::pair{".check.card-on", kCardToggleWidth}})
+            css += std::string(track) + ".on .mark{left:" + Em(width - kTogglePeg - kToggleInset) + ";}";
+        css += ".check.wide{width:" + control + ";}";
         // Joined choices. These, tabs, buttons and lists ease between their looks, and the picked one is the gradient.
         css += std::string(".seg,.tab,.btn,.dd,.opt,.wchip{transition:background-color") + kEase + ",border-color" + kEase +
                ",color" + kEase + ";}";

@@ -9,6 +9,7 @@
 #include <RmlUi/Core.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <map>
 #include <string>
@@ -1146,69 +1147,100 @@ TEST(a_list_drops_in_in_both_themes)
     }
 }
 
-TEST(a_toggles_knob_slides_across_its_track_in_both_themes)
+TEST(a_toggle_is_a_sliders_width_and_its_wide_peg_slides_across_its_track_in_both_themes)
 {
-    const std::string box = "entities-nameplates-stack-names";
+    const std::string box = "entities-nameplates-stack-names", slider = "entities-nameplates-vertical-offset";
     auto size = [](Rml::Element* element) { return element->GetBox().GetSize(Rml::BoxArea::Border); };
     auto left = [](Rml::Element* mark) {
         return mark->GetAbsoluteOffset(Rml::BoxArea::Border).x - mark->GetParentNode()->GetAbsoluteOffset(Rml::BoxArea::Border).x;
+    };
+    auto middle = [](Rml::Element* element) {
+        return element->GetAbsoluteOffset(Rml::BoxArea::Border).x + element->GetBox().GetSize(Rml::BoxArea::Border).x / 2.0f;
     };
     for (const MenuTheme theme : {MenuTheme::Phoenix, MenuTheme::Aurora})
     {
         Window window(theme);
         Rml::Element* track = window.Find(box);
-        // Much wider than tall, with its knob at the left end while off.
-        const float width = size(track).x, height = size(track).y, knob = size(track->GetChild(0)).x;
-        CHECK(width > 2.0f * height && knob > 0.0f && knob < height);
+        const float width = size(track).x, height = size(track).y, peg = size(track->GetChild(0)).x;
+        // As wide as the slider above it and right under it, with a peg wider than the track is tall.
+        CHECK(std::abs(width - size(window.Find(slider)).x) < 0.5f);
+        CHECK(std::abs(middle(track) - middle(window.Find(slider))) < 1.0f);
+        CHECK(peg > height && peg < width / 2.0f);
+        // Rounded as a dropdown is, not as a pill.
+        const float radius = track->GetComputedValues().border_top_left_radius();
+        CHECK(radius > 0.0f && radius < height / 2.0f);
+        CHECK_EQ(radius, window.Find("entities-nameplates-default-font")->GetComputedValues().border_top_left_radius());
         const float inset = left(track->GetChild(0));
-        CHECK(inset > 0.0f && inset < knob);
+        CHECK(inset > 0.0f && inset < height / 2.0f);
         CHECK(window.Click(box));
         const float early = left(window.Find(box)->GetChild(0));
-        CHECK(early > inset + 0.5f && early < width - knob - inset - 0.5f); // on its way
+        CHECK(early > inset + 0.5f && early < width - peg - inset - 0.5f); // on its way
         window.Frames(30);
         const float end = left(window.Find(box)->GetChild(0));
-        CHECK(end > width - knob - inset - 0.5f && end < width - knob - inset + 0.5f);
-        // It stands in the middle of the controls' column: under the middle of the slider above it.
-        auto middle = [](Rml::Element* element) {
-            return element->GetAbsoluteOffset(Rml::BoxArea::Border).x + element->GetBox().GetSize(Rml::BoxArea::Border).x / 2.0f;
-        };
-        const float off = middle(window.Find(box)) - middle(window.Find("entities-nameplates-vertical-offset"));
-        CHECK(off > -1.0f && off < 1.0f);
-        // And it is nearly as wide as that slider.
-        const float slider = size(window.Find("entities-nameplates-vertical-offset")).x;
-        CHECK(width > 0.8f * slider && width < slider);
+        CHECK(end > width - peg - inset - 0.5f && end < width - peg - inset + 0.5f);
     }
 }
 
-TEST(a_toggles_word_sits_inside_its_track_clear_of_the_knob_at_either_end)
+TEST(a_cards_title_toggle_is_about_twice_as_wide_as_before_and_a_tables_stays_small_and_wordless)
 {
+    constexpr float kOldTitleToggle = 3.2f; // ems, before the tester's fourth round
     Window window;
+    const float title = window.Find("entities-nameplates-on")->GetBox().GetSize(Rml::BoxArea::Border).x;
+    CHECK(title >= 2.0f * kOldTitleToggle * kEm && title <= 2.5f * kOldTitleToggle * kEm);
     window.Page("mobs");
-    const std::string box = "mobs-detection-icons-links";
+    Rml::Element* cell = window.Find("mobs-statuses-status-paralyze");
+    CHECK(cell != nullptr && window.Find("mobs-statuses-status-paralyze-state") == nullptr);
+    CHECK(cell->GetBox().GetSize(Rml::BoxArea::Border).x < title);
+}
+
+TEST(a_toggles_word_says_its_state_in_capitals_inside_its_track_clear_of_the_peg)
+{
     auto edges = [](Rml::Element* element) {
         const float x = element->GetAbsoluteOffset(Rml::BoxArea::Border).x;
         return std::pair{x, x + element->GetBox().GetSize(Rml::BoxArea::Border).x};
     };
-    Rml::Element* track = window.Find(box);
-    Rml::Element* word  = window.Find(box + "-state");
-    CHECK(track != nullptr && word != nullptr && !word->GetInnerRML().empty());
-    const auto [trackLeft, trackRight] = edges(track);
-    // The word's own letters, wherever its box reaches: they are centered in it.
-    const auto text = [&] {
-        const auto [left, right] = edges(word);
-        const float middle = (left + right) / 2.0f;
-        const float half   = static_cast<float>(Rml::ElementUtilities::GetStringWidth(word, word->GetInnerRML())) / 2.0f;
-        return std::pair{middle - half, middle + half};
+    auto argb = [](const Rml::Colourb& c) {
+        return static_cast<uint32_t>(c.alpha) << 24 | static_cast<uint32_t>(c.red) << 16 | static_cast<uint32_t>(c.green) << 8 | c.blue;
     };
-    for (int flip = 0; flip < 2; ++flip)
+    struct Toggle
     {
-        const auto [left, right] = text();
-        const auto [knobLeft, knobRight] = edges(window.Find(box)->GetChild(0));
-        CHECK(left > trackLeft && right < trackRight);
-        CHECK(right < knobLeft || left > knobRight);
-        window.Click(box);
-        window.Frames(30);
-    }
+        const char* page;
+        const char* id;
+        const char* off;
+        const char* on;
+    };
+    const Toggle toggles[] = {{"entities", "entities-nameplates-stack-names", "OFF", "ON"},
+        {"entities", "entities-nameplates-on", "OFF", "ON"}, {"mobs", "mobs-detection-icons-links", "HIDDEN", "SHOWN"}};
+    for (const MenuTheme theme : {MenuTheme::Phoenix, MenuTheme::Aurora})
+        for (const char* font : {kBarlowCondensed, kCinzel})
+            for (const Toggle& toggle : toggles)
+            {
+                Window window(theme, font);
+                window.Page(toggle.page);
+                const std::string box = toggle.id;
+                for (int flip = 0; flip < 2; ++flip)
+                {
+                    Rml::Element* track = window.Find(box);
+                    Rml::Element* word  = window.Find(box + "-state");
+                    CHECK(word != nullptr);
+                    const bool on = track->IsClassSet("on");
+                    std::string shown = word->GetInnerRML();
+                    std::ranges::transform(shown, shown.begin(), [](unsigned char ch) { return static_cast<char>(std::toupper(ch)); });
+                    CHECK_EQ(shown, on ? toggle.on : toggle.off);
+                    CHECK(word->GetComputedValues().text_transform() == Rml::Style::TextTransform::Uppercase);
+                    CHECK_EQ(argb(word->GetComputedValues().color()), MenuColorsOf(theme).text);
+                    // Its capitals, centered in the word's box, stand inside the track and clear of the peg.
+                    const auto [trackLeft, trackRight] = edges(track);
+                    const auto [boxLeft, boxRight]     = edges(word);
+                    const float half = static_cast<float>(Rml::ElementUtilities::GetStringWidth(word, shown)) / 2.0f;
+                    const float left = (boxLeft + boxRight) / 2.0f - half, right = (boxLeft + boxRight) / 2.0f + half;
+                    const auto [pegLeft, pegRight] = edges(track->GetChild(0));
+                    CHECK(left > trackLeft && right < trackRight);
+                    CHECK(right < pegLeft || left > pegRight);
+                    window.Click(box);
+                    window.Frames(30);
+                }
+            }
 }
 
 TEST(the_debug_report_button_on_the_headsup_config_page_asks_for_one_report)

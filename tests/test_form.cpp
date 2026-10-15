@@ -111,13 +111,16 @@ TEST(a_card_holds_its_rows_and_what_they_show)
     CHECK(Has(rml, "<div class=\"card-body\"><div class=\"note\">A &lt;tip&gt;</div>"));
     CHECK(Has(rml, "<div class=\"arrow open\"></div><div class=\"card-title\">Mouse Pointer</div>"));
     CHECK(Has(rml, "<div class=\"label\" id=\"page-mouse-pointer-chocobo-label\" tip=\"The chocobo.\">Chocobo</div>"));
-    CHECK(Has(rml, "<div class=\"check wide\" id=\"page-mouse-pointer-chocobo\"><div class=\"mark\"></div></div>"));
+    CHECK(Has(rml, "<div class=\"check wide\" id=\"page-mouse-pointer-chocobo\"><div class=\"mark\"></div><div class=\"state\" "
+                   "id=\"page-mouse-pointer-chocobo-state\"></div></div>"));
     CHECK(Has(rml, "<input type=\"range\" id=\"page-mouse-pointer-height\" min=\"24\" max=\"64\" step=\"1\"/>"));
     CHECK(Has(rml, "min=\"0.5\" max=\"3\" step=\"0.1\"")); // a float slider steps by its format's last decimal
     // What they show is no part of the markup.
     CHECK(!ClassOn(form, "page-mouse-pointer-chocobo", "on") && ClassOn(form, "page-mouse-pointer-on", "on"));
     CHECK_EQ(ValueText(form, "page-mouse-pointer-height"), "45");
     CHECK_EQ(TextOf(form, "page-mouse-pointer-height-val"), "45 px");
+    CHECK_EQ(TextOf(form, "page-mouse-pointer-chocobo-state"), "Off"); // the kit's own words, from the layout
+    CHECK_EQ(TextOf(form, "page-mouse-pointer-on-state"), "On");
     CHECK_EQ(TextOf(form, "page-mouse-pointer-thickness-val"), "1.0 px");
     CHECK_EQ(TextOf(form, "page-mouse-pointer-theme-val"), "Theme 1");
     CHECK(!form.changed && !form.popup);
@@ -131,6 +134,7 @@ TEST(a_click_flips_a_switch_and_the_markup_stays_the_same)
     const Form form = Pass({{"page-mouse-pointer-chocobo", kClickEvent, ""}}, state, b);
     CHECK(b.chocobo && form.changed);
     CHECK(ClassOn(form, "page-mouse-pointer-chocobo", "on"));
+    CHECK_EQ(TextOf(form, "page-mouse-pointer-chocobo-state"), "On");
     CHECK_EQ(form.blocks[0].rml, before);
     // The card's own checkbox, at its title's right.
     const Form off = Pass({{"page-mouse-pointer-on", kClickEvent, ""}}, state, b);
