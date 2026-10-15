@@ -191,6 +191,8 @@ namespace headsup
     // How opaque a kind's nameplates are, in percent, by what you target: with no target, as another than your
     // target, and as your target. Fading in, each is whole within kFadeNearYalms and almost nothing at the range.
     constexpr float kPercent = 100.0f; // what a setting in percent is a share of
+    constexpr int kPercentStep = 5;    // what every setting in percent moves by
+    int Stepped(int value, int step);  // the multiple of step nearest value
     constexpr float kMinOutlineDistance = 15.0f, kMaxOutlineDistance = 50.0f; // yalms: the game draws no mob past 50
 
     struct OpacitySettings

@@ -675,26 +675,26 @@ namespace headsup
                     break;
                 }
                 case LineStylesRow::TextSize:
-                    form.SliderInt(label.c_str(), line.textSize, kMinSizePercent, kMaxSizePercent, "%d%%", tip);
+                    form.SliderPercent(label.c_str(), line.textSize, kMinSizePercent, kMaxSizePercent, tip);
                     break;
                 case LineStylesRow::IconSize:
-                    form.SliderInt(label.c_str(), line.iconSize, kMinSizePercent, kMaxSizePercent, "%d%%", tip);
+                    form.SliderPercent(label.c_str(), line.iconSize, kMinSizePercent, kMaxSizePercent, tip);
                     break;
                 case LineStylesRow::Padding:
                     form.SliderInt(label.c_str(), line.padding, 0, kMaxLinePadding, "%d px", n < kPlateLines - 1 ? tip : row.otherTip);
                     break;
                 case LineStylesRow::TextColor: form.ColorPickRow(label.c_str(), line.color, sources, tip); break;
                 case LineStylesRow::ShadowStrength:
-                    form.SliderInt(label.c_str(), line.shadow, kMinShadow, kMaxShadow, "%d%%", tip);
+                    form.SliderPercent(label.c_str(), line.shadow, kMinShadow, kMaxShadow, tip);
                     break;
                 case LineStylesRow::ShadowColor:
                     form.Fade(off || line.shadow == 0);
                     form.ColorPickRow(label.c_str(), line.shadowColor, sources, tip);
                     break;
-                case LineStylesRow::GlowStrength: form.SliderInt(label.c_str(), line.glow, kMinGlow, kMaxGlow, "%d%%", tip); break;
+                case LineStylesRow::GlowStrength: form.SliderPercent(label.c_str(), line.glow, kMinGlow, kMaxGlow, tip); break;
                 case LineStylesRow::GlowSize:
                     form.Fade(off || line.glow == 0);
-                    form.SliderInt(label.c_str(), line.glowSize, kMinGlowSize, kMaxGlowSize, "%d%%", tip);
+                    form.SliderPercent(label.c_str(), line.glowSize, kMinGlowSize, kMaxGlowSize, tip);
                     break;
                 case LineStylesRow::GlowColor:
                     form.Fade(off || line.glow == 0);
@@ -881,9 +881,9 @@ namespace headsup
                 form.Fade(!plates || !s.scaleWithDistance);
                 form.Indent(true);
                 if (e.piece == SettingPiece::MinSize)
-                    form.SliderInt(label.c_str(), s.scaleMin, kMinSizePercent, kMaxSizePercent, "%d%%", tip);
+                    form.SliderPercent(label.c_str(), s.scaleMin, kMinSizePercent, kMaxSizePercent, tip);
                 else if (e.piece == SettingPiece::MaxSize)
-                    form.SliderInt(label.c_str(), s.scaleMax, kMinSizePercent, kMaxSizePercent, "%d%%", tip);
+                    form.SliderPercent(label.c_str(), s.scaleMax, kMinSizePercent, kMaxSizePercent, tip);
                 else
                     form.Switch(label.c_str(), s.scaleOwnName, tip);
                 form.Indent(false);
@@ -902,11 +902,11 @@ namespace headsup
                 break;
             case SettingPiece::Thickness:
                 form.Fade(!outlines);
-                form.SliderInt(label.c_str(), s.outlineThickness, kMinOutlineThickness, kMaxOutlineThickness, "%d%%", tip);
+                form.SliderPercent(label.c_str(), s.outlineThickness, kMinOutlineThickness, kMaxOutlineThickness, tip);
                 break;
             case SettingPiece::Opacity:
                 form.Fade(!outlines);
-                form.SliderInt(label.c_str(), s.outlineOpacity, kMinOpacity, kMaxOpacity, "%d%%", tip);
+                form.SliderPercent(label.c_str(), s.outlineOpacity, kMinOpacity, kMaxOpacity, tip);
                 break;
             case SettingPiece::Smoothness:
             {
@@ -940,7 +940,7 @@ namespace headsup
                 break;
             case SettingPiece::OutlineThickness:
                 form.Fade(!cursor);
-                form.SliderInt(label.c_str(), s.cursorOutlineThickness, kMinCursorEdge, kMaxCursorEdge, "%d%%", tip);
+                form.SliderPercent(label.c_str(), s.cursorOutlineThickness, kMinCursorEdge, kMaxCursorEdge, tip);
                 break;
             case SettingPiece::Scale:
                 form.Fade(!cursor);
@@ -990,15 +990,15 @@ namespace headsup
             case SettingPiece::Ornament: Ornament(c, e); break;
             case SettingPiece::NoTarget:
                 form.Fade(!shown);
-                form.SliderInt(label.c_str(), s.Kind(*c.kind).opacity.noTarget, kMinOpacity, kMaxOpacity, "%d%%", tip);
+                form.SliderPercent(label.c_str(), s.Kind(*c.kind).opacity.noTarget, kMinOpacity, kMaxOpacity, tip);
                 break;
             case SettingPiece::NotTargeted:
                 form.Fade(!shown);
-                form.SliderInt(label.c_str(), s.Kind(*c.kind).opacity.notTargeted, kMinOpacity, kMaxOpacity, "%d%%", tip);
+                form.SliderPercent(label.c_str(), s.Kind(*c.kind).opacity.notTargeted, kMinOpacity, kMaxOpacity, tip);
                 break;
             case SettingPiece::IsTargeted:
                 form.Fade(!shown);
-                form.SliderInt(label.c_str(), s.Kind(*c.kind).opacity.targeted, kMinOpacity, kMaxOpacity, "%d%%", tip);
+                form.SliderPercent(label.c_str(), s.Kind(*c.kind).opacity.targeted, kMinOpacity, kMaxOpacity, tip);
                 break;
             case SettingPiece::FadeIn:
                 form.Fade(!shown);
@@ -1056,7 +1056,7 @@ namespace headsup
                 break;
             case SettingPiece::TimerSize:
                 form.Fade(!on || !s.phTimers);
-                form.SliderInt(label.c_str(), s.timerPercent, kMinSizePercent, kMaxSizePercent, "%d%%", tip);
+                form.SliderPercent(label.c_str(), s.timerPercent, kMinSizePercent, kMaxSizePercent, tip);
                 break;
             // User Interface
             case SettingPiece::Key:
@@ -1199,7 +1199,7 @@ namespace headsup
                 break;
             case SettingPiece::WindowOpacity:
                 form.Fade(false);
-                form.SliderInt(label.c_str(), s.menuOpacity, kMinMenuOpacity, kMaxOpacity, "%d%%", tip);
+                form.SliderPercent(label.c_str(), s.menuOpacity, kMinMenuOpacity, kMaxOpacity, tip);
                 break;
             case SettingPiece::ResetAllSettings: ResetAll(c, e); break;
             case SettingPiece::DebugReport:

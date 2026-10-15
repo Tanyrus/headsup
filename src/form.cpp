@@ -263,11 +263,11 @@ namespace headsup
         return m_State.popup == control && Clicked(control);
     }
 
-    void Form::TakeWhole(const std::string& slider, int& value, int lo, int hi)
+    void Form::TakeWhole(const std::string& slider, int& value, int lo, int hi, int step)
     {
         const FormEvent* moved = Took(slider, kChangeEvent);
         if (moved == nullptr || m_Off) return;
-        const int to = std::clamp(static_cast<int>(std::lround(std::strtof(moved->value.c_str(), nullptr))), lo, hi);
+        const int to = std::clamp(Stepped(static_cast<int>(std::lround(std::strtof(moved->value.c_str(), nullptr))), step), lo, hi);
         if (to == value) return;
         value   = to;
         changed = true;
@@ -279,6 +279,14 @@ namespace headsup
         TakeWhole(slider, value, lo, hi);
         Slider(slider, label, static_cast<float>(value), static_cast<float>(lo), static_cast<float>(hi), 1.0f,
             Formatted(format, value), tip);
+    }
+
+    void Form::SliderPercent(const char* label, int& value, int lo, int hi, const char* tip)
+    {
+        const std::string slider = Id(label);
+        TakeWhole(slider, value, lo, hi, kPercentStep);
+        Slider(slider, label, static_cast<float>(value), static_cast<float>(lo), static_cast<float>(hi),
+            static_cast<float>(kPercentStep), Formatted("%d%%", value), tip);
     }
 
     void Form::Stepper(const char* label, int& value, int lo, int hi, const char* format, const char* tip)

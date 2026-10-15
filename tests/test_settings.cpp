@@ -669,6 +669,37 @@ TEST(called_for_help_has_its_own_color_orange_until_one_is_saved)
     CHECK(LoadSettings(file).palette.claim[static_cast<int>(ClaimState::Yours)] == Settings{}.palette.claim[static_cast<int>(ClaimState::Yours)]);
 }
 
+TEST(percents_load_and_clamp_onto_steps_of_five)
+{
+    Settings s;
+    s.timerPercent           = 87;
+    s.scaleMin               = 88;
+    s.outlineOpacity         = 12;
+    s.menuOpacity            = 33;
+    s.cursorOutlineThickness = 52;
+    LineDesign& line = s.Kind(PlateKind::Players).lines[0];
+    line.textSize    = 87;
+    line.iconSize    = 112;
+    line.shadow      = 3;
+    line.glow        = 298;
+    line.glowSize    = 26;
+    OpacitySettings& o = s.Kind(PlateKind::Mobs).opacity;
+    o.noTarget         = 87;
+    o.notTargeted      = 41;
+    o.targeted         = 99;
+    const Settings c = Clamp(s);
+    CHECK(c.timerPercent == 85 && c.scaleMin == 90 && c.outlineOpacity == 10 && c.menuOpacity == 35);
+    CHECK_EQ(c.cursorOutlineThickness, 50);
+    const LineDesign& l = c.Kind(PlateKind::Players).lines[0];
+    CHECK(l.textSize == 85 && l.iconSize == 110 && l.shadow == 5 && l.glow == 300 && l.glowSize == 25);
+    const OpacitySettings& co = c.Kind(PlateKind::Mobs).opacity;
+    CHECK(co.noTarget == 85 && co.notTargeted == 40 && co.targeted == 100);
+    CHECK(Clamp(Settings{}) == Settings{}); // every default is on the steps already
+    MapStore file = ReleaseFile({{"timerPercent", "87.0000"}, {"mobsLine2TextSize", "87.0000"}});
+    const Settings loaded = LoadSettings(file);
+    CHECK(loaded.timerPercent == 85 && loaded.Kind(PlateKind::Mobs).lines[1].textSize == 85);
+}
+
 TEST(non_finite_values_fall_back_to_defaults)
 {
     // A number that is none reads as a key the file lacks: the file loads as it would without them.
@@ -1180,8 +1211,9 @@ TEST(a_new_install_looks_as_the_release_did_for_one_but_for_the_reviews_four_cha
         const KindSettings& then = release.kinds[static_cast<size_t>(k)];
         for (int l = 0; l < kPlateLines; ++l)
         {
-            // A shadow half again as strong as the release's, and icons of 16 px where a name's were of its 15 px.
-            CHECK(std::abs(static_cast<float>(now.lines[l].shadow) - 1.5f * static_cast<float>(then.lines[l].shadow)) <= 1.0f);
+            // A shadow half again as strong as the release's, on the steps of five, and icons of 16 px where a name's
+            // were of its 15 px.
+            CHECK(std::abs(static_cast<float>(now.lines[l].shadow) - 1.5f * static_cast<float>(then.lines[l].shadow)) <= 2.5f);
             const float grown = iconPixels(fresh, now.lines[l]) - iconPixels(release, then.lines[l]);
             CHECK(grown >= 0.0f && grown < 1.0f);
             now.lines[l].shadow   = then.lines[l].shadow;
@@ -1456,9 +1488,9 @@ TEST(an_old_file_migrates_field_by_field)
     const int base = static_cast<int>(std::strtof(store.values.at("mobNameSize").c_str(), nullptr));
     CHECK_EQ(s.baseSize, base);
     CHECK_EQ(mobs.lines[2].textSize, 100);
-    CHECK_EQ(mobs.lines[1].textSize, std::lround(100.0f * std::strtof(store.values.at("labelSize").c_str(), nullptr) / static_cast<float>(base)));
+    CHECK_EQ(mobs.lines[1].textSize, Stepped(static_cast<int>(std::lround(100.0f * std::strtof(store.values.at("labelSize").c_str(), nullptr) / static_cast<float>(base))), kPercentStep));
     CHECK_EQ(mobs.lines[0].iconSize, 150); // iconSize=24 px, of the 16 px base icon
-    CHECK_EQ(s.Kind(PlateKind::Self).lines[2].textSize, std::lround(100.0f * std::strtof(store.values.at("selfNameSize").c_str(), nullptr) / static_cast<float>(base)));
+    CHECK_EQ(s.Kind(PlateKind::Self).lines[2].textSize, Stepped(static_cast<int>(std::lround(100.0f * std::strtof(store.values.at("selfNameSize").c_str(), nullptr) / static_cast<float>(base))), kPercentStep));
     // showLabels=false with mobId=lastThree leaves the ID alone on line 2; showIcons=false with the three badge
     // switches on leaves the badge tags on line 1; hideClaimed shows both lines on unclaimed mobs only.
     // mobIconPlace=inline with the level text "$id": the icons move onto line 2, left of the ID (badgeSide=left;
@@ -1475,13 +1507,13 @@ TEST(an_old_file_migrates_field_by_field)
     CHECK(mobs.ornament.color.source == ColorSource::Custom); // ownOrnamentColor=true
     CHECK_EQ(mobs.ornament.width, static_cast<int>(std::strtof(store.values.at("ornamentWidth").c_str(), nullptr)));
     CHECK_EQ(mobs.ornament.height, static_cast<int>(std::strtof(store.values.at("ornamentThickness").c_str(), nullptr)));
-    CHECK_EQ(mobs.lines[2].shadow, 33); // nameShadow=50, of a unit that is now one and a half of it
+    CHECK_EQ(mobs.lines[2].shadow, 35); // nameShadow=50, of a unit that is now one and a half of it: 33, on the steps of five
     // ownNameColor, nameShadow and the player icon size reach the players' name line too.
     const LineDesign& playerName = s.Kind(PlateKind::Players).lines[2];
     CHECK(mobs.lines[2].color.source == ColorSource::Custom && playerName.color.source == ColorSource::Custom);
     CHECK_EQ(playerName.shadow, mobs.lines[2].shadow);
-    CHECK_EQ(playerName.iconSize, 98); // playerIconSize=120 of playerNameSize=13 is 15.6 px, of the 16 px base icon
-    CHECK_EQ(s.Kind(PlateKind::Self).lines[2].iconSize, 128); // of selfNameSize=17: 20.4 px
+    CHECK_EQ(playerName.iconSize, 100); // playerIconSize=120 of playerNameSize=13 is 15.6 px, 98 of the 16 px base icon
+    CHECK_EQ(s.Kind(PlateKind::Self).lines[2].iconSize, 130); // of selfNameSize=17: 20.4 px, 128 of 16
     CHECK_EQ(playerName.text, "$name"); // showPlayerIcons=false
     // Saved again, the file carries the new version and the new keys.
     MapStore again;
@@ -1611,7 +1643,7 @@ TEST(a_players_name_line_carries_the_icons_the_old_settings_showed_on_each_side)
 TEST(a_players_icons_are_a_percent_of_that_players_own_name_size)
 {
     const Settings s = Load2({{"mobNameSize", "20"}, {"playerNameSize", "14"}, {"selfNameSize", "24"}, {"playerIconSize", "100"}});
-    CHECK_EQ(s.Kind(PlateKind::Players).lines[2].iconSize, 88); // 14 px of the 16 px base icon
+    CHECK_EQ(s.Kind(PlateKind::Players).lines[2].iconSize, 90); // 14 px of the 16 px base icon, on the steps of five
     CHECK_EQ(s.Kind(PlateKind::Self).lines[2].iconSize, 150); // 24 px
 }
 
@@ -1649,10 +1681,10 @@ TEST(the_old_glow_and_shadow_settings_reach_the_mob_lines_and_the_cursor_edge)
     const Settings shadow = Load2({{"labelShadow", "40"}, {"labelShadowColorR", "0.1"}, {"labelShadowColorG", "0.2"},
         {"labelShadowColorB", "0.3"}, {"nameShadow", "170"}});
     const KindSettings& mobs = shadow.Kind(PlateKind::Mobs);
-    CHECK_EQ(mobs.lines[1].shadow, 27); // 40 of the unit before, which was two thirds of this one
+    CHECK_EQ(mobs.lines[1].shadow, 25); // 40 of the unit before, which was two thirds of this one, on the steps of five
     CHECK(mobs.lines[1].shadowColor.custom == (Color{{0.1f, 0.2f, 0.3f}}));
-    CHECK_EQ(mobs.lines[2].shadow, 113); // 170 likewise
-    CHECK_EQ(shadow.Kind(PlateKind::Players).lines[2].shadow, 113);
+    CHECK_EQ(mobs.lines[2].shadow, 115); // 170 likewise
+    CHECK_EQ(shadow.Kind(PlateKind::Players).lines[2].shadow, 115);
     const Settings outline = Load2({{"textOutlineR", "0.6"}, {"textOutlineG", "0.7"}, {"textOutlineB", "0.8"}});
     const Color edge{{0.6f, 0.7f, 0.8f}};
     CHECK((outline.cursorEdgeColor == ColorPick{ColorSource::Custom, edge}));
@@ -1981,23 +2013,24 @@ TEST(a_row_saved_as_expanding_shows_its_nameplate)
 
 TEST(a_shadow_saved_before_its_unit_grew_keeps_its_look)
 {
-    // 100 percent is now one and a half of the shadow it was: 150 from before is 100, and 100 is 67.
+    // 100 percent is now one and a half of the shadow it was: 150 from before is 100, and 100 is 67, or 65 on the
+    // steps of five.
     MapStore file = ReleaseFile({{"mobsLine3Shadow", "150.0000"}, {"mobsLine2Shadow", "100.0000"}});
     const Settings loaded = LoadSettings(file);
     CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[2].shadow, 100);
-    CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[1].shadow, 67);
+    CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[1].shadow, 65);
     // Such a file is owed a save, which gives it the new keys and leaves the old ones as they were.
     ChangedKeys keys(file);
     const Settings again = keys.Load();
     CHECK(keys.Outdated() && again == loaded);
     keys.Save(again);
-    CHECK_EQ(file.values.at("mobsLine2ShadowStrength"), "67.0000");
+    CHECK_EQ(file.values.at("mobsLine2ShadowStrength"), "65.0000");
     CHECK_EQ(file.values.at("mobsLine2Shadow"), "100.0000");
     CHECK(std::ranges::find(file.sets, "mobsLine2Shadow") == file.sets.end());
     CHECK_EQ(file.values.at("settingsVersion"), "4.0000");
     // The build before, run again, writes its own key: this build goes by its own.
     file.values["mobsLine2Shadow"] = "200.0000";
-    CHECK_EQ(LoadSettings(file).Kind(PlateKind::Mobs).lines[1].shadow, 67);
+    CHECK_EQ(LoadSettings(file).Kind(PlateKind::Mobs).lines[1].shadow, 65);
     // A file with neither key has the default.
     file.values.erase("mobsLine2Shadow");
     file.values.erase("mobsLine2ShadowStrength");
@@ -2007,12 +2040,12 @@ TEST(a_shadow_saved_before_its_unit_grew_keeps_its_look)
 TEST(an_icon_size_saved_as_a_share_of_the_font_size_keeps_its_pixels)
 {
     // A line's icons were a percent of the base font size, and are one of the base icon size, 16 px: 107 percent of a
-    // 20 px font was 21.4 px, which is 134 percent of 16.
+    // 20 px font was 21.4 px, which is 134 percent of 16, and 135 on the steps of five.
     MapStore file = ReleaseFile({{"baseSize", "20.0000"}, {"mobsLine1IconSize", "107.0000"}, {"playersLine3IconSize", "50.0000"}});
     const Settings loaded = LoadSettings(file);
     CHECK_EQ(loaded.baseIconSize, 16);
-    CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[0].iconSize, 134);
-    CHECK_EQ(loaded.Kind(PlateKind::Players).lines[2].iconSize, 63); // 10 px
+    CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[0].iconSize, 135);
+    CHECK_EQ(loaded.Kind(PlateKind::Players).lines[2].iconSize, 65); // 10 px
     // Saved under its own key, it is read back as it is, whatever the base sizes become.
     Settings changed    = loaded;
     changed.baseSize    = 30;
@@ -2051,7 +2084,7 @@ TEST(a_number_of_before_is_converted_in_a_store_that_adds_what_a_typed_read_miss
         {"npcsOrnamentPlace", "lines12"}, {"petsRowPetPlate", "hidden"}});
     const Settings loaded = LoadSettings(file);
     CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[2].shadow, 60); // 90 of the unit that was two thirds of today's
-    CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[0].iconSize, 28); // 30 percent of a 15 px font is 4.5 px, of 16
+    CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[0].iconSize, 30); // 30 percent of a 15 px font is 4.5 px, 28 of 16
     CHECK(loaded.Kind(PlateKind::Npcs).ornament.place == OrnamentPlace::AboveMiddle);
     for (int row = 0; row < kPetRowCount; ++row)
         CHECK(loaded.Kind(PlateKind::Pets).rows[row].plate == PlateMode::Hidden);
@@ -2394,7 +2427,7 @@ TEST(pets_migrate_as_the_mobs_they_were_drawn_as)
     const Settings plain   = Load2({});
     KindSettings expected  = Settings{}.Kind(PlateKind::Pets);
     for (LineDesign& line : expected.lines)
-        line.shadow = 67;
+        line.shadow = 65; // 67, on the steps of five
     for (int row = 0; row < kPetRowCount; ++row)
         expected.rows[row].plate = PlateMode::Shown;
     CHECK(plain.Kind(PlateKind::Pets) == expected);

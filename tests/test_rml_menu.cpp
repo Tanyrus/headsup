@@ -940,6 +940,24 @@ TEST(the_font_arrows_step_through_the_fonts_and_a_slider_follows_the_pointer)
     CHECK_EQ(window.TextOf("entities-nameplates-vertical-offset-val"), std::to_string(window.settings.nameRaise) + " px");
 }
 
+TEST(a_percent_slider_lands_on_steps_of_five_while_it_is_dragged_and_stepped)
+{
+    Window window;
+    window.Page("entities");
+    const std::string slider = "entities-nameplates-min-size";
+    const int was            = window.settings.scaleMin;
+    for (const float by : {7.0f, 3.0f, 11.0f})
+    {
+        CHECK(window.Drag(slider, Rml::Vector2f(by, 0.0f)));
+        CHECK_EQ(window.settings.scaleMin % 5, 0);
+        CHECK_EQ(window.TextOf(slider + "-val"), std::to_string(window.settings.scaleMin) + "%");
+    }
+    CHECK(window.settings.scaleMin != was);
+    const int dragged = window.settings.scaleMin;
+    CHECK(window.Key(Rml::Input::KI_RIGHT));
+    CHECK_EQ(window.settings.scaleMin, dragged + 5);
+}
+
 TEST(a_slider_takes_the_arrow_keys_only_while_the_pointer_is_on_the_window)
 {
     Window window;

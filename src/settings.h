@@ -158,7 +158,7 @@ namespace headsup
         bool autoCheck    = false; // every mob that comes near is checked by HeadsUp, for its exact level
         std::string defaultFont = kDefaultFont;
         int scaleMin = 50, scaleMax = 250; // percent: the distance scale's limits
-        int timerPercent = 87;
+        int timerPercent = 85;
         std::array<KindSettings, kPlateKindCount> kinds = DefaultKinds();
         Palette palette = DefaultPalette();
         uint32_t detectionShown = kDefaultDetection;

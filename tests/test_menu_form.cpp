@@ -475,9 +475,9 @@ TEST(a_setting_moved_to_another_page_hides_as_it_would_at_home)
     w.settings.scaleWithDistance = false;
     CHECK(ClassOn(w.Pass(), "configmenu-this-frame-min-size-label-row", kOffClass));
     w.settings.scaleWithDistance = true;
-    const Form form = w.Pass({{"configmenu-this-frame-min-size", kChangeEvent, "77"}});
+    const Form form = w.Pass({{"configmenu-this-frame-min-size", kChangeEvent, "75"}});
     CHECK(!ClassOn(form, "configmenu-this-frame-min-size-label-row", kOffClass));
-    CHECK(form.changed && w.settings.scaleMin == 77);
+    CHECK(form.changed && w.settings.scaleMin == 75);
 }
 
 TEST(a_card_moved_to_another_page_shows_there_with_its_settings)

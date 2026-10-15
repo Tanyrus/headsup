@@ -44,11 +44,12 @@ namespace headsup
             const char* key;
             int Settings::*field;
             int lo, hi;
+            int step = 1;
         };
         constexpr IntKey kInts[] = {{"smoothness", &Settings::smoothness, kMinSmoothness, kMaxSmoothness},
-            {"outlineThickness", &Settings::outlineThickness, kMinOutlineThickness, kMaxOutlineThickness},
-            {"outlineOpacity", &Settings::outlineOpacity, kMinOpacity, kMaxOpacity},
-            {"menuOpacity", &Settings::menuOpacity, kMinMenuOpacity, kMaxOpacity},
+            {"outlineThickness", &Settings::outlineThickness, kMinOutlineThickness, kMaxOutlineThickness, kPercentStep},
+            {"outlineOpacity", &Settings::outlineOpacity, kMinOpacity, kMaxOpacity, kPercentStep},
+            {"menuOpacity", &Settings::menuOpacity, kMinMenuOpacity, kMaxOpacity, kPercentStep},
             {"cursorRaise", &Settings::cursorRaise, -kMaxCursorRaise, kMaxCursorRaise},
             {"nameRaise", &Settings::nameRaise, kMinNameRaise, kMaxNameRaise},
             {"elementWeakRank", &Settings::elementWeakRank, kNoWeakRank, kMaxWeakRank},
@@ -59,9 +60,9 @@ namespace headsup
             {"popupTextSize", &Settings::popupTextSize, kAutoPopupTextSize, kMaxBarTextSize},
             {"baseSize", &Settings::baseSize, kMinTextSize, kMaxTextSize},
             {"baseIconSize", &Settings::baseIconSize, kMinTextSize, kMaxTextSize},
-            {"scaleMin", &Settings::scaleMin, kMinSizePercent, kMaxSizePercent},
-            {"scaleMax", &Settings::scaleMax, kMinSizePercent, kMaxSizePercent},
-            {"timerPercent", &Settings::timerPercent, kMinSizePercent, kMaxSizePercent},
+            {"scaleMin", &Settings::scaleMin, kMinSizePercent, kMaxSizePercent, kPercentStep},
+            {"scaleMax", &Settings::scaleMax, kMinSizePercent, kMaxSizePercent, kPercentStep},
+            {"timerPercent", &Settings::timerPercent, kMinSizePercent, kMaxSizePercent, kPercentStep},
             {"screenshotKey", &Settings::screenshotKey, 0, UINT8_MAX}};
 
         // Numbers whose meaning changed and whose key changed with it: saved and bounded as the rest, and read through
@@ -76,7 +77,7 @@ namespace headsup
         constexpr IntKey kRebasedInts[] = {{kCursorWidthKey, &Settings::cursorWidth, kMinCursorSide, kMaxCursorSide},
             {kMenuFontSizeKey, &Settings::menuFontSize, kMinMenuFontSize, kMaxMenuFontSize},
             {kCursorHeightKey, &Settings::cursorHeight, kMinCursorSide, kMaxCursorSide},
-            {kCursorEdgeKey, &Settings::cursorOutlineThickness, kMinCursorEdge, kMaxCursorEdge}};
+            {kCursorEdgeKey, &Settings::cursorOutlineThickness, kMinCursorEdge, kMaxCursorEdge, kPercentStep}};
         constexpr const char* kDashMarkKey = "dashMark";
         const char* const kDashMarkNames[kDashMarkCount] = {"no", "dot", "square", "diamond"};
         constexpr const char* kCursorStyleKey = "cursorStyle";
@@ -1034,12 +1035,12 @@ namespace headsup
             if (static_cast<int>(line.align) >= kAlignCount) line.align = d.align;
             line.style &= kAllFontStyles;
             line.show.when &= conditions;
-            line.textSize  = std::clamp(line.textSize, kMinSizePercent, kMaxSizePercent);
-            line.iconSize  = std::clamp(line.iconSize, kMinSizePercent, kMaxSizePercent);
+            line.textSize  = std::clamp(Stepped(line.textSize, kPercentStep), kMinSizePercent, kMaxSizePercent);
+            line.iconSize  = std::clamp(Stepped(line.iconSize, kPercentStep), kMinSizePercent, kMaxSizePercent);
             line.padding   = std::clamp(line.padding, 0, kMaxLinePadding);
-            line.shadow    = std::clamp(line.shadow, kMinShadow, kMaxShadow);
-            line.glow      = std::clamp(line.glow, kMinGlow, kMaxGlow);
-            line.glowSize  = std::clamp(line.glowSize, kMinGlowSize, kMaxGlowSize);
+            line.shadow    = std::clamp(Stepped(line.shadow, kPercentStep), kMinShadow, kMaxShadow);
+            line.glow      = std::clamp(Stepped(line.glow, kPercentStep), kMinGlow, kMaxGlow);
+            line.glowSize  = std::clamp(Stepped(line.glowSize, kPercentStep), kMinGlowSize, kMaxGlowSize);
             ClampPick(line.color, d.color, offered);
             ClampPick(line.shadowColor, d.shadowColor, offered);
             ClampPick(line.glowColor, d.glowColor, offered);
@@ -1097,7 +1098,7 @@ namespace headsup
                 ClampPick(o.color, defaults.ornament.color, plain);
                 OpacitySettings& opacity = kind.opacity;
                 for (int OpacitySettings::*percent : {&OpacitySettings::noTarget, &OpacitySettings::notTargeted, &OpacitySettings::targeted})
-                    opacity.*percent = std::clamp(opacity.*percent, kMinOpacity, kMaxOpacity);
+                    opacity.*percent = std::clamp(Stepped(opacity.*percent, kPercentStep), kMinOpacity, kMaxOpacity);
                 opacity.range = ClampFloat(opacity.range, kMinOutlineDistance, kMaxOutlineDistance, defaults.opacity.range);
                 // Your own nameplate is never far from you.
                 if (static_cast<PlateKind>(k) == PlateKind::Self) opacity.fadeIn = false;
@@ -1127,9 +1128,9 @@ namespace headsup
         for (const FloatKey& f : kFloats)
             s.*f.field = ClampFloat(s.*f.field, f.lo, f.hi, d.*f.field);
         for (const IntKey& i : kInts)
-            s.*i.field = std::clamp(s.*i.field, i.lo, i.hi);
+            s.*i.field = std::clamp(Stepped(s.*i.field, i.step), i.lo, i.hi);
         for (const IntKey& i : kRebasedInts)
-            s.*i.field = std::clamp(s.*i.field, i.lo, i.hi);
+            s.*i.field = std::clamp(Stepped(s.*i.field, i.step), i.lo, i.hi);
         s.smoothness = SmoothnessCopies(SmoothnessLevelOf(s.smoothness));
         if (s.badgeFontName.size() > kMaxFontName) s.badgeFontName = d.badgeFontName;
         if (s.barTitleFont.size() > kMaxFontName) s.barTitleFont = d.barTitleFont;

@@ -70,7 +70,7 @@ TEST(the_default_mob_design_composes_todays_three_lines)
     CHECK_EQ(OrnamentLineOf(plate).line, 2);
     CHECK_EQ(plate.ornamentColor, ToArgb(s.palette.aggression[static_cast<int>(Nature::Aggressive)]));
     CHECK_EQ(plate.lines[2].look.textSize, 15.0f);
-    CHECK_EQ(plate.lines[1].look.textSize, BasePixels(s, 87));
+    CHECK_EQ(plate.lines[1].look.textSize, BasePixels(s, 85));
     CHECK_EQ(plate.lines[0].look.iconSize, 16.0f); // the whole of the base icon size
     CHECK_EQ(plate.lines[0].source, 0);
 }

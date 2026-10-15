@@ -1,6 +1,7 @@
 #include "plate_settings.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace headsup
 {
@@ -55,7 +56,7 @@ namespace headsup
         }
         mobs.lines[0].text         = kTagDetect;
         mobs.lines[1].text         = kTagLevelCon;
-        mobs.lines[1].textSize     = 87; // 13 px of 15
+        mobs.lines[1].textSize     = 85;
         mobs.lines[1].color.source = ColorSource::Toughness;
         mobs.lines[2]              = NameLine(kTagName);
         mobs.lines[2].glow         = 100;
@@ -142,4 +143,6 @@ namespace headsup
         static_assert(static_cast<int>(OutlineMode::ByNature) == kOutlineModeCount - 1);
         return CanOutlineByNature(kind, row) ? kOutlineModeCount : kOutlineModeCount - 1;
     }
+
+    int Stepped(int value, int step) { return static_cast<int>(std::lround(static_cast<double>(value) / step)) * step; }
 }

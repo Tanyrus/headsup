@@ -192,6 +192,7 @@ namespace headsup
             EndRow();
         }
         void SliderInt(const char* label, int& value, int lo, int hi, const char* format, const char* tip);
+        void SliderPercent(const char* label, int& value, int lo, int hi, const char* tip);
         // A number stepped one at a time by the arrows either side of it, for one whose change moves the window under
         // the pointer, as a slider's would.
         void Stepper(const char* label, int& value, int lo, int hi, const char* format, const char* tip);
@@ -321,7 +322,7 @@ namespace headsup
         // Opens the popup with rows, and tells which of them was clicked.
         bool ListChoice(const std::string& control, std::string rows, int count, int& chosen);
         // A slider's newest whole value, when it moved.
-        void TakeWhole(const std::string& slider, int& value, int lo, int hi);
+        void TakeWhole(const std::string& slider, int& value, int lo, int hi, int step = 1);
         void Slider(const std::string& slider, const char* label, float value, float lo, float hi, float step,
             const std::string& shown, const char* tip);
         // A toggle, and its id: a row's is wide, one among other controls compact.

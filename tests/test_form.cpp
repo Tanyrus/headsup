@@ -42,6 +42,7 @@ namespace
         int height    = 45;
         int theme     = 1;
         float thick   = 1.0f;
+        int opacity   = 85;
         int quality   = 1;
         std::string name;
     };
@@ -57,6 +58,7 @@ namespace
             form.SliderInt("Height", b.height, 24, 64, "%d px", nullptr);
             form.SliderFloat("Thickness", b.thick, 0.5f, 3.0f, "%.1f px", nullptr);
             form.SliderNamed("Quality", b.quality, kQualities, 4, nullptr);
+            form.SliderPercent("Opacity", b.opacity, 10, 100, nullptr);
             form.NumberDropdown("Theme", b.theme, 0, 2, [](int t) { return "Theme " + std::to_string(t); }, nullptr, 0.0f,
                 [](int t) { return "What theme " + std::to_string(t) + " is."; });
             form.Row("Name", nullptr);
@@ -171,6 +173,20 @@ TEST(a_slider_takes_its_newest_value_within_its_ends)
     const Form lowest = Pass({{"page-mouse-pointer-quality", kChangeEvent, "-4"}}, state, b);
     CHECK_EQ(b.quality, 0);
     CHECK_EQ(TextOf(lowest, "page-mouse-pointer-quality-val"), "Low");
+}
+
+TEST(a_percent_slider_steps_by_five_whatever_value_it_is_given)
+{
+    FormState state;
+    Bound b;
+    const Form form = Pass({}, state, b);
+    CHECK(Has(form.blocks[0].rml, "id=\"page-mouse-pointer-opacity\" min=\"10\" max=\"100\" step=\"5\""));
+    CHECK_EQ(TextOf(form, "page-mouse-pointer-opacity-val"), "85%");
+    const Form moved = Pass({{"page-mouse-pointer-opacity", kChangeEvent, "88"}}, state, b);
+    CHECK(b.opacity == 90 && moved.changed);
+    CHECK_EQ(TextOf(moved, "page-mouse-pointer-opacity-val"), "90%");
+    Pass({{"page-mouse-pointer-opacity", kChangeEvent, "12"}}, state, b);
+    CHECK_EQ(b.opacity, 10);
 }
 
 TEST(a_dropdown_opens_a_popup_of_its_rows_and_takes_the_one_clicked)
