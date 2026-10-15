@@ -688,7 +688,8 @@ namespace headsup
         {
             PlateTexture& t = cursor.under ? m_LoneCursorUnder : m_LoneCursor;
             // A target with no name is no entity HeadsUp knows: a door, read as the NPC or object it is.
-            if (!PrepareCursor(t, CursorState(EntityState{}, cursor.target), FixedRasterHeight(shown), settings)) break;
+            if (!PrepareCursor(t, CursorState(EntityState{}, cursor.target), CursorRaster(shown, 0, false, settings.cursorHeight), settings))
+                break;
             if (t.unfit) continue;
             const float fit       = FitOf(shown, t.raster);
             const float width     = t.width * fit, height = t.height * fit;

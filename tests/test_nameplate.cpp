@@ -160,6 +160,17 @@ TEST(every_width_step_widens_the_cursors_picture_however_small_it_is_shown)
         }
 }
 
+TEST(a_cursors_picture_is_drawn_at_its_shown_height_and_never_below_its_height_setting)
+{
+    // Scaling, the steps of 1.25 from 6 pixels first pass 100 at 109.1; kept the same size, the shown height itself.
+    CHECK_EQ(CursorRaster(100.0f, 0, true, 20), 109);
+    CHECK_EQ(CursorRaster(40.0f, 0, false, 20), 40);
+    CHECK_EQ(CursorRaster(40.4f, 0, false, 20), 40);
+    // Shown smaller than its height setting, it is drawn at that setting and shrunk.
+    CHECK_EQ(CursorRaster(5.0f, 0, true, 20), 20);
+    CHECK_EQ(CursorRaster(12.0f, 0, false, 20), 20);
+}
+
 TEST(a_cursors_picture_is_as_wide_for_its_height_as_the_settings_have_it)
 {
     // Drawn 40 pixels tall where the settings say 9 by 20: 18 wide. An edge of 100 percent is a twentieth of the height.
