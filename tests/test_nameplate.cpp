@@ -220,6 +220,20 @@ TEST(a_plate_sized_by_its_own_name_follows_the_names_distance_and_not_its_jumps)
     CHECK_EQ(NameScale(0.99436f, 11.8f, 1440.0f, 0.8f, 1.2f), 1.2f);
 }
 
+TEST(the_camera_sits_behind_you_as_far_as_your_own_name_is_from_it)
+{
+    // Your name's depth 0.98693 in a live dump: 0.1 / 0.01307 = 7.651 yalms from the camera, whether or not a scene
+    // camera came from the shadows this frame, so a camera blinking in and out moves no plate.
+    Camera camera{};
+    camera.eye = WorldPoint{0.0f, 0.0f, 0.0f};
+    const WorldPoint feet{3.0f, 4.0f, 0.0f}; // 5 yalms from that camera
+    CHECK(std::abs(*CameraBehind(0.98693f, nullptr, feet) - 7.651f) < 0.001f);
+    CHECK(std::abs(*CameraBehind(0.98693f, &camera, feet) - 7.651f) < 0.001f);
+    // Without your name, the camera's distance to your feet; without either, nothing.
+    CHECK(std::abs(*CameraBehind(0.0f, &camera, feet) - 5.0f) < 0.001f);
+    CHECK(!CameraBehind(0.0f, nullptr, feet).has_value());
+}
+
 TEST(text_is_redrawn_only_when_its_size_moves_a_step)
 {
     CHECK_EQ(RasterHeight(15.0f, 0), 18);  // the first size at or above it: 6 px times 1.25 steps

@@ -84,6 +84,10 @@ namespace headsup
         return camera;
     }
 
+    uint32_t CameraRun(uint32_t run, bool seen) { return seen ? run + 1 : 0; }
+
+    bool CameraSteady(uint32_t run) { return run >= kCameraSteadyFrames; }
+
     bool CameraStillSeen(uint32_t frame, uint32_t seenFrame)
     {
         return frame - seenFrame <= kCameraGraceFrames;

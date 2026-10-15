@@ -17,6 +17,7 @@ namespace headsup
     void GameNames::NewFrame()
     {
         FinishText();
+        m_CameraRun = CameraRun(m_CameraRun, SceneCamera() != nullptr);
         ++m_Frame;
         m_MeshDraws.clear();
         m_TextFinished   = false;

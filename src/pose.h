@@ -42,6 +42,12 @@ namespace headsup
     // were then: it counts for this many frames after the last draw that gave it.
     constexpr uint32_t kCameraGraceFrames = 8;
     bool CameraStillSeen(uint32_t frame, uint32_t seenFrame);
+    // Frames in a row a camera has been there (seen: there this frame, CameraStillSeen's), and whether that is long
+    // enough to lower a seated name by: with shadows off, other draws give one for a moment now and then (9 to 42
+    // frames on a live client), which moved names down and back up.
+    constexpr uint32_t kCameraSteadyFrames = 90;
+    uint32_t CameraRun(uint32_t run, bool seen);
+    bool CameraSteady(uint32_t run);
 
     bool RowAtHeight(const Camera& camera, const WorldPoint& feet, float height, float& row);
     bool HeightAtRow(const Camera& camera, const WorldPoint& feet, float row, float& height);

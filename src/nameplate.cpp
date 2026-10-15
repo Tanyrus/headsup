@@ -172,6 +172,13 @@ namespace headsup
         return std::isnan(yalms) ? DistanceScale(letterHeight, screenHeight, minScale, maxScale) : ScaleAtDistance(yalms, minScale, maxScale);
     }
 
+    std::optional<float> CameraBehind(float ownNameDepth, const Camera* camera, const WorldPoint& yourFeet)
+    {
+        if (const float yalms = YalmsAtDepth(ownNameDepth); !std::isnan(yalms)) return yalms;
+        if (camera == nullptr) return std::nullopt;
+        return Distance(camera->eye, yourFeet);
+    }
+
     float EaseScale(float shown, float target, double seconds)
     {
         if (shown <= 0.0f) return target;

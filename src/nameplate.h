@@ -102,6 +102,11 @@ namespace headsup
     // name's yalms from the camera, which its depth gives, so neither the game's steps nor a frame it draws a name at
     // another size move it; DistanceScale of the name's height where the depth says nothing.
     float NameScale(float depth, float letterHeight, float screenHeight, float minScale, float maxScale);
+    // How far the camera sits behind you, in yalms, which every other plate adds to its owner's distance from you:
+    // your own name's distance from the camera, which its depth gives and which the game draws every frame, else the
+    // scene camera's distance to your feet; nothing without either. The shadows' camera comes and goes with shadows
+    // off, and the two measures differ, so the name wins whenever it is there.
+    std::optional<float> CameraBehind(float ownNameDepth, const Camera* camera, const WorldPoint& yourFeet);
     // The game steps its name size, by 5% at a time far away; a plate eases toward each step. A plate with no size yet
     // (0) takes the size at once.
     float EaseScale(float shown, float target, double seconds);
