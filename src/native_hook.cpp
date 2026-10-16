@@ -834,7 +834,7 @@ namespace headsup
             if (!key) return;
             const auto* rect = reinterpret_cast<const int16_t*>(mcd + kMcdRect);
             const WindowSpot now{rect[0], rect[1]};
-            LabelPlace(std::span<int16_t, 4>(place, 4), g_FrameShifts.left,
+            LabelPlace(std::span<int16_t, 4>(place, 4), g_FrameShifts.left.shift,
                 now.top - g_Placements.OriginOf(mcd, *key, now).top);
         }
 
@@ -904,7 +904,8 @@ namespace headsup
             {
                 const OpenWindow& w     = g_OpenWindows[i];
                 const WindowSpot origin = g_Placements.OriginOf(w.mcd, w.key, WindowSpot{w.left, w.top});
-                g_FrameWindows[i]       = FrameWindow{w.key, origin.left, origin.top, w.hidden};
+                g_FrameWindows[i] =
+                    FrameWindow{w.key, origin.left, origin.top, origin.left + (w.right - w.left), w.hidden};
                 opened |= !w.hidden && !g_PlannedKeys.Has(w.key);
                 if (HelpStripWindow(w.key) && !w.hidden && !g_HiddenWindows.helpBar)
                 {
@@ -970,8 +971,9 @@ namespace headsup
             const KeyOffset* offset = nullptr;
             for (size_t i = 0; i < g_OffsetCount; ++i)
                 if (g_Offsets[i].key == key) offset = &g_Offsets[i];
-            const int shift =
-                HangsFromTop(origin.top, band.screenBottom) ? g_FrameShifts.For(origin.left, band.screenRight) : 0;
+            const int shift = HangsFromTop(origin.top, band.screenBottom)
+                                  ? g_FrameShifts.For(origin.left, origin.left + (right - left), band.screenRight)
+                                  : 0;
             if (const std::optional<WindowSpot> to = g_Placements.PlaceFor(mcd, key, now, right - left, bottom - top,
                     offset != nullptr ? offset->x : 0, shift + (offset != nullptr ? offset->y : 0), band.screenRight,
                     band.screenBottom))

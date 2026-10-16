@@ -40,6 +40,12 @@ namespace headsup
                 ReadAt<uint32_t>(record.data(), kMcdType) == kWindowOpening};
             return true;
         }
+
+        // A shown window hanging from the top that moves with its view: not the strip, nor above its row.
+        bool HangsInView(const FrameWindow& w, int screenBottom)
+        {
+            return !w.hidden && MovableWindow(w.key) && w.top >= kGameTopRow && HangsFromTop(w.top, screenBottom);
+        }
     }
 
     size_t ReadWindowList(uint32_t list, const ProcessMemory& memory, std::span<OpenWindow> out)
@@ -83,8 +89,7 @@ namespace headsup
     {
         std::optional<int> top;
         for (const FrameWindow& w : frame)
-            if (!w.hidden && MovableWindow(w.key) && w.top >= kGameTopRow && HangsFromTop(w.top, screenBottom))
-                top = std::min(top.value_or(w.top), w.top);
+            if (HangsInView(w, screenBottom)) top = std::min(top.value_or(w.top), w.top);
         return top;
     }
 
@@ -102,7 +107,22 @@ namespace headsup
             if (!sideTop || *sideTop == *top) return viewShift;
             return FrameShift(*sideTop, std::nullopt, placedUnder, band, keepClear);
         };
-        return {own(leftTop), own(rightTop)};
+        const auto side = [&](std::span<const FrameWindow> windows, std::optional<int> sideTop) {
+            SideShift shift{own(sideTop), std::nullopt};
+            for (const FrameWindow& w : windows)
+                if (HangsInView(w, screenBottom) && w.top < kGameUnderStripRow)
+                    shift.topRow = TopRow{std::min(shift.topRow ? shift.topRow->left : w.left, w.left),
+                        std::max(shift.topRow ? shift.topRow->right : w.right, w.right)};
+            return shift;
+        };
+        return {side(left, leftTop), side(right, rightTop)};
+    }
+
+    int FrameShifts::For(int windowLeft, int windowRight, int screenRight) const
+    {
+        const SideShift& side = OnLeftSide(windowLeft, screenRight) ? left : right;
+        const bool beside = side.topRow && (windowRight <= side.topRow->left || windowLeft >= side.topRow->right);
+        return beside ? side.shift - (kGameUnderStripRow - kGameTopRow) : side.shift;
     }
 
     int FrameShift(int frameTop, std::optional<int> chosen, int placedUnder, int band, bool keepClear)

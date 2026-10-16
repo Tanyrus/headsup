@@ -138,9 +138,10 @@ namespace
     // Status as the game draws it: the strip's windows, the hidden menu it came from, the chat log at the bottom.
     std::vector<FrameWindow> StatusFrame()
     {
-        return {{Key("helpwind"), 130, 16, false}, {Key("titlewin"), 16, 16, true}, {Key("buff"), 142, 48, false},
-            {Key("menuwind"), 1792, 48, true}, {Key("level"), 16, 208, false}, {Key("statcom2"), 1792, 48, false},
-            {Key("persona"), 16, 16, false}, {Key("logwindo"), 16, 1058, false}};
+        return {{Key("helpwind"), 130, 16, 1790, false}, {Key("titlewin"), 16, 16, 128, true},
+            {Key("buff"), 142, 48, 382, false}, {Key("menuwind"), 1792, 48, 1904, true},
+            {Key("level"), 16, 208, 128, false}, {Key("statcom2"), 1792, 48, 1904, false},
+            {Key("persona"), 16, 16, 128, false}, {Key("logwindo"), 16, 1058, 1790, false}};
     }
 }
 
@@ -148,11 +149,12 @@ TEST(a_frame_is_the_view_holding_most_of_its_shown_windows_and_the_smaller_one_o
 {
     std::vector<FrameWindow> frame = StatusFrame();
     CHECK(ViewOf(kViews, frame) == std::optional<size_t>(1));
-    frame.push_back({Key("profile"), 130, 48, false});
+    frame.push_back({Key("profile"), 130, 48, 382, false});
     CHECK(ViewOf(kViews, frame) == std::optional<size_t>(2));
     frame.back().hidden = true; // a hidden window is not part of what is shown
     CHECK(ViewOf(kViews, frame) == std::optional<size_t>(1));
-    const std::vector<FrameWindow> nothing = {{Key("helpwind"), 130, 16, false}, {Key("logwindo"), 16, 1058, false}};
+    const std::vector<FrameWindow> nothing = {{Key("helpwind"), 130, 16, 1790, false},
+        {Key("logwindo"), 16, 1058, 1790, false}};
     CHECK(!ViewOf(kViews, nothing).has_value());
 }
 
@@ -162,12 +164,12 @@ TEST(a_frame_s_top_is_its_highest_shown_window_that_hangs_from_the_top_and_is_no
     std::vector<FrameWindow> currencies = StatusFrame();
     currencies[6].hidden = true; // the portrait, under the list
     CHECK(FrameTop(currencies, kScreenBottom) == std::optional<int>(48));
-    const std::vector<FrameWindow> bottomOnly = {{Key("helpwind"), 130, 16, false}, {Key("iteminfo"), 16, 992, false},
-        {Key("logwindo"), 16, 1058, false}};
+    const std::vector<FrameWindow> bottomOnly = {{Key("helpwind"), 130, 16, 1790, false},
+        {Key("iteminfo"), 16, 992, 382, false}, {Key("logwindo"), 16, 1058, 1790, false}};
     CHECK(!FrameTop(bottomOnly, kScreenBottom).has_value());
     // The map's corner frame, 106 x 14 at the screen's corner, draws nothing: the map's own windows are the top.
-    const std::vector<FrameWindow> map = {{Key("buff"), 142, 48, false}, {Key("mapframe"), 0, 0, false},
-        {Key("map0"), 1792, 48, false}};
+    const std::vector<FrameWindow> map = {{Key("buff"), 142, 48, 382, false}, {Key("mapframe"), 0, 0, 106, false},
+        {Key("map0"), 1792, 48, 1904, false}};
     CHECK(FrameTop(map, kScreenBottom) == std::optional<int>(48));
 }
 
@@ -242,14 +244,45 @@ TEST(wide_scan_s_label_under_the_strip_s_title_moves_with_the_frame_s_windows_an
 TEST(the_side_holding_the_view_s_highest_window_takes_its_shift_and_the_other_hangs_under_the_band_by_its_own)
 {
     // Status: the status column at 16 on the left, and its menu at 48 on the right, where the Commands menu was.
-    CHECK((ShiftsOf(StatusFrame(), std::nullopt, 64, 64, true, kScreenRight, kScreenBottom) == FrameShifts{48, 16}));
-    CHECK((ShiftsOf(StatusFrame(), 30, 64, 64, false, kScreenRight, kScreenBottom) == FrameShifts{30, 16}));
-    CHECK((ShiftsOf(StatusFrame(), std::nullopt, 64, 80, true, kScreenRight, kScreenBottom) == FrameShifts{64, 32}));
+    const auto column = [](const FrameShifts& s) { return s.For(16, 128, kScreenRight); };
+    const auto menu   = [](const FrameShifts& s) { return s.For(1792, 1904, kScreenRight); };
+    const FrameShifts placed = ShiftsOf(StatusFrame(), std::nullopt, 64, 64, true, kScreenRight, kScreenBottom);
+    CHECK(column(placed) == 48 && menu(placed) == 16);
+    const FrameShifts chosen = ShiftsOf(StatusFrame(), 30, 64, 64, false, kScreenRight, kScreenBottom);
+    CHECK(column(chosen) == 30 && menu(chosen) == 16);
+    const FrameShifts pushed = ShiftsOf(StatusFrame(), std::nullopt, 64, 80, true, kScreenRight, kScreenBottom);
+    CHECK(column(pushed) == 64 && menu(pushed) == 32);
     // Items: the list on the left and its sort menu on the right start together, so the player's shift moves both.
-    const std::vector<FrameWindow> items = {{Key("buff"), 142, 48, false}, {Key("inventor"), 16, 48, false},
-        {Key("itmsort2"), 1792, 48, false}, {Key("iteminfo"), 16, 992, false}};
-    CHECK((ShiftsOf(items, 20, 64, 64, false, kScreenRight, kScreenBottom) == FrameShifts{20, 20}));
+    const std::vector<FrameWindow> items = {{Key("buff"), 142, 48, 382, false}, {Key("inventor"), 16, 48, 198, false},
+        {Key("itmsort2"), 1792, 48, 1904, false}, {Key("iteminfo"), 16, 992, 382, false}};
+    const FrameShifts both = ShiftsOf(items, 20, 64, 64, false, kScreenRight, kScreenBottom);
+    CHECK(both.For(16, 198, kScreenRight) == 20 && both.For(1792, 1904, kScreenRight) == 20);
     // A view on the right alone takes its shift there.
-    const std::vector<FrameWindow> conquest = {{Key("conquer1"), 1792, 48, false}};
-    CHECK(ShiftsOf(conquest, 6, 64, 64, false, kScreenRight, kScreenBottom).right == 6);
+    const std::vector<FrameWindow> conquest = {{Key("conquer1"), 1792, 48, 1904, false}};
+    CHECK(ShiftsOf(conquest, 6, 64, 64, false, kScreenRight, kScreenBottom).For(1792, 1904, kScreenRight) == 6);
+}
+
+TEST(a_window_the_game_hangs_under_the_strip_beside_the_status_column_rises_to_line_up_with_it)
+{
+    // Status > Magic Skills: the column in the strip's row, the list beside it a row lower, the Level box under it.
+    std::vector<FrameWindow> magic = StatusFrame();
+    magic.push_back({Key("mgcskill"), 130, 48, 382, false});
+    const auto top = [](const FrameShifts& s, int left, int top, int right) {
+        return top + s.For(left, right, kScreenRight);
+    };
+    const FrameShifts placed = ShiftsOf(magic, std::nullopt, 64, 64, true, kScreenRight, kScreenBottom);
+    CHECK(top(placed, 16, 16, 128) == 64);
+    CHECK(top(placed, 130, 48, 382) == 64);
+    CHECK(top(placed, 16, 208, 128) == 256);
+    CHECK(top(placed, 142, 48, 382) == 64); // the status icons stay where they were before Status opened
+    CHECK(top(placed, 1792, 48, 1904) == 64);
+    const FrameShifts chosen = ShiftsOf(magic, 30, 64, 64, false, kScreenRight, kScreenBottom);
+    CHECK(top(chosen, 16, 16, 128) == 46 && top(chosen, 130, 48, 382) == 46);
+    // Currencies hides the column under its list: nothing is beside it, and the icons stay too.
+    std::vector<FrameWindow> currencies = StatusFrame();
+    currencies[6].hidden = true;
+    currencies.push_back({Key("evitem"), 16, 48, 382, false});
+    const FrameShifts hidden = ShiftsOf(currencies, std::nullopt, 64, 64, true, kScreenRight, kScreenBottom);
+    CHECK(top(hidden, 16, 48, 382) == 64 && top(hidden, 142, 48, 382) == 64);
+    CHECK(FrameShifts{}.For(130, 382, kScreenRight) == 0); // windows not moved
 }
