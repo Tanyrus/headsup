@@ -236,7 +236,7 @@ class Build(unittest.TestCase):
         return tables, files
 
     def test_the_rows(self):
-        (rows, shops, links, systems), _ = self.run_npcs()
+        (rows, shops, links, systems, key_items), _ = self.run_npcs()
         self.assertEqual([r['id'] for r in rows], [16785599, 16785600, 16785601])
         rodrigue, ganger, qm = rows
         self.assertEqual((rodrigue['shop'], ganger['shop'], qm['shop']), (1, 1, 0))
@@ -249,6 +249,7 @@ class Build(unittest.TestCase):
                           ('quest', 7, 12, 'Atellounes Lament', '', 'wotg', 0)])
         self.assertEqual((ganger['links'], rodrigue['links']), ([1, 2, 3], [1]))
         self.assertEqual((qm['name'], qm['links'], qm['unread'], systems), ('???', [], [], []))
+        self.assertEqual(key_items, {400: 'Map of the Caves'})  # Ganger's reward, by its identifier in words
 
     def test_the_files_gen_npcs_reads(self):
         _, files = self.run_npcs()
@@ -256,6 +257,7 @@ class Build(unittest.TestCase):
                          '16785600\t2\tGanger\tGanger\t1.500,-2.250,3.000,7\t4128,4148\t1590\t400\t\t\t1\t1,2,3\t\t')
         self.assertEqual(files['phoenix_npc_links.tsv'].splitlines()[3],
                          '3\tquest\t7\t12\tAtellounes Lament\t\twotg\t0')
+        self.assertEqual(files['phoenix_key_items.tsv'], 'id\tname\n400\tMap of the Caves\n')
 
     def test_a_quest_whose_every_step_needs_a_setting_live_has_off(self):
         # A trust quest on Rodrigue, its one step gated as scripts/quests/hiddenQuests/Trust_Halver.lua's.
@@ -270,7 +272,7 @@ class Build(unittest.TestCase):
                    Rodrigue={'onTrigger': [entry]})}))
         settings = {'main': dict(SETTINGS['main'], ENABLE_TRUST_QUESTS=0)}
         try:
-            (rows, _, links, _), _ = self.run_npcs([{'npcs': DUMP_NPCS, 'npcLua': lua, 'settings': settings}])
+            (rows, _, links, _, _), _ = self.run_npcs([{'npcs': DUMP_NPCS, 'npcLua': lua, 'settings': settings}])
         finally:
             del SCRIPTS[script]
         trust = next(l for l in links if l['kind'] == 'hidden')
@@ -307,7 +309,7 @@ class Build(unittest.TestCase):
                                                          [trust, 1, 3], 'Trust_Halver')]})
         lua = dict(DUMP_LUA, interactions={'2': interactions})
         settings = {'main': dict(SETTINGS['main'], ENABLE_TRUST_QUESTS=0)}
-        (rows, _, links, _), _ = self.run_npcs([{'npcs': DUMP_NPCS, 'npcLua': lua, 'settings': settings}], scripts)
+        (rows, _, links, _, _), _ = self.run_npcs([{'npcs': DUMP_NPCS, 'npcLua': lua, 'settings': settings}], scripts)
         rodrigue, _, qm = rows
         self.assertEqual([(l['name'], l['live']) for l in links],
                          [('A Squires Test', 1), ('Storms of Fate', 1), ('Atellounes Lament', 0), ('Trust Halver', 1)])
@@ -343,14 +345,24 @@ class Format(unittest.TestCase):
         links = gen.parse_links('\t'.join(gen.LINK_COLUMNS) + '\n1\tquest\t0\t4\tA Squires Test\t\t\t1\n')
         shops = gen.parse_shops('list\titem\tprice\trank\n1\t4112\t910\t0\n')
         systems = gen.parse_systems('system\tfamily\tcall\n1\thelm\thelm.onTrade(player)\n')
+        key_items = gen.parse_key_items('id\tname\n400\tMap of the Caves\n')
         row = gen.parse_npcs(NPC_HEADER + '\n' + NPC_ROW + '\n')
-        gen.check(row, shops, links, systems)
+        gen.check(row, shops, links, systems, key_items)
         with self.assertRaises(gen.DataError) as caught:
-            gen.check([dict(row[0], links=[])], shops, links, systems)
+            gen.check([dict(row[0], links=[])], shops, links, systems, key_items)
         self.assertIn('phoenix_npc_links.tsv: 1 entries no NPC names', str(caught.exception))
         with self.assertRaises(gen.DataError) as caught:
-            gen.check([dict(row[0], shop=2)], shops, links, systems)
+            gen.check([dict(row[0], shop=2)], shops, links, systems, key_items)
         self.assertIn('NPC 16785600 names a shop, link or system past', str(caught.exception))
+        with self.assertRaises(gen.DataError) as caught:
+            gen.check([dict(row[0], needs=[87])], shops, links, systems, key_items)
+        self.assertIn('NPC 16785600 names key item 87, which phoenix_key_items.tsv does not', str(caught.exception))
+        with self.assertRaises(gen.DataError) as caught:
+            gen.check(row, shops, links, systems, {**key_items, 87: 'Silver Bell'})
+        self.assertIn('phoenix_key_items.tsv: 1 key items no NPC names, the first 87', str(caught.exception))
+        with self.assertRaises(gen.DataError) as caught:
+            gen.parse_key_items('id\tname\n400\tMap of the Caves\n87\tSilver Bell\n', 'k.tsv')
+        self.assertIn('k.tsv:3: ids must be strictly increasing', str(caught.exception))
         with self.assertRaises(gen.DataError) as caught:
             gen.parse_links('\t'.join(gen.LINK_COLUMNS) + '\n2\tquest\t0\t4\tA\t\t\t1\n', 'l.tsv')
         self.assertIn('l.tsv:2: link must count from 1', str(caught.exception))
@@ -373,8 +385,11 @@ class ValidateNpcs(unittest.TestCase):
     SHOPS = [[{'list': 1, 'item': i, 'price': p, 'rank': 0} for i, p in
               ((4112, 910), (4128, 4832), (4148, 316), (4150, 2595), (4151, 800))]]
 
-    def check(self, npcs_=None, shops=None, **limits):
-        return validate.check_npcs(npcs_ or self.NPCS, shops or self.SHOPS, [], [], min_npc=limits)
+    KEY_ITEMS = {8: 'Airship Pass'}
+
+    def check(self, npcs_=None, shops=None, key_items=None, **limits):
+        return validate.check_npcs(npcs_ or self.NPCS, shops or self.SHOPS, [], [], key_items or self.KEY_ITEMS,
+                                   min_npc=limits)
 
     def test_known_npcs_pass(self):
         self.assertEqual(self.check(), [])
@@ -384,6 +399,10 @@ class ValidateNpcs(unittest.TestCase):
         self.assertEqual(len(self.check(lost)), 1)
         cheaper = [[dict(e, price=e['price'] - 1) for e in self.SHOPS[0]]]
         self.assertEqual(len(self.check(shops=cheaper)), 1)
+
+    def test_a_key_item_under_another_name_fails(self):
+        self.assertEqual(self.check(key_items={8: 'Airship Pas'}),
+                         ["key item 8: expected the name 'Airship Pass', got 'Airship Pas'"])
 
     def test_an_npc_live_turns_off_fails(self):
         self.assertEqual(self.check(self.NPCS + [npc(17199755)]),

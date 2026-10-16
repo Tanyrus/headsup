@@ -4,12 +4,15 @@
 #include "bar_game_help.h"
 #include "bar_job.h"
 #include "bar_server_time.h"
+#include "npcdata.h"
 #include "ph_timers.h"
 #include "titles.h"
 #include "vanadiel.h"
 #include "zones.h"
 
+#include <algorithm>
 #include <cmath>
+#include <span>
 #include <string_view>
 #include <utility>
 
@@ -54,6 +57,12 @@ namespace headsup
         bool IsMob(const ActorInfo* target)
         {
             return target != nullptr && target->kind == EntityKind::Mob && target->mob != nullptr;
+        }
+
+        // An NPC target's record; nullptr for anything else, or an NPC the data has nothing to show of.
+        const NpcRecord* NpcOf(const ActorInfo* target)
+        {
+            return target != nullptr && target->kind == EntityKind::Npc ? NpcById(target->serverId) : nullptr;
         }
 
         // "WAR 75 / NIN 37", or the game's "? ? ?" for an anonymous player, whose jobs come as 0.
@@ -245,6 +254,68 @@ namespace headsup
             return spawn;
         }
 
+        // Items by the game's names, gil as "Gil", without those it has no name for.
+        std::vector<std::string> ItemNames(std::span<const uint16_t> items, const BarState& state)
+        {
+            std::vector<std::string> names;
+            for (const uint16_t item : items)
+            {
+                const char* name = item == kGilItem              ? "Gil"
+                                   : state.itemName != nullptr ? state.itemName(item)
+                                                               : nullptr;
+                if (name != nullptr && *name != '\0') names.emplace_back(name);
+            }
+            return names;
+        }
+
+        // The mobs it pops by Phoenix's names, each once.
+        std::vector<std::string> MobNames(std::span<const uint32_t> mobs)
+        {
+            std::vector<std::string> names;
+            for (const uint32_t id : mobs)
+            {
+                const MobRecord* mob = MobById(id);
+                if (mob != nullptr && std::ranges::find(names, mob->name) == names.end()) names.emplace_back(mob->name);
+            }
+            return names;
+        }
+
+        std::vector<std::string> KeyItemNames(std::span<const uint16_t> keyItems)
+        {
+            std::vector<std::string> names;
+            for (const uint16_t keyItem : keyItems)
+                if (const char* name = KeyItemNameOf(keyItem)) names.emplace_back(name);
+            return names;
+        }
+
+        // A name a line, and a dim note when its scripts do more of it than the data could read; none when there is
+        // neither.
+        void AddListing(std::vector<PopupSection>& sections, std::string heading, const std::vector<std::string>& names,
+            bool unread = false)
+        {
+            if (names.empty() && !unread) return;
+            PopupSection section{std::move(heading), {}};
+            for (const std::string& name : names)
+                section.rows.push_back(LineOf(name));
+            if (unread)
+                section.rows.push_back(
+                    LineOf(names.empty() ? "Worked out by its script" : "And more its script works out", Tone::Dim));
+            sections.push_back(std::move(section));
+        }
+
+        // What it takes in trade and what that pops, what it gives, and the key items it gives and checks for.
+        std::vector<PopupSection> NpcSections(const ActorInfo& target, const NpcRecord& npc, const BarState& state)
+        {
+            std::vector<PopupSection> sections = ListOf(PopupSection{"",
+                ListOf(Line(Cell(Text("ID " + Printed("%03X", target.serverId & kTargetIndexBits), Tone::Dim))))});
+            AddListing(sections, "Trade", ItemNames(TradesOf(npc), state), (npc.unread & kNpcUnreadTrade) != 0);
+            AddListing(sections, "Pops", MobNames(PopsOf(npc)), (npc.unread & kNpcUnreadPops) != 0);
+            AddListing(sections, "Gives", ItemNames(GivesOf(npc), state), (npc.unread & kNpcUnreadGives) != 0);
+            AddListing(sections, "Key items", KeyItemNames(KeyItemsOf(npc)));
+            AddListing(sections, "Checks for", KeyItemNames(NeedsOf(npc)));
+            return sections;
+        }
+
         PopupContent TargetPopup(const BarState& state, const Settings& settings)
         {
             PopupContent popup;
@@ -273,6 +344,8 @@ namespace headsup
                     rows.rows.push_back(LineOf("As of your check", Tone::Dim));
                     popup.sections = ListOf(std::move(rows));
                 }
+                else if (const NpcRecord* npc = NpcOf(target))
+                    popup.sections = NpcSections(*target, *npc, state);
                 return popup;
             }
             const MobRecord& mob      = *target->mob;
@@ -530,6 +603,7 @@ namespace headsup
                     w.subtitle = ListOf(Text(CheckedJobs(state.targetCheck->general), Tone::Dim));
                     w.hasPopup = true;
                 }
+                w.hasPopup = w.hasPopup || NpcOf(state.target) != nullptr;
             }
             else
             {

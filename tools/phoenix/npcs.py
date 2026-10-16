@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Turn the NPCs of headsup_dump JSON files into phoenix_npcs.tsv, phoenix_npc_shops.tsv, phoenix_npc_links.tsv and
-phoenix_npc_systems.tsv (tools/gen_npcs.py has the format).
+"""Turn the NPCs of headsup_dump JSON files into phoenix_npcs.tsv, phoenix_npc_shops.tsv, phoenix_npc_links.tsv,
+phoenix_npc_systems.tsv and phoenix_key_items.tsv (tools/gen_npcs.py has the format).
 
 Usage: npcs.py SERVER_DIR DUMP_JSON [DUMP_JSON ...] OUT_DIR
 
@@ -539,7 +539,11 @@ def build(npcs, lua, settings, server):
     system_rows = [{'system': n, 'family': family, 'call': call}
                    for (family, call), n in sorted(systems.items(), key=lambda kv: kv[1])]
     shop_rows = [(n, stock) for stock, n in sorted(shops.items(), key=lambda kv: kv[1])]
-    return npc_rows, shop_rows, link_rows, system_rows
+    identifiers = {}
+    for identifier, key_item in sorted(c.key_items.items()):
+        identifiers.setdefault(key_item, identifier)
+    key_item_rows = {k: title(identifiers[k]) for k in sorted({k for r in npc_rows for k in r['keyItems'] + r['needs']})}
+    return npc_rows, shop_rows, link_rows, system_rows, key_item_rows
 
 
 def cell(v) -> str:
@@ -551,7 +555,7 @@ def cell(v) -> str:
     return text
 
 
-def texts(npc_rows, shop_rows, link_rows, system_rows):
+def texts(npc_rows, shop_rows, link_rows, system_rows, key_item_rows):
     npcs = '\t'.join(schema.NPC_COLUMNS) + '\n' + ''.join(
         '\t'.join(cell(r[col]) for col in schema.NPC_COLUMNS) + '\n' for r in npc_rows)
     shops = '\t'.join(schema.SHOP_COLUMNS) + '\n' + ''.join(
@@ -560,14 +564,18 @@ def texts(npc_rows, shop_rows, link_rows, system_rows):
         '\t'.join(cell(r[col]) for col in schema.LINK_COLUMNS) + '\n' for r in link_rows)
     systems = '\t'.join(schema.SYSTEM_COLUMNS) + '\n' + ''.join(
         '\t'.join(cell(r[col]) for col in schema.SYSTEM_COLUMNS) + '\n' for r in system_rows)
-    return {schema.NPCS_NAME: npcs, schema.SHOPS_NAME: shops, schema.LINKS_NAME: links, schema.SYSTEMS_NAME: systems}
+    key_items = '\t'.join(schema.KEY_ITEM_COLUMNS) + '\n' + ''.join(
+        f'{k}\t{cell(name)}\n' for k, name in key_item_rows.items())
+    return {schema.NPCS_NAME: npcs, schema.SHOPS_NAME: shops, schema.LINKS_NAME: links, schema.SYSTEMS_NAME: systems,
+            schema.KEY_ITEMS_NAME: key_items}
 
 
 def run(server, dump_paths, out_dir):
     npcs, lua, settings = load(dump_paths)
     files = texts(*build(npcs, lua, settings, server))
     tables = [schema.parse_npcs(files[schema.NPCS_NAME]), schema.parse_shops(files[schema.SHOPS_NAME]),
-              schema.parse_links(files[schema.LINKS_NAME]), schema.parse_systems(files[schema.SYSTEMS_NAME])]
+              schema.parse_links(files[schema.LINKS_NAME]), schema.parse_systems(files[schema.SYSTEMS_NAME]),
+              schema.parse_key_items(files[schema.KEY_ITEMS_NAME])]
     schema.check(*tables)
     out_dir = pathlib.Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -581,11 +589,12 @@ def main(argv) -> int:
         print(__doc__.strip(), file=sys.stderr)
         return 2
     try:
-        npcs, shops, links, systems = run(argv[1], argv[2:-1], argv[-1])
+        npcs, shops, links, systems, key_items = run(argv[1], argv[2:-1], argv[-1])
     except (OSError, DataError) as error:
         print(f'npcs: {error}', file=sys.stderr)
         return 1
-    print(f'npcs: {len(npcs)} NPCs, {len(shops)} shops, {len(links)} links, {len(systems)} system calls')
+    print(f'npcs: {len(npcs)} NPCs, {len(shops)} shops, {len(links)} links, {len(systems)} system calls, '
+          f'{len(key_items)} key items')
     return 0
 
 

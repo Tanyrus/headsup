@@ -1494,3 +1494,121 @@ TEST(a_mobs_popup_lists_what_it_drops_at_its_treasure_hunter_0_chance_and_what_c
     state.itemName = nullptr; // no names: no lists
     CHECK(Section(BarPopupContent(BarWidget::Target, state, settings), "Drops") == nullptr);
 }
+
+namespace
+{
+    ActorInfo NpcTarget(uint32_t serverId, const char* name)
+    {
+        ActorInfo npc;
+        npc.kind     = EntityKind::Npc;
+        npc.serverId = serverId;
+        npc.index    = serverId & 0xFFF;
+        std::snprintf(npc.name, sizeof(npc.name), "%s", name);
+        return npc;
+    }
+
+    const char* NpcItemName(uint16_t item)
+    {
+        switch (item)
+        {
+        case 4373: return "Sleepshroom";
+        case 4374: return "Woozyshroom";
+        case 4375: return "Danceshroom";
+        case 1823: return "Shrimp Lantern";
+        default: return nullptr; // left out, as a drop the game has no name for is
+        }
+    }
+
+    // A section's lines; none when the popup has no such section.
+    std::vector<std::string> SectionLines(const PopupContent& popup, const std::string& heading)
+    {
+        const PopupSection* section = Section(popup, heading);
+        return section != nullptr ? Lines(*section) : std::vector<std::string>{"(no " + heading + ")"};
+    }
+
+    std::vector<std::string> Headings(const PopupContent& popup)
+    {
+        std::vector<std::string> headings;
+        for (const PopupSection& s : popup.sections)
+            headings.push_back(s.heading);
+        return headings;
+    }
+}
+
+TEST(a_qms_popup_says_what_to_trade_it_and_what_that_pops)
+{
+    // Carpenters' Landing's qm_mycophile (its script): a Sleepshroom, Woozyshroom or Danceshroom pops Mycophile.
+    Settings settings;
+    const ActorInfo qm = NpcTarget(16785729, "???");
+    BarState state;
+    state.target   = &qm;
+    state.itemName = NpcItemName;
+    CHECK(BarWidgetContent(BarWidget::Target, state, settings).hasPopup);
+    const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
+    CHECK(Joined(p.title) == "???");
+    CHECK(Headings(p) == (std::vector<std::string>{"", "Trade", "Pops"}));
+    CHECK(SectionLines(p, "") == (std::vector<std::string>{"ID 141"}));
+    CHECK(SectionLines(p, "Trade") == (std::vector<std::string>{"Sleepshroom", "Woozyshroom", "Danceshroom"}));
+    CHECK(SectionLines(p, "Pops") == (std::vector<std::string>{"Mycophile"}));
+}
+
+TEST(a_qm_that_pops_two_of_one_nm_names_it_once)
+{
+    // Al'Taieu's qm_jailer_of_prudence spawns both Jailers of Prudence, 16912846 and 16912847.
+    Settings settings;
+    const ActorInfo qm = NpcTarget(16912886, "???");
+    BarState state;
+    state.target = &qm;
+    CHECK(SectionLines(BarPopupContent(BarWidget::Target, state, settings), "Pops") ==
+          (std::vector<std::string>{"Jailer of Prudence"}));
+}
+
+TEST(a_qm_whose_script_works_out_what_it_pops_says_so)
+{
+    // Bibiki Bay's qm_shen takes a Shrimp Lantern and looks Shen up by name while it runs.
+    Settings settings;
+    const ActorInfo qm = NpcTarget(16793970, "???");
+    BarState state;
+    state.target   = &qm;
+    state.itemName = NpcItemName;
+    const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
+    CHECK(SectionLines(p, "Trade") == (std::vector<std::string>{"Shrimp Lantern"}));
+    CHECK(SectionLines(p, "Pops") == (std::vector<std::string>{"Worked out by its script"}));
+    if (const PopupSection* pops = Section(p, "Pops")) CHECK(pops->rows[0].cells[0].text[0].tone == Tone::Dim);
+}
+
+TEST(an_npcs_popup_names_the_key_items_it_gives_and_checks_for)
+{
+    // Carpenters' Landing's qm_para: with the Antique Amulet it pops Para, and it gives the Cathedral Medallion.
+    Settings settings;
+    const ActorInfo qm = NpcTarget(16785781, "???");
+    BarState state;
+    state.target         = &qm;
+    const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
+    CHECK(Headings(p) == (std::vector<std::string>{"", "Pops", "Key items", "Checks for"}));
+    CHECK(SectionLines(p, "Pops") == (std::vector<std::string>{"Para"}));
+    CHECK(SectionLines(p, "Key items") == (std::vector<std::string>{"Cathedral Medallion"}));
+    CHECK(SectionLines(p, "Checks for") == (std::vector<std::string>{"Antique Amulet"}));
+}
+
+TEST(a_trade_of_gil_reads_gil_and_an_item_without_a_name_is_left_out)
+{
+    // Whitegate's Cacaroon takes an Imperial Bronze Piece (2184, which NpcItemName cannot name) and gil.
+    Settings settings;
+    const ActorInfo cacaroon = NpcTarget(16982252, "Cacaroon");
+    BarState state;
+    state.target   = &cacaroon;
+    state.itemName = NpcItemName;
+    CHECK(SectionLines(BarPopupContent(BarWidget::Target, state, settings), "Trade") == (std::vector<std::string>{"Gil"}));
+}
+
+TEST(an_npc_the_data_has_nothing_of_gets_only_its_name)
+{
+    Settings settings;
+    const ActorInfo blank = NpcTarget(16781329, "Door");
+    BarState state;
+    state.target = &blank;
+    const WidgetContent w = BarWidgetContent(BarWidget::Target, state, settings);
+    CHECK(Joined(w.title) == "Door" && !w.hasPopup);
+    CHECK(BarPopupContent(BarWidget::Target, state, settings).sections.empty());
+}

@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
 """The format of data/phoenix_npcs.tsv and the lists it points into, data/phoenix_npc_shops.tsv,
-data/phoenix_npc_links.tsv and data/phoenix_npc_systems.tsv (written by tools/phoenix/refresh.sh).
+data/phoenix_npc_links.tsv, data/phoenix_npc_systems.tsv and data/phoenix_key_items.tsv (written by
+tools/phoenix/refresh.sh), and src/generated/npcdata.inc from them: each NPC with something to show, for the plugin's
+Target popup.
 
-With --check DIR, check DIR's four files and write nothing: refresh.sh does, before it copies a refresh's NPC files
-into data/. Nothing reads them into the plugin yet.
+With --check DIR, check DIR's files and write nothing: refresh.sh does, before it copies a refresh's NPC files into
+data/.
 """
 import pathlib
 import re
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from gen_mobdata import DataError, number, table_rows  # noqa: E402
+from gen_mobdata import META_NAME, DataError, c_string, number, read_commit, table_rows  # noqa: E402
 
 NPCS_NAME = 'phoenix_npcs.tsv'
 SHOPS_NAME = 'phoenix_npc_shops.tsv'
 LINKS_NAME = 'phoenix_npc_links.tsv'
 SYSTEMS_NAME = 'phoenix_npc_systems.tsv'
+KEY_ITEMS_NAME = 'phoenix_key_items.tsv'
 # phoenix_npcs.tsv: every NPC content restriction leaves on, by server ID. script: its internal name, empty for a blank
 # placeholder; name: the name it shows, empty for one that shows none. pos: x, y, z and rotation (0 to 255) where the
 # dump found it. trades: the items its trade handlers ask for; gives: the items it hands out, quest rewards included;
@@ -46,6 +49,9 @@ EXPANSIONS = ['rotz', 'cop', 'toau', 'wotg', 'acp', 'amk', 'asa', 'abyssea', 'so
 # phoenix_npc_systems.tsv: each distinct call an NPC makes into a shared system (xi.helm, xi.dynamis, ...), numbered
 # from 1: the system and the call as written, spaces collapsed.
 SYSTEM_COLUMNS = ['system', 'family', 'call']
+# phoenix_key_items.tsv: the name of each key item an NPC gives or checks for, by its ID: its identifier in Phoenix's
+# scripts in words, which drops the game's punctuation ("C L Report" for the game's "C.L. Report").
+KEY_ITEM_COLUMNS = ['id', 'name']
 POSITION = re.compile(r'-?[0-9]+\.[0-9]{3},-?[0-9]+\.[0-9]{3},-?[0-9]+\.[0-9]{3},[0-9]{1,3}')
 
 
@@ -134,8 +140,23 @@ def parse_systems(text: str, source: str = SYSTEMS_NAME) -> list:
     return numbered(rows, 'system', source)
 
 
-def check(npcs, shops, links, systems) -> None:
-    """Every number an NPC names is in its list, and every list entry is named."""
+def parse_key_items(text: str, source: str = KEY_ITEMS_NAME) -> dict:
+    """{key item: name}, in ID order."""
+    names = {}
+    for line, row in table_rows(text, KEY_ITEM_COLUMNS, source):
+        at = f'{source}:{line}'
+        key_item = number(row['id'], 1, 0xFFFF, f'{at}: id')
+        if names and key_item <= max(names):
+            raise DataError(f'{at}: ids must be strictly increasing')
+        if not row['name']:
+            raise DataError(f'{at}: empty name')
+        names[key_item] = row['name']
+    return names
+
+
+def check(npcs, shops, links, systems, key_items) -> None:
+    """Every number an NPC names is in its list, every key item it names has a name, and every list entry and name is
+    named."""
     used_shops, used_links, used_systems = set(), set(), set()
     for npc in npcs:
         if npc['shop'] > len(shops) or any(n > len(links) for n in npc['links']) or \
@@ -145,32 +166,101 @@ def check(npcs, shops, links, systems) -> None:
         used_shops.add(npc['shop'])
         used_links.update(npc['links'])
         used_systems.update(npc['systems'])
+        unnamed = sorted(set(npc['keyItems'] + npc['needs']) - set(key_items))
+        if unnamed:
+            raise DataError(f"NPC {npc['id']} names key item {unnamed[0]}, which {KEY_ITEMS_NAME} does not")
     for name, count, used in ((SHOPS_NAME, len(shops), used_shops), (LINKS_NAME, len(links), used_links),
                               (SYSTEMS_NAME, len(systems), used_systems)):
         unused = sorted(set(range(1, count + 1)) - used)
         if unused:
             raise DataError(f'{name}: {len(unused)} entries no NPC names, the first {unused[0]}')
+    unused = sorted(set(key_items) - {k for npc in npcs for k in npc['keyItems'] + npc['needs']})
+    if unused:
+        raise DataError(f'{KEY_ITEMS_NAME}: {len(unused)} key items no NPC names, the first {unused[0]}')
 
 
 def load(data: pathlib.Path):
     tables = [parse((data / name).read_text(encoding='utf-8'), str(data / name)) for parse, name in
               ((parse_npcs, NPCS_NAME), (parse_shops, SHOPS_NAME), (parse_links, LINKS_NAME),
-               (parse_systems, SYSTEMS_NAME))]
+               (parse_systems, SYSTEMS_NAME), (parse_key_items, KEY_ITEMS_NAME))]
     check(*tables)
     return tables
 
 
+# The lists of an NPC's row that npcdata.inc carries, each into the pool of its kind: NpcRecord's spans, in its order.
+POOLS = {'trades': 'kNpcItems', 'gives': 'kNpcItems', 'keyItems': 'kNpcKeyItems', 'needs': 'kNpcKeyItems',
+         'pops': 'kNpcMobs'}
+POOL_TYPES = {'kNpcItems': 'uint16_t', 'kNpcKeyItems': 'uint16_t', 'kNpcMobs': 'uint32_t'}
+SHOWN_UNREAD = ['trade', 'gives', 'pops']  # what the popup says the data cannot name
+VALUES_A_LINE = 16
+
+
+def shown(npc) -> bool:
+    """Whether the popup has anything to say of an NPC."""
+    return any(npc[column] for column in POOLS) or any(kind in SHOWN_UNREAD for kind in npc['unread'])
+
+
+def generate(npcs, key_items, commit: str) -> str:
+    """npcdata.inc: kNpcs, each NPC shown() in ID order with where its lists sit in their pools, each pool holding
+    each distinct list once after the empty entry at 0; and kKeyItemNames in ID order."""
+    pools = {pool: [0] for pool in POOL_TYPES}
+    starts = {pool: {(): 0} for pool in POOL_TYPES}
+    records = []
+    for npc in npcs:
+        if not shown(npc):
+            continue
+        spans = []
+        for column, pool in POOLS.items():
+            values = tuple(npc[column])
+            if len(values) > 0xFF:
+                raise DataError(f"NPC {npc['id']}: {len(values)} {column} do not fit NpcSpan")
+            if values not in starts[pool]:
+                starts[pool][values] = len(pools[pool])
+                pools[pool] += values
+            spans.append(f'{{{starts[pool][values]}, {len(values)}}}')
+        unread = sum(1 << UNREAD.index(kind) for kind in npc['unread'])
+        records.append(f"    {{{npc['id']}u, {', '.join(spans)}, {unread}}},")
+    if any(len(pool) > 0xFFFF for pool in pools.values()):
+        raise DataError('the NPC lists do not fit NpcSpan')
+    lines = [f'// Generated by tools/gen_npcs.py from data/{NPCS_NAME} and data/{KEY_ITEMS_NAME} (Phoenix {commit}). '
+             'Do not edit.',
+             f'// {len(records)} NPCs with something to show of the {len(npcs)} live has, {len(key_items)} key items.']
+    lines += [f'static_assert(kNpcUnread{kind.capitalize()} == {1 << n}, "NpcUnread must follow gen_npcs.UNREAD");'
+              for n, kind in enumerate(UNREAD)]
+    for pool, kind in POOL_TYPES.items():
+        values = pools[pool]
+        lines += ['', f'const {kind} {pool}[] = {{']
+        lines += ['    ' + ', '.join(f'{v}u' if kind == 'uint32_t' else str(v) for v in values[n:n + VALUES_A_LINE]) +
+                  ',' for n in range(0, len(values), VALUES_A_LINE)]
+        lines.append('};')
+    lines += ['', 'const NpcRecord kNpcs[] = {'] + records + ['};', '', 'const KeyItemName kKeyItemNames[] = {']
+    lines += [f'    {{{key_item}, {c_string(name)}}},' for key_item, name in key_items.items()] + ['};', '']
+    return '\n'.join(lines)
+
+
 def main(argv) -> int:
-    if len(argv) != 3 or argv[1] != '--check':
-        print('usage: gen_npcs.py --check DATA_DIR', file=sys.stderr)
+    root = pathlib.Path(__file__).resolve().parent.parent
+    if len(argv) == 3 and argv[1] == '--check':
+        data = pathlib.Path(argv[2])
+    elif len(argv) == 1:
+        data = root / 'data'
+    else:
+        print('usage: gen_npcs.py [--check DATA_DIR]', file=sys.stderr)
         return 2
-    data = pathlib.Path(argv[2])
     try:
-        npcs, shops, links, systems = load(data)
+        npcs, shops, links, systems, key_items = load(data)
+        text = generate(npcs, key_items, read_commit(root / 'data' / META_NAME)) if len(argv) == 1 else None
     except (OSError, DataError) as error:
         print(f'gen_npcs: {error}', file=sys.stderr)
         return 1
-    print(f'npcs: {len(npcs)} NPCs, {len(shops)} shops, {len(links)} links and {len(systems)} system calls in {data} pass')
+    if text is None:
+        print(f'npcs: {len(npcs)} NPCs, {len(shops)} shops, {len(links)} links, {len(systems)} system calls and '
+              f'{len(key_items)} key items in {data} pass')
+        return 0
+    out = root / 'src' / 'generated' / 'npcdata.inc'
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text, encoding='utf-8')
+    print(f'npcs: {len(npcs)} NPCs, {len(key_items)} key items -> {out}')
     return 0
 
 
