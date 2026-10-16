@@ -333,10 +333,13 @@ TEST(each_glyph_is_drawn_from_its_rectangle_into_its_box_one_after_another_insid
     GameFontFace face = Face();
     SetGlyph(face, 'A', 0, 0, 3, 5);
     SetGlyph(face, 'B', 10, 0, 2, 4, 128);
+    face.picture.fill[static_cast<size_t>(1 * face.picture.width + 11)] = 64;
     const Coverage c = GameFontRasterize(face, GameFontVariant::Narrow, "AB", 12, kPlain, 0, 2);
     CHECK(c.width == 3 + 2 + 4 && c.height == 13 + 4);
     CHECK((InkColumns(c, 2) == std::vector<int>{2, 3, 4, 5, 6}));
-    CHECK(At(c, 2, 2) == 255 && At(c, 5, 2) == 128 && At(c, 4, 6) == 255 && At(c, 5, 6) == 0 && At(c, 2, 7) == 0);
+    CHECK(At(c, 2, 2) == 255 && At(c, 4, 6) == 255 && At(c, 5, 6) == 0 && At(c, 2, 7) == 0);
+    // A glyph's brightest pixel is full: the font keeps its small letters, the punctuation, at about 60%.
+    CHECK(At(c, 5, 2) == 255 && At(c, 6, 3) == 128);
     CHECK(InkColumns(c, 0).empty() && InkColumns(c, 1).empty());
     // Tracking adds after each character, as GDI's does.
     CHECK_EQ(GameFontRasterize(face, GameFontVariant::Narrow, "AB", 12, kPlain, 3, 2).width, 3 + 2 + 6 + 4);

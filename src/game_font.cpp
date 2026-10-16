@@ -119,10 +119,24 @@ namespace headsup
             return taps;
         }
 
-        // A glyph's rectangle of the picture drawn into the box from (x0, y0) to (x1, y1) of the coverage, each pixel
-        // the higher of what it had and the glyph.
+        // The brightest of a glyph's pixels: the font keeps its small letters, the punctuation, at about 60%.
+        uint8_t Peak(const FontPicture& picture, const GlyphShape& g)
+        {
+            uint8_t peak = 0;
+            for (int v = g.v; v < g.v + g.height; ++v)
+            {
+                const uint8_t* line = picture.fill.data() + static_cast<size_t>(v) * static_cast<size_t>(picture.width);
+                peak                = std::max(peak, *std::max_element(line + g.u, line + g.u + g.width));
+            }
+            return peak;
+        }
+
+        // A glyph's rectangle of the picture drawn into the box from (x0, y0) to (x1, y1) of the coverage, its brightest
+        // pixel full, each pixel the higher of what it had and the glyph.
         void DrawGlyph(Coverage& out, const FontPicture& picture, const GlyphShape& g, float x0, float y0, float x1, float y1)
         {
+            const uint8_t peak = Peak(picture, g);
+            if (peak == 0) return;
             const float fx = (x1 - x0) / static_cast<float>(g.width), fy = (y1 - y0) / static_cast<float>(g.height);
             const float rx = std::max(1.0f, 1.0f / fx), ry = std::max(1.0f, 1.0f / fy);
             const float magnification = std::min(fx, fy);
@@ -149,7 +163,7 @@ namespace headsup
                             if (u >= 0 && u < g.width) sum += rows.weights[j] * cols.weights[i] * line[u];
                         }
                     }
-                    const uint8_t value = Sharpened(sum / (rows.total * cols.total) / kFullCoverage, magnification);
+                    const uint8_t value = Sharpened(sum / (rows.total * cols.total) / static_cast<float>(peak), magnification);
                     uint8_t& pixel      = out.alpha[static_cast<size_t>(y) * static_cast<size_t>(out.width) + static_cast<size_t>(x)];
                     pixel               = std::max(pixel, value);
                 }
