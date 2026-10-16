@@ -970,3 +970,42 @@ TEST(a_text_moved_less_than_its_windows_height_is_not_moved_twice)
     CHECK(fresh.Natural({20, 24}) == (WindowSpot{20, 24}));
 }
 
+
+TEST(an_owners_copy_of_its_windows_place_moves_with_the_window)
+{
+    // As read from the test client (2026-10-15): the Level box's owner keeps its window's rectangle at +0x14 exactly,
+    // the craft skill list's keeps the same left, top and right with the list's full height.
+    using Place = std::array<int16_t, 4>;
+    CHECK((MovedPlaceCopy(Place{16, 208, 128, 296}, Place{16, 208, 128, 296}, 0, 48) == Place{16, 256, 128, 344}));
+    CHECK((MovedPlaceCopy(Place{130, 48, 382, 184}, Place{130, 48, 382, 140}, 0, 48) == Place{130, 96, 382, 232}));
+    CHECK((MovedPlaceCopy(Place{130, 48, 382, 184}, Place{130, 48, 382, 140}, 6, -10) == Place{136, 38, 388, 174}));
+    // Whatever else an owner keeps there is left alone.
+    CHECK(!MovedPlaceCopy(Place{0, 48, 382, 184}, Place{130, 48, 382, 140}, 0, 48));
+    CHECK(!MovedPlaceCopy(Place{130, 49, 382, 184}, Place{130, 48, 382, 140}, 0, 48));
+    CHECK(!MovedPlaceCopy(Place{130, 48, 380, 184}, Place{130, 48, 382, 140}, 0, 48));
+    CHECK(!MovedPlaceCopy(Place{130, 48, 382, 20}, Place{130, 48, 382, 140}, 0, 48)); // a bottom above its top
+}
+
+TEST(an_owners_place_copy_is_found_in_its_layouts_call_for_the_windows_rectangle)
+{
+    // The client's own bytes (2026-10-13 build): each layout pushes the address of its copy and calls MCD::GetRect.
+    constexpr uintptr_t getRect = 0x118F70;
+    // Combat and magic skills: lea eax,[ecx+18h]; mov ecx,[ecx+8]; push eax; call GetRect.
+    const std::vector<uint8_t> skills{0x8D, 0x41, 0x18, 0x8B, 0x49, 0x08, 0x50, 0xE8, 0xC4, 0x0B, 0xFD, 0xFF};
+    CHECK(PlaceCopyOffset(skills, 0x1483A0, getRect) == std::optional<uint32_t>(0x18));
+    // Craft skills: mov ecx,[esi+8]; lea eax,[esi+14h]; push eax; call GetRect.
+    const std::vector<uint8_t> craft{0x8B, 0x4E, 0x08, 0x8D, 0x46, 0x14, 0x50, 0xE8, 0x3A, 0x07, 0xFD, 0xFF};
+    CHECK(PlaceCopyOffset(craft, 0x14882A, getRect) == std::optional<uint32_t>(0x14));
+    // The Level box moves its window first (a call to MCD::MoveTo), then: mov ecx,[esi+8]; lea edx,[esi+14h]; push edx.
+    const std::vector<uint8_t> level{0xE8, 0x78, 0x1A, 0xFD, 0xFF, 0x8B, 0x4E, 0x08, 0x8D, 0x56, 0x14, 0x52, 0xE8, 0xCC, 0x18,
+        0xFD, 0xFF};
+    CHECK(PlaceCopyOffset(level, 0x147693, getRect) == std::optional<uint32_t>(0x14));
+    // No call for the rectangle, another register pushed than the one loaded, or the call elsewhere: no copy.
+    CHECK(!PlaceCopyOffset(craft, 0x14882A, getRect + 0x10));
+    const std::vector<uint8_t> otherPush{0x8B, 0x4E, 0x08, 0x8D, 0x46, 0x14, 0x52, 0xE8, 0x3A, 0x07, 0xFD, 0xFF};
+    CHECK(!PlaceCopyOffset(otherPush, 0x14882A, getRect));
+    CHECK(!PlaceCopyOffset(std::vector<uint8_t>{0x50, 0xE8, 0x3A, 0x07, 0xFD, 0xFF}, 0x148830, getRect));
+    // lea eax,[esi]; nop; push eax: no displacement, and no copy read off the byte after it.
+    const std::vector<uint8_t> noDisplacement{0x8D, 0x06, 0x90, 0x50, 0xE8, 0x3A, 0x07, 0xFD, 0xFF};
+    CHECK(!PlaceCopyOffset(noDisplacement, 0x14882D, getRect));
+}

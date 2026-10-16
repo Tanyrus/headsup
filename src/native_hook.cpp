@@ -788,18 +788,36 @@ namespace headsup
                 }
         }
 
-        // The game's own move. An owner whose kOwnerPlaceCopy holds the window's rectangle draws from that copy, which
-        // the move leaves where the window was: it gets the copy again from the game. Nothing else of it is touched.
+        // Where an owner keeps its copy of its window's place, read off its class's layout: none for a class that keeps
+        // none, or when the code cannot be read.
+        std::optional<uint32_t> PlaceCopyAt(uint32_t owner)
+        {
+            const auto* object = reinterpret_cast<const uint8_t*>(owner);
+            if (g_WindowGetRect == 0 || owner == 0 || !Readable(object, sizeof(uint32_t))) return std::nullopt;
+            const auto* slot = reinterpret_cast<const uint8_t*>(ReadAt<uint32_t>(object, 0) + kOwnerLayoutSlot * sizeof(uint32_t));
+            if (!Readable(slot, sizeof(uint32_t))) return std::nullopt;
+            const uint32_t layout = ReadAt<uint32_t>(slot, 0);
+            const auto* code      = reinterpret_cast<const uint8_t*>(layout);
+            if (layout == 0 || !Readable(code, kLayoutScanBytes)) return std::nullopt;
+            return PlaceCopyOffset({code, kLayoutScanBytes}, layout, g_WindowGetRect);
+        }
+
+        // The game's own move. An owner that keeps a copy of its window's place draws from it, and the move leaves it
+        // where the window was: the copy is moved with it. Nothing else of the owner is touched.
         void MoveTo(uint32_t mcd, WindowSpot to)
         {
-            const auto* rect     = reinterpret_cast<const int16_t*>(mcd + kMcdRect);
-            const uint32_t owner = ReadAt<uint32_t>(reinterpret_cast<const uint8_t*>(mcd + kMcdOwner), 0);
-            auto* copy           = reinterpret_cast<int16_t*>(owner + kOwnerPlaceCopy);
-            const bool copies    = g_WindowGetRect != 0 && owner != 0 &&
-                                Readable(reinterpret_cast<const uint8_t*>(copy), kWindowRectBytes) &&
-                                std::memcmp(copy, rect, kWindowRectBytes) == 0;
+            WindowRect window{};
+            std::memcpy(window.data(), reinterpret_cast<const void*>(mcd + kMcdRect), kWindowRectBytes);
+            const uint32_t owner            = ReadAt<uint32_t>(reinterpret_cast<const uint8_t*>(mcd + kMcdOwner), 0);
+            const std::optional<uint32_t> at = PlaceCopyAt(owner);
+            auto* copy                      = at ? reinterpret_cast<uint8_t*>(owner + *at) : nullptr;
+            const bool readable             = copy != nullptr && Readable(copy, kWindowRectBytes);
+            WindowRect kept{};
+            if (readable) std::memcpy(kept.data(), copy, kWindowRectBytes);
             reinterpret_cast<WindowMoveToFn>(g_WindowMoveTo)(mcd, to.left, to.top);
-            if (copies) reinterpret_cast<WindowGetRectFn>(g_WindowGetRect)(mcd, copy);
+            if (!readable) return;
+            if (const std::optional<WindowRect> moved = MovedPlaceCopy(kept, window, to.left - window[0], to.top - window[1]))
+                std::memcpy(copy, moved->data(), kWindowRectBytes);
         }
 
         // In place of the call through which Wide Scan's grid label asks for the strip title's rectangle, inside the

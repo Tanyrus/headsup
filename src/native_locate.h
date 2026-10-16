@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -182,11 +183,21 @@ namespace headsup
     // hit tests follow, then has the owner lay out its own content again.
     WindowMoveSite LocateWindowMove(const ImageSection& text);
     // MCD::GetRect(int16* place) (RVA 0x118F70 in the client of 2026-10-13): a thiscall on the MCD that pops its one
-    // argument and writes the window's rectangle there. Many owners keep that copy at +0x14 and draw their values
-    // from it (the Level box's figures, the Profile window's values, Font Colors' sample), refreshing it only when
-    // they lay the window out themselves.
-    constexpr uint32_t kOwnerPlaceCopy = 0x14;
-    constexpr size_t kWindowRectBytes  = 4 * sizeof(int16_t);
+    // argument and writes the window's rectangle there. Many owners keep such a copy of their window's place and draw
+    // their values from it (the Level box's figures, the Profile window's values, Font Colors' sample, the skill
+    // lists' rows), refreshing it only when they lay the window out themselves.
+    constexpr size_t kWindowRectBytes = 4 * sizeof(int16_t);
+    using WindowRect                   = std::array<int16_t, 4>; // left, top, right, bottom
+    // An owner's copy, moved as its window moves by dx, dy: when it has the window's left, top and right (its bottom
+    // may reach further, as the craft skill list's covers the whole list). None when it is no such copy.
+    std::optional<WindowRect> MovedPlaceCopy(const WindowRect& copy, const WindowRect& window, int dx, int dy);
+    // Where an owner keeps that copy, from the start of its class's layout (vtable slot kOwnerLayoutSlot), at at: the
+    // displacement of `lea r, [base + disp8]` whose register it pushes for its call of MCD::GetRect, at getRect, with
+    // at most a `mov ecx, [r + 8]` (the MCD) between. None when the layout makes no such call: the class keeps none
+    // (the Level box and the craft skill list keep it at +0x14, the combat and magic skill lists at +0x18).
+    constexpr uint32_t kOwnerLayoutSlot = 1;
+    constexpr size_t kLayoutScanBytes   = 0x200;
+    std::optional<uint32_t> PlaceCopyOffset(std::span<const uint8_t> layout, uintptr_t at, uintptr_t getRect);
     // An MCD's rectangle in the game's menu resolution: int16 left, top, right and bottom from +0x3A. +0x94 is a move's
     // countdown (MoveUnderWay); +0x99 is set for windows kept in a 640 x 480 space instead; +0x10 is
     // kWindowOpening while the window has no owner to lay out yet.
