@@ -67,7 +67,7 @@ namespace
     constexpr const char* kName              = "headsup";
     // Ashita takes a plugin's version as one number, so it holds the release tag's major.minor; the release workflow
     // checks the two agree.
-    constexpr double kVersion                = 0.65;
+    constexpr double kVersion                = 0.7;
     constexpr const char* kConfigAlias       = "headsup";
     constexpr const char* kConfigFolder      = "config";
     constexpr const char* kWindowFile        = "settings_window.json"; // a developer's build reads one in its config folder
