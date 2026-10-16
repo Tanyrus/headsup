@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <string>
+#include <vector>
 
 using namespace headsup;
 
@@ -23,7 +24,7 @@ TEST(passive_and_notorious_flags)
 {
     const MobRecord* snipper = MobById(17199322);
     CHECK(snipper != nullptr);
-    CHECK_EQ(snipper->flags, 0);
+    CHECK_EQ(snipper->flags, kMobCharmable); // passive, and a beastmaster can charm a crab
     CHECK_EQ(snipper->detects, kDetectHearing); // crabs detect by sound
     const MobRecord* monk = MobById(17199603);
     CHECK(monk != nullptr);
@@ -217,4 +218,67 @@ TEST(what_equipment_adds_to_magic_accuracy)
     CHECK(cornette != nullptr);
     CHECK_EQ(cornette->skill, 42);
     CHECK(ItemMagicOf(13856) == nullptr);
+}
+
+// Attohwa Chasm's Citipati as data/zones/attohwa_chasm/mobs.yaml has him: THF/BLM, a flat 8,000 HP, out from 20:00 to
+// 04:00, 15% from his slot with 10,800 s out after his kill; his Corse family takes a quarter less magic damage and
+// half breath damage.
+TEST(a_mobs_jobs_spawn_window_and_lottery)
+{
+    const MobRecord* citipati = MobById(16806162);
+    CHECK(citipati != nullptr);
+    if (citipati == nullptr) return;
+    const MobInfo& info = InfoOf(*citipati);
+    CHECK(info.mainJob == 6 && info.subJob == 4);
+    CHECK(info.windowStart == 20 && info.windowEnd == 4);
+    CHECK(info.lotteryChance == 15 && info.lotteryCooldown == 10800u);
+    const MobDefenses& defenses = DefensesOf(*citipati);
+    CHECK_EQ(defenses.damageTaken[static_cast<int>(DamageKind::Magic)], -2500);
+    CHECK_EQ(defenses.damageTaken[static_cast<int>(DamageKind::Breath)], -5000);
+    CHECK_EQ(defenses.damageTaken[static_cast<int>(DamageKind::Physical)], 0);
+    for (int level = citipati->minLevel; level <= citipati->maxLevel; ++level)
+    {
+        const MobCombat* combat = CombatAt(*citipati, level);
+        CHECK(combat != nullptr && combat->value[static_cast<int>(Combat::Hp)] == 8000);
+    }
+    CHECK(CombatAt(*citipati, citipati->maxLevel + 1) == nullptr);
+    // His Corse placeholder spawns at any hour and is no lottery NM.
+    const MobInfo& corse = InfoOf(*MobById(16806161));
+    CHECK(corse.windowStart == kNoWindow && corse.lotteryChance == 0);
+}
+
+// Qufim Island's Clipper, a crab: its TP moves, and regimes 41 and 42 (its first target) and 43 (its second) of
+// scripts/zones/Qufim_Island/mobs/Clipper.lua. Regime 41 is page 1 there in regimes.lua: nine of it and one of
+// another, levels 26 to 29, 630 experience.
+TEST(a_crabs_tp_moves_and_training_regimes)
+{
+    const MobRecord* clipper = MobById(17293331);
+    CHECK(clipper != nullptr);
+    if (clipper == nullptr) return;
+    std::vector<std::string> moves;
+    for (const MobSkill& skill : SkillsOf(*clipper))
+        moves.emplace_back(skill.name);
+    for (const char* move : {"Bubble Shower", "Bubble Curtain", "Big Scissors", "Scissor Guard", "Metallic Body"})
+        CHECK(std::ranges::find(moves, move) != moves.end());
+    const std::span<const MobRegime> regimes = RegimesOf(*clipper);
+    CHECK_EQ(regimes.size(), 3u);
+    if (regimes.size() != 3) return;
+    CHECK(regimes[0].regime == 41 && regimes[0].target == 1 && regimes[2].regime == 43 && regimes[2].target == 2);
+    const Regime* page = RegimeById(41);
+    CHECK(page != nullptr);
+    if (page == nullptr) return;
+    CHECK(page->type == RegimeType::Fields && page->zone == 126 && page->page == 1);
+    CHECK(page->counts[0] == 9 && page->counts[1] == 1 && page->minLevel == 26 && page->maxLevel == 29 && page->exp == 630);
+    CHECK(RegimeById(1000) == nullptr);
+}
+
+// Corse casts from its list (attohwa_chasm's template names spell list 1), each spell from its own level.
+TEST(a_casters_spells_and_a_mob_without_any)
+{
+    const std::span<const MobSpell> spells = SpellsOf(*MobById(16806161));
+    CHECK(!spells.empty());
+    for (const MobSpell& spell : spells)
+        CHECK(spell.spell > 0 && spell.minLevel <= spell.maxLevel);
+    CHECK(SpellsOf(*MobById(17293331)).empty()); // a crab casts nothing
+    CHECK(SkillsOf(*MobById(17293331)).size() >= 5);
 }

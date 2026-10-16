@@ -84,6 +84,75 @@ namespace headsup
         uint16_t weight;
     };
 
+    // What else the server knows of a mob (data/phoenix_mob_info.tsv), beside its MobRecord.
+    struct MobInfo
+    {
+        uint8_t mainJob;          // Phoenix's xi::Job, 1 WAR to 22 RUN
+        uint8_t subJob;
+        uint8_t sight;            // the yalms it sees players from
+        uint8_t sound;            // and hears them from
+        uint8_t windowStart;      // the Vana'diel hour it spawns from, and until; kNoWindow when it spawns at any
+        uint8_t windowEnd;
+        uint8_t lotteryChance;    // an NM's percent chance to take its spawn slot's roll after a kill; 0 for any other
+        uint32_t lotteryCooldown; // seconds it sits out of the roll after its own kill
+        uint8_t traits;           // MobTrait bits
+        const char* addEffect;    // what its melee hits add, "" when nothing
+        uint16_t defenses;        // index into the table DefensesOf reads; 0 is none
+        uint16_t combat;          // index into the runs CombatAt reads; 0 is none
+        uint16_t skills;          // its TP move list, 0 when none
+        uint16_t spells;          // its spell list, 0 when none
+        uint16_t regimes;         // the run of regimes it counts for, 0 when none
+    };
+
+    // A mob's HP, MP, attack, defense, evasion and accuracy at one level, in mobflags.h's Combat order.
+    struct MobCombat
+    {
+        int32_t value[kCombatCount];
+    };
+
+    // A mob's percent chance to absorb each element, and its damage taken of each DamageKind: damage is multiplied
+    // by 1 + value / 10000, past the SDT of MobResistances.
+    struct MobDefenses
+    {
+        int16_t absorb[kElementCount];
+        int16_t damageTaken[kDamageKindCount];
+    };
+
+    struct MobSkill
+    {
+        uint16_t id;
+        const char* name;
+    };
+
+    // A spell a mob casts from minLevel to maxLevel of its own level.
+    struct MobSpell
+    {
+        uint16_t spell; // the game's spell ID
+        uint8_t minLevel;
+        uint8_t maxLevel;
+    };
+
+    // A Fields or Grounds of Valor regime: its zone and page there, how many of each of its targets to kill, its
+    // level range and the experience it gives.
+    struct Regime
+    {
+        uint16_t id;
+        RegimeType type;
+        uint16_t zone;
+        uint8_t page;
+        uint8_t counts[kRegimeTargets];
+        uint8_t minLevel;
+        uint8_t maxLevel;
+        uint16_t exp;
+    };
+
+    // A regime a mob counts for, and which of the page's targets it is, from 1.
+    struct MobRegime
+    {
+        uint16_t regime;
+        uint8_t target;
+    };
+
     bool IsAggressive(const MobRecord& mob);
 
     // The record for this server ID; nullptr when there is none. The name an entity shows is not asked: the renamer
@@ -105,5 +174,22 @@ namespace headsup
 
     // Group 1 and up of its drop list; {0, 0} for group 0 or one it does not have.
     const MobDropGroup& DropGroupOf(const MobRecord& mob, uint8_t group);
+
+    // Its info by its server ID; one of nothing (no jobs, no window) for a record the data does not have.
+    const MobInfo& InfoOf(const MobRecord& mob);
+
+    // Its combat stats at a level of its range; nullptr when the data has none for it or the level is outside it.
+    const MobCombat* CombatAt(const MobRecord& mob, int level);
+
+    // Its absorbs and damage taken; none for a record the data does not have.
+    const MobDefenses& DefensesOf(const MobRecord& mob);
+
+    // Its TP moves, its spells and the regimes it counts for, each empty when it has none.
+    std::span<const MobSkill> SkillsOf(const MobRecord& mob);
+    std::span<const MobSpell> SpellsOf(const MobRecord& mob);
+    std::span<const MobRegime> RegimesOf(const MobRecord& mob);
+
+    // The regime of that ID; nullptr when there is none.
+    const Regime* RegimeById(uint16_t id);
 
 }

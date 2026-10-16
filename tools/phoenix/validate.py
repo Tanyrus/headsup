@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Check phoenix_mobs.tsv and phoenix_drops.tsv against spawns whose values are known, phoenix_items.tsv against items
-whose values are known, and phoenix_rules.json against rules whose values are known. Exit 1 on any failure.
+"""Check phoenix_mobs.tsv, phoenix_drops.tsv and phoenix_mob_info.tsv with its tables against spawns whose values are
+known, phoenix_items.tsv against items whose values are known, and phoenix_rules.json against rules whose values are
+known. Exit 1 on any failure.
 
 Usage: validate.py PHOENIX_MOBS_TSV PHOENIX_RULES_JSON [PHOENIX_DROPS_TSV]
 
-PHOENIX_DROPS_TSV defaults to the phoenix_drops.tsv beside PHOENIX_MOBS_TSV; phoenix_items.tsv is read from beside it.
+PHOENIX_DROPS_TSV defaults to the phoenix_drops.tsv beside PHOENIX_MOBS_TSV; the other files are read from beside it.
 """
 import pathlib
 import sys
@@ -75,6 +76,28 @@ EXPECTED_REMOVED = {
     (FLEDERMAUS_ZONE, 'Fledermaus'): {FIEND_BLOOD},
 }
 EVEN_MATCH_EXP = 100  # every bracket of the era table, which only content restricted to ToAU loads (200 without)
+CITIPATI, VALKURM_EMPEROR, CLIPPER = 16806162, 17199438, 17293331
+# id: columns of phoenix_mob_info.tsv as its template, spawn and spawn slot in data/zones/<zone>/mobs.yaml have them.
+# Citipati (attohwa_chasm) is THF/BLM, out from 20:00 to 04:00, 15% with 10,800 s out after his kill; Clipper
+# (Qufim Island) counts for regimes 41 and 42's first target and 43's second (scripts/zones/Qufim_Island/mobs/Clipper.lua).
+EXPECTED_INFO = {
+    CITIPATI: {'jobs': [6, 4], 'window': [20, 4], 'lottery': [15, 10800]},
+    CLIPPER: {'regimes': [(41, 1), (42, 1), (43, 2)]},
+}
+# id: its lottery chance; a module sets Valkurm Emperor's cooldown (valkurm_dunes' slot says 15 alone).
+EXPECTED_CHANCES = {VALKURM_EMPEROR: 15}
+# id: HP at every level, from a template's flat stats.hp (Citipati's 8000).
+EXPECTED_FLAT_HP = {CITIPATI: 8000}
+# id: TP moves its list must have, by the game's names (a crab's).
+EXPECTED_MOVES = {CLIPPER: {'Bubble Shower', 'Bubble Curtain', 'Big Scissors', 'Scissor Guard', 'Metallic Body'}}
+HP = schema.COMBAT_ORDER.index('Hp')
+MAGIC = schema.DAMAGE_ORDER.index('Magic')
+# Each kind of value thousands of Phoenix's mobs have (tens of thousands with TP moves, hundreds with an added
+# effect), so fewer means the dump read it wrong or not at all. Most mobs' HP grows with their level; a dump that
+# worked HP out without recovering the mob gives every level the same.
+MIN_INFO = {'combat stats': 55000, 'TP moves': 50000, 'spells': 10000, 'training regimes': 10000,
+            'HP that grows with the level': 20000, 'more or less magic damage taken': 5000, 'an added effect': 500}
+MIN_REGIMES, MIN_CHARMABLE = 300, 10000
 RESTING, SITTING = 33, 47  # xi::Animation Healing and Sit, which CBattleEntity::isSitting names
 
 
@@ -187,6 +210,42 @@ def check_items(items, min_items=MIN_ITEMS):
     return problems
 
 
+def check_info(records, info, skills, spells, regimes, min_info=None, min_regimes=MIN_REGIMES,
+               min_charmable=MIN_CHARMABLE):
+    problems, by_id = [], {i['id']: i for i in info}
+    counts = {'combat stats': sum(1 for i in info if i['combat']), 'TP moves': sum(1 for i in info if i['skills']),
+              'spells': sum(1 for i in info if i['spells']), 'training regimes': sum(1 for i in info if i['regimes']),
+              'HP that grows with the level': sum(1 for i in info if i['combat'] and i['combat'][-1][HP] > i['combat'][0][HP]),
+              'more or less magic damage taken': sum(1 for i in info if i['damageTaken'][MAGIC]),
+              'an added effect': sum(1 for i in info if i['addEffect'])}
+    for what, least in (MIN_INFO if min_info is None else min_info).items():
+        if counts[what] < least:
+            problems.append(f'only {counts[what]} mobs with {what} (expected at least {least})')
+    if len(regimes) < min_regimes:
+        problems.append(f'only {len(regimes)} training regimes (expected at least {min_regimes})')
+    charmable = sum(1 for r in records.values() if r['flags'] & schema.MobFlag.CHARMABLE)
+    if charmable < min_charmable:
+        problems.append(f'only {charmable} charmable mobs (expected at least {min_charmable})')
+    for mob_id, expected in EXPECTED_INFO.items():
+        got = {column: by_id[mob_id][column] for column in expected} if mob_id in by_id else None
+        if got != expected:
+            problems.append(f'{mob_id}: expected {expected}, got {got}')
+    for mob_id, chance in EXPECTED_CHANCES.items():
+        got = by_id[mob_id]['lottery'][0] if mob_id in by_id else None
+        if got != chance:
+            problems.append(f'{mob_id}: expected a lottery chance of {chance}, got {got}')
+    for mob_id, hp in EXPECTED_FLAT_HP.items():
+        got = [level[HP] for level in by_id[mob_id]['combat']] if mob_id in by_id else None
+        if not got or any(value != hp for value in got):
+            problems.append(f'{mob_id}: expected {hp} HP at every level, got {got}')
+    for mob_id, moves in EXPECTED_MOVES.items():
+        number = by_id[mob_id]['skills'] if mob_id in by_id else 0
+        got = {move['name'] for move in skills[number - 1]} if 0 < number <= len(skills) else set()
+        if not moves <= got:
+            problems.append(f'{mob_id}: its TP moves have no {sorted(moves - got)}')
+    return problems
+
+
 def check_rules(rules):
     problems = []
     even = rules['baseExp'][-rules['firstDifference']] if 0 <= -rules['firstDifference'] < len(rules['baseExp']) else None
@@ -208,7 +267,12 @@ def main(argv) -> int:
         lists = schema.parse_drops(drops_path.read_text(encoding='utf-8'), str(drops_path))
         items_path = pathlib.Path(argv[1]).parent / schema.ITEMS_NAME
         items = schema.parse_items(items_path.read_text(encoding='utf-8'), str(items_path))
-        problems = (check(records) + check_drops(records, lists) + check_items(items) +
+        tables = []
+        for parse, name in ((schema.parse_info, schema.INFO_NAME), (schema.parse_skills, schema.SKILLS_NAME),
+                            (schema.parse_spells, schema.SPELLS_NAME), (schema.parse_regimes, schema.REGIMES_NAME)):
+            path = pathlib.Path(argv[1]).parent / name
+            tables.append(parse(path.read_text(encoding='utf-8'), str(path)))
+        problems = (check(records) + check_drops(records, lists) + check_items(items) + check_info(records, *tables) +
                     check_rules(gen_rules.parse(rules_path.read_text(encoding='utf-8'), str(rules_path))))
     except schema.DataError as error:
         problems = [str(error)]

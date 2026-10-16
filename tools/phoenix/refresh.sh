@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Regenerate data/phoenix_mobs.tsv, data/phoenix_drops.tsv, data/phoenix_items.tsv and data/phoenix_rules.json from
-# Phoenix's own map server, and data/phoenix_zones.tsv, data/phoenix_weather.tsv and data/phoenix_titles.tsv from its
-# checkout; data/ is only written when all of them pass. It clones Phoenix at PHOENIX_COMMIT with its patches and mesh
+# Regenerate data/phoenix_mobs.tsv, data/phoenix_drops.tsv, data/phoenix_items.tsv, data/phoenix_mob_info.tsv,
+# data/phoenix_skills.tsv, data/phoenix_spells.tsv, data/phoenix_regimes.tsv and data/phoenix_rules.json from Phoenix's
+# own map server and its mob scripts, and data/phoenix_zones.tsv, data/phoenix_weather.tsv and data/phoenix_titles.tsv
+# from its checkout; data/ is only written when all of them pass. It clones Phoenix at PHOENIX_COMMIT with its patches and mesh
 # submodules (not the staff-only phoenix_ac), builds the map server with the headsup_dump module, loads Phoenix's
 # database into a private MariaDB, runs the server with live's settings (live_settings.lua) until the module has dumped
 # every loaded mob, every item with magic accuracy and the /check and aggro rules HEADSUP_PHOENIX_DUMPS times, then
@@ -163,7 +164,7 @@ for run in $(seq "$DUMPS"); do
 done
 
 rm -rf "$STAGE"
-python3 "$ROOT/tools/phoenix/compact.py" "$LIVE_SETTINGS" "$SNAPSHOTS"/*.json "$STAGE" "$COMMIT" ||
+python3 "$ROOT/tools/phoenix/compact.py" "$LIVE_SETTINGS" "$SERVER" "$SNAPSHOTS"/*.json "$STAGE" "$COMMIT" ||
     fail "compact; data/ left unchanged"
 python3 "$ROOT/tools/phoenix/zones.py" "$SERVER" "$STAGE" ||
     fail "zones; data/ left unchanged"
@@ -175,7 +176,9 @@ python3 "$ROOT/tools/phoenix/validate.py" "$STAGE/phoenix_mobs.tsv" "$STAGE/phoe
     "$STAGE/phoenix_drops.tsv" || fail "validation; data/ left unchanged"
 mkdir -p "$ROOT/data"
 cp "$STAGE/phoenix_mobs.tsv" "$STAGE/phoenix_mobs.meta" "$STAGE/phoenix_drops.tsv" "$STAGE/phoenix_items.tsv" \
+    "$STAGE/phoenix_mob_info.tsv" "$STAGE/phoenix_skills.tsv" "$STAGE/phoenix_spells.tsv" "$STAGE/phoenix_regimes.tsv" \
     "$STAGE/phoenix_rules.json" "$STAGE/phoenix_zones.tsv" "$STAGE/phoenix_weather.tsv" "$STAGE/phoenix_titles.tsv" \
     "$ROOT/data/"
-log "data/phoenix_mobs.tsv, .meta, phoenix_drops.tsv, phoenix_items.tsv, phoenix_rules.json, phoenix_zones.tsv," \
-    "phoenix_weather.tsv and phoenix_titles.tsv updated"
+log "data/phoenix_mobs.tsv, .meta, phoenix_drops.tsv, phoenix_items.tsv, phoenix_mob_info.tsv, phoenix_skills.tsv," \
+    "phoenix_spells.tsv, phoenix_regimes.tsv, phoenix_rules.json, phoenix_zones.tsv, phoenix_weather.tsv and" \
+    "phoenix_titles.tsv updated"
