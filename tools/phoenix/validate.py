@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check phoenix_mobs.tsv, phoenix_drops.tsv and phoenix_mob_info.tsv with its tables against spawns whose values are
-known, phoenix_items.tsv against items whose values are known, and phoenix_rules.json against rules whose values are
-known. Exit 1 on any failure.
+known, phoenix_items.tsv against items whose values are known, phoenix_rules.json against rules whose values are
+known, and phoenix_npcs.tsv with its lists against NPCs whose scripts are known. Exit 1 on any failure.
 
 Usage: validate.py PHOENIX_MOBS_TSV PHOENIX_RULES_JSON [PHOENIX_DROPS_TSV]
 
@@ -12,6 +12,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 import gen_mobdata as schema  # noqa: E402
+import gen_npcs  # noqa: E402
 import gen_rules  # noqa: E402
 
 SIGHT, HEARING = schema.Detect.SIGHT, schema.Detect.HEARING
@@ -96,6 +97,21 @@ MAGIC = schema.DAMAGE_ORDER.index('Magic')
 MIN_INFO = {'combat stats': 55000, 'TP moves': 50000, 'spells': 10000, 'HP that grows with the level': 20000,
             'more or less magic damage taken': 5000, 'an added effect': 500}
 MIN_CHARMABLE = 10000
+# NPCs whose scripts say what they do. Carpenters' Landing's qm_mycophile takes Sleepshroom, Woozyshroom and
+# Danceshroom (4373 to 4375, its script) and pops Mycophile (16785722, carpenters_landing/mobs.yaml); Valkurm Dunes' qm1
+# gives a Pinch of Valkurm Sunsand (503, scripts/enum/item.lua); Maera on the ship to Selbina sells what her script's
+# stock lists.
+EXPECTED_NPCS = {
+    16785729: {'trades': [4373, 4374, 4375], 'pops': [16785722]},
+    17199699: {'gives': [503]},
+}
+EXPECTED_STOCK = {17678362: [(4112, 910, 0), (4128, 4832, 0), (4148, 316, 0), (4150, 2595, 0), (4151, 800, 0)]}
+# NPCs live's settings turn off by their content tag: Valkurm Dunes' Field Manual (field_manuals), Southern San
+# d'Oria's Mystrix (daily_tally, a Gobbie Mystery Box NPC) and Port Bastok's Clarion Star (trust_quests).
+ABSENT_NPCS = {17199755: 'Field_Manual', 17719641: 'Mystrix', 17744189: 'Clarion_Star'}
+# Each kind thousands or hundreds of Phoenix's NPCs have, so fewer means the dump or the read of the scripts broke.
+MIN_NPC = {'NPCs': 20000, 'NPCs that take a trade': 300, '??? that take a trade': 80, '??? that pop a mob': 100,
+           'shops': 120, 'links': 900, 'links live has off': 50, 'system calls': 300}
 RESTING, SITTING = 33, 47  # xi::Animation Healing and Sit, which CBattleEntity::isSitting names
 
 
@@ -251,6 +267,31 @@ def check_rules(rules):
     return problems
 
 
+def check_npcs(npcs, shops, links, systems, min_npc=None):
+    problems, by_id = [], {npc['id']: npc for npc in npcs}
+    counts = {'NPCs': len(npcs), 'NPCs that take a trade': sum(1 for n in npcs if n['trades']),
+              '??? that take a trade': sum(1 for n in npcs if n['name'] == '???' and n['trades']),
+              '??? that pop a mob': sum(1 for n in npcs if n['name'] == '???' and n['pops']),
+              'shops': len(shops), 'links': len(links), 'links live has off': sum(1 for l in links if not l['live']),
+              'system calls': len(systems)}
+    for what, least in (MIN_NPC if min_npc is None else min_npc).items():
+        if counts[what] < least:
+            problems.append(f'only {counts[what]} {what} (expected at least {least})')
+    for npc_id, expected in EXPECTED_NPCS.items():
+        got = {column: by_id[npc_id][column] for column in expected} if npc_id in by_id else None
+        if got is None or any(not set(want) <= set(got[column]) for column, want in expected.items()):
+            problems.append(f'NPC {npc_id}: expected at least {expected}, got {got}')
+    for npc_id, stock in EXPECTED_STOCK.items():
+        shop = by_id[npc_id]['shop'] if npc_id in by_id else 0
+        got = [(e['item'], e['price'], e['rank']) for e in shops[shop - 1]] if 0 < shop <= len(shops) else None
+        if got != stock:
+            problems.append(f'NPC {npc_id}: expected the stock {stock}, got {got}')
+    for npc_id, script in ABSENT_NPCS.items():
+        if npc_id in by_id:
+            problems.append(f'NPC {npc_id} ({script}) should be turned off by live\'s settings')
+    return problems
+
+
 def main(argv) -> int:
     if len(argv) not in (3, 4):
         print(__doc__.strip(), file=sys.stderr)
@@ -268,8 +309,9 @@ def main(argv) -> int:
             path = pathlib.Path(argv[1]).parent / name
             tables.append(parse(path.read_text(encoding='utf-8'), str(path)))
         problems = (check(records) + check_drops(records, lists) + check_items(items) + check_info(records, *tables) +
-                    check_rules(gen_rules.parse(rules_path.read_text(encoding='utf-8'), str(rules_path))))
-    except schema.DataError as error:
+                    check_rules(gen_rules.parse(rules_path.read_text(encoding='utf-8'), str(rules_path))) +
+                    check_npcs(*gen_npcs.load(pathlib.Path(argv[1]).parent)))
+    except (schema.DataError, OSError) as error:
         problems = [str(error)]
     for problem in problems:
         print(f'validate: {problem}', file=sys.stderr)

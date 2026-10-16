@@ -1,0 +1,983 @@
+link	kind	log	id	name	file	expansion	live
+1	quest	0	0	A Sentrys Peril	scripts/quests/sandoria/A_Sentrys_Peril		1
+2	quest	0	1	Waters of the Cheval	scripts/quests/sandoria/Waters_of_the_Cheval		1
+3	quest	0	2	Rosel the Armorer	scripts/quests/sandoria/Rosel_the_Armorer		1
+4	quest	0	3	The Pickpocket	scripts/quests/sandoria/The_Pickpocket		1
+5	quest	0	4	Father and Son	scripts/quests/sandoria/Father_and_Son		1
+6	quest	0	5	The Seamstress	scripts/quests/sandoria/The_Seamstress		1
+7	quest	0	6	The Dismayed Customer	scripts/quests/sandoria/The_Dismayed_Customer		1
+8	quest	0	7	The Trader in the Forest	scripts/quests/sandoria/The_Trader_in_the_Forest		1
+9	quest	0	8	The Sweetest Things	scripts/quests/sandoria/The_Sweetest_Things		1
+10	quest	0	9	The Vicasques Sermon	scripts/quests/sandoria/The_Vicasques_Sermon		1
+11	quest	0	10	A Squires Test	scripts/quests/sandoria/A_Squires_Test		1
+12	quest	0	11	Grave Concerns	scripts/quests/sandoria/Grave_Concerns		1
+13	quest	0	12	The Brugaire Consortium	scripts/quests/sandoria/The_Brugaire_Consortium		1
+14	quest	0	15	Lizard Skins	scripts/quests/sandoria/Lizard_Skins		1
+15	quest	0	16	Flyers for Regine			1
+16	quest	0	18	Gates to Paradise			1
+17	quest	0	19	A Squires Test II	scripts/quests/sandoria/A_Squires_Test_II		1
+18	quest	0	20	To Cure a Cough			1
+19	quest	0	23	Tigers Teeth	scripts/quests/sandoria/Tigers_Teeth		1
+20	quest	0	26	Undying Flames			1
+21	quest	0	27	A Purchase of Arms	scripts/quests/sandoria/A_Purchase_of_Arms		1
+22	quest	0	29	A Knights Test	scripts/quests/sandoria/A_Knights_Test		1
+23	quest	0	30	The Medicine Woman	scripts/quests/sandoria/The_Medicine_Woman		1
+24	quest	0	31	Black Tiger Skins	scripts/quests/sandoria/Black_Tiger_Skins		1
+25	quest	0	58	Growing Flowers	scripts/quests/sandoria/Growing_Flowers		1
+26	quest	0	59	Trial by Ice			1
+27	quest	0	60	The Generals Secret	scripts/quests/sandoria/The_Generals_Secret		1
+28	quest	0	61	The Rumor	scripts/quests/sandoria/The_Rumor		1
+29	quest	0	62	Her Majestys Garden	scripts/quests/sandoria/Her_Majestys_Garden		1
+30	quest	0	63	Introduction to Teamwork	scripts/quests/sandoria/Introduction_to_Teamwork		1
+31	quest	0	64	Intermediate Teamwork	scripts/quests/sandoria/Intermediate_Teamwork		1
+32	quest	0	65	Advanced Teamwork	scripts/quests/sandoria/Advanced_Teamwork		1
+33	quest	0	66	Grimy Signposts	scripts/quests/sandoria/Grimy_Signposts		1
+34	quest	0	67	A Job for the Consortium	scripts/quests/sandoria/A_Job_for_the_Consortium		1
+35	quest	0	68	Trouble at the Sluice	scripts/quests/sandoria/Trouble_at_the_Sluice		1
+36	quest	0	69	The Merchants Bidding	scripts/quests/sandoria/The_Merchants_Bidding		1
+37	quest	0	71	Blackmail	scripts/quests/sandoria/Blackmail		1
+38	quest	0	72	The Setting Sun	scripts/quests/sandoria/The_Setting_Sun		1
+39	quest	0	74	Distant Loyalties	scripts/quests/sandoria/Distant_Loyalties		1
+40	quest	0	75	The Rivalry	scripts/quests/sandoria/The_Rivalry		1
+41	quest	0	76	The Competition	scripts/quests/sandoria/The_Competition		1
+42	quest	0	77	Starting a Flame	scripts/quests/sandoria/Starting_a_Flame		1
+43	quest	0	78	Fear of the Dark	scripts/quests/sandoria/Fear_of_the_Dark		1
+44	quest	0	79	Warding Vampires	scripts/quests/sandoria/Warding_Vampires		1
+45	quest	0	80	Sleepless Nights	scripts/quests/sandoria/Sleepless_Nights		1
+46	quest	0	81	Lufets Lake Salt	scripts/quests/sandoria/Lufets_Lake_Salt		1
+47	quest	0	82	Healing the Land			1
+48	quest	0	83	Sorcery of the North			1
+49	quest	0	84	The Crimson Trial	scripts/quests/sandoria/RDM_AF1_The_Crimson_Trial		1
+50	quest	0	85	Enveloped in Darkness	scripts/quests/sandoria/RDM_AF2_Enveloped_in_Darkness		1
+51	quest	0	86	Peace for the Spirit			1
+52	quest	0	87	Messenger from Beyond	scripts/quests/sandoria/Messenger_From_Beyond		1
+53	quest	0	88	Prelude of Black and White	scripts/quests/sandoria/Prelude_of_Black_and_White		1
+54	quest	0	89	Pieujes Decision			1
+55	quest	0	90	Sharpening the Sword	scripts/quests/sandoria/Sharpening_the_Sword		1
+56	quest	0	91	A Boys Dream			1
+57	quest	0	92	Under Oath			1
+58	quest	0	93	The Holy Crest			1
+59	quest	0	94	A Craftsmans Work			1
+60	quest	0	95	Chasing Quotas	scripts/quests/sandoria/Chasing_Quotas		1
+61	quest	0	96	Knight Stalker			1
+62	quest	0	97	Eco Warrior	scripts/quests/sandoria/Eco_Warrior		1
+63	quest	0	98	Methods Create Madness	scripts/quests/sandoria/Methods_Create_Madness		1
+64	quest	0	99	Souls in Shadow	scripts/quests/sandoria/Souls_in_Shadow		1
+65	quest	0	100	A Taste for Meat	scripts/quests/sandoria/A_Taste_for_Meat		1
+66	quest	0	101	Exit the Gambler	scripts/quests/sandoria/Exit_the_Gambler		1
+67	quest	0	102	Old Wounds	scripts/quests/sandoria/Old_Wounds		1
+68	quest	0	105	A Timely Visit	scripts/quests/sandoria/A_Timely_Visit		1
+69	quest	0	107	Trial Size Trial by Ice			1
+70	quest	0	108	Signed in Blood	scripts/quests/sandoria/Signed_in_Blood		1
+71	quest	0	109	Tea with a Tonberry	scripts/quests/sandoria/Tea_with_a_Tonberry		1
+72	quest	0	110	Spice Gals	scripts/quests/sandoria/Spice_Gals		1
+73	quest	0	112	Over the Hills and Far Away			1
+74	quest	0	113	Lure of the Wildcat	scripts/quests/sandoria/Lure_of_the_Wildcat_Sandoria		1
+75	quest	0	117	Thick Shells			1
+76	quest	0	119	Trust Sandoria			1
+77	quest	1	0	The Sirens Tear	scripts/quests/bastok/The_Sirens_Tear		1
+78	quest	1	1	Beauty and the Galka	scripts/quests/bastok/Beauty_and_the_Galka		1
+79	quest	1	2	Welcome to Bastok	scripts/quests/bastok/Welcome_to_Bastok		1
+80	quest	1	3	Guest of Hauteur	scripts/quests/bastok/Guest_of_Hauteur		1
+81	quest	1	4	The Quadavs Curse	scripts/quests/bastok/The_Quadavs_Curse		1
+82	quest	1	5	Out of Ones Shell	scripts/quests/bastok/Out_of_Ones_Shell		1
+83	quest	1	6	Hearts of Mythril	scripts/quests/bastok/Hearts_of_Mythril		1
+84	quest	1	7	The Elevenths Hour	scripts/quests/bastok/The_Elevenths_Hour		1
+85	quest	1	8	Shady Business	scripts/quests/bastok/Shady_Business		1
+86	quest	1	9	A Foremans Best Friend	scripts/quests/bastok/A_Foremans_Best_Friend		1
+87	quest	1	10	Breaking Stones	scripts/quests/bastok/Breaking_Stones		1
+88	quest	1	11	The Cold Light of Day	scripts/quests/bastok/The_Cold_Light_of_Day		1
+89	quest	1	12	Gourmet	scripts/quests/bastok/Gourmet		1
+90	quest	1	13	The Elvaan Goldsmith	scripts/quests/bastok/The_Elvaan_Goldsmith		1
+91	quest	1	14	A Flash in the Pan	scripts/quests/bastok/A_Flash_in_the_Pan		1
+92	quest	1	15	Smoke on the Mountain	scripts/quests/bastok/Smoke_on_the_Mountain		1
+93	quest	1	16	Stamp Hunt	scripts/quests/bastok/Stamp_Hunt		1
+94	quest	1	17	Forever to Hold	scripts/quests/bastok/Forever_to_Hold		1
+95	quest	1	18	Till Death Do Us Part	scripts/quests/bastok/Till_Death_Do_Us_Part		1
+96	quest	1	19	Fallen Comrades	scripts/quests/bastok/Fallen_Comrades		1
+97	quest	1	20	Rivals	scripts/quests/bastok/Rivals		1
+98	quest	1	21	Mom the Adventurer	scripts/quests/bastok/Mom_the_Adventurer		1
+99	quest	1	22	The Signpost Marks the Spot	scripts/quests/bastok/The_Signpost_Marks_the_Spot		1
+100	quest	1	23	Past Perfect	scripts/quests/bastok/Past_Perfect		1
+101	quest	1	24	Stardust	scripts/quests/bastok/Stardust		1
+102	quest	1	25	Mean Machine	scripts/quests/bastok/Mean_Machine		1
+103	quest	1	26	Cids Secret	scripts/quests/bastok/Cids_Secret		1
+104	quest	1	27	The Usual	scripts/quests/bastok/The_Usual		1
+105	quest	1	28	Blade of Darkness	scripts/quests/bastok/Blade_of_Darkness		1
+106	quest	1	29	Father Figure	scripts/quests/bastok/Father_Figure		1
+107	quest	1	30	The Return of the Adventurer	scripts/quests/bastok/The_Return_of_the_Adventurer		1
+108	quest	1	31	Drachenfall	scripts/quests/bastok/Drachenfall		1
+109	quest	1	32	Vengeful Wrath	scripts/quests/bastok/Vengeful_Wrath		1
+110	quest	1	33	Beadeaux Smog	scripts/quests/bastok/Beadeaux_Smog		1
+111	quest	1	34	The Curse Collector	scripts/quests/bastok/The_Curse_Collector		1
+112	quest	1	35	Fear of Flying	scripts/quests/bastok/Fear_of_Flying		1
+113	quest	1	36	The Wisdom of Elders	scripts/quests/bastok/The_Wisdom_of_Elders		1
+114	quest	1	37	Groceries	scripts/quests/bastok/Groceries		1
+115	quest	1	38	The Bare Bones	scripts/quests/bastok/The_Bare_Bones		1
+116	quest	1	39	Minesweeper	scripts/quests/bastok/Minesweeper		1
+117	quest	1	40	The Darksmith	scripts/quests/bastok/The_Darksmith		1
+118	quest	1	41	Buckets of Gold	scripts/quests/bastok/Buckets_of_Gold		1
+119	quest	1	42	The Stars of Ifrit	scripts/quests/bastok/The_Stars_of_Ifrit		1
+120	quest	1	43	Love and Ice	scripts/quests/bastok/Love_and_Ice		1
+121	quest	1	44	Brygid the Stylist	scripts/quests/bastok/Brygid_the_Stylist		1
+122	quest	1	45	The Gustaberg Tour	scripts/quests/bastok/The_Gustaberg_Tour		1
+123	quest	1	46	Bite the Dust	scripts/quests/bastok/Bite_the_Dust		1
+124	quest	1	47	Blade of Death	scripts/quests/bastok/Blade_of_Death		1
+125	quest	1	48	Silence of the Rams	scripts/quests/bastok/Silence_of_the_Rams		1
+126	quest	1	49	Altanas Sorrow	scripts/quests/bastok/Altanas_Sorrow		1
+127	quest	1	50	A Ladys Heart	scripts/quests/bastok/A_Ladys_Heart		1
+128	quest	1	51	Ghosts of the Past	scripts/quests/bastok/MNK_AF1_Ghosts_of_the_Past		1
+129	quest	1	52	The First Meeting	scripts/quests/bastok/MNK_AF2_The_First_Meeting		1
+130	quest	1	53	True Strength	scripts/quests/bastok/MNK_AF3_True_Strength		1
+131	quest	1	54	The Doorman	scripts/quests/bastok/WAR_AF1_The_Doorman		1
+132	quest	1	55	The Talekeepers Truth	scripts/quests/bastok/WAR_AF2_The_Talekeepers_Truth		1
+133	quest	1	56	The Talekeepers Gift	scripts/quests/bastok/WAR_AF3_The_Talekeepers_Gift		1
+134	quest	1	57	Dark Legacy	scripts/quests/bastok/DRK_AF1_Dark_Legacy		1
+135	quest	1	58	Dark Puppet	scripts/quests/bastok/DRK_AF2_Dark_Puppet		1
+136	quest	1	59	Blade of Evil	scripts/quests/bastok/DRK_AF3_Blade_of_Evil		1
+137	quest	1	60	Ayame and Kaede	scripts/quests/bastok/Ayame_and_Kaede		1
+138	quest	1	61	Trial by Earth	scripts/quests/bastok/Trial_by_Earth		1
+139	quest	1	62	A Test of True Love	scripts/quests/bastok/A_Test_of_True_Love		1
+140	quest	1	63	Lovers in the Dusk	scripts/quests/bastok/Lovers_in_the_Dusk		1
+141	quest	1	64	Wish Upon a Star	scripts/quests/bastok/Wish_Upon_a_Star		1
+142	quest	1	65	Eco Warrior	scripts/quests/bastok/Eco_Warrior		1
+143	quest	1	66	The Weight of Your Limits	scripts/quests/bastok/The_Weight_of_Your_Limits		1
+144	quest	1	67	Shoot First Ask Questions Later	scripts/quests/bastok/Shoot_First_Ask_Questions_Later		1
+145	quest	1	68	Inheritance	scripts/quests/bastok/Inheritance		1
+146	quest	1	69	The Walls of Your Mind	scripts/quests/bastok/The_Walls_of_Your_Mind		1
+147	quest	1	72	Trial Size Trial by Earth	scripts/quests/bastok/Trial_Size_Trial_by_Earth		1
+148	quest	1	73	Faded Promises	scripts/quests/bastok/Faded_Promises		1
+149	quest	1	74	Brygid the Stylist Returns	scripts/quests/bastok/Brygid_the_Stylist_Returns		1
+150	quest	1	75	Out of the Depths	scripts/quests/bastok/Out_of_the_Depths		1
+151	quest	1	77	A Question of Faith	scripts/quests/bastok/A_Question_of_Faith		1
+152	quest	1	78	Return to the Depths	scripts/quests/bastok/Return_to_the_Depths		1
+153	quest	1	79	Teak Me to the Stars	scripts/quests/bastok/Teak_Me_to_the_Stars		1
+154	quest	1	82	Chips	scripts/quests/bastok/Chips		1
+155	quest	1	84	Lure of the Wildcat	scripts/quests/bastok/Lure_of_the_Wildcat_Bastok		1
+156	quest	1	85	Achieving True Power	scripts/quests/bastok/PUP_LB_Achieving_True_Power		1
+157	quest	1	86	Too Many Chefs			1
+158	quest	1	87	A Proper Burial			1
+159	quest	1	92	Trust Bastok	scripts/quests/bastok/Trust_Bastok		1
+160	quest	2	0	Hat in Hand			1
+161	quest	2	1	A Feather in Ones Cap			1
+162	quest	2	2	A Crisis in the Making			1
+163	quest	2	3	Making Amends	scripts/quests/windurst/Making_Amends		1
+164	quest	2	4	Making the Grade	scripts/quests/windurst/Making_the_Grade		1
+165	quest	2	5	In a Pickle			1
+166	quest	2	6	Wondering Minstrel	scripts/quests/windurst/Wondering_Minstrel		1
+167	quest	2	7	A Pose by Any Other Name	scripts/quests/windurst/A_Pose_by_Any_Other_Name		1
+168	quest	2	8	Making Amens			1
+169	quest	2	9	The Moonlit Path	scripts/quests/windurst/The_Moonlit_Path		1
+170	quest	2	10	Star Struck	scripts/quests/windurst/Star_Struck		1
+171	quest	2	11	Blast from the Past	scripts/quests/windurst/Blast_from_the_Past		1
+172	quest	2	12	A Smudge on Ones Record	scripts/quests/windurst/A_Smudge_on_Ones_Record		1
+173	quest	2	13	Chasing Tales	scripts/quests/windurst/Chasing_Tales		1
+174	quest	2	14	Food for Thought	scripts/quests/windurst/Food_for_Thought		1
+175	quest	2	15	Overnight Delivery	scripts/quests/windurst/Overnight_Delivery		1
+176	quest	2	16	Water Way to Go	scripts/quests/windurst/Water_Way_to_Go		1
+177	quest	2	17	Blue Ribbon Blues	scripts/quests/windurst/Blue_Ribbon_Blues		1
+178	quest	2	18	The All New C 3000			1
+179	quest	2	19	The Postman Always Kos Twice			1
+180	quest	2	20	Early Bird Catches the Bookworm	scripts/quests/windurst/Early_Bird_Catches_the_Bookworm		1
+181	quest	2	21	Catch It If You Can			1
+182	quest	2	23	All at Sea	scripts/quests/windurst/All_At_Sea		1
+183	quest	2	24	The All New C 2000			1
+184	quest	2	25	Mihgos Amigo	scripts/quests/windurst/Mihgos_Amigo		1
+185	quest	2	26	Rock Racketeer	scripts/quests/windurst/Rock_Racketeer		1
+186	quest	2	27	Chocobilious			1
+187	quest	2	28	Teachers Pet	scripts/quests/windurst/Teachers_Pet		1
+188	quest	2	29	Reap What You Sow			1
+189	quest	2	30	Glyph Hanger	scripts/quests/windurst/Glyph_Hanger		1
+190	quest	2	31	The Fanged One	scripts/quests/windurst/The_Fanged_One		1
+191	quest	2	32	Curses Foiled Again 1	scripts/quests/windurst/Curses_Foiled_Again_1		1
+192	quest	2	33	Curses Foiled Again 2	scripts/quests/windurst/Curses_Foiled_Again_2		1
+193	quest	2	34	Mandragora Mad			1
+194	quest	2	35	To Bee Or Not to Bee			1
+195	quest	2	36	Truth Justice and the Onion Way	scripts/quests/windurst/SOB1_Truth_Justice_and_the_Onion_Way		1
+196	quest	2	37	Making Headlines			1
+197	quest	2	38	Scooped	scripts/quests/windurst/Scooped		1
+198	quest	2	39	Creepy Crawlies			1
+199	quest	2	40	Know Ones Onions	scripts/quests/windurst/SOB2_Know_Ones_Onions		1
+200	quest	2	41	Inspectors Gadget	scripts/quests/windurst/SOB3_Inspectors_Gadget		1
+201	quest	2	42	Onion Rings	scripts/quests/windurst/SOB4_Onion_Rings		1
+202	quest	2	43	A Greeting Cardian	scripts/quests/windurst/A_Greeting_Cardian		1
+203	quest	2	44	Legendary Plan B			1
+204	quest	2	45	In a Stew	scripts/quests/windurst/In_a_Stew		1
+205	quest	2	46	Let Sleeping Dogs Lie	scripts/quests/windurst/Let_Sleeping_Dogs_Lie		1
+206	quest	2	47	Can Cardians Cry			1
+207	quest	2	48	Wonder Wands			1
+208	quest	2	50	Say It with Flowers	scripts/quests/windurst/Say_It_With_Flowers		1
+209	quest	2	51	Hoist the Jelly Roger			1
+210	quest	2	52	Something Fishy			1
+211	quest	2	53	To Catch a Falling Star			1
+212	quest	2	60	Paying Lip Service			1
+213	quest	2	61	The Amazin Scorpio			1
+214	quest	2	62	Twinstone Bonding			1
+215	quest	2	63	Curses Foiled a Golem	scripts/quests/windurst/Curses_Foiled_A_Golem		1
+216	quest	2	64	Acting in Good Faith	scripts/quests/windurst/Acting_in_Good_Faith		1
+217	quest	2	65	Flower Child	scripts/quests/windurst/Flower_Child		1
+218	quest	2	66	The Three Magi			1
+219	quest	2	67	Recollections			1
+220	quest	2	68	The Root of the Problem			1
+221	quest	2	69	The Tenshodo Showdown	scripts/quests/windurst/THF_AF1_The_Tenshodo_Showdown		1
+222	quest	2	70	As Thick As Thieves	scripts/quests/windurst/THF_AF2_As_Thick_as_Thieves		1
+223	quest	2	71	Hitting the Marquisate	scripts/quests/windurst/THF_AF3_Hitting_the_Marquisate		1
+224	quest	2	72	Sin Hunting	scripts/quests/windurst/RNG_AF1_Sin_Hunting		1
+225	quest	2	73	Fire and Brimstone			1
+226	quest	2	74	Unbridled Passion			1
+227	quest	2	75	I Can Hear a Rainbow	scripts/quests/windurst/SMN_I_Can_Hear_a_Rainbow		1
+228	quest	2	76	Crying Over Onions	scripts/quests/windurst/SOB5_Crying_Over_Onions		1
+229	quest	2	77	Wild Card	scripts/quests/windurst/SOB6_Wild_Card		1
+230	quest	2	78	The Promise	scripts/quests/windurst/SOB7_The_Promise		1
+231	quest	2	80	Toraimarai Turmoil	scripts/quests/windurst/Toraimarai_Turmoil		1
+232	quest	2	81	The Puppet Master	scripts/quests/windurst/SMN_AF1_The_Puppet_Master		1
+233	quest	2	82	Class Reunion			1
+234	quest	2	83	Carbuncle Debacle			1
+235	quest	2	84	Eco Warrior	scripts/quests/windurst/Eco_Warrior		1
+236	quest	2	85	From Saplings Grow	scripts/quests/windurst/From_Saplings_Grow		1
+237	quest	2	86	Orastery Woes	scripts/quests/windurst/Orastery_Woes		1
+238	quest	2	87	Blood and Glory	scripts/quests/windurst/Blood_and_Glory		1
+239	quest	2	90	Tuning in			1
+240	quest	2	91	Tuning Out			1
+241	quest	2	92	One Good Deed	scripts/quests/windurst/One_Good_Deed		1
+242	quest	2	93	Waking Dreams	scripts/quests/windurst/Waking_Dreams		1
+243	quest	2	94	Lure of the Wildcat	scripts/quests/windurst/Lure_of_the_Wildcat_Windurst		1
+244	quest	2	96	Trust Windurst			1
+245	quest	3	0	Crest of Davoi	scripts/quests/jeuno/Crest_of_Davoi		1
+246	quest	3	1	Save My Sister	scripts/quests/jeuno/Save_My_Sister		1
+247	quest	3	2	A Clock Most Delicate	scripts/quests/jeuno/A_Clock_Most_Delicate		1
+248	quest	3	3	Save the Clock Tower	scripts/quests/jeuno/Save_the_Clock_Tower		1
+249	quest	3	4	Chocobos Wounds	scripts/quests/jeuno/Chocobos_Wounds		1
+250	quest	3	5	Save My Son	scripts/quests/jeuno/Save_My_Son		1
+251	quest	3	6	A Candlelight Vigil	scripts/quests/jeuno/A_Candlelight_Vigil		1
+252	quest	3	7	The Wonder Magic Set			1
+253	quest	3	8	The Kind Cardian			1
+254	quest	3	9	Your Crystal Ball	scripts/quests/jeuno/Your_Crystal_Ball		1
+255	quest	3	10	Collect Tarut Cards	scripts/quests/jeuno/Collect_Tarut_Cards		1
+256	quest	3	11	The Old Monument	scripts/quests/jeuno/The_Old_Monument		1
+257	quest	3	12	A Minstrel in Despair	scripts/quests/jeuno/A_Minstrel_In_Despair		1
+258	quest	3	13	Rubbish Day	scripts/quests/jeuno/Rubbish_Day		1
+259	quest	3	14	Never to Return	scripts/quests/jeuno/Never_to_Return		1
+260	quest	3	15	Community Service	scripts/quests/jeuno/Community_Service		1
+261	quest	3	16	Cooks Pride			1
+262	quest	3	17	Tenshodo Membership	scripts/quests/jeuno/Tenshodo_Membership		1
+263	quest	3	18	The Lost Cardian			1
+264	quest	3	19	Path of the Beastmaster	scripts/quests/jeuno/Path_of_the_Beastmaster		1
+265	quest	3	20	Path of the Bard	scripts/quests/jeuno/Path_of_the_Bard		1
+266	quest	3	21	The Clockmaster	scripts/quests/jeuno/The_Clockmaster		1
+267	quest	3	22	Candle Making	scripts/quests/jeuno/Candle_Making		1
+268	quest	3	23	Childs Play	scripts/quests/jeuno/Childs_Play		1
+269	quest	3	24	Northward	scripts/quests/jeuno/Northward		1
+270	quest	3	25	The Antique Collector	scripts/quests/jeuno/The_Antique_Collector		1
+271	quest	3	26	Deal with Tenshodo	scripts/quests/jeuno/Deal_with_Tenshodo		1
+272	quest	3	27	The Gobbiebag Part I	scripts/quests/jeuno/The_Gobbiebag_Part_I		1
+273	quest	3	28	The Gobbiebag Part II	scripts/quests/jeuno/The_Gobbiebag_Part_II		1
+274	quest	3	29	The Gobbiebag Part III	scripts/quests/jeuno/The_Gobbiebag_Part_III		1
+275	quest	3	30	The Gobbiebag Part IV	scripts/quests/jeuno/The_Gobbiebag_Part_IV		1
+276	quest	3	31	Mysteries of Beadeaux I	scripts/quests/jeuno/Mysteries_of_Beadeaux_I		1
+277	quest	3	32	Mysteries of Beadeaux II	scripts/quests/jeuno/Mysteries_of_Beadeaux_II		1
+278	quest	3	41	Fistful of Fury			1
+279	quest	3	42	The Goblin Tailor	scripts/quests/jeuno/The_Goblin_Tailor		1
+280	quest	3	43	Pretty Little Things	scripts/quests/jeuno/Pretty_Little_Things		1
+281	quest	3	44	Borghertzs Warring Hands	scripts/quests/jeuno/Borghertzs_Warring_Hands		1
+282	quest	3	45	Borghertzs Striking Hands	scripts/quests/jeuno/Borghertzs_Striking_Hands		1
+283	quest	3	46	Borghertzs Healing Hands	scripts/quests/jeuno/Borghertzs_Healing_Hands		1
+284	quest	3	47	Borghertzs Sorcerous Hands	scripts/quests/jeuno/Borghertzs_Sorcerous_Hands		1
+285	quest	3	48	Borghertzs Vermillion Hands	scripts/quests/jeuno/Borghertzs_Vermillion_Hands		1
+286	quest	3	49	Borghertzs Sneaky Hands	scripts/quests/jeuno/Borghertzs_Sneaky_Hands		1
+287	quest	3	50	Borghertzs Stalwart Hands	scripts/quests/jeuno/Borghertzs_Stalwart_Hands		1
+288	quest	3	51	Borghertzs Shadowy Hands	scripts/quests/jeuno/Borghertzs_Shadowy_Hands		1
+289	quest	3	52	Borghertzs Wild Hands	scripts/quests/jeuno/Borghertzs_Wild_Hands		1
+290	quest	3	53	Borghertzs Harmonious Hands	scripts/quests/jeuno/Borghertzs_Harmonious_Hands		1
+291	quest	3	54	Borghertzs Chasing Hands	scripts/quests/jeuno/Borghertzs_Chasing_Hands		1
+292	quest	3	55	Borghertzs Loyal Hands	scripts/quests/jeuno/Borghertzs_Loyal_Hands		1
+293	quest	3	56	Borghertzs Lurking Hands	scripts/quests/jeuno/Borghertzs_Lurking_Hands		1
+294	quest	3	57	Borghertzs Dragon Hands	scripts/quests/jeuno/Borghertzs_Dragon_Hands		1
+295	quest	3	58	Borghertzs Calling Hands	scripts/quests/jeuno/Borghertzs_Calling_Hands		1
+296	quest	3	59	Axe the Competition	scripts/quests/jeuno/Axe_the_Competition		1
+297	quest	3	60	Wings of Gold	scripts/quests/jeuno/Wings_of_Gold		1
+298	quest	3	61	Scattered into Shadow	scripts/quests/jeuno/Scattered_into_Shadow		1
+299	quest	3	62	A New Dawn			1
+300	quest	3	63	Painful Memory	scripts/quests/jeuno/Painful_Memory		1
+301	quest	3	64	The Requiem	scripts/quests/jeuno/The_Requiem		1
+302	quest	3	65	The Circle of Time	scripts/quests/jeuno/The_Circle_of_Time		1
+303	quest	3	66	Searching for the Right Words	scripts/quests/jeuno/Searching_for_the_Right_Words		1
+304	quest	3	67	Beat Around the Bushin			1
+305	quest	3	68	Ducal Hospitality	scripts/quests/jeuno/Ducal_Hospitality		1
+306	quest	3	69	In the Mood for Love	scripts/quests/jeuno/In_the_Mood_for_Love		1
+307	quest	3	70	Empty Memories	scripts/quests/jeuno/Empty_Memories		1
+308	quest	3	71	Hook Line and Sinker	scripts/quests/jeuno/Hook_Line_and_Sinker		1
+309	quest	3	72	A Chocobos Tale	scripts/quests/jeuno/A_Chocobos_Tale		1
+310	quest	3	74	The Gobbiebag Part V	scripts/quests/jeuno/The_Gobbiebag_Part_V		1
+311	quest	3	75	The Gobbiebag Part VI	scripts/quests/jeuno/The_Gobbiebag_Part_VI		1
+312	quest	3	76	Beyond the Sun	scripts/quests/jeuno/LB05_2_Beyond_the_Sun		1
+313	quest	3	77	Unlisted Qualities	scripts/quests/jeuno/Unlisted_Qualities		1
+314	quest	3	86	Storms of Fate	scripts/quests/jeuno/Storms_of_Fate		1
+315	quest	3	88	Shadows of the Departed	scripts/quests/jeuno/Shadows_of_the_Departed		1
+316	quest	3	89	Apocalypse Nigh	scripts/quests/jeuno/Apocalypse_Nigh		1
+317	quest	3	90	Lure of the Wildcat	scripts/quests/jeuno/Lure_of_the_Wildcat_Jeuno		1
+318	quest	3	91	The Road to Aht Urhgan	scripts/quests/jeuno/The_Road_to_Aht_Urhgan		1
+319	quest	3	92	Chocobo on the Loose	scripts/quests/jeuno/Chocobo_on_the_Loose		1
+320	quest	3	93	The Gobbiebag Part VII	scripts/quests/jeuno/The_Gobbiebag_Part_VII		1
+321	quest	3	94	The Gobbiebag Part VIII	scripts/quests/jeuno/The_Gobbiebag_Part_VIII		1
+322	quest	3	95	Lakeside Minuet	scripts/quests/jeuno/Lakeside_Minuet		1
+323	quest	3	96	The Unfinished Waltz	scripts/quests/jeuno/DNC_AF1_The_Unfinished_Waltz		1
+324	quest	3	97	The Road to Divadom	scripts/quests/jeuno/DNC_AF2_The_Road_to_Divadom		1
+325	quest	3	98	Comeback Queen	scripts/quests/jeuno/DNC_AF3_Comeback_Queen		1
+326	quest	3	102	Unlocking a Myth Warrior	scripts/quests/jeuno/Unlocking_A_Myth_WAR		1
+327	quest	3	103	Unlocking a Myth Monk	scripts/quests/jeuno/Unlocking_A_Myth_MNK		1
+328	quest	3	104	Unlocking a Myth White Mage	scripts/quests/jeuno/Unlocking_A_Myth_WHM		1
+329	quest	3	105	Unlocking a Myth Black Mage	scripts/quests/jeuno/Unlocking_A_Myth_BLM		1
+330	quest	3	106	Unlocking a Myth Red Mage	scripts/quests/jeuno/Unlocking_A_Myth_RDM		1
+331	quest	3	107	Unlocking a Myth Thief	scripts/quests/jeuno/Unlocking_A_Myth_THF		1
+332	quest	3	108	Unlocking a Myth Paladin	scripts/quests/jeuno/Unlocking_A_Myth_PLD		1
+333	quest	3	109	Unlocking a Myth Dark Knight	scripts/quests/jeuno/Unlocking_A_Myth_DRK		1
+334	quest	3	110	Unlocking a Myth Beastmaster	scripts/quests/jeuno/Unlocking_A_Myth_BST		1
+335	quest	3	111	Unlocking a Myth Bard	scripts/quests/jeuno/Unlocking_A_Myth_BRD		1
+336	quest	3	112	Unlocking a Myth Ranger	scripts/quests/jeuno/Unlocking_A_Myth_RNG		1
+337	quest	3	113	Unlocking a Myth Samurai	scripts/quests/jeuno/Unlocking_A_Myth_SAM		1
+338	quest	3	114	Unlocking a Myth Ninja	scripts/quests/jeuno/Unlocking_A_Myth_NIN		1
+339	quest	3	115	Unlocking a Myth Dragoon	scripts/quests/jeuno/Unlocking_A_Myth_DRG		1
+340	quest	3	116	Unlocking a Myth Summoner	scripts/quests/jeuno/Unlocking_A_Myth_SMN		1
+341	quest	3	117	Unlocking a Myth Blue Mage	scripts/quests/jeuno/Unlocking_A_Myth_BLU		1
+342	quest	3	118	Unlocking a Myth Corsair	scripts/quests/jeuno/Unlocking_A_Myth_COR		1
+343	quest	3	119	Unlocking a Myth Puppetmaster	scripts/quests/jeuno/Unlocking_A_Myth_PUP		1
+344	quest	3	120	Unlocking a Myth Dancer	scripts/quests/jeuno/Unlocking_A_Myth_DNC		1
+345	quest	3	121	Unlocking a Myth Scholar	scripts/quests/jeuno/Unlocking_A_Myth_SCH		1
+346	quest	3	123	The Gobbiebag Part IX	scripts/quests/jeuno/The_Gobbiebag_Part_IX		1
+347	quest	3	124	The Gobbiebag Part X	scripts/quests/jeuno/The_Gobbiebag_Part_X		1
+348	quest	3	128	In Defiant Challenge	scripts/quests/jeuno/LB01_In_Defiant_Challenge		1
+349	quest	3	129	Atop the Highest Mountains	scripts/quests/jeuno/LB02_Atop_the_Highest_Mountains		1
+350	quest	3	130	Whence Blows the Wind	scripts/quests/jeuno/LB03_Whence_Blows_the_wind		1
+351	quest	3	131	Riding on the Clouds	scripts/quests/jeuno/LB04_Riding_on_the_clouds		1
+352	quest	3	132	Shattering Stars	scripts/quests/jeuno/LB05_1_Shattering_Stars		1
+353	quest	3	133	New Worlds Await	scripts/quests/jeuno/LB06_New_Worlds_Await		1
+354	quest	3	134	Expanding Horizons	scripts/quests/jeuno/LB07_Expanding_Horizons		1
+355	quest	3	135	Beyond the Stars	scripts/quests/jeuno/LB08_Beyond_the_Stars		1
+356	quest	3	136	Dormant Powers Dislodged	scripts/quests/jeuno/LB09_1_Dormant_Powers_Dislodged		1
+357	quest	3	137	Beyond Infinity	scripts/quests/jeuno/LB10_Beyond_Infinity		1
+358	quest	3	166	All in the Cards	scripts/quests/jeuno/All_in_the_Cards		1
+359	quest	3	167	Martial Mastery	scripts/quests/jeuno/Martial_Mastery		1
+360	quest	3	170	Prelude to Puissance	scripts/quests/jeuno/LB09_2_Prelude_to_Puissance		1
+361	quest	4	0	Rycharde the Chef	scripts/quests/otherAreas/RQ1_Rycharde_the_Chef		1
+362	quest	4	1	Way of the Cook	scripts/quests/otherAreas/RQ2_Way_of_the_Cook		1
+363	quest	4	2	Unending Chase	scripts/quests/otherAreas/RQ3_Unending_Chase		1
+364	quest	4	3	His Name Is Valgeir	scripts/quests/otherAreas/RQ4_His_Name_is_Valgeir		1
+365	quest	4	4	Expertise	scripts/quests/otherAreas/RQ5_Expertise		1
+366	quest	4	5	The Clue	scripts/quests/otherAreas/RQ6_The_Clue		1
+367	quest	4	6	The Basics	scripts/quests/otherAreas/RQ7_The_Basics		1
+368	quest	4	7	Orlandos Antiques			1
+369	quest	4	8	The Sand Charm	scripts/quests/otherAreas/The_Sand_Charm		1
+370	quest	4	9	A Potters Preference			1
+371	quest	4	10	The Old Lady	scripts/quests/otherAreas/The_Old_Lady		1
+372	quest	4	16	Donate to Recycling			1
+373	quest	4	17	Under the Sea	scripts/quests/otherAreas/Under_the_Sea		1
+374	quest	4	18	Only the Best			1
+375	quest	4	19	An Explorers Footsteps	scripts/quests/otherAreas/An_Explorers_Footsteps		1
+376	quest	4	20	Cargo			1
+377	quest	4	21	The Gift	scripts/quests/otherAreas/The_Gift		1
+378	quest	4	22	The Real Gift	scripts/quests/otherAreas/The_Real_Gift		1
+379	quest	4	23	The Rescue	scripts/quests/otherAreas/The_Rescue		1
+380	quest	4	24	Elder Memories	scripts/quests/otherAreas/Elder_Memories		1
+381	quest	4	25	Test My Mettle	scripts/quests/otherAreas/Test_My_Mettle		1
+382	quest	4	26	Inside the Belly	scripts/quests/otherAreas/Inside_the_Belly		1
+383	quest	4	27	Trial by Lightning			1
+384	quest	4	28	Trial Size Trial by Lightning			1
+385	quest	4	29	Its Raining Mannequins	scripts/quests/otherAreas/Its_Raining_Mannequins		1
+386	quest	4	30	Recycling Rods	scripts/quests/otherAreas/Recycling_Rods		1
+387	quest	4	31	Picture Perfect			1
+388	quest	4	32	Waking the Beast	scripts/quests/otherAreas/Waking_the_Beast		1
+389	quest	4	64	A Hard Days Knight	scripts/quests/otherAreas/A_Hard_Days_Knight		1
+390	quest	4	65	X Marks the Spot	scripts/quests/otherAreas/X_Marks_The_Spot		1
+391	quest	4	66	A Bitter Past	scripts/quests/otherAreas/A_Bitter_Past		1
+392	quest	4	67	The Call of the Sea	scripts/quests/otherAreas/The_Call_of_the_Sea		1
+393	quest	4	68	Paradise Salvation and Maps	scripts/quests/otherAreas/Paradise_Salvation_and_Maps		1
+394	quest	4	69	Go Go Gobmuffin	scripts/quests/otherAreas/Go_Go_Gobmuffin		1
+395	quest	4	71	Fly High			1
+396	quest	4	72	Unforgiven	scripts/quests/otherAreas/Unforgiven		1
+397	quest	4	73	Secrets of Ovens Lost	scripts/quests/otherAreas/Secrets_of_Ovens_Lost		1
+398	quest	4	74	Petals for Parelbriaux	scripts/quests/otherAreas/Petals_for_Parelbriaux		1
+399	quest	4	75	Elderly Pursuits	scripts/quests/otherAreas/Elderly_Pursuits		1
+400	quest	4	76	In the Name of Science			1
+401	quest	4	77	Behind the Smile	scripts/quests/otherAreas/Behind_the_Smile		1
+402	quest	4	78	Knocking on Forbidden Doors	scripts/quests/otherAreas/Knocking_on_Forbidden_Doors		1
+403	quest	4	79	Confessions of a Bellmaker	scripts/quests/otherAreas/Confessions_of_a_Bellmaker		1
+404	quest	4	80	In Search of the Truth	scripts/quests/otherAreas/In_Search_of_the_Truth		1
+405	quest	4	81	Uninvited Guests	scripts/quests/otherAreas/Uninvited_Guests		1
+406	quest	4	82	Tango with a Tracker	scripts/quests/otherAreas/Tango_with_a_Tracker		1
+407	quest	4	83	Requiem of Sin	scripts/quests/otherAreas/Requiem_of_Sin		1
+408	quest	4	96	Bombs Away	scripts/quests/otherAreas/Bombs_Away		1
+409	quest	4	100	Give a Moogle a Break	scripts/quests/otherAreas/Give_a_Moogle_a_Break		1
+410	quest	4	101	The Moogle Picnic	scripts/quests/otherAreas/The_Moogles_Picnic		1
+411	quest	4	102	Moogles in the Wild	scripts/quests/otherAreas/Moogles_in_the_Wild		1
+412	quest	4	103	Missionary Moblin	scripts/quests/otherAreas/Missionary_Moblin		1
+413	quest	4	104	For the Birds	scripts/quests/otherAreas/For_The_Birds		1
+414	quest	4	105	Better the Demon You Know	scripts/quests/otherAreas/Better_The_Demon_You_Know		1
+415	quest	4	108	A Moral Manifest			1
+416	quest	5	2	Greetings to the Guardian			1
+417	quest	5	3	A Question of Taste	scripts/quests/outlands/A_Question_of_Taste		1
+418	quest	5	4	Everyones Grudging	scripts/quests/outlands/Everyones_Grudging		1
+419	quest	5	6	You Call That a Knife	scripts/quests/outlands/You_Call_That_a_Knife		1
+420	quest	5	7	Missionary Man			1
+421	quest	5	8	Gullibles Travels			1
+422	quest	5	9	Even More Gullibles Travels			1
+423	quest	5	10	Personal Hygiene			1
+424	quest	5	11	The Opo Opo and I			1
+425	quest	5	12	Trial by Fire	scripts/quests/outlands/Trial_by_Fire		1
+426	quest	5	13	Cloak and Dagger	scripts/quests/outlands/Cloak_and_Dagger		1
+427	quest	5	15	Trial Size Trial by Fire			1
+428	quest	5	129	Forge Your Destiny	scripts/quests/outlands/Forge_Your_Destiny		1
+429	quest	5	130	Black Market			1
+430	quest	5	131	Mama Mia			1
+431	quest	5	132	Stop Your Whining	scripts/quests/outlands/Stop_Your_Whining		1
+432	quest	5	133	Trial by Water			1
+433	quest	5	134	Everyones Grudge			1
+434	quest	5	135	Secret of the Damp Scroll	scripts/quests/outlands/Secret_of_the_Damp_Scroll		1
+435	quest	5	136	The Sahagins Stash	scripts/quests/outlands/The_Sahagins_Stash		1
+436	quest	5	137	Its Not Your Vault			1
+437	quest	5	138	Like a Shining Subligar	scripts/quests/outlands/Like_Shining_Subligar		1
+438	quest	5	139	Like Shining Leggings	scripts/quests/outlands/Like_Shining_Leggings		1
+439	quest	5	140	The Sacred Katana	scripts/quests/outlands/SAM_AF1_The_Sacred_Katana		1
+440	quest	5	141	Yomi Okuri	scripts/quests/outlands/SAM_AF2_Yomi_Okuri		1
+441	quest	5	142	A Thief in Norg	scripts/quests/outlands/SAM_AF3_A_Thief_in_Norg		1
+442	quest	5	143	Twenty in Pirate Years			1
+443	quest	5	144	I Ll Take the Big Box	scripts/quests/outlands/Ill_Take_the_Big_Box		1
+444	quest	5	145	True Will			1
+445	quest	5	146	The Potential Within	scripts/quests/outlands/The_Potential_Within		1
+446	quest	5	147	Bugi Soden	scripts/quests/outlands/Bugi_Soden		1
+447	quest	5	148	Trial Size Trial by Water			1
+448	quest	5	149	An Undying Pledge			1
+449	quest	5	160	Wrath of the Opo Opos	scripts/quests/outlands/Wrath_of_the_Opo_Opos		1
+450	quest	5	161	Wandering Souls	scripts/quests/outlands/Wandering_Souls		1
+451	quest	5	162	Soul Searching	scripts/quests/outlands/Soul_Searching		1
+452	quest	5	163	Divine Might	scripts/quests/outlands/Divine_Might		1
+453	quest	5	164	Divine Might Repeat	scripts/quests/outlands/Divine_Might_Repeat		1
+454	quest	5	192	Dont Forget the Antidote			1
+455	quest	5	193	The Missing Piece	scripts/quests/outlands/The_Missing_Piece		1
+456	quest	5	194	Trial by Wind			1
+457	quest	5	195	The Kuftal Tour	scripts/quests/outlands/The_Kuftal_Tour		1
+458	quest	5	196	The Immortal Lu Shang			1
+459	quest	5	197	Trial Size Trial by Wind			1
+460	quest	5	199	Chasing Dreams	scripts/quests/outlands/Chasing_Dreams		1
+461	quest	5	201	Indomitable Spirit			1
+462	quest	6	0	Keeping Notes	scripts/quests/ahtUrhgan/Keeping_Notes	toau	1
+463	quest	6	1	Arts and Crafts	scripts/quests/ahtUrhgan/Arts_and_Crafts	toau	1
+464	quest	6	2	Olduum	scripts/quests/ahtUrhgan/Olduum	toau	1
+465	quest	6	3	Got It All	scripts/quests/ahtUrhgan/Got_It_All	toau	1
+466	quest	6	5	An Empty Vessel	scripts/quests/ahtUrhgan/An_Empty_Vessel	toau	1
+467	quest	6	6	Luck of the Draw	scripts/quests/ahtUrhgan/Luck_of_the_Draw	toau	1
+468	quest	6	7	No Strings Attached	scripts/quests/ahtUrhgan/No_Strings_Attached	toau	1
+469	quest	6	9	Give Peace a Chance	scripts/quests/ahtUrhgan/Give_Peace_a_Chance	toau	1
+470	quest	6	12	A Taste of Honey	scripts/quests/ahtUrhgan/A_Taste_of_Honey	toau	1
+471	quest	6	13	Such Sweet Sorrow	scripts/quests/ahtUrhgan/Such_Sweet_Sorrow	toau	1
+472	quest	6	14	Fear of the Dark II	scripts/quests/ahtUrhgan/Fear_of_the_Dark_2	toau	1
+473	quest	6	15	Cook a Roon	scripts/quests/ahtUrhgan/Cook-a-roon	toau	1
+474	quest	6	16	The Die Is Cast	scripts/quests/ahtUrhgan/The_Die_is_Cast	toau	1
+475	quest	6	17	Two Horn the Savage	scripts/quests/ahtUrhgan/Two_Horn_the_Savage	toau	1
+476	quest	6	19	What Friends Are for	scripts/quests/ahtUrhgan/What_Friends_Are_For	toau	1
+477	quest	6	20	Rock Bottom	scripts/quests/ahtUrhgan/Rock_Bottom	toau	1
+478	quest	6	21	Beginnings	scripts/quests/ahtUrhgan/BLU_AF1_Beginnings	toau	1
+479	quest	6	22	Omens	scripts/quests/ahtUrhgan/BLU_AF2_Omens	toau	1
+480	quest	6	23	Transformations	scripts/quests/ahtUrhgan/BLU_AF3_Transformations	toau	1
+481	quest	6	24	Equipped for All Occasions	scripts/quests/ahtUrhgan/COR_AF1_Equipped_for_All_Occasions	toau	1
+482	quest	6	25	Navigating the Unfriendly Seas	scripts/quests/ahtUrhgan/COR_AF2_Navigating_the_Unfriendly_Seas	toau	1
+483	quest	6	26	Against All Odds	scripts/quests/ahtUrhgan/COR_AF3_Against_All_Odds	toau	1
+484	quest	6	27	The Wayward Automaton		toau	1
+485	quest	6	28	Operation Teatime		toau	1
+486	quest	6	29	Puppetmaster Blues	scripts/quests/ahtUrhgan/PUP_AF3_Puppetmaster_Blues	toau	1
+487	quest	6	30	Moment of Truth	scripts/quests/ahtUrhgan/Moment_of_Truth	toau	1
+488	quest	6	31	Three Men and a Closet	scripts/quests/ahtUrhgan/Three_Men_and_a_Closet	toau	1
+489	quest	6	40	The Beast Within	scripts/quests/ahtUrhgan/BLU_LB_The_Beast_Within	toau	1
+490	quest	6	41	Breaking the Bonds of Fate	scripts/quests/ahtUrhgan/COR_LB_Breaking_the_Bonds_of_Fate	toau	1
+491	quest	6	43	Saga of the Skyserpent	scripts/quests/ahtUrhgan/Saga_of_the_Skyserpent	toau	1
+492	quest	6	44	Ode to the Serpents	scripts/quests/ahtUrhgan/Ode_to_the_Serpents	toau	1
+493	quest	6	45	When the Bow Breaks	scripts/quests/ahtUrhgan/When_the_Bow_Breaks	toau	1
+494	quest	6	46	Fist of the People	scripts/quests/ahtUrhgan/Fist_of_the_People	toau	1
+495	quest	6	47	Soothing Waters	scripts/quests/ahtUrhgan/Soothing_Waters	toau	1
+496	quest	6	48	Embers of His Past	scripts/quests/ahtUrhgan/Embers_of_His_Past	toau	1
+497	quest	6	60	The Prankster	scripts/quests/ahtUrhgan/The_Prankster	toau	1
+498	quest	6	61	Delivering the Goods	scripts/quests/ahtUrhgan/Delivering_the_Goods	toau	1
+499	quest	6	62	Vanishing Act	scripts/quests/ahtUrhgan/Vanishing_Act	toau	1
+500	quest	6	63	Striking a Balance	scripts/quests/ahtUrhgan/Striking_a_Balance	toau	1
+501	quest	6	64	Not Meant to Be	scripts/quests/ahtUrhgan/Not_Meant_to_Be	toau	1
+502	quest	6	65	Led Astray	scripts/quests/ahtUrhgan/Led_Astray	toau	1
+503	quest	6	66	Rat Race	scripts/quests/ahtUrhgan/Rat_Race	toau	1
+504	quest	6	67	The Prince and the Hopper	scripts/quests/ahtUrhgan/The_Prince_and_the_Hopper	toau	1
+505	quest	6	74	Waking the Colossus	scripts/quests/ahtUrhgan/Waking_the_Colossus	toau	1
+506	quest	6	75	Divine Interference	scripts/quests/ahtUrhgan/Divine_Interference	toau	1
+507	quest	6	90	Promotion Private First Class	scripts/quests/ahtUrhgan/Promotion_Private_First_Class	toau	1
+508	quest	6	91	Promotion Superior Private	scripts/quests/ahtUrhgan/Promotion_Superior_Private	toau	1
+509	quest	6	92	Promotion Lance Corporal	scripts/quests/ahtUrhgan/Promotion_Lance_Corporal	toau	1
+510	quest	6	93	Promotion Corporal	scripts/quests/ahtUrhgan/Promotion_Corporal	toau	1
+511	quest	6	94	Promotion Sergeant	scripts/quests/ahtUrhgan/Promotion_Sergeant	toau	1
+512	quest	6	95	Promotion Sergeant Major			1
+513	quest	6	96	Promotion Chief Sergeant	scripts/quests/ahtUrhgan/Promotion_Chief_Sergeant	toau	1
+514	quest	6	97	Promotion Second Lieutenant	scripts/quests/ahtUrhgan/Promotion_Second_Lieutenant	toau	1
+515	quest	6	98	Promotion First Lieutenant	scripts/quests/ahtUrhgan/Promotion_First_Lieutenant	toau	1
+516	quest	7	1	Message on the Winds	scripts/quests/crystalWar/Message_on_the_Winds	wotg	0
+517	quest	7	5	The Dawn of Delectability	scripts/quests/crystalWar/The_Dawn_of_Delectability	wotg	0
+518	quest	7	12	Better Part of Valor	scripts/quests/crystalWar/WOTG_BAS_1_Better_Part_of_Valor	wotg	0
+519	quest	7	13	Fires of Discontent	scripts/quests/crystalWar/WOTG_BAS_2_Fires_of_Discontent	wotg	0
+520	quest	7	19	Light in the Darkness	scripts/quests/crystalWar/WOTG_BAS_3_Light_in_the_Darkness	wotg	0
+521	quest	7	20	Burden of Suspicion	scripts/quests/crystalWar/WOTG_BAS_4_Burden_of_Suspicion	wotg	0
+522	quest	7	26	The Lost Book	scripts/quests/crystalWar/The_Lost_Book	wotg	0
+523	quest	7	32	On Sabbatical	scripts/quests/crystalWar/SCH_AF1_On_Sabbatical	wotg	0
+524	quest	7	35	Storm on the Horizon	scripts/quests/crystalWar/WOTG_BAS_5_Storm_on_the_Horizon	wotg	0
+525	quest	7	36	Fire in the Hole	scripts/quests/crystalWar/WOTG_BAS_6_Fire_in_the_Hole	wotg	0
+526	quest	7	41	Say It with a Handbag		wotg	0
+527	quest	7	42	Quelling the Storm	scripts/quests/crystalWar/WOTG_BAS_7_Quelling_the_Storm	wotg	0
+528	quest	7	43	Honor Under Fire	scripts/quests/crystalWar/WOTG_BAS_8_Honor_Under_Fire	wotg	0
+529	quest	7	49	Beneath the Mask	scripts/quests/crystalWar/WOTG_BAS_9_Beneath_the_Mask	wotg	0
+530	quest	7	50	What Price Loyalty	scripts/quests/crystalWar/WOTG_BAS_10_What_Price_Loyalty	wotg	0
+531	quest	7	51	Songbirds in a Snowstorm	scripts/quests/crystalWar/WOTG_SAN_9_Songbirds_in_a_Snowstorm	wotg	0
+532	quest	7	52	Blood of Heroes	scripts/quests/crystalWar/WOTG_SAN_10_Blood_of_Heroes	wotg	0
+533	quest	7	58	The Truth Lies Hid	scripts/quests/crystalWar/WOTG_BAS_11_The_Truth_Lies_Hid	wotg	0
+534	quest	7	59	Bonds of Mythril	scripts/quests/crystalWar/WOTG_BAS_12_Bonds_of_Mythril	wotg	0
+535	quest	7	60	Chasing Shadows	scripts/quests/crystalWar/WOTG_SAN_11_Chasing_Shadows	wotg	0
+536	quest	7	61	Face of the Future	scripts/quests/crystalWar/WOTG_SAN_12_Face_of_the_Future	wotg	0
+537	quest	7	64	Her Memories Homecoming Queen	scripts/quests/crystalWar/Her_Memories_Homecoming_Queen	wotg	0
+538	quest	7	68	Her Memories Operation Cupid	scripts/quests/crystalWar/Her_Memories_Operation_Cupid	wotg	0
+539	quest	7	72	Her Memories of Malign Maladies	scripts/quests/crystalWar/Her_Memories_Of_Malign_Maladies	wotg	0
+540	quest	7	73	Champion of the Dawn		wotg	0
+541	quest	7	75	A Forbidden Reunion		wotg	0
+542	quest	7	81	Drafted by the Duchy		wotg	0
+543	quest	7	82	Battle on a New Front		wotg	0
+544	quest	7	83	Voidwalker Op 126		wotg	0
+545	quest	8	167	First Contact	scripts/quests/abyssea/First_Contact	abyssea	0
+546	quest	8	170	Tenuous Existence	scripts/quests/abyssea/Tenuous_Existence	abyssea	0
+547	mission	0	0	Smash the Orcish Scouts	scripts/missions/sandoria/1_1_Smash_the_Orcish_Scouts		1
+548	mission	0	1	Bat Hunt	scripts/missions/sandoria/1_2_Bat_Hunt		1
+549	mission	0	2	Save the Children	scripts/missions/sandoria/1_3_Save_the_Children		1
+550	mission	0	3	The Rescue Drill	scripts/missions/sandoria/2_1_The_Rescue_Drill		1
+551	mission	0	4	The Davoi Report	scripts/missions/sandoria/2_2_The_Davoi_Report		1
+552	mission	0	5	Journey Abroad	scripts/missions/sandoria/2_3_0_Journey_Abroad		1
+553	mission	0	6	Journey to Bastok	scripts/missions/sandoria/2_3_1_Journey_to_Bastok		1
+554	mission	0	7	Journey to Windurst	scripts/missions/sandoria/2_3_2_Journey_to_Windurst		1
+555	mission	0	8	Journey to Bastok2	scripts/missions/sandoria/2_3_3_Journey_to_Bastok2		1
+556	mission	0	9	Journey to Windurst2	scripts/missions/sandoria/2_3_4_Journey_to_Windurst2		1
+557	mission	0	10	Infiltrate Davoi	scripts/missions/sandoria/3_1_Infiltrate_Davoi		1
+558	mission	0	11	The Crystal Spring	scripts/missions/sandoria/3_2_The_Crystal_Spring		1
+559	mission	0	12	Appointment to Jeuno	scripts/missions/sandoria/3_3_Appointment_to_Jeuno		1
+560	mission	0	13	Magicite	scripts/missions/sandoria/4_1_Magicite		1
+561	mission	0	14	The Ruins of Fei Yin	scripts/missions/sandoria/5_1_The_Ruins_of_FeiYin		1
+562	mission	0	15	The Shadow Lord	scripts/missions/sandoria/5_2_The_Shadow_Lord		1
+563	mission	0	16	Leautes Last Wishes	scripts/missions/sandoria/6_1_Leautes_Last_Wishes		1
+564	mission	0	17	Ranperres Final Rest	scripts/missions/sandoria/6_2_Ranperres_Final_Rest		1
+565	mission	0	18	Prestige of the Papsque	scripts/missions/sandoria/7_1_Prestige_of_the_Papsque		1
+566	mission	0	19	The Secret Weapon	scripts/missions/sandoria/7_2_The_Secret_Weapon		1
+567	mission	0	20	Coming of Age	scripts/missions/sandoria/8_1_Coming_of_Age		1
+568	mission	0	21	Lightbringer	scripts/missions/sandoria/8_2_Lightbringer		1
+569	mission	0	22	Breaking Barriers	scripts/missions/sandoria/9_1_Breaking_Barriers		1
+570	mission	0	23	The Heir to the Light	scripts/missions/sandoria/9_2_The_Heir_to_the_Light		1
+571	mission	0	65535	None			1
+572	mission	1	0	The Zeruhn Report	scripts/missions/bastok/1_1_The_Zeruhn_Report		1
+573	mission	1	1	Geological Survey	scripts/missions/bastok/1_2_A_Geological_Survey		1
+574	mission	1	2	Fetichism	scripts/missions/bastok/1_3_Fetichism		1
+575	mission	1	3	The Crystal Line	scripts/missions/bastok/2_1_The_Crystal_Line		1
+576	mission	1	4	Wading Beasts	scripts/missions/bastok/2_2_Wading_Beasts		1
+577	mission	1	5	The Emissary	scripts/missions/bastok/2_3_0_The_Emissary		1
+578	mission	1	6	The Emissary Sandoria	scripts/missions/bastok/2_3_1_The_Emissary_Sandoria		1
+579	mission	1	7	The Emissary Windurst	scripts/missions/bastok/2_3_2_The_Emissary_Windurst		1
+580	mission	1	8	The Emissary Sandoria2	scripts/missions/bastok/2_3_3_The_Emissary_Sandoria2		1
+581	mission	1	9	The Emissary Windurst2	scripts/missions/bastok/2_3_4_The_Emissary_Windurst2		1
+582	mission	1	10	The Four Musketeers	scripts/missions/bastok/3_1_The_Four_Musketeers		1
+583	mission	1	11	To the Forsaken Mines	scripts/missions/bastok/3_2_To_the_Forsaken_Mines		1
+584	mission	1	12	Jeuno	scripts/missions/bastok/3_3_Jeuno		1
+585	mission	1	13	Magicite	scripts/missions/bastok/4_1_Magicite		1
+586	mission	1	14	Darkness Rising	scripts/missions/bastok/5_1_Darkness_Rising		1
+587	mission	1	15	Xarcabard Land of Truths	scripts/missions/bastok/5_2_Xarcabard_Land_of_Truths		1
+588	mission	1	16	Return of the Talekeeper	scripts/missions/bastok/6_1_Return_of_the_Talekeeper		1
+589	mission	1	17	The Pirates Cove	scripts/missions/bastok/6_2_The_Pirates_Cove		1
+590	mission	1	18	The Final Image	scripts/missions/bastok/7_1_The_Final_Image		1
+591	mission	1	19	On My Way	scripts/missions/bastok/7_2_On_My_Way		1
+592	mission	1	20	The Chains That Bind Us	scripts/missions/bastok/8_1_The_Chains_That_Bind_Us		1
+593	mission	1	21	Enter the Talekeeper	scripts/missions/bastok/8_2_Enter_the_Talekeeper		1
+594	mission	1	22	The Salt of the Earth	scripts/missions/bastok/9_1_The_Salt_of_the_Earth		1
+595	mission	1	23	Where Two Paths Converge	scripts/missions/bastok/9_2_Where_Two_Paths_Converge		1
+596	mission	1	65535	None			1
+597	mission	2	0	The Horutoto Ruins Experiment	scripts/missions/windurst/1_1_The_Horutoto_Ruins_Experiment		1
+598	mission	2	1	The Heart of the Matter	scripts/missions/windurst/1_2_The_Heart_of_the_Matter		1
+599	mission	2	2	The Price of Peace	scripts/missions/windurst/1_3_The_Price_of_Peace		1
+600	mission	2	3	Lost for Words	scripts/missions/windurst/2_1_Lost_for_Words		1
+601	mission	2	4	A Testing Time	scripts/missions/windurst/2_2_A_Testing_Time		1
+602	mission	2	5	The Three Kingdoms	scripts/missions/windurst/2_3_0_The_Three_Kingdoms		1
+603	mission	2	6	The Three Kingdoms Sandoria	scripts/missions/windurst/2_3_1_The_Three_Kingdoms_Sandoria		1
+604	mission	2	7	The Three Kingdoms Bastok	scripts/missions/windurst/2_3_2_The_Three_Kingdoms_Bastok		1
+605	mission	2	8	The Three Kingdoms Sandoria2	scripts/missions/windurst/2_3_3_The_Three_Kingdoms_Sandoria2		1
+606	mission	2	9	The Three Kingdoms Bastok2	scripts/missions/windurst/2_3_4_The_Three_Kingdoms_Bastok2		1
+607	mission	2	10	To Each His Own Right	scripts/missions/windurst/3_1_To_Each_His_Own_Right		1
+608	mission	2	11	Written in the Stars	scripts/missions/windurst/3_2_Written_in_the_Stars		1
+609	mission	2	12	A New Journey	scripts/missions/windurst/3_3_A_New_Journey		1
+610	mission	2	13	Magicite	scripts/missions/windurst/4_1_Magicite		1
+611	mission	2	14	The Final Seal	scripts/missions/windurst/5_1_The_Final_Seal		1
+612	mission	2	15	The Shadow Awaits	scripts/missions/windurst/5_2_The_Shadow_Awaits		1
+613	mission	2	16	Full Moon Fountain	scripts/missions/windurst/6_1_Full_Moon_Fountain		1
+614	mission	2	17	Saintly Invitation	scripts/missions/windurst/6_2_Saintly_Invitation		1
+615	mission	2	18	The Sixth Ministry	scripts/missions/windurst/7_1_The_Sixth_Ministry		1
+616	mission	2	19	Awakening of the Gods	scripts/missions/windurst/7_2_Awakening_of_the_Gods		1
+617	mission	2	20	Vain	scripts/missions/windurst/8_1_Vain		1
+618	mission	2	21	The Jester Whod Be King	scripts/missions/windurst/8_2_The_Jester_Whod_be_King		1
+619	mission	2	22	Doll of the Dead	scripts/missions/windurst/9_1_Doll_of_the_Dead		1
+620	mission	2	23	Moon Reading	scripts/missions/windurst/9_2_Moon_Reading		1
+621	mission	2	65535	None			1
+622	mission	3	0	The New Frontier	scripts/missions/rotz/01_The_New_Frontier	rotz	1
+623	mission	3	4	Welcome Tnorg	scripts/missions/rotz/02_Welcome_to_Norg	rotz	1
+624	mission	3	6	Kazhams Chieftainess	scripts/missions/rotz/03_Kazhams_Chieftainess	rotz	1
+625	mission	3	8	The Temple of Uggalepih	scripts/missions/rotz/04_The_Temple_of_Uggalepih	rotz	1
+626	mission	3	10	Headstone Pilgrimage	scripts/missions/rotz/05_Headstone_Pilgrimage	rotz	1
+627	mission	3	12	Through the Quicksand Caves	scripts/missions/rotz/06_Through_the_Quicksand_Caves	rotz	1
+628	mission	3	14	The Chamber of Oracles	scripts/missions/rotz/07_The_Chamber_of_Oracles	rotz	1
+629	mission	3	16	Return to Delkfutts Tower	scripts/missions/rotz/08_Return_to_Delkfutts_Tower	rotz	1
+630	mission	3	18	Romaeve	scripts/missions/rotz/09_RoMaeve	rotz	1
+631	mission	3	20	The Temple of Desolation	scripts/missions/rotz/10_The_Temple_of_Desolation	rotz	1
+632	mission	3	22	The Hall of the Gods	scripts/missions/rotz/11_The_Hall_of_the_Gods	rotz	1
+633	mission	3	23	The Mithra and the Crystal	scripts/missions/rotz/12_The_Mithra_and_the_Crystal	rotz	1
+634	mission	3	24	The Gate of the Gods		rotz	1
+635	mission	3	26	Ark Angels	scripts/missions/rotz/14_Ark_Angels	rotz	1
+636	mission	3	27	The Sealed Shrine	scripts/missions/rotz/15_The_Sealed_Shrine	rotz	1
+637	mission	3	28	The Celestial Nexus	scripts/missions/rotz/16_The_Celestial_Nexus	rotz	1
+638	mission	3	30	Awakening	scripts/missions/rotz/17_Awakening	rotz	1
+639	mission	4	1	Immortal Sentries	scripts/missions/toau/02_Immortal_Sentries	toau	1
+640	mission	4	2	President Salaheem	scripts/missions/toau/03_President_Salaheem	toau	1
+641	mission	4	3	Knight of Gold	scripts/missions/toau/04_Knight_of_Gold	toau	1
+642	mission	4	4	Confessions of Royalty	scripts/missions/toau/05_Confessions_of_Royalty	toau	1
+643	mission	4	5	Easterly Winds	scripts/missions/toau/06_Easterly_Winds	toau	1
+644	mission	4	6	Westerly Winds	scripts/missions/toau/07_Westerly_Winds	toau	1
+645	mission	4	7	A Mercenary Life	scripts/missions/toau/08_A_Mercenary_Life	toau	1
+646	mission	4	8	Undersea Scouting	scripts/missions/toau/09_Undersea_Scouting	toau	1
+647	mission	4	9	Astral Waves	scripts/missions/toau/10_Astral_Waves	toau	1
+648	mission	4	10	Imperial Schemes	scripts/missions/toau/11_Imperial_Schemes	toau	1
+649	mission	4	11	Royal Puppeteer	scripts/missions/toau/12_Royal_Puppeteer	toau	1
+650	mission	4	12	Lost Kingdom	scripts/missions/toau/13_Lost_Kingdom	toau	1
+651	mission	4	13	The Dolphin Crest	scripts/missions/toau/14_The_Dolphin_Crest	toau	1
+652	mission	4	14	The Black Coffin	scripts/missions/toau/15_The_Black_Coffin	toau	1
+653	mission	4	15	Ghosts of the Past	scripts/missions/toau/16_Ghosts_of_the_Past	toau	1
+654	mission	4	16	Guests of the Empire	scripts/missions/toau/17_Guests_of_the_Empire	toau	1
+655	mission	4	17	Passing Glory	scripts/missions/toau/18_Passing_Glory	toau	1
+656	mission	4	18	Sweets for the Soul	scripts/missions/toau/19_Sweets_for_the_Soul	toau	1
+657	mission	4	19	Teahouse Tumult	scripts/missions/toau/20_Teahouse_Tumult	toau	1
+658	mission	4	21	Shield of Diplomacy	scripts/missions/toau/22_Shield_of_Diplomacy	toau	1
+659	mission	4	23	Foiled Ambition	scripts/missions/toau/24_Foiled_Ambition	toau	1
+660	mission	4	24	Playing the Part	scripts/missions/toau/25_Playing_the_Part	toau	1
+661	mission	4	25	Seal of the Serpent	scripts/missions/toau/26_Seal_of_the_Serpent	toau	1
+662	mission	4	26	Misplaced Nobility	scripts/missions/toau/27_Misplaced_Nobility	toau	1
+663	mission	4	27	Bastion of Knowledge	scripts/missions/toau/28_Bastion_of_Knowledge	toau	1
+664	mission	4	28	Puppet in Peril	scripts/missions/toau/29_Puppet_in_Peril	toau	1
+665	mission	4	29	Prevalence of Pirates	scripts/missions/toau/30_Prevalence_of_Pirates	toau	1
+666	mission	4	30	Shades of Vengeance	scripts/missions/toau/31_Shades_of_Vengeance	toau	1
+667	mission	4	31	In the Blood	scripts/missions/toau/32_In_the_Blood	toau	1
+668	mission	4	32	Sentinels Honor	scripts/missions/toau/33_Sentinels_Honor	toau	1
+669	mission	4	33	Testing the Waters	scripts/missions/toau/34_Testing_the_Waters	toau	1
+670	mission	4	34	Legacy of the Lost	scripts/missions/toau/35_Legacy_of_the_Lost	toau	1
+671	mission	4	35	Gaze of the Saboteur	scripts/missions/toau/36_Gaze_of_the_Saboteur	toau	1
+672	mission	4	37	Stirrings of War	scripts/missions/toau/38_Stirrings_of_War	toau	1
+673	mission	4	38	Allied Rumblings	scripts/missions/toau/39_Allied_Rumblings	toau	1
+674	mission	4	39	Unraveling Reason	scripts/missions/toau/40_Unraveling_Reason	toau	1
+675	mission	4	40	Light of Judgment	scripts/missions/toau/41_Light_of_Judgement	toau	1
+676	mission	4	41	Path of Darkness	scripts/missions/toau/42_Path_of_Darkness	toau	1
+677	mission	4	43	Nashmeiras Plea	scripts/missions/toau/44_Nashmeiras_Plea	toau	1
+678	mission	4	45	Imperial Coronation	scripts/missions/toau/46_Imperial_Coronation	toau	1
+679	mission	4	47	Eternal Mercenary	scripts/missions/toau/48_Eternal_Mercenary	toau	1
+680	mission	5	0	Cavernous Maws	scripts/missions/wotg/01_Cavernous_Maws	wotg	0
+681	mission	5	1	Back to the Beginning	scripts/missions/wotg/02_Back_to_the_Beginning	wotg	0
+682	mission	5	9	Daughter of a Knight	scripts/missions/wotg/10_Daughter_of_a_Knight	wotg	0
+683	mission	5	24	The Will of the World		wotg	0
+684	mission	5	27	Another World	scripts/missions/wotg/28_Another_World	wotg	0
+685	mission	5	28	A Hawk in Repose	scripts/missions/wotg/29_A_Hawk_in_Repose	wotg	0
+686	mission	5	29	The Battle of Xarcabard	scripts/missions/wotg/30_The_Battle_of_Xarcabard	wotg	0
+687	mission	5	30	Prelude to a Storm	scripts/missions/wotg/31_Prelude_to_a_Storm	wotg	0
+688	mission	5	31	Storms Crescendo	scripts/missions/wotg/32_Storms_Crescendo	wotg	0
+689	mission	5	32	Into the Beasts Maw	scripts/missions/wotg/33_Into_the_Beasts_Maw	wotg	0
+690	mission	5	33	The Hunter Ensnared	scripts/missions/wotg/34_The_Hunter_Ensnared	wotg	0
+691	mission	5	38	By the Fading Light	scripts/missions/wotg/39_By_the_Fading_Light	wotg	0
+692	mission	5	39	Edge of Existence	scripts/missions/wotg/40_Edge_of_Existence	wotg	0
+693	mission	5	41	Forget Me Not	scripts/missions/wotg/42_Forget_Me_Not	wotg	0
+694	mission	5	45	When Wills Collide	scripts/missions/wotg/46_When_Wills_Collide	wotg	0
+695	mission	5	48	Cait in the Woods	scripts/missions/wotg/49_Cait_in_the_Woods	wotg	0
+696	mission	5	49	Fork in the Road	scripts/missions/wotg/50_Fork_in_the_Road	wotg	0
+697	mission	5	50	Maiden of the Dusk	scripts/missions/wotg/51_Maiden_of_the_Dusk	wotg	0
+698	mission	6	110	The Rites of Life	scripts/missions/cop/1_1_The_Rites_of_Life	cop	1
+699	mission	6	118	Below the Arks	scripts/missions/cop/1_2_Below_the_Arks	cop	1
+700	mission	6	128	The Mothercrystals	scripts/missions/cop/1_3_The_Mothercrystals	cop	1
+701	mission	6	218	The Lost City	scripts/missions/cop/2_2_The_Lost_City	cop	1
+702	mission	6	228	Distant Beliefs	scripts/missions/cop/2_3_Distant_Beliefs	cop	1
+703	mission	6	238	An Eternal Melody	scripts/missions/cop/2_4_An_Eternal_Melody	cop	1
+704	mission	6	248	Ancient Vows	scripts/missions/cop/2_5_Ancient_Vows	cop	1
+705	mission	6	258	The Call of the Wyrmking	scripts/missions/cop/3_1_The_Call_of_the_Wyrmking	cop	1
+706	mission	6	318	A Vessel Without a Captain	scripts/missions/cop/3_2_A_Vessel_Without_a_Captain	cop	1
+707	mission	6	325	The Road Forks	scripts/missions/cop/3_3_The_Road_Forks	cop	1
+708	mission	6	350	Tending Aged Wounds	scripts/missions/cop/3_4_Tending_Aged_Wounds	cop	1
+709	mission	6	358	Darkness Named	scripts/missions/cop/3_5_Darkness_Named	cop	1
+710	mission	6	368	Sheltering Doubt	scripts/missions/cop/4_1_Sheltering_Doubt	cop	1
+711	mission	6	418	The Savage	scripts/missions/cop/4_2_The_Savage	cop	1
+712	mission	6	428	The Secrets of Worship	scripts/missions/cop/4_3_The_Secrets_of_Worship	cop	1
+713	mission	6	438	Slanderous Utterings	scripts/missions/cop/4_4_Slanderous_Utterings	cop	1
+714	mission	6	448	The Enduring Tumult of War	scripts/missions/cop/5_1_The_Enduring_Tumult_of_War	cop	1
+715	mission	6	518	Desires of Emptiness	scripts/missions/cop/5_2_Desires_of_Emptiness	cop	1
+716	mission	6	530	Three Paths	scripts/missions/cop/5_3_Three_Paths	cop	1
+717	mission	6	578	For Whom the Verse Is Sung	scripts/missions/cop/6_1_For_Whom_the_Verse_is_Sung	cop	1
+718	mission	6	618	A Place to Return	scripts/missions/cop/6_2_A_Place_to_Return	cop	1
+719	mission	6	628	More Questions Than Answers	scripts/missions/cop/6_3_More_Questions_than_Answers	cop	1
+720	mission	6	638	One to Be Feared	scripts/missions/cop/6_4_One_to_be_Feared	cop	1
+721	mission	6	648	Chains and Bonds	scripts/missions/cop/7_1_Chains_and_Bonds	cop	1
+722	mission	6	718	Flames in the Darkness	scripts/missions/cop/7_2_Flames_in_the_Darkness	cop	1
+723	mission	6	728	Fire in the Eyes of Men	scripts/missions/cop/7_3_Fire_in_the_Eyes_of_Men	cop	1
+724	mission	6	738	Calm Before the Storm	scripts/missions/cop/7_4_Calm_Before_the_Storm	cop	1
+725	mission	6	748	The Warriors Path	scripts/missions/cop/7_5_The_Warriors_Path	cop	1
+726	mission	6	800	Garden of Antiquity	scripts/missions/cop/8_1_Garden_of_Antiquity	cop	1
+727	mission	6	818	A Fate Decided	scripts/missions/cop/8_2_A_Fate_Decided	cop	1
+728	mission	6	828	When Angels Fall	scripts/missions/cop/8_3_When_Angels_Fall	cop	1
+729	mission	6	840	Dawn	scripts/missions/cop/8_4_Dawn	cop	1
+730	mission	6	850	The Last Verse		cop	1
+731	mission	9	5	Those Who Lurk in Shadows II		acp	0
+732	mission	9	6	Those Who Lurk in Shadows III		acp	0
+733	mission	10	0	A Moogle Kupo Detat	scripts/missions/amk/01_A_Moogle_Kupo_dEtat	amk	0
+734	mission	10	1	Drenched It Began with a Raindrop	scripts/missions/amk/02_Drenched_It_Began_with_a_Raindrop	amk	0
+735	mission	10	4	Curses a Horrifically Harrowing Hex	scripts/missions/amk/05_Curses_A_Horrifically_Harrowing_Hex	amk	0
+736	mission	10	5	An Errand the Professors Price	scripts/missions/amk/06_An_Errand_The_Professors_Price	amk	0
+737	mission	10	7	Lender Beware Read the Fine Print	scripts/missions/amk/08_Lender_Beware_Read_the_Fine_Print	amk	0
+738	mission	10	8	Rescue a Moogles Labor of Love	scripts/missions/amk/09_Rescue_A_Moogles_Labor_of_Love	amk	0
+739	mission	10	9	Roar a Cat Burglar Bares Her Fangs	scripts/missions/amk/10_Roar_A_Cat_Burglar_Bares_Her_Fangs	amk	0
+740	mission	10	12	A Challenge You Could Be a Winner	scripts/missions/amk/13_A_Challenge_You_Could_Be_a_Winner	amk	0
+741	mission	11	2	That Which Curdles Blood	scripts/missions/asa/03_That_Which_Curdles_Blood	asa	0
+742	mission	11	3	Sugar Coated Directive	scripts/missions/asa/04_Sugar-Coated_Directive	asa	0
+743	mission	12	82	The Gates	scripts/missions/soa/4_3_0_The_Gates	soa	0
+744	mission	12	85	A New Force Arises	scripts/missions/soa/4_3_2_A_New_Force_Arises	soa	0
+745	mission	13	3	Emissary from the Seas	scripts/missions/rov/1_03_Emissary_from_the_Seas	rov	0
+746	mission	13	4	Set Free	scripts/missions/rov/1_04_Set_Free	rov	0
+747	mission	13	6	The Beginning	scripts/missions/rov/1_05_The_Beginning	rov	0
+748	mission	13	10	Flames of Prayer	scripts/missions/rov/1_06_Flames_of_Prayer	rov	0
+749	mission	13	12	The Path Untraveled	scripts/missions/rov/1_07_The_Path_Untraveled	rov	0
+750	mission	13	18	At the Heavens Door	scripts/missions/rov/1_08_At_Heavens_Door	rov	0
+751	mission	13	26	A Land After Time	scripts/missions/rov/1_11_A_Land_After_Time	rov	0
+752	mission	13	30	What Lies Beyond	scripts/missions/rov/1_13_What_Lies_Beyond	rov	0
+753	mission	13	36	The Lost Avatar	scripts/missions/rov/1_16_The_Lost_Avatar	rov	0
+754	mission	13	40	Volto Oscuro	scripts/missions/rov/1_17_Volto_Oscuro	rov	0
+755	mission	13	42	Ring My Bell	scripts/missions/rov/1_18_Ring_My_Bell	rov	0
+756	mission	13	50	Numbering Days	scripts/missions/rov/2_04_Numbering_Days	rov	0
+757	mission	13	52	Inescapable Binds		rov	0
+758	mission	13	56	Ever Forward	scripts/missions/rov/2_07_Ever_Forward	rov	0
+759	mission	13	62	Aphmaus Light	scripts/missions/rov/2_09_Aphmaus_Light	rov	0
+760	mission	13	64	Reunited	scripts/missions/rov/2_10_Reunited	rov	0
+761	mission	13	70	From the Ruins	scripts/missions/rov/2_13_From_the_Ruins	rov	0
+762	mission	13	72	Cauterize	scripts/missions/rov/2_14_Cauterize	rov	0
+763	mission	13	80	Ganged Up on	scripts/missions/rov/2_16_Ganged_Up_On	rov	0
+764	mission	13	83	Sacrifice	scripts/missions/rov/2_17_Sacrifice	rov	0
+765	mission	13	86	Somber Dreams	scripts/missions/rov/2_18_Somber_Dreams	rov	0
+766	mission	13	92	Of Light and Darkness	scripts/missions/rov/2_19_Of_Light_and_Darkness	rov	0
+767	mission	13	100	Past Imperfect	scripts/missions/rov/2_23_Past_Imperfect	rov	0
+768	mission	13	102	The Cursed Temple	scripts/missions/rov/2_24_The_Cursed_Temple	rov	0
+769	mission	13	103	Wisdom of Our Forefathers	scripts/missions/rov/2_25_Wisdom_of_Our_Forefathers	rov	0
+770	battlefield	0	0	Rank 2 Mission 1	scripts/battlefields/Horlais_Peak/rank_2_mission		1
+771	battlefield	0	1	Tails of Woe	scripts/battlefields/Horlais_Peak/tails_of_woe		1
+772	battlefield	0	2	Dismemberment Brigade	scripts/battlefields/Horlais_Peak/dismemberment_brigade		1
+773	battlefield	0	3	The Secret Weapon	scripts/battlefields/Horlais_Peak/the_secret_weapon		1
+774	battlefield	0	4	Hostile Herbivores	scripts/battlefields/Horlais_Peak/hostile_herbivores		1
+775	battlefield	0	5	Shattering Stars War	scripts/battlefields/Horlais_Peak/shattering_stars_war		1
+776	battlefield	0	6	Shattering Stars Blm	scripts/battlefields/Horlais_Peak/shattering_stars_blm		1
+777	battlefield	0	7	Shattering Stars Rng	scripts/battlefields/Horlais_Peak/shattering_stars_rng		1
+778	battlefield	0	8	Carapace Combatants	scripts/battlefields/Horlais_Peak/carapace_combatants		1
+779	battlefield	0	9	Shooting Fish	scripts/battlefields/Horlais_Peak/shooting_fish		1
+780	battlefield	0	10	Dropping Like Flies	scripts/battlefields/Horlais_Peak/dropping_like_flies		1
+781	battlefield	0	11	Horns of War	scripts/battlefields/Horlais_Peak/horns_of_war		1
+782	battlefield	0	12	Under Observation	scripts/battlefields/Horlais_Peak/under_observation		1
+783	battlefield	0	13	Eye of the Tiger	scripts/battlefields/Horlais_Peak/eye_of_the_tiger		1
+784	battlefield	0	14	Shots in the Dark	scripts/battlefields/Horlais_Peak/shots_in_the_dark		1
+785	battlefield	0	15	Double Dragonian	scripts/battlefields/Horlais_Peak/double_dragonian		1
+786	battlefield	0	16	Todays Horoscope	scripts/battlefields/Horlais_Peak/todays_horoscope		1
+787	battlefield	0	17	Contaminated Colosseum	scripts/battlefields/Horlais_Peak/contaminated_colosseum		1
+788	battlefield	0	20	Beyond Infinity Horlais Peak	scripts/battlefields/Horlais_Peak/beyond_infinity		1
+789	battlefield	0	33	Holy Crest	scripts/battlefields/Ghelsba_Outpost/holy_crest		1
+790	battlefield	0	64	Rank 2 Mission 2	scripts/battlefields/Waughroon_Shrine/rank_2_mission		1
+791	battlefield	0	65	Worms Turn	scripts/battlefields/Waughroon_Shrine/worms_turn		1
+792	battlefield	0	66	Grimshell Shocktroopers	scripts/battlefields/Waughroon_Shrine/grimshell_shocktroopers		1
+793	battlefield	0	67	On My Way	scripts/battlefields/Waughroon_Shrine/on_my_way		1
+794	battlefield	0	68	Thief in Norg	scripts/battlefields/Waughroon_Shrine/thief_in_norg		1
+795	battlefield	0	69	Three Two One	scripts/battlefields/Waughroon_Shrine/3_2_1		1
+796	battlefield	0	70	Shattering Stars Rdm	scripts/battlefields/Waughroon_Shrine/shattering_stars_rdm		1
+797	battlefield	0	71	Shattering Stars Thf	scripts/battlefields/Waughroon_Shrine/shattering_stars_thf		1
+798	battlefield	0	72	Shattering Stars Bst	scripts/battlefields/Waughroon_Shrine/shattering_stars_bst		1
+799	battlefield	0	73	Birds of a Feather	scripts/battlefields/Waughroon_Shrine/birds_of_a_feather		1
+800	battlefield	0	74	Crustacean Conundrum	scripts/battlefields/Waughroon_Shrine/crustacean_conundrum		1
+801	battlefield	0	75	Grove Guardians	scripts/battlefields/Waughroon_Shrine/grove_guardians		1
+802	battlefield	0	76	Hills Are Alive	scripts/battlefields/Waughroon_Shrine/hills_are_alive		1
+803	battlefield	0	77	Royal Jelly	scripts/battlefields/Waughroon_Shrine/royal_jelly		1
+804	battlefield	0	78	Final Bout	scripts/battlefields/Waughroon_Shrine/final_bout		1
+805	battlefield	0	79	Up in Arms	scripts/battlefields/Waughroon_Shrine/up_in_arms		1
+806	battlefield	0	80	Copycat	scripts/battlefields/Waughroon_Shrine/copycat		1
+807	battlefield	0	81	Operation Desert Swarm	scripts/battlefields/Waughroon_Shrine/operation_desert_swarm		1
+808	battlefield	0	82	Prehistoric Pigeons	scripts/battlefields/Waughroon_Shrine/prehistoric_pigeons		1
+809	battlefield	0	85	Beyond Infinity Waughroon Shrine	scripts/battlefields/Waughroon_Shrine/beyond_infinity		1
+810	battlefield	0	96	Rank 2 Mission	scripts/battlefields/Balgas_Dais/rank_2_mission		1
+811	battlefield	0	97	Steamed Sprouts	scripts/battlefields/Balgas_Dais/steamed_sprouts		1
+812	battlefield	0	98	Divine Punishers	scripts/battlefields/Balgas_Dais/divine_punishers		1
+813	battlefield	0	99	Saintly Invitation	scripts/battlefields/Balgas_Dais/saintly_invitation		1
+814	battlefield	0	100	Treasure and Tribulations	scripts/battlefields/Balgas_Dais/treasure_and_tribulations		1
+815	battlefield	0	101	Shattering Stars Mnk	scripts/battlefields/Balgas_Dais/shattering_stars_mnk		1
+816	battlefield	0	102	Shattering Stars Whm	scripts/battlefields/Balgas_Dais/shattering_stars_whm		1
+817	battlefield	0	103	Shattering Stars Smn	scripts/battlefields/Balgas_Dais/shattering_stars_smn		1
+818	battlefield	0	104	Creeping Doom	scripts/battlefields/Balgas_Dais/creeping_doom		1
+819	battlefield	0	105	Charming Trio	scripts/battlefields/Balgas_Dais/charming_trio		1
+820	battlefield	0	106	Harem Scarem	scripts/battlefields/Balgas_Dais/harem_scarem		1
+821	battlefield	0	107	Early Bird Catches the Wyrm	scripts/battlefields/Balgas_Dais/early_bird_catches_the_wyrm		1
+822	battlefield	0	108	Royal Succession	scripts/battlefields/Balgas_Dais/royal_succession		1
+823	battlefield	0	109	Rapid Raptors	scripts/battlefields/Balgas_Dais/rapid_raptors		1
+824	battlefield	0	110	Wild Wild Whiskers	scripts/battlefields/Balgas_Dais/wild_wild_whiskers		1
+825	battlefield	0	111	Seasons Greetings	scripts/battlefields/Balgas_Dais/seasons_greetings		1
+826	battlefield	0	112	Royale Ramble	scripts/battlefields/Balgas_Dais/royale_ramble		1
+827	battlefield	0	113	Moa Constrictors	scripts/battlefields/Balgas_Dais/moa_constrictors		1
+828	battlefield	0	116	Beyond Infinity Balgas Dais	scripts/battlefields/Balgas_Dais/beyond_infinity		1
+829	battlefield	0	128	Temple of Uggalepih	scripts/battlefields/Sacrificial_Chamber/temple_of_uggalepih		1
+830	battlefield	0	129	Jungle Boogymen	scripts/battlefields/Sacrificial_Chamber/jungle_boogymen		1
+831	battlefield	0	130	Amphibian Assault	scripts/battlefields/Sacrificial_Chamber/amphibian_assault		1
+832	battlefield	0	160	Shadow Lord Battle	scripts/battlefields/Throne_Room/shadow_lord_battle		1
+833	battlefield	0	161	Where Two Paths Converge	scripts/battlefields/Throne_Room/where_two_paths_converge		1
+834	battlefield	0	162	Kindred Spirits	scripts/battlefields/Throne_Room/kindred_spirits		1
+835	battlefield	0	164	Smash a Malevolent Menace	scripts/battlefields/Throne_Room/smash_a_malevolent_menace		1
+836	battlefield	0	192	Through the Quicksand Caves	scripts/battlefields/Chamber_of_Oracles/through_the_quicksand_caves		1
+837	battlefield	0	193	Legion Xi Comitatensis	scripts/battlefields/Chamber_of_Oracles/legion_xi_comitatensis		1
+838	battlefield	0	194	Shattering Stars Sam	scripts/battlefields/Chamber_of_Oracles/shattering_stars_sam		1
+839	battlefield	0	195	Shattering Stars Nin	scripts/battlefields/Chamber_of_Oracles/shattering_stars_nin		1
+840	battlefield	0	196	Shattering Stars Drg	scripts/battlefields/Chamber_of_Oracles/shattering_stars_drg		1
+841	battlefield	0	197	Cactuar Suave	scripts/battlefields/Chamber_of_Oracles/cactuar_suave		1
+842	battlefield	0	198	Eye of the Storm	scripts/battlefields/Chamber_of_Oracles/eye_of_the_storm		1
+843	battlefield	0	199	Scarlet King	scripts/battlefields/Chamber_of_Oracles/the_scarlet_king		1
+844	battlefield	0	200	Cat Burglar Bares Fangs	scripts/battlefields/Chamber_of_Oracles/cat_burglar_bares_fangs		1
+845	battlefield	0	224	Moonlit Path	scripts/battlefields/Full_Moon_Fountain/moonlit_path		1
+846	battlefield	0	225	Moon Reading	scripts/battlefields/Full_Moon_Fountain/moon_reading		1
+847	battlefield	0	226	Waking the Beast Fullmoon	scripts/battlefields/Full_Moon_Fountain/waking_the_beast		1
+848	battlefield	0	256	Return to Delkfutts Tower	scripts/battlefields/Stellar_Fulcrum/return_to_delkfutts_tower		1
+849	battlefield	0	288	Ark Angels 1	scripts/battlefields/LaLoff_Amphitheater/ark_angels_1		1
+850	battlefield	0	289	Ark Angels 2	scripts/battlefields/LaLoff_Amphitheater/ark_angels_2		1
+851	battlefield	0	290	Ark Angels 3	scripts/battlefields/LaLoff_Amphitheater/ark_angels_3		1
+852	battlefield	0	291	Ark Angels 4	scripts/battlefields/LaLoff_Amphitheater/ark_angels_4		1
+853	battlefield	0	292	Ark Angels 5	scripts/battlefields/LaLoff_Amphitheater/ark_angels_5		1
+854	battlefield	0	320	Celestial Nexus	scripts/battlefields/The_Celestial_Nexus/celestial_nexus		1
+855	battlefield	0	416	Trial by Wind	scripts/battlefields/Cloister_of_Gales/trial_by_wind		1
+856	battlefield	0	417	Carbuncle Debacle Cloister of Gales	scripts/battlefields/Cloister_of_Gales/carbuncle_debacle		1
+857	battlefield	0	418	Trial Size Trial by Wind	scripts/battlefields/Cloister_of_Gales/trial-size_trial_by_wind		1
+858	battlefield	0	419	Waking the Beast Cloister of Gales	scripts/battlefields/Cloister_of_Gales/waking_the_beast		1
+859	battlefield	0	420	Sugar Coated Directive Cloister of Gales	scripts/battlefields/Cloister_of_Gales/sugar-coated_directive		1
+860	battlefield	0	448	Trial by Lightning	scripts/battlefields/Cloister_of_Storms/trial_by_lightning		1
+861	battlefield	0	449	Carbuncle Debacle Cloister of Storms	scripts/battlefields/Cloister_of_Storms/carbuncle_debacle		1
+862	battlefield	0	450	Trial Size Trial by Lightning	scripts/battlefields/Cloister_of_Storms/trial-size_trial_by_lightning		1
+863	battlefield	0	451	Waking the Beast Cloister of Storms	scripts/battlefields/Cloister_of_Storms/waking_the_beast		1
+864	battlefield	0	452	Sugar Coated Directive Cloister of Storms	scripts/battlefields/Cloister_of_Storms/sugar-coated_directive		1
+865	battlefield	0	480	Trial by Ice	scripts/battlefields/Cloister_of_Frost/trial_by_ice		1
+866	battlefield	0	481	Class Reunion	scripts/battlefields/Cloister_of_Frost/class_reunion		1
+867	battlefield	0	482	Trial Size Trial by Ice	scripts/battlefields/Cloister_of_Frost/trial-size_trial_by_ice		1
+868	battlefield	0	483	Waking the Beast Cloister of Frost	scripts/battlefields/Cloister_of_Frost/waking_the_beast		1
+869	battlefield	0	484	Sugar Coated Directive Cloister of Frost	scripts/battlefields/Cloister_of_Frost/sugar-coated_directive		1
+870	battlefield	0	512	Rank 5 Mission	scripts/battlefields/QuBia_Arena/rank_5_mission		1
+871	battlefield	0	513	Come into My Parlor	scripts/battlefields/QuBia_Arena/come_into_my_parlor		1
+872	battlefield	0	514	E Vase Ive Action	scripts/battlefields/QuBia_Arena/e_vase_ive_action		1
+873	battlefield	0	515	Infernal Swarm	scripts/battlefields/QuBia_Arena/infernal_swarm		1
+874	battlefield	0	516	Heir to the Light	scripts/battlefields/QuBia_Arena/heir_to_the_light		1
+875	battlefield	0	517	Shattering Stars Pld	scripts/battlefields/QuBia_Arena/shattering_stars_pld		1
+876	battlefield	0	518	Shattering Stars Drk	scripts/battlefields/QuBia_Arena/shattering_stars_drk		1
+877	battlefield	0	519	Shattering Stars Brd	scripts/battlefields/QuBia_Arena/shattering_stars_brd		1
+878	battlefield	0	520	Demolition Squad	scripts/battlefields/QuBia_Arena/demolition_squad		1
+879	battlefield	0	521	Die by the Sword	scripts/battlefields/QuBia_Arena/die_by_the_sword		1
+880	battlefield	0	522	Let Sleeping Dogs Die	scripts/battlefields/QuBia_Arena/let_sleeping_dogs_die		1
+881	battlefield	0	523	Brothers D Aurphe	scripts/battlefields/QuBia_Arena/brothers_d_aurphe		1
+882	battlefield	0	524	Undying Promise	scripts/battlefields/QuBia_Arena/undying_promise		1
+883	battlefield	0	525	Factory Rejects	scripts/battlefields/QuBia_Arena/factory_rejects		1
+884	battlefield	0	526	Idol Thoughts	scripts/battlefields/QuBia_Arena/idol_thoughts		1
+885	battlefield	0	527	Awful Autopsy	scripts/battlefields/QuBia_Arena/awful_autopsy		1
+886	battlefield	0	528	Celery	scripts/battlefields/QuBia_Arena/celery		1
+887	battlefield	0	532	Those Who Lurk in Shadows	scripts/battlefields/QuBia_Arena/those_who_lurk_in_shadows		1
+888	battlefield	0	533	Beyond Infinity	scripts/battlefields/QuBia_Arena/beyond_infinity		1
+889	battlefield	0	544	Trial by Fire	scripts/battlefields/Cloister_of_Flames/trial_by_fire		1
+890	battlefield	0	545	Trial Size Trial by Fire	scripts/battlefields/Cloister_of_Flames/trial-size_trial_by_fire		1
+891	battlefield	0	546	Waking the Beast Cloister of Flames	scripts/battlefields/Cloister_of_Flames/waking_the_beast		1
+892	battlefield	0	547	Sugar Coated Directive Cloister of Flames	scripts/battlefields/Cloister_of_Flames/sugar-coated_directive		1
+893	battlefield	0	576	Trial by Earth	scripts/battlefields/Cloister_of_Tremors/trial_by_earth		1
+894	battlefield	0	577	Puppet Master	scripts/battlefields/Cloister_of_Tremors/puppet_master		1
+895	battlefield	0	578	Trial Size Trial by Earth	scripts/battlefields/Cloister_of_Tremors/trial-size_trial_by_earth		1
+896	battlefield	0	579	Waking the Beast Cloister of Tremors	scripts/battlefields/Cloister_of_Tremors/waking_the_beast		1
+897	battlefield	0	580	Sugar Coated Directive Cloister of Tremors	scripts/battlefields/Cloister_of_Tremors/sugar-coated_directive		1
+898	battlefield	0	608	Trial by Water	scripts/battlefields/Cloister_of_Tides/trial_by_water		1
+899	battlefield	0	609	Trial Size Trial by Water	scripts/battlefields/Cloister_of_Tides/trial-size_trial_by_water		1
+900	battlefield	0	610	Waking the Beast Cloister of Tides	scripts/battlefields/Cloister_of_Tides/waking_the_beast		1
+901	battlefield	0	611	Sugar Coated Directive Cloister of Tides	scripts/battlefields/Cloister_of_Tides/sugar-coated_directive		1
+902	battlefield	0	640	Flames for the Dead	scripts/battlefields/Bearclaw_Pinnacle/flames_for_the_dead		1
+903	battlefield	0	641	Follow the White Rabbit	scripts/battlefields/Bearclaw_Pinnacle/follow_the_white_rabbit		1
+904	battlefield	0	642	When Hell Freezes Over	scripts/battlefields/Bearclaw_Pinnacle/when_hell_freezes_over		1
+905	battlefield	0	643	Brothers	scripts/battlefields/Bearclaw_Pinnacle/brothers		1
+906	battlefield	0	644	Holy Cow	scripts/battlefields/Bearclaw_Pinnacle/holy_cow		1
+907	battlefield	0	672	Head Wind	scripts/battlefields/Boneyard_Gully/head_wind		1
+908	battlefield	0	673	Like the Wind	scripts/battlefields/Boneyard_Gully/like_the_wind		1
+909	battlefield	0	674	Sheep in Antlions Clothing	scripts/battlefields/Boneyard_Gully/sheep_in_antlions_clothing		1
+910	battlefield	0	675	Shell We Dance	scripts/battlefields/Boneyard_Gully/shell_we_dance		1
+911	battlefield	0	677	Tango with a Tracker	scripts/battlefields/Boneyard_Gully/tango_with_a_tracker		1
+912	battlefield	0	678	Requiem of Sin	scripts/battlefields/Boneyard_Gully/requiem_of_sin		1
+913	battlefield	0	704	Darkness Named	scripts/battlefields/The_Shrouded_Maw/darkness_named		1
+914	battlefield	0	705	Test Your Mite	scripts/battlefields/The_Shrouded_Maw/test_your_mite		1
+915	battlefield	0	706	Waking Dreams	scripts/battlefields/The_Shrouded_Maw/waking_dreams		1
+916	battlefield	0	736	Century of Hardship	scripts/battlefields/Mine_Shaft_2716/century_of_hardship		1
+917	battlefield	0	737	Return to the Depths	scripts/battlefields/Mine_Shaft_2716/return_to_the_depths		1
+918	battlefield	0	738	Bionic Bug	scripts/battlefields/Mine_Shaft_2716/bionic_bug		1
+919	battlefield	0	739	Pulling the Strings	scripts/battlefields/Mine_Shaft_2716/pulling_the_strings		1
+920	battlefield	0	740	Automaton Assault	scripts/battlefields/Mine_Shaft_2716/automaton_assault		1
+921	battlefield	0	768	Ancient Flames Beckon Spire of Holla	scripts/battlefields/Spire_of_Holla/ancient_flames_beckon		1
+922	battlefield	0	769	Simulant	scripts/battlefields/Spire_of_Holla/simulant		1
+923	battlefield	0	800	Ancient Flames Beckon Spire of Dem	scripts/battlefields/Spire_of_Dem/ancient_flames_beckon		1
+924	battlefield	0	801	You Are What You Eat	scripts/battlefields/Spire_of_Dem/you_are_what_you_eat		1
+925	battlefield	0	832	Ancient Flames Beckon Spire of Mea	scripts/battlefields/Spire_of_Mea/ancient_flames_beckon		1
+926	battlefield	0	833	Playing Host	scripts/battlefields/Spire_of_Mea/playing_host		1
+927	battlefield	0	864	Desires of Emptiness	scripts/battlefields/Spire_of_Vahzl/desires_of_emptiness		1
+928	battlefield	0	865	Pulling the Plug	scripts/battlefields/Spire_of_Vahzl/pulling_the_plug		1
+929	battlefield	0	896	Storms of Fate	scripts/battlefields/Riverne_Site_B01/storms_of_fate		1
+930	battlefield	0	897	Wyrmking Descends	scripts/battlefields/Riverne_Site_B01/wyrmking_descends		1
+931	battlefield	0	928	Ouryu Cometh	scripts/battlefields/Riverne_Site_A01/ouryu_cometh		1
+932	battlefield	0	960	Ancient Vows	scripts/battlefields/Monarch_Linn/ancient_vows		1
+933	battlefield	0	961	Savage	scripts/battlefields/Monarch_Linn/savage		1
+934	battlefield	0	962	Fire in the Sky	scripts/battlefields/Monarch_Linn/fire_in_the_sky		1
+935	battlefield	0	964	Bugard in the Clouds	scripts/battlefields/Monarch_Linn/bugard_in_the_clouds		1
+936	battlefield	0	965	Beloved of the Atlantes	scripts/battlefields/Monarch_Linn/beloved_of_the_atlantes		1
+937	battlefield	0	966	Uninvited Guests	scripts/battlefields/Monarch_Linn/uninvited_guests		1
+938	battlefield	0	992	One to Be Feared	scripts/battlefields/Sealions_Den/one_to_be_feared		1
+939	battlefield	0	993	Warriors Path	scripts/battlefields/Sealions_Den/warriors_path		1
+940	battlefield	0	1024	When Angels Fall	scripts/battlefields/The_Garden_of_RuHmet/when_angels_fall		1
+941	battlefield	0	1056	Dawn	scripts/battlefields/Empyreal_Paradox/dawn		1
+942	battlefield	0	1057	Apocalypse Nigh	scripts/battlefields/Empyreal_Paradox/apocalypse_nigh		1
+943	battlefield	0	1088	Call to Arms	scripts/battlefields/Talacca_Cove/call_to_arms		1
+944	battlefield	0	1089	Compliments to the Chef	scripts/battlefields/Talacca_Cove/compliments_to_the_chef		1
+945	battlefield	0	1090	Puppetmaster Blues	scripts/battlefields/Talacca_Cove/puppetmaster_blues		1
+946	battlefield	0	1091	Breaking the Bonds of Fate	scripts/battlefields/Talacca_Cove/breaking_the_bonds_of_fate		1
+947	battlefield	0	1092	Legacy of the Lost	scripts/battlefields/Talacca_Cove/legacy_of_the_lost		1
+948	battlefield	0	1120	Tough Nut to Crack	scripts/battlefields/Navukgo_Execution_Chamber/tough_nut_to_crack		1
+949	battlefield	0	1121	Happy Caster	scripts/battlefields/Navukgo_Execution_Chamber/happy_caster		1
+950	battlefield	0	1122	Omens	scripts/battlefields/Navukgo_Execution_Chamber/omens		1
+951	battlefield	0	1123	Achieving True Power	scripts/battlefields/Navukgo_Execution_Chamber/achieving_true_power		1
+952	battlefield	0	1124	Shield of Diplomacy	scripts/battlefields/Navukgo_Execution_Chamber/shield_of_diplomacy		1
+953	battlefield	0	1152	Making a Mockery	scripts/battlefields/Jade_Sepulcher/making_a_mockery		1
+954	battlefield	0	1153	Shadows of the Mind	scripts/battlefields/Jade_Sepulcher/Shadows_of_the_Mind		1
+955	battlefield	0	1154	Beast Within	scripts/battlefields/Jade_Sepulcher/the_beast_within		1
+956	battlefield	0	1155	Moment of Truth	scripts/battlefields/Jade_Sepulcher/moment_of_truth		1
+957	battlefield	0	1156	Puppet in Peril	scripts/battlefields/Jade_Sepulcher/puppet_in_peril		1
+958	battlefield	0	1296	Central Apollyon	scripts/battlefields/Apollyon/central_apollyon		1
+959	battlefield	0	1303	Central Temenos 1st Floor	scripts/battlefields/Temenos/central_temenos_1st_floor		1
+960	hidden	0	0	ChocoboWhistle	scripts/quests/hiddenQuests/Chocobo_Whistle		1
+961	hidden	0	0	CorArtifact	scripts/quests/hiddenQuests/Crafted_Corsair_Artifact		1
+962	hidden	0	0	CrimsonOrb	scripts/quests/hiddenQuests/Crimson_Orb		1
+963	hidden	0	0	DncArtifact	scripts/quests/hiddenQuests/Crafted_Dancer_Artifact		1
+964	hidden	0	0	Invitation Cards	scripts/quests/hiddenQuests/Invitation_Cards		1
+965	hidden	0	0	LostChick	scripts/quests/hiddenQuests/Lost_Chick		1
+966	hidden	0	0	MagusArtifact	scripts/quests/hiddenQuests/Crafted_Magus_Artifact		1
+967	hidden	0	0	PuppetryArtifact	scripts/quests/hiddenQuests/Crafted_Puppetry_Artifact		1
+968	hidden	0	0	TrustAbquhbah	scripts/quests/hiddenQuests/Trust_Abquhbah		0
+969	hidden	0	0	TrustCherukiki	scripts/quests/hiddenQuests/Trust_Cherukiki		0
+970	hidden	0	0	TrustHalver	scripts/quests/hiddenQuests/Trust_Halver		0
+971	hidden	0	0	TrustMaat	scripts/quests/hiddenQuests/Trust_Maat		0
+972	hidden	0	0	TrustNashmeira	scripts/quests/hiddenQuests/Trust_Nashmeira		0
+973	hidden	0	0	TrustPrishe	scripts/quests/hiddenQuests/Trust_Prishe		0
+974	hidden	0	0	TrustSemih	scripts/quests/hiddenQuests/Trust_Semih		0
+975	hidden	0	0	TrustShantotto	scripts/quests/hiddenQuests/Trust_Shantotto		0
+976	hidden	0	0	TrustShikareeZ	scripts/quests/hiddenQuests/Trust_ShikareeZ		0
+977	hidden	0	0	TrustUlmia	scripts/quests/hiddenQuests/Trust_Ulmia		0
+978	hidden	0	0	TrustZeidII	scripts/quests/hiddenQuests/Trust_Zeid_II		0
+979	hidden	0	0	Tutorial	scripts/quests/hiddenQuests/Tutorial_Quest		1
+980	hidden	0	0	mimeoStone	scripts/quests/hiddenQuests/Mimeo_Stone		1
+981	hidden	0	0	moghouseExpo	scripts/quests/hiddenQuests/Moghouse_Exposition		1
+982	hidden	0	0	portalCharm	scripts/quests/hiddenQuests/Portal_Charm		1

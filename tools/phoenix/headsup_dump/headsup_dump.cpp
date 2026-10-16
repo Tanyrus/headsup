@@ -8,14 +8,16 @@
  * taken, resistance ranks, magic evasion, resist traits, jobs, spawn
  * window, lottery chance, senses, absorbs, traits, TP moves, spells, stats
  * and combat stats at each level and loot, every item with magic accuracy,
- * the TP move and spell lists, the /check and aggro rules the server
- * loaded and the settings it ran with to $HEADSUP_DUMP_PATH as JSON and
- * exits.
+ * the TP move and spell lists, every NPC content restriction leaves on
+ * with where its script and quest handlers are defined and the constant
+ * tables they name, the /check and aggro rules the server loaded and the
+ * settings it ran with to $HEADSUP_DUMP_PATH as JSON and exits.
  ************************************************************************/
 
 #include "common/lua.h"
 #include "map/ai/ai_container.h"
 #include "map/entities/mob_entity.h"
+#include "map/entities/npc_entity.h"
 #include "map/items/item_equipment.h"
 #include "map/items/item_weapon.h"
 #include "map/mob_spell_list.h"
@@ -191,10 +193,11 @@ namespace
                 out += '\\';
                 out += c;
             }
-            else if (static_cast<unsigned char>(c) < 0x20)
+            else if (static_cast<unsigned char>(c) < 0x20 || static_cast<unsigned char>(c) >= 0x80)
             {
+                // A byte past ASCII (the game's Shift-JIS) as the code point of that byte, so the file stays UTF-8.
                 char escaped[8];
-                std::snprintf(escaped, sizeof(escaped), "\\u%04x", c);
+                std::snprintf(escaped, sizeof(escaped), "\\u%04x", static_cast<unsigned char>(c));
                 out += escaped;
             }
             else
@@ -393,6 +396,162 @@ namespace
         std::fputs("}", out);
     }
 
+    // Every NPC content restriction leaves on (a turned-off one sits at 0,0,0, hidden): its zone, script and shown name
+    // and its place.
+    void WriteNpcs(FILE* out)
+    {
+        std::fputs("\"npcs\":[", out);
+        bool first = true;
+        zoneutils::ForEachZone([&](CZone* PZone) {
+            PZone->ForEachNpc([&](CNpcEntity* PNpc) {
+                if (PNpc->contentDisabled()) return;
+                std::fprintf(out,
+                    "%s\n{\"id\":%u,\"zone\":%u,\"zoneName\":\"%s\",\"script\":\"%s\",\"name\":\"%s\","
+                    "\"pos\":[%.3f,%.3f,%.3f,%u]}",
+                    first ? "" : ",", PNpc->id, static_cast<unsigned>(PZone->GetID()),
+                    JsonEscape(PZone->getName()).c_str(), JsonEscape(PNpc->getName()).c_str(),
+                    JsonEscape(PNpc->getPacketName()).c_str(), PNpc->loc.p.x, PNpc->loc.p.y, PNpc->loc.p.z,
+                    static_cast<unsigned>(PNpc->loc.p.rotation));
+                first = false;
+            });
+        });
+        std::fputs("\n]", out);
+    }
+
+    // Where each NPC script function and each interaction handler is defined ([file, first line, last line], the
+    // version a module's override left), and the constant tables the scripts name: zone name -> script -> handler;
+    // zone ID -> entity -> handler -> [{container, check, handler}], a handler that is an action written as its
+    // fields; item and key item names to IDs; each zone's ID table of mobs; quest and mission logs and IDs and the
+    // battlefields' IDs.
+    constexpr const char* kNpcLua = R"lua(
+local function str(s)
+    return '"' .. tostring(s):gsub('[%c"\\\128-\255]', function(c) return string.format('\\u%04x', c:byte()) end) .. '"'
+end
+local function fn(f)
+    local i = debug.getinfo(f, 'S')
+    local file = i.source:gsub('^@', ''):gsub('^%./', '')
+    return '[' .. str(file) .. ',' .. i.linedefined .. ',' .. i.lastlinedefined .. ']'
+end
+local function value(v, depth)
+    local t = type(v)
+    if t == 'function' then return fn(v) end
+    if t == 'number' then
+        if v ~= v or v == math.huge or v == -math.huge then return nil end
+        return v == math.floor(v) and string.format('%d', v) or string.format('%.17g', v)
+    end
+    if t == 'boolean' then return v and 'true' or 'false' end
+    if t == 'string' then return str(v) end
+    if t ~= 'table' or depth <= 0 then return nil end
+    local parts = {}
+    for k, x in pairs(v) do
+        local e = value(x, depth - 1)
+        if e then parts[#parts + 1] = str(k) .. ':' .. e end
+    end
+    return '{' .. table.concat(parts, ',') .. '}'
+end
+local function names(t)
+    local parts = {}
+    for k, v in pairs(t or {}) do
+        if type(v) == 'number' then parts[#parts + 1] = str(k) .. ':' .. string.format('%d', v) end
+    end
+    return '{' .. table.concat(parts, ',') .. '}'
+end
+local function each(t, f)
+    local parts = {}
+    for k, v in pairs(t or {}) do
+        local e = f(v)
+        if e then parts[#parts + 1] = str(k) .. ':' .. e end
+    end
+    return '{' .. table.concat(parts, ',') .. '}'
+end
+
+local scripts = each(xi.zones, function(zone)
+    return type(zone) == 'table' and each(zone.npcs, function(script)
+        if type(script) ~= 'table' then return nil end
+        local parts = {}
+        for k, f in pairs(script) do
+            if type(f) == 'function' then parts[#parts + 1] = str(k) .. ':' .. fn(f) end
+        end
+        return '{' .. table.concat(parts, ',') .. '}'
+    end) or nil
+end)
+
+local function container(c)
+    if type(c) ~= 'table' then return 'null' end
+    return '{"id":' .. str(c.id) .. ',"file":' .. (c.filename and str(c.filename) or 'null') .. ',"log":' ..
+        (c.areaId and string.format('%d', c.areaId) or 'null') .. ',"quest":' ..
+        (c.questId and string.format('%d', c.questId) or 'null') .. ',"mission":' ..
+        (c.missionId and string.format('%d', c.missionId) or 'null') .. ',"name":' ..
+        (c.name and str(c.name) or 'null') .. '}'
+end
+local lookup = InteractionGlobal and InteractionGlobal.lookup and InteractionGlobal.lookup.data or {}
+local interactions = each(lookup, function(entities)
+    return each(entities, function(handlers)
+        return type(handlers) == 'table' and each(handlers, function(entries)
+            if type(entries) ~= 'table' then return nil end
+            local list = {}
+            for _, entry in ipairs(entries) do
+                list[#list + 1] = '{"container":' .. container(entry.container) .. ',"check":' ..
+                    (entry.check and fn(entry.check) or 'null') .. ',"handler":' ..
+                    (value(entry.handler, 3) or 'null') .. '}'
+            end
+            return '[' .. table.concat(list, ',') .. ']'
+        end) or nil
+    end)
+end)
+
+-- A zone's mob IDs by name: a number; a plain list of them in its order, so ID.mob.X[n] reads; or, for any other
+-- table (keyed or nested, whose order pairs does not keep), {"ids": the entity IDs in it, sorted, each once}.
+local function entityIds(t)
+    local found, seen = {}, {}
+    local function walk(x, depth)
+        for _, v in pairs(x) do
+            if type(v) == 'number' and v >= 0x1000000 and not seen[v] then
+                seen[v] = true
+                found[#found + 1] = v
+            elseif type(v) == 'table' and depth > 0 then
+                walk(v, depth - 1)
+            end
+        end
+    end
+    walk(t, 2)
+    table.sort(found)
+    return found
+end
+local mobIds = each(zones, function(ids)
+    return type(ids) == 'table' and each(ids.mob, function(v)
+        if type(v) == 'number' then return string.format('%d', v) end
+        if type(v) ~= 'table' then return nil end
+        local count = 0
+        for _ in pairs(v) do count = count + 1 end
+        local plain = count == #v
+        for i = 1, #v do plain = plain and type(v[i]) == 'number' end
+        local list = {}
+        for _, x in ipairs(plain and v or entityIds(v)) do list[#list + 1] = string.format('%d', x) end
+        local text = '[' .. table.concat(list, ',') .. ']'
+        return plain and text or '{"ids":' .. text .. '}'
+    end) or nil
+end)
+
+return '{"scripts":' .. scripts .. ',"interactions":' .. interactions .. ',"items":' .. names(xi.item) ..
+    ',"keyItems":' .. names(xi.keyItem or xi.ki) .. ',"mobs":' .. mobIds .. ',"questLogs":' .. names(xi.questLog) ..
+    ',"quests":' .. each(xi.quest and xi.quest.id, names) .. ',"missionLogs":' ..
+    names(xi.mission and xi.mission.log_id) .. ',"missions":' .. each(xi.mission and xi.mission.id, names) ..
+    ',"battlefields":' .. names(xi.battlefield and xi.battlefield.id) .. '}'
+)lua";
+
+    void WriteNpcLua(FILE* out)
+    {
+        auto result = ::lua.safe_script(kNpcLua, sol::script_pass_on_error);
+        if (!result.valid())
+        {
+            const sol::error error = result;
+            ShowError("headsup_dump: the NPC scripts: %s", error.what());
+            std::_Exit(1);
+        }
+        std::fprintf(out, "\"npcLua\":%s", result.get<std::string>().c_str());
+    }
+
     void WriteRules(FILE* out, CMobEntity* PMob)
     {
         std::fputs("\"rules\":{", out);
@@ -584,6 +743,10 @@ class HeadsUpDumpModule : public CPPModule
         WriteItems(out);
         std::fputs(",\n", out);
         WriteRules(out, anyMob);
+        std::fputs(",\n", out);
+        WriteNpcs(out);
+        std::fputs(",\n", out);
+        WriteNpcLua(out);
         std::fputs(",\n", out);
         WriteSettings(out);
         std::fputs("}\n", out);
