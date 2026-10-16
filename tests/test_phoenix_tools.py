@@ -50,8 +50,25 @@ ZERO_LISTS = ['0', ','.join(['0'] * 12), ','.join(['0'] * 8), ','.join(['0'] * 1
 ZEROS_RECORD = {'immunity': 0, 'sdt': [0] * 12, 'elementRanks': [0] * 8, 'statusRanks': [0] * 10, 'drops': 0}
 
 
-def dump(mobs, rules=RULES, drop_lists=DROP_LISTS):
-    return {'mobs': mobs, 'dropLists': drop_lists, 'rules': rules}
+# What live_settings.lua sets, as LIVE_SETTINGS_TEXT spells it and a dump writes it back.
+LIVE_SETTINGS_TEXT = """-- live's
+xi = xi or {}
+xi.settings = xi.settings or {}
+
+-- content
+xi.settings.main.RESTRICT_CONTENT = 1
+xi.settings.main.ENABLE_WOTG      = 0
+
+xi.settings.main.USE_ADOULIN_WEAPON_SKILL_CHANGES = false
+xi.settings.map.DROP_RATE_MULTIPLIER = 1.5
+"""
+SETTINGS = {'main': {'RESTRICT_CONTENT': 1, 'ENABLE_WOTG': 0, 'ENABLE_SOA': 1,
+                     'USE_ADOULIN_WEAPON_SKILL_CHANGES': False, 'SERVER_NAME': 'Nameless'},
+            'map': {'DROP_RATE_MULTIPLIER': 1.5, 'MOB_STAT_MULTIPLIER': 1.0}}
+
+
+def dump(mobs, rules=RULES, drop_lists=DROP_LISTS, settings=SETTINGS):
+    return {'mobs': mobs, 'dropLists': drop_lists, 'rules': rules, 'settings': settings}
 
 
 def run_compact(tmp, *dumps):
@@ -60,7 +77,9 @@ def run_compact(tmp, *dumps):
         path = pathlib.Path(tmp) / f'run-{n}.json'
         path.write_text(json.dumps(contents))
         paths.append(path)
-    compact.compact(paths, tmp, 'abc123')
+    settings = pathlib.Path(tmp) / 'live_settings.lua'
+    settings.write_text(LIVE_SETTINGS_TEXT)
+    compact.compact(paths, tmp, 'abc123', settings)
     out = pathlib.Path(tmp)
     rows = [line.split('\t') for line in (out / 'phoenix_mobs.tsv').read_text().splitlines()]
     drops = [line.split('\t') for line in (out / 'phoenix_drops.tsv').read_text().splitlines()]
@@ -228,6 +247,20 @@ class Rules(unittest.TestCase):
         broken = dict(RULES, baseExp=[[0] * 19])
         self.assertCompactFails('phoenix_rules.json: baseExp row 0 must have 20 columns', dump([mob()], broken))
 
+    def test_a_dump_run_with_other_settings_than_live_s_names_each(self):
+        # XI_MAIN_USE_ADOULIN_WEAPON_SKILL_CHANGES=0 runs with the number 0, which Lua counts as true.
+        other = {'main': dict(SETTINGS['main'], RESTRICT_CONTENT=0, USE_ADOULIN_WEAPON_SKILL_CHANGES=0),
+                 'map': SETTINGS['map']}
+        self.assertCompactFails('run-1.json: the server ran with main.RESTRICT_CONTENT 0 and '
+                                'main.USE_ADOULIN_WEAPON_SKILL_CHANGES 0, where live_settings.lua has 1 and False',
+                                dump([mob()]), dump([mob()], settings=other))
+
+    def test_a_dump_missing_a_live_setting_names_it(self):
+        other = {'main': SETTINGS['main'], 'map': {}}
+        self.assertCompactFails('run-0.json: the server ran with main.RESTRICT_CONTENT', dump([mob()], settings={}))
+        self.assertCompactFails('map.DROP_RATE_MULTIPLIER None, where live_settings.lua has 1.5',
+                                dump([mob()], settings=other))
+
     def test_a_dump_without_mobs_or_rules_names_its_file(self):
         self.assertCompactFails('run-0.json: not a dump this compact.py reads', {'rules': RULES})
         self.assertCompactFails('run-0.json: not a dump this compact.py reads', [mob()])
@@ -264,7 +297,9 @@ class CompactRejects(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = pathlib.Path(tmp) / 'run-1.json'
             path.write_text(text)
-            compact.compact([path], tmp, 'abc123')
+            settings = pathlib.Path(tmp) / 'live_settings.lua'
+            settings.write_text(LIVE_SETTINGS_TEXT)
+            compact.compact([path], tmp, 'abc123', settings)
 
     def test_a_value_the_plugin_cannot_hold(self):
         for fields, message in (({'detects': 0x10000}, 'detects must be a whole number from 0 to 65535'),
@@ -434,3 +469,19 @@ class ValidateRules(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class LiveSettings(unittest.TestCase):
+    def test_each_table_s_keys_are_read_with_their_lua_values(self):
+        self.assertEqual(compact.live_settings(LIVE_SETTINGS_TEXT, 'live_settings.lua'),
+                         {('main', 'RESTRICT_CONTENT'): 1, ('main', 'ENABLE_WOTG'): 0,
+                          ('main', 'USE_ADOULIN_WEAPON_SKILL_CHANGES'): False, ('map', 'DROP_RATE_MULTIPLIER'): 1.5})
+
+    def test_a_value_it_cannot_compare_is_an_error(self):
+        for line in ("xi.settings.main.SERVER_NAME = 'Phoenix'", 'xi.settings.main.EGG_HUNT = { START = 1 }',
+                     'xi.settings.main = { RESTRICT_CONTENT = 1 }'):
+            with self.subTest(line=line):
+                text = LIVE_SETTINGS_TEXT.replace('xi.settings.main.RESTRICT_CONTENT = 1', line)
+                with self.assertRaises(compact.schema.DataError) as caught:
+                    compact.live_settings(text, 'live_settings.lua')
+                self.assertIn('live_settings.lua:', str(caught.exception))

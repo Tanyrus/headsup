@@ -5,19 +5,22 @@
  * zones have spawned their mobs, it spawns the rest, so every mob runs its
  * spawn script, and watches them all live a while, noting any it sees
  * attacking, then writes every loaded mob, with its immunities, damage
- * taken, resistance ranks and loot, and the /check and aggro rules the
- * server loaded to $HEADSUP_DUMP_PATH as JSON and exits.
+ * taken, resistance ranks and loot, the /check and aggro rules the
+ * server loaded and the settings it ran with to $HEADSUP_DUMP_PATH as
+ * JSON and exits.
  ************************************************************************/
 
 #include "common/lua.h"
 #include "map/ai/ai_container.h"
 #include "map/entities/mob_entity.h"
+#include "map/spawn_slot.h"
 #include "map/utils/charutils.h"
 #include "map/utils/itemutils.h"
 #include "map/utils/moduleutils.h"
 #include "map/utils/zoneutils.h"
 #include "map/zone.h"
 
+#include <algorithm>
 #include <cerrno>
 #include <chrono>
 #include <cstdio>
@@ -85,11 +88,23 @@ namespace
         return out;
     }
 
-    // Every NM script's lottery placeholders (entity.phList, as the server loaded it): placeholder server ID to the NM's,
-    // the first when it can roll several.
+    // Every lottery placeholder: placeholder server ID to the NM's, the first when it can roll several. A spawn slot
+    // (a zone's mobs.yaml `slots`) holds its NM as the member with a spawn chance; an NM script's entity.phList, as the
+    // server loaded it, names the rest.
     std::unordered_map<uint32, uint32> Placeholders()
     {
         std::unordered_map<uint32, uint32> nmOf;
+        zoneutils::ForEachZone([&](CZone* PZone) {
+            PZone->ForEachMob([&](CMobEntity* PMob) {
+                const SpawnSlot* slot = PMob->GetSpawnSlot();
+                if (slot == nullptr) return;
+                const auto& entries = slot->GetEntries();
+                const auto own = std::ranges::find(entries, PMob, &SpawnSlotEntry::mob);
+                const auto nm  = std::ranges::find_if(entries, [](const SpawnSlotEntry& e) { return e.spawnChance > 0; });
+                if (own != entries.end() && own->spawnChance == 0 && nm != entries.end())
+                    nmOf.try_emplace(PMob->id, nm->mob->id);
+            });
+        });
         const auto zones = ::lua["xi"]["zones"].get<sol::optional<sol::table>>();
         if (!zones) return nmOf;
         for (const auto& [zoneName, zone] : *zones)
@@ -179,6 +194,41 @@ namespace
         }
         std::fputs("]", out);
         PMob->animation = own;
+    }
+
+    // Every setting of main.lua and map.lua that is a boolean or a number, as the server ran with it. Strings are
+    // left out: some hold the game's Shift-JIS text, which JSON cannot carry.
+    void WriteSettings(FILE* out)
+    {
+        std::fputs("\"settings\":{", out);
+        bool firstTable = true;
+        for (const char* table : {"main", "map"})
+        {
+            std::fprintf(out, "%s\"%s\":{", firstTable ? "" : ",", table);
+            firstTable = false;
+            bool first        = true;
+            const auto values = ::lua["xi"]["settings"][table].get<sol::optional<sol::table>>();
+            if (values)
+                for (const auto& [key, value] : *values)
+                {
+                    if (!key.is<std::string>()) continue;
+                    std::string text;
+                    if (value.get_type() == sol::type::boolean)
+                        text = value.as<bool>() ? "true" : "false";
+                    else if (value.get_type() == sol::type::number)
+                    {
+                        char number[32];
+                        std::snprintf(number, sizeof(number), "%.17g", value.as<double>());
+                        text = number;
+                    }
+                    else
+                        continue;
+                    std::fprintf(out, "%s\"%s\":%s", first ? "" : ",", JsonEscape(key.as<std::string>()).c_str(), text.c_str());
+                    first = false;
+                }
+            std::fputs("}", out);
+        }
+        std::fputs("}", out);
     }
 
     void WriteRules(FILE* out, CMobEntity* PMob)
@@ -330,6 +380,8 @@ class HeadsUpDumpModule : public CPPModule
         WriteDropLists(out, dropLists);
         std::fputs(",\n", out);
         WriteRules(out, anyMob);
+        std::fputs(",\n", out);
+        WriteSettings(out);
         std::fputs("}\n", out);
         if (std::ferror(out) != 0 || std::fclose(out) != 0)
         {

@@ -2,16 +2,18 @@
 """Turn one or more headsup_dump JSON files of the same server into phoenix_mobs.tsv, phoenix_drops.tsv,
 phoenix_mobs.meta and phoenix_rules.json.
 
-Usage: compact.py DUMP_JSON [DUMP_JSON ...] OUT_DIR PHOENIX_COMMIT
+Usage: compact.py LIVE_SETTINGS DUMP_JSON [DUMP_JSON ...] OUT_DIR PHOENIX_COMMIT
 
 Some mobs change aggression while the server runs (elementals, the Ghrah forms), so one dump is one snapshot. With
 several dumps a mob counts as aggressive if any of them saw it attack, so an aggressive mob is never painted safe.
-Every dump must carry the same rules. A mob's drop list comes from the first dump that has the mob, like the rest of its
+Every dump must carry the same rules, and the server must have run with every value LIVE_SETTINGS (refresh.sh's
+live_settings.lua) sets. A mob's drop list comes from the first dump that has the mob, like the rest of its
 record, and compact names any mob whose list differs in a later dump.
 """
 import datetime
 import json
 import pathlib
+import re
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
@@ -28,6 +30,8 @@ AGGRO_FIELDS = ('aggro', 'alwaysAggro', 'noAggro')
 DROP_KIND_OF_TYPE = {0x00: 'drop', 0x02: 'steal', 0x04: 'despoil'}
 DROP_GROUPED = 0x01
 DIFFERING_SHOWN = 10  # mob IDs named when drop lists differ between dumps
+# live_settings.lua's lines: a key of one of xi.settings' tables set to a number or a boolean.
+SETTING = re.compile(r'xi\.settings\.(\w+)\.(\w+)\s*=\s*(true|false|-?[0-9]+(?:\.[0-9]+)?)')
 
 
 def flags(mob) -> int:
@@ -157,7 +161,41 @@ def dump_rules(raw, source):
             'incrediblyEasyPrey': raw['incrediblyEasyPrey'], 'sittingAnimations': raw['sittingAnimations']}
 
 
-def load(path):
+def live_settings(text, source):
+    """{(table, key): value} for each setting the file sets, as Lua reads the value."""
+    settings = {}
+    for number, line in enumerate(text.splitlines(), start=1):
+        code = line.split('--', 1)[0].strip()
+        if code in ('', 'xi = xi or {}', 'xi.settings = xi.settings or {}'):
+            continue
+        setting = SETTING.fullmatch(code)
+        if setting is None:
+            raise schema.DataError(f'{source}:{number}: not a setting of a number or a boolean: {line.strip()!r}')
+        table, key, value = setting.groups()
+        settings[(table, key)] = value == 'true' if value in ('true', 'false') else json.loads(value)
+    return settings
+
+
+def same_setting(got, want) -> bool:
+    """Lua's equality: a boolean is never a number, and 1 is 1.0."""
+    if isinstance(got, bool) or isinstance(want, bool):
+        return type(got) is type(want) and got == want
+    return isinstance(got, (int, float)) and got == want
+
+
+def check_settings(ran, expected, source):
+    """Every setting of expected as the server ran with it, a dump's {table: {key: value}}."""
+    def value(table, key):
+        values = ran.get(table) if isinstance(ran, dict) else None
+        return values.get(key) if isinstance(values, dict) else None
+    wrong = [(f'{table}.{key}', value(table, key), want) for (table, key), want in expected.items()
+             if not same_setting(value(table, key), want)]
+    if wrong:
+        raise schema.DataError(f'{source}: the server ran with ' + ' and '.join(f'{name} {got!r}' for name, got, _ in wrong)
+                               + ', where live_settings.lua has ' + ' and '.join(repr(want) for _, _, want in wrong))
+
+
+def load(path, settings):
     try:
         dump = json.loads(pathlib.Path(path).read_text(encoding='utf-8'))
     except json.JSONDecodeError as error:
@@ -167,6 +205,7 @@ def load(path):
         lists = [drop_list(raw, f'{path}: drop list {index}') for index, raw in enumerate(dump['dropLists'])]
     except (KeyError, TypeError) as error:
         raise schema.DataError(f'{path}: not a dump this compact.py reads ({error!r})') from error
+    check_settings(dump.get('settings'), settings, path)
     for mob in mobs:
         missing = MOB_KEYS - mob.keys()
         if missing:
@@ -185,8 +224,10 @@ def agreed_rules(dump_paths, rules):
     return rules[0]
 
 
-def compact(dump_paths, out_dir, commit):
-    snapshots = [load(path) for path in dump_paths]
+def compact(dump_paths, out_dir, commit, settings_path):
+    settings_path = pathlib.Path(settings_path)
+    settings = live_settings(settings_path.read_text(encoding='utf-8'), settings_path.name)
+    snapshots = [load(path, settings) for path in dump_paths]
     differing = set()
     mobs = sorted(merge((dump_mobs for dump_mobs, _ in snapshots), differing), key=lambda m: m['id'])
     if differing:
@@ -212,11 +253,11 @@ def compact(dump_paths, out_dir, commit):
 
 
 def main(argv) -> int:
-    if len(argv) < 4:
+    if len(argv) < 5:
         print(__doc__.strip(), file=sys.stderr)
         return 2
     try:
-        count, zones = compact(argv[1:-2], argv[-2], argv[-1])
+        count, zones = compact(argv[2:-2], argv[-2], argv[-1], argv[1])
     except schema.DataError as error:
         print(f'compact: {error}', file=sys.stderr)
         return 1

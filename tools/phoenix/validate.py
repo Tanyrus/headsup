@@ -57,7 +57,7 @@ EXPECTED_DROPS = {
 EXPECTED_REMOVED = {
     (FLEDERMAUS_ZONE, 'Fledermaus'): {FIEND_BLOOD},
 }
-EVEN_MATCH_EXP = 100  # every bracket of every experience table Phoenix ships
+EVEN_MATCH_EXP = 100  # every bracket of the era table, which only content restricted to ToAU loads (200 without)
 RESTING, SITTING = 33, 47  # xi::Animation Healing and Sit, which CBattleEntity::isSitting names
 
 

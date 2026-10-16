@@ -3,7 +3,8 @@
 # and data/phoenix_zones.tsv, data/phoenix_weather.tsv and data/phoenix_titles.tsv from its checkout; data/ is only written
 # when all of them pass. It clones Phoenix at PHOENIX_COMMIT with its patches and mesh submodules (not the staff-only
 # phoenix_ac), builds the map server with the headsup_dump module, loads Phoenix's database into a private MariaDB, runs
-# the server until the module has dumped every loaded mob and the /check and aggro rules HEADSUP_PHOENIX_DUMPS times,
+# the server with live's settings (live_settings.lua) until the module has dumped every loaded mob and the /check and
+# aggro rules HEADSUP_PHOENIX_DUMPS times,
 # then merges every dump kept for this commit and validates it. zones.py reads the zones, regions and weather calendars,
 # and titles.py the title names, from the checkout's sources alone.
 # A mob counts as aggressive if any run saw it attack: some change aggression while the server runs.
@@ -36,12 +37,11 @@ DB="$WORK/db"
 SOCKET="${XDG_RUNTIME_DIR:-$WORK}/headsup-phoenix.sock"
 STAGE="$WORK/out"
 # Live Phoenix restricts content to Treasures of Aht Urhgan and before. That picks the era experience table and /check
-# curve, and which mobs load, so the server runs with the same settings. Dumps made with other settings, or by another
-# version of the dump module, are kept apart.
-LIVE_SETTINGS=(XI_MAIN_RESTRICT_CONTENT=1 XI_MAIN_ENABLE_WOTG=0 XI_MAIN_ENABLE_ACP=0 XI_MAIN_ENABLE_AMK=0
-    XI_MAIN_ENABLE_ASA=0 XI_MAIN_ENABLE_ABYSSEA=0 XI_MAIN_ENABLE_VOIDWATCH=0 XI_MAIN_ENABLE_SOA=0 XI_MAIN_ENABLE_ROV=0
-    XI_MAIN_ENABLE_TVR=0)
-DUMP_ID="$(printf '%s\n' "${LIVE_SETTINGS[@]}" | cat - "$ROOT/tools/phoenix/headsup_dump/headsup_dump.cpp" | sha256sum | cut -c1-8)"
+# curve, the era modules that run and which mobs load, so the server runs with live's settings as a settings file:
+# an XI_MAIN_ variable cannot turn a setting off, since "false" reaches Lua as a string, which is true. Dumps made with
+# other settings, or by another version of the dump module, are kept apart.
+LIVE_SETTINGS="$ROOT/tools/phoenix/live_settings.lua"
+DUMP_ID="$(cat "$LIVE_SETTINGS" "$ROOT/tools/phoenix/headsup_dump/headsup_dump.cpp" | sha256sum | cut -c1-8)"
 SNAPSHOTS="${HEADSUP_PHOENIX_SNAPSHOTS:-$HOME/.cache/headsup-snapshots}/$COMMIT-$DUMP_ID"
 
 log() { printf '[refresh] %s\n' "$*"; }
@@ -85,6 +85,7 @@ cmp -s "$ROOT/tools/phoenix/headsup_dump/headsup_dump.cpp" "$SERVER/modules/head
     cp "$ROOT/tools/phoenix/headsup_dump/headsup_dump.cpp" "$SERVER/modules/headsup_dump/headsup_dump.cpp"
 grep -qx 'headsup_dump/' "$SERVER/modules/init.txt" ||
     printf '\n# headsup: dump every loaded mob (tools/phoenix/refresh.sh)\nheadsup_dump/\n' >> "$SERVER/modules/init.txt"
+cp "$LIVE_SETTINGS" "$SERVER/settings/main.lua"
 
 if [ ! -x "$VENV/bin/python" ]; then
     log "creating the Python venv"
@@ -92,11 +93,13 @@ if [ ! -x "$VENV/bin/python" ]; then
 fi
 "$VENV/bin/pip" install -q -r "$SERVER/tools/requirements.txt" > "$WORK/pip.log" 2>&1 || fail "pip install; see $WORK/pip.log"
 log "configuring"
-cmake -G Ninja -S "$SERVER" -B "$BUILD" -DCMAKE_BUILD_TYPE=Release -DTRACY_ENABLE=OFF -DPCH_ENABLE=ON \
+# With precompiled headers GCC 16 fails live's commit (redefinitions of everything in common/logging.h), so the build
+# goes without them.
+cmake -G Ninja -S "$SERVER" -B "$BUILD" -DCMAKE_BUILD_TYPE=Release -DTRACY_ENABLE=OFF -DPCH_ENABLE=OFF \
     -DWARNINGS_AS_ERRORS=FALSE -DENABLE_CLANG_TIDY=OFF -DPython_EXECUTABLE="$VENV/bin/python" \
     > "$WORK/configure.log" 2>&1 || fail "cmake configure; see $WORK/configure.log"
-log "building (the first build takes about 15 minutes)"
-cmake --build "$BUILD" > "$WORK/build.log" 2>&1 || fail "build; see $WORK/build.log"
+log "building the map server (the first build takes about 30 minutes)"
+cmake --build "$BUILD" --target xi_map > "$WORK/build.log" 2>&1 || fail "build; see $WORK/build.log"
 [ -x "$SERVER/xi_map" ] || fail "no xi_map after the build"
 
 stop_db() {
@@ -145,7 +148,7 @@ for run in $(seq "$DUMPS"); do
     offset=$(((run - 1) * VANADIEL_DAY / DUMPS))
     log "running xi_map until dump $run of $DUMPS is written (clock +${offset}s)"
     status=0
-    (cd "$SERVER" && timeout "$MAP_TIMEOUT" faketime -f "+${offset}" env "${LIVE_SETTINGS[@]}" HEADSUP_DUMP_PATH="$dump.part" \
+    (cd "$SERVER" && timeout "$MAP_TIMEOUT" faketime -f "+${offset}" env HEADSUP_DUMP_PATH="$dump.part" \
         ./xi_map --ip "$HOST" --port "$MAP_PORT" < /dev/null > "$WORK/map.log" 2>&1) || status=$?
     if [ "$status" -ne 0 ] || [ ! -s "$dump.part" ]; then
         rm -f "$dump.part"
@@ -156,7 +159,7 @@ for run in $(seq "$DUMPS"); do
 done
 
 rm -rf "$STAGE"
-python3 "$ROOT/tools/phoenix/compact.py" "$SNAPSHOTS"/*.json "$STAGE" "$COMMIT" ||
+python3 "$ROOT/tools/phoenix/compact.py" "$LIVE_SETTINGS" "$SNAPSHOTS"/*.json "$STAGE" "$COMMIT" ||
     fail "compact; data/ left unchanged"
 python3 "$ROOT/tools/phoenix/zones.py" "$SERVER" "$STAGE" ||
     fail "zones; data/ left unchanged"
