@@ -22,7 +22,9 @@ SYSTEMS_NAME = 'phoenix_npc_systems.tsv'
 # keyItems: the key items it gives; needs: the key items it checks for; pops: the mobs it spawns; shop: its list in
 # phoenix_npc_shops.tsv, 0 for none; links: its quests, missions and battlefields in phoenix_npc_links.tsv; systems:
 # its calls in phoenix_npc_systems.tsv; unread: UNREAD kinds its scripts do but in a way the refresh could not read.
-# Lists are comma-separated and increasing.
+# A step of a quest, mission or battlefield adds to these only when its link is live and its own check needs no setting
+# live has off, so the later content of an NPC live has stays out; links still names every one. Lists are
+# comma-separated and increasing.
 NPC_COLUMNS = ['id', 'zone', 'script', 'name', 'pos', 'trades', 'gives', 'keyItems', 'needs', 'pops', 'shop', 'links',
                'systems', 'unread']
 LIST_LIMITS = {'trades': (1, 0xFFFF), 'gives': (1, 0xFFFF), 'keyItems': (1, 0xFFFF), 'needs': (1, 0xFFFF),

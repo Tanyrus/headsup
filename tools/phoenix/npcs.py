@@ -11,7 +11,8 @@ This reads those handlers
 from the server's checkout (SERVER_DIR) for what they take in trade, give, check for, spawn and sell, and the shared
 systems they call. It reads what a script spells out and nothing more: an item a handler works out while it runs is
 left unread and named in the NPC's unread column. A quest or mission whose folder names an expansion live's settings
-turn off is marked so, and so is one whose every step needs a setting live has off.
+turn off is marked so, and so is one whose every step needs a setting live has off; what such a quest's steps do, and
+what any step does whose own check needs a setting live has off, is left out of the NPC's row.
 """
 import json
 import pathlib
@@ -221,6 +222,12 @@ class Facts:
     def __init__(self):
         self.trades, self.gives, self.key_items, self.needs, self.pops = set(), set(), set(), set(), set()
         self.stock, self.systems, self.unread, self.legacy = None, set(), set(), set()
+
+    def add(self, other) -> None:
+        """What another handler does, beside this one's; its stock, when it has one, is the one kept."""
+        for name in ('trades', 'gives', 'key_items', 'needs', 'pops', 'systems', 'unread', 'legacy'):
+            getattr(self, name).update(getattr(other, name))
+        self.stock = other.stock or self.stock
 
 
 CALL = re.compile(r'(npcUtil\.trade(?:Has|HasExactly|HasOnly|Matches)|trade:hasItemQty|npcUtil\.giveItem|'
@@ -454,12 +461,15 @@ def build(npcs, lua, settings, server):
     open_steps = {}  # link: whether any step an NPC takes part in can be open on live
     reward_cache = {}
     for npc in sorted(npcs, key=lambda n: n['id']):
-        facts, npc_links = Facts(), set()
+        # What its own script does, and what each step of a quest, mission or battlefield it takes part in does:
+        # (link, whether the step needs a setting live has off, facts), kept apart until every NPC says whether its
+        # link is live.
+        facts, steps, npc_links = Facts(), [], set()
         own = (lua['scripts'].get(npc['zoneName']) or {}).get(npc['script']) or {}
-        handlers = [(name, where, None) for name, where in own.items()]
+        handlers = [(name, where, None, False) for name, where in own.items()]
         for name, entries in ((lua['interactions'].get(str(npc['zone'])) or {}).get(npc['script']) or {}).items():
             for entry in entries:
-                handler, container = entry['handler'], entry['container']
+                handler, container, step_off = entry['handler'], entry['container'], False
                 if container and not container.get('file'):
                     # A module that rebuilds a container (xi.module.modifyInteractionEntry) leaves it no file name;
                     # its steps' checks are still the quest's own file's.
@@ -468,54 +478,66 @@ def build(npcs, lua, settings, server):
                     found = link_of(container, c)
                     if found:
                         check = sources.span(entry['check'])[0] if entry.get('check') else None
+                        step_off = check is not None and gated(check, c)
                         open_steps.setdefault(found[0], False)
-                        open_steps[found[0]] |= check is None or not gated(check, c)
+                        open_steps[found[0]] |= not step_off
                 if isinstance(handler, list):
-                    handlers.append((name, handler, container))
+                    handlers.append((name, handler, container, step_off))
                 elif container:
-                    handlers.append((name, None, container))
-        for name, where, container in handlers:
+                    handlers.append((name, None, container, step_off))
+        for name, where, container, step_off in handlers:
+            key = None
             if container:
                 found = link_of(container, c)
                 if found:
-                    npc_links.add(found[0])
-                    if found[0] not in links or not links[found[0]]['file']:
-                        links[found[0]] = found[1]  # the container's own row beats a script's mention
+                    key = found[0]
+                    npc_links.add(key)
+                    if key not in links or not links[key]['file']:
+                        links[key] = found[1]  # the container's own row beats a script's mention
             if where is None:
                 continue
             text, whole = sources.span(where)
             if text is None:
                 continue
-            read_handler(text, whole, npc['zone'], c, facts, name == 'onTrade')
+            into = facts if key is None else Facts()
+            read_handler(text, whole, npc['zone'], c, into, name == 'onTrade')
             if container and container.get('file') and re.search(r'\b(?:quest|mission):complete\s*\(', text):
                 file = container['file']
                 if file not in reward_cache:
                     reward_cache[file] = rewards(sources.text(file + '.lua') or '', c)
-                facts.gives.update(reward_cache[file][0])
-                facts.key_items.update(reward_cache[file][1])
-        for kind, area, name in facts.legacy:
+                into.gives.update(reward_cache[file][0])
+                into.key_items.update(reward_cache[file][1])
+            if key is not None:
+                steps.append((key, step_off, into))
+        for kind, area, name in facts.legacy.union(*(step.legacy for _, _, step in steps)):
             found = legacy_link(kind, area, name, c)
             if found:
                 npc_links.add(found[0])
                 links.setdefault(found[0], found[1])
-        shop = shops.setdefault(facts.stock, len(shops) + 1) if facts.stock else 0
-        system_numbers = [systems.setdefault(s, len(systems) + 1) for s in sorted(facts.systems)]
-        rows.append((npc, facts, shop, npc_links, system_numbers))
-    numbers = {}
+        rows.append((npc, facts, steps, npc_links))
+    numbers, live = {}, {}
     for key in sorted(links, key=lambda k: (schema.LINK_KINDS.index(k[0]), k[1], k[2], k[3])):
         numbers[key] = len(numbers) + 1
         row = links[key]
-        row['live'] = int(row['expansion'] not in c.off_expansions and open_steps.get(key, True))
+        live[key] = row['live'] = int(row['expansion'] not in c.off_expansions and open_steps.get(key, True))
         link_rows.append(dict(row, link=numbers[key]))
+    npc_rows = []
+    for npc, facts, steps, npc_links in rows:
+        # A step counts when its link is live and its own check needs nothing live has off: the trades, rewards and
+        # pops of later content on an NPC that live has stay out.
+        for key, step_off, step in steps:
+            if live[key] and not step_off:
+                facts.add(step)
+        shop = shops.setdefault(facts.stock, len(shops) + 1) if facts.stock else 0
+        npc_rows.append({'id': npc['id'], 'zone': npc['zone'], 'script': npc['script'], 'name': npc['name'],
+                         'pos': '{:.3f},{:.3f},{:.3f},{}'.format(*npc['pos'][:3], int(npc['pos'][3])),
+                         'trades': sorted(facts.trades), 'gives': sorted(facts.gives),
+                         'keyItems': sorted(facts.key_items), 'needs': sorted(facts.needs), 'pops': sorted(facts.pops),
+                         'shop': shop, 'links': sorted(numbers[k] for k in npc_links),
+                         'systems': sorted(systems.setdefault(s, len(systems) + 1) for s in sorted(facts.systems)),
+                         'unread': [k for k in schema.UNREAD if k in facts.unread]})
     system_rows = [{'system': n, 'family': family, 'call': call}
                    for (family, call), n in sorted(systems.items(), key=lambda kv: kv[1])]
-    npc_rows = [{'id': npc['id'], 'zone': npc['zone'], 'script': npc['script'], 'name': npc['name'],
-                 'pos': '{:.3f},{:.3f},{:.3f},{}'.format(*npc['pos'][:3], int(npc['pos'][3])),
-                 'trades': sorted(facts.trades), 'gives': sorted(facts.gives), 'keyItems': sorted(facts.key_items),
-                 'needs': sorted(facts.needs), 'pops': sorted(facts.pops), 'shop': shop,
-                 'links': sorted(numbers[k] for k in npc_links), 'systems': sorted(system_numbers),
-                 'unread': [k for k in schema.UNREAD if k in facts.unread]}
-                for npc, facts, shop, npc_links, system_numbers in rows]
     shop_rows = [(n, stock) for stock, n in sorted(shops.items(), key=lambda kv: kv[1])]
     return npc_rows, shop_rows, link_rows, system_rows
 

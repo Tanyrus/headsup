@@ -221,10 +221,10 @@ DUMP_LUA = dict(LUA, scripts={'Somewhere': {
 
 
 class Build(unittest.TestCase):
-    def run_npcs(self, dumps=None):
+    def run_npcs(self, dumps=None, scripts=None):
         with tempfile.TemporaryDirectory() as tmp:
             server = pathlib.Path(tmp) / 'server'
-            for path, text in SCRIPTS.items():
+            for path, text in dict(SCRIPTS, **(scripts or {})).items():
                 (server / path).parent.mkdir(parents=True, exist_ok=True)
                 (server / path).write_text(text)
             paths = []
@@ -276,6 +276,43 @@ class Build(unittest.TestCase):
         trust = next(l for l in links if l['kind'] == 'hidden')
         self.assertEqual((trust['name'], trust['file'], trust['live']), ('Trust Halver', script[:-4], 0))
         self.assertEqual(rows[0]['links'], [1, trust['link']])
+
+    def test_what_an_npc_does_only_for_content_live_has_off_is_left_out(self):
+        # qm2 takes part in two quests: its step of A Squire's Test takes Valkurm sunsand, and its step of Atellounes
+        # Lament (WotG's, which live turns off) takes Chamomile and pops the Mycophile. A trust quest has a step on qm2
+        # that needs nothing, so it is live, and one on Rodrigue that needs ENABLE_TRUST_QUESTS and gives a Scroll of
+        # Raise.
+        squire, lament, trust = ('scripts/quests/sandoria/Squire_Steps.lua',
+                                 'scripts/quests/crystalWar/Atellounes_Lament.lua',
+                                 'scripts/quests/hiddenQuests/Trust_Halver.lua')
+        scripts = {
+            squire: 'onTrade = function(player, npc, trade)\n'
+                    '    if npcUtil.tradeHasExactly(trade, xi.item.PINCH_OF_VALKURM_SUNSAND) then end\nend\n',
+            lament: 'onTrade = function(player, npc, trade)\n'
+                    '    if npcUtil.tradeHasExactly(trade, xi.item.CHAMOMILE) then npcUtil.popFromQM(player, npc, '
+                    'ID.mob.MYCOPHILE) end\nend\n',
+            trust: 'check = function(player)\n    return xi.settings.main.ENABLE_TRUST_QUESTS == 1\nend\n'
+                   'onTrigger = function(player, npc)\n    npcUtil.giveItem(player, xi.item.SCROLL_OF_RAISE)\nend\n'}
+
+        def step(cid, file, log, quest, handler, check=None, name=None):
+            return {'container': {'id': cid, 'file': file, 'log': log, 'quest': quest, 'mission': None, 'name': name},
+                    'check': check, 'handler': handler}
+        interactions = dict(DUMP_LUA['interactions']['2'],
+                            qm2={'onTrade': [step('Quest[0][4]', 'scripts/quests/sandoria/A_Squires_Test', 0, 4,
+                                                  [squire, 1, 3]),
+                                             step('Quest[7][12]', lament[:-4], 7, 12, [lament, 1, 3])],
+                                 'onTrigger': [step('HQuest[Trust_Halver]', trust[:-4], None, None, {'id': 433},
+                                                    name='Trust_Halver')]},
+                            Rodrigue={'onTrigger': [step('HQuest[Trust_Halver]', trust[:-4], None, None, [trust, 4, 6],
+                                                         [trust, 1, 3], 'Trust_Halver')]})
+        lua = dict(DUMP_LUA, interactions={'2': interactions})
+        settings = {'main': dict(SETTINGS['main'], ENABLE_TRUST_QUESTS=0)}
+        (rows, _, links, _), _ = self.run_npcs([{'npcs': DUMP_NPCS, 'npcLua': lua, 'settings': settings}], scripts)
+        rodrigue, _, qm = rows
+        self.assertEqual([(l['name'], l['live']) for l in links],
+                         [('A Squires Test', 1), ('Storms of Fate', 1), ('Atellounes Lament', 0), ('Trust Halver', 1)])
+        self.assertEqual((qm['trades'], qm['pops'], qm['links'], qm['unread']), ([1416], [], [1, 3, 4], []))
+        self.assertEqual((rodrigue['gives'], rodrigue['links']), ([], [1, 4]))
 
     def test_dumps_with_other_npcs_are_an_error(self):
         dump = {'npcs': DUMP_NPCS, 'npcLua': DUMP_LUA, 'settings': SETTINGS}
