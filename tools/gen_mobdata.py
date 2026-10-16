@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Generate src/generated/mobdata.inc and mobflags.h from data/phoenix_mobs.tsv and data/phoenix_drops.tsv (written by
-tools/phoenix/refresh.sh), with each distinct set of resistances stored once for the mobs to point at, and each distinct
-drop list too.
+"""Generate src/generated/mobdata.inc and mobflags.h from data/phoenix_mobs.tsv, data/phoenix_drops.tsv and
+data/phoenix_items.tsv (written by tools/phoenix/refresh.sh), with each distinct set of resistances stored once for the
+mobs to point at, and each distinct drop list and run of stats too.
 
 This file owns the TSVs' format: their columns and ranges, the bits of the flags, detects and immunity columns, the order
 of the list columns, the drop kinds, the names of the data files and the meta file's commit key. The Phoenix tools
@@ -15,10 +15,11 @@ import sys
 
 TSV_NAME = 'phoenix_mobs.tsv'
 DROPS_NAME = 'phoenix_drops.tsv'
+ITEMS_NAME = 'phoenix_items.tsv'
 META_NAME = 'phoenix_mobs.meta'
 META_COMMIT_KEY = 'phoenix_commit'
 COLUMNS = ['id', 'zone', 'name', 'minLevel', 'maxLevel', 'flags', 'respawn', 'detects', 'expLevelMod', 'placeholderOf',
-           'immunity', 'sdt', 'elementRanks', 'statusRanks', 'drops']
+           'immunity', 'sdt', 'elementRanks', 'statusRanks', 'elementMeva', 'statusMeva', 'statusResist', 'stats', 'drops']
 LIMITS = {'id': (1, 0xFFFFFFFF), 'zone': (0, 0xFFFF), 'minLevel': (0, 255), 'maxLevel': (0, 255), 'flags': (0, 0xFF),
           'respawn': (0, 0xFFFFFFFF), 'detects': (0, 0xFFFF), 'expLevelMod': (-0x8000, 0x7FFF),
           'placeholderOf': (0, 0xFFFFFFFF), 'immunity': (0, 0xFFFFFFFF), 'drops': (0, 0xFFFF)}
@@ -26,9 +27,22 @@ LIMITS = {'id': (1, 0xFFFFFFFF), 'zone': (0, 0xFFFF), 'minLevel': (0, 255), 'max
 SDT_ORDER = ['Slashing', 'Piercing', 'Impact', 'H2H', 'Fire', 'Ice', 'Wind', 'Earth', 'Lightning', 'Water', 'Light', 'Dark']
 ELEMENT_ORDER = ['Fire', 'Ice', 'Wind', 'Earth', 'Lightning', 'Water', 'Light', 'Dark']
 STATUS_RANK_ORDER = ['Paralyze', 'Bind', 'Silence', 'Slow', 'Poison', 'LightSleep', 'DarkSleep', 'Blind', 'Stun', 'Gravity']
-# Comma-separated lists: their length and each value's range, what the plugin stores (int16 SDT, int8 ranks).
-LISTS = {'sdt': (len(SDT_ORDER), -0x8000, 0x7FFF), 'elementRanks': (len(ELEMENT_ORDER), -0x80, 0x7F),
-         'statusRanks': (len(STATUS_RANK_ORDER), -0x80, 0x7F)}
+# The stats a mob has at each level: STR to CHR as the magic hit rate reads them, then magic evasion.
+STAT_ORDER = ['Str', 'Dex', 'Vit', 'Agi', 'Int', 'Mnd', 'Chr', 'MagicEvasion']
+# Comma-separated lists: their length and each value's range, what the plugin stores (int16 SDT, magic evasion and
+# resist traits, int8 ranks).
+INT16 = (-0x8000, 0x7FFF)
+LISTS = {'sdt': (len(SDT_ORDER), *INT16), 'elementRanks': (len(ELEMENT_ORDER), -0x80, 0x7F),
+         'statusRanks': (len(STATUS_RANK_ORDER), -0x80, 0x7F), 'elementMeva': (len(ELEMENT_ORDER), *INT16),
+         'statusMeva': (len(STATUS_RANK_ORDER), *INT16), 'statusResist': (len(STATUS_RANK_ORDER), *INT16)}
+# The stats column: one list of STAT_ORDER a level from minLevel to maxLevel, separated by semicolons; empty when a
+# script sets the mob's level.
+LEVEL_SEPARATOR = ';'
+# phoenix_items.tsv: every item with magic accuracy, an element's or an elemental staff bonus (each in ELEMENT_ORDER),
+# or an instrument's skill (Phoenix's xi::SkillType, 0 for any other item).
+ITEM_COLUMNS = ['id', 'macc', 'elementMacc', 'staffBonus', 'skill']
+ITEM_LIMITS = {'id': (1, 0xFFFF), 'macc': INT16, 'skill': (0, 0xFF)}
+ITEM_LISTS = {'elementMacc': (len(ELEMENT_ORDER), *INT16), 'staffBonus': (len(ELEMENT_ORDER), *INT16)}
 
 # phoenix_drops.tsv holds each distinct drop list once, numbered from 1 in the order of the first mob that has it (a
 # mob's drops column; 0 is none), one row per entry in the server's order: the ungrouped entries, then each group's.
@@ -88,6 +102,13 @@ class DataError(ValueError):
     pass
 
 
+def whole_numbers(value: str, count: int, lo: int, hi: int, what: str) -> list:
+    parts = value.split(',')
+    if len(parts) != count or not all(re.fullmatch(r'-?[0-9]+', p) and lo <= int(p) <= hi for p in parts):
+        raise DataError(f'{what} must be {count} whole numbers from {lo} to {hi} separated by commas, got {value!r}')
+    return [int(p) for p in parts]
+
+
 def parse(text: str, source: str = TSV_NAME):
     lines = text.splitlines()
     if not lines or lines[0].split('\t') != COLUMNS:
@@ -104,13 +125,12 @@ def parse(text: str, source: str = TSV_NAME):
                     raise DataError(f'{source}:{number}: empty name')
                 record[column] = value
                 continue
+            if column == 'stats':
+                record[column] = [whole_numbers(level, len(STAT_ORDER), *INT16, f'{source}:{number}: stats')
+                                  for level in value.split(LEVEL_SEPARATOR)] if value else []
+                continue
             if column in LISTS:
-                count, lo, hi = LISTS[column]
-                parts = value.split(',')
-                if len(parts) != count or not all(re.fullmatch(r'-?[0-9]+', p) and lo <= int(p) <= hi for p in parts):
-                    raise DataError(f'{source}:{number}: {column} must be {count} whole numbers from {lo} to {hi} '
-                                    f'separated by commas, got {value!r}')
-                record[column] = [int(p) for p in parts]
+                record[column] = whole_numbers(value, *LISTS[column], f'{source}:{number}: {column}')
                 continue
             lo, hi = LIMITS[column]
             if not re.fullmatch(r'-?[0-9]+', value) or not lo <= int(value) <= hi:
@@ -118,6 +138,10 @@ def parse(text: str, source: str = TSV_NAME):
             record[column] = int(value)
         if record['minLevel'] > record['maxLevel']:
             raise DataError(f'{source}:{number}: minLevel is above maxLevel')
+        levels = record['maxLevel'] - record['minLevel'] + 1
+        if record['stats'] and (record['minLevel'] == 0 or len(record['stats']) != levels):
+            raise DataError(f'{source}:{number}: stats must have a list a level from minLevel to maxLevel, '
+                            f'{levels}, got {len(record["stats"])}')
         if record['id'] <= last_id:
             raise DataError(f'{source}:{number}: ids must be strictly increasing')
         last_id = record['id']
@@ -170,6 +194,32 @@ def parse_drops(text: str, source: str = DROPS_NAME):
     return lists
 
 
+def parse_items(text: str, source: str = ITEMS_NAME):
+    """The items in increasing id order, each a dict of ITEM_COLUMNS."""
+    lines = text.splitlines()
+    if not lines or lines[0].split('\t') != ITEM_COLUMNS:
+        raise DataError(f'{source}:1: expected the header ' + ' '.join(ITEM_COLUMNS))
+    items, last_id = [], 0
+    for number, line in enumerate(lines[1:], start=2):
+        fields = line.split('\t')
+        if len(fields) != len(ITEM_COLUMNS):
+            raise DataError(f'{source}:{number}: expected {len(ITEM_COLUMNS)} columns, got {len(fields)}')
+        item = {}
+        for column, value in zip(ITEM_COLUMNS, fields):
+            if column in ITEM_LISTS:
+                item[column] = whole_numbers(value, *ITEM_LISTS[column], f'{source}:{number}: {column}')
+                continue
+            lo, hi = ITEM_LIMITS[column]
+            if not re.fullmatch(r'-?[0-9]+', value) or not lo <= int(value) <= hi:
+                raise DataError(f'{source}:{number}: {column} must be a whole number from {lo} to {hi}, got {value!r}')
+            item[column] = int(value)
+        if item['id'] <= last_id:
+            raise DataError(f'{source}:{number}: ids must be strictly increasing')
+        last_id = item['id']
+        items.append(item)
+    return items
+
+
 def group_weights(entries) -> list:
     """Each group's summed rates: the total one roll of the group picks among."""
     weights = []
@@ -189,11 +239,12 @@ def c_string(text: str) -> str:
     return '"' + ''.join(out) + '"'
 
 
-NEUTRAL = (0, (0,) * len(SDT_ORDER), (0,) * len(ELEMENT_ORDER), (0,) * len(STATUS_RANK_ORDER))
+RESISTANCE_LISTS = ['sdt', 'elementRanks', 'statusRanks', 'elementMeva', 'statusMeva', 'statusResist']
+NEUTRAL = (0,) + tuple((0,) * LISTS[column][0] for column in RESISTANCE_LISTS)
 
 
 def resistances_key(r):
-    return r['immunity'], tuple(r['sdt']), tuple(r['elementRanks']), tuple(r['statusRanks'])
+    return (r['immunity'],) + tuple(tuple(r[column]) for column in RESISTANCE_LISTS)
 
 
 def c_list(values) -> str:
@@ -201,14 +252,45 @@ def c_list(values) -> str:
 
 
 def c_resistances(key) -> str:
-    immunity, sdt, elements, statuses = key
-    return f'    {{{immunity}u, {c_list(sdt)}, {c_list(elements)}, {c_list(statuses)}}},'
+    immunity, *lists = key
+    return f'    {{{immunity}u, ' + ', '.join(c_list(values) for values in lists) + '},'
 
 
-def c_record(r, resistances: int, placeholders: int, placeholder_respawn: int) -> str:
+def c_record(r, resistances: int, placeholders: int, placeholder_respawn: int, stats: int) -> str:
     return (f"    {{{r['id']}u, {c_string(r['name'])}, {r['minLevel']}, {r['maxLevel']}, {r['flags']}, {r['respawn']}u, "
             f"{r['detects']}, {r['expLevelMod']}, {r['placeholderOf']}u, {placeholders}, {resistances}, {r['drops']}, "
-            f"{placeholder_respawn}u}},")
+            f"{placeholder_respawn}u, {stats}}},")
+
+
+def stat_tables(records):
+    """kMobStats, each distinct run of levels' stats once, a run to a line; kMobStatRuns, where each run starts, after
+    the none at 0 a mob without stats reads; and each record's run."""
+    runs, blocks, starts, indices, first = {(): 0}, [], ['    0u,'], [], 0
+    for r in records:
+        key = tuple(tuple(level) for level in r['stats'])
+        if key not in runs:
+            runs[key] = len(runs)
+            starts.append(f'    {first}u,')
+            blocks.append('    ' + ' '.join(f'{{{c_list(level)}}},' for level in key))
+            first += len(key)
+        indices.append(runs[key])
+    if len(runs) > 0xFFFF:
+        raise DataError(f'{len(runs)} distinct runs of stats do not fit MobRecord::stats')
+    return (['const MobStats kMobStats[] = {'] + blocks + ['};', '', 'const uint32_t kMobStatRuns[] = {'] + starts +
+            ['};', ''], indices, len(runs))
+
+
+def c_item(item) -> str:
+    return (f"    {{{item['id']}, {item['macc']}, {c_list(item['elementMacc'])}, {c_list(item['staffBonus'])}, "
+            f"{item['skill']}}},")
+
+
+def generate_items(items, commit: str) -> str:
+    if not items:
+        raise DataError(f'{ITEMS_NAME} has no items: the dump read none')
+    return '\n'.join([f'// Generated by tools/gen_mobdata.py from data/{ITEMS_NAME} (Phoenix {commit}). Do not edit.',
+                      f'// {len(items)} items, sorted by ID.', 'const ItemMagic kItemMagic[] = {'] +
+                     [c_item(item) for item in items] + ['};', ''])
 
 
 def c_drop(entry) -> str:
@@ -255,15 +337,18 @@ def generate(records, lists, commit: str) -> str:
     for r in records:
         if r['drops'] > len(lists):
             raise DataError(f"mob {r['id']} has drop list {r['drops']}, past the {len(lists)} in {DROPS_NAME}")
+    stats_lines, stats, runs = stat_tables(records)
     lines = [f'// Generated by tools/gen_mobdata.py from data/{TSV_NAME} and data/{DROPS_NAME} (Phoenix {commit}). '
              'Do not edit.',
-             f'// {len(records)} mobs, sorted by server ID, {len(table)} distinct resistances and {len(lists)} distinct '
-             'drop lists.']
+             f'// {len(records)} mobs, sorted by server ID, {len(table)} distinct resistances, {len(lists)} distinct '
+             f'drop lists and {runs - 1} distinct runs of stats.']
     lines += drop_tables(lists)
+    lines += stats_lines
     lines += ['const MobResistances kMobResistances[] = {']
     lines += [c_resistances(key) for key in table]
     lines += ['};', '', 'const MobRecord kMobs[] = {']
-    lines += [c_record(r, index, placeholders[r['id']], returns.get(r['id'], 0)) for r, index in zip(records, indices)]
+    lines += [c_record(r, index, placeholders[r['id']], returns.get(r['id'], 0), run)
+              for r, index, run in zip(records, indices, stats)]
     lines += ['};', '']
     return '\n'.join(lines)
 
@@ -287,8 +372,9 @@ def generate_flags() -> str:
     lines += cpp_enum('MobDetect', 'kDetect', 'uint16_t', Detect)
     lines += ['', "    // Bits of MobResistances::immunity: Phoenix's xi::Immunity."]
     lines += cpp_enum('MobImmunity', 'kImmune', 'uint32_t', Immunity)
-    lines += ['', '    // The order of MobResistances::sdt, ::elementRanks and ::statusRanks.']
-    lines += cpp_order('Sdt', SDT_ORDER) + cpp_order('Element', ELEMENT_ORDER) + cpp_order('StatusRank', STATUS_RANK_ORDER)
+    lines += ['', '    // The order of MobResistances::sdt, its element lists, its status lists and MobStats::value.']
+    lines += (cpp_order('Sdt', SDT_ORDER) + cpp_order('Element', ELEMENT_ORDER) + cpp_order('StatusRank', STATUS_RANK_ORDER)
+              + cpp_order('Stat', STAT_ORDER))
     lines += ['', '    // MobDrop::kind.'] + cpp_order('DropKind', [kind.capitalize() for kind in DROP_KINDS])
     lines += ['}', '']
     return '\n'.join(lines)
@@ -308,14 +394,17 @@ def main() -> int:
     try:
         records = parse((root / 'data' / TSV_NAME).read_text(encoding='utf-8'), str(root / 'data' / TSV_NAME))
         lists = parse_drops((root / 'data' / DROPS_NAME).read_text(encoding='utf-8'), str(root / 'data' / DROPS_NAME))
-        text = generate(records, lists, read_commit(root / 'data' / META_NAME))
+        items = parse_items((root / 'data' / ITEMS_NAME).read_text(encoding='utf-8'), str(root / 'data' / ITEMS_NAME))
+        commit = read_commit(root / 'data' / META_NAME)
+        text, items_text = generate(records, lists, commit), generate_items(items, commit)
     except DataError as error:
         print(f'gen_mobdata: {error}', file=sys.stderr)
         return 1
     generated.mkdir(parents=True, exist_ok=True)
     (generated / 'mobdata.inc').write_text(text, encoding='utf-8')
+    (generated / 'item_magic.inc').write_text(items_text, encoding='utf-8')
     (generated / 'mobflags.h').write_text(generate_flags(), encoding='utf-8')
-    print(f'mobdata: {len(records)} mobs, {len(lists)} drop lists -> {generated}')
+    print(f'mobdata: {len(records)} mobs, {len(lists)} drop lists, {len(items)} items -> {generated}')
     return 0
 
 

@@ -190,3 +190,31 @@ TEST(a_lottery_nm_knows_how_long_its_placeholder_takes_to_come_back)
     CHECK_EQ(MobById(17191194)->placeholderRespawn, 0u);   // a worm itself
     CHECK_EQ(MobById(17199648)->placeholderRespawn, 0u);   // no lottery at all
 }
+
+TEST(a_mob_s_stats_by_level_within_its_range)
+{
+    // Clipper of Qufim Island, levels 28 and 29, has no magic evasion mods: rank C+ at its level (Phoenix's
+    // sql/skill_caps.sql r7) is 80 at 28 and 83 at 29.
+    const MobRecord* clipper = MobById(17293331);
+    CHECK(clipper != nullptr);
+    CHECK(StatsAt(*clipper, 28) != nullptr && StatsAt(*clipper, 29) != nullptr);
+    CHECK_EQ(StatsAt(*clipper, 28)->value[static_cast<int>(Stat::MagicEvasion)], 80);
+    CHECK_EQ(StatsAt(*clipper, 29)->value[static_cast<int>(Stat::MagicEvasion)], 83);
+    CHECK(StatsAt(*clipper, 27) == nullptr && StatsAt(*clipper, 30) == nullptr);
+    CHECK(StatsAt(MobRecord{1, "Mob", 5, 6, 0, 0, 0, 0, 0, 0, 0}, 5) == nullptr); // no run of stats
+}
+
+TEST(what_equipment_adds_to_magic_accuracy)
+{
+    // Phoenix's sql/item_mods.sql: the Ice Staff's ice staff bonus 2 and wind -2; sql/item_weapon.sql: the Cornette is
+    // a wind instrument (skill 42). The Wizard's Petasos adds INT and thunder magic evasion, nothing to accuracy.
+    const ItemMagic* staff = ItemMagicOf(17547);
+    CHECK(staff != nullptr);
+    CHECK_EQ(staff->staffBonus[static_cast<int>(Element::Ice)], 2);
+    CHECK_EQ(staff->staffBonus[static_cast<int>(Element::Wind)], -2);
+    CHECK_EQ(staff->macc, 0);
+    const ItemMagic* cornette = ItemMagicOf(17344);
+    CHECK(cornette != nullptr);
+    CHECK_EQ(cornette->skill, 42);
+    CHECK(ItemMagicOf(13856) == nullptr);
+}

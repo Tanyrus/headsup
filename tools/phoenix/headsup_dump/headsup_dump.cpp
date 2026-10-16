@@ -5,22 +5,27 @@
  * zones have spawned their mobs, it spawns the rest, so every mob runs its
  * spawn script, and watches them all live a while, noting any it sees
  * attacking, then writes every loaded mob, with its immunities, damage
- * taken, resistance ranks and loot, the /check and aggro rules the
- * server loaded and the settings it ran with to $HEADSUP_DUMP_PATH as
- * JSON and exits.
+ * taken, resistance ranks, magic evasion, resist traits, stats at each
+ * level and loot, every item with magic accuracy, the /check and aggro
+ * rules the server loaded and the settings it ran with to
+ * $HEADSUP_DUMP_PATH as JSON and exits.
  ************************************************************************/
 
 #include "common/lua.h"
 #include "map/ai/ai_container.h"
 #include "map/entities/mob_entity.h"
+#include "map/items/item_equipment.h"
+#include "map/items/item_weapon.h"
 #include "map/spawn_slot.h"
 #include "map/utils/charutils.h"
 #include "map/utils/itemutils.h"
+#include "map/utils/mobutils.h"
 #include "map/utils/moduleutils.h"
 #include "map/utils/zoneutils.h"
 #include "map/zone.h"
 
 #include <algorithm>
+#include <array>
 #include <cerrno>
 #include <chrono>
 #include <cstdio>
@@ -56,6 +61,21 @@ namespace
     constexpr xi::Mod kStatusRankMods[] = {xi::Mod::PARALYZE_RES_RANK, xi::Mod::BIND_RES_RANK, xi::Mod::SILENCE_RES_RANK,
         xi::Mod::SLOW_RES_RANK, xi::Mod::POISON_RES_RANK, xi::Mod::LIGHT_SLEEP_RES_RANK, xi::Mod::DARK_SLEEP_RES_RANK,
         xi::Mod::BLIND_RES_RANK, xi::Mod::STUN_RES_RANK, xi::Mod::GRAVITY_RES_RANK};
+    constexpr xi::Mod kElementMevaMods[] = {xi::Mod::FIRE_MEVA, xi::Mod::ICE_MEVA, xi::Mod::WIND_MEVA, xi::Mod::EARTH_MEVA,
+        xi::Mod::THUNDER_MEVA, xi::Mod::WATER_MEVA, xi::Mod::LIGHT_MEVA, xi::Mod::DARK_MEVA};
+    // scripts/data/status_effect_tables.lua's magic evasion and resist trait of each status; both sleeps are SLEEP_I's.
+    constexpr xi::Mod kStatusMevaMods[] = {xi::Mod::PARALYZE_MEVA, xi::Mod::BIND_MEVA, xi::Mod::SILENCE_MEVA,
+        xi::Mod::SLOW_MEVA, xi::Mod::POISON_MEVA, xi::Mod::SLEEP_MEVA, xi::Mod::SLEEP_MEVA, xi::Mod::BLIND_MEVA,
+        xi::Mod::STUN_MEVA, xi::Mod::GRAVITY_MEVA};
+    constexpr xi::Mod kStatusResistMods[] = {xi::Mod::PARALYZERES, xi::Mod::BINDRES, xi::Mod::SILENCERES, xi::Mod::SLOWRES,
+        xi::Mod::POISONRES, xi::Mod::SLEEPRES, xi::Mod::SLEEPRES, xi::Mod::BLINDRES, xi::Mod::STUNRES, xi::Mod::GRAVITYRES};
+    constexpr xi::Mod kElementMaccMods[] = {xi::Mod::FIRE_MACC, xi::Mod::ICE_MACC, xi::Mod::WIND_MACC, xi::Mod::EARTH_MACC,
+        xi::Mod::THUNDER_MACC, xi::Mod::WATER_MACC, xi::Mod::LIGHT_MACC, xi::Mod::DARK_MACC};
+    constexpr xi::Mod kStaffBonusMods[] = {xi::Mod::FIRE_STAFF_BONUS, xi::Mod::ICE_STAFF_BONUS, xi::Mod::WIND_STAFF_BONUS,
+        xi::Mod::EARTH_STAFF_BONUS, xi::Mod::THUNDER_STAFF_BONUS, xi::Mod::WATER_STAFF_BONUS, xi::Mod::LIGHT_STAFF_BONUS,
+        xi::Mod::DARK_STAFF_BONUS};
+    // In tools/gen_mobdata.py's STAT_ORDER: STR to CHR as the magic hit rate reads them (getStat), and magic evasion.
+    using Stats = std::array<int, 8>;
 
     template <size_t N>
     void WriteMods(FILE* out, const char* key, CMobEntity* PMob, const xi::Mod (&mods)[N])
@@ -64,6 +84,84 @@ namespace
         for (size_t i = 0; i < N; ++i)
             std::fprintf(out, "%s%d", i ? "," : "", static_cast<int>(PMob->getMod(mods[i])));
         std::fputs("]", out);
+    }
+
+    // Each status's value with what every status shares added, as the magic hit rate and the resist trait roll add it.
+    template <size_t N>
+    void WriteModsWith(FILE* out, const char* key, CMobEntity* PMob, const xi::Mod (&mods)[N], xi::Mod shared)
+    {
+        std::fprintf(out, ",\"%s\":[", key);
+        for (size_t i = 0; i < N; ++i)
+            std::fprintf(out, "%s%d", i ? "," : "", static_cast<int>(PMob->getMod(mods[i]) + PMob->getMod(shared)));
+        std::fputs("]", out);
+    }
+
+    Stats StatsOf(CMobEntity* PMob)
+    {
+        return {PMob->STR(), PMob->DEX(), PMob->VIT(), PMob->AGI(), PMob->INT(), PMob->MND(), PMob->CHR(),
+            PMob->getMod(xi::Mod::MEVA)};
+    }
+
+    // What the server's calculation gives at a level, set as CMobEntity::Spawn sets it.
+    Stats CalculatedAt(CMobEntity* PMob, uint8 level)
+    {
+        PMob->TraitList.clear();
+        PMob->SetMLevel(level);
+        PMob->SetSLevel(level);
+        mobutils::CalculateMobStats(PMob, false);
+        return StatsOf(PMob);
+    }
+
+    // Its stats at each level of its range from minLevel, with what its SQL mods and spawn script added at the level it
+    // spawned at; none for a mob whose script sets its level. It recalculates the mob, so it comes last in its record.
+    void WriteLevelStats(FILE* out, CMobEntity* PMob)
+    {
+        std::fputs(",\"stats\":[", out);
+        const uint8 spawned = PMob->GetMLevel();
+        if (PMob->m_minLevel > 0 && spawned > 0)
+        {
+            const Stats seen       = StatsOf(PMob);
+            const Stats calculated = CalculatedAt(PMob, spawned);
+            for (int level = PMob->m_minLevel; level <= PMob->m_maxLevel; ++level)
+            {
+                const Stats at = CalculatedAt(PMob, static_cast<uint8>(level));
+                std::fputs(level == PMob->m_minLevel ? "[" : ",[", out);
+                for (size_t i = 0; i < at.size(); ++i)
+                    std::fprintf(out, "%s%d", i ? "," : "", at[i] + seen[i] - calculated[i]);
+                std::fputs("]", out);
+            }
+        }
+        std::fputs("]", out);
+    }
+
+    // Every piece of equipment the magic hit rate reads: its magic accuracy, each element's and each elemental staff
+    // bonus, and an instrument's skill, as songs add a wind instrument's.
+    void WriteItems(FILE* out)
+    {
+        std::fputs("\"items\":[", out);
+        bool first = true;
+        for (uint32 id = 0; id < MAX_ITEMID; ++id)
+        {
+            const auto* item = xi::items::lookup<CItemEquipment>(static_cast<uint16>(id));
+            if (item == nullptr) continue;
+            const auto* weapon  = dynamic_cast<const CItemWeapon*>(item);
+            const auto skill    = weapon != nullptr ? weapon->getSkillType() : xi::SkillType::None;
+            const bool instrument = skill == xi::SkillType::WindInstrument || skill == xi::SkillType::StringInstrument;
+            bool any            = instrument || item->getModifier(xi::Mod::MACC) != 0;
+            for (size_t i = 0; i < std::size(kElementMaccMods); ++i)
+                any = any || item->getModifier(kElementMaccMods[i]) != 0 || item->getModifier(kStaffBonusMods[i]) != 0;
+            if (!any) continue;
+            std::fprintf(out, "%s\n{\"id\":%u,\"macc\":%d,\"elementMacc\":[", first ? "" : ",", id,
+                static_cast<int>(item->getModifier(xi::Mod::MACC)));
+            first = false;
+            for (size_t i = 0; i < std::size(kElementMaccMods); ++i)
+                std::fprintf(out, "%s%d", i ? "," : "", static_cast<int>(item->getModifier(kElementMaccMods[i])));
+            std::fputs("],\"staffBonus\":[", out);
+            for (size_t i = 0; i < std::size(kStaffBonusMods); ++i)
+                std::fprintf(out, "%s%d", i ? "," : "", static_cast<int>(item->getModifier(kStaffBonusMods[i])));
+            std::fprintf(out, "],\"skill\":%d}", instrument ? static_cast<int>(skill) : 0);
+        }
+        std::fputs("\n]", out);
     }
 
     std::string JsonEscape(const std::string& text)
@@ -363,9 +461,13 @@ class HeadsUpDumpModule : public CPPModule
                 WriteMods(out, "sdt", PMob, kSdtMods);
                 WriteMods(out, "elementRanks", PMob, kElementRankMods);
                 WriteMods(out, "statusRanks", PMob, kStatusRankMods);
+                WriteMods(out, "elementMeva", PMob, kElementMevaMods);
+                WriteModsWith(out, "statusMeva", PMob, kStatusMevaMods, xi::Mod::STATUS_MEVA);
+                WriteModsWith(out, "statusResist", PMob, kStatusResistMods, xi::Mod::STATUSRES);
                 if (const auto seen = seenAttacking.find(PMob); seen != seenAttacking.end())
                     std::fprintf(out, ",\"seenAttacking\":{\"aggro\":%s,\"alwaysAggro\":%d,\"noAggro\":%d}",
                         seen->second.aggro ? "true" : "false", seen->second.alwaysAggro, seen->second.noAggro);
+                WriteLevelStats(out, PMob);
                 std::fputs("}", out);
                 anyMob = PMob;
                 ++count;
@@ -378,6 +480,8 @@ class HeadsUpDumpModule : public CPPModule
         }
         std::fputs("\n],\n", out);
         WriteDropLists(out, dropLists);
+        std::fputs(",\n", out);
+        WriteItems(out);
         std::fputs(",\n", out);
         WriteRules(out, anyMob);
         std::fputs(",\n", out);

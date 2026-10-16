@@ -8,15 +8,26 @@
 
 namespace headsup
 {
-    // A mob's immunities (MobImmunity bits), damage taken per type (sdt: damage is multiplied by 1 + sdt / 10000) and
-    // elemental and status resistance ranks (Phoenix clamps them to -3..11), in mobflags.h's Sdt, Element and StatusRank
-    // orders.
+    // A mob's immunities (MobImmunity bits), damage taken per type (sdt: damage is multiplied by 1 + sdt / 10000),
+    // elemental and status resistance ranks (Phoenix clamps them to -3..11), magic evasion against each element and
+    // status, and each status's resist trait (the chance it resists outright, past its first 5), in mobflags.h's Sdt,
+    // Element and StatusRank orders. A status's magic evasion and resist trait include what every status shares.
     struct MobResistances
     {
         uint32_t immunity;
         int16_t sdt[kSdtCount];
         int8_t elementRanks[kElementCount];
         int8_t statusRanks[kStatusRankCount];
+        int16_t elementMeva[kElementCount];
+        int16_t statusMeva[kStatusRankCount];
+        int16_t statusResist[kStatusRankCount];
+    };
+
+    // A mob's stats at one level, in mobflags.h's Stat order: STR to CHR as the magic hit rate reads them, then its
+    // magic evasion, which its rank multiplies.
+    struct MobStats
+    {
+        int16_t value[kStatCount];
     };
 
     // One mob as Phoenix's map server loads it (tools/phoenix/refresh.sh).
@@ -35,6 +46,18 @@ namespace headsup
         uint16_t resistances;   // index into the table ResistancesOf reads; 0 is neutral
         uint16_t drops = 0;     // index into the lists DropsOf reads; 0 is none
         uint32_t placeholderRespawn = 0; // an NM's: seconds its placeholder takes to return after it despawns; 0 if none
+        uint16_t stats = 0;              // index into the runs StatsAt reads, a level each from minLevel; 0 is none
+    };
+
+    // What a piece of equipment adds to magic accuracy: its own, each element's and each elemental staff bonus (ten
+    // magic accuracy a point), in Element order, and an instrument's skill (Phoenix's skill type, 0 for any other).
+    struct ItemMagic
+    {
+        uint16_t id;
+        int16_t macc;
+        int16_t elementMacc[kElementCount];
+        int16_t staffBonus[kElementCount];
+        uint8_t skill;
     };
 
     // One entry of a mob's drop list, as the server loaded it. Rates are per mille (1000 is always) and are tiers, not
@@ -69,6 +92,12 @@ namespace headsup
 
     // Its resistances; the neutral set when its index is past the table.
     const MobResistances& ResistancesOf(const MobRecord& mob);
+
+    // Its stats at a level of its range; nullptr when the data has none for it or the level is outside the range.
+    const MobStats* StatsAt(const MobRecord& mob, int level);
+
+    // What a piece of equipment adds to magic accuracy; nullptr for one that adds nothing.
+    const ItemMagic* ItemMagicOf(uint16_t itemId);
 
     // Its drop list in the server's order, the ungrouped entries first; empty when it has no loot or its index is past
     // the table.

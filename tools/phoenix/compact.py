@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Turn one or more headsup_dump JSON files of the same server into phoenix_mobs.tsv, phoenix_drops.tsv,
-phoenix_mobs.meta and phoenix_rules.json.
+phoenix_items.tsv, phoenix_mobs.meta and phoenix_rules.json.
 
 Usage: compact.py LIVE_SETTINGS DUMP_JSON [DUMP_JSON ...] OUT_DIR PHOENIX_COMMIT
 
 Some mobs change aggression while the server runs (elementals, the Ghrah forms), so one dump is one snapshot. With
 several dumps a mob counts as aggressive if any of them saw it attack, so an aggressive mob is never painted safe.
-Every dump must carry the same rules, and the server must have run with every value LIVE_SETTINGS (refresh.sh's
+Every dump must carry the same rules and items, and the server must have run with every value LIVE_SETTINGS (refresh.sh's
 live_settings.lua) sets. A mob's drop list comes from the first dump that has the mob, like the rest of its
 record, and compact names any mob whose list differs in a later dump.
 """
@@ -24,7 +24,7 @@ MobFlag = schema.MobFlag
 MOBTYPE_NOTORIOUS = 0x02  # Phoenix data/enums/mob_type.yaml
 MOB_KEYS = {'id', 'zone', 'name', 'minLevel', 'maxLevel', 'respawn', 'aggro', 'alwaysAggro', 'noAggro', 'type', 'link',
             'detects', 'trueDetection', 'expLevelMod', 'follows', 'placeholderOf', 'immunity', 'sdt', 'elementRanks',
-            'statusRanks'}
+            'statusRanks', 'elementMeva', 'statusMeva', 'statusResist', 'stats'}
 AGGRO_FIELDS = ('aggro', 'alwaysAggro', 'noAggro')
 # Phoenix's DROP_TYPE (src/map/utils/itemutils.h): a grouped entry only appears inside a group, and is a drop.
 DROP_KIND_OF_TYPE = {0x00: 'drop', 0x02: 'steal', 0x04: 'despoil'}
@@ -67,13 +67,17 @@ def attacks(mob) -> bool:
 
 
 def merge(snapshots, differing=None):
-    """One record per mob ID. The level range spans every snapshot, the aggro fields come from the first snapshot in
-    which the mob attacks, as dumped or as the dump saw it at some moment of its run (seenAttacking), and the rest
-    comes from the first snapshot that has the mob. The IDs of mobs whose loot differs in a later snapshot go into
-    differing."""
-    merged = {}
+    """One record per mob ID. The level range spans every snapshot, the stats of each level come from the first
+    snapshot with that level (none at all unless every level of the range has some), the aggro fields come from the
+    first snapshot in which the mob attacks, as dumped or as the dump saw it at some moment of its run (seenAttacking),
+    and the rest comes from the first snapshot that has the mob. The IDs of mobs whose loot differs in a later snapshot
+    go into differing."""
+    merged, levels = {}, {}
     for snapshot in snapshots:
         for mob in snapshot:
+            known = levels.setdefault(mob['id'], {})
+            for level, stats in zip(range(mob['minLevel'], mob['maxLevel'] + 1), mob['stats']):
+                known.setdefault(level, stats)
             first = merged.get(mob['id'])
             if first is None:
                 first = merged[mob['id']] = dict(mob)
@@ -87,6 +91,9 @@ def merge(snapshots, differing=None):
                 if sample is not None and not attacks(first) and attacks(sample):
                     for field in AGGRO_FIELDS:
                         first[field] = sample[field]
+    for mob_id, mob in merged.items():
+        span = range(mob['minLevel'], mob['maxLevel'] + 1)
+        mob['stats'] = [levels[mob_id][level] for level in span] if all(level in levels[mob_id] for level in span) else []
     return list(merged.values())
 
 
@@ -129,7 +136,14 @@ def drops_text(mobs) -> str:
 
 
 def cell(value) -> str:
+    if isinstance(value, list) and value and isinstance(value[0], list):
+        return schema.LEVEL_SEPARATOR.join(cell(level) for level in value)
     return ','.join(str(v) for v in value) if isinstance(value, list) else str(value)
+
+
+def items_text(items) -> str:
+    return '\t'.join(schema.ITEM_COLUMNS) + '\n' + ''.join(
+        '\t'.join(cell(item[column]) for column in schema.ITEM_COLUMNS) + '\n' for item in sorted(items, key=lambda i: i['id']))
 
 
 def row(mob) -> str:
@@ -201,7 +215,7 @@ def load(path, settings):
     except json.JSONDecodeError as error:
         raise schema.DataError(f'{path}: not a complete dump ({error}); delete it and refresh again') from error
     try:
-        mobs, rules = dump['mobs'], dump_rules(dump['rules'], path)
+        mobs, rules, items = dump['mobs'], dump_rules(dump['rules'], path), dump['items']
         lists = [drop_list(raw, f'{path}: drop list {index}') for index, raw in enumerate(dump['dropLists'])]
     except (KeyError, TypeError) as error:
         raise schema.DataError(f'{path}: not a dump this compact.py reads ({error!r})') from error
@@ -214,14 +228,14 @@ def load(path, settings):
         if index is not None and (type(index) is not int or not 0 <= index < len(lists)):
             raise schema.DataError(f"{path}: mob {mob['id']} has drop list {index!r}, past the {len(lists)} dumped")
         mob['loot'] = () if index is None else lists[index]
-    return mobs, rules
+    return mobs, rules, items
 
 
-def agreed_rules(dump_paths, rules):
-    for path, other in zip(dump_paths[1:], rules[1:]):
-        if other != rules[0]:
-            raise schema.DataError(f'{path}: its rules differ from those of {dump_paths[0]}')
-    return rules[0]
+def agreed(dump_paths, values, what):
+    for path, other in zip(dump_paths[1:], values[1:]):
+        if other != values[0]:
+            raise schema.DataError(f'{path}: its {what} differ from those of {dump_paths[0]}')
+    return values[0]
 
 
 def compact(dump_paths, out_dir, commit, settings_path):
@@ -229,7 +243,7 @@ def compact(dump_paths, out_dir, commit, settings_path):
     settings = live_settings(settings_path.read_text(encoding='utf-8'), settings_path.name)
     snapshots = [load(path, settings) for path in dump_paths]
     differing = set()
-    mobs = sorted(merge((dump_mobs for dump_mobs, _ in snapshots), differing), key=lambda m: m['id'])
+    mobs = sorted(merge((dump_mobs for dump_mobs, _, _ in snapshots), differing), key=lambda m: m['id'])
     if differing:
         shown = ', '.join(str(i) for i in sorted(differing)[:DIFFERING_SHOWN])
         print(f'compact: {len(differing)} mobs have another drop list in a later dump, kept the first: {shown}'
@@ -237,12 +251,15 @@ def compact(dump_paths, out_dir, commit, settings_path):
     drops = drops_text(mobs)
     text = '\t'.join(schema.COLUMNS) + '\n' + '\n'.join(row(m) for m in mobs) + '\n'
     schema.generate(schema.parse(text, schema.TSV_NAME), schema.parse_drops(drops, schema.DROPS_NAME), commit)
-    rules_text = gen_rules.format_rules(agreed_rules(dump_paths, [rules for _, rules in snapshots]))
+    items = items_text(agreed(dump_paths, [items for _, _, items in snapshots], 'items'))
+    schema.generate_items(schema.parse_items(items, schema.ITEMS_NAME), commit)
+    rules_text = gen_rules.format_rules(agreed(dump_paths, [rules for _, rules, _ in snapshots], 'rules'))
     gen_rules.parse(rules_text, gen_rules.RULES_NAME)
     out_dir = pathlib.Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / schema.TSV_NAME).write_text(text, encoding='utf-8')
     (out_dir / schema.DROPS_NAME).write_text(drops, encoding='utf-8')
+    (out_dir / schema.ITEMS_NAME).write_text(items, encoding='utf-8')
     (out_dir / gen_rules.RULES_NAME).write_text(rules_text, encoding='utf-8')
     zones = len({m['zone'] for m in mobs})
     generated = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')

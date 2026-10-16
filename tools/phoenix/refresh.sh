@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Regenerate data/phoenix_mobs.tsv, data/phoenix_drops.tsv and data/phoenix_rules.json from Phoenix's own map server,
-# and data/phoenix_zones.tsv, data/phoenix_weather.tsv and data/phoenix_titles.tsv from its checkout; data/ is only written
-# when all of them pass. It clones Phoenix at PHOENIX_COMMIT with its patches and mesh submodules (not the staff-only
-# phoenix_ac), builds the map server with the headsup_dump module, loads Phoenix's database into a private MariaDB, runs
-# the server with live's settings (live_settings.lua) until the module has dumped every loaded mob and the /check and
-# aggro rules HEADSUP_PHOENIX_DUMPS times,
-# then merges every dump kept for this commit and validates it. zones.py reads the zones, regions and weather calendars,
-# and titles.py the title names, from the checkout's sources alone.
+# Regenerate data/phoenix_mobs.tsv, data/phoenix_drops.tsv, data/phoenix_items.tsv and data/phoenix_rules.json from
+# Phoenix's own map server, and data/phoenix_zones.tsv, data/phoenix_weather.tsv and data/phoenix_titles.tsv from its
+# checkout; data/ is only written when all of them pass. It clones Phoenix at PHOENIX_COMMIT with its patches and mesh
+# submodules (not the staff-only phoenix_ac), builds the map server with the headsup_dump module, loads Phoenix's
+# database into a private MariaDB, runs the server with live's settings (live_settings.lua) until the module has dumped
+# every loaded mob, every item with magic accuracy and the /check and aggro rules HEADSUP_PHOENIX_DUMPS times, then
+# merges every dump kept for this commit and validates it. zones.py reads the zones, regions and weather calendars, and
+# titles.py the title names, from the checkout's sources alone.
 # A mob counts as aggressive if any run saw it attack: some change aggression while the server runs.
 #
 #   HEADSUP_PHOENIX_DIR        work folder, default ~/.cache/headsup-phoenix (about 6 GB; never under /tmp)
@@ -25,6 +25,9 @@ DB_NAME=xidb
 DB_USER=xi
 DB_PASSWORD=xi
 MAP_TIMEOUT=1200 # seconds for one server run to write its dump
+# The dump's tick recalculates every mob's stats at each level of its range, far past the 2 s the map server's
+# watchdog lets one tick take before it kills the server; a run is held to MAP_TIMEOUT instead.
+DUMP_WATCHDOG_MS=$((MAP_TIMEOUT * 1000))
 VANADIEL_DAY=3456 # real seconds in a Vana'diel day: 24 hours of 144 s
 DUMPS="${HEADSUP_PHOENIX_DUMPS:-5}"
 COMMIT="$(tr -d '[:space:]' < "$ROOT/tools/phoenix/PHOENIX_COMMIT")"
@@ -149,6 +152,7 @@ for run in $(seq "$DUMPS"); do
     log "running xi_map until dump $run of $DUMPS is written (clock +${offset}s)"
     status=0
     (cd "$SERVER" && timeout "$MAP_TIMEOUT" faketime -f "+${offset}" env HEADSUP_DUMP_PATH="$dump.part" \
+        XI_MAIN_INACTIVITY_WATCHDOG_PERIOD="$DUMP_WATCHDOG_MS" \
         ./xi_map --ip "$HOST" --port "$MAP_PORT" < /dev/null > "$WORK/map.log" 2>&1) || status=$?
     if [ "$status" -ne 0 ] || [ ! -s "$dump.part" ]; then
         rm -f "$dump.part"
@@ -170,7 +174,8 @@ python3 "$ROOT/tools/phoenix/titles.py" "$SERVER" "$STAGE" ||
 python3 "$ROOT/tools/phoenix/validate.py" "$STAGE/phoenix_mobs.tsv" "$STAGE/phoenix_rules.json" \
     "$STAGE/phoenix_drops.tsv" || fail "validation; data/ left unchanged"
 mkdir -p "$ROOT/data"
-cp "$STAGE/phoenix_mobs.tsv" "$STAGE/phoenix_mobs.meta" "$STAGE/phoenix_drops.tsv" "$STAGE/phoenix_rules.json" \
-    "$STAGE/phoenix_zones.tsv" "$STAGE/phoenix_weather.tsv" "$STAGE/phoenix_titles.tsv" "$ROOT/data/"
-log "data/phoenix_mobs.tsv, .meta, phoenix_drops.tsv, phoenix_rules.json, phoenix_zones.tsv, phoenix_weather.tsv and" \
-    "phoenix_titles.tsv updated"
+cp "$STAGE/phoenix_mobs.tsv" "$STAGE/phoenix_mobs.meta" "$STAGE/phoenix_drops.tsv" "$STAGE/phoenix_items.tsv" \
+    "$STAGE/phoenix_rules.json" "$STAGE/phoenix_zones.tsv" "$STAGE/phoenix_weather.tsv" "$STAGE/phoenix_titles.tsv" \
+    "$ROOT/data/"
+log "data/phoenix_mobs.tsv, .meta, phoenix_drops.tsv, phoenix_items.tsv, phoenix_rules.json, phoenix_zones.tsv," \
+    "phoenix_weather.tsv and phoenix_titles.tsv updated"

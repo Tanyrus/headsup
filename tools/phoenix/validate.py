@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Check phoenix_mobs.tsv and phoenix_drops.tsv against spawns whose values are known, and phoenix_rules.json against
-rules whose values are known. Exit 1 on any failure.
+"""Check phoenix_mobs.tsv and phoenix_drops.tsv against spawns whose values are known, phoenix_items.tsv against items
+whose values are known, and phoenix_rules.json against rules whose values are known. Exit 1 on any failure.
 
 Usage: validate.py PHOENIX_MOBS_TSV PHOENIX_RULES_JSON [PHOENIX_DROPS_TSV]
 
-PHOENIX_DROPS_TSV defaults to the phoenix_drops.tsv beside PHOENIX_MOBS_TSV.
+PHOENIX_DROPS_TSV defaults to the phoenix_drops.tsv beside PHOENIX_MOBS_TSV; phoenix_items.tsv is read from beside it.
 """
 import pathlib
 import sys
@@ -26,6 +26,23 @@ MIN_MOBS, MIN_ZONES = 60000, 200
 # Phoenix, so fewer means the dump read those columns before they were set.
 MIN_RESISTING = 1000
 STRONG_RANK = 4
+# Mobs with stats: all but the few whose level a script sets (about 1,600 of 65,000), so fewer means the dump lost them.
+MIN_WITH_STATS = 55000
+# id: its magic evasion at each level, from minLevel. Clipper of Qufim Island, 28 and 29, has no magic evasion mods:
+# rank C+ at its level (Phoenix's sql/skill_caps.sql r7, mobutils::GetMagicEvasion).
+EXPECTED_MAGIC_EVASION = {
+    17293331: [80, 83],
+}
+MAGIC_EVASION = schema.STAT_ORDER.index('MagicEvasion')
+# Items with magic accuracy, an element's, an elemental staff bonus or an instrument's skill: about 1,400 in Phoenix's
+# sql/item_mods.sql and sql/item_weapon.sql, so fewer means the dump missed whole kinds.
+MIN_ITEMS = 1000
+ICE_STAFF, CORNETTE = 17547, 17344  # Phoenix sql/item_basic.sql
+# id: the item as phoenix_items.tsv has it, from sql/item_mods.sql and sql/item_weapon.sql (a wind instrument is 42).
+EXPECTED_ITEMS = {
+    ICE_STAFF: {'id': ICE_STAFF, 'macc': 0, 'elementMacc': [0] * 8, 'staffBonus': [0, 2, -2, 0, 0, 0, 0, 0], 'skill': 0},
+    CORNETTE: {'id': CORNETTE, 'macc': 0, 'elementMacc': [0] * 8, 'staffBonus': [0] * 8, 'skill': 42},
+}
 # id: EXP_LVL_MOD, set by the mob's spawn script
 EXPECTED_LEVEL_MODS = {
     17190918: -2,  # Wild Rabbit, scripts/zones/East_Ronfaure/mobs/Wild_Rabbit.lua
@@ -66,7 +83,7 @@ def load(path):
     return {r['id']: r for r in schema.parse(pathlib.Path(path).read_text(encoding='utf-8'), str(path))}
 
 
-def check(records, min_mobs=MIN_MOBS, min_zones=MIN_ZONES, min_resisting=MIN_RESISTING):
+def check(records, min_mobs=MIN_MOBS, min_zones=MIN_ZONES, min_resisting=MIN_RESISTING, min_with_stats=MIN_WITH_STATS):
     problems = []
     if len(records) < min_mobs:
         problems.append(f'only {len(records)} mobs (expected at least {min_mobs})')
@@ -101,6 +118,14 @@ def check(records, min_mobs=MIN_MOBS, min_zones=MIN_ZONES, min_resisting=MIN_RES
     for what, count in counts.items():
         if count < min_resisting:
             problems.append(f'only {count} mobs with {what} (expected at least {min_resisting})')
+    with_stats = sum(1 for r in records.values() if r['stats'])
+    if with_stats < min_with_stats:
+        problems.append(f'only {with_stats} mobs with stats (expected at least {min_with_stats})')
+    for mob_id, expected in EXPECTED_MAGIC_EVASION.items():
+        r = records.get(mob_id)
+        got = None if r is None else [level[MAGIC_EVASION] for level in r['stats']]
+        if got != expected:
+            problems.append(f"{mob_id} {'' if r is None else r['name']}: expected magic evasion {expected}, got {got}")
     for (zone, name), bits in EXPECTED_IMMUNITIES.items():
         found = [r for r in records.values() if r['zone'] == zone and r['name'] == name]
         if not found:
@@ -149,6 +174,19 @@ def check_drops(records, lists, min_looting=MIN_LOOTING, min_lists=MIN_DROP_LIST
     return problems
 
 
+def check_items(items, min_items=MIN_ITEMS):
+    problems = []
+    if len(items) < min_items:
+        problems.append(f'only {len(items)} items with magic accuracy or an instrument (expected at least {min_items})')
+    by_id = {item['id']: item for item in items}
+    for item_id, expected in EXPECTED_ITEMS.items():
+        if item_id not in by_id:
+            problems.append(f'item {item_id}: missing')
+        elif by_id[item_id] != expected:
+            problems.append(f'item {item_id}: expected {expected}, got {by_id[item_id]}')
+    return problems
+
+
 def check_rules(rules):
     problems = []
     even = rules['baseExp'][-rules['firstDifference']] if 0 <= -rules['firstDifference'] < len(rules['baseExp']) else None
@@ -168,7 +206,9 @@ def main(argv) -> int:
         drops_path = pathlib.Path(argv[3] if len(argv) == 4 else pathlib.Path(argv[1]).parent / schema.DROPS_NAME)
         records = load(argv[1])
         lists = schema.parse_drops(drops_path.read_text(encoding='utf-8'), str(drops_path))
-        problems = (check(records) + check_drops(records, lists) +
+        items_path = pathlib.Path(argv[1]).parent / schema.ITEMS_NAME
+        items = schema.parse_items(items_path.read_text(encoding='utf-8'), str(items_path))
+        problems = (check(records) + check_drops(records, lists) + check_items(items) +
                     check_rules(gen_rules.parse(rules_path.read_text(encoding='utf-8'), str(rules_path))))
     except schema.DataError as error:
         problems = [str(error)]

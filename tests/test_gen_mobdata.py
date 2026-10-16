@@ -7,13 +7,19 @@ from tooling import load
 gen = load('tools/gen_mobdata.py')
 
 HEADER = ('id\tzone\tname\tminLevel\tmaxLevel\tflags\trespawn\tdetects\texpLevelMod\tplaceholderOf\t'
-          'immunity\tsdt\telementRanks\tstatusRanks\tdrops')
-NEUTRAL = '\t0\t' + ','.join(['0'] * 12) + '\t' + ','.join(['0'] * 8) + '\t' + ','.join(['0'] * 10) + '\t0'
-DOMAN = ('\t12312\t0,2500,0,0,0,0,0,0,0,0,0,0\t-2,-2,-2,-2,-2,-2,-3,4\t0,0,0,0,0,6,6,0,0,0')
+          'immunity\tsdt\telementRanks\tstatusRanks\telementMeva\tstatusMeva\tstatusResist\tstats\tdrops')
+NEUTRAL = ('\t0\t' + ','.join(['0'] * 12) + '\t' + ','.join(['0'] * 8) + '\t' + ','.join(['0'] * 10) + '\t' +
+           ','.join(['0'] * 8) + '\t' + ','.join(['0'] * 10) + '\t' + ','.join(['0'] * 10) + '\t\t0')
+DOMAN = ('\t12312\t0,2500,0,0,0,0,0,0,0,0,0,0\t-2,-2,-2,-2,-2,-2,-3,4\t0,0,0,0,0,6,6,0,0,0'
+         '\t0,15,0,0,0,0,0,-20\t0,0,0,0,0,30,30,0,0,0\t0,0,0,0,0,25,25,0,0,0')
+# A level's STR, DEX, VIT, AGI, INT, MND, CHR and magic evasion.
+WORM_STATS = '7,6,7,5,4,4,4,16;8,7,8,6,5,5,5,19'
+GOBLIN_STATS = ';'.join(f'{20 + n},{18 + n},{19 + n},{17 + n},{15 + n},{15 + n},{14 + n},{60 + 3 * n}' for n in range(4))
 GOOD = (HEADER + '\n17190918\t101\tWild Rabbit\t1\t1\t0\t60\t257\t-2\t0' + NEUTRAL + '\n'
-        '17191194\t101\tCarrion Worm\t4\t5\t0\t180\t2\t0\t17191196' + DOMAN + '\t1\n'
-        '17199648\t103\tGoblin Bounty Hunter\t17\t20\t161\t300\t259\t0\t0' + DOMAN + '\t2\n')
-ZEROS = {'immunity': 0, 'sdt': [0] * 12, 'elementRanks': [0] * 8, 'statusRanks': [0] * 10, 'drops': 0}
+        '17191194\t101\tCarrion Worm\t4\t5\t0\t180\t2\t0\t17191196' + DOMAN + '\t' + WORM_STATS + '\t1\n'
+        '17199648\t103\tGoblin Bounty Hunter\t17\t20\t161\t300\t259\t0\t0' + DOMAN + '\t' + GOBLIN_STATS + '\t2\n')
+ZEROS = {'immunity': 0, 'sdt': [0] * 12, 'elementRanks': [0] * 8, 'statusRanks': [0] * 10, 'elementMeva': [0] * 8,
+         'statusMeva': [0] * 10, 'statusResist': [0] * 10, 'stats': [], 'drops': 0}
 DROPS_HEADER = 'list\tkind\tgroup\tgroupRate\titem\trate'
 # The Carrion Worm's list (East Ronfaure) and a goblin's with a group, ids from Phoenix's sql/item_basic.sql.
 DROPS = (DROPS_HEADER + '\n1\tdrop\t0\t0\t768\t150\n1\tsteal\t0\t0\t17296\t0\n1\tdespoil\t0\t0\t640\t0\n'
@@ -21,7 +27,8 @@ DROPS = (DROPS_HEADER + '\n1\tdrop\t0\t0\t768\t150\n1\tsteal\t0\t0\t17296\t0\n1\
          '2\tdrop\t2\t50\t4496\t1\n')
 LISTS = gen.parse_drops(DROPS)
 DOMAN_VALUES = {'immunity': 12312, 'sdt': [0, 2500] + [0] * 10, 'elementRanks': [-2] * 6 + [-3, 4],
-                'statusRanks': [0] * 5 + [6, 6] + [0] * 3}
+                'statusRanks': [0] * 5 + [6, 6] + [0] * 3, 'elementMeva': [0, 15, 0, 0, 0, 0, 0, -20],
+                'statusMeva': [0] * 5 + [30, 30] + [0] * 3, 'statusResist': [0] * 5 + [25, 25] + [0] * 3}
 
 
 class Parse(unittest.TestCase):
@@ -30,10 +37,11 @@ class Parse(unittest.TestCase):
             dict({'id': 17190918, 'zone': 101, 'name': 'Wild Rabbit', 'minLevel': 1, 'maxLevel': 1, 'flags': 0,
                   'respawn': 60, 'detects': 257, 'expLevelMod': -2, 'placeholderOf': 0}, **ZEROS),
             dict({'id': 17191194, 'zone': 101, 'name': 'Carrion Worm', 'minLevel': 4, 'maxLevel': 5, 'flags': 0,
-                  'respawn': 180, 'detects': 2, 'expLevelMod': 0, 'placeholderOf': 17191196, 'drops': 1},
-                 **DOMAN_VALUES),
+                  'respawn': 180, 'detects': 2, 'expLevelMod': 0, 'placeholderOf': 17191196, 'drops': 1,
+                  'stats': [[7, 6, 7, 5, 4, 4, 4, 16], [8, 7, 8, 6, 5, 5, 5, 19]]}, **DOMAN_VALUES),
             dict({'id': 17199648, 'zone': 103, 'name': 'Goblin Bounty Hunter', 'minLevel': 17, 'maxLevel': 20,
-                  'flags': 161, 'respawn': 300, 'detects': 259, 'expLevelMod': 0, 'placeholderOf': 0, 'drops': 2},
+                  'flags': 161, 'respawn': 300, 'detects': 259, 'expLevelMod': 0, 'placeholderOf': 0, 'drops': 2,
+                  'stats': [[20 + n, 18 + n, 19 + n, 17 + n, 15 + n, 15 + n, 14 + n, 60 + 3 * n] for n in range(4)]},
                  **DOMAN_VALUES)])
 
     def assertBadRow(self, row, message):
@@ -43,7 +51,7 @@ class Parse(unittest.TestCase):
         self.assertIn(message, str(caught.exception))
 
     def test_bad_rows_name_their_line(self):
-        self.assertBadRow('1\t103\tA\t1\t2\t0\t0\t0\t0', 'expected 15 columns')
+        self.assertBadRow('1\t103\tA\t1\t2\t0\t0\t0\t0', 'expected 19 columns')
         self.assertBadRow('1\t103\t\t1\t2\t0\t0\t0\t0\t0' + NEUTRAL, 'empty name')
         self.assertBadRow('1\t103\tA\t1\t300\t0\t0\t0\t0\t0' + NEUTRAL, 'maxLevel must be')
         self.assertBadRow('1\t103\tA\t-1\t2\t0\t0\t0\t0\t0' + NEUTRAL, 'minLevel must be')
@@ -62,10 +70,22 @@ class Parse(unittest.TestCase):
                           'sdt must be 12 whole numbers from -32768 to 32767')
         self.assertBadRow(base + '\t0\t' + ','.join(['0'] * 11) + ',40000' + NEUTRAL[NEUTRAL.index('\t', 3):],
                           'sdt must be 12 whole numbers')
+        meva = '\t' + ','.join(['0'] * 8) + '\t' + ','.join(['0'] * 10) + '\t' + ','.join(['0'] * 10) + '\t'
         self.assertBadRow(base + '\t0\t' + ','.join(['0'] * 12) + '\t' + ','.join(['0'] * 7) + ',128\t' +
-                          ','.join(['0'] * 10) + '\t0', 'elementRanks must be 8 whole numbers from -128 to 127')
-        self.assertBadRow(base + '\t0\t' + ','.join(['0'] * 12) + '\t' + ','.join(['0'] * 8) + '\t0,,0\t0',
+                          ','.join(['0'] * 10) + meva + '\t0', 'elementRanks must be 8 whole numbers from -128 to 127')
+        self.assertBadRow(base + '\t0\t' + ','.join(['0'] * 12) + '\t' + ','.join(['0'] * 8) + '\t0,,0' + meva + '\t0',
                           'statusRanks must be 10 whole numbers')
+        self.assertBadRow(base + '\t0\t' + ','.join(['0'] * 12) + '\t' + ','.join(['0'] * 8) + '\t' +
+                          ','.join(['0'] * 10) + '\t0,0\t' + ','.join(['0'] * 10) + '\t' + ','.join(['0'] * 10) + '\t\t0',
+                          'elementMeva must be 8 whole numbers from -32768 to 32767')
+
+    def test_stats_hold_a_list_a_level_of_the_range(self):
+        def row(levels, stats):
+            return f'1\t103\tA\t{levels}\t0\t0\t0\t0\t0' + NEUTRAL.replace('\t\t0', f'\t{stats}\t0')
+        self.assertBadRow(row('4\t6', WORM_STATS), 'stats must have a list a level from minLevel to maxLevel, 3, got 2')
+        self.assertBadRow(row('0\t0', '1,1,1,1,1,1,1,1'), 'stats must have a list a level')
+        self.assertBadRow(row('4\t5', '7,6,7,5,4,4,4;8,7,8,6,5,5,5,19'), 'stats must be 8 whole numbers')
+        self.assertBadRow(row('4\t4', '7,6,7,5,4,4,4,40000'), 'stats must be 8 whole numbers from -32768 to 32767')
 
     def test_ids_must_increase(self):
         with self.assertRaises(gen.DataError) as caught:
@@ -85,17 +105,17 @@ class Output(unittest.TestCase):
 
     def test_record_line(self):
         records = gen.parse(GOOD)
-        self.assertEqual(gen.c_record(records[2], 1, 0, 0),
-                         '    {17199648u, "Goblin Bounty Hunter", 17, 20, 161, 300u, 259, 0, 0u, 0, 1, 2, 0u},')
-        self.assertEqual(gen.c_record(records[0], 0, 3, 240),
-                         '    {17190918u, "Wild Rabbit", 1, 1, 0, 60u, 257, -2, 0u, 3, 0, 0, 240u},')
+        self.assertEqual(gen.c_record(records[2], 1, 0, 0, 2),
+                         '    {17199648u, "Goblin Bounty Hunter", 17, 20, 161, 300u, 259, 0, 0u, 0, 1, 2, 0u, 2},')
+        self.assertEqual(gen.c_record(records[0], 0, 3, 240, 0),
+                         '    {17190918u, "Wild Rabbit", 1, 1, 0, 60u, 257, -2, 0u, 3, 0, 0, 240u, 0},')
 
     def test_an_nm_record_counts_the_mobs_that_are_its_placeholders(self):
         worm = '\t101\tCarrion Worm\t4\t5\t0\t180\t2\t0\t17191196' + NEUTRAL + '\n'
         text = gen.generate(gen.parse(HEADER + '\n17191194' + worm + '17191195' + worm +
                                       '17191196\t101\tBigmouth Billy\t9\t9\t8\t0\t2\t0\t0' + NEUTRAL + '\n'), LISTS, 'abc')
-        self.assertIn('    {17191194u, "Carrion Worm", 4, 5, 0, 180u, 2, 0, 17191196u, 0, 0, 0, 0u},', text)
-        self.assertIn('    {17191196u, "Bigmouth Billy", 9, 9, 8, 0u, 2, 0, 0u, 2, 0, 0, 180u},', text)
+        self.assertIn('    {17191194u, "Carrion Worm", 4, 5, 0, 180u, 2, 0, 17191196u, 0, 0, 0, 0u, 0},', text)
+        self.assertIn('    {17191196u, "Bigmouth Billy", 9, 9, 8, 0u, 2, 0, 0u, 2, 0, 0, 180u, 0},', text)
 
     def test_an_nm_record_carries_the_shortest_respawn_of_its_placeholders_on_a_timer(self):
         def billy(*respawns):
@@ -104,9 +124,9 @@ class Output(unittest.TestCase):
             text = gen.generate(gen.parse(HEADER + '\n' + rows + '17191196\t101\tBigmouth Billy\t9\t9\t8\t0\t2\t0\t0' +
                                           NEUTRAL + '\n'), LISTS, 'abc')
             return next(line for line in text.splitlines() if '"Bigmouth Billy"' in line)
-        self.assertTrue(billy(900, 600).endswith(', 600u},'))  # the earlier is the one not to miss
-        self.assertTrue(billy(0, 600).endswith(', 600u},'))  # a placeholder off any timer brings no time
-        self.assertTrue(billy(0, 0).endswith(', 0u},'))
+        self.assertTrue(billy(900, 600).endswith(', 600u, 0},'))  # the earlier is the one not to miss
+        self.assertTrue(billy(0, 600).endswith(', 600u, 0},'))  # a placeholder off any timer brings no time
+        self.assertTrue(billy(0, 0).endswith(', 0u, 0},'))
 
     def test_more_placeholders_than_a_byte_holds_is_an_error(self):
         rows = ''.join(f'{1000 + i}\t101\tWorm\t1\t1\t0\t0\t0\t0\t5000' + NEUTRAL + '\n' for i in range(256))
@@ -117,13 +137,26 @@ class Output(unittest.TestCase):
     def test_each_distinct_set_of_resistances_is_stored_once_after_the_neutral_one(self):
         text = gen.generate(gen.parse(GOOD), LISTS, 'abc123')
         table = text.split('const MobResistances kMobResistances[] = {\n')[1].split('};')[0].splitlines()
-        self.assertEqual(table, ['    {0u, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0}, '
-                                 '{0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},',
+        zeros = {n: '{' + ', '.join(['0'] * n) + '}' for n in (8, 10, 12)}
+        self.assertEqual(table, ['    {0u, ' + ', '.join(zeros[n] for n in (12, 8, 10, 8, 10, 10)) + '},',
                                  '    {12312u, {0, 2500, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {-2, -2, -2, -2, -2, -2, -3, 4}, '
-                                 '{0, 0, 0, 0, 0, 6, 6, 0, 0, 0}},'])
-        self.assertIn('"Wild Rabbit", 1, 1, 0, 60u, 257, -2, 0u, 0, 0, 0, 0u},', text)
-        self.assertIn('"Carrion Worm", 4, 5, 0, 180u, 2, 0, 17191196u, 0, 1, 1, 0u},', text)
-        self.assertIn('"Goblin Bounty Hunter", 17, 20, 161, 300u, 259, 0, 0u, 0, 1, 2, 0u},', text)
+                                 '{0, 0, 0, 0, 0, 6, 6, 0, 0, 0}, {0, 15, 0, 0, 0, 0, 0, -20}, '
+                                 '{0, 0, 0, 0, 0, 30, 30, 0, 0, 0}, {0, 0, 0, 0, 0, 25, 25, 0, 0, 0}},'])
+        self.assertIn('"Wild Rabbit", 1, 1, 0, 60u, 257, -2, 0u, 0, 0, 0, 0u, 0},', text)
+        self.assertIn('"Carrion Worm", 4, 5, 0, 180u, 2, 0, 17191196u, 0, 1, 1, 0u, 1},', text)
+        self.assertIn('"Goblin Bounty Hunter", 17, 20, 161, 300u, 259, 0, 0u, 0, 1, 2, 0u, 2},', text)
+
+    def test_each_distinct_run_of_stats_is_stored_once_after_the_none(self):
+        worm = '\t101\tCarrion Worm\t4\t5\t0\t180\t2\t0\t0' + DOMAN + '\t' + WORM_STATS + '\t0\n'
+        text = gen.generate(gen.parse(GOOD.replace('\t1\n', '\t0\n') + '17200000' + worm + '17200001' + worm), LISTS, 'abc')
+        self.assertIn('const MobStats kMobStats[] = {\n'
+                      '    {{7, 6, 7, 5, 4, 4, 4, 16}}, {{8, 7, 8, 6, 5, 5, 5, 19}},\n'
+                      '    ' + ' '.join('{{' + ', '.join(str(v) for v in (20 + n, 18 + n, 19 + n, 17 + n, 15 + n, 15 + n,
+                                                                         14 + n, 60 + 3 * n)) + '}},' for n in range(4)) +
+                      '\n};\n', text)
+        self.assertIn('const uint32_t kMobStatRuns[] = {\n    0u,\n    0u,\n    2u,\n};\n', text)
+        self.assertEqual([line.rsplit(', ', 1)[1] for line in text.split('const MobRecord kMobs[] = {\n')[1].splitlines()
+                          if line.startswith('    {')], ['0},', '1},', '2},', '1},', '1},'])
 
     def test_the_plugin_gets_the_immunity_bits_and_the_list_orders(self):
         flags = gen.generate_flags()
@@ -139,6 +172,9 @@ class Output(unittest.TestCase):
                       '        Slow,\n        Poison,\n        LightSleep,\n        DarkSleep,\n        Blind,\n'
                       '        Stun,\n        Gravity,\n    };\n    constexpr int kStatusRankCount = 10;\n', flags)
         self.assertIn('    enum class DropKind : uint8_t\n    {\n        Drop,\n        Steal,\n        Despoil,\n    };\n', flags)
+        self.assertIn('    enum class Stat : uint8_t\n    {\n        Str,\n        Dex,\n        Vit,\n        Agi,\n'
+                      '        Int,\n        Mnd,\n        Chr,\n        MagicEvasion,\n    };\n'
+                      '    constexpr int kStatCount = 8;\n', flags)
 
     def test_generate_names_the_commit(self):
         text = gen.generate(gen.parse(GOOD), LISTS, 'abc123')
@@ -165,6 +201,43 @@ class Output(unittest.TestCase):
             self.assertIn('no phoenix_commit line', str(caught.exception))
             meta.write_text('generated\tnow\nphoenix_commit\tabc123\n')
             self.assertEqual(gen.read_commit(meta), 'abc123')
+
+
+ITEMS_HEADER = 'id\tmacc\telementMacc\tstaffBonus\tskill'
+# Phoenix's sql/item_mods.sql: an Ice Staff's ice staff bonus, a Wizard's Petasos' magic accuracy and a Cornette.
+ITEMS = (ITEMS_HEADER + '\n17547\t0\t0,0,0,0,0,0,0,0\t0,1,0,0,0,0,0,0\t0\n'
+         '17352\t0\t0,0,0,0,0,0,0,0\t0,0,0,0,0,0,0,0\t42\n')
+
+
+class Items(unittest.TestCase):
+    def test_items_in_order(self):
+        rows = ITEMS_HEADER + '\n17352\t0\t0,0,0,0,0,0,0,0\t0,0,0,0,0,0,0,0\t42\n15080\t3\t0,0,0,0,0,0,0,0\t0,0,0,0,0,0,0,0\t0\n'
+        with self.assertRaises(gen.DataError) as caught:
+            gen.parse_items(rows, 'i.tsv')
+        self.assertIn('i.tsv:3: ids must be strictly increasing', str(caught.exception))
+
+    def test_an_item_s_values(self):
+        text = ITEMS_HEADER + '\n15080\t3\t0,2,0,0,0,0,0,-1\t0,1,0,0,0,0,0,0\t42\n'
+        self.assertEqual(gen.parse_items(text), [{'id': 15080, 'macc': 3, 'elementMacc': [0, 2, 0, 0, 0, 0, 0, -1],
+                                                  'staffBonus': [0, 1, 0, 0, 0, 0, 0, 0], 'skill': 42}])
+        self.assertEqual(gen.generate_items(gen.parse_items(text), 'abc').splitlines()[2:],
+                         ['const ItemMagic kItemMagic[] = {', '    {15080, 3, {0, 2, 0, 0, 0, 0, 0, -1}, '
+                          '{0, 1, 0, 0, 0, 0, 0, 0}, 42},', '};'])
+
+    def test_bad_rows_name_their_line(self):
+        for row, message in (('15080\t3\t0,0,0,0,0,0,0\t0,0,0,0,0,0,0,0\t0', 'elementMacc must be 8 whole numbers'),
+                             ('15080\t3\t0,0,0,0,0,0,0,0\t0,0,0,0,0,0,0,0\t256', 'skill must be a whole number'),
+                             ('0\t3\t0,0,0,0,0,0,0,0\t0,0,0,0,0,0,0,0\t0', 'id must be a whole number from 1'),
+                             ('15080\t3\t0,0,0,0,0,0,0,0\t0', 'expected 5 columns')):
+            with self.subTest(message=message):
+                with self.assertRaises(gen.DataError) as caught:
+                    gen.parse_items(ITEMS_HEADER + '\n' + row + '\n', 'i.tsv')
+                self.assertIn('i.tsv:2:', str(caught.exception))
+                self.assertIn(message, str(caught.exception))
+
+    def test_no_items_is_an_error(self):
+        with self.assertRaises(gen.DataError):
+            gen.generate_items([], 'abc')
 
 
 class Drops(unittest.TestCase):

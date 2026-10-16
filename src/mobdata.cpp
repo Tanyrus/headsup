@@ -17,6 +17,7 @@ namespace headsup
         };
 
 #include "generated/mobdata.inc"
+#include "generated/item_magic.inc"
 
         const MobDropList& DropListOf(const MobRecord& mob)
         {
@@ -39,6 +40,20 @@ namespace headsup
     const MobResistances& ResistancesOf(const MobRecord& mob)
     {
         return mob.resistances < std::size(kMobResistances) ? kMobResistances[mob.resistances] : kMobResistances[0];
+    }
+
+    const MobStats* StatsAt(const MobRecord& mob, int level)
+    {
+        if (mob.stats == 0 || mob.stats >= std::size(kMobStatRuns) || level < mob.minLevel || level > mob.maxLevel)
+            return nullptr;
+        return &kMobStats[kMobStatRuns[mob.stats] + static_cast<uint32_t>(level - mob.minLevel)];
+    }
+
+    const ItemMagic* ItemMagicOf(uint16_t itemId)
+    {
+        const auto it = std::lower_bound(std::begin(kItemMagic), std::end(kItemMagic), itemId,
+            [](const ItemMagic& item, uint16_t id) { return item.id < id; });
+        return it == std::end(kItemMagic) || it->id != itemId ? nullptr : &*it;
     }
 
     std::span<const MobDrop> DropsOf(const MobRecord& mob)
