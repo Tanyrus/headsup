@@ -2,6 +2,7 @@
 #include "test.h"
 
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace headsup;
@@ -58,4 +59,28 @@ TEST(an_npc_with_nothing_to_show_has_no_record)
     CHECK(NpcById(16781329) == nullptr); // a blank placeholder of zone 1
     CHECK(NpcById(0) == nullptr);
     CHECK(NpcById(0xFFFFFFFF) == nullptr);
+}
+
+TEST(a_shop_has_its_stock_and_says_whether_fame_moves_its_prices)
+{
+    // Maera, aboard the ship to Selbina, sells at fixed prices; Southern San d'Oria's Lusiane sells by xi.shop.nation,
+    // which prices by fame and stocks some items only while San d'Oria places well in conquest.
+    const NpcRecord* maera = NpcById(17678362);
+    CHECK(maera != nullptr && ShopOf(*maera) != nullptr);
+    if (maera == nullptr || ShopOf(*maera) == nullptr) return;
+    std::vector<std::pair<uint16_t, uint32_t>> stock;
+    for (const NpcStockItem& entry : StockOf(*ShopOf(*maera)))
+        stock.emplace_back(entry.item, entry.price);
+    CHECK(stock == (std::vector<std::pair<uint16_t, uint32_t>>{{4112, 910}, {4128, 4832}, {4148, 316}, {4150, 2595}, {4151, 800}}));
+    CHECK(!ShopOf(*maera)->fame);
+    const NpcRecord* lusiane = NpcById(17719350);
+    CHECK(lusiane != nullptr && ShopOf(*lusiane) != nullptr);
+    if (lusiane == nullptr || ShopOf(*lusiane) == nullptr) return;
+    std::vector<int> ranks;
+    for (const NpcStockItem& entry : StockOf(*ShopOf(*lusiane)))
+        ranks.push_back(entry.rank);
+    CHECK(ranks == (std::vector<int>{2, 3, 1, 2, 3, 3, 3}));
+    CHECK(ShopOf(*lusiane)->fame);
+    const NpcRecord* qm = NpcById(16785729);
+    CHECK(qm != nullptr && ShopOf(*qm) == nullptr);
 }

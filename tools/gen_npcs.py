@@ -34,9 +34,11 @@ LIST_LIMITS = {'trades': (1, 0xFFFF), 'gives': (1, 0xFFFF), 'keyItems': (1, 0xFF
                'pops': (1, 0xFFFFFFFF), 'links': (1, 0xFFFF), 'systems': (1, 0xFFFF)}
 UNREAD = ['trade', 'gives', 'pops', 'shop']
 # phoenix_npc_shops.tsv: each distinct stock, numbered from 1 with its rows together: an item, its price before fame,
-# and the nation rank xi.shop.nation sells it from (1, 2 or 3), 0 for a shop that sells it to all.
-SHOP_COLUMNS = ['list', 'item', 'price', 'rank']
-SHOP_LIMITS = {'list': (1, 0xFFFF), 'item': (1, 0xFFFF), 'price': (0, 0xFFFFFFFF), 'rank': (0, 3)}
+# and the nation rank xi.shop.nation sells it from (1, 2 or 3), 0 for a shop that sells it to all; fame, the same on
+# each of a list's rows, is 1 when the shop's prices move with fame (xi.shop.nation, and xi.shop.general given a fame
+# area: from 10% off to 10% more).
+SHOP_COLUMNS = ['list', 'item', 'price', 'rank', 'fame']
+SHOP_LIMITS = {'list': (1, 0xFFFF), 'item': (1, 0xFFFF), 'price': (0, 0xFFFFFFFF), 'rank': (0, 3), 'fame': (0, 1)}
 # phoenix_npc_links.tsv: each quest, mission and battlefield an NPC takes part in, numbered from 1. log: the quest or
 # mission log (0 for a battlefield or hidden quest); id: the quest, mission or battlefield ID; file: its script, empty
 # for a quest an NPC's own script names; expansion: the one EXPANSIONS names from its folder, empty when the folder does
@@ -93,7 +95,7 @@ def numbered(rows, column: str, source: str) -> list:
 
 
 def parse_shops(text: str, source: str = SHOPS_NAME) -> list:
-    """The stocks in order, list n at index n - 1, each a list of {list, item, price, rank}."""
+    """The stocks in order, list n at index n - 1, each a list of {list, item, price, rank, fame}."""
     lists = []
     for line, row in table_rows(text, SHOP_COLUMNS, source):
         entry = {column: number(row[column], *limits, f'{source}:{line}: {column}')
@@ -102,6 +104,8 @@ def parse_shops(text: str, source: str = SHOPS_NAME) -> list:
             lists.append([])
         elif entry['list'] != len(lists):
             raise DataError(f"{source}:{line}: lists must be numbered from 1 with each list's rows together")
+        elif entry['fame'] != lists[-1][0]['fame']:
+            raise DataError(f"{source}:{line}: fame must be the same on each of a list's rows")
         lists[-1].append(entry)
     return lists
 
@@ -191,18 +195,34 @@ def load(data: pathlib.Path):
 POOLS = {'trades': 'kNpcItems', 'gives': 'kNpcItems', 'keyItems': 'kNpcKeyItems', 'needs': 'kNpcKeyItems',
          'pops': 'kNpcMobs'}
 POOL_TYPES = {'kNpcItems': 'uint16_t', 'kNpcKeyItems': 'uint16_t', 'kNpcMobs': 'uint32_t'}
-SHOWN_UNREAD = ['trade', 'gives', 'pops']  # what the popup says the data cannot name
+SHOWN_UNREAD = ['trade', 'gives', 'pops', 'shop']  # what the popup says the data cannot name
 VALUES_A_LINE = 16
 
 
 def shown(npc) -> bool:
     """Whether the popup has anything to say of an NPC."""
-    return any(npc[column] for column in POOLS) or any(kind in SHOWN_UNREAD for kind in npc['unread'])
+    return any(npc[column] for column in POOLS) or npc['shop'] > 0 or \
+        any(kind in SHOWN_UNREAD for kind in npc['unread'])
 
 
-def generate(npcs, key_items, commit: str) -> str:
+def shop_tables(shops) -> list:
+    """kNpcStock, every list's items one after another after the empty entry at 0, and kNpcShops, each list at its
+    number, where its items sit and whether fame moves its prices."""
+    stock, starts = ['    {0, 0, 0u},'], ['    {{0, 0}, false},']
+    for entries in shops:
+        if len(entries) > 0xFF:
+            raise DataError(f"shop {entries[0]['list']}: {len(entries)} items do not fit NpcSpan")
+        starts.append(f"    {{{{{len(stock)}, {len(entries)}}}, {'true' if entries[0]['fame'] else 'false'}}},")
+        stock += [f"    {{{e['item']}, {e['rank']}, {e['price']}u}}," for e in entries]
+    if len(stock) > 0xFFFF:
+        raise DataError('the shops do not fit NpcSpan')
+    return ['', 'const NpcStockItem kNpcStock[] = {'] + stock + ['};', '', 'const NpcShop kNpcShops[] = {'] + starts + \
+        ['};']
+
+
+def generate(npcs, shops, key_items, commit: str) -> str:
     """npcdata.inc: kNpcs, each NPC shown() in ID order with where its lists sit in their pools, each pool holding
-    each distinct list once after the empty entry at 0; and kKeyItemNames in ID order."""
+    each distinct list once after the empty entry at 0; the shops by number; and kKeyItemNames in ID order."""
     pools = {pool: [0] for pool in POOL_TYPES}
     starts = {pool: {(): 0} for pool in POOL_TYPES}
     records = []
@@ -219,12 +239,13 @@ def generate(npcs, key_items, commit: str) -> str:
                 pools[pool] += values
             spans.append(f'{{{starts[pool][values]}, {len(values)}}}')
         unread = sum(1 << UNREAD.index(kind) for kind in npc['unread'])
-        records.append(f"    {{{npc['id']}u, {', '.join(spans)}, {unread}}},")
+        records.append(f"    {{{npc['id']}u, {', '.join(spans)}, {npc['shop']}, {unread}}},")
     if any(len(pool) > 0xFFFF for pool in pools.values()):
         raise DataError('the NPC lists do not fit NpcSpan')
     lines = [f'// Generated by tools/gen_npcs.py from data/{NPCS_NAME} and data/{KEY_ITEMS_NAME} (Phoenix {commit}). '
              'Do not edit.',
-             f'// {len(records)} NPCs with something to show of the {len(npcs)} live has, {len(key_items)} key items.']
+             f'// {len(records)} NPCs with something to show of the {len(npcs)} live has, {len(shops)} shops, '
+             f'{len(key_items)} key items.']
     lines += [f'static_assert(kNpcUnread{kind.capitalize()} == {1 << n}, "NpcUnread must follow gen_npcs.UNREAD");'
               for n, kind in enumerate(UNREAD)]
     for pool, kind in POOL_TYPES.items():
@@ -233,6 +254,7 @@ def generate(npcs, key_items, commit: str) -> str:
         lines += ['    ' + ', '.join(f'{v}u' if kind == 'uint32_t' else str(v) for v in values[n:n + VALUES_A_LINE]) +
                   ',' for n in range(0, len(values), VALUES_A_LINE)]
         lines.append('};')
+    lines += shop_tables(shops)
     lines += ['', 'const NpcRecord kNpcs[] = {'] + records + ['};', '', 'const KeyItemName kKeyItemNames[] = {']
     lines += [f'    {{{key_item}, {c_string(name)}}},' for key_item, name in key_items.items()] + ['};', '']
     return '\n'.join(lines)
@@ -249,7 +271,7 @@ def main(argv) -> int:
         return 2
     try:
         npcs, shops, links, systems, key_items = load(data)
-        text = generate(npcs, key_items, read_commit(root / 'data' / META_NAME)) if len(argv) == 1 else None
+        text = generate(npcs, shops, key_items, read_commit(root / 'data' / META_NAME)) if len(argv) == 1 else None
     except (OSError, DataError) as error:
         print(f'gen_npcs: {error}', file=sys.stderr)
         return 1

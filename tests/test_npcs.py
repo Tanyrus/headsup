@@ -126,7 +126,13 @@ entity.onTrigger = function(player, npc)
     xi.shop.nation(player, stock, xi.nation.BASTOK)
 end"""
         handler = 'entity.onTrigger = function(player, npc)\n    xi.shop.nation(player, stock, xi.nation.BASTOK)\nend'
-        self.assertEqual(facts_of(handler, whole_file=file).stock, ((4112, 910, 3), (4128, 4832, 0)))
+        nation = facts_of(handler, whole_file=file)
+        self.assertEqual((nation.stock, nation.fame), (((4112, 910, 3), (4128, 4832, 0)), True))
+        # A general shop's prices move with fame only when it names a fame area, as xi.shop.general reads its log.
+        for call, fame in (('xi.shop.general(player, stock, xi.fameArea.WINDURST)', True),
+                           ('xi.shop.general(player, stock)', False)):
+            self.assertEqual(facts_of(handler.replace('xi.shop.nation(player, stock, xi.nation.BASTOK)', call),
+                                      whole_file=file).fame, fame)
         built = facts_of('local stock = {}\nfor _, f in ipairs(flowers) do table.insert(stock, f) end\n'
                          'xi.shop.general(player, stock)')
         self.assertEqual((built.stock, built.unread), (None, {'shop'}))
@@ -240,7 +246,7 @@ class Build(unittest.TestCase):
         self.assertEqual([r['id'] for r in rows], [16785599, 16785600, 16785601])
         rodrigue, ganger, qm = rows
         self.assertEqual((rodrigue['shop'], ganger['shop'], qm['shop']), (1, 1, 0))
-        self.assertEqual(shops, [[{'list': 1, 'item': 4112, 'price': 910, 'rank': 0}]])
+        self.assertEqual(shops, [[{'list': 1, 'item': 4112, 'price': 910, 'rank': 0, 'fame': 0}]])
         self.assertEqual((ganger['trades'], ganger['gives'], ganger['keyItems']), ([4128, 4148], [1590], [400]))
         self.assertEqual(ganger['pos'], [1.5, -2.25, 3.0, 7])
         self.assertEqual([(l['kind'], l['log'], l['id'], l['name'], l['file'], l['expansion'], l['live']) for l in links],
@@ -343,7 +349,7 @@ class Format(unittest.TestCase):
 
     def test_lists_count_from_1_and_every_entry_is_named(self):
         links = gen.parse_links('\t'.join(gen.LINK_COLUMNS) + '\n1\tquest\t0\t4\tA Squires Test\t\t\t1\n')
-        shops = gen.parse_shops('list\titem\tprice\trank\n1\t4112\t910\t0\n')
+        shops = gen.parse_shops('list\titem\tprice\trank\tfame\n1\t4112\t910\t0\t0\n')
         systems = gen.parse_systems('system\tfamily\tcall\n1\thelm\thelm.onTrade(player)\n')
         key_items = gen.parse_key_items('id\tname\n400\tMap of the Caves\n')
         row = gen.parse_npcs(NPC_HEADER + '\n' + NPC_ROW + '\n')
@@ -360,6 +366,9 @@ class Format(unittest.TestCase):
         with self.assertRaises(gen.DataError) as caught:
             gen.check(row, shops, links, systems, {**key_items, 87: 'Silver Bell'})
         self.assertIn('phoenix_key_items.tsv: 1 key items no NPC names, the first 87', str(caught.exception))
+        with self.assertRaises(gen.DataError) as caught:
+            gen.parse_shops('list\titem\tprice\trank\tfame\n1\t4112\t910\t0\t0\n1\t4128\t4832\t0\t1\n', 's.tsv')
+        self.assertIn("s.tsv:3: fame must be the same on each of a list's rows", str(caught.exception))
         with self.assertRaises(gen.DataError) as caught:
             gen.parse_key_items('id\tname\n400\tMap of the Caves\n87\tSilver Bell\n', 'k.tsv')
         self.assertIn('k.tsv:3: ids must be strictly increasing', str(caught.exception))
@@ -382,7 +391,7 @@ class ValidateNpcs(unittest.TestCase):
     # What the known NPCs' scripts say (validate.EXPECTED_NPCS and EXPECTED_STOCK, written down here again).
     NPCS = [npc(16785729, name='???', trades=[4373, 4374, 4375], pops=[16785722]), npc(17199699, gives=[503, 1000]),
             npc(17678362, shop=1)]
-    SHOPS = [[{'list': 1, 'item': i, 'price': p, 'rank': 0} for i, p in
+    SHOPS = [[{'list': 1, 'item': i, 'price': p, 'rank': 0, 'fame': 0} for i, p in
               ((4112, 910), (4128, 4832), (4148, 316), (4150, 2595), (4151, 800))]]
 
     KEY_ITEMS = {8: 'Airship Pass'}

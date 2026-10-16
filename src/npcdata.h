@@ -21,6 +21,21 @@ namespace headsup
         uint8_t count;
     };
 
+    // One item of a shop's stock. rank is where xi.shop.nation stocks it from: 3 always, 2 while the shop's nation is
+    // 1st or 2nd in conquest, 1 while it is 1st and only to its citizens; 0 for a shop that is not a nation's.
+    struct NpcStockItem
+    {
+        uint16_t item;
+        uint8_t rank;
+        uint32_t price; // before fame
+    };
+
+    struct NpcShop
+    {
+        NpcSpan stock;
+        bool fame; // its prices move with fame, from 10% off to 10% more
+    };
+
     // One NPC with something to show, as live Phoenix loads it (data/phoenix_npcs.tsv). A step of a quest, mission or
     // battlefield adds to its lists only when live has that content.
     struct NpcRecord
@@ -31,6 +46,7 @@ namespace headsup
         NpcSpan keyItems; // the key items it gives
         NpcSpan needs;    // the key items it checks for
         NpcSpan pops;     // the mobs it spawns, by server ID
+        uint16_t shop;    // its shop in the table ShopOf reads; 0 for none
         uint8_t unread;   // NpcUnread bits
     };
 
@@ -49,6 +65,11 @@ namespace headsup
     std::span<const uint16_t> KeyItemsOf(const NpcRecord& npc);
     std::span<const uint16_t> NeedsOf(const NpcRecord& npc);
     std::span<const uint32_t> PopsOf(const NpcRecord& npc);
+
+    // Its shop; nullptr when it sells nothing the data could read.
+    const NpcShop* ShopOf(const NpcRecord& npc);
+    // A shop's stock in its script's order.
+    std::span<const NpcStockItem> StockOf(const NpcShop& shop);
 
     // A key item's name, its identifier in Phoenix's scripts in words; nullptr for one no NPC gives or checks for.
     const char* KeyItemNameOf(uint16_t keyItem);

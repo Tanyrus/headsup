@@ -34,6 +34,13 @@ namespace headsup
 
     std::span<const uint32_t> PopsOf(const NpcRecord& npc) { return SpanOf(kNpcMobs, npc.pops); }
 
+    const NpcShop* ShopOf(const NpcRecord& npc)
+    {
+        return npc.shop > 0 && npc.shop < std::size(kNpcShops) ? &kNpcShops[npc.shop] : nullptr;
+    }
+
+    std::span<const NpcStockItem> StockOf(const NpcShop& shop) { return SpanOf(kNpcStock, shop.stock); }
+
     const char* KeyItemNameOf(uint16_t keyItem)
     {
         const auto it = std::lower_bound(std::begin(kKeyItemNames), std::end(kKeyItemNames), keyItem,

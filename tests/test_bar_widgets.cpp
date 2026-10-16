@@ -1515,6 +1515,18 @@ namespace
         case 4374: return "Woozyshroom";
         case 4375: return "Danceshroom";
         case 1823: return "Shrimp Lantern";
+        case 4112: return "Potion";
+        case 4128: return "Ether";
+        case 4148: return "Antidote";
+        case 4150: return "Eye Drops";
+        case 4151: return "Echo Drops";
+        case 17389: return "Bamboo Fishing Rod";
+        case 17390: return "Yew Fishing Rod";
+        case 17391: return "Willow Fishing Rod";
+        case 17395: return "Lugworm";
+        case 17396: return "Little Worm";
+        case 5066: return "Scroll of Lightning Threnody";
+        case 5068: return "Scroll of Light Threnody";
         default: return nullptr; // left out, as a drop the game has no name for is
         }
     }
@@ -1611,4 +1623,46 @@ TEST(an_npc_the_data_has_nothing_of_gets_only_its_name)
     const WidgetContent w = BarWidgetContent(BarWidget::Target, state, settings);
     CHECK(Joined(w.title) == "Door" && !w.hasPopup);
     CHECK(BarPopupContent(BarWidget::Target, state, settings).sections.empty());
+}
+
+TEST(a_shops_popup_lists_its_stock_with_prices)
+{
+    // Maera's stock, aboard the ship to Selbina (her script), at prices fame does not move.
+    Settings settings;
+    const ActorInfo maera = NpcTarget(17678362, "Maera");
+    BarState state;
+    state.target   = &maera;
+    state.itemName = NpcItemName;
+    CHECK(BarWidgetContent(BarWidget::Target, state, settings).hasPopup);
+    const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
+    CHECK(Headings(p) == (std::vector<std::string>{"", "Shop"}));
+    CHECK(SectionLines(p, "Shop") == (std::vector<std::string>{"Potion 910 gil", "Ether 4,832 gil", "Antidote 316 gil",
+                                         "Eye Drops 2,595 gil", "Echo Drops 800 gil"}));
+}
+
+TEST(a_nation_shop_puts_what_conquest_holds_back_under_its_place_and_says_fame_moves_its_prices)
+{
+    // Southern San d'Oria's Lusiane, by xi.shop.nation: rank 3 always, 2 while San d'Oria is 1st or 2nd, 1 while it is
+    // 1st and only to its citizens.
+    Settings settings;
+    const ActorInfo lusiane = NpcTarget(17719350, "Lusiane");
+    BarState state;
+    state.target   = &lusiane;
+    state.itemName = NpcItemName;
+    CHECK(SectionLines(BarPopupContent(BarWidget::Target, state, settings), "Shop") ==
+          (std::vector<std::string>{"Little Worm 4 gil", "Willow Fishing Rod 72 gil", "Scroll of Light Threnody 120 gil",
+              "Scroll of Lightning Threnody 1,376 gil", "When its nation is 1st or 2nd in conquest", "Lugworm 12 gil",
+              "Yew Fishing Rod 236 gil", "When its nation is 1st in conquest, to its citizens",
+              "Bamboo Fishing Rod 540 gil", "Prices before fame, which moves them up to 10% either way"}));
+}
+
+TEST(a_shop_whose_stock_its_script_works_out_says_so)
+{
+    Settings settings;
+    const ActorInfo dabih = NpcTarget(17772597, "Dabih Jajalioh"); // Ru'Lude Gardens: the stock follows the season
+    BarState state;
+    state.target   = &dabih;
+    state.itemName = NpcItemName;
+    CHECK(SectionLines(BarPopupContent(BarWidget::Target, state, settings), "Shop") ==
+          (std::vector<std::string>{"Worked out by its script"}));
 }

@@ -303,11 +303,47 @@ namespace headsup
             sections.push_back(std::move(section));
         }
 
-        // What it takes in trade and what that pops, what it gives, and the key items it gives and checks for.
+        // What a shop always stocks, then what a nation's shop holds back until the nation places well in conquest,
+        // under the place it needs (NpcStockItem's ranks).
+        constexpr std::pair<uint8_t, const char*> kStockPlaces[] = {
+            {2, "When its nation is 1st or 2nd in conquest"}, {1, "When its nation is 1st in conquest, to its citizens"}};
+
+        void AddShop(std::vector<PopupSection>& sections, const NpcRecord& npc, const BarState& state)
+        {
+            const NpcShop* shop  = ShopOf(npc);
+            const bool unread    = (npc.unread & kNpcUnreadShop) != 0;
+            PopupSection section = {"Shop", {}};
+            const auto add = [&](uint8_t place, const char* note) {
+                bool first = true;
+                for (const NpcStockItem& entry : shop != nullptr ? StockOf(*shop) : std::span<const NpcStockItem>())
+                {
+                    const uint8_t at  = entry.rank == 1 || entry.rank == 2 ? entry.rank : 0;
+                    const char* name = state.itemName != nullptr ? state.itemName(entry.item) : nullptr;
+                    if (at != place || name == nullptr || *name == '\0') continue;
+                    if (first && note != nullptr) section.rows.push_back(LineOf(note, Tone::Dim));
+                    first = false;
+                    section.rows.push_back(Labeled(name, Text(Grouped(entry.price) + " gil")));
+                }
+            };
+            add(0, nullptr);
+            for (const auto& [place, note] : kStockPlaces)
+                add(place, note);
+            if (section.rows.empty() && !unread) return;
+            if (!section.rows.empty() && shop->fame)
+                section.rows.push_back(LineOf("Prices before fame, which moves them up to 10% either way", Tone::Dim));
+            if (unread)
+                section.rows.push_back(LineOf(
+                    section.rows.empty() ? "Worked out by its script" : "And more its script works out", Tone::Dim));
+            sections.push_back(std::move(section));
+        }
+
+        // Its shop, what it takes in trade and what that pops, what it gives, and the key items it gives and checks
+        // for.
         std::vector<PopupSection> NpcSections(const ActorInfo& target, const NpcRecord& npc, const BarState& state)
         {
             std::vector<PopupSection> sections = ListOf(PopupSection{"",
                 ListOf(Line(Cell(Text("ID " + Printed("%03X", target.serverId & kTargetIndexBits), Tone::Dim))))});
+            AddShop(sections, npc, state);
             AddListing(sections, "Trade", ItemNames(TradesOf(npc), state), (npc.unread & kNpcUnreadTrade) != 0);
             AddListing(sections, "Pops", MobNames(PopsOf(npc)), (npc.unread & kNpcUnreadPops) != 0);
             AddListing(sections, "Gives", ItemNames(GivesOf(npc), state), (npc.unread & kNpcUnreadGives) != 0);

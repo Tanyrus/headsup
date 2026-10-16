@@ -222,12 +222,14 @@ class Facts:
     def __init__(self):
         self.trades, self.gives, self.key_items, self.needs, self.pops = set(), set(), set(), set(), set()
         self.stock, self.systems, self.unread, self.legacy = None, set(), set(), set()
+        self.fame = False  # whether its stock's prices move with fame
 
     def add(self, other) -> None:
         """What another handler does, beside this one's; its stock, when it has one, is the one kept."""
         for name in ('trades', 'gives', 'key_items', 'needs', 'pops', 'systems', 'unread', 'legacy'):
             getattr(self, name).update(getattr(other, name))
-        self.stock = other.stock or self.stock
+        if other.stock:
+            self.stock, self.fame = other.stock, other.fame
 
 
 CALL = re.compile(r'(npcUtil\.trade(?:Has|HasExactly|HasOnly|Matches)|trade:hasItemQty|npcUtil\.giveItem|'
@@ -279,7 +281,9 @@ def read_handler(text: str, whole_file: str, zone: int, c: Constants, facts: Fac
         elif family == 'shop' and function in STOCK_SHOPS:
             stock = shop_stock(args[1] if len(args) > 1 else '', code, whole_file, c)
             if stock:
+                # xi.shop.nation passes its nation as the fame area; xi.shop.general uses the one it is given.
                 facts.stock = stock
+                facts.fame = function == 'nation' or (len(args) > 2 and args[2].strip() != 'nil')
             else:
                 facts.unread.add('shop')
         elif family and family not in NOT_SYSTEMS:
@@ -528,7 +532,7 @@ def build(npcs, lua, settings, server):
         for key, step_off, step in steps:
             if live[key] and not step_off:
                 facts.add(step)
-        shop = shops.setdefault(facts.stock, len(shops) + 1) if facts.stock else 0
+        shop = shops.setdefault((facts.stock, facts.fame), len(shops) + 1) if facts.stock else 0
         npc_rows.append({'id': npc['id'], 'zone': npc['zone'], 'script': npc['script'], 'name': npc['name'],
                          'pos': '{:.3f},{:.3f},{:.3f},{}'.format(*npc['pos'][:3], int(npc['pos'][3])),
                          'trades': sorted(facts.trades), 'gives': sorted(facts.gives),
@@ -559,7 +563,7 @@ def texts(npc_rows, shop_rows, link_rows, system_rows, key_item_rows):
     npcs = '\t'.join(schema.NPC_COLUMNS) + '\n' + ''.join(
         '\t'.join(cell(r[col]) for col in schema.NPC_COLUMNS) + '\n' for r in npc_rows)
     shops = '\t'.join(schema.SHOP_COLUMNS) + '\n' + ''.join(
-        f'{n}\t{item}\t{price}\t{rank}\n' for n, stock in shop_rows for item, price, rank in stock)
+        f'{n}\t{item}\t{price}\t{rank}\t{int(fame)}\n' for n, (stock, fame) in shop_rows for item, price, rank in stock)
     links = '\t'.join(schema.LINK_COLUMNS) + '\n' + ''.join(
         '\t'.join(cell(r[col]) for col in schema.LINK_COLUMNS) + '\n' for r in link_rows)
     systems = '\t'.join(schema.SYSTEM_COLUMNS) + '\n' + ''.join(

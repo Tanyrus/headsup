@@ -265,7 +265,7 @@ A bar of widgets across the top of the screen, on by default, with these widgets
 | Job | Your jobs and levels, and the EXP to your next level (your merits at 75), over a bar of it; its Layout can put the EXP first, as the larger line, or show the EXP alone | EXP per hour, the time to level, limit points |
 | Party | How many are in your party, with the lowest HP and MP in your zone | Each member's jobs, levels, HP, MP and TP |
 | Signet | The time left on Signet or Sanction, only while one is on | What it gives and whether it works where you are |
-| Target | A monster's name in its border color, its level and con | Its jobs, weaknesses, resistances, absorbs, immunities, tags, stats, TP moves, spells, spawn, drops at Treasure Hunter 0 and what can be stolen; for an NPC or ??? in Phoenix's NPC data, what to trade it, what it pops and gives, and the key items it gives and checks for; for a player you checked, their jobs, master level, linkshell and title, as of your check |
+| Target | A monster's name in its border color, its level and con | Its jobs, weaknesses, resistances, absorbs, immunities, tags, stats, TP moves, spells, spawn, drops at Treasure Hunter 0 and what can be stolen; for an NPC or ??? in Phoenix's NPC data, its shop, what to trade it, what it pops and gives, and the key items it gives and checks for; for a player you checked, their jobs, master level, linkshell and title, as of your check |
 | Gil | Your gil, or the currency picked in its section | Gil and every currency you have |
 | Bags | Your inventory's used and maximum space | Every bag you have |
 | Connection | The game's own S and R, bytes sent and received a second; amber when no data arrives, red once the game's meter drops, with the latency if switched on | Latency, the last server data, this session's totals |
@@ -299,9 +299,11 @@ Its HP, MP, attack, defense, evasion, accuracy, stats and magic evasion are at i
 and so are the spells it casts, after its TP moves. Spawn gives the hours it spawns between, and a lottery NM's pop chance
 and cooldown, which its placeholder gives too; a player you have checked shows their jobs and levels, or
 ? ? ? when anonymous, with a popup of the check. An NPC or ??? whose scripts Phoenix's NPC data can read has a popup of
-what it takes in trade, the monsters that pops, what it gives (quest rewards too) and the key items it gives and checks
-for, leaving out quest steps of expansions Phoenix has off; when a script works the trade or the monster out as it
-runs, the popup says so. Any other player or NPC shows just its name. The weather widget reads the
+its shop, what it takes in trade, the monsters that pops, what it gives (quest rewards too) and the key items it gives
+and checks for, leaving out quest steps of expansions Phoenix has off; when a script works the stock, the trade or the
+monster out as it runs, the popup says so. A shop's prices are before fame, which moves a nation's and some others'
+prices up to 10% either way, and what a nation's shop stocks only while the nation places 1st or 2nd in conquest comes
+under the place it needs. Any other player or NPC shows just its name. The weather widget reads the
 weather the game keeps; if HeadsUp cannot find it, it goes by the server's weather changes and shows the day's usual
 weather until one comes. While the Gil widget is on, HeadsUp asks the server for your currencies with the two requests
 the game's Currencies menu sends: once after loading, once per zone and each minute while the widget's popup is open.
