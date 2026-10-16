@@ -78,11 +78,9 @@ EXPECTED_REMOVED = {
 EVEN_MATCH_EXP = 100  # every bracket of the era table, which only content restricted to ToAU loads (200 without)
 CITIPATI, VALKURM_EMPEROR, CLIPPER = 16806162, 17199438, 17293331
 # id: columns of phoenix_mob_info.tsv as its template, spawn and spawn slot in data/zones/<zone>/mobs.yaml have them.
-# Citipati (attohwa_chasm) is THF/BLM, out from 20:00 to 04:00, 15% with 10,800 s out after his kill; Clipper
-# (Qufim Island) counts for regimes 41 and 42's first target and 43's second (scripts/zones/Qufim_Island/mobs/Clipper.lua).
+# Citipati (attohwa_chasm) is THF/BLM, out from 20:00 to 04:00, 15% with 10,800 s out after his kill.
 EXPECTED_INFO = {
     CITIPATI: {'jobs': [6, 4], 'window': [20, 4], 'lottery': [15, 10800]},
-    CLIPPER: {'regimes': [(41, 1), (42, 1), (43, 2)]},
 }
 # id: its lottery chance; a module sets Valkurm Emperor's cooldown (valkurm_dunes' slot says 15 alone).
 EXPECTED_CHANCES = {VALKURM_EMPEROR: 15}
@@ -95,9 +93,9 @@ MAGIC = schema.DAMAGE_ORDER.index('Magic')
 # Each kind of value thousands of Phoenix's mobs have (tens of thousands with TP moves, hundreds with an added
 # effect), so fewer means the dump read it wrong or not at all. Most mobs' HP grows with their level; a dump that
 # worked HP out without recovering the mob gives every level the same.
-MIN_INFO = {'combat stats': 55000, 'TP moves': 50000, 'spells': 10000, 'training regimes': 10000,
-            'HP that grows with the level': 20000, 'more or less magic damage taken': 5000, 'an added effect': 500}
-MIN_REGIMES, MIN_CHARMABLE = 300, 10000
+MIN_INFO = {'combat stats': 55000, 'TP moves': 50000, 'spells': 10000, 'HP that grows with the level': 20000,
+            'more or less magic damage taken': 5000, 'an added effect': 500}
+MIN_CHARMABLE = 10000
 RESTING, SITTING = 33, 47  # xi::Animation Healing and Sit, which CBattleEntity::isSitting names
 
 
@@ -210,19 +208,16 @@ def check_items(items, min_items=MIN_ITEMS):
     return problems
 
 
-def check_info(records, info, skills, spells, regimes, min_info=None, min_regimes=MIN_REGIMES,
-               min_charmable=MIN_CHARMABLE):
+def check_info(records, info, skills, spells, min_info=None, min_charmable=MIN_CHARMABLE):
     problems, by_id = [], {i['id']: i for i in info}
     counts = {'combat stats': sum(1 for i in info if i['combat']), 'TP moves': sum(1 for i in info if i['skills']),
-              'spells': sum(1 for i in info if i['spells']), 'training regimes': sum(1 for i in info if i['regimes']),
+              'spells': sum(1 for i in info if i['spells']),
               'HP that grows with the level': sum(1 for i in info if i['combat'] and i['combat'][-1][HP] > i['combat'][0][HP]),
               'more or less magic damage taken': sum(1 for i in info if i['damageTaken'][MAGIC]),
               'an added effect': sum(1 for i in info if i['addEffect'])}
     for what, least in (MIN_INFO if min_info is None else min_info).items():
         if counts[what] < least:
             problems.append(f'only {counts[what]} mobs with {what} (expected at least {least})')
-    if len(regimes) < min_regimes:
-        problems.append(f'only {len(regimes)} training regimes (expected at least {min_regimes})')
     charmable = sum(1 for r in records.values() if r['flags'] & schema.MobFlag.CHARMABLE)
     if charmable < min_charmable:
         problems.append(f'only {charmable} charmable mobs (expected at least {min_charmable})')
@@ -269,7 +264,7 @@ def main(argv) -> int:
         items = schema.parse_items(items_path.read_text(encoding='utf-8'), str(items_path))
         tables = []
         for parse, name in ((schema.parse_info, schema.INFO_NAME), (schema.parse_skills, schema.SKILLS_NAME),
-                            (schema.parse_spells, schema.SPELLS_NAME), (schema.parse_regimes, schema.REGIMES_NAME)):
+                            (schema.parse_spells, schema.SPELLS_NAME)):
             path = pathlib.Path(argv[1]).parent / name
             tables.append(parse(path.read_text(encoding='utf-8'), str(path)))
         problems = (check(records) + check_drops(records, lists) + check_items(items) + check_info(records, *tables) +

@@ -8,9 +8,9 @@
  * taken, resistance ranks, magic evasion, resist traits, jobs, spawn
  * window, lottery chance, senses, absorbs, traits, TP moves, spells, stats
  * and combat stats at each level and loot, every item with magic accuracy,
- * the TP move and spell lists, the training regimes' pages, the /check
- * and aggro rules the server loaded and the settings it ran with to
- * $HEADSUP_DUMP_PATH as JSON and exits.
+ * the TP move and spell lists, the /check and aggro rules the server
+ * loaded and the settings it ran with to $HEADSUP_DUMP_PATH as JSON and
+ * exits.
  ************************************************************************/
 
 #include "common/lua.h"
@@ -341,50 +341,6 @@ namespace
         std::fputs("\n]", out);
     }
 
-    // The training regimes' pages, kept in a local table of scripts/globals/regimes.lua that only its functions see:
-    // {type: {zone: [[the four counts, min level, max level, experience, regime], ...]}}.
-    constexpr const char* kRegimesLua = R"lua(
-local info
-for _, f in pairs(xi.regime or {}) do
-    if type(f) == 'function' then
-        local i = 1
-        while not info do
-            local name, value = debug.getupvalue(f, i)
-            if not name then break end
-            if name == 'regimeInfo' then info = value end
-            i = i + 1
-        end
-    end
-end
-local types = {}
-for _, t in pairs(xi.regime and xi.regime.type or {}) do
-    local zones = {}
-    for zone, z in pairs(info and info[t] and info[t].zone or {}) do
-        local pages = {}
-        for _, page in ipairs(z.page or {}) do
-            local values = {}
-            for _, v in ipairs(page) do values[#values + 1] = string.format('%d', v) end
-            pages[#pages + 1] = '[' .. table.concat(values, ',') .. ']'
-        end
-        zones[#zones + 1] = '"' .. zone .. '":[' .. table.concat(pages, ',') .. ']'
-    end
-    types[#types + 1] = '"' .. t .. '":{' .. table.concat(zones, ',') .. '}'
-end
-return '{' .. table.concat(types, ',') .. '}'
-)lua";
-
-    void WriteRegimes(FILE* out)
-    {
-        auto result = ::lua.safe_script(kRegimesLua, sol::script_pass_on_error);
-        if (!result.valid())
-        {
-            const sol::error error = result;
-            ShowError("headsup_dump: the training regimes: %s", error.what());
-            std::_Exit(1);
-        }
-        std::fprintf(out, "\"regimes\":%s", result.get<std::string>().c_str());
-    }
-
     // isSitting reads only the entity's animation: try each on one mob, then give it its own back.
     void WriteSittingAnimations(FILE* out, CMobEntity* PMob)
     {
@@ -624,8 +580,6 @@ class HeadsUpDumpModule : public CPPModule
         WriteSkillLists(out, skillLists);
         std::fputs(",\n", out);
         WriteSpellLists(out, spellLists);
-        std::fputs(",\n", out);
-        WriteRegimes(out);
         std::fputs(",\n", out);
         WriteItems(out);
         std::fputs(",\n", out);

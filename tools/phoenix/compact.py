@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Turn one or more headsup_dump JSON files of the same server into phoenix_mobs.tsv, phoenix_drops.tsv,
-phoenix_items.tsv, phoenix_mob_info.tsv, phoenix_skills.tsv, phoenix_spells.tsv, phoenix_regimes.tsv,
-phoenix_mobs.meta and phoenix_rules.json. Each mob's script in the server's checkout says which training regimes it
-counts for and what its melee hits add.
+phoenix_items.tsv, phoenix_mob_info.tsv, phoenix_skills.tsv, phoenix_spells.tsv, phoenix_mobs.meta and
+phoenix_rules.json. Each mob's script in the server's checkout says what its melee hits add.
 
 Usage: compact.py LIVE_SETTINGS SERVER_DIR DUMP_JSON [DUMP_JSON ...] OUT_DIR PHOENIX_COMMIT
 
@@ -33,9 +32,6 @@ DAMAGE_MODS = ['udmgphys', 'dmgphys', 'udmgmagic', 'dmgmagic', 'dmgmagic_ii', 'u
                'dmgbreath', 'dmg']
 TRAIT_MODS = ['regen', 'refresh', 'regain', 'blink', 'utsusemi', 'counter', 'spikes', 'enspell']
 PER_TEN_THOUSAND = 10000
-REGIME_TYPE_NAMES = {'1': 'fields', '2': 'grounds'}  # scripts/globals/regimes.lua's xi.regime.type
-# A kill counts for the regime by its ID alone: the type a script passes only picks the alliance rule.
-CHECK_REGIME = re.compile(r'xi\.regime\.checkRegime\(\s*player\s*,\s*mob\s*,\s*(\d+)\s*,\s*(\d+)\s*,')
 # What a script's onAdditionalEffect adds, in the order looked for: one of xi.mob.ae, a status effect, an element's damage.
 ADD_EFFECTS = (re.compile(r'xi\.mob\.ae\.([A-Z_]+)'), re.compile(r'effectId\s*=\s*xi\.effect\.([A-Z_]+)'),
                re.compile(r'magicalElement\s*=\s*xi\.element\.([A-Z]+)'))
@@ -110,17 +106,16 @@ def traits(values) -> int:
 
 
 class Scripts:
-    """What each mob script of a server checkout says: the regimes it counts for and what its melee hits add."""
+    """What each mob script of a server checkout says its melee hits add."""
 
     def __init__(self, server):
         self.server, self.facts = pathlib.Path(server), {}
 
-    def of(self, zone_name, script):
+    def add_effect(self, zone_name, script):
         key = (zone_name, script)
         if key not in self.facts:
             path = self.server / 'scripts' / 'zones' / zone_name / 'mobs' / f'{script}.lua'
             text = path.read_text(encoding='utf-8', errors='replace') if path.is_file() else ''
-            regimes = [(int(regime), int(target)) for regime, target in CHECK_REGIME.findall(text)]
             effect = None
             body = text.split('onAdditionalEffect', 1)[1] if 'onAdditionalEffect' in text else ''
             for number, pattern in enumerate(ADD_EFFECTS):
@@ -129,7 +124,7 @@ class Scripts:
                     name = EFFECT_NAMES.get(found.group(1), title(found.group(1)))
                     effect = name + ' Damage' if number == len(ADD_EFFECTS) - 1 else name
                     break
-            self.facts[key] = regimes, effect
+            self.facts[key] = effect
         return self.facts[key]
 
 
@@ -231,38 +226,11 @@ def lists_text(columns, numbers) -> str:
     return '\t'.join(columns) + '\n' + ''.join(row + '\n' for row in rows)
 
 
-def regime_rows(raw, source) -> list:
-    """The dump's {type: {zone: [page, ...]}} as a row a regime, in ID order: each page is its four counts, its level
-    range, its experience and its regime, and its page number is its place in the zone's list."""
-    rows = {}
-    try:
-        for kind, zones in raw.items():
-            for zone, pages in zones.items():
-                for page_number, page in enumerate(pages, start=1):
-                    counts, low, high, exp, regime = page[:4], page[4], page[5], page[6], page[7]
-                    if regime in rows:
-                        raise schema.DataError(f'{source}: regime {regime} is on two pages')
-                    rows[regime] = {'regime': regime, 'type': REGIME_TYPE_NAMES[kind], 'zone': int(zone),
-                                    'page': page_number, 'counts': counts, 'minLevel': low, 'maxLevel': high, 'exp': exp}
-    except (KeyError, TypeError, ValueError, IndexError, AttributeError) as error:
-        raise schema.DataError(f'{source}: the regimes are not as headsup_dump.cpp writes them ({error!r})') from error
-    return [rows[regime] for regime in sorted(rows)]
-
-
-def regimes_text(regimes) -> str:
-    return '\t'.join(schema.REGIME_COLUMNS) + '\n' + ''.join(
-        '\t'.join(cell(regime[column]) for column in schema.REGIME_COLUMNS) + '\n' for regime in regimes)
-
-
-def info_row(mob, scripts, regimes) -> str:
-    targets, effect = scripts.of(mob['zoneName'], mob['script'])
-    for regime, _ in targets:
-        if regime not in regimes:
-            raise schema.DataError(f"mob {mob['id']}'s script counts it for regime {regime}, which the dump has not")
+def info_row(mob, scripts) -> str:
+    effect = scripts.add_effect(mob['zoneName'], mob['script'])
     values = dict(mob, window=mob.get('window', ''), lottery=mob.get('lottery', [0, 0]), traits=traits(mob['traits']),
                   addEffect=(effect or schema.UNKNOWN_ADD_EFFECT) if mob['addEffect'] > 0 else '',
-                  damageTaken=damage_taken(mob['damageMods']), skills=mob['skillsNumber'], spells=mob['spellsNumber'],
-                  regimes=';'.join(f'{regime}:{target}' for regime, target in targets))
+                  damageTaken=damage_taken(mob['damageMods']), skills=mob['skillsNumber'], spells=mob['spellsNumber'])
     return '\t'.join(cell(values[column]) for column in schema.INFO_COLUMNS)
 
 
@@ -352,7 +320,6 @@ def load(path, settings):
         skill_lists = {raw['id']: tuple((move, title(names[move])) for move in raw['skills'] if move in names)
                        for raw in dump['skillLists']}
         spell_lists = [tuple(tuple(spell) for spell in raw) for raw in dump['spellLists']]
-        regimes = regime_rows(dump['regimes'], path)
     except (KeyError, TypeError) as error:
         raise schema.DataError(f'{path}: not a dump this compact.py reads ({error!r})') from error
     check_settings(dump.get('settings'), settings, path)
@@ -375,7 +342,7 @@ def load(path, settings):
             raise schema.DataError(f"{path}: mob {mob['id']} has spell list {spells!r}, past the {len(spell_lists)} dumped")
         mob['skills'] = skill_lists.get(mob['skillList'], ())
         mob['spells'] = spell_lists[spells - 1] if spells else ()
-    return mobs, rules, items, regimes
+    return mobs, rules, items
 
 
 def agreed(dump_paths, values, what):
@@ -390,7 +357,7 @@ def compact(dump_paths, out_dir, commit, settings_path, server_dir):
     settings = live_settings(settings_path.read_text(encoding='utf-8'), settings_path.name)
     snapshots = [load(path, settings) for path in dump_paths]
     differing = set()
-    mobs = sorted(merge((dump_mobs for dump_mobs, _, _, _ in snapshots), differing), key=lambda m: m['id'])
+    mobs = sorted(merge((dump_mobs for dump_mobs, _, _ in snapshots), differing), key=lambda m: m['id'])
     if differing:
         shown = ', '.join(str(i) for i in sorted(differing)[:DIFFERING_SHOWN])
         print(f'compact: {len(differing)} mobs have another drop list in a later dump, kept the first: {shown}'
@@ -398,25 +365,22 @@ def compact(dump_paths, out_dir, commit, settings_path, server_dir):
     drops = drops_text(mobs)
     text = '\t'.join(schema.COLUMNS) + '\n' + '\n'.join(row(m) for m in mobs) + '\n'
     schema.generate(schema.parse(text, schema.TSV_NAME), schema.parse_drops(drops, schema.DROPS_NAME), commit)
-    items = items_text(agreed(dump_paths, [items for _, _, items, _ in snapshots], 'items'))
+    items = items_text(agreed(dump_paths, [items for _, _, items in snapshots], 'items'))
     schema.generate_items(schema.parse_items(items, schema.ITEMS_NAME), commit)
-    regimes = agreed(dump_paths, [regimes for _, _, _, regimes in snapshots], 'regimes')
     skills = lists_text(schema.SKILL_COLUMNS, numbered(mobs, 'skills', 'skillsNumber'))
     spells = lists_text(schema.SPELL_COLUMNS, numbered(mobs, 'spells', 'spellsNumber'))
-    scripts, by_id = Scripts(server_dir), {regime['regime']: regime for regime in regimes}
-    info = '\t'.join(schema.INFO_COLUMNS) + '\n' + ''.join(info_row(m, scripts, by_id) + '\n' for m in mobs)
-    regime_table = regimes_text(regimes)
+    scripts = Scripts(server_dir)
+    info = '\t'.join(schema.INFO_COLUMNS) + '\n' + ''.join(info_row(m, scripts) + '\n' for m in mobs)
     schema.generate_info(schema.parse(text, schema.TSV_NAME), schema.parse_info(info), schema.parse_skills(skills),
-                         schema.parse_spells(spells), schema.parse_regimes(regime_table), commit)
-    rules_text = gen_rules.format_rules(agreed(dump_paths, [rules for _, rules, _, _ in snapshots], 'rules'))
+                         schema.parse_spells(spells), commit)
+    rules_text = gen_rules.format_rules(agreed(dump_paths, [rules for _, rules, _ in snapshots], 'rules'))
     gen_rules.parse(rules_text, gen_rules.RULES_NAME)
     out_dir = pathlib.Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / schema.TSV_NAME).write_text(text, encoding='utf-8')
     (out_dir / schema.DROPS_NAME).write_text(drops, encoding='utf-8')
     (out_dir / schema.ITEMS_NAME).write_text(items, encoding='utf-8')
-    for name, contents in ((schema.INFO_NAME, info), (schema.SKILLS_NAME, skills), (schema.SPELLS_NAME, spells),
-                           (schema.REGIMES_NAME, regime_table)):
+    for name, contents in ((schema.INFO_NAME, info), (schema.SKILLS_NAME, skills), (schema.SPELLS_NAME, spells)):
         (out_dir / name).write_text(contents, encoding='utf-8')
     (out_dir / gen_rules.RULES_NAME).write_text(rules_text, encoding='utf-8')
     zones = len({m['zone'] for m in mobs})

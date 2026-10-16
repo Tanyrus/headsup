@@ -28,7 +28,6 @@ namespace headsup
         constexpr const char* kStatNames[kStatCount] = {"STR", "DEX", "VIT", "AGI", "INT", "MND", "CHR", "MEva"};
         constexpr const char* kCombatNames[kCombatCount] = {"HP", "MP", "ATT", "DEF", "EVA", "ACC"};
         constexpr const char* kDamageKindNames[kDamageKindCount] = {"Physical", "Magic", "Ranged", "Breath"};
-        constexpr const char* kRegimeBooks[kRegimeTypeCount] = {"Fields of Valor", "Grounds of Valor"};
         constexpr std::pair<MobTrait, const char*> kTraitNames[] = {{kTraitRegen, "Regen"}, {kTraitRefresh, "Refresh"},
             {kTraitRegain, "Regain"}, {kTraitShadows, "Shadows"}, {kTraitCounter, "Counter"}};
         constexpr int kWholeAbsorb = 100; // percent
@@ -158,17 +157,6 @@ namespace headsup
                 if (name != nullptr && *name != '\0') names.emplace_back(name);
             }
             return names;
-        }
-
-        std::optional<PopupSection> Training(const MobRecord& mob)
-        {
-            PopupSection training{"Training", {}};
-            for (const MobRegime& ref : RegimesOf(mob))
-                if (const Regime* regime = RegimeById(ref.regime))
-                    training.rows.push_back(LineOf(std::string(kRegimeBooks[static_cast<int>(regime->type)]) + " page " +
-                        std::to_string(regime->page) + ": kill " + std::to_string(regime->counts[ref.target - 1]) +
-                        ", Lv " + std::to_string(regime->minLevel) + "-" + std::to_string(regime->maxLevel)));
-            return training.rows.empty() ? std::nullopt : std::optional<PopupSection>(std::move(training));
         }
 
         // "20:00"
@@ -372,7 +360,6 @@ namespace headsup
             if (std::optional<PopupSection> list = NameList("Spells", SpellsAt(mob, level, state)))
                 popup.sections.push_back(std::move(*list));
             popup.sections.push_back(Spawn(mob, state));
-            if (std::optional<PopupSection> training = Training(mob)) popup.sections.push_back(std::move(*training));
             for (PopupSection& loot : Loot(mob, state))
                 popup.sections.push_back(std::move(loot));
             return popup;

@@ -182,7 +182,7 @@ TEST(the_target_popup_has_every_element_and_status_with_its_percent)
     for (const PopupSection& s : popup.sections)
         headings.push_back(s.heading);
     CHECK(headings == (std::vector<std::string>{"", "Damage taken", "Elements", "Statuses", "Immune", "Stats at Lv 20",
-                                                "TP moves", "Spawn", "Training"}));
+                                                "TP moves", "Spawn"}));
     const PopupRow& elements = Section(popup, "Elements")->rows[0];
     CHECK(elements.kind == RowKind::Grid && elements.columns == 4 && elements.cells.size() == 8);
     CHECK(elements.cells[6].icon == Icon::Light);
@@ -202,8 +202,6 @@ TEST(the_target_popup_has_every_element_and_status_with_its_percent)
     const PopupRow& moves = Section(popup, "TP moves")->rows[0];
     CHECK(moves.kind == RowKind::Grid && moves.columns == 3 && moves.cells.size() == 3);
     CHECK(Joined(moves.cells[0].text) == "Goblin Rush" && Joined(moves.cells[2].text) == "Bomb Toss Suicide");
-    // Valkurm Dunes' fifth Fields of Valor page wants two of it, at 22 to 25 (regimes.lua's regime 57).
-    CHECK(Lines(*Section(popup, "Training")) == (std::vector<std::string>{"Fields of Valor page 5: kill 2, Lv 22-25"}));
     const PopupRow& statuses = Section(popup, "Statuses")->rows[0];
     CHECK(statuses.columns == 5 && statuses.cells.size() == 10 && statuses.cells[0].icon == Icon::Paralyze);
     CHECK(Section(popup, "Immune")->rows[0].cells[0].text == (std::vector<Span>{{"None", Tone::Neutral}}));

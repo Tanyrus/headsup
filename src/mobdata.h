@@ -101,7 +101,6 @@ namespace headsup
         uint16_t combat;          // index into the runs CombatAt reads; 0 is none
         uint16_t skills;          // its TP move list, 0 when none
         uint16_t spells;          // its spell list, 0 when none
-        uint16_t regimes;         // the run of regimes it counts for, 0 when none
     };
 
     // A mob's HP, MP, attack, defense, evasion and accuracy at one level, in mobflags.h's Combat order.
@@ -130,27 +129,6 @@ namespace headsup
         uint16_t spell; // the game's spell ID
         uint8_t minLevel;
         uint8_t maxLevel;
-    };
-
-    // A Fields or Grounds of Valor regime: its zone and page there, how many of each of its targets to kill, its
-    // level range and the experience it gives.
-    struct Regime
-    {
-        uint16_t id;
-        RegimeType type;
-        uint16_t zone;
-        uint8_t page;
-        uint8_t counts[kRegimeTargets];
-        uint8_t minLevel;
-        uint8_t maxLevel;
-        uint16_t exp;
-    };
-
-    // A regime a mob counts for, and which of the page's targets it is, from 1.
-    struct MobRegime
-    {
-        uint16_t regime;
-        uint8_t target;
     };
 
     bool IsAggressive(const MobRecord& mob);
@@ -184,12 +162,8 @@ namespace headsup
     // Its absorbs and damage taken; none for a record the data does not have.
     const MobDefenses& DefensesOf(const MobRecord& mob);
 
-    // Its TP moves, its spells and the regimes it counts for, each empty when it has none.
+    // Its TP moves and its spells, each empty when it has none.
     std::span<const MobSkill> SkillsOf(const MobRecord& mob);
     std::span<const MobSpell> SpellsOf(const MobRecord& mob);
-    std::span<const MobRegime> RegimesOf(const MobRecord& mob);
-
-    // The regime of that ID; nullptr when there is none.
-    const Regime* RegimeById(uint16_t id);
 
 }

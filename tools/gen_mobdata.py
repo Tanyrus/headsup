@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Generate src/generated/mobdata.inc, mob_info.inc, item_magic.inc and mobflags.h from data/phoenix_mobs.tsv,
-data/phoenix_drops.tsv, data/phoenix_items.tsv, data/phoenix_mob_info.tsv, data/phoenix_skills.tsv,
-data/phoenix_spells.tsv and data/phoenix_regimes.tsv (written by tools/phoenix/refresh.sh), with each distinct set of
-resistances stored once for the mobs to point at, and each distinct drop list, run of stats, set of defenses and run of
-combat stats too.
+data/phoenix_drops.tsv, data/phoenix_items.tsv, data/phoenix_mob_info.tsv, data/phoenix_skills.tsv and
+data/phoenix_spells.tsv (written by tools/phoenix/refresh.sh), with each distinct set of resistances stored once for the
+mobs to point at, and each distinct drop list, run of stats, set of defenses and run of combat stats too.
 
 This file owns the TSVs' format: their columns and ranges, the bits of the flags, detects and immunity columns, the order
 of the list columns, the drop kinds, the names of the data files and the meta file's commit key. The Phoenix tools
@@ -21,7 +20,6 @@ ITEMS_NAME = 'phoenix_items.tsv'
 INFO_NAME = 'phoenix_mob_info.tsv'
 SKILLS_NAME = 'phoenix_skills.tsv'
 SPELLS_NAME = 'phoenix_spells.tsv'
-REGIMES_NAME = 'phoenix_regimes.tsv'
 META_NAME = 'phoenix_mobs.meta'
 META_COMMIT_KEY = 'phoenix_commit'
 COLUMNS = ['id', 'zone', 'name', 'minLevel', 'maxLevel', 'flags', 'respawn', 'detects', 'expLevelMod', 'placeholderOf',
@@ -66,29 +64,21 @@ DROP_LIMITS = {'list': (1, 0xFFFF), 'group': (0, 0xFF), 'groupRate': (0, PER_MIL
 # its own kill; 0,0 for any other mob. traits: Trait bits. addEffect: what its melee hits add, empty for none. absorb:
 # the percent chance it absorbs each element (ELEMENT_ORDER). damageTaken: damage of each DAMAGE_ORDER kind is
 # multiplied by 1 + value / 10000. skills and spells: its TP move list and spell list, numbered from 1 (0 for none).
-# regimes: regime:target pairs separated by semicolons, the target from 1 to 4 of the regime's page. combat: one list
-# of COMBAT_ORDER a level, like phoenix_mobs.tsv's stats.
+# combat: one list of COMBAT_ORDER a level, like phoenix_mobs.tsv's stats.
 INFO_COLUMNS = ['id', 'jobs', 'senses', 'window', 'lottery', 'traits', 'addEffect', 'absorb', 'damageTaken', 'skills',
-                'spells', 'regimes', 'combat']
+                'spells', 'combat']
 INFO_LISTS = {'jobs': (2, 0, 0xFF), 'senses': (2, 0, 0xFF), 'absorb': (len(ELEMENT_ORDER), *INT16)}
 INFO_LIMITS = {'id': (1, 0xFFFFFFFF), 'traits': (0, 0xFF), 'skills': (0, 0xFFFF), 'spells': (0, 0xFFFF)}
 HOURS = 24
 INT32 = (-0x80000000, 0x7FFFFFFF)
 DAMAGE_ORDER = ['Physical', 'Magic', 'Ranged', 'Breath']
 COMBAT_ORDER = ['Hp', 'Mp', 'Attack', 'Defense', 'Evasion', 'Accuracy']
-REGIME_TARGETS = 4
 UNKNOWN_ADD_EFFECT = 'Unknown'  # addEffect of a mob whose melee hits add something its script does not name
 # phoenix_skills.tsv: each TP move list, numbered from 1 with its rows together: a move's ID and name.
 SKILL_COLUMNS = ['list', 'skill', 'name']
 # phoenix_spells.tsv: each spell list the same way: a spell's ID (the game's) and the levels it is cast from and to.
 SPELL_COLUMNS = ['list', 'spell', 'minLevel', 'maxLevel']
 SPELL_LIMITS = {'list': (1, 0xFFFF), 'spell': (1, 0xFFFF), 'minLevel': (0, 0xFF), 'maxLevel': (0, 0xFF)}
-# phoenix_regimes.tsv: every Fields and Grounds of Valor regime by ID: its book, zone and page there, how many of each
-# of its four targets to kill, its level range and the experience it gives.
-REGIME_COLUMNS = ['regime', 'type', 'zone', 'page', 'counts', 'minLevel', 'maxLevel', 'exp']
-REGIME_TYPES = ['fields', 'grounds']
-REGIME_LIMITS = {'regime': (1, 0xFFFF), 'zone': (0, 0xFFFF), 'page': (1, 0xFF), 'minLevel': (0, 0xFF),
-                 'maxLevel': (0, 0xFF), 'exp': (0, 0xFFFF)}
 
 
 class MobFlag(enum.IntFlag):
@@ -289,16 +279,6 @@ def levels_of(value: str, count: int, lo: int, hi: int, what: str) -> list:
     return [whole_numbers(level, count, lo, hi, what) for level in value.split(LEVEL_SEPARATOR)] if value else []
 
 
-def regime_targets(value: str, what: str) -> list:
-    pairs = []
-    for pair in value.split(LEVEL_SEPARATOR) if value else []:
-        regime, colon, target = pair.partition(':')
-        if not colon:
-            raise DataError(f'{what} must be regime:target pairs separated by semicolons, got {value!r}')
-        pairs.append((number(regime, *REGIME_LIMITS['regime'], what), number(target, 1, REGIME_TARGETS, what)))
-    return pairs
-
-
 def parse_info(text: str, source: str = INFO_NAME):
     """A dict of INFO_COLUMNS for each mob, in increasing ID order."""
     info, last_id = [], 0
@@ -313,7 +293,6 @@ def parse_info(text: str, source: str = INFO_NAME):
             raise DataError(f'{at}: a lottery chance is a percent, got {record["lottery"][0]}')
         record['addEffect'] = row['addEffect']
         record['damageTaken'] = whole_numbers(row['damageTaken'], len(DAMAGE_ORDER), *INT16, f'{at}: damageTaken')
-        record['regimes'] = regime_targets(row['regimes'], f'{at}: regimes')
         record['combat'] = levels_of(row['combat'], len(COMBAT_ORDER), *INT32, f'{at}: combat')
         if record['id'] <= last_id:
             raise DataError(f'{at}: ids must be strictly increasing')
@@ -352,23 +331,6 @@ def parse_spells(text: str, source: str = SPELLS_NAME):
             yield line, {column: number(row[column], *limits, f'{source}:{line}: {column}')
                          for column, limits in SPELL_LIMITS.items()}
     return numbered_lists(rows(), source)
-
-
-def parse_regimes(text: str, source: str = REGIMES_NAME):
-    """The regimes in increasing ID order, each a dict of REGIME_COLUMNS."""
-    regimes, last_id = [], 0
-    for line, row in table_rows(text, REGIME_COLUMNS, source):
-        at = f'{source}:{line}'
-        if row['type'] not in REGIME_TYPES:
-            raise DataError(f'{at}: type must be one of {", ".join(REGIME_TYPES)}, got {row["type"]!r}')
-        regime = {column: number(row[column], *limits, f'{at}: {column}') for column, limits in REGIME_LIMITS.items()}
-        regime['type'] = row['type']
-        regime['counts'] = whole_numbers(row['counts'], REGIME_TARGETS, 0, 0xFF, f'{at}: counts')
-        if regime['regime'] <= last_id:
-            raise DataError(f'{at}: regimes must be strictly increasing')
-        last_id = regime['regime']
-        regimes.append(regime)
-    return regimes
 
 
 def group_weights(entries) -> list:
@@ -526,10 +488,9 @@ def spans(groups) -> tuple:
     return entries, starts
 
 
-def check_info(records, info, skills, spells, regimes):
+def check_info(records, info, skills, spells):
     if [r['id'] for r in records] != [i['id'] for i in info]:
         raise DataError(f'{INFO_NAME} must have a row for each mob of {TSV_NAME}, in its order')
-    known = {regime['regime']: regime for regime in regimes}
     for r, i in zip(records, info):
         levels = r['maxLevel'] - r['minLevel'] + 1
         if i['combat'] and (r['minLevel'] == 0 or len(i['combat']) != levels):
@@ -538,45 +499,35 @@ def check_info(records, info, skills, spells, regimes):
         if i['skills'] > len(skills) or i['spells'] > len(spells):
             raise DataError(f"mob {r['id']} has TP move list {i['skills']} and spell list {i['spells']}, past the "
                             f"{len(skills)} in {SKILLS_NAME} or the {len(spells)} in {SPELLS_NAME}")
-        for regime, target in i['regimes']:
-            if regime not in known or known[regime]['counts'][target - 1] == 0:
-                raise DataError(f"mob {r['id']} counts for target {target} of regime {regime}, which {REGIMES_NAME} "
-                                'does not have')
 
 
-def generate_info(records, info, skills, spells, regimes, commit: str) -> str:
+def generate_info(records, info, skills, spells, commit: str) -> str:
     """mob_info.inc: kMobInfo, each distinct row once, kMobInfoOf beside kMobs, each mob's row, and the tables the rows
     point into."""
-    check_info(records, info, skills, spells, regimes)
+    check_info(records, info, skills, spells)
     defenses = {NEUTRAL_DEFENSES: 0}
     defense_indices = [defenses.setdefault(tuple(i['absorb']) + tuple(i['damageTaken']), len(defenses)) for i in info]
     if len(defenses) > 0xFFFF:
         raise DataError(f'{len(defenses)} distinct defenses do not fit MobInfo::defenses')
     combat_lines, combat, runs = run_tables((i['combat'] for i in info), 'MobCombat', 'kMobCombat', 'kMobCombatRuns',
                                             'MobInfo::combat')
-    regime_runs = {(): 0}
-    regime_indices = [regime_runs.setdefault(tuple(i['regimes']), len(regime_runs)) for i in info]
     skill_entries, skill_starts = spans([f"{{{e['skill']}, {c_string(e['name'])}}}," for e in s] for s in skills)
     spell_entries, spell_starts = spans([f"{{{e['spell']}, {e['minLevel']}, {e['maxLevel']}}}," for e in s] for s in spells)
-    ref_entries, ref_starts = spans([f'{{{regime}, {target}}},' for regime, target in run] for run in list(regime_runs)[1:])
-    lines = [f'// Generated by tools/gen_mobdata.py from data/{INFO_NAME}, data/{SKILLS_NAME}, data/{SPELLS_NAME} and '
-             f'data/{REGIMES_NAME} (Phoenix {commit}). Do not edit.',
+    lines = [f'// Generated by tools/gen_mobdata.py from data/{INFO_NAME}, data/{SKILLS_NAME} and data/{SPELLS_NAME} '
+             f'(Phoenix {commit}). Do not edit.',
              f'// {len(info)} mobs, {len(defenses)} distinct defenses, {runs - 1} distinct runs of combat stats, '
-             f'{len(skills)} TP move lists, {len(spells)} spell lists and {len(regimes)} regimes.']
+             f'{len(skills)} TP move lists and {len(spells)} spell lists.']
     lines += ['const MobSkill kMobSkills[] = {'] + skill_entries + ['};', '', 'const MobSpan kMobSkillLists[] = {']
     lines += skill_starts + ['};', '', 'const MobSpell kMobSpells[] = {'] + spell_entries + ['};', '']
-    lines += ['const MobSpan kMobSpellLists[] = {'] + spell_starts + ['};', '', 'const Regime kRegimes[] = {']
-    lines += [f"    {{{g['regime']}, RegimeType::{g['type'].capitalize()}, {g['zone']}, {g['page']}, {c_list(g['counts'])}, "
-              f"{g['minLevel']}, {g['maxLevel']}, {g['exp']}}}," for g in regimes]
-    lines += ['};', '', 'const MobRegime kMobRegimes[] = {'] + ref_entries + ['};', '', 'const MobSpan kMobRegimeRuns[] = {']
-    lines += ref_starts + ['};', ''] + combat_lines + ['const MobDefenses kMobDefenses[] = {']
+    lines += ['const MobSpan kMobSpellLists[] = {'] + spell_starts + ['};', ''] + combat_lines
+    lines += ['const MobDefenses kMobDefenses[] = {']
     lines += [f'    {{{c_list(key[:len(ELEMENT_ORDER)])}, {c_list(key[len(ELEMENT_ORDER):])}}},' for key in defenses]
     rows, row_indices = {}, []
-    for i, defense, run, regime_run in zip(info, defense_indices, combat, regime_indices):
+    for i, defense, run in zip(info, defense_indices, combat):
         start, end = i['window'] or (NO_WINDOW, NO_WINDOW)
         row = (f"    {{{i['jobs'][0]}, {i['jobs'][1]}, {i['senses'][0]}, {i['senses'][1]}, {start}, {end}, "
                f"{i['lottery'][0]}, {i['lottery'][1]}u, {i['traits']}, {c_string(i['addEffect'])}, {defense}, {run}, "
-               f"{i['skills']}, {i['spells']}, {regime_run}}},")
+               f"{i['skills']}, {i['spells']}}},")
         row_indices.append(rows.setdefault(row, len(rows)))
     if len(rows) > 0xFFFF:
         raise DataError(f'{len(rows)} distinct rows of mob info do not fit kMobInfoOf')
@@ -612,10 +563,9 @@ def generate_flags() -> str:
     lines += (cpp_order('Sdt', SDT_ORDER) + cpp_order('Element', ELEMENT_ORDER) + cpp_order('StatusRank', STATUS_RANK_ORDER)
               + cpp_order('Stat', STAT_ORDER))
     lines += ['', '    // MobDrop::kind.'] + cpp_order('DropKind', [kind.capitalize() for kind in DROP_KINDS])
-    lines += ['', '    // The order of MobDefenses::damageTaken and MobCombat::value, and Regime::type.']
-    lines += (cpp_order('DamageKind', DAMAGE_ORDER) + cpp_order('Combat', COMBAT_ORDER) +
-              cpp_order('RegimeType', [kind.capitalize() for kind in REGIME_TYPES]))
-    lines += [f'    constexpr int kRegimeTargets = {REGIME_TARGETS};', f'    constexpr uint8_t kNoWindow = {NO_WINDOW};',
+    lines += ['', '    // The order of MobDefenses::damageTaken and MobCombat::value.']
+    lines += cpp_order('DamageKind', DAMAGE_ORDER) + cpp_order('Combat', COMBAT_ORDER)
+    lines += [f'    constexpr uint8_t kNoWindow = {NO_WINDOW};',
               f'    constexpr const char* kUnknownAddEffect = {c_string(UNKNOWN_ADD_EFFECT)};']
     lines += ['}', '']
     return '\n'.join(lines)
@@ -637,8 +587,8 @@ def main() -> int:
         lists = parse_drops((root / 'data' / DROPS_NAME).read_text(encoding='utf-8'), str(root / 'data' / DROPS_NAME))
         items = parse_items((root / 'data' / ITEMS_NAME).read_text(encoding='utf-8'), str(root / 'data' / ITEMS_NAME))
         tables = [parse((root / 'data' / name).read_text(encoding='utf-8'), str(root / 'data' / name))
-                  for parse, name in ((parse_info, INFO_NAME), (parse_skills, SKILLS_NAME), (parse_spells, SPELLS_NAME),
-                                      (parse_regimes, REGIMES_NAME))]
+                  for parse, name in ((parse_info, INFO_NAME), (parse_skills, SKILLS_NAME),
+                                      (parse_spells, SPELLS_NAME))]
         commit = read_commit(root / 'data' / META_NAME)
         text, items_text = generate(records, lists, commit), generate_items(items, commit)
         info_text = generate_info(records, *tables, commit)

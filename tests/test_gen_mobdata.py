@@ -241,32 +241,29 @@ class Items(unittest.TestCase):
             gen.generate_items([], 'abc')
 
 
-INFO_HEADER = 'id\tjobs\tsenses\twindow\tlottery\ttraits\taddEffect\tabsorb\tdamageTaken\tskills\tspells\tregimes\tcombat'
+INFO_HEADER = 'id\tjobs\tsenses\twindow\tlottery\ttraits\taddEffect\tabsorb\tdamageTaken\tskills\tspells\tcombat'
 ABSORB_NONE, TAKEN_NONE = ','.join(['0'] * 8), '0,0,0,0'
 # Rows for GOOD's three mobs. The worm's combat stats are a level's HP, MP, attack, defense, evasion and accuracy; the
 # goblin takes a quarter less magic damage and half breath damage, as Citipati does (Attohwa Chasm), spawns from
 # 20:00 to 04:00 and is a lottery NM at 15% with three hours out after its kill, absorbs wind, regenerates and
-# counters, and counts for the first target of regime 56 and the second of 640.
-INFO = (INFO_HEADER + f'\n17190918\t1,1\t15,8\t\t0,0\t0\t\t{ABSORB_NONE}\t{TAKEN_NONE}\t0\t0\t\t\n' +
-        f'17191194\t5,5\t15,8\t\t0,0\t0\t\t{ABSORB_NONE}\t{TAKEN_NONE}\t1\t0\t\t103,0,19,21,17,19;111,0,21,23,19,21\n'
-        '17199648\t6,4\t15,8\t20,4\t15,10800\t17\tPoison\t0,0,100,0,0,0,0,0\t0,-2500,0,-5000\t1\t1\t56:1;640:2\t\n')
+# counters.
+INFO = (INFO_HEADER + f'\n17190918\t1,1\t15,8\t\t0,0\t0\t\t{ABSORB_NONE}\t{TAKEN_NONE}\t0\t0\t\n' +
+        f'17191194\t5,5\t15,8\t\t0,0\t0\t\t{ABSORB_NONE}\t{TAKEN_NONE}\t1\t0\t103,0,19,21,17,19;111,0,21,23,19,21\n'
+        '17199648\t6,4\t15,8\t20,4\t15,10800\t17\tPoison\t0,0,100,0,0,0,0,0\t0,-2500,0,-5000\t1\t1\t\n')
 SKILLS = 'list\tskill\tname\n1\t442\tBubble Shower\n1\t443\tBubble Curtain\n'
 SPELLS = 'list\tspell\tminLevel\tmaxLevel\n1\t159\t1\t8\n1\t220\t3\t25\n'
-REGIMES = ('regime\ttype\tzone\tpage\tcounts\tminLevel\tmaxLevel\texp\n56\tfields\t100\t5\t6,1,0,0\t4\t8\t330\n'
-           '640\tgrounds\t191\t1\t3,3,0,0\t20\t24\t500\n')
 
 
 class Info(unittest.TestCase):
     def tables(self, info=INFO):
-        return (gen.parse(GOOD), gen.parse_info(info), gen.parse_skills(SKILLS), gen.parse_spells(SPELLS),
-                gen.parse_regimes(REGIMES))
+        return gen.parse(GOOD), gen.parse_info(info), gen.parse_skills(SKILLS), gen.parse_spells(SPELLS)
 
     def test_a_row_s_values(self):
         goblin = gen.parse_info(INFO)[2]
         self.assertEqual(goblin, {'id': 17199648, 'jobs': [6, 4], 'senses': [15, 8], 'window': [20, 4],
                                   'lottery': [15, 10800], 'traits': 17, 'addEffect': 'Poison',
                                   'absorb': [0, 0, 100, 0, 0, 0, 0, 0], 'damageTaken': [0, -2500, 0, -5000], 'skills': 1,
-                                  'spells': 1, 'regimes': [(56, 1), (640, 2)], 'combat': []})
+                                  'spells': 1, 'combat': []})
         rabbit, worm = gen.parse_info(INFO)[:2]
         self.assertIsNone(rabbit['window'])
         self.assertEqual(worm['combat'], [[103, 0, 19, 21, 17, 19], [111, 0, 21, 23, 19, 21]])
@@ -278,34 +275,30 @@ class Info(unittest.TestCase):
         self.assertIn(message, str(caught.exception))
 
     def test_bad_rows_name_their_line(self):
-        good = f'1\t1,1\t15,8\t\t0,0\t0\t\t{ABSORB_NONE}\t{TAKEN_NONE}\t0\t0\t\t'
+        good = f'1\t1,1\t15,8\t\t0,0\t0\t\t{ABSORB_NONE}\t{TAKEN_NONE}\t0\t0\t'
         self.assertEqual(len(gen.parse_info(INFO_HEADER + '\n' + good + '\n')), 1)
-        self.assertBadInfo(good[:-1], 'expected 13 columns')
+        self.assertBadInfo(good[:-1], 'expected 12 columns')
         self.assertBadInfo(good.replace('\t\t0,0', '\t24,4\t0,0'), 'window must be 2 whole numbers from 0 to 23')
         self.assertBadInfo(good.replace('\t0,0\t', '\t101,0\t'), 'a lottery chance is a percent')
         self.assertBadInfo(good.replace('\t1,1\t', '\t1\t'), 'jobs must be 2 whole numbers')
-        self.assertBadInfo(good[:-2] + '\t56\t', 'regimes must be regime:target pairs')
-        self.assertBadInfo(good[:-2] + '\t56:5\t', 'regimes must be a whole number from 1 to 4')
         self.assertBadInfo(good + '1,2,3', 'combat must be 6 whole numbers')
 
     def test_the_rows_follow_the_mobs_and_their_levels(self):
-        records, info, skills, spells, regimes = self.tables()
+        records, info, skills, spells = self.tables()
         with self.assertRaises(gen.DataError) as caught:
-            gen.generate_info(records[:2], info, skills, spells, regimes, 'x')
+            gen.generate_info(records[:2], info, skills, spells, 'x')
         self.assertIn('a row for each mob of phoenix_mobs.tsv, in its order', str(caught.exception))
         with self.assertRaises(gen.DataError) as caught:
-            gen.generate_info(records, gen.parse_info(INFO.replace(';111,0,21,23,19,21', '')), skills, spells, regimes, 'x')
+            gen.generate_info(records, gen.parse_info(INFO.replace(';111,0,21,23,19,21', '')), skills, spells, 'x')
         self.assertIn('mob 17191194: combat must have a list a level from minLevel to maxLevel, 2, got 1', str(caught.exception))
 
-    def test_a_row_names_only_lists_and_regimes_there_are(self):
-        records, info, skills, spells, regimes = self.tables()
-        for broken, message in ((INFO.replace('\t1\t1\t56', '\t2\t1\t56'), 'TP move list 2'),
-                                (INFO.replace('\t1\t1\t56', '\t1\t2\t56'), 'spell list 2'),
-                                (INFO.replace('640:2', '640:3'), 'target 3 of regime 640'),
-                                (INFO.replace('56:1', '57:1'), 'target 1 of regime 57')):
+    def test_a_row_names_only_lists_there_are(self):
+        records, info, skills, spells = self.tables()
+        for broken, message in ((INFO.replace('\t1\t1\t\n', '\t2\t1\t\n'), 'TP move list 2'),
+                                (INFO.replace('\t1\t1\t\n', '\t1\t2\t\n'), 'spell list 2')):
             with self.subTest(message=message):
                 with self.assertRaises(gen.DataError) as caught:
-                    gen.generate_info(records, gen.parse_info(broken), skills, spells, regimes, 'x')
+                    gen.generate_info(records, gen.parse_info(broken), skills, spells, 'x')
                 self.assertIn(message, str(caught.exception))
 
     def test_the_tables(self):
@@ -313,26 +306,22 @@ class Info(unittest.TestCase):
         self.assertIn('const MobSkill kMobSkills[] = {\n    {442, "Bubble Shower"}, {443, "Bubble Curtain"},\n};\n', text)
         self.assertIn('const MobSpan kMobSkillLists[] = {\n    {0u, 0},\n    {0u, 2},\n};\n', text)
         self.assertIn('const MobSpell kMobSpells[] = {\n    {159, 1, 8}, {220, 3, 25},\n};\n', text)
-        self.assertIn('const Regime kRegimes[] = {\n    {56, RegimeType::Fields, 100, 5, {6, 1, 0, 0}, 4, 8, 330},\n'
-                      '    {640, RegimeType::Grounds, 191, 1, {3, 3, 0, 0}, 20, 24, 500},\n};\n', text)
-        self.assertIn('const MobRegime kMobRegimes[] = {\n    {56, 1}, {640, 2},\n};\n', text)
-        self.assertIn('const MobSpan kMobRegimeRuns[] = {\n    {0u, 0},\n    {0u, 2},\n};\n', text)
         self.assertIn('const MobCombat kMobCombat[] = {\n    {{103, 0, 19, 21, 17, 19}}, {{111, 0, 21, 23, 19, 21}},\n};\n'
                       '\nconst uint32_t kMobCombatRuns[] = {\n    0u,\n    0u,\n};\n', text)
         self.assertIn('const MobDefenses kMobDefenses[] = {\n    {{0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0}},\n'
                       '    {{0, 0, 100, 0, 0, 0, 0, 0}, {0, -2500, 0, -5000}},\n};\n', text)
         self.assertIn('const MobInfo kMobInfo[] = {\n'
-                      '    {1, 1, 15, 8, 255, 255, 0, 0u, 0, "", 0, 0, 0, 0, 0},\n'
-                      '    {5, 5, 15, 8, 255, 255, 0, 0u, 0, "", 0, 1, 1, 0, 0},\n'
-                      '    {6, 4, 15, 8, 20, 4, 15, 10800u, 17, "Poison", 1, 0, 1, 1, 1},\n};\n'
+                      '    {1, 1, 15, 8, 255, 255, 0, 0u, 0, "", 0, 0, 0, 0},\n'
+                      '    {5, 5, 15, 8, 255, 255, 0, 0u, 0, "", 0, 1, 1, 0},\n'
+                      '    {6, 4, 15, 8, 20, 4, 15, 10800u, 17, "Poison", 1, 0, 1, 1},\n};\n'
                       '\nconst uint16_t kMobInfoOf[] = {\n    0, 1, 2,\n};\n', text)
 
     def test_mobs_alike_share_their_row(self):
-        records, info, skills, spells, regimes = self.tables()
+        records, info, skills, spells = self.tables()
         rabbit = INFO.splitlines()[1]
         twins = gen.parse(GOOD + '17199649\t103\tWild Rabbit\t1\t1\t0\t60\t257\t-2\t0' + NEUTRAL + '\n')
         text = gen.generate_info(twins, gen.parse_info(INFO + rabbit.replace('17190918', '17199649') + '\n'),
-                                 skills, spells, regimes, 'abc')
+                                 skills, spells, 'abc')
         self.assertEqual(text.split('const MobInfo kMobInfo[] = {\n')[1].split('};')[0].count('\n'), 3)
         self.assertIn('const uint16_t kMobInfoOf[] = {\n    0, 1, 2, 0,\n};\n', text)
 
@@ -347,14 +336,6 @@ class Info(unittest.TestCase):
             gen.parse_skills('list\tskill\tname\n1\t442\t\n', 's.tsv')
         self.assertIn('s.tsv:2: empty name', str(caught.exception))
 
-    def test_regimes_increase_and_have_a_known_book(self):
-        with self.assertRaises(gen.DataError) as caught:
-            gen.parse_regimes(REGIMES + '56\tfields\t100\t5\t6,1,0,0\t4\t8\t330\n', 'r.tsv')
-        self.assertIn('r.tsv:4: regimes must be strictly increasing', str(caught.exception))
-        with self.assertRaises(gen.DataError) as caught:
-            gen.parse_regimes(REGIMES.replace('grounds', 'caves'), 'r.tsv')
-        self.assertIn('r.tsv:3: type must be one of fields, grounds', str(caught.exception))
-
     def test_the_plugin_gets_the_trait_bits_and_the_orders(self):
         flags = gen.generate_flags()
         self.assertIn('    enum MobTrait : uint8_t\n    {\n        kTraitRegen = 1,\n        kTraitRefresh = 2,\n'
@@ -363,8 +344,7 @@ class Info(unittest.TestCase):
                       '        Breath,\n    };\n    constexpr int kDamageKindCount = 4;\n', flags)
         self.assertIn('    enum class Combat : uint8_t\n    {\n        Hp,\n        Mp,\n        Attack,\n        Defense,\n'
                       '        Evasion,\n        Accuracy,\n    };\n    constexpr int kCombatCount = 6;\n', flags)
-        self.assertIn('    enum class RegimeType : uint8_t\n    {\n        Fields,\n        Grounds,\n    };\n', flags)
-        self.assertIn('    constexpr int kRegimeTargets = 4;\n    constexpr uint8_t kNoWindow = 255;\n'
+        self.assertIn('    constexpr uint8_t kNoWindow = 255;\n'
                       '    constexpr const char* kUnknownAddEffect = "Unknown";\n', flags)
 
 

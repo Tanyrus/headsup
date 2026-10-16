@@ -247,10 +247,8 @@ TEST(a_mobs_jobs_spawn_window_and_lottery)
     CHECK(corse.windowStart == kNoWindow && corse.lotteryChance == 0);
 }
 
-// Qufim Island's Clipper, a crab: its TP moves, and regimes 41 and 42 (its first target) and 43 (its second) of
-// scripts/zones/Qufim_Island/mobs/Clipper.lua. Regime 41 is page 1 there in regimes.lua: nine of it and one of
-// another, levels 26 to 29, 630 experience.
-TEST(a_crabs_tp_moves_and_training_regimes)
+// Qufim Island's Clipper, a crab, has a crab's TP moves.
+TEST(a_crabs_tp_moves)
 {
     const MobRecord* clipper = MobById(17293331);
     CHECK(clipper != nullptr);
@@ -260,16 +258,6 @@ TEST(a_crabs_tp_moves_and_training_regimes)
         moves.emplace_back(skill.name);
     for (const char* move : {"Bubble Shower", "Bubble Curtain", "Big Scissors", "Scissor Guard", "Metallic Body"})
         CHECK(std::ranges::find(moves, move) != moves.end());
-    const std::span<const MobRegime> regimes = RegimesOf(*clipper);
-    CHECK_EQ(regimes.size(), 3u);
-    if (regimes.size() != 3) return;
-    CHECK(regimes[0].regime == 41 && regimes[0].target == 1 && regimes[2].regime == 43 && regimes[2].target == 2);
-    const Regime* page = RegimeById(41);
-    CHECK(page != nullptr);
-    if (page == nullptr) return;
-    CHECK(page->type == RegimeType::Fields && page->zone == 126 && page->page == 1);
-    CHECK(page->counts[0] == 9 && page->counts[1] == 1 && page->minLevel == 26 && page->maxLevel == 29 && page->exp == 630);
-    CHECK(RegimeById(1000) == nullptr);
 }
 
 // Corse casts from its list (attohwa_chasm's template names spell list 1), each spell from its own level.

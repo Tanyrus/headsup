@@ -29,7 +29,7 @@ namespace headsup
 
         static_assert(std::size(kMobInfoOf) == std::size(kMobs), "mob_info.inc must name a row for each mob");
 
-        constexpr MobInfo kNoInfo{0, 0, 0, 0, kNoWindow, kNoWindow, 0, 0, 0, "", 0, 0, 0, 0, 0};
+        constexpr MobInfo kNoInfo{0, 0, 0, 0, kNoWindow, kNoWindow, 0, 0, 0, "", 0, 0, 0, 0};
 
         const MobDropList& DropListOf(const MobRecord& mob)
         {
@@ -110,17 +110,5 @@ namespace headsup
     std::span<const MobSkill> SkillsOf(const MobRecord& mob) { return SpanOf(kMobSkills, kMobSkillLists, InfoOf(mob).skills); }
 
     std::span<const MobSpell> SpellsOf(const MobRecord& mob) { return SpanOf(kMobSpells, kMobSpellLists, InfoOf(mob).spells); }
-
-    std::span<const MobRegime> RegimesOf(const MobRecord& mob)
-    {
-        return SpanOf(kMobRegimes, kMobRegimeRuns, InfoOf(mob).regimes);
-    }
-
-    const Regime* RegimeById(uint16_t id)
-    {
-        const auto it = std::lower_bound(std::begin(kRegimes), std::end(kRegimes), id,
-            [](const Regime& r, uint16_t want) { return r.id < want; });
-        return it == std::end(kRegimes) || it->id != id ? nullptr : &*it;
-    }
 
 }

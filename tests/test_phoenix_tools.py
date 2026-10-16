@@ -89,10 +89,9 @@ SETTINGS = {'main': {'RESTRICT_CONTENT': 1, 'ENABLE_WOTG': 0, 'ENABLE_SOA': 1,
 
 
 def dump(mobs, rules=RULES, drop_lists=DROP_LISTS, settings=SETTINGS, items=ITEMS, skill_lists=(), mob_skills=(),
-         spell_lists=(), regimes=None):
+         spell_lists=()):
     return {'mobs': mobs, 'dropLists': drop_lists, 'skillLists': list(skill_lists), 'mobSkills': list(mob_skills),
-            'spellLists': list(spell_lists), 'regimes': regimes or {}, 'rules': rules, 'settings': settings,
-            'items': items}
+            'spellLists': list(spell_lists), 'rules': rules, 'settings': settings, 'items': items}
 
 
 def tsv(path):
@@ -101,7 +100,7 @@ def tsv(path):
 
 def run_compact(tmp, *dumps, scripts=None):
     """Compacts the dumps against a checkout holding scripts, {(zone, script): text}. The new files' rows are in
-    run_compact.items, .info, .skills, .spells and .regimes."""
+    run_compact.items, .info, .skills and .spells."""
     paths = []
     for n, contents in enumerate(dumps):
         path = pathlib.Path(tmp) / f'run-{n}.json'
@@ -116,7 +115,7 @@ def run_compact(tmp, *dumps, scripts=None):
         path.write_text(text)
     out = pathlib.Path(tmp) / 'out'
     compact.compact(paths, out, 'abc123', settings, server)
-    for name in ('items', 'mob_info', 'skills', 'spells', 'regimes'):
+    for name in ('items', 'mob_info', 'skills', 'spells'):
         setattr(run_compact, name.removeprefix('mob_'), tsv(out / f'phoenix_{name}.tsv'))
     return (tsv(out / 'phoenix_mobs.tsv'), (out / 'phoenix_mobs.meta').read_text(),
             json.loads((out / 'phoenix_rules.json').read_text()), tsv(out / 'phoenix_drops.tsv'))
@@ -291,7 +290,7 @@ class MergeSnapshots(unittest.TestCase):
 
 # Attohwa Chasm's Citipati, as its template and spawn there have him: THF/BLM, 8,000 HP whatever his level, out from
 # 20:00 to 04:00 and a lottery NM at 15% with three hours out after his kill; his Corse family takes a quarter less
-# magic damage and half breath damage. Its script counts him for regime 640's second target and adds HP Drain.
+# magic damage and half breath damage. Its script adds HP Drain.
 CITIPATI = dict(id=16806162, zone=7, name='Citipati', minLevel=67, maxLevel=68, script='Citipati', zoneName='Attohwa_Chasm',
                 jobs=[6, 4], window=[20, 4], lottery=[15, 10800], charmable=1, senses=[20, 8], addEffect=1,
                 skillList=74, spellList=1,
@@ -301,23 +300,15 @@ CITIPATI = dict(id=16806162, zone=7, name='Citipati', minLevel=67, maxLevel=68, 
 CITIPATI_SCRIPT = """entity.onAdditionalEffect = function(mob, target, damage)
     return xi.mob.onAddEffect(mob, target, damage, xi.mob.ae.HP_DRAIN)
 end
-
-entity.onMobDeath = function(mob, player, optParams)
-    xi.regime.checkRegime(player, mob, 640, 2, xi.regime.type.FIELDS)
-end
 """
 SKILL_LISTS = [{'id': 74, 'skills': [442, 443, 999]}]  # 999 has no move: GetMobSkill found none
 MOB_SKILLS = [{'id': 442, 'name': 'bubble_shower'}, {'id': 443, 'name': 'gates_of_hades'}]
 SPELL_LISTS = [[[159, 1, 8], [220, 3, 25]]]
-# regimes.lua's pages: four counts, the level range, experience and the regime; FIELDS is 1 and GROUNDS 2.
-REGIMES = {'1': {'100': [[6, 0, 0, 0, 1, 6, 270, 1], [6, 1, 0, 0, 4, 8, 330, 56]]},
-           '2': {'191': [[3, 3, 0, 0, 20, 24, 500, 640]]}}
 
 
 class Info(unittest.TestCase):
     def compact_info(self, *mobs, scripts=None, **lists):
-        lists = dict({'skill_lists': SKILL_LISTS, 'mob_skills': MOB_SKILLS, 'spell_lists': SPELL_LISTS,
-                      'regimes': REGIMES}, **lists)
+        lists = dict({'skill_lists': SKILL_LISTS, 'mob_skills': MOB_SKILLS, 'spell_lists': SPELL_LISTS}, **lists)
         with tempfile.TemporaryDirectory() as tmp:
             self.rows, _, _, _ = run_compact(tmp, dump(list(mobs), **lists), scripts=scripts)
         return run_compact.info
@@ -325,23 +316,20 @@ class Info(unittest.TestCase):
     def test_a_mob_s_row(self):
         info = self.compact_info(mob(**CITIPATI), scripts={('Attohwa_Chasm', 'Citipati'): CITIPATI_SCRIPT})
         self.assertEqual(info[0], ['id', 'jobs', 'senses', 'window', 'lottery', 'traits', 'addEffect', 'absorb',
-                                   'damageTaken', 'skills', 'spells', 'regimes', 'combat'])
+                                   'damageTaken', 'skills', 'spells', 'combat'])
         self.assertEqual(info[1], ['16806162', '6,4', '20,8', '20,4', '15,10800', str(1 | 8 | 16), 'HP Drain',
-                                   '0,0,100,0,0,0,0,0', '0,-2500,0,-5000', '1', '1', '640:2',
+                                   '0,0,100,0,0,0,0,0', '0,-2500,0,-5000', '1', '1',
                                    '8000,1926,274,261,312,275;8000,1957,279,266,317,280'])
         self.assertEqual(int(self.rows[1][5]) & 16, 16)  # charmable, in phoenix_mobs.tsv's flags
         self.assertEqual(run_compact.skills, [['list', 'skill', 'name'], ['1', '442', 'Bubble Shower'],
                                               ['1', '443', 'Gates of Hades']])
         self.assertEqual(run_compact.spells, [['list', 'spell', 'minLevel', 'maxLevel'], ['1', '159', '1', '8'],
                                               ['1', '220', '3', '25']])
-        self.assertEqual(run_compact.regimes[1:], [['1', 'fields', '100', '1', '6,0,0,0', '1', '6', '270'],
-                                                   ['56', 'fields', '100', '2', '6,1,0,0', '4', '8', '330'],
-                                                   ['640', 'grounds', '191', '1', '3,3,0,0', '20', '24', '500']])
 
     def test_a_mob_with_none_of_it(self):
         info = self.compact_info(mob())
         self.assertEqual(info[1], ['16797854', '4,4', '15,8', '', '0,0', '0', '', ','.join(['0'] * 8), '0,0,0,0', '0',
-                                   '0', '', ''])
+                                   '0', ''])
 
     def test_what_melee_hits_add_comes_from_the_script(self):
         def effect(script, adds=1):
@@ -354,20 +342,6 @@ class Info(unittest.TestCase):
         self.assertEqual(effect(CITIPATI_SCRIPT.replace('HP_DRAIN', 'ENAMNESIA')), 'Amnesia')
         self.assertEqual(effect(None), 'Unknown')  # a mixin or family adds it
         self.assertEqual(effect(CITIPATI_SCRIPT, adds=0), '')  # the server calls the script only with the mob mod
-
-    def test_the_regime_s_type_comes_from_its_page_not_the_script(self):
-        # Garlaige Citadel's Fallen Major names Grounds of Valor regime 703 as a Fields one; the kill counts by ID.
-        info = self.compact_info(mob(**CITIPATI), scripts={('Attohwa_Chasm', 'Citipati'): CITIPATI_SCRIPT.replace(
-            'xi.regime.type.FIELDS', 'xi.regime.type.GROUNDS')})
-        self.assertEqual(info[1][11], '640:2')
-
-    def test_a_regime_the_dump_has_not_is_an_error(self):
-        with self.assertRaises(compact.schema.DataError) as caught:
-            self.compact_info(mob(**CITIPATI), scripts={('Attohwa_Chasm', 'Citipati'): CITIPATI_SCRIPT.replace('640', '641')})
-        self.assertIn("mob 16806162's script counts it for regime 641, which the dump has not", str(caught.exception))
-        with self.assertRaises(compact.schema.DataError) as caught:
-            self.compact_info(mob(), regimes={'1': {'100': [[6, 0, 0, 0, 1, 6, 270, 1]]}, '2': {'101': [[6, 0, 0, 0, 1, 6, 270, 1]]}})
-        self.assertIn('regime 1 is on two pages', str(caught.exception))
 
     def test_equal_lists_are_numbered_once_by_their_first_mob(self):
         info = self.compact_info(mob(skillList=74, spellList=1), mob(id=16797855, skillList=74, spellList=1),
@@ -616,8 +590,8 @@ class Validate(unittest.TestCase):
 
 def info_row(mob_id, **fields):
     return dict({'id': mob_id, 'jobs': [1, 1], 'senses': [15, 8], 'window': None, 'lottery': [0, 0], 'traits': 0,
-                 'addEffect': '', 'absorb': [0] * 8, 'damageTaken': [0] * 4, 'skills': 0, 'spells': 0, 'regimes': [],
-                 'combat': []}, **fields)
+                 'addEffect': '', 'absorb': [0] * 8, 'damageTaken': [0] * 4, 'skills': 0, 'spells': 0, 'combat': []},
+                **fields)
 
 
 CRAB_MOVES = ['Bubble Shower', 'Bubble Curtain', 'Big Scissors', 'Scissor Guard', 'Metallic Body']
@@ -626,13 +600,13 @@ CRAB_MOVES = ['Bubble Shower', 'Bubble Curtain', 'Big Scissors', 'Scissor Guard'
 class ValidateInfo(unittest.TestCase):
     INFO = [info_row(validate.CITIPATI, jobs=[6, 4], window=[20, 4], lottery=[15, 10800], combat=[[8000, 0, 1, 1, 1, 1]] * 4),
             info_row(validate.VALKURM_EMPEROR, lottery=[15, 3600]),
-            info_row(validate.CLIPPER, skills=1, regimes=[(41, 1), (42, 1), (43, 2)],
+            info_row(validate.CLIPPER, skills=1,
                      combat=[[667, 739, 111, 116, 89, 99], [703, 768, 114, 120, 92, 102]])]
     SKILLS = [[{'list': 1, 'skill': 442 + n, 'name': name} for n, name in enumerate(CRAB_MOVES)]]
 
     def check(self, info=None, skills=None, **limits):
-        return validate.check_info(Validate.RECORDS, info or self.INFO, skills or self.SKILLS, [], [],
-                                   **dict(dict(min_info={}, min_regimes=0, min_charmable=0), **limits))
+        return validate.check_info(Validate.RECORDS, info or self.INFO, skills or self.SKILLS, [],
+                                   **dict(dict(min_info={}, min_charmable=0), **limits))
 
     def changed(self, mob_id, **fields):
         return [dict(i, **fields) if i['id'] == mob_id else i for i in self.INFO]
@@ -640,11 +614,10 @@ class ValidateInfo(unittest.TestCase):
     def test_known_mobs_pass(self):
         self.assertEqual(self.check(), [])
 
-    def test_a_wrong_window_jobs_or_regime_fails(self):
+    def test_a_wrong_window_or_jobs_fails(self):
         self.assertEqual(self.check(self.changed(validate.CITIPATI, window=[20, 5])),
                          [f"{validate.CITIPATI}: expected {{'jobs': [6, 4], 'window': [20, 4], 'lottery': [15, 10800]}}, "
                           "got {'jobs': [6, 4], 'window': [20, 5], 'lottery': [15, 10800]}"])
-        self.assertEqual(len(self.check(self.changed(validate.CLIPPER, regimes=[(41, 1)]))), 1)
 
     def test_a_flat_hp_must_hold_at_every_level(self):
         self.assertEqual(self.check(self.changed(validate.CITIPATI, combat=[[8000, 0, 1, 1, 1, 1], [7999, 0, 1, 1, 1, 1]])),
@@ -659,8 +632,7 @@ class ValidateInfo(unittest.TestCase):
     def test_too_few_of_a_kind_fail(self):
         self.assertEqual(self.check(min_info={'HP that grows with the level': 2, 'TP moves': 1}),
                          ['only 1 mobs with HP that grows with the level (expected at least 2)'])
-        self.assertEqual(self.check(min_regimes=1, min_charmable=1),
-                         ['only 0 training regimes (expected at least 1)', 'only 0 charmable mobs (expected at least 1)'])
+        self.assertEqual(self.check(min_charmable=1), ['only 0 charmable mobs (expected at least 1)'])
 
 
 def entry(kind, item, rate, group=0, group_rate=0, list_number=1):
