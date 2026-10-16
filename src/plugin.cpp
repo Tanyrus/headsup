@@ -12,6 +12,7 @@
 #include "d3d_util.h"
 #include "debug_report.h"
 #include "fonts.h"
+#include "game_font.h"
 #include "game_cursor.h"
 #include "game_names.h"
 #include "game_state.h"
@@ -88,6 +89,11 @@ namespace
     constexpr const char* kMenuWidth         = "0037";
     constexpr float kWindowClearance         = 4.0f; // back buffer pixels between the help bar and a window it moved
     constexpr const char* kMenuHeight        = "0038";
+    // XIPivot, which puts its overlays' DAT files in place of the game's, and where it keeps its config and overlays.
+    constexpr const char* kPivotModule       = "pivot.dll";
+    constexpr const char* kPivotConfig       = "config\\pivot\\pivot.ini";
+    constexpr const char* kPivotDats         = "\\DATs";
+    constexpr uint64_t kMaxFontFileBytes     = 64u << 20; // the game's own is 4 MB
     constexpr uint32_t kPartyIconMembers     = 5;  // the other members of your party, whose buffs the game keeps
     constexpr uint32_t kPartyMembers         = 18; // you, your party and the two other alliance parties
     constexpr uint32_t kEngagedStatus        = 1;  // an entity's status while it fights
@@ -318,6 +324,8 @@ class HeadsUp final : public IPlugin
     std::vector<std::string> m_SeenWindows;
     std::vector<std::string> m_CursorFiles;      // the cursors folder's, as the Target Cursor and Cursor Icon lists offer them
     std::optional<std::string> m_CursorFileRead; // the File cursor read last, whether or not it was one
+    std::string m_GameFontFailure;                // why the game's font could not be read; empty when it was
+    bool m_GameFontWarned = false;
     float m_MenuHeight  = 0.0f;
     int m_CaptureLeft   = 0;
     std::string m_CapturePath;
@@ -806,7 +814,10 @@ public:
                 .lastReport       = &m_LastReport,
             };
             if (m_RmlMenu.Update(MenuHostNow(), m_Settings, readings, m_Fonts.Choices(m_Settings.defaultFont), kVersion))
+            {
                 m_SettingsChangedAt = now;
+                SayGameFontFailure();
+            }
             if (m_RmlMenu.TakeDebugRequest()) m_DebugPending = true;
 #ifdef HEADSUP_DEV
             if (m_RmlMenu.TakeWatchRequest())
@@ -1163,6 +1174,59 @@ private:
             Print("could not hook the game's target arrows, so it draws its own and HeadsUp none: " + failure + ".");
         if (const std::string failure = m_PointerFix.Start(); !failure.empty())
             Print("could not fix the game's mouse pointer: " + failure + ".");
+        ReadGameFont();
+        SayGameFontFailure();
+    }
+
+    // The font the game writes its names in, from the file it reads it from: while XIPivot is loaded, the first of
+    // its overlays that holds the file.
+    void ReadGameFont()
+    {
+        std::string pivotIni;
+        const std::string pivotFolder = headsup::ModuleFolder(kPivotModule);
+        if (!pivotFolder.empty())
+        {
+            std::ifstream in(std::string(m_AshitaCore->GetInstallPath()) + kPivotConfig, std::ios::binary);
+            pivotIni.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+        }
+        const std::string gameFolder = headsup::ModuleFolder(headsup::kGameModule);
+        for (const std::string& path : headsup::GameFontCandidates(pivotIni, pivotFolder + kPivotDats, gameFolder))
+        {
+            std::ifstream in(path, std::ios::binary | std::ios::ate);
+            const std::streamoff size = in.tellg();
+            if (!in || size <= 0) continue;
+            m_GameFontFailure = path + ": ";
+            if (static_cast<uint64_t>(size) > kMaxFontFileBytes)
+            {
+                m_GameFontFailure += "it is too large";
+                return;
+            }
+            std::vector<uint8_t> bytes(static_cast<size_t>(size));
+            in.seekg(0);
+            if (!in.read(reinterpret_cast<char*>(bytes.data()), size))
+            {
+                m_GameFontFailure += "it could not be read";
+                return;
+            }
+            headsup::Read<headsup::GameFontFace> font = headsup::ReadGameFont(bytes);
+            if (!font.value)
+            {
+                m_GameFontFailure += font.failure;
+                return;
+            }
+            m_GameFontFailure.clear();
+            m_Nameplates.SetGameFont(std::move(font.value));
+            return;
+        }
+        m_GameFontFailure = "the game's ROM\\119\\51.DAT was not found under " + gameFolder;
+    }
+
+    // Once, when a nameplate is set in the game's font and it could not be read.
+    void SayGameFontFailure()
+    {
+        if (m_GameFontFailure.empty() || !headsup::UsesGameFont(m_Settings) || std::exchange(m_GameFontWarned, true)) return;
+        Print("the game's font could not be read (" + m_GameFontFailure + "): nameplates set in it are drawn in " +
+              headsup::kDefaultFont + " until HeadsUp is reloaded.");
     }
 
 #ifdef HEADSUP_DEV

@@ -3,6 +3,7 @@
 #include "argb.h"
 #include "cursor_picture.h"
 #include "fonts.h"
+#include "game_font.h"
 #include "pointer_keys.h"
 #include "utf16.h"
 
@@ -1003,6 +1004,14 @@ namespace headsup
             if (std::none_of(choices.begin(), choices.end(), [&](const std::string& had) { return SameFamily(had, name); }))
                 choices.push_back(name);
         return choices;
+    }
+
+    bool UsesGameFont(const Settings& s)
+    {
+        const auto game = [](const std::string& font) { return GameFontVariantOf(font).has_value(); };
+        return game(s.defaultFont) || game(s.badgeFontName) || std::ranges::any_of(s.kinds, [&](const KindSettings& k) {
+            return std::ranges::any_of(k.lines, [&](const LineDesign& line) { return game(line.font); });
+        });
     }
 
     namespace

@@ -262,6 +262,12 @@ namespace headsup
         ++m_CursorFileSerial;
     }
 
+    void NameplateRenderer::SetGameFont(std::optional<GameFontFace> face)
+    {
+        ReleasePlates();
+        m_Gdi.SetGameFont(std::move(face));
+    }
+
     bool NameplateRenderer::Upload(PlateTexture& t, const Image& image, TextureKey key)
     {
         float u = 0.0f, v = 0.0f;

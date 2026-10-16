@@ -22,6 +22,10 @@ struct IDirect3DSurface8;
 
 namespace headsup
 {
+    constexpr const char* kGameModule = "FFXiMain.dll";
+    // The folder a loaded module was loaded from, without its last separator; empty when it is not loaded.
+    std::string ModuleFolder(const char* module);
+
     // Sends every name the game is about to draw through HeadsUp first: the six bytes at the name routine's hook
     // (native_locate.h) become a jump to a gate that calls OnName with the routine's frame, then either runs the bytes
     // it replaced and resumes the routine, or skips to the routine's exit so the game draws nothing.

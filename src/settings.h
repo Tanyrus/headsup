@@ -193,6 +193,8 @@ namespace headsup
     // The fonts to offer: the installed families (as GDI lists them, once per character set and with vertical variants
     // named @...), each once and sorted, with current added when it is not installed.
     std::vector<std::string> FontChoices(std::vector<std::string> installed, const std::string& current);
+    // Whether a nameplate is set in the game's own font: the default, a line's or the badges'.
+    bool UsesGameFont(const Settings& s);
 
     // Key/value persistence: Ashita's configuration manager in the plugin, an in-memory map in tests.
     class SettingsStore

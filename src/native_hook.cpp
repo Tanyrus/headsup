@@ -126,7 +126,6 @@ namespace headsup
 {
     namespace
     {
-        constexpr const char* kGameModule = "FFXiMain.dll";
         constexpr char kCodeSection[]     = ".text";
         constexpr char kConstSection[]    = ".rdata";
         constexpr char kDataSection[]     = ".data";
@@ -962,6 +961,16 @@ namespace headsup
                                            bottom - top, *to);
             }
         }
+    }
+
+    std::string ModuleFolder(const char* module)
+    {
+        const HMODULE handle = GetModuleHandleA(module);
+        char path[MAX_PATH]{};
+        if (handle == nullptr || GetModuleFileNameA(handle, path, MAX_PATH) == 0) return {};
+        const std::string file(path);
+        const size_t slash = file.find_last_of("\\/");
+        return slash == std::string::npos ? std::string() : file.substr(0, slash);
     }
 }
 

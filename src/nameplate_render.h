@@ -69,6 +69,8 @@ namespace headsup
         void SetCoveredTop(float pixels) { m_CoveredTop = pixels; }
         // The picture a cursor of the File style draws, or none for a file that could not be read.
         void SetCursorFile(std::optional<Image> picture);
+        // The game's own font, for the text set in it; every plate is drawn again with it.
+        void SetGameFont(std::optional<GameFontFace> face);
         // The game's cursor is blocked over these.
         const std::vector<CursorName>& CursorNames() const { return m_CursorNames; }
         bool NamesFailed() const { return m_NamesFailed; }

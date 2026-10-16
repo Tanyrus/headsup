@@ -1,3 +1,4 @@
+#include "game_font.h"
 #include "pointer_keys.h"
 #include "settings.h"
 #include "release_file.h"
@@ -2492,4 +2493,21 @@ TEST(a_font_name_of_31_characters_is_kept_and_one_of_32_refused)
     const Settings refused = Clamp(s), d;
     CHECK(refused.defaultFont == d.defaultFont && refused.badgeFontName == d.badgeFontName);
     CHECK(refused.barTitleFont == d.barTitleFont && refused.barTextFont == d.barTextFont);
+}
+
+TEST(the_game_font_is_in_use_when_the_default_a_line_or_the_badges_name_it)
+{
+    Settings s;
+    CHECK(!UsesGameFont(s));
+    s.defaultFont = kGameFontName;
+    CHECK(UsesGameFont(s));
+    s = Settings{};
+    s.Kind(PlateKind::Npcs).lines[2].font = "game font narrow";
+    CHECK(UsesGameFont(s));
+    s = Settings{};
+    s.badgeFontName = kGameFontNarrowName;
+    CHECK(UsesGameFont(s));
+    s = Settings{};
+    s.barTitleFont = kGameFontName; // the top panel never draws it
+    CHECK(!UsesGameFont(s));
 }

@@ -3,6 +3,7 @@
 #include "screen_vertex.h"
 
 #include "game_glyphs.h"
+#include "settings.h"
 #include "utf16.h"
 
 #include <algorithm>
@@ -66,6 +67,12 @@ namespace headsup
         int margin, Coverage& out)
     {
         out = Coverage{};
+        if (const std::optional<GameFontVariant> game = GameFontVariantOf(family))
+        {
+            if (!m_GameFont) return Rasterize(text, kDefaultFont, pixelHeight, style, tracking, margin, out);
+            out = GameFontRasterize(*m_GameFont, *game, text, pixelHeight, style, tracking, margin);
+            return true;
+        }
         const HDC dc = WithFont(family, pixelHeight, style, tracking);
         if (dc == nullptr) return false;
         const std::wstring wide = Utf16(text);
@@ -111,6 +118,12 @@ namespace headsup
 
     bool GdiText::Extent(const char* text, const char* family, int pixelHeight, uint8_t style, int& width, int& height)
     {
+        if (const std::optional<GameFontVariant> game = GameFontVariantOf(family))
+        {
+            if (!m_GameFont) return Extent(text, kDefaultFont, pixelHeight, style, width, height);
+            GameFontExtent(*m_GameFont, *game, text, pixelHeight, style, width, height);
+            return true;
+        }
         const HDC dc = WithFont(family, pixelHeight, style, 0);
         if (dc == nullptr) return false;
         const std::wstring wide = Utf16(text);
@@ -123,6 +136,12 @@ namespace headsup
 
     bool GdiText::UnderlineBand(const char* family, int pixelHeight, uint8_t style, int& top, int& thickness)
     {
+        if (GameFontVariantOf(family))
+        {
+            if (!m_GameFont) return UnderlineBand(kDefaultFont, pixelHeight, style, top, thickness);
+            GameFontUnderlineBand(pixelHeight, top, thickness);
+            return true;
+        }
         const HDC dc = WithFont(family, pixelHeight, style, 0);
         if (dc == nullptr) return false;
         // Only an outline font says where its underline goes; GDI's own is drawn by the same two numbers.
