@@ -180,7 +180,8 @@ TEST(the_target_popup_has_every_element_and_status_with_its_percent)
     std::vector<std::string> headings;
     for (const PopupSection& s : popup.sections)
         headings.push_back(s.heading);
-    CHECK(headings == (std::vector<std::string>{"", "Damage taken", "Elements", "Statuses", "Immune", "Spawn"}));
+    CHECK(headings ==
+          (std::vector<std::string>{"", "Damage taken", "Elements", "Statuses", "Immune", "Stats at Lv 20", "Spawn"}));
     const PopupRow& elements = Section(popup, "Elements")->rows[0];
     CHECK(elements.kind == RowKind::Grid && elements.columns == 4 && elements.cells.size() == 8);
     CHECK(elements.cells[6].icon == Icon::Light);
@@ -189,6 +190,9 @@ TEST(the_target_popup_has_every_element_and_status_with_its_percent)
     CHECK(elements.cells[6].text == (std::vector<Span>{{"+3%", Tone::Weak}}));
     CHECK(elements.cells[7].text == (std::vector<Span>{{"0%", Tone::Neutral}}));
     CHECK(elements.cells[0].text == (std::vector<Span>{{"+3%", Tone::Weak}}));
+    const PopupRow& stats = Section(popup, "Stats at Lv 20")->rows[0];
+    CHECK(stats.kind == RowKind::Grid && stats.cells.size() == 8);
+    CHECK(stats.cells[7].text == (std::vector<Span>{{"MEva", Tone::Dim}, {" 58", Tone::Normal}}));
     const PopupRow& statuses = Section(popup, "Statuses")->rows[0];
     CHECK(statuses.columns == 5 && statuses.cells.size() == 10 && statuses.cells[0].icon == Icon::Paralyze);
     CHECK(Section(popup, "Immune")->rows[0].cells[0].text == (std::vector<Span>{{"None", Tone::Neutral}}));

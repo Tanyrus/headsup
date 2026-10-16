@@ -22,7 +22,8 @@ namespace headsup
         constexpr const char* kItemsMenu = "Items";
         constexpr uint32_t kElementColors[kElementCount] = {0xFFFF8A3C, 0xFF8FD8FF, kBarGreen, 0xFFD8B25A, 0xFFC58CFF,
             0xFF5B9DFF, 0xFFFFFFFF, 0xFF9A8AA8};
-        constexpr int kDamageColumns = 4, kElementColumns = 4, kStatusColumns = 5, kBagColumns = 2;
+        constexpr int kDamageColumns = 4, kElementColumns = 4, kStatusColumns = 5, kStatColumns = 4, kBagColumns = 2;
+        constexpr const char* kStatNames[kStatCount] = {"STR", "DEX", "VIT", "AGI", "INT", "MND", "CHR", "MEva"};
         constexpr int kForecastDays = 5, kForecastColumns = 4;
         constexpr uint16_t kGilItem  = 0xFFFF;
 
@@ -237,7 +238,18 @@ namespace headsup
                 PopupSection{"Damage taken", ListOf(std::move(damage))},
                 PopupSection{"Elements", ListOf(std::move(elements))},
                 PopupSection{"Statuses", ListOf(std::move(statuses))},
-                PopupSection{"Immune", ListOf(std::move(immune))}, Spawn(mob, state));
+                PopupSection{"Immune", ListOf(std::move(immune))});
+            // At the level the chances are figured for: the check's, else the top of its range.
+            if (numbers.target)
+            {
+                PopupRow stats = Grid(kStatColumns, kStatCount);
+                for (int i = 0; i < kStatCount; ++i)
+                    stats.cells.push_back(Cell(ListOf(Text(kStatNames[i], Tone::Dim),
+                        Text(" " + std::to_string(numbers.target->stats.value[i])))));
+                popup.sections.push_back(
+                    PopupSection{"Stats at Lv " + std::to_string(numbers.target->level), ListOf(std::move(stats))});
+            }
+            popup.sections.push_back(Spawn(mob, state));
             for (PopupSection& loot : Loot(mob, state))
                 popup.sections.push_back(std::move(loot));
             return popup;

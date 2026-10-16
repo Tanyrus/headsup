@@ -292,7 +292,8 @@ help bar has an X and Y offset of its own, in screen pixels, in its card. Unload
 Hover a widget to open its details. Click it to keep them open; click it again to let them close once the pointer leaves
 the widget and its popup. Left and right clicks on the bar or an open popup never reach the game in windowed modes.
 
-Under Target, a monster in Phoenix's mob data has a popup; a player you have checked shows their jobs and levels, or
+Under Target, a monster in Phoenix's mob data has a popup, with its stats and magic evasion at its checked level or the
+top of its range; a player you have checked shows their jobs and levels, or
 ? ? ? when anonymous, with a popup of the check; any other player or NPC shows just its name. The weather widget reads the
 weather the game keeps; if HeadsUp cannot find it, it goes by the server's weather changes and shows the day's usual
 weather until one comes. While the Gil widget is on, HeadsUp asks the server for your currencies with the two requests
