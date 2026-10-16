@@ -548,6 +548,20 @@ namespace headsup
                 return leaAt(mov, pushed);
             return std::nullopt;
         };
+        // The layout ends at a ret padded to the next 16-byte boundary, where the compiler starts the next function;
+        // a ret with code after it is an early return. Read no further: that code is another class's.
+        constexpr uint8_t kRet = 0xC3, kNop = 0x90, kInt3 = 0xCC;
+        constexpr uintptr_t kFunctionAlign = 16;
+        size_t end = layout.size();
+        for (size_t i = 0; i + 1 < layout.size() && end == layout.size(); ++i)
+        {
+            if (layout[i] != kRet || (layout[i + 1] != kNop && layout[i + 1] != kInt3)) continue;
+            size_t pad = i + 1;
+            while (pad < layout.size() && (at + pad) % kFunctionAlign != 0 && (layout[pad] == kNop || layout[pad] == kInt3))
+                ++pad;
+            if ((at + pad) % kFunctionAlign == 0) end = i + 1;
+        }
+        layout = layout.first(end);
         for (size_t i = 1; i + kCallBytes <= layout.size(); ++i)
         {
             if (layout[i] != kCall ||

@@ -1004,6 +1004,16 @@ TEST(an_owners_place_copy_is_found_in_its_layouts_call_for_the_windows_rectangle
     const std::vector<uint8_t> trade{0x8B, 0x4E, 0x08, 0x8D, 0x46, 0x18, 0x50, 0x66, 0xC7, 0x86, 0xBC, 0x00, 0x00, 0x00, 0x01,
         0x00, 0xE8, 0xD7, 0x7B, 0xFC, 0xFF};
     CHECK(PlaceCopyOffset(trade, 0x151384, getRect) == std::optional<uint32_t>(0x18));
+    // A layout that returns before any such call keeps none: the code after its ret and padding is another
+    // function's (the client's 0x12BF50 is three instructions and a ret, before a layout that does call it).
+    std::vector<uint8_t> shortLayout{0x8B, 0x49, 0x08, 0x6A, 0x00, 0x6A, 0x01, 0xE8, 0x54, 0xD3, 0xFE, 0xFF, 0xC3, 0x90, 0x90, 0x90};
+    shortLayout.insert(shortLayout.end(), craft.begin(), craft.end());
+    constexpr uintptr_t landsAt = 0xFC6A6; // where the craft bytes' call lands when they start at 0x12BF60
+    CHECK(!PlaceCopyOffset(shortLayout, 0x12BF50, landsAt));
+    // A ret in the middle of a layout, with its code going on after it, does not end the search.
+    std::vector<uint8_t> earlyReturn{0x85, 0xC0, 0x75, 0x01, 0xC3};
+    earlyReturn.insert(earlyReturn.end(), craft.begin(), craft.end());
+    CHECK(PlaceCopyOffset(earlyReturn, 0x148825, getRect) == std::optional<uint32_t>(0x14));
     // No call for the rectangle, another register pushed than the one loaded, or the call elsewhere: no copy.
     CHECK(!PlaceCopyOffset(craft, 0x14882A, getRect + 0x10));
     const std::vector<uint8_t> otherPush{0x8B, 0x4E, 0x08, 0x8D, 0x46, 0x14, 0x52, 0xE8, 0x3A, 0x07, 0xFD, 0xFF};
