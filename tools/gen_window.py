@@ -153,7 +153,8 @@ PIECES = Pieces(
             'aggression', 'links', 'sight', 'true-sight', 'sound', 'scent', 'use-of-spells', 'use-of-abilities',
             'low-player-hp'),
             words={'senses': True, 'hide': True, 'show': True}),
-        'badge-font': Setting(), 'use-rank-system': Setting(), 'weak-color': Setting(), 'resist-color': Setting(),
+        'badge-font': Setting(), 'badge-numbers': Setting(options=3), 'count-your-accuracy': Setting(),
+        'weak-color': Setting(), 'resist-color': Setting(),
         'status-resist-color': Setting(), 'immune-color': Setting(),
         'weak-from': Setting(), 'resist-from': Setting(), 'max-elements': Setting(),
         'status-table': Setting(unnamed=True, rows=rows(

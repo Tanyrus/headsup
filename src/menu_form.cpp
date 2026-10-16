@@ -771,9 +771,9 @@ namespace headsup
             Form& form           = c.form;
             Settings& s          = c.s;
             const bool dim       = !s.enabled || !s.nameplates || !Uses(s, {Tag::Status});
-            const auto cutoff    = [&s](int rank) { return CutoffText(rank, s.showRanks); };
-            const auto weakTip   = [&s](int rank) { return CutoffTip(rank, s.showRanks, true); };
-            const auto resistTip = [&s](int rank) { return CutoffTip(rank, s.showRanks, false); };
+            const auto cutoff    = [](int rank) { return CutoffText(rank); };
+            const auto weakTip   = [](int rank) { return CutoffTip(rank, true); };
+            const auto resistTip = [](int rank) { return CutoffTip(rank, false); };
             form.Fade(dim);
             form.Row("##status heads", nullptr);
             form.Caption("", "head", kToggleWidth);
@@ -845,7 +845,7 @@ namespace headsup
             const bool shown  = plates && c.plates; // a kind's design, on a page whose rows draw a nameplate
             static const Settings kDefaults;
             static const Palette kPalette = DefaultPalette();
-            const auto cutoff             = [&s](int rank) { return CutoffText(rank, s.showRanks); };
+            const auto cutoff             = [](int rank) { return CutoffText(rank); };
             switch (e.piece)
             {
             // Entities
@@ -1019,9 +1019,16 @@ namespace headsup
                 form.Fade(!on);
                 form.FontDropdown(label.c_str(), s.badgeFontName, c.plateFonts, tip, Word(c, WindowWord::DefaultFont));
                 break;
-            case SettingPiece::UseRankSystem:
+            case SettingPiece::BadgeNumbers:
+            {
                 form.Fade(!on);
-                form.Switch(label.c_str(), s.showRanks, tip);
+                const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(e));
+                form.Segments(label.c_str(), s.rankDisplay, names.data(), kRankDisplayCount, tip, kWideSegmentWidth);
+                break;
+            }
+            case SettingPiece::CountYourAccuracy:
+                form.Fade(!on || s.rankDisplay != RankDisplay::IncreasedChance);
+                form.Switch(label.c_str(), s.countAccuracy, tip);
                 break;
             case SettingPiece::WeakColor:
                 form.Fade(!on);
@@ -1042,12 +1049,12 @@ namespace headsup
             case SettingPiece::WeakFrom:
                 form.Fade(!plates || !Uses(s, {Tag::Weak, Tag::Resist}));
                 form.NumberDropdown(label.c_str(), s.elementWeakRank, kMaxWeakRank, kNoWeakRank, cutoff, tip, 0.0f,
-                    [&s](int rank) { return CutoffTip(rank, s.showRanks, true); });
+                    [](int rank) { return CutoffTip(rank, true); });
                 break;
             case SettingPiece::ResistFrom:
                 form.Fade(!plates || !Uses(s, {Tag::Weak, Tag::Resist}));
                 form.NumberDropdown(label.c_str(), s.elementResistRank, kMinResistRank, kNoResistRank, cutoff, tip, 0.0f,
-                    [&s](int rank) { return CutoffTip(rank, s.showRanks, false); });
+                    [](int rank) { return CutoffTip(rank, false); });
                 break;
             case SettingPiece::MaxElements:
                 form.Fade(!plates || !Uses(s, {Tag::Weak, Tag::Resist}));

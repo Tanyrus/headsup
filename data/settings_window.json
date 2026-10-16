@@ -563,7 +563,17 @@
         "kinds": ["mobs"],
         "settings": [
           {"key": "badge-font", "name": "Badge Font"},
-          {"key": "use-rank-system", "name": "Use Rank System", "tip": "Phoenix's ranks, -3 to 11, instead of percents. -3 is +50% and 4 is -50%."},
+          {
+            "key": "badge-numbers",
+            "name": "Badge Numbers",
+            "tip": "What the badge of a weakness or resistance by rank says. A rank changes the mob's magic evasion, so it changes how often magic lands, not how hard it hits.",
+            "options": [
+              {"name": "Rank", "tip": "Phoenix's rank, -3 to 11."},
+              {"name": "Increased Chance", "tip": "How much more often magic lands than on a mob without the weakness, or how much less often with a resistance."},
+              {"name": "Total Chance", "tip": "How often your spell lands: an unresisted tier I nuke for an element, the effect for a status, from your level, skill, stats and gear against the mob's."}
+            ]
+          },
+          {"key": "count-your-accuracy", "name": "Count Your Accuracy", "tip": "Increased Chance from your own magic accuracy, so it shrinks once you land 95% of the time anyway. Off, it is the magic evasion the rank takes away or adds alone."},
           {"key": "weak-color", "name": "Weakness Color", "tip": "The color used for badge text with Weakness icons."},
           {"key": "resist-color", "name": "Resistance Color", "tip": "The color used for badge text with Resistance icons."},
           {"key": "status-resist-color", "name": "Status Resist Color", "tip": "The color used for badge text with Status icons."},

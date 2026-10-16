@@ -24,6 +24,7 @@ namespace headsup
         bool sitting = false; // resting, /sit or a chair: Phoenix lets Too Weak aggressive mobs aggro then
         bool inEvent = false; // a cutscene or an NPC's dialog is running
         bool inCombat = false; // PlayerInCombat
+        std::optional<Caster> caster = std::nullopt; // your magic accuracy, for the rank badges' chances
     };
 
     // Phoenix's CZoneEntities::tapMobAggro with its mob data. checkedLevel is the level a /check reported for this

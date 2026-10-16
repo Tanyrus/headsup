@@ -373,7 +373,7 @@ helpBarY=8.0000
         s.elementWeakRank     = -3;
         s.elementResistRank   = 6;
         s.maxElements         = 3;
-        s.showRanks           = true;
+        s.rankDisplay         = RankDisplay::Rank; // from the old ranks switch
         s.badgeFontName       = "Tahoma";
         s.showBar      = false;
         s.barTheme     = BarTheme::UmbraDark;
@@ -425,7 +425,7 @@ helpBarY=8.0000
 
     // The keys of kSavedFile that only an older build's file carries: a migration reads them, or nothing does, and
     // nothing writes them.
-    const char* const kOldKeys[] = {"movedWindows", "windowGroups", "allUnderBar", "menuScale", "chocoboPointer", "untargetedOpacity", "glowOffWhenFighting", "thickness", "cursorSize", "cursorOutline", "replaceCursor", "cursorFeather", "barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
+    const char* const kOldKeys[] = {"showRanks", "movedWindows", "windowGroups", "allUnderBar", "menuScale", "chocoboPointer", "untargetedOpacity", "glowOffWhenFighting", "thickness", "cursorSize", "cursorOutline", "replaceCursor", "cursorFeather", "barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
         "serverClockZone", "showLabels", "replaceMobNames", "showIcons", "hideInCombat", "hideClaimed", "hideTooWeak",
         "hideWhileEngaged", "markPlaceholders", "fontBold", "nameGlow", "scalePlayerNames",
         "labelFontBold", "showOrnament", "ownGlowColor", "ownOrnamentColor", "labelFontName", "glowSize",
@@ -652,6 +652,30 @@ TEST(the_target_cursor_rises_or_sinks_up_to_twenty_pixels)
     Settings s;
     s.cursorRaise = 25;
     CHECK_EQ(Clamp(s).cursorRaise, 20);
+}
+
+TEST(a_file_from_before_badge_numbers_keeps_its_ranks_and_trades_the_skillchain_percents_for_chances)
+{
+    const auto display = [](std::vector<std::pair<std::string, std::string>> values)
+    {
+        MapStore file;
+        file.values.insert(values.begin(), values.end());
+        return LoadSettings(file).rankDisplay;
+    };
+    CHECK(display({{"enabled", "true"}, {"showRanks", "true"}}) == RankDisplay::Rank);
+    CHECK(display({{"enabled", "true"}, {"showRanks", "false"}}) == RankDisplay::IncreasedChance);
+    CHECK(display({{"enabled", "true"}, {"rankDisplay", "total"}, {"showRanks", "true"}}) == RankDisplay::TotalChance);
+    CHECK(display({{"enabled", "true"}, {"rankDisplay", "tens"}}) == RankDisplay::IncreasedChance);
+    for (const RankDisplay each : {RankDisplay::Rank, RankDisplay::IncreasedChance, RankDisplay::TotalChance})
+    {
+        Settings s;
+        s.rankDisplay   = each;
+        s.countAccuracy = false;
+        MapStore file;
+        SaveSettings(s, file);
+        CHECK(LoadSettings(file).rankDisplay == each && !LoadSettings(file).countAccuracy);
+        CHECK(!file.values.contains("showRanks"));
+    }
 }
 
 TEST(a_file_from_before_hide_during_conversation_keeps_plates_in_conversations)
@@ -896,7 +920,8 @@ TEST(a_file_from_before_the_badge_group_takes_its_defaults)
     old.values = {{"enabled", "true"}, {"showIcons", "true"}};
     const Settings s = LoadSettings(old);
     CHECK_EQ(s.Kind(PlateKind::Mobs).lines[0].text, "$detect"); // no badges: the top bar's popup shows them
-    CHECK(s.elementWeakRank == -1 && s.elementResistRank == 4 && s.maxElements == kElementCount && !s.showRanks);
+    CHECK(s.elementWeakRank == -1 && s.elementResistRank == 4 && s.maxElements == kElementCount);
+    CHECK(s.rankDisplay == RankDisplay::IncreasedChance && s.countAccuracy);
     CHECK_EQ(s.badgeFontName, "Barlow Condensed"); // the font badges had, where a new install's are in the default font
     CHECK_EQ(s.detectionShown, kAllDetection); // and every icon, the aggression one too, which a new install hides
     for (const StatusBadgeRule& status : s.statusBadges)

@@ -10,6 +10,7 @@
 #include "fonts.h"
 #include "icons.h"
 #include "ini_text.h"
+#include "magic_chance.h"
 #include "menu_document.h"
 #include "menu_fonts.h"
 #include "native_locate.h"
@@ -83,7 +84,8 @@ namespace headsup
         int elementResistRank = BadgeRules{}.elementResistRank;
         int maxElements       = BadgeRules{}.maxElements;
         StatusBadgeRule statusBadges[kStatusRankCount] = {}; // by StatusRank
-        bool showRanks = false; // rank badges as ranks rather than the wikis' percents
+        RankDisplay rankDisplay = RankDisplay::IncreasedChance; // what a rank badge's number says
+        bool countAccuracy      = true; // Increased Chance with your own magic accuracy, not the mob's evasion alone
         std::string badgeFontName; // badges' numbers; empty for the default font
         bool showBar       = true;
         BarTheme barTheme  = BarTheme::PhoenixGold;

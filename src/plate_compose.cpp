@@ -159,7 +159,8 @@ namespace headsup
             }
         }
 
-        std::vector<IconDraw> TagIcons(Tag tag, const ActorInfo& info, const Settings& s, std::optional<BadgeRules>& badgeRules)
+        std::vector<IconDraw> TagIcons(Tag tag, const ActorInfo& info, const PlayerState& player, const Settings& s,
+            std::optional<BadgeRules>& badgeRules)
         {
             std::vector<IconDraw> out;
             switch (tag)
@@ -184,10 +185,12 @@ namespace headsup
                     std::ranges::copy(s.statusBadges, badgeRules->status);
                 }
                 const InfoIconSet set = InfoIconsOf(info.mob ? &ResistancesOf(*info.mob) : nullptr, *badgeRules, GroupOf(tag));
+                const RankNumbers numbers{s.rankDisplay, s.countAccuracy, player.caster ? &*player.caster : nullptr,
+                    info.mob ? MagicTargetOf(*info.mob, info.checked ? info.checked->level : 0) : std::nullopt};
                 for (int i = 0; i < set.count; ++i)
                 {
                     IconDraw draw = DrawOf(set.icons[i].icon);
-                    draw.badge      = BadgeText(set.icons[i], s.showRanks);
+                    draw.badge      = BadgeText(set.icons[i], numbers);
                     draw.badgeColor = BadgeColor(set.icons[i].badge, s);
                     out.push_back(std::move(draw));
                 }
@@ -342,7 +345,7 @@ namespace headsup
                     }
                     const bool counted = IsCountedIcon(tag);
                     if (counted && statusIcons >= kind.maxIcons) continue;
-                    std::vector<IconDraw> icons = TagIcons(tag, info, s, badgeRules);
+                    std::vector<IconDraw> icons = TagIcons(tag, info, player, s, badgeRules);
                     drawn                       = !icons.empty();
                     if (drawn && counted) ++statusIcons;
                     if (drawn) builder.Icons(std::move(icons), IsBadgeTag(tag));

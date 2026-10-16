@@ -31,7 +31,7 @@ namespace headsup
         constexpr const char* kEnabledKey = "enabled"; // in every file any build saved: what tells a file from none
         constexpr BoolKey kBools[] = {{kEnabledKey, &Settings::enabled}, {"phTimers", &Settings::phTimers},
             {"scaleWithDistance", &Settings::scaleWithDistance}, {"scaleOwnName", &Settings::scaleOwnName},
-            {"fixPointer", &Settings::fixPointer}, {"showRanks", &Settings::showRanks}, {"showBar", &Settings::showBar},
+            {"fixPointer", &Settings::fixPointer}, {"countAccuracy", &Settings::countAccuracy}, {"showBar", &Settings::showBar},
             {"hideHelpBar", &Settings::hideHelpBar}, {"hideNetstat", &Settings::hideNetstat},
             {"screenshotHidesGame", &Settings::screenshotHidesGame},
             {"clockSeconds", &Settings::clockSeconds},
@@ -119,6 +119,10 @@ namespace headsup
         constexpr const char* kCursorPickKey     = "cursorPick";
 
         constexpr const char* kBadgeFontKey = "badgeFontName";
+        constexpr const char* kRankDisplayKey = "rankDisplay";
+        const char* const kRankDisplayNames[kRankDisplayCount] = {"rank", "increased", "total"};
+        // Before the chances a badge's rank read as the skillchain table's percent unless this was on.
+        constexpr const char* kOldShowRanksKey = "showRanks";
         constexpr const char* kBarTitleFontKey = "barTitleFont";
         constexpr const char* kBarTextFontKey  = "barTextFont";
         // Saved files from before the cursor scaled on its own, when it scaled with the names, take the names'.
@@ -1220,6 +1224,12 @@ namespace headsup
         else if (HeldSwitch(store, kOldChocoboPointerKey).value_or(false))
             s.pointerIcon = PointerIcon::Chocobo;
         s.pointerFile = store.GetString(kPointerFileKey, "");
+        const std::string display = store.GetString(kRankDisplayKey, kNoText);
+        if (display != kNoText)
+            s.rankDisplay = static_cast<RankDisplay>(
+                NameIndex(kRankDisplayNames, kRankDisplayCount, display, static_cast<int>(s.rankDisplay)));
+        else if (HeldSwitch(store, kOldShowRanksKey).value_or(false))
+            s.rankDisplay = RankDisplay::Rank;
         s.dashMark     = static_cast<DashMark>(
             NameIndex(kDashMarkNames, kDashMarkCount, store.GetString(kDashMarkKey, ""), static_cast<int>(s.dashMark)));
         s.cursorHeight = Rebased(store, kCursorHeightKey, kOldCursorSizeKey, s.cursorHeight, [](float size) { return size; });
@@ -1350,6 +1360,7 @@ namespace headsup
         store.Set(kCursorFileKey, s.cursorFile.c_str());
         store.Set(kPointerIconKey, kPointerIconNames[static_cast<int>(s.pointerIcon)]);
         store.Set(kPointerFileKey, s.pointerFile.c_str());
+        store.Set(kRankDisplayKey, kRankDisplayNames[static_cast<int>(s.rankDisplay)]);
         store.Set(kDashMarkKey, kDashMarkNames[static_cast<int>(s.dashMark)]);
         SavePick(store, kCursorPickKey, s.cursorColor);
         SavePick(store, kCursorEdgePickKey, s.cursorEdgeColor);

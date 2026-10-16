@@ -1,10 +1,12 @@
 #pragma once
 
 #include "generated/icon_ids.h"
+#include "magic_chance.h"
 #include "mobdata.h"
 #include "plate_settings.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 
 namespace headsup
@@ -83,14 +85,27 @@ namespace headsup
     // The entries of InfoIconsFor in one group, in its order: Weak holds Weak and WeakRank, Resist Resist and
     // ResistRank, Status StatusWeak and StatusRank.
     InfoIconSet InfoIconsOf(const MobResistances* mob, const BadgeRules& rules, BadgeGroup group);
-    // A change in damage taken as the badges spell it: "+25%", "-50%", "0%".
+    // A change in damage taken or in a chance as the badges spell it: "+25%", "-50%", "0%".
     std::string PercentText(int percent);
-    // A rank as the wikis' percent, -3 as "+50%" (150%) and 4 as "-50%", or as the rank itself.
-    std::string RankText(int rank, bool ranks);
     // The mark of an immunity: a times sign.
     constexpr const char* kTimesSign = "\xC3\x97";
-    // "+25%", "-50%", a rank as RankText gives it, or kTimesSign for an immunity.
-    std::string BadgeText(const InfoIcon& icon, bool ranks);
+
+    // What a rank's number is figured with: what it says, your accuracy and the mob at the level it is figured for.
+    struct RankNumbers
+    {
+        RankDisplay display  = RankDisplay::IncreasedChance;
+        bool countAccuracy   = true;
+        const Caster* caster = nullptr;
+        std::optional<MagicTarget> target;
+    };
+    // The mob at the level a check gave (its level mod taken back off) or else the top of its range, when the data has
+    // its stats there.
+    std::optional<MagicTarget> MagicTargetOf(const MobRecord& mob, int checkedLevel);
+    // An element's rank and a status's as RankNumberText gives them, by the spell each stands for.
+    std::string ElementRankText(Element element, int rank, const RankNumbers& numbers);
+    std::string StatusRankText(StatusRank status, int rank, const RankNumbers& numbers);
+    // "+25%", "-50%", a rank's number, or kTimesSign for an immunity.
+    std::string BadgeText(const InfoIcon& icon, const RankNumbers& numbers);
 
     constexpr int kFirstElementSdt = static_cast<int>(Sdt::Fire);
     // A damage type's or element's icon, by its place in Sdt.

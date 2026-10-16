@@ -49,6 +49,7 @@ namespace headsup
         const char* (*itemName)(uint16_t item) = nullptr;
         std::optional<double> targetPhSeconds; // the target placeholder's countdown, when one runs
         std::optional<PlayerCheck> targetCheck; // the targeted player's last check, gathered with the target
+        std::optional<Caster> caster;           // your magic accuracy, gathered with the target for its chances
         std::optional<uint32_t> gil;           // nullopt while the inventory reports nothing
         CurrencyValues currencies{};           // the server's, as last sent; gil is the inventory's, above
         std::array<std::optional<BagCount>, kContainerCount> bags{}; // nullopt for a container without room

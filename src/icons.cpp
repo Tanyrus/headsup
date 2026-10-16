@@ -13,9 +13,6 @@ namespace headsup
 #include "generated/icons.inc"
 
         constexpr double kSdtPerPercent = 100.0;
-        // The wikis' percent for each rank from kMinRank, which a skillchain's damage is multiplied by.
-        constexpr int kRankPercent[kMaxRank - kMinRank + 1] = {150, 130, 115, 100, 85, 70, 60, 50, 40, 30, 25, 20, 15, 10, 5};
-        constexpr int kNeutralPercent                       = 100;
         constexpr Icon kSdtIcons[kSdtCount] = {Icon::Slashing, Icon::Piercing, Icon::Impact, Icon::H2H, Icon::Fire, Icon::Ice,
             Icon::Wind, Icon::Earth, Icon::Lightning, Icon::Water, Icon::Light, Icon::Dark};
         struct Status
@@ -34,29 +31,28 @@ namespace headsup
             {Icon::Requiem, kImmuneRequiem}, {Icon::Petrify, kImmunePetrify}};
         constexpr uint32_t kBothSleeps = kImmuneLightSleep | kImmuneDarkSleep;
 
-        int RankPercent(int rank) { return kRankPercent[std::clamp(rank, kMinRank, kMaxRank) - kMinRank]; }
         bool Weak(int rank, int cutoff) { return cutoff != kNoWeakRank && rank < 0 && rank <= cutoff; }
         bool Resists(int rank, int cutoff) { return cutoff != kNoResistRank && rank > 0 && rank >= cutoff; }
 
         void HighestFirst(std::vector<InfoIcon>& icons) { std::ranges::stable_sort(icons, std::greater{}, &InfoIcon::value); }
         void LowestFirst(std::vector<InfoIcon>& icons) { std::ranges::stable_sort(icons, std::less{}, &InfoIcon::value); }
 
-        // Keeps at most `most` of the two lists together, the ranks furthest from neutral first and then a weakness, then
-        // the element order; each list keeps its own order.
+        // Keeps at most `most` of the two lists together, the ranks that change magic evasion most first and then a
+        // weakness, then the element order; each list keeps its own order.
         void KeepFurthest(std::vector<InfoIcon>& weak, std::vector<InfoIcon>& resist, int most)
         {
             if (std::ssize(weak) + std::ssize(resist) <= most) return;
             struct Pick
             {
-                int distance;
+                double distance;
                 bool resist;
                 size_t index;
             };
             std::vector<Pick> picks;
             for (size_t i = 0; i < weak.size(); ++i)
-                picks.push_back({std::abs(RankPercent(weak[i].value) - kNeutralPercent), false, i});
+                picks.push_back({std::abs(EvasionMultiplierOf(weak[i].value) - 1), false, i});
             for (size_t i = 0; i < resist.size(); ++i)
-                picks.push_back({std::abs(RankPercent(resist[i].value) - kNeutralPercent), true, i});
+                picks.push_back({std::abs(EvasionMultiplierOf(resist[i].value) - 1), true, i});
             std::ranges::stable_sort(picks, std::greater{}, &Pick::distance);
             picks.resize(static_cast<size_t>(std::max(most, 0)));
             std::vector<bool> keepWeak(weak.size()), keepResist(resist.size());
@@ -216,12 +212,26 @@ namespace headsup
 
     std::string PercentText(int percent) { return (percent > 0 ? "+" : "") + std::to_string(percent) + "%"; }
 
-    std::string RankText(int rank, bool ranks)
+    std::optional<MagicTarget> MagicTargetOf(const MobRecord& mob, int checkedLevel)
     {
-        return ranks ? std::to_string(rank) : PercentText(RankPercent(rank) - kNeutralPercent);
+        const int level        = checkedLevel > 0 ? checkedLevel - mob.expLevelMod : mob.maxLevel;
+        const MobStats* stats  = StatsAt(mob, level);
+        if (stats == nullptr) return std::nullopt;
+        return MagicTarget{level, *stats, ResistancesOf(mob)};
     }
 
-    std::string BadgeText(const InfoIcon& icon, bool ranks)
+    std::string ElementRankText(Element element, int rank, const RankNumbers& numbers)
+    {
+        return RankNumberText(numbers.display, numbers.countAccuracy, rank, NukeOf(element), numbers.caster, numbers.target);
+    }
+
+    std::string StatusRankText(StatusRank status, int rank, const RankNumbers& numbers)
+    {
+        return RankNumberText(numbers.display, numbers.countAccuracy, rank, StatusSpellOf(status, numbers.caster),
+            numbers.caster, numbers.target);
+    }
+
+    std::string BadgeText(const InfoIcon& icon, const RankNumbers& numbers)
     {
         switch (icon.badge)
         {
@@ -230,10 +240,17 @@ namespace headsup
         case BadgeKind::Immune: return kTimesSign;
         case BadgeKind::WeakRank:
         case BadgeKind::ResistRank:
+        {
+            const auto sdt = std::ranges::find(kSdtIcons, icon.icon) - std::begin(kSdtIcons);
+            return ElementRankText(static_cast<Element>(sdt - kFirstElementSdt), icon.value, numbers);
+        }
         case BadgeKind::StatusWeak:
         case BadgeKind::StatusRank: break;
         }
-        return RankText(icon.value, ranks);
+        // One Sleep badge for both stands for dark sleep's spell.
+        const auto status = icon.icon == Icon::Sleep ? static_cast<std::ptrdiff_t>(StatusRank::DarkSleep)
+                                                     : std::ranges::find(kRankStatuses, icon.icon, &Status::icon) - std::begin(kRankStatuses);
+        return StatusRankText(static_cast<StatusRank>(status), icon.value, numbers);
     }
 
     Icon SdtIcon(int sdt) { return kSdtIcons[sdt]; }

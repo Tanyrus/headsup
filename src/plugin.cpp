@@ -1871,6 +1871,7 @@ private:
         {
             s.target   = m_Tracker.FindIndex(m_CursorTargets.target);
             s.itemName = ItemName;
+            s.caster   = m_Player.caster;
         }
         if (s.target != nullptr)
             s.targetDistance = headsup::DistanceFromSquared(
@@ -1971,6 +1972,36 @@ private:
             if (party->GetStatusIconsServerId(member) != 0 &&
                 headsup::LevelSyncInPartyIcons(party->GetStatusIcons(member), party->GetStatusIconsBitMask(member)))
                 m_BuffSynced.insert(static_cast<uint16_t>(party->GetStatusIconsTargetIndex(member)));
+    }
+
+    // Your magic accuracy as the game knows it; nullopt before the game reports your level.
+    std::optional<headsup::Caster> CasterNow() const
+    {
+        // Ashita's stat IDs of INT, MND and CHR, in CasterStat order; an equipped item's index holds its container
+        // over its slot.
+        constexpr uint32_t kStatIds[headsup::kCasterStatCount] = {4, 5, 6};
+        constexpr uint32_t kContainerShift = 8, kSlotBits = 0xFF;
+        IPlayer* player                   = m_AshitaCore->GetMemoryManager()->GetPlayer();
+        const Ashita::FFXI::player_t* raw = player->GetRawStructure();
+        if (raw == nullptr || player->GetMainJobLevel() == 0) return std::nullopt;
+        headsup::CasterReading reading;
+        reading.level = player->GetMainJobLevel();
+        static_assert(sizeof(raw->CombatSkills) == sizeof(reading.combatSkills));
+        std::memcpy(reading.combatSkills, &raw->CombatSkills, sizeof(reading.combatSkills));
+        for (int i = 0; i < headsup::kCasterStatCount; ++i)
+            reading.stat[i] = player->GetStat(kStatIds[i]) + player->GetStatModifier(kStatIds[i]);
+        IInventory* inventory = m_AshitaCore->GetMemoryManager()->GetInventory();
+        for (uint32_t slot = 0; slot < headsup::kEquipSlotCount; ++slot)
+        {
+            const Ashita::FFXI::equipmententry_t* entry = inventory->GetEquippedItem(slot);
+            if (entry == nullptr || entry->Index == 0) continue;
+            const Ashita::FFXI::item_t* item =
+                inventory->GetContainerItem((entry->Index >> kContainerShift) & kSlotBits, entry->Index & kSlotBits);
+            if (item != nullptr) reading.equipped[slot] = item->Id;
+        }
+        if (const int16_t* buffs = player->GetBuffs(); buffs != nullptr)
+            reading.buffs = std::span(buffs, headsup::kStatusIconSlots);
+        return headsup::CasterOf(reading);
     }
 
     // The names of the linkshells you wear, from their items: Phoenix equips a linkshell from any container.
@@ -2108,6 +2139,7 @@ private:
         for (headsup::CheckCandidate& candidate : checkable)
             candidate.pet = petOwners.contains(candidate.index);
         m_Player.level   = player->GetMainJobLevel();
+        m_Player.caster  = CasterNow();
         m_Player.sitting = headsup::IsSittingStatus(entity->GetStatus(m_SelfIndex));
         // The status the server gave you says an event runs: your own stayed 0 through an NPC's dialog, a cutscene
         // and one begun at zone-in.

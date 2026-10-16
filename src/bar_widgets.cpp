@@ -31,9 +31,9 @@ namespace headsup
             return Text(PercentText(percent), percent > 0 ? Tone::Weak : percent < 0 ? Tone::Resist : Tone::Neutral);
         }
 
-        Span Rank(int rank, bool ranks)
+        Span Ranked(std::string text, int rank)
         {
-            return Text(RankText(rank, ranks), rank < 0 ? Tone::Weak : rank > 0 ? Tone::Resist : Tone::Neutral);
+            return Text(std::move(text), rank < 0 ? Tone::Weak : rank > 0 ? Tone::Resist : Tone::Neutral);
         }
 
         // The data gives zone 0, the unknown one, a calendar of its own, so only a known zone has odds.
@@ -205,22 +205,26 @@ namespace headsup
             for (int i = 0; i < kFirstElementSdt; ++i)
                 damage.cells.push_back(Cell(Percent(SdtPercent(res.sdt[i])), SdtIcon(i)));
 
+            const RankNumbers numbers{settings.rankDisplay, settings.countAccuracy, state.caster ? &*state.caster : nullptr,
+                MagicTargetOf(mob, target->checked ? target->checked->level : 0)};
             PopupRow elements = Grid(kElementColumns, kElementCount);
             for (int e = 0; e < kElementCount; ++e)
             {
                 const int percent = SdtPercent(res.sdt[kFirstElementSdt + e]);
-                elements.cells.push_back(
-                    Cell(percent != 0 ? Percent(percent) : Rank(res.elementRanks[e], settings.showRanks),
-                        SdtIcon(kFirstElementSdt + e)));
+                const int rank    = res.elementRanks[e];
+                elements.cells.push_back(Cell(percent != 0 ? Percent(percent)
+                                                           : Ranked(ElementRankText(static_cast<Element>(e), rank, numbers), rank),
+                    SdtIcon(kFirstElementSdt + e)));
             }
 
             PopupRow statuses = Grid(kStatusColumns, kStatusRankCount);
             for (int s = 0; s < kStatusRankCount; ++s)
             {
                 const bool immuneTo = (res.immunity & StatusImmunity(s)) != 0;
-                statuses.cells.push_back(
-                    Cell(immuneTo ? Text(kTimesSign, Tone::Immune) : Rank(res.statusRanks[s], settings.showRanks),
-                        StatusIcon(s)));
+                const int rank      = res.statusRanks[s];
+                statuses.cells.push_back(Cell(immuneTo ? Text(kTimesSign, Tone::Immune)
+                                                       : Ranked(StatusRankText(static_cast<StatusRank>(s), rank, numbers), rank),
+                    StatusIcon(s)));
             }
 
             PopupRow immune{RowKind::Line, 0, {}};

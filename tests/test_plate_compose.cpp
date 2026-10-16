@@ -759,8 +759,9 @@ TEST(badge_tags_draw_what_the_icon_groups_and_badge_functions_give)
     BadgeRules rules{.elementWeakRank = s.elementWeakRank, .elementResistRank = s.elementResistRank,
         .maxElements = s.maxElements};
     std::ranges::copy(s.statusBadges, rules.status);
-    const auto expected = [&](bool ranks, std::initializer_list<BadgeGroup> groups)
+    const auto expected = [&](RankDisplay display, std::initializer_list<BadgeGroup> groups)
     {
+        const RankNumbers numbers{display, s.countAccuracy, nullptr, MagicTargetOf(*hunter, 0)};
         std::vector<IconDraw> out;
         for (const BadgeGroup group : groups)
         {
@@ -769,7 +770,7 @@ TEST(badge_tags_draw_what_the_icon_groups_and_badge_functions_give)
             {
                 IconDraw draw;
                 draw.icon       = set.icons[i].icon;
-                draw.badge      = BadgeText(set.icons[i], ranks);
+                draw.badge      = BadgeText(set.icons[i], numbers);
                 draw.badgeColor = BadgeColor(set.icons[i].badge, s);
                 out.push_back(draw);
             }
@@ -783,15 +784,16 @@ TEST(badge_tags_draw_what_the_icon_groups_and_badge_functions_give)
     };
     const ComposedPlate plate = Compose(info, s);
     CHECK_EQ(plate.lines.size(), size_t{3});
-    const std::vector<IconDraw> weak = expected(false, {BadgeGroup::Weak});
+    const std::vector<IconDraw> weak = expected(RankDisplay::IncreasedChance, {BadgeGroup::Weak});
     CHECK(!weak.empty());
     CHECK(composed(plate.lines[0]) == weak);
-    const std::vector<IconDraw> rest = expected(false, {BadgeGroup::Resist, BadgeGroup::Status, BadgeGroup::Immune});
+    const std::vector<IconDraw> rest =
+        expected(RankDisplay::IncreasedChance, {BadgeGroup::Resist, BadgeGroup::Status, BadgeGroup::Immune});
     CHECK(!rest.empty());
     CHECK(composed(plate.lines[1]) == rest);
-    s.showRanks = true;
+    s.rankDisplay = RankDisplay::Rank;
     const std::vector<IconDraw> ranked = composed(Compose(info, s).lines[0]);
-    CHECK(ranked == expected(true, {BadgeGroup::Weak}));
+    CHECK(ranked == expected(RankDisplay::Rank, {BadgeGroup::Weak}));
     CHECK(ranked != weak);
 }
 

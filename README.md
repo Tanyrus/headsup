@@ -128,7 +128,7 @@ out. Typed by hand it is `${sync|bazaar}`.
 | ID | `$id` | Mobs | The last three hex digits of its ID, which players name placeholders by, such as [106] |
 | Server ID | `$serverid` | Mobs | Its whole ID in decimal |
 | Placeholder | `$ph` | Mobs | [PH] on a lottery placeholder, whose death can pop a notorious monster |
-| Weaknesses, Resistances | `$weak`, `$resist` | Mobs | The damage types and elements it is weak to or resists, with percents or ranks |
+| Weaknesses, Resistances | `$weak`, `$resist` | Mobs | The damage types and elements it is weak to or resists: damage taken in percent, or an element's rank as a chance or the rank itself |
 | Statuses | `$status` | Mobs | The statuses it is weak to or resists, as the Statuses card picks |
 | Immunities | `$immune` | Mobs | The statuses it cannot take |
 | Job | `$job` | Players, Self | Jobs, such as WAR/MNK: yours, your party's, and another player's once you have checked them |
@@ -143,7 +143,13 @@ Players and Self pages, Max Icons Shown limits how many of a player's icons a na
 lines from the top; the GM icon always shows.
 
 Weaknesses, resistances, statuses and immunities are shown as small badges on icons. The Badges card sets their font,
-colors and whether they show ranks; the Weaknesses and Statuses cards pick what is worth a badge.
+colors and what a rank's badge says. A rank changes how often magic lands, not how hard it hits, so Badge Numbers
+offers Increased Chance (the default: how much more often magic lands than without the weakness, or less often with a
+resistance), Total Chance (how often your spell lands: an unresisted tier I nuke for an element, the effect for a
+status, from your level, skill, stats and gear against the mob's at its checked level or the top of its range) and
+Rank. Count Your Accuracy (on by default) figures Increased Chance with your own accuracy, so it shrinks once you land
+95% of the time anyway. Merits, food and weather are not counted. The Weaknesses and Statuses cards pick what is worth a
+badge.
 
 After the design come a Line Style card, with a tab for each line, an Ornament card and a Nameplate Opacity card. A
 line has these settings:

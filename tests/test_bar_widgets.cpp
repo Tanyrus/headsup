@@ -184,15 +184,17 @@ TEST(the_target_popup_has_every_element_and_status_with_its_percent)
     const PopupRow& elements = Section(popup, "Elements")->rows[0];
     CHECK(elements.kind == RowKind::Grid && elements.columns == 4 && elements.cells.size() == 8);
     CHECK(elements.cells[6].icon == Icon::Light);
-    CHECK(elements.cells[6].text == (std::vector<Span>{{"+50%", Tone::Weak}}));
+    // Unchecked, at the top of its range: magic evasion 58 at 20 (rank C+, Phoenix's sql/skill_caps.sql), light -3
+    // takes floor(58 * 0.95) = 55 off it, fire -2 floor(58 * 0.96019) = 55; dark is 0.
+    CHECK(elements.cells[6].text == (std::vector<Span>{{"+3%", Tone::Weak}}));
     CHECK(elements.cells[7].text == (std::vector<Span>{{"0%", Tone::Neutral}}));
-    CHECK(elements.cells[0].text == (std::vector<Span>{{"+30%", Tone::Weak}}));
+    CHECK(elements.cells[0].text == (std::vector<Span>{{"+3%", Tone::Weak}}));
     const PopupRow& statuses = Section(popup, "Statuses")->rows[0];
     CHECK(statuses.columns == 5 && statuses.cells.size() == 10 && statuses.cells[0].icon == Icon::Paralyze);
     CHECK(Section(popup, "Immune")->rows[0].cells[0].text == (std::vector<Span>{{"None", Tone::Neutral}}));
     CHECK(Joined(Section(popup, "Spawn")->rows[0].cells[0].text) == "Respawn 5:00");
     CHECK(Joined(popup.sections[0].rows[0].cells[1].text) == "ID 220"); // 17199648 is 0x1067220
-    settings.showRanks = true;
+    settings.rankDisplay = RankDisplay::Rank;
     CHECK(Section(BarPopupContent(BarWidget::Target, state, settings), "Elements")->rows[0].cells[6].text ==
           (std::vector<Span>{{"-3", Tone::Weak}}));
 }
