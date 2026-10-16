@@ -404,6 +404,32 @@ TEST(a_dropdown_lists_its_choices_under_it_and_a_pick_sets_the_setting)
     CHECK(!window.Shows("mobs-line-style-text-color-mobs1-o-0"));
 }
 
+TEST(badge_numbers_is_a_dropdown_whose_closed_control_holds_each_choice_on_one_line)
+{
+    for (const char* font : {kBarlowCondensed, kCinzel})
+    {
+        Window window(MenuTheme::Phoenix, font);
+        window.Page("mobs");
+        std::string control;
+        for (Rml::Element* element : window.OfClass("dd"))
+            if (element->GetId().find("badge-numbers") != std::string::npos) control = element->GetId();
+        CHECK(!control.empty());
+        if (control.empty()) continue;
+        for (const RankDisplay each : {RankDisplay::Rank, RankDisplay::TotalChance, RankDisplay::IncreasedChance})
+        {
+            window.Click(control);
+            CHECK(window.Click(control + "-o-" + std::to_string(static_cast<int>(each))));
+            CHECK(window.settings.rankDisplay == each);
+            // The closed control cuts off what is past its edge rather than wrapping it.
+            Rml::Element* shown = window.Find(control + "-val");
+            CHECK(shown != nullptr && !shown->GetInnerRML().empty());
+            if (shown == nullptr) continue;
+            const float text = static_cast<float>(Rml::ElementUtilities::GetStringWidth(shown, shown->GetInnerRML()));
+            CHECK(text <= shown->GetBox().GetSize(Rml::BoxArea::Content).x);
+        }
+    }
+}
+
 TEST(a_list_of_checks_stays_open_while_its_rows_are_checked)
 {
     Window window;

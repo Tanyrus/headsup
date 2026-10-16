@@ -94,7 +94,7 @@ namespace headsup
     struct RankNumbers
     {
         RankDisplay display  = RankDisplay::IncreasedChance;
-        bool countAccuracy   = true;
+        bool countAccuracy   = false;
         const Caster* caster = nullptr;
         std::optional<MagicTarget> target;
     };

@@ -85,7 +85,7 @@ namespace headsup
         int maxElements       = BadgeRules{}.maxElements;
         StatusBadgeRule statusBadges[kStatusRankCount] = {}; // by StatusRank
         RankDisplay rankDisplay = RankDisplay::IncreasedChance; // what a rank badge's number says
-        bool countAccuracy      = true; // Increased Chance with your own magic accuracy, not the mob's evasion alone
+        bool countAccuracy      = false; // Increased Chance with your own magic accuracy, not the mob's evasion alone
         std::string badgeFontName; // badges' numbers; empty for the default font
         bool showBar       = true;
         BarTheme barTheme  = BarTheme::PhoenixGold;

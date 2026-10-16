@@ -1020,12 +1020,9 @@ namespace headsup
                 form.FontDropdown(label.c_str(), s.badgeFontName, c.plateFonts, tip, Word(c, WindowWord::DefaultFont));
                 break;
             case SettingPiece::BadgeNumbers:
-            {
                 form.Fade(!on);
-                const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(e));
-                form.Segments(label.c_str(), s.rankDisplay, names.data(), kRankDisplayCount, tip, kWideSegmentWidth);
+                OptionsDropdown(form, label, s.rankDisplay, c.layout.OptionsOf(e), tip);
                 break;
-            }
             case SettingPiece::CountYourAccuracy:
                 form.Fade(!on || s.rankDisplay != RankDisplay::IncreasedChance);
                 form.Switch(label.c_str(), s.countAccuracy, tip);

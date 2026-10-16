@@ -678,6 +678,18 @@ TEST(a_file_from_before_badge_numbers_keeps_its_ranks_and_trades_the_skillchain_
     }
 }
 
+TEST(your_accuracy_starts_left_out_even_in_a_file_where_an_early_build_wrote_it_on)
+{
+    MapStore early;
+    early.values = {{"enabled", "true"}, {"countAccuracy", "true"}};
+    CHECK(!LoadSettings(early).countAccuracy);
+    Settings s;
+    s.countAccuracy = true;
+    MapStore file;
+    SaveSettings(s, file);
+    CHECK(LoadSettings(file).countAccuracy);
+}
+
 TEST(a_file_from_before_hide_during_conversation_keeps_plates_in_conversations)
 {
     MapStore file = ReleaseFile();
@@ -921,7 +933,7 @@ TEST(a_file_from_before_the_badge_group_takes_its_defaults)
     const Settings s = LoadSettings(old);
     CHECK_EQ(s.Kind(PlateKind::Mobs).lines[0].text, "$detect"); // no badges: the top bar's popup shows them
     CHECK(s.elementWeakRank == -1 && s.elementResistRank == 4 && s.maxElements == kElementCount);
-    CHECK(s.rankDisplay == RankDisplay::IncreasedChance && s.countAccuracy);
+    CHECK(s.rankDisplay == RankDisplay::IncreasedChance && !s.countAccuracy);
     CHECK_EQ(s.badgeFontName, "Barlow Condensed"); // the font badges had, where a new install's are in the default font
     CHECK_EQ(s.detectionShown, kAllDetection); // and every icon, the aggression one too, which a new install hides
     for (const StatusBadgeRule& status : s.statusBadges)

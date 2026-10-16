@@ -147,8 +147,8 @@ colors and what a rank's badge says. A rank changes how often magic lands, not h
 offers Increased Chance (the default: how much more often magic lands than without the weakness, or less often with a
 resistance), Total Chance (how often your spell lands: an unresisted tier I nuke for an element, the effect for a
 status, from your level, skill, stats and gear against the mob's at its checked level or the top of its range) and
-Rank. Count Your Accuracy (on by default) figures Increased Chance with your own accuracy, so it shrinks once you land
-95% of the time anyway. Merits, food and weather are not counted. The Weaknesses and Statuses cards pick what is worth a
+Rank. By default Increased Chance is the mob's side alone, the magic evasion the rank takes away or adds; Count Your
+Accuracy figures it with your own accuracy instead, so it shrinks once you land 95% of the time anyway. Merits, food and weather are not counted. The Weaknesses and Statuses cards pick what is worth a
 badge.
 
 After the design come a Line Style card, with a tab for each line, an Ornament card and a Nameplate Opacity card. A
