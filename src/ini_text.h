@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -17,4 +18,6 @@ namespace headsup
     std::string WithIniValues(std::string_view file, std::string_view section, std::span<const KeyText> values);
     // Whether the file holds every one of them already: setting them would change nothing.
     bool HoldsIniValues(std::string_view file, std::string_view section, std::span<const KeyText> values);
+    // A key's value in a section, trimmed, as that reader reads it: none when the first section of the name lacks it.
+    std::optional<std::string> IniValue(std::string_view file, std::string_view section, std::string_view key);
 }

@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace headsup
@@ -18,4 +19,6 @@ namespace headsup
 
     const BundledFont* BundledFonts(size_t& count);
     std::vector<std::string> BundledFamilies();
+    // Whether two font names are one family: GDI matches names in any case.
+    bool SameFamily(std::string_view a, std::string_view b);
 }

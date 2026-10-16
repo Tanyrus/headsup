@@ -926,13 +926,6 @@ namespace headsup
                 if (o.ownNameColor) k.lines[kBottomLine].color = ColorPick{ColorSource::Custom, o.nameColor};
             }
         }
-
-        bool SameIgnoringCase(const std::string& a, const std::string& b)
-        {
-            return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), [](char x, char y) {
-                return std::tolower(static_cast<unsigned char>(x)) == std::tolower(static_cast<unsigned char>(y));
-            });
-        }
     }
 
     bool NameplatesOn(const Settings& s)
@@ -1004,10 +997,10 @@ namespace headsup
             return l;
         };
         std::sort(installed.begin(), installed.end(), [&](const std::string& a, const std::string& b) { return lower(a) < lower(b); });
-        installed.erase(std::unique(installed.begin(), installed.end(), SameIgnoringCase), installed.end());
+        installed.erase(std::unique(installed.begin(), installed.end(), [](const std::string& a, const std::string& b) { return SameFamily(a, b); }), installed.end());
         std::vector<std::string> choices = BundledFamilies();
         for (const std::string& name : installed)
-            if (std::none_of(choices.begin(), choices.end(), [&](const std::string& had) { return SameIgnoringCase(had, name); }))
+            if (std::none_of(choices.begin(), choices.end(), [&](const std::string& had) { return SameFamily(had, name); }))
                 choices.push_back(name);
         return choices;
     }

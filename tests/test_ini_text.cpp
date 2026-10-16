@@ -2,6 +2,7 @@
 #include "test.h"
 
 #include <initializer_list>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -227,4 +228,16 @@ TEST(a_file_without_the_section_gets_it_at_its_end_and_an_empty_one_is_the_secti
     // A section whose name only starts or ends like it is another.
     CHECK_EQ(Set("[settings2]\r\nenabled=other\r\n", {{"enabled", "true"}}),
         "[settings2]\r\nenabled=other\r\n[settings]\r\nenabled=true\r\n");
+}
+
+TEST(a_value_is_read_as_the_reader_reads_it)
+{
+    const char* file = "\xEF\xBB\xBF[Settings]\r\n; root_path=commented\r\nRoot_Path = X:\\DATs \r\nroot_path=second\r\n"
+                       "[overlays]\r\n0=A\r\n[settings]\r\nlater=1\r\n";
+    CHECK(IniValue(file, "settings", "root_path") == std::optional<std::string>("X:\\DATs"));
+    CHECK(IniValue(file, "OVERLAYS", "0") == std::optional<std::string>("A"));
+    CHECK(!IniValue(file, "overlays", "1"));
+    CHECK(!IniValue(file, "settings", "later")); // only the first section of the name is read
+    CHECK(!IniValue(file, "cache", "0"));
+    CHECK(IniValue("[a]\nk=\n", "a", "k") == std::optional<std::string>(""));
 }

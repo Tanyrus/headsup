@@ -117,4 +117,31 @@ namespace headsup
     {
         return WithIniValues(file, section, values) == file;
     }
+
+    std::optional<std::string> IniValue(std::string_view file, std::string_view section, std::string_view key)
+    {
+        const std::string sectionName = Name(section), keyName = Name(key);
+        bool inside                   = false;
+        for (bool first = true; !file.empty(); first = false)
+        {
+            const size_t lf       = file.find(kLf);
+            std::string_view line = file.substr(0, lf);
+            file.remove_prefix(lf == std::string_view::npos ? file.size() : lf + 1);
+            if (line.ends_with(kCrLf.front())) line.remove_suffix(1);
+            const std::string_view trimmed =
+                Trimmed(first && line.starts_with(kByteOrderMark) ? line.substr(kByteOrderMark.size()) : line);
+            if (trimmed.starts_with(kSectionOpen))
+            {
+                if (inside) return std::nullopt;
+                const size_t close = trimmed.rfind(kSectionClose);
+                inside = close != std::string_view::npos && Name(Trimmed(trimmed.substr(1, close - 1))) == sectionName;
+                continue;
+            }
+            const size_t assign = trimmed.find(kAssign);
+            if (!inside || assign == std::string_view::npos) continue;
+            const std::string_view name = Trimmed(trimmed.substr(0, assign));
+            if (IsKey(name) && Name(name) == keyName) return std::string(Trimmed(trimmed.substr(assign + 1)));
+        }
+        return std::nullopt;
+    }
 }

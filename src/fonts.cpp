@@ -1,5 +1,7 @@
 #include "fonts.h"
 
+#include <algorithm>
+#include <cctype>
 #include <iterator>
 
 namespace headsup
@@ -21,5 +23,12 @@ namespace headsup
         for (const BundledFont& font : kBundledFonts)
             families.emplace_back(font.family);
         return families;
+    }
+
+    bool SameFamily(std::string_view a, std::string_view b)
+    {
+        return std::ranges::equal(a, b, [](char x, char y) {
+            return std::tolower(static_cast<unsigned char>(x)) == std::tolower(static_cast<unsigned char>(y));
+        });
     }
 }
