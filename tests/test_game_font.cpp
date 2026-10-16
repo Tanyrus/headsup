@@ -1,4 +1,6 @@
 #include "game_font.h"
+#include "plate_image.h"
+#include "plate_settings.h"
 #include "test.h"
 
 #include <array>
@@ -77,7 +79,7 @@ namespace
             out[static_cast<size_t>(k / 2)] |= static_cast<uint8_t>(alphas[static_cast<size_t>(k)] << (k % 2 * 4));
         return out + ColorBlock(c0, c1, picks);
     }
-    constexpr uint16_t kWhite = 0xFFFF, kBlack = 0x0000;
+    constexpr uint16_t kWhite565 = 0xFFFF, kBlack565 = 0x0000;
 
     // A shapes chunk's body as 51.DAT has it: its name, the pictures it draws from, the shape count, then each shape:
     // a flag, its box's four corners, the picture's rectangle as width, height, u and v, a byte and four colors; every
@@ -120,6 +122,37 @@ namespace
     }
     constexpr int kSheetWide = 256, kSheetTall = 16;
 
+    // A face whose picture is clear but for the rectangles a test fills, every glyph a box of 4 x 11 units drawn from
+    // a clear corner, and the space 4 x 8.
+    GameFontFace Face(int width = 64, int height = 32)
+    {
+        GameFontFace face;
+        face.picture = FontPicture{kPictureName, width, height, std::vector<uint8_t>(static_cast<size_t>(width * height), 0)};
+        for (GlyphShape& g : face.glyphs)
+            g = GlyphShape{0, 0, 4, 11, 60, 0, 4, 11};
+        face.glyphs[0] = GlyphShape{0, 0, 4, 8, 60, 0, 4, 8};
+        return face;
+    }
+    // A glyph drawn from a width by height rectangle at u, v, all of it filled at alpha, into a box of the same size
+    // in units.
+    void SetGlyph(GameFontFace& face, char c, int u, int v, int width, int height, uint8_t alpha = 255)
+    {
+        face.glyphs[static_cast<size_t>(c - kFirstGlyph)] = GlyphShape{0, 0, width, height, u, v, width, height};
+        for (int y = v; y < v + height; ++y)
+            for (int x = u; x < u + width; ++x)
+                face.picture.fill[static_cast<size_t>(y * face.picture.width + x)] = alpha;
+    }
+    uint8_t At(const Coverage& c, int x, int y) { return c.alpha[static_cast<size_t>(y * c.width + x)]; }
+    // The columns of a coverage's row that hold anything.
+    std::vector<int> InkColumns(const Coverage& c, int y)
+    {
+        std::vector<int> columns;
+        for (int x = 0; x < c.width; ++x)
+            if (At(c, x, y) != 0) columns.push_back(x);
+        return columns;
+    }
+    constexpr uint8_t kPlain = 0;
+
     bool Same(const GlyphShape& a, const GlyphShape& b)
     {
         return a.left == b.left && a.top == b.top && a.right == b.right && a.bottom == b.bottom && a.u == b.u && a.v == b.v &&
@@ -161,7 +194,7 @@ TEST(a_dxt3_pictures_letters_are_their_white_times_their_alpha)
     std::array<uint8_t, 16> opaque{};
     opaque.fill(15);
     // The second block's first color is the smaller, which in DXT1 would make its fourth clear.
-    const Bytes blocks = Dxt3Block(alphas, kWhite, kBlack, picks) + Dxt3Block(opaque, kBlack, kWhite, {3, 2});
+    const Bytes blocks = Dxt3Block(alphas, kWhite565, kBlack565, picks) + Dxt3Block(opaque, kBlack565, kWhite565, {3, 2});
     const Read<FontPicture> read = ReadFontPicture(PictureBody(8, 4, "DXT3", blocks));
     CHECK(read.value && read.failure.empty());
     CHECK(read.value->name == kPictureName && read.value->width == 8 && read.value->height == 4);
@@ -173,7 +206,7 @@ TEST(a_dxt3_pictures_letters_are_their_white_times_their_alpha)
 TEST(a_dxt1_picture_is_clear_where_it_picks_its_fourth_color_after_a_smaller_first)
 {
     // DXT1 with the first color not above the second has three: the two and halfway, and its fourth is clear.
-    const Bytes blocks = ColorBlock(kBlack, kWhite, {0, 1, 2, 3}) + ColorBlock(kWhite, kBlack, {3});
+    const Bytes blocks = ColorBlock(kBlack565, kWhite565, {0, 1, 2, 3}) + ColorBlock(kWhite565, kBlack565, {3});
     const Read<FontPicture> read = ReadFontPicture(PictureBody(8, 4, "DXT1", blocks));
     CHECK(read.value);
     const std::vector<uint8_t>& fill = read.value->fill;
@@ -183,7 +216,7 @@ TEST(a_dxt1_picture_is_clear_where_it_picks_its_fourth_color_after_a_smaller_fir
 
 TEST(a_record_that_is_no_picture_is_refused_with_why)
 {
-    const Bytes block = Dxt3Block({}, kWhite, kBlack, {});
+    const Bytes block = Dxt3Block({}, kWhite565, kBlack565, {});
     auto refused      = [](const Bytes& body) {
         const Read<FontPicture> read = ReadFontPicture(body);
         return !read.value && !read.failure.empty();
@@ -237,9 +270,9 @@ TEST(the_font_is_its_picture_and_shapes_out_of_one_dat)
     Bytes blocks;
     std::array<uint8_t, 16> opaque{};
     opaque.fill(15);
-    blocks = Dxt3Block(opaque, kWhite, kWhite, {});
+    blocks = Dxt3Block(opaque, kWhite565, kWhite565, {});
     for (int b = 1; b < kSheetWide / 4 * kSheetTall / 4; ++b)
-        blocks = blocks + Dxt3Block({}, kBlack, kBlack, {});
+        blocks = blocks + Dxt3Block({}, kBlack565, kBlack565, {});
     const Bytes picture = Chunk("font", kPictureChunkType, PictureBody(kSheetWide, kSheetTall, "DXT3", blocks));
     const Bytes shapes  = Chunk("font", kShapesChunkType, ShapesBody(Glyphs()));
     const Read<GameFontFace> read = ReadGameFont(Chunk("menu", 0x01, Bytes(16, 0)) + picture + shapes);
@@ -267,4 +300,116 @@ TEST(the_font_is_read_where_xipivot_would_read_it_then_from_the_game)
                         "[overlays]\n0=EraDATs\n1=XICombinedMaps-2048\n2=XiView-Standard\n";
     const std::vector<std::string> files = GameFontCandidates(pivot, "D:\\d", "C:\\Game");
     CHECK(files.size() == 4u && files[2] == "X:\\Games\\PhoenixXI\\polplugins\\DATs\\XiView-Standard\\ROM\\119\\51.DAT");
+}
+
+TEST(a_character_past_the_fonts_is_drawn_as_its_question_mark)
+{
+    CHECK_EQ(GlyphOf(U' '), 0u);
+    CHECK_EQ(GlyphOf(U'A'), static_cast<size_t>('A' - 0x20));
+    CHECK_EQ(GlyphOf(U'~'), kGlyphCount - 1);
+    CHECK_EQ(GlyphOf(U'\u00E9'), static_cast<size_t>('?' - 0x20));
+    CHECK_EQ(GlyphOf(U'\t'), static_cast<size_t>('?' - 0x20));
+}
+
+TEST(text_is_as_wide_as_its_boxes_at_twelve_units_to_the_height_asked_and_the_game_stretches_it_16_to_9)
+{
+    // "AB A": boxes of 9, 6, 4 (the space) and 9 units, 28 in all; at 24 pixels a unit is 2 pixels tall, and the line
+    // is 13 units.
+    GameFontFace face = Face();
+    SetGlyph(face, 'A', 0, 0, 9, 11);
+    SetGlyph(face, 'B', 10, 0, 6, 11);
+    int width = 0, height = 0;
+    GameFontExtent(face, GameFontVariant::Narrow, "AB A", 24, kPlain, width, height);
+    CHECK(width == 56 && height == 26);
+    GameFontExtent(face, GameFontVariant::Game, "AB A", 24, kPlain, width, height);
+    CHECK(width == 100 && height == 26); // 56 x 16 / 9 = 99.6
+    GameFontExtent(face, GameFontVariant::Narrow, "AB A", 24, StyleBit(FontStyle::Italic), width, height);
+    CHECK_EQ(width, 56 + ItalicLean(24, StyleBit(FontStyle::Italic)));
+}
+
+TEST(each_glyph_is_drawn_from_its_rectangle_into_its_box_one_after_another_inside_the_margin)
+{
+    // At 12 pixels a unit is a pixel: the picture's pixels land as they are.
+    GameFontFace face = Face();
+    SetGlyph(face, 'A', 0, 0, 3, 5);
+    SetGlyph(face, 'B', 10, 0, 2, 4, 128);
+    const Coverage c = GameFontRasterize(face, GameFontVariant::Narrow, "AB", 12, kPlain, 0, 2);
+    CHECK(c.width == 3 + 2 + 4 && c.height == 13 + 4);
+    CHECK((InkColumns(c, 2) == std::vector<int>{2, 3, 4, 5, 6}));
+    CHECK(At(c, 2, 2) == 255 && At(c, 5, 2) == 128 && At(c, 4, 6) == 255 && At(c, 5, 6) == 0 && At(c, 2, 7) == 0);
+    CHECK(InkColumns(c, 0).empty() && InkColumns(c, 1).empty());
+    // Tracking adds after each character, as GDI's does.
+    CHECK_EQ(GameFontRasterize(face, GameFontVariant::Narrow, "AB", 12, kPlain, 3, 2).width, 3 + 2 + 6 + 4);
+    // A character the font lacks is its question mark.
+    SetGlyph(face, '?', 20, 0, 3, 7);
+    CHECK(GameFontRasterize(face, GameFontVariant::Narrow, "\xC3\xA9", 12, kPlain, 0, 0).alpha ==
+          GameFontRasterize(face, GameFontVariant::Narrow, "?", 12, kPlain, 0, 0).alpha);
+}
+
+TEST(the_game_variant_draws_each_glyph_16_to_9_as_wide)
+{
+    GameFontFace face = Face();
+    SetGlyph(face, 'A', 0, 0, 9, 11);
+    const Coverage c = GameFontRasterize(face, GameFontVariant::Game, "A", 12, kPlain, 0, 0);
+    CHECK_EQ(c.width, 16);
+    CHECK((InkColumns(c, 5) == std::vector<int>{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}));
+    CHECK_EQ(At(c, 8, 5), 255);
+}
+
+TEST(a_glyph_drawn_larger_is_sharpened_to_an_edge_a_pixel_wide)
+{
+    // Twice as large, a hard edge between two source pixels is a quarter and three quarters across the two pixels it
+    // falls between; the curve makes them clear and full. At its own size nothing changes.
+    CHECK_EQ(Sharpened(0.25f, 2.0f), 0);
+    CHECK_EQ(Sharpened(0.75f, 2.0f), 255);
+    CHECK_EQ(Sharpened(0.25f, 1.0f), 64);
+    CHECK_EQ(Sharpened(0.6f, 0.5f), 153);
+    GameFontFace face = Face();
+    SetGlyph(face, 'A', 5, 0, 4, 11); // a block from column 5 of a 9-wide glyph
+    face.glyphs['A' - kFirstGlyph] = GlyphShape{0, 0, 9, 11, 0, 0, 9, 11};
+    const Coverage c = GameFontRasterize(face, GameFontVariant::Narrow, "A", 24, kPlain, 0, 0);
+    CHECK(At(c, 9, 10) == 0 && At(c, 10, 10) == 255);
+}
+
+TEST(bold_strikes_a_glyph_twice_half_a_unit_apart_and_italic_leans_its_top_by_the_renderers_room)
+{
+    GameFontFace face = Face();
+    face.glyphs['I' - kFirstGlyph] = GlyphShape{0, 0, 5, 11, 2, 0, 5, 11};
+    for (int y = 0; y < 11; ++y)
+        face.picture.fill[static_cast<size_t>(y * face.picture.width + 4)] = 255; // a stem at the box's column 2
+    CHECK((InkColumns(GameFontRasterize(face, GameFontVariant::Narrow, "I", 24, kPlain, 0, 0), 10) == std::vector<int>{4, 5}));
+    CHECK((InkColumns(GameFontRasterize(face, GameFontVariant::Narrow, "I", 24, StyleBit(FontStyle::Bold), 0, 0), 10) ==
+           std::vector<int>{4, 5, 6}));
+    const uint8_t italic = StyleBit(FontStyle::Italic);
+    const Coverage leaning = GameFontRasterize(face, GameFontVariant::Narrow, "I", 24, italic, 0, 0);
+    const int lean         = ItalicLean(24, italic);
+    CHECK_EQ(leaning.width, 10 + lean);
+    CHECK((InkColumns(leaning, 0) == std::vector<int>{4 + lean, 5 + lean}));
+    CHECK((InkColumns(leaning, 25) == std::vector<int>{}));
+    // Row 21 of the 26 leans 4/25 of the way: 0.96 of a pixel, rounded to 1.
+    CHECK((InkColumns(leaning, 21) == std::vector<int>{5, 6}));
+}
+
+TEST(an_underline_runs_a_unit_under_the_baseline_a_unit_thick)
+{
+    int top = 0, thickness = 0;
+    GameFontUnderlineBand(24, top, thickness);
+    CHECK(top == 21 && thickness == 2); // 10.5 and 1 units of 2 pixels
+    GameFontFace face = Face();
+    SetGlyph(face, 'A', 0, 0, 9, 11);
+    const Coverage c = GameFontRasterize(face, GameFontVariant::Narrow, "A", 24, StyleBit(FontStyle::Underline), 0, 1);
+    CHECK(At(c, 1, 1 + 22) == 255 && At(c, 18, 1 + 23) == 0 && At(c, 1, 1 + 23) == 0 && At(c, 18, 1 + 21) == 255);
+}
+
+TEST(a_glyph_drawn_smaller_averages_the_pixels_each_pixel_covers)
+{
+    // At half size each pixel drawn covers two of the picture's and a tent twice as wide weighs them, so a stem a
+    // pixel wide keeps its weight, a quarter and three quarters of half across two pixels, where a bilinear sample
+    // would drop or double it.
+    GameFontFace face             = Face();
+    face.glyphs['I' - kFirstGlyph] = GlyphShape{0, 0, 4, 8, 0, 0, 4, 8};
+    for (int y = 0; y < 8; ++y)
+        face.picture.fill[static_cast<size_t>(y * face.picture.width + 2)] = 255;
+    const Coverage c = GameFontRasterize(face, GameFontVariant::Narrow, "I", 6, kPlain, 0, 0);
+    CHECK(c.width == 2 && At(c, 0, 1) == 32 && At(c, 1, 1) == 96);
 }

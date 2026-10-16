@@ -20,3 +20,10 @@ TEST(broken_utf8_becomes_replacement_characters_rather_than_nothing)
     CHECK(Utf16("\x80\x80") == std::wstring(L"\xFFFD\xFFFD")); // continuations with no lead
     CHECK(Utf16("\xF4\x90\x80\x80") == std::wstring(L"\xFFFD"));  // past U+10FFFF, the last code point
 }
+
+TEST(utf8_becomes_its_code_points)
+{
+    CHECK(CodePoints("Lv\xC2\xB7\xF0\x9F\x90\xA6") == std::u32string(U"Lv\u00B7\U0001F426"));
+    CHECK(CodePoints("a\xFF" "b\xE2\x82") == std::u32string(U"a\uFFFDb\uFFFD")); // a stray byte, and a character cut short
+    CHECK(CodePoints("").empty());
+}
