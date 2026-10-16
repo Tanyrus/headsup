@@ -43,6 +43,7 @@ namespace headsup
             std::optional<PlateKind> kind; // an entity page's
             bool plates        = false;    // the kind has a row that draws a nameplate
             bool outlineColors = false;    // and one outlined in its own color pick
+            const std::vector<std::string> plateFonts = NameplateFontChoices(fonts);
         };
 
         std::string Words(const char* text) { return std::string(Said(text)); }
@@ -669,7 +670,7 @@ namespace headsup
                     }
                     break;
                 case LineStylesRow::Font:
-                    form.FontDropdown(label.c_str(), line.font, c.fonts, tip, Word(c, WindowWord::DefaultFont));
+                    form.FontDropdown(label.c_str(), line.font, c.plateFonts, tip, Word(c, WindowWord::DefaultFont));
                     break;
                 case LineStylesRow::FontStyle:
                 {
@@ -854,7 +855,7 @@ namespace headsup
                 break;
             case SettingPiece::DefaultFont:
                 form.Fade(!plates);
-                form.FontDropdown(label.c_str(), s.defaultFont, c.fonts, tip);
+                form.FontDropdown(label.c_str(), s.defaultFont, c.plateFonts, tip);
                 break;
             case SettingPiece::BaseIconSize:
                 form.Fade(!plates);
@@ -1016,7 +1017,7 @@ namespace headsup
             // The Target widget's popup reads the ranks switch and these colors too, whatever the nameplates do or hold.
             case SettingPiece::BadgeFont:
                 form.Fade(!on);
-                form.FontDropdown(label.c_str(), s.badgeFontName, c.fonts, tip, Word(c, WindowWord::DefaultFont));
+                form.FontDropdown(label.c_str(), s.badgeFontName, c.plateFonts, tip, Word(c, WindowWord::DefaultFont));
                 break;
             case SettingPiece::UseRankSystem:
                 form.Fade(!on);

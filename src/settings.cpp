@@ -989,7 +989,7 @@ namespace headsup
     {
         installed.push_back(current);
         installed.erase(std::remove_if(installed.begin(), installed.end(),
-                            [](const std::string& name) { return name.empty() || name[0] == '@'; }),
+                            [](const std::string& name) { return name.empty() || name[0] == '@' || GameFontVariantOf(name); }),
             installed.end());
         auto lower = [](const std::string& name) {
             std::string l = name;
@@ -1003,6 +1003,13 @@ namespace headsup
         for (const std::string& name : installed)
             if (std::none_of(choices.begin(), choices.end(), [&](const std::string& had) { return SameFamily(had, name); }))
                 choices.push_back(name);
+        return choices;
+    }
+
+    std::vector<std::string> NameplateFontChoices(const std::vector<std::string>& fonts)
+    {
+        std::vector<std::string> choices{kGameFontName, kGameFontNarrowName};
+        choices.insert(choices.end(), fonts.begin(), fonts.end());
         return choices;
     }
 

@@ -2511,3 +2511,11 @@ TEST(the_game_font_is_in_use_when_the_default_a_line_or_the_badges_name_it)
     s.barTitleFont = kGameFontName; // the top panel never draws it
     CHECK(!UsesGameFont(s));
 }
+
+TEST(the_nameplate_fonts_are_the_games_two_then_the_font_list_which_never_holds_them)
+{
+    const std::vector<std::string> choices = NameplateFontChoices(FontChoices({"Arial", "game font"}, kGameFontNarrowName));
+    const std::vector<std::string> expected{kGameFontName, kGameFontNarrowName, "Montserrat SemiBold", "Marcellus SC", "Cinzel",
+        "Cormorant SC", "Barlow Condensed", "Arial"};
+    CHECK(choices == expected);
+}

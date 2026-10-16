@@ -191,8 +191,10 @@ namespace headsup
     bool BarRuns(const Settings& s, uint8_t loginStatus);
 
     // The fonts to offer: the installed families (as GDI lists them, once per character set and with vertical variants
-    // named @...), each once and sorted, with current added when it is not installed.
+    // named @...), each once and sorted, with current added when it is not installed, and never the game's own two.
     std::vector<std::string> FontChoices(std::vector<std::string> installed, const std::string& current);
+    // The fonts a nameplate can be set in: the game's own two, then the font list.
+    std::vector<std::string> NameplateFontChoices(const std::vector<std::string>& fonts);
     // Whether a nameplate is set in the game's own font: the default, a line's or the badges'.
     bool UsesGameFont(const Settings& s);
 

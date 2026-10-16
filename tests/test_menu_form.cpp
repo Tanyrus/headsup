@@ -1,3 +1,4 @@
+#include "game_font.h"
 #include "layout_edit.h"
 #include "menu_form.h"
 #include "settings.h"
@@ -651,4 +652,19 @@ TEST(auto_adjust_places_the_views_under_the_line_the_windows_last_went_under)
     CHECK(w.settings.placedUnder[kOn] == 80 && w.settings.placedUnder[kOff] == 50);
     CHECK(w.settings.viewShifts[kOn].empty());
     CHECK_EQ(ValueOn(w.Pass(), kStatusShift), std::to_string(80 - kPortraitTop));
+}
+
+TEST(the_nameplate_fonts_lead_with_the_games_font_and_the_top_panels_leave_it_out)
+{
+    Window w;
+    w.state.page = Page::Entities;
+    w.Pass({{"entities-nameplates-default-font", kClickEvent, ""}});
+    w.Pass({{"entities-nameplates-default-font-o-0", kClickEvent, ""}});
+    CHECK(w.settings.defaultFont == kGameFontName);
+    w.Pass({{"entities-nameplates-default-font", kClickEvent, ""}});
+    w.Pass({{"entities-nameplates-default-font-o-1", kClickEvent, ""}});
+    CHECK(w.settings.defaultFont == kGameFontNarrowName);
+    w.state.page = Page::TopPanel;
+    const Form open = w.Pass({{"toppanel-top-panel-title-font", kClickEvent, ""}});
+    CHECK(open.popup && Has(open.popup->rml, "Arial") && !Has(open.popup->rml, kGameFontName));
 }

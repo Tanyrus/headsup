@@ -1,6 +1,7 @@
 #include "rml_menu.h"
 
 #include "fonts.h"
+#include "game_font.h"
 #include "layout_edit.h"
 #include "menu_state.h"
 #include "plate_template.h"
@@ -999,7 +1000,7 @@ TEST(the_font_arrows_step_through_the_fonts_and_a_slider_follows_the_pointer)
     window.Page("players");
     CHECK(window.settings.Kind(PlateKind::Players).lines[0].font.empty());
     CHECK(window.Click("players-line-style-font-players0-next"));
-    CHECK_EQ(window.settings.Kind(PlateKind::Players).lines[0].font, "Arial");
+    CHECK_EQ(window.settings.Kind(PlateKind::Players).lines[0].font, kGameFontName); // the list's first
     CHECK(window.Click("players-line-style-font-players0-previous"));
     CHECK(window.settings.Kind(PlateKind::Players).lines[0].font.empty());
 
@@ -1149,10 +1150,10 @@ TEST(a_font_list_holds_its_longest_name_whole_and_says_each_name_under_the_point
     CHECK_EQ(window.Find(control)->GetAttribute<Rml::String>("tip", ""), kLongFont);
     window.Click(control);
     window.Frames(10);
-    Rml::Element* row = window.Find(control + "-o-3");
+    Rml::Element* row = window.Find(control + "-o-5"); // after the game's two fonts, Arial, Barlow Condensed and Marcellus SC
     CHECK(row != nullptr && row->IsVisible(true));
     CHECK_EQ(row->GetAttribute<Rml::String>("tip", ""), kLongFont);
-    CHECK_EQ(window.Find(control + "-o-0")->GetAttribute<Rml::String>("tip", ""), "Arial");
+    CHECK_EQ(window.Find(control + "-o-2")->GetAttribute<Rml::String>("tip", ""), "Arial");
     // The list is wider than its control, as wide as the name needs.
     CHECK(width(window.Find("popup")) > width(window.Find(control)) + 20.0f);
     CHECK(row->GetScrollWidth() <= row->GetClientWidth() + 0.5f);
