@@ -524,6 +524,7 @@ namespace headsup
         constexpr uint8_t kCall = 0xE8, kLea = 0x8D, kMov = 0x8B, kPush = 0x50, kRegisters = 8;
         constexpr uint8_t kModDisp8 = 1, kRmSib = 4, kEcx = 1, kMcdField = 0x08;
         constexpr size_t kCallBytes = 5, kOperandBytes = 3; // lea and mov, each with a ModRM and a disp8
+        constexpr size_t kPushReach = 16;                   // bytes from the push to the call at most
         const auto mod = [](uint8_t modrm) { return modrm >> 6; };
         const auto reg = [](uint8_t modrm) { return (modrm >> 3) & 7; };
         const auto rm  = [](uint8_t modrm) { return modrm & 7; };
@@ -535,20 +536,26 @@ namespace headsup
                 return std::nullopt;
             return lea[2];
         };
+        // The argument pushed at push, its lea right before it or before the MCD's fetch for the call.
+        const auto argumentAt = [&](size_t push) -> std::optional<uint32_t> {
+            if (layout[push] < kPush || layout[push] >= kPush + kRegisters) return std::nullopt;
+            const int pushed = layout[push] - kPush;
+            if (const std::optional<uint32_t> offset = leaAt(push, pushed)) return offset;
+            if (push < kOperandBytes) return std::nullopt;
+            const size_t mov = push - kOperandBytes;
+            if (layout[mov] == kMov && mod(layout[mov + 1]) == kModDisp8 && reg(layout[mov + 1]) == kEcx &&
+                layout[mov + 2] == kMcdField)
+                return leaAt(mov, pushed);
+            return std::nullopt;
+        };
         for (size_t i = 1; i + kCallBytes <= layout.size(); ++i)
         {
             if (layout[i] != kCall ||
                 at + i + kCallBytes + static_cast<uintptr_t>(ReadAt<int32_t>(layout.data(), i + 1)) != getRect)
                 continue;
-            const uint8_t push = layout[i - 1];
-            if (push < kPush || push >= kPush + kRegisters) continue;
-            const int pushed = push - kPush;
-            if (const std::optional<uint32_t> offset = leaAt(i - 1, pushed)) return offset;
-            // The MCD fetched for the call between the lea and the push.
-            const size_t mov = i - 1 - kOperandBytes;
-            if (i - 1 >= kOperandBytes && layout[mov] == kMov && mod(layout[mov + 1]) == kModDisp8 &&
-                reg(layout[mov + 1]) == kEcx && layout[mov + 2] == kMcdField)
-                if (const std::optional<uint32_t> offset = leaAt(mov, pushed)) return offset;
+            // The push may have an instruction or two after it before the call (Trade sets a flag there).
+            for (size_t back = 1; back <= kPushReach && back <= i; ++back)
+                if (const std::optional<uint32_t> offset = argumentAt(i - back)) return offset;
         }
         return std::nullopt;
     }
