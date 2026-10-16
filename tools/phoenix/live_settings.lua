@@ -21,3 +21,6 @@ xi.settings.main.ENABLE_VOIDWATCH = 0
 
 -- Every zone is level corrected, as before Adoulin.
 xi.settings.main.USE_ADOULIN_WEAPON_SKILL_CHANGES = false
+
+-- The level cap: no Limit Break quest past Shattering Stars, and battlefields capped at it.
+xi.settings.main.MAX_LEVEL = 75
