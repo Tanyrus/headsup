@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <map>
 #include <string>
 #include <utility>
 
@@ -165,8 +166,8 @@ TEST(a_dead_mob_with_data_keeps_its_aggro_icon_and_popup_but_has_no_level)
     const PopupContent popup = BarPopupContent(BarWidget::Target, state, settings);
     CHECK(popup.icon == Icon::AggroNQ);
     const PopupRow& top = popup.sections[0].rows[0];
-    CHECK(top.cells.size() == 1);
-    CHECK(Joined(top.cells[0].text) == "ID 220");
+    CHECK(top.cells.size() == 2);
+    CHECK(Joined(top.cells[0].text) == "WAR/WAR" && Joined(top.cells[1].text) == "ID 220");
     CHECK(Section(popup, "Spawn") != nullptr);
 }
 
@@ -180,8 +181,8 @@ TEST(the_target_popup_has_every_element_and_status_with_its_percent)
     std::vector<std::string> headings;
     for (const PopupSection& s : popup.sections)
         headings.push_back(s.heading);
-    CHECK(headings ==
-          (std::vector<std::string>{"", "Damage taken", "Elements", "Statuses", "Immune", "Stats at Lv 20", "Spawn"}));
+    CHECK(headings == (std::vector<std::string>{"", "Damage taken", "Elements", "Statuses", "Immune", "Stats at Lv 20",
+                                                "TP moves", "Spawn", "Training"}));
     const PopupRow& elements = Section(popup, "Elements")->rows[0];
     CHECK(elements.kind == RowKind::Grid && elements.columns == 4 && elements.cells.size() == 8);
     CHECK(elements.cells[6].icon == Icon::Light);
@@ -190,14 +191,25 @@ TEST(the_target_popup_has_every_element_and_status_with_its_percent)
     CHECK(elements.cells[6].text == (std::vector<Span>{{"+3%", Tone::Weak}}));
     CHECK(elements.cells[7].text == (std::vector<Span>{{"0%", Tone::Neutral}}));
     CHECK(elements.cells[0].text == (std::vector<Span>{{"+3%", Tone::Weak}}));
-    const PopupRow& stats = Section(popup, "Stats at Lv 20")->rows[0];
+    // Its combat stats at 20 from data/phoenix_mob_info.tsv, then STR to CHR and its magic evasion.
+    const PopupRow& combat = Section(popup, "Stats at Lv 20")->rows[0];
+    CHECK(combat.kind == RowKind::Grid && combat.cells.size() == 6);
+    CHECK(combat.cells[0].text == (std::vector<Span>{{"HP", Tone::Dim}, {" 414", Tone::Normal}}));
+    CHECK(combat.cells[3].text == (std::vector<Span>{{"DEF", Tone::Dim}, {" 85", Tone::Normal}}));
+    const PopupRow& stats = Section(popup, "Stats at Lv 20")->rows[1];
     CHECK(stats.kind == RowKind::Grid && stats.cells.size() == 8);
     CHECK(stats.cells[7].text == (std::vector<Span>{{"MEva", Tone::Dim}, {" 58", Tone::Normal}}));
+    const PopupRow& moves = Section(popup, "TP moves")->rows[0];
+    CHECK(moves.kind == RowKind::Grid && moves.columns == 3 && moves.cells.size() == 3);
+    CHECK(Joined(moves.cells[0].text) == "Goblin Rush" && Joined(moves.cells[2].text) == "Bomb Toss Suicide");
+    // Valkurm Dunes' fifth Fields of Valor page wants two of it, at 22 to 25 (regimes.lua's regime 57).
+    CHECK(Lines(*Section(popup, "Training")) == (std::vector<std::string>{"Fields of Valor page 5: kill 2, Lv 22-25"}));
     const PopupRow& statuses = Section(popup, "Statuses")->rows[0];
     CHECK(statuses.columns == 5 && statuses.cells.size() == 10 && statuses.cells[0].icon == Icon::Paralyze);
     CHECK(Section(popup, "Immune")->rows[0].cells[0].text == (std::vector<Span>{{"None", Tone::Neutral}}));
     CHECK(Joined(Section(popup, "Spawn")->rows[0].cells[0].text) == "Respawn 5:00");
-    CHECK(Joined(popup.sections[0].rows[0].cells[1].text) == "ID 220"); // 17199648 is 0x1067220
+    CHECK(Joined(popup.sections[0].rows[0].cells[1].text) == "WAR/WAR");
+    CHECK(Joined(popup.sections[0].rows[0].cells[2].text) == "ID 220"); // 17199648 is 0x1067220
     settings.rankDisplay = RankDisplay::Rank;
     CHECK(Section(BarPopupContent(BarWidget::Target, state, settings), "Elements")->rows[0].cells[6].text ==
           (std::vector<Span>{{"-3", Tone::Weak}}));
@@ -215,7 +227,7 @@ TEST(a_placeholder_names_its_nm_and_counts_down)
     state.targetPhSeconds = 299.0;
     const PopupContent popup  = BarPopupContent(BarWidget::Target, state, settings);
     const PopupSection* spawn = Section(popup, "Spawn");
-    CHECK(Joined(spawn->rows[1].cells[0].text) == "Placeholder for Bigmouth Billy");
+    CHECK(Joined(spawn->rows[1].cells[0].text) == "Placeholder for Bigmouth Billy (15%)"); // his slot's chance
     CHECK(Joined(spawn->rows[2].cells[0].text) == "Back in 4:59");
     target.mob      = MobById(17191196);
     target.serverId = 17191196;
@@ -245,19 +257,23 @@ TEST(the_tags_say_how_a_mob_aggros_links_and_detects)
     BarState state;
     state.target              = &target;
     const PopupContent goblin = BarPopupContent(BarWidget::Target, state, settings);
-    CHECK(TagsOf(goblin) == (std::vector<std::string>{"Aggressive", "Links", "Sight"}));
+    CHECK(TagsOf(goblin) == (std::vector<std::string>{"Aggressive", "Links", "Sight 15y"}));
     target                        = MobTarget(16797799);
     const PopupContent brontotaur = BarPopupContent(BarWidget::Target, state, settings);
-    CHECK(TagsOf(brontotaur) == (std::vector<std::string>{"Aggressive", "Links", "True sight"}));
+    CHECK(TagsOf(brontotaur) == (std::vector<std::string>{"Aggressive", "Links", "True sight 15y", "Counter"}));
+    // Qufim Island's Clipper, a crab: it hears from 8 yalms and a beastmaster can charm it.
+    target = MobTarget(17293331);
+    CHECK(TagsOf(BarPopupContent(BarWidget::Target, state, settings)) == (std::vector<std::string>{"Passive", "Sound 8y", "Charmable"}));
 }
 
 TEST(a_tags_words_take_the_tag_tone_and_nothing_else_in_the_popup_does)
 {
     // The words sit in their frames, drawn in the tag's text color; the ID beside them and the rows after keep theirs.
-    // data/phoenix_mobs.tsv: the Brontotaur, 16797799, has three tags (Aggressive, Links, True sight); Bloodtear
-    // Baldurf, 17195318, flags 11 and detects 257, four (Aggressive, Sight, Scent, NM).
+    // data/phoenix_mobs.tsv: the Brontotaur, 16797799, has three tags (Aggressive, Links, True sight) and counters
+    // (a fourth, data/phoenix_mob_info.tsv); Bloodtear Baldurf, 17195318, flags 11 and detects 257, four (Aggressive,
+    // Sight, Scent, NM).
     Settings settings;
-    for (const auto& [id, tags] : {std::pair{16797799u, size_t{3}}, {17195318u, size_t{4}}})
+    for (const auto& [id, tags] : {std::pair{16797799u, size_t{4}}, {17195318u, size_t{4}}})
     {
         ActorInfo target = MobTarget(id);
         BarState state;
@@ -275,6 +291,87 @@ TEST(a_tags_words_take_the_tag_tone_and_nothing_else_in_the_popup_does)
                     }
         CHECK(tagged == tags && others > 0);
     }
+}
+
+namespace
+{
+    const char* SpellNumber(uint16_t spell)
+    {
+        static std::map<uint16_t, std::string> names;
+        return names.try_emplace(spell, "S" + std::to_string(spell)).first->second.c_str();
+    }
+}
+
+TEST(a_lottery_nm_shows_its_jobs_window_chance_and_cooldown_and_its_placeholder_its_chance)
+{
+    // Attohwa Chasm (data/zones/attohwa_chasm/mobs.yaml): Citipati is THF/BLM, out from 20:00 to 04:00, 15% from his
+    // slot with three hours out after his kill, and takes a quarter less magic damage and half breath damage; the
+    // Corse is his placeholder.
+    Settings settings;
+    BarState state;
+    const ActorInfo citipati = MobTarget(16806162);
+    state.target             = &citipati;
+    const PopupContent popup = BarPopupContent(BarWidget::Target, state, settings);
+    CHECK(Joined(popup.sections[0].rows[0].cells[1].text) == "THF/BLM");
+    CHECK(Lines(*Section(popup, "Spawn")) == (std::vector<std::string>{"Respawn 5:00", "Spawns 20:00 to 04:00",
+                                                 "15% pop chance", "3:00:00 cooldown after its kill",
+                                                 "1 placeholder in this zone"}));
+    const PopupRow& kinds = Section(popup, "Damage taken")->rows[1];
+    CHECK(kinds.cells.size() == 2);
+    CHECK(kinds.cells[0].text == (std::vector<Span>{{"Magic", Tone::Dim}, {" ", Tone::Normal}, {"-25%", Tone::Resist}}));
+    CHECK(kinds.cells[1].text == (std::vector<Span>{{"Breath", Tone::Dim}, {" ", Tone::Normal}, {"-50%", Tone::Resist}}));
+    const ActorInfo corse = MobTarget(16806161);
+    state.target          = &corse;
+    CHECK(Lines(*Section(BarPopupContent(BarWidget::Target, state, settings), "Spawn"))[1] ==
+          "Placeholder for Citipati (15%)");
+    // A mob with no other kind of damage taken has only its SDT row.
+    const ActorInfo goblin = Goblin();
+    state.target           = &goblin;
+    CHECK(Section(BarPopupContent(BarWidget::Target, state, settings), "Damage taken")->rows.size() == 1);
+}
+
+TEST(a_casters_spells_are_the_ones_it_casts_at_its_level)
+{
+    // The Corse's list (data/phoenix_spells.tsv, list 8), at 67, the top of its range: each spell whose levels
+    // hold 67, in the list's order.
+    Settings settings;
+    BarState state;
+    const ActorInfo corse = MobTarget(16806161);
+    state.target          = &corse;
+    state.spellName       = SpellNumber;
+    std::vector<std::string> expected;
+    for (const int spell : {254, 258, 245, 250, 253, 216, 225, 247, 231, 259, 252, 206, 210, 274, 146, 191, 151, 166, 186})
+        expected.push_back("S" + std::to_string(spell));
+    const PopupContent popup   = BarPopupContent(BarWidget::Target, state, settings);
+    const PopupSection* spells = Section(popup, "Spells");
+    CHECK(spells != nullptr);
+    if (spells == nullptr) return;
+    CHECK(spells->rows[0].kind == RowKind::Grid && spells->rows[0].columns == 3);
+    std::vector<std::string> names;
+    for (const PopupCell& cell : spells->rows[0].cells)
+        names.push_back(Joined(cell.text));
+    CHECK(names == expected);
+    state.spellName = nullptr; // without the game's names there is nothing to list
+    CHECK(Section(BarPopupContent(BarWidget::Target, state, settings), "Spells") == nullptr);
+}
+
+TEST(an_element_it_absorbs_and_what_it_does_by_itself)
+{
+    // data/phoenix_mob_info.tsv: Puk WW (Windurst Waters' Puk, 16986223) absorbs wind; the Stubborn Dredvodd,
+    // 16781327, regenerates; a Water Elemental of zone 37, 16928885, poisons with its hits.
+    Settings settings;
+    BarState state;
+    const ActorInfo puk = MobTarget(16986223);
+    state.target        = &puk;
+    const PopupContent pukPopup = BarPopupContent(BarWidget::Target, state, settings);
+    const PopupRow& elements    = Section(pukPopup, "Elements")->rows[0];
+    CHECK(elements.cells[static_cast<int>(Element::Wind)].text == (std::vector<Span>{{"Absorbs", Tone::Immune}}));
+    const ActorInfo dredvodd = MobTarget(16781327);
+    state.target             = &dredvodd;
+    CHECK(Lines(BarPopupContent(BarWidget::Target, state, settings).sections[0]).back() == "Regen");
+    const ActorInfo elemental = MobTarget(16928885);
+    state.target              = &elemental;
+    CHECK(Lines(BarPopupContent(BarWidget::Target, state, settings).sections[0]).back() == "Additional effect: Poison");
 }
 
 TEST(a_resisted_damage_type_shows_its_percent_in_the_resist_tone)

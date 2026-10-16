@@ -174,6 +174,12 @@ namespace
         return found != nullptr ? found->Name[0] : nullptr;
     }
 
+    const char* SpellName(uint16_t spell)
+    {
+        const ISpell* found = g_Resources != nullptr ? g_Resources->GetSpellById(spell) : nullptr;
+        return found != nullptr ? found->Name[0] : nullptr;
+    }
+
     BOOL __stdcall OnMouse(uint32_t message, WPARAM wParam, LPARAM lParam, bool blocked)
     {
         const float x = static_cast<float>(static_cast<int16_t>(LOWORD(lParam))) * g_BarScaleX;
@@ -1869,9 +1875,10 @@ private:
         }
         if (needs.target)
         {
-            s.target   = m_Tracker.FindIndex(m_CursorTargets.target);
-            s.itemName = ItemName;
-            s.caster   = m_Player.caster;
+            s.target    = m_Tracker.FindIndex(m_CursorTargets.target);
+            s.itemName  = ItemName;
+            s.spellName = SpellName;
+            s.caster    = m_Player.caster;
         }
         if (s.target != nullptr)
             s.targetDistance = headsup::DistanceFromSquared(

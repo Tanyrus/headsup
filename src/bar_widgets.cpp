@@ -2,6 +2,7 @@
 
 #include "argb.h"
 #include "bar_game_help.h"
+#include "bar_job.h"
 #include "bar_server_time.h"
 #include "ph_timers.h"
 #include "titles.h"
@@ -23,7 +24,14 @@ namespace headsup
         constexpr uint32_t kElementColors[kElementCount] = {0xFFFF8A3C, 0xFF8FD8FF, kBarGreen, 0xFFD8B25A, 0xFFC58CFF,
             0xFF5B9DFF, 0xFFFFFFFF, 0xFF9A8AA8};
         constexpr int kDamageColumns = 4, kElementColumns = 4, kStatusColumns = 5, kStatColumns = 4, kBagColumns = 2;
+        constexpr int kListColumns = 3; // TP moves and spells
         constexpr const char* kStatNames[kStatCount] = {"STR", "DEX", "VIT", "AGI", "INT", "MND", "CHR", "MEva"};
+        constexpr const char* kCombatNames[kCombatCount] = {"HP", "MP", "ATT", "DEF", "EVA", "ACC"};
+        constexpr const char* kDamageKindNames[kDamageKindCount] = {"Physical", "Magic", "Ranged", "Breath"};
+        constexpr const char* kRegimeBooks[kRegimeTypeCount] = {"Fields of Valor", "Grounds of Valor"};
+        constexpr std::pair<MobTrait, const char*> kTraitNames[] = {{kTraitRegen, "Regen"}, {kTraitRefresh, "Refresh"},
+            {kTraitRegain, "Regain"}, {kTraitShadows, "Shadows"}, {kTraitCounter, "Counter"}};
+        constexpr int kWholeAbsorb = 100; // percent
         constexpr int kForecastDays = 5, kForecastColumns = 4;
         constexpr uint16_t kGilItem  = 0xFFFF;
 
@@ -79,17 +87,92 @@ namespace headsup
             return ToArgb(settings.palette.toughness[static_cast<int>(target.level.shade)]);
         }
 
-        // The nameplate's icons as words, so the popup and the plates say the same, then NM.
+        // "15y": a sense's range in yalms.
+        std::string Yalms(int yalms) { return std::to_string(yalms) + "y"; }
+
+        // The nameplate's icons as words, so the popup and the plates say the same, sight and sound with how far
+        // they reach, then NM and whether a beastmaster can charm it.
         PopupRow Tags(const MobRecord& mob)
         {
             const IconSet icons = IconsFor(&mob, kAllDetection);
+            const MobInfo& info = InfoOf(mob);
             PopupRow row{RowKind::Tags, 0, {}};
-            row.cells.reserve(static_cast<size_t>(icons.count) + 1);
             for (int i = 0; i < icons.count; ++i)
-                row.cells.push_back(Cell(Text(IconTag(icons.icons[i]), Tone::Tag)));
+            {
+                std::string tag = IconTag(icons.icons[i]);
+                if (icons.icons[i] == Icon::Sight || icons.icons[i] == Icon::TrueSight) tag += " " + Yalms(info.sight);
+                if (icons.icons[i] == Icon::Sound) tag += " " + Yalms(info.sound);
+                row.cells.push_back(Cell(Text(std::move(tag), Tone::Tag)));
+            }
             if (mob.flags & kMobNotorious) row.cells.push_back(Cell(Text("NM", Tone::Tag)));
+            if (mob.flags & kMobCharmable) row.cells.push_back(Cell(Text("Charmable", Tone::Tag)));
             return row;
         }
+
+        // What it does by itself, and what its melee hits add.
+        PopupRow Traits(const MobRecord& mob)
+        {
+            const MobInfo& info = InfoOf(mob);
+            PopupRow row{RowKind::Tags, 0, {}};
+            for (const auto& [trait, name] : kTraitNames)
+                if (info.traits & trait) row.cells.push_back(Cell(Text(name, Tone::Tag)));
+            if (*info.addEffect != '\0')
+                row.cells.push_back(Cell(Text(std::string_view(info.addEffect) == kUnknownAddEffect
+                                                  ? std::string("Additional effect")
+                                                  : std::string("Additional effect: ") + info.addEffect,
+                    Tone::Tag)));
+            return row;
+        }
+
+        // "THF/BLM"; nothing for a mob without a job.
+        std::string MobJobs(const MobInfo& info)
+        {
+            const std::string main = JobName(info.mainJob), sub = JobName(info.subJob);
+            return main.empty() ? std::string() : sub.empty() ? main : main + "/" + sub;
+        }
+
+        // A cell of a name and its number, as the stats are.
+        PopupCell Numbered(const char* name, int64_t value)
+        {
+            return Cell(ListOf(Text(name, Tone::Dim), Text(" " + std::to_string(value))));
+        }
+
+        // A grid of names, kListColumns a line; none when there are no names.
+        std::optional<PopupSection> NameList(std::string heading, const std::vector<std::string>& names)
+        {
+            if (names.empty()) return std::nullopt;
+            PopupRow grid = Grid(kListColumns, names.size());
+            for (const std::string& name : names)
+                grid.cells.push_back(Cell(Text(name)));
+            return PopupSection{std::move(heading), ListOf(std::move(grid))};
+        }
+
+        // The spells it casts at a level: each whose levels hold it, by the game's name.
+        std::vector<std::string> SpellsAt(const MobRecord& mob, int level, const BarState& state)
+        {
+            std::vector<std::string> names;
+            if (state.spellName == nullptr) return names;
+            for (const MobSpell& spell : SpellsOf(mob))
+            {
+                const char* name = level >= spell.minLevel && level <= spell.maxLevel ? state.spellName(spell.spell) : nullptr;
+                if (name != nullptr && *name != '\0') names.emplace_back(name);
+            }
+            return names;
+        }
+
+        std::optional<PopupSection> Training(const MobRecord& mob)
+        {
+            PopupSection training{"Training", {}};
+            for (const MobRegime& ref : RegimesOf(mob))
+                if (const Regime* regime = RegimeById(ref.regime))
+                    training.rows.push_back(LineOf(std::string(kRegimeBooks[static_cast<int>(regime->type)]) + " page " +
+                        std::to_string(regime->page) + ": kill " + std::to_string(regime->counts[ref.target - 1]) +
+                        ", Lv " + std::to_string(regime->minLevel) + "-" + std::to_string(regime->maxLevel)));
+            return training.rows.empty() ? std::nullopt : std::optional<PopupSection>(std::move(training));
+        }
+
+        // "20:00"
+        std::string Hour(int hour) { return Printed("%02d:00", hour); }
 
         // Phoenix's Treasure Hunter tiers in per mille: a rate rolls as the highest at or below it (mobdata.h).
         constexpr uint16_t kDropTiers[] = {1000, 240, 150, 100, 50, 10, 5, 1};
@@ -144,11 +227,22 @@ namespace headsup
         PopupSection Spawn(const MobRecord& mob, const BarState& state)
         {
             PopupSection spawn{"Spawn", {}};
+            const MobInfo& info = InfoOf(mob);
             spawn.rows.push_back(LineOf(mob.respawn > 0 ? "Respawn " + Countdown(mob.respawn) : "No respawn timer"));
+            if (info.windowStart != kNoWindow)
+                spawn.rows.push_back(LineOf("Spawns " + Hour(info.windowStart) + " to " + Hour(info.windowEnd)));
+            if (info.lotteryChance > 0)
+            {
+                spawn.rows.push_back(LineOf(std::to_string(info.lotteryChance) + "% pop chance"));
+                if (info.lotteryCooldown > 0)
+                    spawn.rows.push_back(LineOf(Countdown(info.lotteryCooldown) + " cooldown after its kill"));
+            }
             if (mob.placeholderOf != 0)
             {
                 const MobRecord* nm = MobById(mob.placeholderOf);
-                spawn.rows.push_back(LineOf(std::string("Placeholder for ") + (nm != nullptr ? nm->name : "an NM")));
+                const int chance    = nm != nullptr ? InfoOf(*nm).lotteryChance : 0;
+                spawn.rows.push_back(LineOf(std::string("Placeholder for ") + (nm != nullptr ? nm->name : "an NM") +
+                    (chance > 0 ? " (" + std::to_string(chance) + "%)" : "")));
                 if (state.targetPhSeconds)
                 {
                     const double left = *state.targetPhSeconds;
@@ -197,14 +291,22 @@ namespace headsup
             const MobResistances& res = ResistancesOf(mob);
             popup.icon  = MobIcon(*target);
             popup.title = ListOf(Colored(target->name, NameColor(*target, settings)));
+            const MobDefenses& defenses = DefensesOf(mob);
             PopupRow identity{RowKind::Line, 0, {}};
             if (HasLevel(*target))
                 identity.cells.push_back(Cell(Colored(target->level.text, ShadeColor(*target, settings))));
+            if (const std::string jobs = MobJobs(InfoOf(mob)); !jobs.empty()) identity.cells.push_back(Cell(Text(jobs)));
             identity.cells.push_back(Cell(Text("ID " + Printed("%03X", target->serverId & kTargetIndexBits), Tone::Dim)));
 
             PopupRow damage = Grid(kDamageColumns, kFirstElementSdt);
             for (int i = 0; i < kFirstElementSdt; ++i)
                 damage.cells.push_back(Cell(Percent(SdtPercent(res.sdt[i])), SdtIcon(i)));
+            PopupSection damageTaken{"Damage taken", ListOf(std::move(damage))};
+            PopupRow kinds = Grid(kDamageColumns, kDamageKindCount);
+            for (int k = 0; k < kDamageKindCount; ++k)
+                if (const int percent = SdtPercent(defenses.damageTaken[k]); percent != 0)
+                    kinds.cells.push_back(Cell(ListOf(Text(kDamageKindNames[k], Tone::Dim), Text(" "), Percent(percent))));
+            if (!kinds.cells.empty()) damageTaken.rows.push_back(std::move(kinds));
 
             const RankNumbers numbers{settings.rankDisplay, settings.countAccuracy, state.caster ? &*state.caster : nullptr,
                 MagicTargetOf(mob, target->checked ? target->checked->level : 0)};
@@ -213,8 +315,13 @@ namespace headsup
             {
                 const int percent = SdtPercent(res.sdt[kFirstElementSdt + e]);
                 const int rank    = res.elementRanks[e];
-                elements.cells.push_back(Cell(percent != 0 ? Percent(percent)
-                                                           : Ranked(ElementRankText(static_cast<Element>(e), rank, numbers), rank),
+                const int absorb  = defenses.absorb[e];
+                elements.cells.push_back(Cell(absorb > 0 ? Text(absorb >= kWholeAbsorb ? std::string("Absorbs")
+                                                                                       : "Absorbs " + std::to_string(absorb) + "%",
+                                                               Tone::Immune)
+                                              : percent != 0
+                                                  ? Percent(percent)
+                                                  : Ranked(ElementRankText(static_cast<Element>(e), rank, numbers), rank),
                     SdtIcon(kFirstElementSdt + e)));
             }
 
@@ -234,22 +341,38 @@ namespace headsup
                 immune.cells.push_back(PopupCell{immunities.icons[i].icon, true, {}});
             if (immune.cells.empty()) immune.cells.push_back(Cell(Text("None", Tone::Neutral)));
 
-            popup.sections = ListOf(PopupSection{"", ListOf(std::move(identity), Tags(mob))},
-                PopupSection{"Damage taken", ListOf(std::move(damage))},
+            PopupSection identityRows{"", ListOf(std::move(identity), Tags(mob))};
+            if (PopupRow traits = Traits(mob); !traits.cells.empty()) identityRows.rows.push_back(std::move(traits));
+            popup.sections = ListOf(std::move(identityRows), std::move(damageTaken),
                 PopupSection{"Elements", ListOf(std::move(elements))},
                 PopupSection{"Statuses", ListOf(std::move(statuses))},
                 PopupSection{"Immune", ListOf(std::move(immune))});
             // At the level the chances are figured for: the check's, else the top of its range.
+            const int level = numbers.target ? numbers.target->level : mob.maxLevel;
             if (numbers.target)
             {
-                PopupRow stats = Grid(kStatColumns, kStatCount);
+                PopupSection stats{"Stats at Lv " + std::to_string(level), {}};
+                if (const MobCombat* combat = CombatAt(mob, level))
+                {
+                    PopupRow row = Grid(kStatColumns, kCombatCount);
+                    for (int i = 0; i < kCombatCount; ++i)
+                        row.cells.push_back(Numbered(kCombatNames[i], combat->value[i]));
+                    stats.rows.push_back(std::move(row));
+                }
+                PopupRow row = Grid(kStatColumns, kStatCount);
                 for (int i = 0; i < kStatCount; ++i)
-                    stats.cells.push_back(Cell(ListOf(Text(kStatNames[i], Tone::Dim),
-                        Text(" " + std::to_string(numbers.target->stats.value[i])))));
-                popup.sections.push_back(
-                    PopupSection{"Stats at Lv " + std::to_string(numbers.target->level), ListOf(std::move(stats))});
+                    row.cells.push_back(Numbered(kStatNames[i], numbers.target->stats.value[i]));
+                stats.rows.push_back(std::move(row));
+                popup.sections.push_back(std::move(stats));
             }
+            std::vector<std::string> moves;
+            for (const MobSkill& skill : SkillsOf(mob))
+                moves.emplace_back(skill.name);
+            if (std::optional<PopupSection> list = NameList("TP moves", moves)) popup.sections.push_back(std::move(*list));
+            if (std::optional<PopupSection> list = NameList("Spells", SpellsAt(mob, level, state)))
+                popup.sections.push_back(std::move(*list));
             popup.sections.push_back(Spawn(mob, state));
+            if (std::optional<PopupSection> training = Training(mob)) popup.sections.push_back(std::move(*training));
             for (PopupSection& loot : Loot(mob, state))
                 popup.sections.push_back(std::move(loot));
             return popup;

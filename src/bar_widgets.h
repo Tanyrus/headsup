@@ -47,6 +47,8 @@ namespace headsup
         std::optional<float> targetDistance;   // yalms, with the target
         // The game's name for an item ID, for a mob's drops; nullptr, or an empty name, when it has none.
         const char* (*itemName)(uint16_t item) = nullptr;
+        // And for a spell ID, for what a mob casts.
+        const char* (*spellName)(uint16_t spell) = nullptr;
         std::optional<double> targetPhSeconds; // the target placeholder's countdown, when one runs
         std::optional<PlayerCheck> targetCheck; // the targeted player's last check, gathered with the target
         std::optional<Caster> caster;           // your magic accuracy, gathered with the target for its chances
