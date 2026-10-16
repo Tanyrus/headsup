@@ -189,12 +189,21 @@ namespace headsup
     constexpr size_t kWindowRectBytes = 4 * sizeof(int16_t);
     using WindowRect                   = std::array<int16_t, 4>; // left, top, right, bottom
     // An owner's copy, moved as its window moves by dx, dy: when it has the window's left, top and right (its bottom
-    // may reach further, as the craft skill list's covers the whole list). None when it is no such copy.
-    std::optional<WindowRect> MovedPlaceCopy(const WindowRect& copy, const WindowRect& window, int dx, int dy);
+    // may reach further, as the craft skill list's covers the whole list), or with Exact when it is the window's
+    // rectangle itself, for a copy kept where the class's layout did not say. None when it is no such copy.
+    enum class PlaceMatch : uint8_t
+    {
+        Edges,
+        Exact,
+    };
+    std::optional<WindowRect> MovedPlaceCopy(const WindowRect& copy, const WindowRect& window, int dx, int dy,
+        PlaceMatch match = PlaceMatch::Edges);
+    constexpr uint32_t kUsualPlaceCopy = 0x14; // where most owners keep it
     // Where an owner keeps that copy, from the start of its class's layout (vtable slot kOwnerLayoutSlot), at at: the
     // displacement of `lea r, [base + disp8]` whose register it pushes for its call of MCD::GetRect, at getRect, with
     // at most a `mov ecx, [r + 8]` (the MCD) between. None when the layout makes no such call: the class keeps none
-    // (the Level box and the craft skill list keep it at +0x14, the combat and magic skill lists at +0x18).
+    // (the Level box and the craft skill list keep it at +0x14, the combat and magic skill lists at +0x18). An
+    // `add r, imm8` before the push counts as the lea does (Font Colors' sample).
     constexpr uint32_t kOwnerLayoutSlot = 1;
     constexpr size_t kLayoutScanBytes   = 0x200;
     std::optional<uint32_t> PlaceCopyOffset(std::span<const uint8_t> layout, uintptr_t at, uintptr_t getRect);

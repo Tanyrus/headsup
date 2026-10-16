@@ -536,11 +536,21 @@ namespace headsup
                 return std::nullopt;
             return lea[2];
         };
-        // The argument pushed at push, its lea right before it or before the MCD's fetch for the call.
+        // An `add pushed, imm8` ending at end: its immediate, the register's own offset into the owner.
+        constexpr uint8_t kGroup1Imm8 = 0x83, kModRegister = 3, kAddOp = 0;
+        const auto addAt = [&](size_t end, int pushed) -> std::optional<uint32_t> {
+            if (end < kOperandBytes) return std::nullopt;
+            const uint8_t* add = layout.data() + end - kOperandBytes;
+            if (add[0] != kGroup1Imm8 || mod(add[1]) != kModRegister || reg(add[1]) != kAddOp || rm(add[1]) != pushed)
+                return std::nullopt;
+            return add[2];
+        };
+        // The argument pushed at push, its lea or add right before it or before the MCD's fetch for the call.
         const auto argumentAt = [&](size_t push) -> std::optional<uint32_t> {
             if (layout[push] < kPush || layout[push] >= kPush + kRegisters) return std::nullopt;
             const int pushed = layout[push] - kPush;
             if (const std::optional<uint32_t> offset = leaAt(push, pushed)) return offset;
+            if (const std::optional<uint32_t> offset = addAt(push, pushed)) return offset;
             if (push < kOperandBytes) return std::nullopt;
             const size_t mov = push - kOperandBytes;
             if (layout[mov] == kMov && mod(layout[mov + 1]) == kModDisp8 && reg(layout[mov + 1]) == kEcx &&
@@ -574,11 +584,11 @@ namespace headsup
         return std::nullopt;
     }
 
-    std::optional<WindowRect> MovedPlaceCopy(const WindowRect& copy, const WindowRect& window, int dx, int dy)
+    std::optional<WindowRect> MovedPlaceCopy(const WindowRect& copy, const WindowRect& window, int dx, int dy, PlaceMatch match)
     {
         enum Edge { kLeft, kTop, kRight, kBottom };
         if (copy[kLeft] != window[kLeft] || copy[kTop] != window[kTop] || copy[kRight] != window[kRight] ||
-            copy[kBottom] < copy[kTop])
+            copy[kBottom] < copy[kTop] || (match == PlaceMatch::Exact && copy[kBottom] != window[kBottom]))
             return std::nullopt;
         const auto by = [](int16_t edge, int d) { return static_cast<int16_t>(edge + d); };
         return WindowRect{by(copy[kLeft], dx), by(copy[kTop], dy), by(copy[kRight], dx), by(copy[kBottom], dy)};

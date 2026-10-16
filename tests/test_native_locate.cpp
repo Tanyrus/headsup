@@ -984,6 +984,9 @@ TEST(an_owners_copy_of_its_windows_place_moves_with_the_window)
     CHECK(!MovedPlaceCopy(Place{130, 49, 382, 184}, Place{130, 48, 382, 140}, 0, 48));
     CHECK(!MovedPlaceCopy(Place{130, 48, 380, 184}, Place{130, 48, 382, 140}, 0, 48));
     CHECK(!MovedPlaceCopy(Place{130, 48, 382, 20}, Place{130, 48, 382, 140}, 0, 48)); // a bottom above its top
+    // Where the class's layout says nothing, only a copy that is the window's rectangle exactly is taken for one.
+    CHECK((MovedPlaceCopy(Place{16, 48, 382, 104}, Place{16, 48, 382, 104}, 0, 16, PlaceMatch::Exact) == Place{16, 64, 382, 120}));
+    CHECK(!MovedPlaceCopy(Place{130, 48, 382, 184}, Place{130, 48, 382, 140}, 0, 48, PlaceMatch::Exact));
 }
 
 TEST(an_owners_place_copy_is_found_in_its_layouts_call_for_the_windows_rectangle)
@@ -1014,6 +1017,11 @@ TEST(an_owners_place_copy_is_found_in_its_layouts_call_for_the_windows_rectangle
     std::vector<uint8_t> earlyReturn{0x85, 0xC0, 0x75, 0x01, 0xC3};
     earlyReturn.insert(earlyReturn.end(), craft.begin(), craft.end());
     CHECK(PlaceCopyOffset(earlyReturn, 0x148825, getRect) == std::optional<uint32_t>(0x14));
+    // Font Colors' sample (0x198C16): add ecx,14h; push ecx; mov ecx,eax; call, with ecx the owner.
+    const std::vector<uint8_t> sample{0x83, 0xC1, 0x14, 0x51, 0x8B, 0xC8, 0xE8, 0x4F, 0x03, 0xF8, 0xFF};
+    CHECK(PlaceCopyOffset(sample, 0x198C16, getRect) == std::optional<uint32_t>(0x14));
+    const std::vector<uint8_t> subtracted{0x83, 0xE9, 0x14, 0x51, 0x8B, 0xC8, 0xE8, 0x4F, 0x03, 0xF8, 0xFF};
+    CHECK(!PlaceCopyOffset(subtracted, 0x198C16, getRect)); // sub ecx,14h: no field of the owner
     // No call for the rectangle, another register pushed than the one loaded, or the call elsewhere: no copy.
     CHECK(!PlaceCopyOffset(craft, 0x14882A, getRect + 0x10));
     const std::vector<uint8_t> otherPush{0x8B, 0x4E, 0x08, 0x8D, 0x46, 0x14, 0x52, 0xE8, 0x3A, 0x07, 0xFD, 0xFF};

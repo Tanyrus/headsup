@@ -810,13 +810,15 @@ namespace headsup
             std::memcpy(window.data(), reinterpret_cast<const void*>(mcd + kMcdRect), kWindowRectBytes);
             const uint32_t owner            = ReadAt<uint32_t>(reinterpret_cast<const uint8_t*>(mcd + kMcdOwner), 0);
             const std::optional<uint32_t> at = PlaceCopyAt(owner);
-            auto* copy                      = at ? reinterpret_cast<uint8_t*>(owner + *at) : nullptr;
+            // A class whose layout does not say may still keep the window's rectangle where most do.
+            const PlaceMatch match          = at ? PlaceMatch::Edges : PlaceMatch::Exact;
+            auto* copy                      = owner != 0 ? reinterpret_cast<uint8_t*>(owner + at.value_or(kUsualPlaceCopy)) : nullptr;
             const bool readable             = copy != nullptr && Readable(copy, kWindowRectBytes);
             WindowRect kept{};
             if (readable) std::memcpy(kept.data(), copy, kWindowRectBytes);
             reinterpret_cast<WindowMoveToFn>(g_WindowMoveTo)(mcd, to.left, to.top);
             if (!readable) return;
-            if (const std::optional<WindowRect> moved = MovedPlaceCopy(kept, window, to.left - window[0], to.top - window[1]))
+            if (const std::optional<WindowRect> moved = MovedPlaceCopy(kept, window, to.left - window[0], to.top - window[1], match))
                 std::memcpy(copy, moved->data(), kWindowRectBytes);
         }
 
