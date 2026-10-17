@@ -55,6 +55,77 @@ namespace headsup
         bool fame; // its prices move with fame, from 10% off to 10% more
     };
 
+    // What an act is (tools/gen_npcs.py's ACT_KINDS): the player clicks or trades, or the zone shows or hides the ???.
+    enum NpcActKind : uint8_t
+    {
+        kActClick,
+        kActTrade,
+        kActShows,
+        kActHides,
+    };
+
+    // A condition of an act (gen_npcs.WHEN_KINDS): when it happens, or what it needs.
+    enum NpcWhen : uint8_t
+    {
+        kWhenHour,      // a from the hour, b to the hour, both in
+        kWhenWeather,   // a the weather (Phoenix's xi.weather)
+        kWhenJob,       // a the main job
+        kWhenDay,       // a the weekday, Firesday 0
+        kWhenNation,    // a the player's nation
+        kWhenKeyItem,   // a a key item held
+        kWhenNoKeyItem, // a a key item not held
+        kWhenKeyItems,  // the key items it checks for held
+        kWhenQuest,     // a quest under way
+        kWhenLink,      // a the quest, mission or battlefield (LinkAt)
+        kWhenStep,      // a its step
+        kWhenPrimed,    // the ??? itself readied (a tree honeyed, the drawer the server picked)
+        kWhenNmKilled,  // the NM a step asks for just killed
+        kWhenRoll,      // a lucky roll
+        kWhenMob,       // name the mob whose death it follows
+        kWhenZoneStart, // the zone starting up
+    };
+
+    struct NpcWhenEntry
+    {
+        uint8_t kind; // NpcWhen
+        uint16_t a;
+        uint16_t b;
+        const char* name;
+    };
+
+    struct NpcActItem
+    {
+        uint16_t item;
+        uint16_t qty;
+    };
+
+    // A message an act says: its words (NpcText) and the parameters that fill their <item>, <keyitem> and <number>.
+    struct NpcSay
+    {
+        uint16_t text;
+        NpcSpan params;
+    };
+
+    // A message's words as the zone's IDs.lua gives them, the game's own, with <item> and the like for parameters.
+    struct NpcText
+    {
+        uint16_t zone;
+        const char* words;
+    };
+
+    // One distinct thing the refresh's probe saw a ??? do on the server (data/phoenix_npc_acts.tsv).
+    struct NpcAct
+    {
+        uint8_t kind;   // NpcActKind
+        NpcSpan items;  // a trade's items
+        NpcSpan when;   // its conditions, none when it happens whenever
+        NpcSpan says;
+        NpcSpan pops;   // mobs, by server ID
+        NpcSpan gives;  // items
+        NpcSpan keyItems;
+        bool event; // it starts a cutscene
+    };
+
     // One NPC with something to show, as live Phoenix loads it (data/phoenix_npcs.tsv). A step of a quest, mission or
     // battlefield adds to its lists only when live has that content.
     struct NpcRecord
@@ -67,6 +138,7 @@ namespace headsup
         NpcSpan pops;     // the mobs it spawns, by server ID
         NpcSpan links;    // the quests, missions and battlefields live has that it takes part in
         NpcSpan purposes; // what the shared systems it calls make it, in words
+        NpcSpan acts;     // what the probe saw it do, in kNpcActs
         uint16_t shop;    // its shop in the table ShopOf reads; 0 for none
         uint8_t unread;   // NpcUnread bits
     };
@@ -94,6 +166,20 @@ namespace headsup
 
     // What the shared systems it calls make it ("Logging point", "Home point", "Teleports to Mineshaft"), each once.
     std::vector<const char*> PurposesOf(const NpcRecord& npc);
+
+    // What the refresh's probe saw it do on the server, in the order it found them.
+    std::span<const NpcAct> ActsOf(const NpcRecord& npc);
+    std::span<const NpcActItem> ItemsOf(const NpcAct& act);
+    std::span<const NpcWhenEntry> WhenOf(const NpcAct& act);
+    std::span<const NpcSay> SaysOf(const NpcAct& act);
+    std::span<const uint32_t> PopsOf(const NpcAct& act);
+    std::span<const uint16_t> GivesOf(const NpcAct& act);
+    std::span<const uint16_t> KeyItemsOf(const NpcAct& act);
+    std::span<const uint32_t> ParamsOf(const NpcSay& say);
+    // A message's words; nullptr for a text past the table.
+    const char* WordsOf(const NpcSay& say);
+    // A live link by its place in the table a kWhenLink condition names; nullptr past it.
+    const NpcLink* LinkAt(uint16_t index);
 
     // Its shop; nullptr when it sells nothing the data could read.
     const NpcShop* ShopOf(const NpcRecord& npc);

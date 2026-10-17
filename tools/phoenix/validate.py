@@ -109,11 +109,16 @@ EXPECTED_STOCK = {17678362: [(4112, 910, 0), (4128, 4832, 0), (4148, 316, 0), (4
 # NPCs live's settings turn off by their content tag: Valkurm Dunes' Field Manual (field_manuals), Southern San
 # d'Oria's Mystrix (daily_tally, a Gobbie Mystery Box NPC) and Port Bastok's Clarion Star (trust_quests).
 ABSENT_NPCS = {17199755: 'Field_Manual', 17719641: 'Mystrix', 17744189: 'Clarion_Star'}
+# What the probe must find two ??? do on the server: Bibiki Bay's qm_shen pops Shen for a Shrimp Lantern (its script
+# looks Shen up by name, so no reading of it finds him), and Carpenters' Landing's qm_mycophile pops the Mycophile for
+# all three mushrooms at once.
+EXPECTED_ACTS = {16793970: ([(1823, 1)], 16793929), 16785729: ([(4373, 1), (4374, 1), (4375, 1)], 16785722)}
 # A key item and its name in scripts/enum/key_item.lua (AIRSHIP_PASS = 8), which Jeuno's airship NPCs check for.
 EXPECTED_KEY_ITEMS = {8: 'Airship Pass'}
 # Each kind thousands or hundreds of Phoenix's NPCs have, so fewer means the dump or the read of the scripts broke.
 MIN_NPC = {'NPCs': 20000, 'NPCs that take a trade': 300, '??? that take a trade': 80, '??? that pop a mob': 100,
-           'shops': 120, 'links': 900, 'links live has off': 50, 'system calls': 300, 'key items': 300}
+           'shops': 120, 'links': 900, 'links live has off': 50, 'system calls': 300, 'key items': 300,
+           'acts': 600, 'texts': 200}
 RESTING, SITTING = 33, 47  # xi::Animation Healing and Sit, which CBattleEntity::isSitting names
 
 
@@ -269,13 +274,13 @@ def check_rules(rules):
     return problems
 
 
-def check_npcs(npcs, shops, links, systems, key_items, min_npc=None):
+def check_npcs(npcs, shops, links, systems, key_items, acts=(), texts=(), min_npc=None):
     problems, by_id = [], {npc['id']: npc for npc in npcs}
     counts = {'NPCs': len(npcs), 'NPCs that take a trade': sum(1 for n in npcs if n['trades']),
               '??? that take a trade': sum(1 for n in npcs if n['name'] == '???' and n['trades']),
               '??? that pop a mob': sum(1 for n in npcs if n['name'] == '???' and n['pops']),
               'shops': len(shops), 'links': len(links), 'links live has off': sum(1 for l in links if not l['live']),
-              'system calls': len(systems), 'key items': len(key_items)}
+              'system calls': len(systems), 'key items': len(key_items), 'acts': len(acts), 'texts': len(texts)}
     for what, least in (MIN_NPC if min_npc is None else min_npc).items():
         if counts[what] < least:
             problems.append(f'only {counts[what]} {what} (expected at least {least})')
@@ -288,6 +293,9 @@ def check_npcs(npcs, shops, links, systems, key_items, min_npc=None):
         got = [(e['item'], e['price'], e['rank']) for e in shops[shop - 1]] if 0 < shop <= len(shops) else None
         if got != stock:
             problems.append(f'NPC {npc_id}: expected the stock {stock}, got {got}')
+    for npc_id, (items, mob) in EXPECTED_ACTS.items():
+        if not any(a['npc'] == npc_id and a['act'] == 'trade' and a['items'] == items and mob in a['pops'] for a in acts):
+            problems.append(f'NPC {npc_id}: expected a trade of {items} that pops {mob}')
     for key_item, name in EXPECTED_KEY_ITEMS.items():
         if key_items.get(key_item) != name:
             problems.append(f'key item {key_item}: expected the name {name!r}, got {key_items.get(key_item)!r}')

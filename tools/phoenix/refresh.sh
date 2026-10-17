@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Regenerate data/phoenix_mobs.tsv, data/phoenix_drops.tsv, data/phoenix_items.tsv, data/phoenix_mob_info.tsv,
 # data/phoenix_skills.tsv, data/phoenix_spells.tsv, data/phoenix_rules.json, data/phoenix_npcs.tsv,
-# data/phoenix_npc_shops.tsv, data/phoenix_npc_links.tsv, data/phoenix_npc_systems.tsv and data/phoenix_key_items.tsv
-# from Phoenix's own map server and its mob and NPC scripts, and data/phoenix_zones.tsv, data/phoenix_weather.tsv and
-# data/phoenix_titles.tsv from its checkout; data/ is only written when all of them pass. It clones Phoenix at PHOENIX_COMMIT with its patches and mesh
+# data/phoenix_npc_shops.tsv, data/phoenix_npc_links.tsv, data/phoenix_npc_systems.tsv, data/phoenix_key_items.tsv,
+# data/phoenix_npc_acts.tsv and data/phoenix_npc_texts.tsv from Phoenix's own map server and its mob and NPC scripts,
+# and data/phoenix_zones.tsv, data/phoenix_weather.tsv and data/phoenix_titles.tsv from its checkout; data/ is only written when all of them pass. It clones Phoenix at PHOENIX_COMMIT with its patches and mesh
 # submodules (not the staff-only phoenix_ac), builds the map server with the headsup_dump module, loads Phoenix's
 # database into a private MariaDB, runs the server with live's settings (live_settings.lua) until the module has dumped
 # every loaded mob, every NPC live has, every item with magic accuracy and the /check and aggro rules
@@ -49,6 +49,11 @@ STAGE="$WORK/out"
 LIVE_SETTINGS="$ROOT/tools/phoenix/live_settings.lua"
 DUMP_ID="$(cat "$LIVE_SETTINGS" "$ROOT/tools/phoenix/headsup_dump/headsup_dump.cpp" | sha256sum | cut -c1-8)"
 SNAPSHOTS="${HEADSUP_PHOENIX_SNAPSHOTS:-$HOME/.cache/headsup-snapshots}/$COMMIT-$DUMP_ID"
+# The ??? probe (headsup_probe with npc_probe.lua) runs once per commit, settings and probe: its output is the same on
+# every run, so it is kept beside the dumps under its own key and a change to the probe leaves them be.
+PROBE_ID="$(cat "$LIVE_SETTINGS" "$ROOT/tools/phoenix/npc_probe.lua" "$ROOT/tools/phoenix/headsup_probe/headsup_probe.cpp" |
+    sha256sum | cut -c1-8)"
+PROBE="${HEADSUP_PHOENIX_SNAPSHOTS:-$HOME/.cache/headsup-snapshots}/$COMMIT-probe-$PROBE_ID.jsonl"
 
 log() { printf '[refresh] %s\n' "$*"; }
 fail() { printf '[refresh] FAILED: %s\n' "$*" >&2; exit 1; }
@@ -91,6 +96,11 @@ cmp -s "$ROOT/tools/phoenix/headsup_dump/headsup_dump.cpp" "$SERVER/modules/head
     cp "$ROOT/tools/phoenix/headsup_dump/headsup_dump.cpp" "$SERVER/modules/headsup_dump/headsup_dump.cpp"
 grep -qx 'headsup_dump/' "$SERVER/modules/init.txt" ||
     printf '\n# headsup: dump every loaded mob (tools/phoenix/refresh.sh)\nheadsup_dump/\n' >> "$SERVER/modules/init.txt"
+mkdir -p "$SERVER/modules/headsup_probe"
+cmp -s "$ROOT/tools/phoenix/headsup_probe/headsup_probe.cpp" "$SERVER/modules/headsup_probe/headsup_probe.cpp" ||
+    cp "$ROOT/tools/phoenix/headsup_probe/headsup_probe.cpp" "$SERVER/modules/headsup_probe/headsup_probe.cpp"
+grep -qx 'headsup_probe/' "$SERVER/modules/init.txt" ||
+    printf '\n# headsup: probe every ??? (tools/phoenix/refresh.sh)\nheadsup_probe/\n' >> "$SERVER/modules/init.txt"
 cp "$LIVE_SETTINGS" "$SERVER/settings/main.lua"
 
 if [ ! -x "$VENV/bin/python" ]; then
@@ -165,10 +175,23 @@ for run in $(seq "$DUMPS"); do
     mv "$dump.part" "$dump"
 done
 
+if [ ! -s "$PROBE" ]; then
+    log "running xi_map until the ??? probe is written"
+    status=0
+    (cd "$SERVER" && timeout "$MAP_TIMEOUT" env HEADSUP_PROBE_LUA="$ROOT/tools/phoenix/npc_probe.lua" \
+        HEADSUP_PROBE_OUT="$PROBE.part" XI_MAIN_INACTIVITY_WATCHDOG_PERIOD="$DUMP_WATCHDOG_MS" \
+        ./xi_map --ip "$HOST" --port "$MAP_PORT" < /dev/null > "$WORK/probe.log" 2>&1) || status=$?
+    if [ "$status" -ne 0 ] || [ ! -s "$PROBE.part" ]; then
+        rm -f "$PROBE.part"
+        fail "xi_map exited with status $status and no probe; see $WORK/probe.log"
+    fi
+    mv "$PROBE.part" "$PROBE"
+fi
+
 rm -rf "$STAGE"
 python3 "$ROOT/tools/phoenix/compact.py" "$LIVE_SETTINGS" "$SERVER" "$SNAPSHOTS"/*.json "$STAGE" "$COMMIT" ||
     fail "compact; data/ left unchanged"
-python3 "$ROOT/tools/phoenix/npcs.py" "$SERVER" "$SNAPSHOTS"/*.json "$STAGE" ||
+python3 "$ROOT/tools/phoenix/npcs.py" "$SERVER" "$PROBE" "$SNAPSHOTS"/*.json "$STAGE" ||
     fail "NPCs; data/ left unchanged"
 python3 "$ROOT/tools/gen_npcs.py" --check "$STAGE" ||
     fail "NPC data the format does not allow; data/ left unchanged"
@@ -185,7 +208,8 @@ cp "$STAGE/phoenix_mobs.tsv" "$STAGE/phoenix_mobs.meta" "$STAGE/phoenix_drops.ts
     "$STAGE/phoenix_mob_info.tsv" "$STAGE/phoenix_skills.tsv" "$STAGE/phoenix_spells.tsv" \
     "$STAGE/phoenix_rules.json" "$STAGE/phoenix_zones.tsv" "$STAGE/phoenix_weather.tsv" "$STAGE/phoenix_titles.tsv" \
     "$STAGE/phoenix_npcs.tsv" "$STAGE/phoenix_npc_shops.tsv" "$STAGE/phoenix_npc_links.tsv" \
-    "$STAGE/phoenix_npc_systems.tsv" "$STAGE/phoenix_key_items.tsv" "$ROOT/data/"
+    "$STAGE/phoenix_npc_systems.tsv" "$STAGE/phoenix_key_items.tsv" "$STAGE/phoenix_npc_acts.tsv" \
+    "$STAGE/phoenix_npc_texts.tsv" "$ROOT/data/"
 log "data/phoenix_mobs.tsv, .meta, phoenix_drops.tsv, phoenix_items.tsv, phoenix_mob_info.tsv, phoenix_skills.tsv," \
-    "phoenix_spells.tsv, phoenix_rules.json, phoenix_zones.tsv, phoenix_weather.tsv, phoenix_titles.tsv and the five" \
+    "phoenix_spells.tsv, phoenix_rules.json, phoenix_zones.tsv, phoenix_weather.tsv, phoenix_titles.tsv and the seven" \
     "NPC files updated"

@@ -71,6 +71,7 @@ id	name
 130	Old Ring
 136	Crimson Orb
 138	Chocobo License
+140	Corrupted Dirt
 141	Stalactite Dew
 144	Book of the East
 145	Book of the West
@@ -146,14 +147,17 @@ id	name
 254	Sublime Statue of the Goddess
 255	Rauteinots Parcel
 256	Treasure Map
+257	Strangely Shaped Coral
 260	Empty Barrel
 261	Barrel of Opo Opo Brew
 264	Joker Card
+266	Altepa Moonpebble
 267	Rhinostery Certificate
 269	Ancient San Dorian Book
 271	Invisible Man Sticker
 272	Paintbrush of Souls
 273	Old Rusty Key
+274	Ancient Tablet Fragment
 275	Star Seeker
 276	Aurastery Ring
 279	Magic Drained Star Seeker
@@ -163,12 +167,15 @@ id	name
 286	Piece of a Broken Key2
 287	Piece of a Broken Key3
 288	Drops of Amnio
+289	Reinforced Cermet
 291	Tonberry Priest Key
+293	Old Piece of Wood
 294	Dragon Curse Remedy
 295	Sealed Iron Box
 296	Sea Serpent Statue
 297	Altepa Polishing Stone
 298	Challenge to the Royal Knights
+299	Ranchuriomes Legacy
 320	Whisper of Flames
 321	Whisper of Tremors
 322	Whisper of Tides
@@ -200,6 +207,7 @@ id	name
 358	Promyvion Holla Sliver
 359	Promyvion Dem Sliver
 360	Promyvion Mea Sliver
+363	Rainbow Resonator
 385	Map of the San Doria Area
 386	Map of the Bastok Area
 387	Map of the Windurst Area
@@ -213,6 +221,7 @@ id	name
 445	Map of Huxzoi
 448	Daze Breaker Charm
 450	Carbuncles Tear
+451	Scrap of Papyrus
 452	Cerulean Crystal
 453	Handful of Crystal Scales
 454	Charred Helm
@@ -240,6 +249,12 @@ id	name
 483	Figure of Titan
 484	Dark Mana Orb
 485	Moongate Pass
+486	Hydra Corps Command Scepter
+487	Hydra Corps Eyeglass
+488	Hydra Corps Lantern
+489	Hydra Corps Tactical Map
+490	Hydra Corps Insignia
+491	Hydra Corps Battle Standard
 493	Diary of Mukunda
 582	Reliquiarium Key
 583	Mimeo Stone
@@ -260,6 +275,7 @@ id	name
 606	Limit Breaker
 609	Alabaster Hairpin
 610	Dawn Talisman
+611	Silver Comets Collar
 613	Delkfutt Recognition Device
 617	Manaclipper Ticket
 621	Rivernewort
@@ -290,12 +306,17 @@ id	name
 709	Mire Incense
 710	Brand of Dawn
 711	Brand of Twilight
+713	Better Humes and Mannequins
 715	Caliginous Blade
 718	Shaded Cruse
 719	Letter from Shikaree X
 720	Monarch Linn Patrol Permit
 721	Letter from Shikaree Y
 734	Cosmo Cleanse
+739	Dynamis Valkurm Sliver
+740	Dynamis Buburimu Sliver
+741	Dynamis Qufim Sliver
+742	Dynamis Tavnazia Sliver
 760	Silver Sea Ferry Ticket
 761	Moonlight Ore
 762	Leujaoam Assault Orders
@@ -311,6 +332,8 @@ id	name
 785	Raillefals Letter
 786	Ephramadian Gold Coin
 787	Imperial Army Id Tag
+790	Bag of Gold Pieces
+791	Forgotten Hexagun
 796	Pot of Tsetseroons Stew
 797	Assault Armband
 798	Antique Automaton
@@ -326,6 +349,7 @@ id	name
 844	Toggle Switch
 848	Life Float
 854	Remnants Permit
+855	Lilac Ribbon
 860	Periqia Assault Area Entry Permit
 878	Nyzul Isle Assault Orders
 891	Mark of the Einherjar
@@ -348,6 +372,7 @@ id	name
 1246	Lightning Cell
 1247	Megomaks Shopping List
 1856	Map of Al Zahbi
+1861	Map of Aydeewa Subterrane
 1865	Map of Alzadaal Ruins
 1872	Map of the Chocobo Circuit
 1977	Serpent Rumors

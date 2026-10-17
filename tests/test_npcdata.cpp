@@ -7,8 +7,8 @@
 
 using namespace headsup;
 
-// Expected values are read from Phoenix's scripts: zones/Carpenters_Landing (zone 2), zones/Bibiki_Bay/npcs/qm_shen.lua
-// and enum/key_item.codegen.lua.
+// Expected values are read from Phoenix's scripts: zones/Carpenters_Landing (zone 2), zones/Bibiki_Bay/npcs/qm_shen.lua,
+// zones/Uleguerand_Range/npcs/Rabbit_Footprint.lua and enum/key_item.codegen.lua.
 
 namespace
 {
@@ -46,12 +46,25 @@ TEST(the_key_items_a_qm_gives_and_checks_for_have_their_names)
 
 TEST(what_a_script_works_out_while_it_runs_is_marked_unread)
 {
-    const NpcRecord* qm = NpcById(16793970); // Bibiki Bay's qm_shen looks Shen up by name
+    // Uleguerand Range's Rabbit Footprint takes a San d'Orian Carrot and pops a Black or a White Coney by the moon.
+    const NpcRecord* footprint = NpcById(16798100);
+    CHECK(footprint != nullptr);
+    if (footprint == nullptr) return;
+    CHECK(Listed(TradesOf(*footprint)) == (std::vector<uint16_t>{4389}));
+    CHECK(PopsOf(*footprint).empty());
+    CHECK_EQ(footprint->unread, kNpcUnreadPops);
+}
+
+TEST(what_the_probe_found_on_the_server_joins_what_the_scripts_spell_out)
+{
+    // Bibiki Bay's qm_shen looks Shen up by name as it runs, which no reading of its script finds; the probe saw it
+    // pop him (16793929) for a Shrimp Lantern.
+    const NpcRecord* qm = NpcById(16793970);
     CHECK(qm != nullptr);
     if (qm == nullptr) return;
-    CHECK(Listed(TradesOf(*qm)) == (std::vector<uint16_t>{1823})); // Shrimp Lantern
-    CHECK(PopsOf(*qm).empty());
-    CHECK_EQ(qm->unread, kNpcUnreadPops);
+    CHECK(Listed(TradesOf(*qm)) == (std::vector<uint16_t>{1823}));
+    CHECK(Listed(PopsOf(*qm)) == (std::vector<uint32_t>{16793929}));
+    CHECK_EQ(qm->unread, 0);
 }
 
 TEST(an_npc_with_nothing_to_show_has_no_record)
@@ -120,4 +133,45 @@ TEST(what_an_npcs_systems_make_it_is_in_words)
     CHECK(purposes(16822535) == (std::vector<std::string>{"Teleports to Mineshaft"}));
     CHECK(purposes(17719548) == (std::vector<std::string>{"Leathercraft guild points"}));
     CHECK(NpcById(16974393) == nullptr); // Aht Urhgan's Najaaj only walks a path
+}
+
+TEST(what_the_probe_saw_a_qm_do_is_its_acts)
+{
+    // Bibiki Bay's qm_shen (scripts/zones/Bibiki_Bay: its IDs.lua's SHEN_QM and SHEN_SPAWN): a click says the shrimp
+    // shells line; a Shrimp Lantern pops Shen with the skimming line, the lantern its <item>.
+    const NpcRecord* qm = NpcById(16793970);
+    CHECK(qm != nullptr);
+    if (qm == nullptr) return;
+    const auto acts = ActsOf(*qm);
+    CHECK(acts.size() == 2);
+    if (acts.size() != 2) return;
+    CHECK(acts[0].kind == kActClick && WhenOf(acts[0]).empty() && SaysOf(acts[0]).size() == 1);
+    if (SaysOf(acts[0]).size() == 1)
+        CHECK(std::string(WordsOf(SaysOf(acts[0])[0])) == "Innumerable shrimp shells are floating in the water here.");
+    CHECK(acts[1].kind == kActTrade && ItemsOf(acts[1]).size() == 1 && ItemsOf(acts[1])[0].item == 1823);
+    CHECK(Listed(PopsOf(acts[1])) == (std::vector<uint32_t>{16793929}));
+    if (SaysOf(acts[1]).size() == 1)
+    {
+        CHECK(std::string(WordsOf(SaysOf(acts[1])[0])).starts_with("The <item> begins skimming"));
+        CHECK(Listed(ParamsOf(SaysOf(acts[1])[0])) == (std::vector<uint32_t>{1823}));
+    }
+}
+
+TEST(a_hidden_qm_shows_and_hides_by_its_zones_clock)
+{
+    // Carpenters' Landing's Hercules Beetle trees: the zone hides them as it starts and at 07:00, shows them at 22:00
+    // (its globals.lua), and one readied with honey pops the Hercules Beetle.
+    const NpcRecord* tree = NpcById(16785730);
+    CHECK(tree != nullptr);
+    if (tree == nullptr) return;
+    std::vector<std::string> acts;
+    for (const NpcAct& act : ActsOf(*tree))
+    {
+        std::string line = std::to_string(act.kind);
+        for (const NpcWhenEntry& when : WhenOf(act))
+            line += " " + std::to_string(when.kind) + ":" + std::to_string(when.a) + "-" + std::to_string(when.b);
+        acts.push_back(line);
+    }
+    CHECK(acts == (std::vector<std::string>{"0 11:0-0", "3 15:0-0", "3 0:7-7", "2 0:22-22"}));
+    if (!ActsOf(*tree).empty()) CHECK(Listed(PopsOf(ActsOf(*tree)[0])) == (std::vector<uint32_t>{16785723}));
 }

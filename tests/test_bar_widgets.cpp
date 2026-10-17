@@ -1515,6 +1515,7 @@ namespace
         case 4374: return "Sleepshroom";
         case 4375: return "Danceshroom";
         case 1823: return "Shrimp Lantern";
+        case 4389: return "San d'Orian Carrot";
         case 4112: return "Potion";
         case 4128: return "Ether";
         case 4148: return "Antidote";
@@ -1575,9 +1576,23 @@ TEST(a_qm_that_pops_two_of_one_nm_names_it_once)
           (std::vector<std::string>{"Jailer of Prudence"}));
 }
 
-TEST(a_qm_whose_script_works_out_what_it_pops_says_so)
+TEST(a_spot_whose_script_works_out_what_it_pops_says_so)
 {
-    // Bibiki Bay's qm_shen takes a Shrimp Lantern and looks Shen up by name while it runs.
+    // Uleguerand Range's Rabbit Footprint takes a San d'Orian Carrot and pops a coney the moon picks.
+    Settings settings;
+    const ActorInfo footprint = NpcTarget(16798100, "Rabbit Footprint");
+    BarState state;
+    state.target   = &footprint;
+    state.itemName = NpcItemName;
+    const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
+    CHECK(SectionLines(p, "Trade") == (std::vector<std::string>{"San d'Orian Carrot"}));
+    CHECK(SectionLines(p, "Pops") == (std::vector<std::string>{"Worked out by its script"}));
+    if (const PopupSection* pops = Section(p, "Pops")) CHECK(pops->rows[0].cells[0].text[0].tone == Tone::Dim);
+}
+
+TEST(a_qm_shows_the_nm_the_probe_saw_it_pop)
+{
+    // Bibiki Bay's qm_shen: a Shrimp Lantern pops Shen, which only the probe on the server found.
     Settings settings;
     const ActorInfo qm = NpcTarget(16793970, "???");
     BarState state;
@@ -1585,8 +1600,7 @@ TEST(a_qm_whose_script_works_out_what_it_pops_says_so)
     state.itemName = NpcItemName;
     const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
     CHECK(SectionLines(p, "Trade") == (std::vector<std::string>{"Shrimp Lantern"}));
-    CHECK(SectionLines(p, "Pops") == (std::vector<std::string>{"Worked out by its script"}));
-    if (const PopupSection* pops = Section(p, "Pops")) CHECK(pops->rows[0].cells[0].text[0].tone == Tone::Dim);
+    CHECK(SectionLines(p, "Pops") == (std::vector<std::string>{"Shen"}));
 }
 
 TEST(an_npcs_popup_names_the_key_items_it_gives_and_checks_for)

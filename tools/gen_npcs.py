@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """The format of data/phoenix_npcs.tsv and the lists it points into, data/phoenix_npc_shops.tsv,
-data/phoenix_npc_links.tsv, data/phoenix_npc_systems.tsv and data/phoenix_key_items.tsv (written by
+data/phoenix_npc_links.tsv, data/phoenix_npc_systems.tsv and data/phoenix_key_items.tsv, and of what the refresh's
+probe saw each ??? do, data/phoenix_npc_acts.tsv and data/phoenix_npc_texts.tsv (all written by
 tools/phoenix/refresh.sh), and src/generated/npcdata.inc from them: each NPC with something to show, for the plugin's
 Target popup.
 
@@ -19,6 +20,8 @@ SHOPS_NAME = 'phoenix_npc_shops.tsv'
 LINKS_NAME = 'phoenix_npc_links.tsv'
 SYSTEMS_NAME = 'phoenix_npc_systems.tsv'
 KEY_ITEMS_NAME = 'phoenix_key_items.tsv'
+ACTS_NAME = 'phoenix_npc_acts.tsv'
+TEXTS_NAME = 'phoenix_npc_texts.tsv'
 # phoenix_npcs.tsv: every NPC content restriction leaves on, by server ID. script: its internal name, empty for a blank
 # placeholder; name: the name it shows, empty for one that shows none. pos: x, y, z and rotation (0 to 255) where the
 # dump found it. trades: the items its trade handlers ask for; gives: the items it hands out, quest rewards included;
@@ -123,6 +126,20 @@ SYSTEM_RULES = {
     'waypoint': [(ANY, 'Waypoint')],
 }
 SMALL_WORDS = {'of', 'the', 'and', 'a', 'an', 'in', 'on', 'to', 'for', 'with', 'from', 'at', 'by'}
+# phoenix_npc_acts.tsv: what each ??? did when the refresh's probe clicked and traded it on the server, one distinct
+# thing a row, the rows of an NPC together: act, a click, a trade, or the ??? shown or hidden by its zone; items, a
+# trade's items (item, or item*qty); when, the condition tokens of the plainest scenario it happened in (hour:FROM-TO,
+# weather:N, job:N, day:N, nation:N, keyItem:N held, noKeyItem:N not held, keyItems held, quest under way, link:N with
+# step:N a quest step, primed for the ??? 's own state, nmKilled, roll for a lucky roll, mob:SCRIPT for a mob's death,
+# zoneStart); says, its messages (a text of phoenix_npc_texts.tsv, then the message's parameters, ':' between);
+# pops, gives and keyItems as in phoenix_npcs.tsv; event, 1 when it starts a cutscene.
+ACT_COLUMNS = ['npc', 'act', 'items', 'when', 'says', 'pops', 'gives', 'keyItems', 'event']
+ACT_KINDS = ['click', 'trade', 'shows', 'hides']
+WHEN = re.compile(r'hour:\d+-\d+|(?:weather|job|day|nation|keyItem|noKeyItem|link|step):\d+|mob:\w+|'
+                  r'keyItems|quest|primed|nmKilled|roll|zoneStart')
+# phoenix_npc_texts.tsv: the messages acts say, numbered from 1: the zone and its message number, and the words as the
+# zone's IDs.lua gives them, with <item>, <keyitem>, <number> and the like where a parameter goes.
+TEXT_COLUMNS = ['text', 'zone', 'message', 'words']
 POSITION = re.compile(r'-?[0-9]+\.[0-9]{3},-?[0-9]+\.[0-9]{3},-?[0-9]+\.[0-9]{3},[0-9]{1,3}')
 
 
@@ -244,7 +261,78 @@ def purpose(family: str, call: str):
     raise DataError(f'no rule of {family} matches {call}')
 
 
-def check(npcs, shops, links, systems, key_items) -> None:
+def parse_acts(text: str, source: str = ACTS_NAME) -> list:
+    acts, last = [], 0
+    for line, row in table_rows(text, ACT_COLUMNS, source):
+        at = f'{source}:{line}'
+        npc = number(row['npc'], 1, 0xFFFFFFFF, f'{at}: npc')
+        if npc < last:
+            raise DataError(f"{at}: an NPC's acts must be together, in ID order")
+        last = npc
+        if row['act'] not in ACT_KINDS:
+            raise DataError(f'{at}: act must be one of {", ".join(ACT_KINDS)}, got {row["act"]!r}')
+        items = []
+        for part in row['items'].split(',') if row['items'] else []:
+            item, _, qty = part.partition('*')
+            items.append((number(item, 1, 0xFFFF, f'{at}: items'), number(qty or '1', 1, 0xFFFF, f'{at}: items')))
+        if [i for i, _ in items] != sorted({i for i, _ in items}):
+            raise DataError(f'{at}: items must be increasing')
+        when = row['when'].split(',') if row['when'] else []
+        bad = [w for w in when if not WHEN.fullmatch(w)]
+        if bad:
+            raise DataError(f'{at}: when has {bad[0]!r}, which no condition token is')
+        says = []
+        for part in row['says'].split(',') if row['says'] else []:
+            fields = part.split(':')
+            says.append((number(fields[0], 1, 0xFFFF, f'{at}: says'),
+                         [number(f, 0, 0xFFFFFFFF, f'{at}: says') for f in fields[1:]]))
+        act = {'npc': npc, 'act': row['act'], 'items': items, 'when': when, 'says': says,
+               'event': live_flag(row['event'], f'{at}: event')}
+        for column, (lo, hi) in (('pops', (1, 0xFFFFFFFF)), ('gives', (1, 0xFFFF)), ('keyItems', (1, 0xFFFF))):
+            act[column] = increasing(row[column], lo, hi, f'{at}: {column}')
+        acts.append(act)
+    return acts
+
+
+def parse_texts(text: str, source: str = TEXTS_NAME) -> list:
+    rows = []
+    for line, row in table_rows(text, TEXT_COLUMNS, source):
+        at = f'{source}:{line}'
+        if not row['words']:
+            raise DataError(f'{at}: empty words')
+        rows.append((line, {'text': number(row['text'], 1, 0xFFFF, f'{at}: text'),
+                            'zone': number(row['zone'], 0, 0xFFFF, f'{at}: zone'),
+                            'message': number(row['message'], 0, 0xFFFF, f'{at}: message'), 'words': row['words']}))
+    return numbered(rows, 'text', source)
+
+
+def check_acts(npcs, links, key_items, acts, texts) -> None:
+    """Every NPC, text, link and key item an act names is in its list, and every text is said."""
+    ids = {npc['id'] for npc in npcs}
+    used = set()
+    for act in acts:
+        where = f"{ACTS_NAME}: NPC {act['npc']}"
+        if act['npc'] not in ids:
+            raise DataError(f'{where} is not in {NPCS_NAME}')
+        for text, _ in act['says']:
+            if text > len(texts):
+                raise DataError(f'{where} says text {text}, past the {len(texts)} in {TEXTS_NAME}')
+            used.add(text)
+        for token in act['when']:
+            head, _, value = token.partition(':')
+            if head == 'link' and (int(value) > len(links) or not links[int(value) - 1]['live']):
+                raise DataError(f'{where} names link {value}, which {LINKS_NAME} does not have live')
+            if head in ('keyItem', 'noKeyItem') and int(value) not in key_items:
+                raise DataError(f'{where} names key item {value}, which {KEY_ITEMS_NAME} does not')
+        unnamed = sorted(set(act['keyItems']) - set(key_items))
+        if unnamed:
+            raise DataError(f'{where} gives key item {unnamed[0]}, which {KEY_ITEMS_NAME} does not')
+    unused = sorted(set(range(1, len(texts) + 1)) - used)
+    if unused:
+        raise DataError(f'{TEXTS_NAME}: {len(unused)} texts no act says, the first {unused[0]}')
+
+
+def check(npcs, shops, links, systems, key_items, acts=(), texts=()) -> None:
     """Every number an NPC names is in its list, every key item it names has a name, and every list entry and name is
     named."""
     used_shops, used_links, used_systems = set(), set(), set()
@@ -266,15 +354,19 @@ def check(npcs, shops, links, systems, key_items) -> None:
             raise DataError(f'{name}: {len(unused)} entries no NPC names, the first {unused[0]}')
     for system in systems:
         purpose(system['family'], system['call'])
-    unused = sorted(set(key_items) - {k for npc in npcs for k in npc['keyItems'] + npc['needs']})
+    named = {k for npc in npcs for k in npc['keyItems'] + npc['needs']} | {k for a in acts for k in a['keyItems']}
+    named |= {int(w.split(':')[1]) for a in acts for w in a['when'] if w.startswith(('keyItem:', 'noKeyItem:'))}
+    unused = sorted(set(key_items) - named)
     if unused:
         raise DataError(f'{KEY_ITEMS_NAME}: {len(unused)} key items no NPC names, the first {unused[0]}')
+    check_acts(npcs, links, key_items, acts, texts)
 
 
 def load(data: pathlib.Path):
     tables = [parse((data / name).read_text(encoding='utf-8'), str(data / name)) for parse, name in
               ((parse_npcs, NPCS_NAME), (parse_shops, SHOPS_NAME), (parse_links, LINKS_NAME),
-               (parse_systems, SYSTEMS_NAME), (parse_key_items, KEY_ITEMS_NAME))]
+               (parse_systems, SYSTEMS_NAME), (parse_key_items, KEY_ITEMS_NAME), (parse_acts, ACTS_NAME),
+               (parse_texts, TEXTS_NAME))]
     check(*tables)
     return tables
 
@@ -286,8 +378,56 @@ POOLS = {'trades': 'kNpcItems', 'gives': 'kNpcItems', 'keyItems': 'kNpcKeyItems'
          'pops': 'kNpcMobs', 'links': 'kNpcLinkIds', 'purposes': 'kNpcPurposeIds'}
 POOL_TYPES = {'kNpcItems': 'uint16_t', 'kNpcKeyItems': 'uint16_t', 'kNpcMobs': 'uint32_t', 'kNpcLinkIds': 'uint16_t',
               'kNpcPurposeIds': 'uint16_t'}
+# The pools of an act's parts, each with its empty entry: an item and its count, a condition, and a message's
+# parameters and the message (a text and where its parameters sit).
+STRUCT_POOLS = {'kNpcActItems': '{0, 0}', 'kNpcWhen': '{0, 0, 0, ""}', 'kNpcSayParams': '0u', 'kNpcSays': '{0, {0, 0}}'}
+STRUCT_POOLS_TYPES = {'kNpcActItems': 'NpcActItem', 'kNpcWhen': 'NpcWhenEntry', 'kNpcSayParams': 'uint32_t',
+                      'kNpcSays': 'NpcSay'}
 SHOWN_UNREAD = ['trade', 'gives', 'pops', 'shop']  # what the popup says the data cannot name
 VALUES_A_LINE = 16
+
+
+# The condition kinds of an act, in NpcWhen's order: hour holds from and to, link the live link, mob the mob's name.
+WHEN_KINDS = ['hour', 'weather', 'job', 'day', 'nation', 'keyItem', 'noKeyItem', 'keyItems', 'quest', 'link', 'step',
+              'primed', 'nmKilled', 'roll', 'mob', 'zoneStart']
+
+
+def when_entry(token: str, numbers) -> str:
+    """One condition token as an NpcWhen entry: {kind, a, b, name}."""
+    head, _, value = token.partition(':')
+    a = b = 0
+    name = ''
+    if head == 'hour':
+        a, b = (int(x) for x in value.split('-'))
+    elif head == 'link':
+        a = numbers[int(value)]
+    elif head == 'mob':
+        name = value.replace('_', ' ')
+    elif value:
+        a = int(value)
+    return f'{{{WHEN_KINDS.index(head)}, {a}, {b}, {c_string(name)}}}'
+
+
+def act_tables(acts, texts, numbers, span) -> tuple:
+    """kNpcActs and the pools its acts point into, and each NPC's acts as (first, count) in kNpcActs; span(pool,
+    values) places a list in a pool, each distinct list once."""
+    records, of_npc = ['    {0, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, false},'], {}
+    for act in acts:
+        first, count = of_npc.get(act['npc'], (len(records), 0))
+        of_npc[act['npc']] = (first, count + 1)
+        says = tuple(f"{{{text}, {span('kNpcSayParams', tuple(params))}}}" for text, params in act['says'])
+        records.append('    {' + ', '.join([
+            str(ACT_KINDS.index(act['act'])),
+            span('kNpcActItems', tuple(f'{{{item}, {qty}}}' for item, qty in act['items'])),
+            span('kNpcWhen', tuple(when_entry(w, numbers) for w in act['when'])),
+            span('kNpcSays', says), span('kNpcMobs', tuple(act['pops'])), span('kNpcItems', tuple(act['gives'])),
+            span('kNpcKeyItems', tuple(act['keyItems'])), 'true' if act['event'] else 'false']) + '},')
+    if len(records) > 0xFFFF:
+        raise DataError('the acts do not fit NpcSpan')
+    lines = ['', 'const NpcText kNpcTexts[] = {', '    {0, ""},']
+    lines += [f"    {{{text['zone']}, {c_string(text['words'])}}}," for text in texts]
+    lines += ['};', '', 'const NpcAct kNpcActs[] = {'] + records + ['};']
+    return lines, of_npc
 
 
 def shown(npc) -> bool:
@@ -324,10 +464,11 @@ def purpose_table(purposes) -> list:
     return ['', 'const char* const kNpcPurposes[] = {'] + [f'    {c_string(label)},' for label in purposes] + ['};']
 
 
-def generate(npcs, shops, links, systems, key_items, commit: str) -> str:
-    """npcdata.inc: kNpcs, each NPC shown() in ID order with where its lists sit in their pools, each pool holding
-    each distinct list once after the empty entry at 0; the shops by number; the links live has, which alone the
-    popup shows; what its systems make it in words; and kKeyItemNames in ID order."""
+def generate(npcs, shops, links, systems, key_items, commit: str, acts=(), texts=()) -> str:
+    """npcdata.inc: kNpcs, each NPC shown() or with acts in ID order with where its lists sit in their pools, each pool
+    holding each distinct list once after the empty entry at 0; the shops by number; the links live has, which alone
+    the popup shows; what its systems make it in words; what the probe saw each ??? do, with the words it says; and
+    kKeyItemNames in ID order."""
     live = [link for link in links if link['live']]
     numbers = {link['link']: n for n, link in enumerate(live, start=1)}
     labels = [purpose(s['family'], s['call']) for s in systems]
@@ -337,12 +478,24 @@ def generate(npcs, shops, links, systems, key_items, commit: str) -> str:
             purposes.setdefault(label, len(purposes))
     pools = {pool: [0] for pool in POOL_TYPES}
     starts = {pool: {(): 0} for pool in POOL_TYPES}
+    for pool, empty in STRUCT_POOLS.items():
+        pools[pool], starts[pool] = [empty], {(): 0}
+
+    def span(pool, values):
+        if len(values) > 0xFF:
+            raise DataError(f'{len(values)} entries of {pool} do not fit NpcSpan')
+        if values not in starts[pool]:
+            starts[pool][values] = len(pools[pool])
+            pools[pool] += values
+        return f'{{{starts[pool][values]}, {len(values)}}}'
+
+    act_lines, acts_of = act_tables(acts, texts, numbers, span)
     records = []
     for npc in npcs:
         said = [purposes[labels[n - 1]] for n in npc['systems'] if labels[n - 1] is not None]
         npc = dict(npc, links=[numbers[n] for n in npc['links'] if n in numbers],
                    purposes=[p for i, p in enumerate(said) if p not in said[:i]])
-        if not shown(npc):
+        if not shown(npc) and npc['id'] not in acts_of:
             continue
         spans = []
         for column, pool in POOLS.items():
@@ -354,7 +507,8 @@ def generate(npcs, shops, links, systems, key_items, commit: str) -> str:
                 pools[pool] += values
             spans.append(f'{{{starts[pool][values]}, {len(values)}}}')
         unread = sum(1 << UNREAD.index(kind) for kind in npc['unread'])
-        records.append(f"    {{{npc['id']}u, {', '.join(spans)}, {npc['shop']}, {unread}}},")
+        first, count = acts_of.get(npc['id'], (0, 0))
+        records.append(f"    {{{npc['id']}u, {', '.join(spans)}, {{{first}, {count}}}, {npc['shop']}, {unread}}},")
     if any(len(pool) > 0xFFFF for pool in pools.values()):
         raise DataError('the NPC lists do not fit NpcSpan')
     lines = [f'// Generated by tools/gen_npcs.py from data/{NPCS_NAME}, data/{SHOPS_NAME}, data/{LINKS_NAME} and '
@@ -365,13 +519,19 @@ def generate(npcs, shops, links, systems, key_items, commit: str) -> str:
               for n, kind in enumerate(UNREAD)]
     lines += [f'static_assert(kLink{kind.capitalize()} == {n}, "NpcLinkKind must follow gen_npcs.LINK_KINDS");'
               for n, kind in enumerate(LINK_KINDS)]
+    lines += [f'static_assert(kAct{kind.capitalize()} == {n}, "NpcActKind must follow gen_npcs.ACT_KINDS");'
+              for n, kind in enumerate(ACT_KINDS)]
     for pool, kind in POOL_TYPES.items():
         values = pools[pool]
         lines += ['', f'const {kind} {pool}[] = {{']
         lines += ['    ' + ', '.join(f'{v}u' if kind == 'uint32_t' else str(v) for v in values[n:n + VALUES_A_LINE]) +
                   ',' for n in range(0, len(values), VALUES_A_LINE)]
         lines.append('};')
-    lines += shop_tables(shops) + link_tables(live) + purpose_table(purposes)
+    lines += [f'static_assert(kWhen{kind[0].upper() + kind[1:]} == {n}, "NpcWhen must follow gen_npcs.WHEN_KINDS");'
+              for n, kind in enumerate(WHEN_KINDS)]
+    for pool, kind in STRUCT_POOLS_TYPES.items():
+        lines += ['', f'const {kind} {pool}[] = {{'] + [f'    {v},' for v in pools[pool]] + ['};']
+    lines += shop_tables(shops) + link_tables(live) + purpose_table(purposes) + act_lines
     lines += ['', 'const NpcRecord kNpcs[] = {'] + records + ['};', '', 'const KeyItemName kKeyItemNames[] = {']
     lines += [f'    {{{key_item}, {c_string(name)}}},' for key_item, name in key_items.items()] + ['};', '']
     return '\n'.join(lines)
@@ -387,15 +547,15 @@ def main(argv) -> int:
         print('usage: gen_npcs.py [--check DATA_DIR]', file=sys.stderr)
         return 2
     try:
-        npcs, shops, links, systems, key_items = load(data)
-        text = generate(npcs, shops, links, systems, key_items, read_commit(root / 'data' / META_NAME)) \
+        npcs, shops, links, systems, key_items, acts, texts = load(data)
+        text = generate(npcs, shops, links, systems, key_items, read_commit(root / 'data' / META_NAME), acts, texts) \
             if len(argv) == 1 else None
     except (OSError, DataError) as error:
         print(f'gen_npcs: {error}', file=sys.stderr)
         return 1
     if text is None:
-        print(f'npcs: {len(npcs)} NPCs, {len(shops)} shops, {len(links)} links, {len(systems)} system calls and '
-              f'{len(key_items)} key items in {data} pass')
+        print(f'npcs: {len(npcs)} NPCs, {len(shops)} shops, {len(links)} links, {len(systems)} system calls, '
+              f'{len(key_items)} key items, {len(acts)} acts and {len(texts)} texts in {data} pass')
         return 0
     out = root / 'src' / 'generated' / 'npcdata.inc'
     out.parent.mkdir(parents=True, exist_ok=True)

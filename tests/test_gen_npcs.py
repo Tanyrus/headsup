@@ -41,10 +41,10 @@ class Generate(unittest.TestCase):
         # its script works out is kept to say so; one in only a quest live has off, or that only walks a path, is left
         # out.
         self.assertIn('const NpcRecord kNpcs[] = {\n'
-                      '    {16785729u, {1, 3}, {0, 0}, {0, 0}, {0, 0}, {1, 1}, {1, 1}, {0, 0}, 0, 0},\n'
-                      '    {16785731u, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, 0, 8},\n'
-                      '    {16785800u, {1, 3}, {4, 1}, {1, 1}, {2, 1}, {0, 0}, {2, 1}, {0, 0}, 1, 12},\n'
-                      '    {16785801u, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {1, 1}, 2, 0},\n'
+                      '    {16785729u, {1, 3}, {0, 0}, {0, 0}, {0, 0}, {1, 1}, {1, 1}, {0, 0}, {0, 0}, 0, 0},\n'
+                      '    {16785731u, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, 0, 8},\n'
+                      '    {16785800u, {1, 3}, {4, 1}, {1, 1}, {2, 1}, {0, 0}, {2, 1}, {0, 0}, {0, 0}, 1, 12},\n'
+                      '    {16785801u, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {1, 1}, {0, 0}, 2, 0},\n'
                       '};', self.text)
         self.assertIn('const uint16_t kNpcItems[] = {\n    0, 4373, 4374, 4375, 503,\n};', self.text)
         self.assertIn('const uint16_t kNpcKeyItems[] = {\n    0, 400, 87,\n};', self.text)
@@ -78,6 +78,42 @@ class Generate(unittest.TestCase):
         with self.assertRaises(gen.DataError) as caught:
             gen.generate([npc(1, gives=list(range(1, 257)))], [], [], [], {}, 'abc123')
         self.assertIn('NPC 1: 256 gives do not fit NpcSpan', str(caught.exception))
+
+
+# What the probe saw two ??? do: 16785730, which has nothing else to show, says a text at night in A Squires Test's
+# step 2; 16785729 pops the Mycophile for its three mushrooms.
+ACTS = [{'npc': 16785729, 'act': 'trade', 'items': [(4373, 1), (4374, 1), (4375, 1)], 'when': [], 'says': [],
+         'pops': [16785722], 'gives': [], 'keyItems': [], 'event': 0},
+        {'npc': 16785730, 'act': 'click', 'items': [], 'when': ['hour:22-3', 'link:1', 'step:2', 'mob:Shen_Aide'],
+         'says': [(1, [4373, 7])], 'pops': [], 'gives': [], 'keyItems': [], 'event': 1}]
+TEXTS = [{'text': 1, 'zone': 2, 'message': 7515, 'words': 'You find a <item> and <number> more.'}]
+
+
+class Acts(unittest.TestCase):
+    def setUp(self):
+        self.text = gen.generate(NPCS, SHOPS, LINKS, SYSTEMS, KEY_ITEMS, 'abc123', ACTS, TEXTS)
+
+    def test_an_npcs_acts_follow_one_another_and_one_with_only_acts_is_shown(self):
+        self.assertIn('    {16785729u, {1, 3}, {0, 0}, {0, 0}, {0, 0}, {1, 1}, {1, 1}, {0, 0}, {1, 1}, 0, 0},\n'
+                      '    {16785730u, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {2, 1}, 0, 0},\n',
+                      self.text)
+        # The trade's items and mob, then the click's conditions, message and cutscene; mobs share kNpcMobs.
+        self.assertIn('const NpcAct kNpcActs[] = {\n    {0, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, false},\n'
+                      '    {1, {1, 3}, {0, 0}, {0, 0}, {1, 1}, {0, 0}, {0, 0}, false},\n'
+                      '    {0, {0, 0}, {1, 4}, {1, 1}, {0, 0}, {0, 0}, {0, 0}, true},\n};', self.text)
+        self.assertIn('const NpcActItem kNpcActItems[] = {\n    {0, 0},\n    {4373, 1},\n    {4374, 1},\n    {4375, 1},\n};',
+                      self.text)
+
+    def test_conditions_messages_and_their_words(self):
+        # link:1 is A Squires Test, the first live link; a mob's script name reads in words.
+        self.assertIn('const NpcWhenEntry kNpcWhen[] = {\n    {0, 0, 0, ""},\n    {0, 22, 3, ""},\n    {9, 1, 0, ""},\n'
+                      '    {10, 2, 0, ""},\n    {14, 0, 0, "Shen Aide"},\n};', self.text)
+        self.assertIn('const uint32_t kNpcSayParams[] = {\n    0u,\n    4373,\n    7,\n};', self.text)
+        self.assertIn('const NpcSay kNpcSays[] = {\n    {0, {0, 0}},\n    {1, {1, 2}},\n};', self.text)
+        self.assertIn('const NpcText kNpcTexts[] = {\n    {0, ""},\n    {2, "You find a <item> and <number> more."},\n};',
+                      self.text)
+        self.assertIn('static_assert(kWhenZoneStart == 15, ', self.text)
+        self.assertIn('static_assert(kActHides == 3, ', self.text)
 
 
 class Purposes(unittest.TestCase):

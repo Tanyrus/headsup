@@ -232,7 +232,7 @@ DUMP_LUA = dict(LUA, scripts={'Somewhere': {
 
 
 class Build(unittest.TestCase):
-    def run_npcs(self, dumps=None, scripts=None):
+    def run_npcs(self, dumps=None, scripts=None, probe=()):
         with tempfile.TemporaryDirectory() as tmp:
             server = pathlib.Path(tmp) / 'server'
             for path, text in dict(SCRIPTS, **(scripts or {})).items():
@@ -242,12 +242,14 @@ class Build(unittest.TestCase):
             for n, dump in enumerate(dumps or [{'npcs': DUMP_NPCS, 'npcLua': DUMP_LUA, 'settings': SETTINGS}]):
                 paths.append(pathlib.Path(tmp) / f'dump-{n}.json')
                 paths[-1].write_text(json.dumps(dump))
-            tables = npcs.run(server, paths, pathlib.Path(tmp) / 'out')
+            probe_path = pathlib.Path(tmp) / 'probe.jsonl'
+            probe_path.write_text(''.join(json.dumps(record) + '\n' for record in probe))
+            tables = npcs.run(server, probe_path, paths, pathlib.Path(tmp) / 'out')
             files = {p.name: p.read_text() for p in (pathlib.Path(tmp) / 'out').iterdir()}
         return tables, files
 
     def test_the_rows(self):
-        (rows, shops, links, systems, key_items), _ = self.run_npcs()
+        (rows, shops, links, systems, key_items, _, _), _ = self.run_npcs()
         self.assertEqual([r['id'] for r in rows], [16785599, 16785600, 16785601])
         rodrigue, ganger, qm = rows
         self.assertEqual((rodrigue['shop'], ganger['shop'], qm['shop']), (1, 1, 0))
@@ -283,7 +285,7 @@ class Build(unittest.TestCase):
                    Rodrigue={'onTrigger': [entry]})}))
         settings = {'main': dict(SETTINGS['main'], ENABLE_TRUST_QUESTS=0)}
         try:
-            (rows, _, links, _, _), _ = self.run_npcs([{'npcs': DUMP_NPCS, 'npcLua': lua, 'settings': settings}])
+            (rows, _, links, _, _, _, _), _ = self.run_npcs([{'npcs': DUMP_NPCS, 'npcLua': lua, 'settings': settings}])
         finally:
             del SCRIPTS[script]
         trust = next(l for l in links if l['kind'] == 'hidden')
@@ -320,7 +322,7 @@ class Build(unittest.TestCase):
                                                          [trust, 1, 3], 'TrustHalver')]})
         lua = dict(DUMP_LUA, interactions={'2': interactions})
         settings = {'main': dict(SETTINGS['main'], ENABLE_TRUST_QUESTS=0)}
-        (rows, _, links, _, _), _ = self.run_npcs([{'npcs': DUMP_NPCS, 'npcLua': lua, 'settings': settings}], scripts)
+        (rows, _, links, _, _, _, _), _ = self.run_npcs([{'npcs': DUMP_NPCS, 'npcLua': lua, 'settings': settings}], scripts)
         rodrigue, _, qm = rows
         self.assertEqual([(l['name'], l['live']) for l in links],
                          [('A Squires Test', 1), ('Storms of Fate', 1), ('Atellounes Lament', 0), ('Trust Halver', 1)])
@@ -409,9 +411,13 @@ class ValidateNpcs(unittest.TestCase):
 
     KEY_ITEMS = {8: 'Airship Pass'}
 
-    def check(self, npcs_=None, shops=None, key_items=None, **limits):
+    # The probe's acts validate.EXPECTED_ACTS asks for: Shen for a Shrimp Lantern, the Mycophile for three mushrooms.
+    ACTS = [{'npc': 16793970, 'act': 'trade', 'items': [(1823, 1)], 'pops': [16793929]},
+            {'npc': 16785729, 'act': 'trade', 'items': [(4373, 1), (4374, 1), (4375, 1)], 'pops': [16785722]}]
+
+    def check(self, npcs_=None, shops=None, key_items=None, acts=None, **limits):
         return validate.check_npcs(npcs_ or self.NPCS, shops or self.SHOPS, [], [], key_items or self.KEY_ITEMS,
-                                   min_npc=limits)
+                                   self.ACTS if acts is None else acts, [], min_npc=limits)
 
     def test_known_npcs_pass(self):
         self.assertEqual(self.check(), [])
@@ -421,6 +427,10 @@ class ValidateNpcs(unittest.TestCase):
         self.assertEqual(len(self.check(lost)), 1)
         cheaper = [[dict(e, price=e['price'] - 1) for e in self.SHOPS[0]]]
         self.assertEqual(len(self.check(shops=cheaper)), 1)
+
+    def test_a_probe_that_lost_a_pop_fails(self):
+        self.assertEqual(self.check(acts=self.ACTS[:1]),
+                         ['NPC 16785729: expected a trade of [(4373, 1), (4374, 1), (4375, 1)] that pops 16785722'])
 
     def test_a_key_item_under_another_name_fails(self):
         self.assertEqual(self.check(key_items={8: 'Airship Pas'}),

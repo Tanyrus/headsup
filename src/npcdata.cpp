@@ -58,6 +58,32 @@ namespace headsup
         return purposes;
     }
 
+    std::span<const NpcAct> ActsOf(const NpcRecord& npc) { return SpanOf(kNpcActs, npc.acts); }
+
+    std::span<const NpcActItem> ItemsOf(const NpcAct& act) { return SpanOf(kNpcActItems, act.items); }
+
+    std::span<const NpcWhenEntry> WhenOf(const NpcAct& act) { return SpanOf(kNpcWhen, act.when); }
+
+    std::span<const NpcSay> SaysOf(const NpcAct& act) { return SpanOf(kNpcSays, act.says); }
+
+    std::span<const uint32_t> PopsOf(const NpcAct& act) { return SpanOf(kNpcMobs, act.pops); }
+
+    std::span<const uint16_t> GivesOf(const NpcAct& act) { return SpanOf(kNpcItems, act.gives); }
+
+    std::span<const uint16_t> KeyItemsOf(const NpcAct& act) { return SpanOf(kNpcKeyItems, act.keyItems); }
+
+    std::span<const uint32_t> ParamsOf(const NpcSay& say) { return SpanOf(kNpcSayParams, say.params); }
+
+    const char* WordsOf(const NpcSay& say)
+    {
+        return say.text > 0 && say.text < std::size(kNpcTexts) ? kNpcTexts[say.text].words : nullptr;
+    }
+
+    const NpcLink* LinkAt(uint16_t index)
+    {
+        return index > 0 && index < std::size(kNpcLinks) ? &kNpcLinks[index] : nullptr;
+    }
+
     const NpcShop* ShopOf(const NpcRecord& npc)
     {
         return npc.shop > 0 && npc.shop < std::size(kNpcShops) ? &kNpcShops[npc.shop] : nullptr;

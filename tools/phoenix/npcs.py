@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Turn the NPCs of headsup_dump JSON files into phoenix_npcs.tsv, phoenix_npc_shops.tsv, phoenix_npc_links.tsv,
-phoenix_npc_systems.tsv and phoenix_key_items.tsv (tools/gen_npcs.py has the format).
+"""Turn the NPCs of headsup_dump JSON files and the ??? probe into phoenix_npcs.tsv, phoenix_npc_shops.tsv,
+phoenix_npc_links.tsv, phoenix_npc_systems.tsv, phoenix_key_items.tsv, phoenix_npc_acts.tsv and phoenix_npc_texts.tsv
+(tools/gen_npcs.py has the format).
 
-Usage: npcs.py SERVER_DIR DUMP_JSON [DUMP_JSON ...] OUT_DIR
+Usage: npcs.py SERVER_DIR PROBE_JSONL DUMP_JSON [DUMP_JSON ...] OUT_DIR
 
 The dump says which NPCs live's settings leave on (each NPC's content tag names the ENABLE_ setting that turns it
 off: an expansion, or a system like the Field Manuals), where each handler of their scripts and of the quests,
@@ -13,6 +14,10 @@ systems they call. It reads what a script spells out and nothing more: an item a
 left unread and named in the NPC's unread column. A quest or mission whose folder names an expansion live's settings
 turn off is marked so, and so is one whose every step needs a setting live has off; what such a quest's steps do, and
 what any step does whose own check needs a setting live has off, is left out of the NPC's row.
+
+The probe (headsup_probe running npc_probe.lua) clicked and traded every ??? on the server: what it found adds to the
+??? 's lists (a pop or a trade a script works out while it runs), and each thing a ??? does becomes an act
+(npc_acts.py) with its messages in the game's words from the zone's IDs.lua.
 """
 import json
 import pathlib
@@ -20,7 +25,9 @@ import re
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import gen_npcs as schema  # noqa: E402
+import npc_acts  # noqa: E402
 from gen_mobdata import DataError  # noqa: E402
 
 # The expansion a quest or mission folder (and the matching xi.quest.id or xi.mission.id key) belongs to; the city
@@ -466,7 +473,7 @@ def load(paths):
     return first
 
 
-def build(npcs, lua, settings, server):
+def build(npcs, lua, settings, server, probe=None):
     c, sources = Constants(lua, settings), Sources(server)
     links, link_rows, shops, systems, rows = {}, [], {}, {}, []
     open_steps = {}  # link: whether any step an NPC takes part in can be open on live
@@ -538,13 +545,36 @@ def build(npcs, lua, settings, server):
         row = links[key]
         live[key] = row['live'] = int(row['expansion'] not in c.off_expansions and open_steps.get(key, True))
         link_rows.append(dict(row, link=numbers[key]))
-    npc_rows = []
+    npc_rows, act_rows, text_numbers, text_rows, ids_texts = [], [], {}, [], {}
+    probed, sweeps = probe or ({}, [])
+    swept = npc_acts.sweeps_by_npc(sweeps)
+    key_item_ids = set(c.key_items.values())
     for npc, facts, steps, npc_links in rows:
         # A step counts when its link is live and its own check needs nothing live has off: the trades, rewards and
         # pops of later content on an NPC that live has stay out.
         for key, step_off, step in steps:
             if live[key] and not step_off:
                 facts.add(step)
+        target = probed.get(npc['id'])
+        if target is not None:
+            acts = npc_acts.acts_of(target, swept, c.item_ids, key_item_ids, numbers, live)
+            add_probed(facts, target, acts, c, live)
+            zone_texts = ids_texts.setdefault(npc['zoneName'], npc_acts.texts_in_ids(
+                sources.text(f"scripts/zones/{npc['zoneName']}/IDs.lua") or ''))
+            for act in acts:
+                says = []
+                for message, params in act['says']:
+                    if message not in zone_texts:
+                        continue  # a message without its words in IDs.lua
+                    key = (npc['zone'], message)
+                    if key not in text_numbers:
+                        text_numbers[key] = len(text_numbers) + 1
+                        text_rows.append({'text': text_numbers[key], 'zone': npc['zone'], 'message': message,
+                                          'words': zone_texts[message]})
+                    says.append(':'.join(str(x) for x in (text_numbers[key],) + params))
+                if says or act['pops'] or act['gives'] or act['keyItems'] or act['event'] or \
+                        act['act'] in ('shows', 'hides'):
+                    act_rows.append(dict(act, npc=npc['id'], says=says))
         shop = shops.setdefault((facts.stock, facts.fame), len(shops) + 1) if facts.stock else 0
         npc_rows.append({'id': npc['id'], 'zone': npc['zone'], 'script': npc['script'], 'name': npc['name'],
                          'pos': '{:.3f},{:.3f},{:.3f},{}'.format(*npc['pos'][:3], int(npc['pos'][3])),
@@ -559,8 +589,33 @@ def build(npcs, lua, settings, server):
     identifiers = {}
     for identifier, key_item in sorted(c.key_items.items()):
         identifiers.setdefault(key_item, identifier)
-    key_item_rows = {k: title(identifiers[k]) for k in sorted({k for r in npc_rows for k in r['keyItems'] + r['needs']})}
-    return npc_rows, shop_rows, link_rows, system_rows, key_item_rows
+    named = {k for r in npc_rows for k in r['keyItems'] + r['needs']}
+    named |= {int(w.split(':')[1]) for a in act_rows for w in a['when'] if w.startswith(('keyItem:', 'noKeyItem:'))}
+    named |= {k for a in act_rows for k in a['keyItems']}
+    key_item_rows = {k: title(identifiers[k]) for k in sorted(named) if k in identifiers}
+    return npc_rows, shop_rows, link_rows, system_rows, key_item_rows, act_rows, text_rows
+
+
+def add_probed(facts, target, acts, c, live):
+    """What the probe found a ??? does joins what its scripts spell out: the items its trades check for, the mobs it
+    pops and what it gives; a kind it found is no longer unread."""
+    checks = list(target['trade'].get('checks') or [])
+    for step in target.get('steps') or []:
+        key = npc_acts.step_key(step)
+        if key is not None and live.get(key, False) and step.get('trade'):
+            checks += step['trade'].get('checks') or []
+    traded = {x for check in checks for x in npc_acts.ints(check) if x in c.item_ids}
+    facts.trades.update(traded)
+    for act in acts:
+        facts.pops.update(act['pops'])
+        facts.gives.update(act['gives'])
+        facts.key_items.update(act['keyItems'])
+    if traded:
+        facts.unread.discard('trade')
+    if any(act['pops'] for act in acts):
+        facts.unread.discard('pops')
+    if any(act['gives'] for act in acts):
+        facts.unread.discard('gives')
 
 
 def cell(v) -> str:
@@ -572,7 +627,16 @@ def cell(v) -> str:
     return text
 
 
-def texts(npc_rows, shop_rows, link_rows, system_rows, key_item_rows):
+def act_cell(act, column) -> str:
+    value = act[column]
+    if column == 'items':
+        return ','.join(f'{item}' if qty == 1 else f'{item}*{qty}' for item, qty in value)
+    if column == 'event':
+        return '1' if value else '0'
+    return cell(value)
+
+
+def texts(npc_rows, shop_rows, link_rows, system_rows, key_item_rows, act_rows, text_rows):
     npcs = '\t'.join(schema.NPC_COLUMNS) + '\n' + ''.join(
         '\t'.join(cell(r[col]) for col in schema.NPC_COLUMNS) + '\n' for r in npc_rows)
     shops = '\t'.join(schema.SHOP_COLUMNS) + '\n' + ''.join(
@@ -583,16 +647,21 @@ def texts(npc_rows, shop_rows, link_rows, system_rows, key_item_rows):
         '\t'.join(cell(r[col]) for col in schema.SYSTEM_COLUMNS) + '\n' for r in system_rows)
     key_items = '\t'.join(schema.KEY_ITEM_COLUMNS) + '\n' + ''.join(
         f'{k}\t{cell(name)}\n' for k, name in key_item_rows.items())
+    acts = '\t'.join(schema.ACT_COLUMNS) + '\n' + ''.join(
+        '\t'.join(act_cell(a, col) for col in schema.ACT_COLUMNS) + '\n' for a in act_rows)
+    words = '\t'.join(schema.TEXT_COLUMNS) + '\n' + ''.join(
+        '\t'.join(cell(r[col]) for col in schema.TEXT_COLUMNS) + '\n' for r in text_rows)
     return {schema.NPCS_NAME: npcs, schema.SHOPS_NAME: shops, schema.LINKS_NAME: links, schema.SYSTEMS_NAME: systems,
-            schema.KEY_ITEMS_NAME: key_items}
+            schema.KEY_ITEMS_NAME: key_items, schema.ACTS_NAME: acts, schema.TEXTS_NAME: words}
 
 
-def run(server, dump_paths, out_dir):
+def run(server, probe_path, dump_paths, out_dir):
     npcs, lua, settings = load(dump_paths)
-    files = texts(*build(npcs, lua, settings, server))
+    files = texts(*build(npcs, lua, settings, server, npc_acts.load(probe_path)))
     tables = [schema.parse_npcs(files[schema.NPCS_NAME]), schema.parse_shops(files[schema.SHOPS_NAME]),
               schema.parse_links(files[schema.LINKS_NAME]), schema.parse_systems(files[schema.SYSTEMS_NAME]),
-              schema.parse_key_items(files[schema.KEY_ITEMS_NAME])]
+              schema.parse_key_items(files[schema.KEY_ITEMS_NAME]), schema.parse_acts(files[schema.ACTS_NAME]),
+              schema.parse_texts(files[schema.TEXTS_NAME])]
     schema.check(*tables)
     out_dir = pathlib.Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -602,16 +671,16 @@ def run(server, dump_paths, out_dir):
 
 
 def main(argv) -> int:
-    if len(argv) < 4:
+    if len(argv) < 5:
         print(__doc__.strip(), file=sys.stderr)
         return 2
     try:
-        npcs, shops, links, systems, key_items = run(argv[1], argv[2:-1], argv[-1])
+        npcs, shops, links, systems, key_items, acts, words = run(argv[1], argv[2], argv[3:-1], argv[-1])
     except (OSError, DataError) as error:
         print(f'npcs: {error}', file=sys.stderr)
         return 1
     print(f'npcs: {len(npcs)} NPCs, {len(shops)} shops, {len(links)} links, {len(systems)} system calls, '
-          f'{len(key_items)} key items')
+          f'{len(key_items)} key items, {len(acts)} acts, {len(words)} texts')
     return 0
 
 
