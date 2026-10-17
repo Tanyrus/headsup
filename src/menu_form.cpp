@@ -98,8 +98,10 @@ namespace headsup
         {
             Form& form = c.form;
             form.BeginBlock(kSidebarBlock);
+            const bool kindPages = KindPagesShown(c.s);
             for (const LayoutPage& page : c.layout.pages)
             {
+                if (!kindPages && KindOfPage(page.page)) continue;
                 const std::string id = kNavStart + std::string(page.key);
                 if (form.Clicked(id) && c.state.page != page.page)
                 {
@@ -111,7 +113,8 @@ namespace headsup
                          EscapedRml(page.name) + "</div>");
             }
             for (const LayoutPage& page : c.layout.pages)
-                form.Set(kNavStart + std::string(page.key), FormValueKind::Class, kPickedClass, {}, page.page == c.state.page);
+                if (kindPages || !KindOfPage(page.page))
+                    form.Set(kNavStart + std::string(page.key), FormValueKind::Class, kPickedClass, {}, page.page == c.state.page);
         }
 
         // A row of keys: each a chip that a click removes, and while there are fewer than most, a chip that takes
@@ -1337,6 +1340,12 @@ namespace headsup
         const std::vector<std::string>& fonts, const std::vector<std::string>& menuFonts, const WindowLayout& layout)
     {
         form.layout = &layout;
+        if (KindOfPage(state.page) && !KindPagesShown(s))
+        {
+            state.Leave();
+            state.page       = Page::Entities;
+            form.scrollToTop = true;
+        }
         Context c{form, s, readings, state, fonts, menuFonts, layout, KindOfPage(state.page)};
         Sidebar(c);
         const LayoutPage& page = layout.PageOf(state.page);

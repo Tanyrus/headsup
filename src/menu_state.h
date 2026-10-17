@@ -23,6 +23,8 @@ namespace headsup
     bool SaveDue(std::optional<double> changedAt, double now, bool windowOpen);
 
     std::optional<PlateKind> KindOfPage(Page page);
+    // The pages of the kinds have nothing to set while neither nameplates nor outlines are on.
+    bool KindPagesShown(const Settings& s);
 
 
     // A label with each word capitalized after a space or a hyphen ("Sub-Target"), but for the small words inside it

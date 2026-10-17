@@ -58,6 +58,20 @@ TEST(the_kind_pages_know_their_kind)
         CHECK(!KindOfPage(page));
 }
 
+TEST(the_kind_pages_show_while_nameplates_or_outlines_are_on)
+{
+    Settings s;
+    CHECK(KindPagesShown(s));
+    s.nameplates = false;
+    CHECK(KindPagesShown(s));
+    s.outlines = false;
+    CHECK(!KindPagesShown(s));
+    s.nameplates = true;
+    CHECK(KindPagesShown(s));
+    s.enabled = false; // HeadsUp off: each kind's page says what switches it on
+    CHECK(KindPagesShown(s));
+}
+
 TEST(labels_are_title_case_with_small_words_left_alone_inside)
 {
     CHECK(TitleCaseText("Hide Level and Icons") == "Hide Level and Icons");

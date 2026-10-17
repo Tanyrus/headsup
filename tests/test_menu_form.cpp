@@ -82,6 +82,27 @@ TEST(the_window_is_its_sidebar_and_the_open_pages_cards)
     CHECK(Block(form, "entities-nameplates") != nullptr && Block(form, "entities-colors-entity-type") != nullptr);
 }
 
+TEST(the_kind_pages_leave_the_sidebar_while_nameplates_and_outlines_are_both_off)
+{
+    const char* kKindNavs[] = {"nav-mobs", "nav-players", "nav-self", "nav-npcs", "nav-pets"};
+    Window w;
+    w.settings.nameplates = false;
+    w.settings.outlines   = false;
+    const std::string side = w.Pass().blocks.front().rml;
+    CHECK(Has(side, "nav-entities") && Has(side, "nav-toppanel"));
+    for (const char* nav : kKindNavs)
+        CHECK(!Has(side, nav));
+    w.settings.outlines = true;
+    for (const char* nav : kKindNavs)
+        CHECK(Has(w.Pass().blocks.front().rml, nav));
+    // A kind's page open as both go off gives way to Entities, where they are switched on again.
+    w.state.page        = Page::Mobs;
+    w.settings.outlines = false;
+    const Form form     = w.Pass();
+    CHECK(w.state.page == Page::Entities);
+    CHECK(Block(form, "entities-nameplates") != nullptr && Block(form, "mobs-nameplate-design") == nullptr);
+}
+
 TEST(a_click_in_the_sidebar_opens_that_page_at_its_top)
 {
     Window w;

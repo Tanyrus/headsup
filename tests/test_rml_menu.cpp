@@ -1099,6 +1099,22 @@ TEST(a_card_folds_on_its_title_and_a_switch_takes_a_click)
     CHECK(window.Shows("entities-nameplates-stack-names"));
 }
 
+TEST(switching_off_nameplates_and_outlines_takes_the_kind_pages_from_the_sidebar)
+{
+    Window window;
+    CHECK(window.Shows("nav-mobs"));
+    window.Click("entities-nameplates-on");
+    CHECK(window.Shows("nav-mobs"));
+    window.Click("entities-outline-style-on");
+    CHECK(!window.settings.nameplates && !window.settings.outlines);
+    window.Frames(2);
+    CHECK(!window.Shows("nav-mobs") && !window.Shows("nav-pets") && window.Shows("nav-entities"));
+    window.Click("entities-outline-style-on");
+    window.Frames(2);
+    CHECK(window.Shows("nav-mobs"));
+    CHECK_EQ(window.Said(), "");
+}
+
 TEST(hide_during_conversation_is_a_switch_of_the_nameplates_card)
 {
     Window window;
