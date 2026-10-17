@@ -209,7 +209,6 @@ namespace headsup
         RowSettings rows[kMaxRows];
         LineDesign lines[kPlateLines];
         OrnamentSettings ornament;
-        OpacitySettings opacity;
         int maxIcons = kCountedIcons; // the status icons a nameplate draws at most, GM's aside
         bool operator==(const KindSettings&) const = default;
     };

@@ -153,8 +153,8 @@ TEST(a_file_is_refused_by_the_entry_that_does_not_fit)
     CHECK(Has(Problem(Replaced(shipped, LineWith(shipped, R"({"tip": "Dot"})"), "")), "\"replace-dashes\" lists 3 options, and the control has 4"));
     CHECK(Has(Problem(Moved(shipped, R"({"key": "aggression", "name": "Aggression")", R"({"key": "links")")),
         "the rows of \"detection\" come in the code's order"));
-    CHECK(Has(Problem(Moved(shipped, R"({"key": "no-target")", R"({"key": "min-size")")),
-        "\"no-target\" is an entity's design and can only go in the entity cards"));
+    CHECK(Has(Problem(Moved(shipped, R"({"key": "design"})", R"({"key": "min-size")")),
+        "\"design\" is an entity's design and can only go in the entity cards"));
     CHECK(Has(Problem(Replaced(shipped, R"("key": "claim-colors",)", R"("key": "claim-colors", "name": "Claims",)")),
         "the setting \"claim-colors\" has a name, and the code shows none"));
     CHECK(Has(Problem(Replaced(shipped, R"({"key": "switch-on", "name": "On"})", R"({"key": "switch-on"})")), "the word \"switch-on\" has no name"));

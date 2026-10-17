@@ -363,7 +363,7 @@ namespace headsup
                 if (composed.lines.empty() && !showCursor && !timersHere) continue;
                 Plate& p = m_Plates[info->index];
                 rank     = PlateRank(info->index, targets);
-                opaque   = PlateAlpha(settings.Kind(PlateKindOf(info->state)).opacity, rank, targets.target != 0, info->distance);
+                opaque   = PlateAlpha(settings.opacity, rank, targets.target != 0, info->distance);
                 p.frame  = m_Frame;
 
                 const bool self = info->index == selfIndex;

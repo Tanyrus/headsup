@@ -359,6 +359,7 @@ helpBarY=8.0000
         s.enabled           = false;
         s.phTimers          = true;
         s.scaleWithDistance = false;
+        s.opacity.notTargeted = 40; // untargetedOpacity
         s.scaleCursor       = true; // apart from the names': a dropped key would take theirs
         s.cursorStyle = CursorStyle::Vanilla; // the cursor was switched off
         s.pointerIcon    = PointerIcon::Chocobo;
@@ -723,7 +724,7 @@ TEST(percents_load_and_clamp_onto_steps_of_five)
     line.shadow      = 3;
     line.glow        = 298;
     line.glowSize    = 26;
-    OpacitySettings& o = s.Kind(PlateKind::Mobs).opacity;
+    OpacitySettings& o = s.opacity;
     o.noTarget         = 87;
     o.notTargeted      = 41;
     o.targeted         = 99;
@@ -732,7 +733,7 @@ TEST(percents_load_and_clamp_onto_steps_of_five)
     CHECK_EQ(c.cursorOutlineThickness, 50);
     const LineDesign& l = c.Kind(PlateKind::Players).lines[0];
     CHECK(l.textSize == 85 && l.iconSize == 110 && l.shadow == 5 && l.glow == 300 && l.glowSize == 25);
-    const OpacitySettings& co = c.Kind(PlateKind::Mobs).opacity;
+    const OpacitySettings& co = c.opacity;
     CHECK(co.noTarget == 85 && co.notTargeted == 40 && co.targeted == 100);
     CHECK(Clamp(Settings{}) == Settings{}); // every default is on the steps already
     MapStore file = ReleaseFile({{"timerPercent", "87.0000"}, {"mobsLine2TextSize", "87.0000"}});
@@ -1347,8 +1348,7 @@ TEST(every_designer_key_round_trips)
     line.glowColor     = ColorPick{ColorSource::Type};
     line.glowOffInCombat = false;
     mobs.ornament      = OrnamentSettings{OrnamentPlace::Top, 120, 9, ColorPick{ColorSource::Target}};
-    mobs.opacity       = OpacitySettings{70, 35, 95, true, 22.0f};
-    s.Kind(PlateKind::Self).opacity.noTarget = 55;
+    s.opacity          = OpacitySettings{70, 35, 95, true, 22.0f};
     s.Kind(PlateKind::Pets).lines[0].text = "$owner's $name";
     s.palette.claim[static_cast<int>(ClaimState::Yours)] = {{0.7f, 0.8f, 0.9f}};
     s.nameplates = false;
@@ -2147,17 +2147,14 @@ TEST(a_cursors_edge_color_of_before_is_its_custom_color_and_its_own_color_follow
     CHECK(loaded.cursorColor.source == ColorSource::Target);
 }
 
-TEST(the_one_opacity_and_glow_switch_of_before_go_to_the_mobs_and_pets_they_were_for)
+TEST(the_one_opacity_and_glow_switch_of_before_go_to_the_nameplates_opacity_and_the_mobs)
 {
-    // Other mobs' plates had one opacity while you had a target, pets among them, and one switch took the glow
-    // off every line of a mob your party had claimed.
+    // Other mobs' plates had one opacity while you had a target, and one switch took the glow off every line of a
+    // mob your party had claimed.
     MapStore file = ReleaseFile({{"untargetedOpacity", "40.0000"}, {"glowOffWhenFighting", "false"}});
     const Settings loaded = LoadSettings(file);
-    CHECK_EQ(loaded.Kind(PlateKind::Mobs).opacity.notTargeted, 40);
-    CHECK_EQ(loaded.Kind(PlateKind::Pets).opacity.notTargeted, 40);
-    for (const PlateKind kind : {PlateKind::Players, PlateKind::Self, PlateKind::Npcs})
-        CHECK_EQ(loaded.Kind(kind).opacity.notTargeted, 100);
-    CHECK_EQ(loaded.Kind(PlateKind::Mobs).opacity.targeted, 100);
+    CHECK_EQ(loaded.opacity.notTargeted, 40);
+    CHECK_EQ(loaded.opacity.targeted, 100);
     for (const LineDesign& line : loaded.Kind(PlateKind::Mobs).lines)
         CHECK(!line.glowOffInCombat);
     // The switch as the release had it, on, takes the glow from the mobs' lines alone.
@@ -2173,7 +2170,7 @@ TEST(the_one_opacity_and_glow_switch_of_before_go_to_the_mobs_and_pets_they_were
             CHECK_EQ(line.glowOffInCombat, static_cast<PlateKind>(k) == PlateKind::Mobs);
     // Keys of their own stand, and the two of before are never written again.
     Settings own;
-    own.Kind(PlateKind::Mobs).opacity.notTargeted     = 75;
+    own.opacity.notTargeted                            = 75;
     own.Kind(PlateKind::Mobs).lines[0].glowOffInCombat = false;
     MapStore saved = OwnFileWith(own, {{"untargetedOpacity", "40.0000"}, {"glowOffWhenFighting", "true"}});
     CHECK(LoadSettings(saved) == own);
@@ -2182,16 +2179,39 @@ TEST(the_one_opacity_and_glow_switch_of_before_go_to_the_mobs_and_pets_they_were
     CHECK(std::ranges::find(saved.sets, "glowOffWhenFighting") == saved.sets.end());
 }
 
-TEST(a_kinds_opacity_is_bounded_and_your_own_nameplate_never_fades_with_distance)
+TEST(the_nameplates_opacity_is_bounded)
 {
     Settings s;
-    s.Kind(PlateKind::Npcs).opacity = OpacitySettings{0, 500, -3, true, 900.0f};
-    s.Kind(PlateKind::Self).opacity.fadeIn = true;
+    s.opacity        = OpacitySettings{0, 500, -3, true, 900.0f};
     const Settings c = Clamp(s);
-    CHECK((c.Kind(PlateKind::Npcs).opacity == OpacitySettings{kMinOpacity, kMaxOpacity, kMinOpacity, true, kMaxOutlineDistance}));
-    CHECK(!c.Kind(PlateKind::Self).opacity.fadeIn);
-    s.Kind(PlateKind::Npcs).opacity.range = 1.0f;
-    CHECK_EQ(Clamp(s).Kind(PlateKind::Npcs).opacity.range, kMinOutlineDistance);
+    CHECK((c.opacity == OpacitySettings{kMinOpacity, kMaxOpacity, kMinOpacity, true, kMaxOutlineDistance}));
+    s.opacity.range = 1.0f;
+    CHECK_EQ(Clamp(s).opacity.range, kMinOutlineDistance);
+}
+
+TEST(the_one_nameplate_opacity_takes_the_mobs_values_from_a_file_that_had_one_a_kind)
+{
+    MapStore file = ReleaseFile({{"mobsOpacityNoTarget", "60.0000"}, {"mobsOpacityNotTargeted", "45.0000"},
+        {"mobsOpacityTargeted", "90.0000"}, {"mobsOpacityFadeIn", "true"}, {"mobsOpacityRange", "30.0000"},
+        {"playersOpacityNoTarget", "80.0000"}, {"petsOpacityNotTargeted", "20.0000"}, {"selfOpacityTargeted", "50.0000"},
+        {"untargetedOpacity", "40.0000"}});
+    CHECK((LoadSettings(file).opacity == OpacitySettings{60, 45, 90, true, 30.0f}));
+    // Its own keys win over the mobs'.
+    file.values["plateOpacityNoTarget"] = "70.0000";
+    file.values["plateOpacityFadeIn"]   = "false";
+    file.values["plateOpacityRange"]    = "25.0000";
+    const Settings own = LoadSettings(file);
+    CHECK((own.opacity == OpacitySettings{70, 45, 90, false, 25.0f}));
+    // A save writes its own five keys and no kind's.
+    MapStore saved;
+    SaveSettings(own, saved);
+    for (const char* key : {"plateOpacityNoTarget", "plateOpacityNotTargeted", "plateOpacityTargeted", "plateOpacityFadeIn",
+             "plateOpacityRange"})
+        CHECK(saved.values.contains(key));
+    for (int k = 0; k < kPlateKindCount; ++k)
+        for (const auto& [key, value] : saved.values)
+            CHECK(!key.starts_with(std::string(KindKey(static_cast<PlateKind>(k))) + "Opacity"));
+    CHECK(LoadSettings(saved).opacity == own.opacity);
 }
 
 TEST(a_kinds_icon_limit_is_kept_for_the_kinds_that_show_status_icons_and_is_bounded)

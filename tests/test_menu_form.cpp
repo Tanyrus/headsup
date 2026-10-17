@@ -427,27 +427,32 @@ TEST(the_games_own_cursor_has_no_settings_and_a_picture_no_color)
     CHECK(!hidden(vanilla, "entities-target-cursor-cursor-style-label-row")); // the list stays, to pick another
 }
 
-TEST(every_kind_has_a_nameplate_opacity_card_and_yours_none_of_its_fading)
+TEST(one_nameplate_opacity_card_sits_under_nameplates_on_the_entities_page)
 {
+    const std::string card = "entities-nameplate-opacity";
     Window w;
+    const Form form = w.Pass();
+    const auto at   = [&](const char* id) {
+        return std::ranges::find_if(form.blocks, [&](const FormBlock& b) { return b.id == id; }) - form.blocks.begin();
+    };
+    CHECK_EQ(at(card.c_str()), at("entities-nameplates") + 1);
+    const FormBlock* block = Block(form, card.c_str());
+    for (const char* control : {"-no-target", "-not-targeted", "-is-targeted", "-fade-in"})
+        CHECK(Has(block->rml, (card + control).c_str()));
+    // The range is the fade's own: it shows once Fade In is on.
+    CHECK(ClassOn(form, (card + "-range-label-row").c_str(), "off"));
+    const Form faded = w.Pass({{card + "-fade-in", kClickEvent, ""}});
+    CHECK(faded.changed && w.settings.opacity.fadeIn);
+    CHECK(!ClassOn(faded, (card + "-range-label-row").c_str(), "off"));
+    w.Pass({{card + "-not-targeted", kChangeEvent, "35"}});
+    CHECK_EQ(w.settings.opacity.notTargeted, 35);
+    w.settings.nameplates = false;
+    CHECK(ClassOn(w.Pass(), card.c_str(), "off"));
+    w.settings.nameplates = true;
     for (const Page page : {Page::Mobs, Page::Players, Page::Npcs, Page::Pets, Page::Self})
     {
         w.state.page = page;
-        const std::string card = std::string(kWindowLayout.PageOf(page).key) + "-nameplate-opacity";
-        const Form form        = w.Pass();
-        const FormBlock* block = Block(form, card.c_str());
-        CHECK(block != nullptr);
-        CHECK(Has(block->rml, (card + "-no-target").c_str()) && Has(block->rml, (card + "-not-targeted").c_str()) &&
-              Has(block->rml, (card + "-is-targeted").c_str()));
-        CHECK_EQ(Has(block->rml, (card + "-fade-in").c_str()), page != Page::Self);
-        if (page == Page::Self) continue;
-        // The range is the fade's own: it shows once Fade In is on.
-        CHECK(ClassOn(form, (card + "-range-label-row").c_str(), "off"));
-        const Form faded = w.Pass({{card + "-fade-in", kClickEvent, ""}});
-        CHECK(faded.changed && w.settings.Kind(*KindOfPage(page)).opacity.fadeIn);
-        CHECK(!ClassOn(faded, (card + "-range-label-row").c_str(), "off"));
-        w.Pass({{card + "-not-targeted", kChangeEvent, "35"}});
-        CHECK_EQ(w.settings.Kind(*KindOfPage(page)).opacity.notTargeted, 35);
+        CHECK(Block(w.Pass(), (std::string(kWindowLayout.PageOf(page).key) + "-nameplate-opacity").c_str()) == nullptr);
     }
 }
 

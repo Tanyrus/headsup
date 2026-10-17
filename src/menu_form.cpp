@@ -989,25 +989,24 @@ namespace headsup
             case SettingPiece::LineStyles: LineStyles(c, e); break;
             case SettingPiece::Ornament: Ornament(c, e); break;
             case SettingPiece::NoTarget:
-                form.Fade(!shown);
-                form.SliderPercent(label.c_str(), s.Kind(*c.kind).opacity.noTarget, kMinOpacity, kMaxOpacity, tip);
+                form.Fade(!plates);
+                form.SliderPercent(label.c_str(), s.opacity.noTarget, kMinOpacity, kMaxOpacity, tip);
                 break;
             case SettingPiece::NotTargeted:
-                form.Fade(!shown);
-                form.SliderPercent(label.c_str(), s.Kind(*c.kind).opacity.notTargeted, kMinOpacity, kMaxOpacity, tip);
+                form.Fade(!plates);
+                form.SliderPercent(label.c_str(), s.opacity.notTargeted, kMinOpacity, kMaxOpacity, tip);
                 break;
             case SettingPiece::IsTargeted:
-                form.Fade(!shown);
-                form.SliderPercent(label.c_str(), s.Kind(*c.kind).opacity.targeted, kMinOpacity, kMaxOpacity, tip);
+                form.Fade(!plates);
+                form.SliderPercent(label.c_str(), s.opacity.targeted, kMinOpacity, kMaxOpacity, tip);
                 break;
             case SettingPiece::FadeIn:
-                form.Fade(!shown);
-                form.Switch(label.c_str(), s.Kind(*c.kind).opacity.fadeIn, Near(tip).c_str());
+                form.Fade(!plates);
+                form.Switch(label.c_str(), s.opacity.fadeIn, Near(tip).c_str());
                 break;
             case SettingPiece::Range:
-                form.Fade(!shown || !s.Kind(*c.kind).opacity.fadeIn);
-                form.SliderFloat(label.c_str(), s.Kind(*c.kind).opacity.range, kMinOutlineDistance, kMaxOutlineDistance,
-                    "%.0f yalms", tip);
+                form.Fade(!plates || !s.opacity.fadeIn);
+                form.SliderFloat(label.c_str(), s.opacity.range, kMinOutlineDistance, kMaxOutlineDistance, "%.0f yalms", tip);
                 break;
             case SettingPiece::Detection: Detection(c, e); break;
             // The Target widget's popup reads these too, but they are set with the nameplates.
@@ -1305,7 +1304,7 @@ namespace headsup
             case CardPiece::NameplateDesign:
             case CardPiece::LineStyle:
             case CardPiece::Ornament:
-            case CardPiece::NameplateOpacity: return {c.kind && !c.plates, !plates};
+            case CardPiece::NameplateOpacity: return {false, !plates};
             case CardPiece::DetectionIcons:
             case CardPiece::Weaknesses:
             case CardPiece::Statuses: return {false, !plates};

@@ -34,6 +34,18 @@
           ]
         },
         {
+          "key": "nameplate-opacity",
+          "name": "Nameplate Opacity",
+          "description": "Allows you to make nameplates more transparent under certain conditions.",
+          "settings": [
+            {"key": "no-target", "name": "No Target", "tip": "The opacity used for all nameplates whenever you currently have no target."},
+            {"key": "not-targeted", "name": "Not Targeted", "tip": "When you are targeting any entity, this is the opacity used for all nameplates of entities that are not your target."},
+            {"key": "is-targeted", "name": "Is Targeted", "tip": "The opacity used for any entity that you are currently targeting, regardless of distance."},
+            {"key": "fade-in", "name": "Fade In", "tip": "If enabled, nameplates will fade in as you get closer. Does not apply to your current target."},
+            {"key": "range", "name": "Max Range", "tip": "At what range (in yalms) the nameplate will become fully transparent."}
+          ]
+        },
+        {
           "key": "outline-style",
           "name": "Outline Style",
           "description": "Appearance settings for the HeadsUp outlines, which gives entities colored borders. You can more deeply configure these per entity in the tabs on the left.",
@@ -514,18 +526,6 @@
               {"key": "color", "name": "Color", "tip": "The divider's color."}
             ]
           }
-        ]
-      },
-      {
-        "key": "nameplate-opacity",
-        "name": "Nameplate Opacity",
-        "description": "Allows you to make nameplates more transparent under certain conditions.",
-        "settings": [
-          {"key": "no-target", "name": "No Target", "tip": "The opacity used for all nameplates whenever you currently have no target."},
-          {"key": "not-targeted", "name": "Not Targeted", "tip": "When you are targeting any entity, this is the opacity used for all nameplates of entities that are not your target."},
-          {"key": "is-targeted", "name": "Is Targeted", "tip": "The opacity used for any entity that you are currently targeting, regardless of distance."},
-          {"key": "fade-in", "name": "Fade In", "tip": "If enabled, nameplates will fade in as you get closer. Does not apply to your current target.", "kinds": ["mobs", "players", "npcs", "pets"]},
-          {"key": "range", "name": "Max Range", "tip": "At what range (in yalms) the nameplate will become fully transparent.", "kinds": ["mobs", "players", "npcs", "pets"]}
         ]
       },
       {

@@ -28,7 +28,7 @@ opens them at a page, such as `/hu menu entities`, `/hu menu mobs` or `/hu menu 
 
 | Page | Holds |
 |---|---|
-| Entities | What every kind shares: the Nameplates card, the outline style, the target cursor and the five color palettes. Under it, a page for each kind: Mobs, Players, Self, NPCs and Pets |
+| Entities | What every kind shares: the Nameplates card, the nameplates' opacity, the outline style, the target cursor and the five color palettes. Under it, a page for each kind: Mobs, Players, Self, NPCs and Pets |
 | User Interface | Screenshot mode and the Window Groups and Game Windows cards, which move the game's windows. Under it, the Top Panel, Widgets and Mouse Cursor pages |
 | HeadsUp Config | Switches HeadsUp off as a whole, writes a report for bug reports, sets the settings window's own theme, font, size and opacity, and holds the button that puts every setting back to its default |
 
@@ -151,8 +151,7 @@ Rank. By default Increased Chance is the mob's side alone, the magic evasion the
 Accuracy figures it with your own accuracy instead, so it shrinks once you land 95% of the time anyway. Merits, food and weather are not counted. The Weaknesses and Statuses cards pick what is worth a
 badge.
 
-After the design come a Line Style card, with a tab for each line, an Ornament card and a Nameplate Opacity card. A
-line has these settings:
+After the design come a Line Style card, with a tab for each line, and an Ornament card. A line has these settings:
 
 - **Sync Line Style:** borrows every setting from another line, so the two always match
 - **Line Visibility:** Always, or only when any picked condition holds: When Targeted, When Unclaimed, When Claimed by
@@ -173,9 +172,10 @@ line has these settings:
 The Ornament is a diamond rule. Its Visibility puts it over the nameplate (Top), under it (Bottom), or between the
 middle line and the one above or below it, where it is drawn while both lines show.
 
-The Nameplate Opacity card sets how see-through a kind's nameplates are by what you target: with No Target, when the
-entity is Not Targeted while something else is, and when it Is Targeted. Fade In makes them fainter with distance, up to
-a Range of their own; your target's nameplate never fades with distance, and your own has no fading.
+The Nameplate Opacity card, on the Entities page under the Nameplates card, sets how see-through every nameplate is by
+what you target: with No Target, when the entity is Not Targeted while something else is, and when it Is Targeted. Fade
+In makes them fainter with distance, up to a Range of their own; your target's nameplate never fades with distance, and
+your own is always near enough to stay whole.
 
 ![A Goblin Leecher's red outline and nameplate](resources/nameplate_and_outline.png)
 

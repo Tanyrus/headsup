@@ -147,9 +147,8 @@ PIECES = Pieces(
             'disable-glow-in-combat'), row_extra={'padding': 'tipBottomLine'},
             words={'do-not-sync': True, 'sync-with': True, 'uses-style': True}),
         'ornament': Setting(entity=True, unnamed=True, rows=rows('visibility', 'width', 'height', 'color')),
-        'no-target': Setting(entity=True), 'not-targeted': Setting(entity=True), 'is-targeted': Setting(entity=True),
-        'fade-in': Setting(entity=True, kinds=('mobs', 'players', 'npcs', 'pets')),
-        'range': Setting(entity=True, kinds=('mobs', 'players', 'npcs', 'pets')),
+        'no-target': Setting(), 'not-targeted': Setting(), 'is-targeted': Setting(), 'fade-in': Setting(),
+        'range': Setting(),
         'detection': Setting(unnamed=True, rows_fixed=True, rows=rows(
             'aggression', 'links', 'sight', 'true-sight', 'sound', 'scent', 'use-of-spells', 'use-of-abilities',
             'low-player-hp'),

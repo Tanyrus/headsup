@@ -162,6 +162,7 @@ namespace headsup
         int scaleMin = 50, scaleMax = 250; // percent: the distance scale's limits
         int timerPercent = 85;
         std::array<KindSettings, kPlateKindCount> kinds = DefaultKinds();
+        OpacitySettings opacity; // every kind's nameplates
         Palette palette = DefaultPalette();
         uint32_t detectionShown = kDefaultDetection;
         ColorPick cursorColor{ColorSource::Target};

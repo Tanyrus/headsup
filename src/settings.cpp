@@ -221,6 +221,7 @@ namespace headsup
         constexpr const char* kLabelShadePrefix = "label"; // kLabelShadeKeys' prefix, which the palette's toughness keys drop
         constexpr const char* kRowInfix         = "Row";
         constexpr const char* kOpacityInfix     = "Opacity";
+        constexpr const char* kPlateOpacityBase = "plateOpacity"; // every kind's, after the builds that kept one a kind
         constexpr const char* kGlowOffSuffix    = "GlowOffInCombat";
         constexpr const char* kOldUntargetedKey = "untargetedOpacity";   // every mob's that was not your target
         constexpr const char* kOldGlowOffKey    = "glowOffWhenFighting"; // every line of a mob your party had claimed
@@ -485,20 +486,31 @@ namespace headsup
             LoadPick(store, base + kColorKey, o.color);
         }
 
-        // A kind's opacities and its lines' glow in combat, from a file of any age: the kind's own keys, else the two
-        // settings of before, which were the mobs': one opacity, pets among them, and one switch for the glow.
-        void LoadFading(SettingsStore& store, PlateKind kind, KindSettings& k)
+        // The nameplates' opacities, from a file of any age: their own keys, else the mobs' of the builds that kept
+        // them a kind, else for Not Targeted the one opacity of before, which was the mobs'.
+        void LoadOpacity(SettingsStore& store, OpacitySettings& o)
         {
-            const std::string base = std::string(KindKey(kind)) + kOpacityInfix;
-            OpacitySettings& o     = k.opacity;
-            const std::string notTargeted = base + kNotTargetedKey;
-            const bool faded              = kind == PlateKind::Mobs || kind == PlateKind::Pets;
-            o.noTarget    = LoadInt(store, (base + kNoTargetKey).c_str(), o.noTarget);
-            o.notTargeted = Rebased(store, notTargeted, faded ? kOldUntargetedKey : notTargeted, o.notTargeted,
-                [](float before) { return before; });
-            o.targeted    = LoadInt(store, (base + kTargetedKey).c_str(), o.targeted);
-            o.fadeIn      = store.GetBool((base + kFadeInKey).c_str(), o.fadeIn);
-            o.range       = store.GetFloat((base + kRangeKey).c_str(), o.range);
+            const std::string own = kPlateOpacityBase, heir = std::string(KindKey(PlateKind::Mobs)) + kOpacityInfix;
+            const auto held = [&](const char* suffix) {
+                const std::optional<float> mine = HeldNumber(store, own + suffix);
+                return mine ? mine : HeldNumber(store, heir + suffix);
+            };
+            const auto percent = [&](const char* suffix, std::optional<float> before, int fallback) {
+                const std::optional<float> v = held(suffix);
+                return Whole(v.value_or(before.value_or(static_cast<float>(fallback))));
+            };
+            o.noTarget    = percent(kNoTargetKey, std::nullopt, o.noTarget);
+            o.notTargeted = percent(kNotTargetedKey, HeldNumber(store, kOldUntargetedKey), o.notTargeted);
+            o.targeted    = percent(kTargetedKey, std::nullopt, o.targeted);
+            o.range       = held(kRangeKey).value_or(o.range);
+            const std::optional<bool> fadeIn = HeldSwitch(store, (own + kFadeInKey).c_str());
+            o.fadeIn = fadeIn ? *fadeIn : HeldSwitch(store, (heir + kFadeInKey).c_str()).value_or(o.fadeIn);
+        }
+
+        // A kind's lines' glow in combat, from a file of any age: the lines' own keys, else the one switch of before,
+        // which was the mobs'.
+        void LoadGlowOff(SettingsStore& store, PlateKind kind, KindSettings& k)
+        {
             const std::optional<bool> before = kind == PlateKind::Mobs ? HeldSwitch(store, kOldGlowOffKey) : std::nullopt;
             for (int n = 0; n < kPlateLines; ++n)
             {
@@ -525,12 +537,6 @@ namespace headsup
             StoreFloat(store, base + kHeightKey, static_cast<float>(k.ornament.height));
             SavePick(store, base + kColorKey, k.ornament.color);
             if (HasStatusIcons(kind)) StoreFloat(store, std::string(KindKey(kind)) + kMaxIconsSuffix, static_cast<float>(k.maxIcons));
-            const std::string opacity = std::string(KindKey(kind)) + kOpacityInfix;
-            StoreFloat(store, opacity + kNoTargetKey, static_cast<float>(k.opacity.noTarget));
-            StoreFloat(store, opacity + kNotTargetedKey, static_cast<float>(k.opacity.notTargeted));
-            StoreFloat(store, opacity + kTargetedKey, static_cast<float>(k.opacity.targeted));
-            StoreBool(store, opacity + kFadeInKey, k.opacity.fadeIn);
-            StoreFloat(store, opacity + kRangeKey, k.opacity.range);
         }
 
         void LoadDesigner(SettingsStore& store, Settings& s)
@@ -548,6 +554,12 @@ namespace headsup
         {
             for (int k = 0; k < kPlateKindCount; ++k)
                 SaveKind(store, static_cast<PlateKind>(k), s.kinds[k]);
+            const std::string opacity = kPlateOpacityBase;
+            StoreFloat(store, opacity + kNoTargetKey, static_cast<float>(s.opacity.noTarget));
+            StoreFloat(store, opacity + kNotTargetedKey, static_cast<float>(s.opacity.notTargeted));
+            StoreFloat(store, opacity + kTargetedKey, static_cast<float>(s.opacity.targeted));
+            StoreBool(store, opacity + kFadeInKey, s.opacity.fadeIn);
+            StoreFloat(store, opacity + kRangeKey, s.opacity.range);
             Palette palette = s.palette;
             for (const PaletteEntry& e : PaletteEntries(palette))
                 StoreColor(store, e.key, *e.color);
@@ -1114,14 +1126,11 @@ namespace headsup
                 o.width  = std::clamp(o.width, kMinOrnamentWidth, kMaxOrnamentWidth);
                 o.height = std::clamp(o.height, kMinOrnamentThickness, kMaxOrnamentThickness);
                 ClampPick(o.color, defaults.ornament.color, plain);
-                OpacitySettings& opacity = kind.opacity;
-                for (int OpacitySettings::*percent : {&OpacitySettings::noTarget, &OpacitySettings::notTargeted, &OpacitySettings::targeted})
-                    opacity.*percent = std::clamp(Stepped(opacity.*percent, kPercentStep), kMinOpacity, kMaxOpacity);
-                opacity.range = ClampFloat(opacity.range, kMinOutlineDistance, kMaxOutlineDistance, defaults.opacity.range);
-                // Your own nameplate is never far from you.
-                if (static_cast<PlateKind>(k) == PlateKind::Self) opacity.fadeIn = false;
                 kind.maxIcons = std::clamp(kind.maxIcons, 1, kCountedIcons);
             }
+            for (int OpacitySettings::*percent : {&OpacitySettings::noTarget, &OpacitySettings::notTargeted, &OpacitySettings::targeted})
+                s.opacity.*percent = std::clamp(Stepped(s.opacity.*percent, kPercentStep), kMinOpacity, kMaxOpacity);
+            s.opacity.range = ClampFloat(s.opacity.range, kMinOutlineDistance, kMaxOutlineDistance, d.opacity.range);
             Palette fallback = d.palette;
             const std::vector<PaletteEntry> entries = PaletteEntries(s.palette), defaults = PaletteEntries(fallback);
             for (size_t i = 0; i < entries.size(); ++i)
@@ -1338,10 +1347,11 @@ namespace headsup
         for (int k = 0; k < kPlateKindCount; ++k)
         {
             const auto kind = static_cast<PlateKind>(k);
-            LoadFading(store, kind, s.kinds[k]);
+            LoadGlowOff(store, kind, s.kinds[k]);
             if (HasStatusIcons(kind))
                 s.kinds[k].maxIcons = LoadInt(store, (std::string(KindKey(kind)) + kMaxIconsSuffix).c_str(), s.kinds[k].maxIcons);
         }
+        LoadOpacity(store, s.opacity);
         return Clamp(s);
     }
 
