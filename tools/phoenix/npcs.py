@@ -55,6 +55,12 @@ def title(identifier: str) -> str:
     return ' '.join(out)
 
 
+def hidden_name(name: str) -> str:
+    """A hidden quest's name in words: mimeoStone -> Mimeo Stone, Trust_Halver -> Trust Halver."""
+    text = ' '.join(re.sub(r'(?<=[a-z0-9])(?=[A-Z])', ' ', name.replace('_', ' ')).split())
+    return text[:1].upper() + text[1:]
+
+
 def norm(name: str) -> str:
     return re.sub(r'[^a-z0-9]', '', name.lower())
 
@@ -407,7 +413,8 @@ def link_of(container, c: Constants):
     if not name:
         name = re.sub(r'^(?:\d+_)+', '', parts[-1]) if parts[-1] else cid
     key = (kind, log, ident, name if kind == 'hidden' else '')
-    return key, {'kind': kind, 'log': log, 'id': ident, 'name': title(name), 'file': file, 'expansion': expansion}
+    return key, {'kind': kind, 'log': log, 'id': ident, 'name': hidden_name(name) if kind == 'hidden' else title(name),
+                 'file': file, 'expansion': expansion}
 
 
 def lookup_name(ids, logs, log, ident):
@@ -519,6 +526,12 @@ def build(npcs, lua, settings, server):
                 npc_links.add(found[0])
                 links.setdefault(found[0], found[1])
         rows.append((npc, facts, steps, npc_links))
+    for kind, log in sorted({(k[0], k[1]) for k in links if k[0] in ('quest', 'mission')}):
+        names, logs = (schema.QUEST_LOGS, c.quest_logs) if kind == 'quest' else (schema.MISSION_LOGS, c.mission_logs)
+        server = next((n for n, number in logs.items() if number == log), None)
+        if log >= len(names) or server is None or norm(server) != norm(names[log]):
+            raise DataError(f"{kind} log {log} is {server} on the server, but gen_npcs names it "
+                            f"{names[log] if log < len(names) else 'nothing'}")
     numbers, live = {}, {}
     for key in sorted(links, key=lambda k: (schema.LINK_KINDS.index(k[0]), k[1], k[2], k[3])):
         numbers[key] = len(numbers) + 1

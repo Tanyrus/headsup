@@ -34,6 +34,22 @@ namespace headsup
 
     std::span<const uint32_t> PopsOf(const NpcRecord& npc) { return SpanOf(kNpcMobs, npc.pops); }
 
+    std::vector<const NpcLink*> LinksOf(const NpcRecord& npc)
+    {
+        std::vector<const NpcLink*> links;
+        for (const uint16_t index : SpanOf(kNpcLinkIds, npc.links))
+            if (index > 0 && index < std::size(kNpcLinks)) links.push_back(&kNpcLinks[index]);
+        return links;
+    }
+
+    const char* LogNameOf(const NpcLink& link)
+    {
+        if (link.kind == kLinkQuest) return link.log < std::size(kQuestLogNames) ? kQuestLogNames[link.log] : nullptr;
+        if (link.kind == kLinkMission)
+            return link.log < std::size(kMissionLogNames) ? kMissionLogNames[link.log] : nullptr;
+        return nullptr;
+    }
+
     const NpcShop* ShopOf(const NpcRecord& npc)
     {
         return npc.shop > 0 && npc.shop < std::size(kNpcShops) ? &kNpcShops[npc.shop] : nullptr;

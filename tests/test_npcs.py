@@ -52,6 +52,11 @@ class LuaText(unittest.TestCase):
         self.assertFalse(npcs.has_code('entity.onTrade = function(player, npc, trade)\nend'))
         self.assertTrue(npcs.has_code('entity.onTrade = function(player, npc, trade)\n    helper(player)\nend'))
 
+    def test_a_hidden_quests_name_in_words(self):
+        # HiddenQuest:new('mimeoStone') in quests/hiddenQuests/Mimeo_Stone.lua, and a module's rebuilt Trust_Halver.
+        self.assertEqual([npcs.hidden_name(n) for n in ('mimeoStone', 'CorArtifact', 'Trust_Halver', 'Tutorial')],
+                         ['Mimeo Stone', 'Cor Artifact', 'Trust Halver', 'Tutorial'])
+
     def test_names_read_as_the_game_writes_them(self):
         self.assertEqual(npcs.title('THE_ROAD_TO_AHT_URHGAN'), 'The Road to Aht Urhgan')
         self.assertEqual(npcs.title('Storms_of_Fate'), 'Storms of Fate')
@@ -309,10 +314,10 @@ class Build(unittest.TestCase):
                             qm2={'onTrade': [step('Quest[0][4]', 'scripts/quests/sandoria/A_Squires_Test', 0, 4,
                                                   [squire, 1, 3]),
                                              step('Quest[7][12]', lament[:-4], 7, 12, [lament, 1, 3])],
-                                 'onTrigger': [step('HQuest[Trust_Halver]', trust[:-4], None, None, {'id': 433},
-                                                    name='Trust_Halver')]},
-                            Rodrigue={'onTrigger': [step('HQuest[Trust_Halver]', trust[:-4], None, None, [trust, 4, 6],
-                                                         [trust, 1, 3], 'Trust_Halver')]})
+                                 'onTrigger': [step('HQuest[TrustHalver]', trust[:-4], None, None, {'id': 433},
+                                                    name='TrustHalver')]},
+                            Rodrigue={'onTrigger': [step('HQuest[TrustHalver]', trust[:-4], None, None, [trust, 4, 6],
+                                                         [trust, 1, 3], 'TrustHalver')]})
         lua = dict(DUMP_LUA, interactions={'2': interactions})
         settings = {'main': dict(SETTINGS['main'], ENABLE_TRUST_QUESTS=0)}
         (rows, _, links, _, _), _ = self.run_npcs([{'npcs': DUMP_NPCS, 'npcLua': lua, 'settings': settings}], scripts)
@@ -321,6 +326,13 @@ class Build(unittest.TestCase):
                          [('A Squires Test', 1), ('Storms of Fate', 1), ('Atellounes Lament', 0), ('Trust Halver', 1)])
         self.assertEqual((qm['trades'], qm['pops'], qm['links'], qm['unread']), ([1416], [], [1, 3, 4], []))
         self.assertEqual((rodrigue['gives'], rodrigue['links']), ([], [1, 4]))
+
+    def test_a_log_whose_server_name_is_not_the_one_gen_npcs_names_it_is_an_error(self):
+        # gen_npcs names quest log 4 Other Areas; a server whose Jeuno log were 4 would show quests under the wrong log.
+        lua = dict(DUMP_LUA, questLogs={'SANDORIA': 0, 'JEUNO': 4, 'CRYSTAL_WAR': 7})
+        with self.assertRaises(npcs.DataError) as caught:
+            self.run_npcs([{'npcs': DUMP_NPCS, 'npcLua': lua, 'settings': SETTINGS}])
+        self.assertIn('quest log 4 is JEUNO on the server, but gen_npcs names it Other Areas', str(caught.exception))
 
     def test_dumps_with_other_npcs_are_an_error(self):
         dump = {'npcs': DUMP_NPCS, 'npcLua': DUMP_LUA, 'settings': SETTINGS}

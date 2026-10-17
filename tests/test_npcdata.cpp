@@ -84,3 +84,23 @@ TEST(a_shop_has_its_stock_and_says_whether_fame_moves_its_prices)
     const NpcRecord* qm = NpcById(16785729);
     CHECK(qm != nullptr && ShopOf(*qm) == nullptr);
 }
+
+TEST(an_npcs_links_are_the_quests_and_missions_live_has_with_their_logs)
+{
+    // The Gate of the Gods (Grand Palace of Hu'Xzoi's _iya) takes part in Jeuno's Apocalypse Nigh and CoP's Garden of
+    // Antiquity and A Fate Decided (quests/jeuno, missions/cop).
+    const NpcRecord* gate = NpcById(16916828);
+    CHECK(gate != nullptr);
+    if (gate == nullptr) return;
+    std::vector<std::string> links;
+    for (const NpcLink* link : LinksOf(*gate))
+        links.push_back(std::string(link->name) + " / " + (LogNameOf(*link) != nullptr ? LogNameOf(*link) : "-"));
+    CHECK(links == (std::vector<std::string>{"Apocalypse Nigh / Jeuno", "Garden of Antiquity / CoP", "A Fate Decided / CoP"}));
+    // The Shrouded Maw's Memento Circle: three battlefields, which have no log.
+    const NpcRecord* circle = NpcById(16818249);
+    CHECK(circle != nullptr && LinksOf(*circle).size() == 3);
+    if (circle != nullptr && !LinksOf(*circle).empty())
+        CHECK(LinksOf(*circle)[0]->kind == kLinkBattlefield && LogNameOf(*LinksOf(*circle)[0]) == nullptr);
+    // Southern San d'Oria [S]'s Mystic Retriever is only in an RoV mission, which live has off.
+    CHECK(NpcById(17105705) == nullptr);
+}

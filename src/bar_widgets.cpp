@@ -337,8 +337,31 @@ namespace headsup
             sections.push_back(std::move(section));
         }
 
-        // Its shop, what it takes in trade and what that pops, what it gives, and the key items it gives and checks
-        // for.
+        // Its quests (hidden ones too), missions and battlefields, each by name, a quest's and mission's log after it.
+        void AddLinks(std::vector<PopupSection>& sections, const NpcRecord& npc)
+        {
+            PopupSection quests{"Quests", {}}, missions{"Missions", {}}, battlefields{"Battlefields", {}};
+            for (const NpcLink* link : LinksOf(npc))
+            {
+                const char* log = LogNameOf(*link);
+                switch (link->kind)
+                {
+                case kLinkQuest:
+                case kLinkHidden:
+                    quests.rows.push_back(Labeled(Text(link->name), Text(log != nullptr ? log : "Hidden", Tone::Dim)));
+                    break;
+                case kLinkMission:
+                    missions.rows.push_back(Labeled(Text(link->name), Text(log != nullptr ? log : "", Tone::Dim)));
+                    break;
+                default: battlefields.rows.push_back(LineOf(link->name)); break;
+                }
+            }
+            for (PopupSection* s : {&quests, &missions, &battlefields})
+                if (!s->rows.empty()) sections.push_back(std::move(*s));
+        }
+
+        // Its shop, what it takes in trade and what that pops, what it gives, the key items it gives and checks for,
+        // and its quests, missions and battlefields.
         std::vector<PopupSection> NpcSections(const ActorInfo& target, const NpcRecord& npc, const BarState& state)
         {
             std::vector<PopupSection> sections = ListOf(PopupSection{"",
@@ -349,6 +372,7 @@ namespace headsup
             AddListing(sections, "Gives", ItemNames(GivesOf(npc), state), (npc.unread & kNpcUnreadGives) != 0);
             AddListing(sections, "Key items", KeyItemNames(KeyItemsOf(npc)));
             AddListing(sections, "Checks for", KeyItemNames(NeedsOf(npc)));
+            AddLinks(sections, npc);
             return sections;
         }
 

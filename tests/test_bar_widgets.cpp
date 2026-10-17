@@ -1591,13 +1591,15 @@ TEST(a_qm_whose_script_works_out_what_it_pops_says_so)
 
 TEST(an_npcs_popup_names_the_key_items_it_gives_and_checks_for)
 {
-    // Carpenters' Landing's qm_para: with the Antique Amulet it pops Para, and it gives the Cathedral Medallion.
+    // Carpenters' Landing's qm_para: with the Antique Amulet it pops Para, and it gives the Cathedral Medallion, for
+    // the quest Elderly Pursuits (quests/otherAreas).
     Settings settings;
     const ActorInfo qm = NpcTarget(16785781, "???");
     BarState state;
     state.target         = &qm;
     const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
-    CHECK(Headings(p) == (std::vector<std::string>{"", "Pops", "Key items", "Checks for"}));
+    CHECK(Headings(p) == (std::vector<std::string>{"", "Pops", "Key items", "Checks for", "Quests"}));
+    CHECK(SectionLines(p, "Quests") == (std::vector<std::string>{"Elderly Pursuits Other Areas"}));
     CHECK(SectionLines(p, "Pops") == (std::vector<std::string>{"Para"}));
     CHECK(SectionLines(p, "Key items") == (std::vector<std::string>{"Cathedral Medallion"}));
     CHECK(SectionLines(p, "Checks for") == (std::vector<std::string>{"Antique Amulet"}));
@@ -1665,4 +1667,45 @@ TEST(a_shop_whose_stock_its_script_works_out_says_so)
     state.itemName = NpcItemName;
     CHECK(SectionLines(BarPopupContent(BarWidget::Target, state, settings), "Shop") ==
           (std::vector<std::string>{"Worked out by its script"}));
+}
+
+TEST(an_npcs_popup_lists_its_quests_and_missions_with_their_logs)
+{
+    // The Gate of the Gods (quests/jeuno/Apocalypse_Nigh, missions/cop/8_1 and 8_2).
+    Settings settings;
+    const ActorInfo gate = NpcTarget(16916828, "Gate of the Gods");
+    BarState state;
+    state.target = &gate;
+    CHECK(BarWidgetContent(BarWidget::Target, state, settings).hasPopup);
+    const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
+    CHECK(Headings(p) == (std::vector<std::string>{"", "Quests", "Missions"}));
+    CHECK(SectionLines(p, "Quests") == (std::vector<std::string>{"Apocalypse Nigh Jeuno"}));
+    CHECK(SectionLines(p, "Missions") == (std::vector<std::string>{"Garden of Antiquity CoP", "A Fate Decided CoP"}));
+    if (const PopupSection* quests = Section(p, "Quests"))
+        CHECK(quests->rows[0].kind == RowKind::Pair && quests->rows[0].cells[0].text[0].tone == Tone::Normal &&
+              quests->rows[0].cells[1].text[0].tone == Tone::Dim);
+}
+
+TEST(battlefields_and_hidden_quests_have_sections_and_what_live_has_off_is_left_out)
+{
+    Settings settings;
+    BarState state;
+    const ActorInfo circle = NpcTarget(16818249, "Memento Circle"); // battlefields/The_Shrouded_Maw
+    state.target           = &circle;
+    CHECK(SectionLines(BarPopupContent(BarWidget::Target, state, settings), "Battlefields") ==
+          (std::vector<std::string>{"Darkness Named", "Test Your Mite", "Waking Dreams"}));
+    const ActorInfo luminant = NpcTarget(16806290, "Luminant"); // quests/hiddenQuests/Mimeo_Stone
+    state.target             = &luminant;
+    CHECK(SectionLines(BarPopupContent(BarWidget::Target, state, settings), "Quests") ==
+          (std::vector<std::string>{"Mimeo Stone Hidden"}));
+    // Misareaux Coast's Dilapidated Gate: three CoP missions, the three mobs of one's fight, and a trust quest live
+    // has off.
+    const ActorInfo gate = NpcTarget(16879936, "Dilapidated Gate");
+    state.target         = &gate;
+    const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
+    CHECK(Headings(p) == (std::vector<std::string>{"", "Pops", "Missions"}));
+    CHECK(SectionLines(p, "Missions").size() == 3);
+    const ActorInfo retriever = NpcTarget(17105705, "Mystic Retriever"); // only in an RoV mission
+    state.target              = &retriever;
+    CHECK(!BarWidgetContent(BarWidget::Target, state, settings).hasPopup);
 }

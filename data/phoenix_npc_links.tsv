@@ -958,26 +958,26 @@ link	kind	log	id	name	file	expansion	live
 957	battlefield	0	1156	Puppet in Peril	scripts/battlefields/Jade_Sepulcher/puppet_in_peril		1
 958	battlefield	0	1296	Central Apollyon	scripts/battlefields/Apollyon/central_apollyon		1
 959	battlefield	0	1303	Central Temenos 1st Floor	scripts/battlefields/Temenos/central_temenos_1st_floor		1
-960	hidden	0	0	ChocoboWhistle	scripts/quests/hiddenQuests/Chocobo_Whistle		1
-961	hidden	0	0	CorArtifact	scripts/quests/hiddenQuests/Crafted_Corsair_Artifact		1
-962	hidden	0	0	CrimsonOrb	scripts/quests/hiddenQuests/Crimson_Orb		1
-963	hidden	0	0	DncArtifact	scripts/quests/hiddenQuests/Crafted_Dancer_Artifact		1
+960	hidden	0	0	Chocobo Whistle	scripts/quests/hiddenQuests/Chocobo_Whistle		1
+961	hidden	0	0	Cor Artifact	scripts/quests/hiddenQuests/Crafted_Corsair_Artifact		1
+962	hidden	0	0	Crimson Orb	scripts/quests/hiddenQuests/Crimson_Orb		1
+963	hidden	0	0	Dnc Artifact	scripts/quests/hiddenQuests/Crafted_Dancer_Artifact		1
 964	hidden	0	0	Invitation Cards	scripts/quests/hiddenQuests/Invitation_Cards		1
-965	hidden	0	0	LostChick	scripts/quests/hiddenQuests/Lost_Chick		1
-966	hidden	0	0	MagusArtifact	scripts/quests/hiddenQuests/Crafted_Magus_Artifact		1
-967	hidden	0	0	PuppetryArtifact	scripts/quests/hiddenQuests/Crafted_Puppetry_Artifact		1
-968	hidden	0	0	TrustAbquhbah	scripts/quests/hiddenQuests/Trust_Abquhbah		0
-969	hidden	0	0	TrustCherukiki	scripts/quests/hiddenQuests/Trust_Cherukiki		0
-970	hidden	0	0	TrustHalver	scripts/quests/hiddenQuests/Trust_Halver		0
-971	hidden	0	0	TrustMaat	scripts/quests/hiddenQuests/Trust_Maat		0
-972	hidden	0	0	TrustNashmeira	scripts/quests/hiddenQuests/Trust_Nashmeira		0
-973	hidden	0	0	TrustPrishe	scripts/quests/hiddenQuests/Trust_Prishe		0
-974	hidden	0	0	TrustSemih	scripts/quests/hiddenQuests/Trust_Semih		0
-975	hidden	0	0	TrustShantotto	scripts/quests/hiddenQuests/Trust_Shantotto		0
-976	hidden	0	0	TrustShikareeZ	scripts/quests/hiddenQuests/Trust_ShikareeZ		0
-977	hidden	0	0	TrustUlmia	scripts/quests/hiddenQuests/Trust_Ulmia		0
-978	hidden	0	0	TrustZeidII	scripts/quests/hiddenQuests/Trust_Zeid_II		0
+965	hidden	0	0	Lost Chick	scripts/quests/hiddenQuests/Lost_Chick		1
+966	hidden	0	0	Magus Artifact	scripts/quests/hiddenQuests/Crafted_Magus_Artifact		1
+967	hidden	0	0	Puppetry Artifact	scripts/quests/hiddenQuests/Crafted_Puppetry_Artifact		1
+968	hidden	0	0	Trust Abquhbah	scripts/quests/hiddenQuests/Trust_Abquhbah		0
+969	hidden	0	0	Trust Cherukiki	scripts/quests/hiddenQuests/Trust_Cherukiki		0
+970	hidden	0	0	Trust Halver	scripts/quests/hiddenQuests/Trust_Halver		0
+971	hidden	0	0	Trust Maat	scripts/quests/hiddenQuests/Trust_Maat		0
+972	hidden	0	0	Trust Nashmeira	scripts/quests/hiddenQuests/Trust_Nashmeira		0
+973	hidden	0	0	Trust Prishe	scripts/quests/hiddenQuests/Trust_Prishe		0
+974	hidden	0	0	Trust Semih	scripts/quests/hiddenQuests/Trust_Semih		0
+975	hidden	0	0	Trust Shantotto	scripts/quests/hiddenQuests/Trust_Shantotto		0
+976	hidden	0	0	Trust Shikaree Z	scripts/quests/hiddenQuests/Trust_ShikareeZ		0
+977	hidden	0	0	Trust Ulmia	scripts/quests/hiddenQuests/Trust_Ulmia		0
+978	hidden	0	0	Trust Zeid II	scripts/quests/hiddenQuests/Trust_Zeid_II		0
 979	hidden	0	0	Tutorial	scripts/quests/hiddenQuests/Tutorial_Quest		1
-980	hidden	0	0	mimeoStone	scripts/quests/hiddenQuests/Mimeo_Stone		1
-981	hidden	0	0	moghouseExpo	scripts/quests/hiddenQuests/Moghouse_Exposition		1
-982	hidden	0	0	portalCharm	scripts/quests/hiddenQuests/Portal_Charm		1
+980	hidden	0	0	Mimeo Stone	scripts/quests/hiddenQuests/Mimeo_Stone		1
+981	hidden	0	0	Moghouse Expo	scripts/quests/hiddenQuests/Moghouse_Exposition		1
+982	hidden	0	0	Portal Charm	scripts/quests/hiddenQuests/Portal_Charm		1
