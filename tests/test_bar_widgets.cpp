@@ -1656,6 +1656,10 @@ TEST(a_nation_shop_puts_what_conquest_holds_back_under_its_place_and_says_fame_m
               "Scroll of Lightning Threnody 1,376 gil", "When its nation is 1st or 2nd in conquest", "Lugworm 12 gil",
               "Yew Fishing Rod 236 gil", "When its nation is 1st in conquest, to its citizens",
               "Bamboo Fishing Rod 540 gil", "Prices before fame, which moves them up to 10% either way"}));
+    // The items in the normal tone, so the dim lines naming a place read as headings over them.
+    const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
+    if (const PopupSection* shop = Section(p, "Shop"))
+        CHECK(shop->rows[0].cells[0].text[0].tone == Tone::Normal && shop->rows[4].cells[0].text[0].tone == Tone::Dim);
 }
 
 TEST(a_shop_whose_stock_its_script_works_out_says_so)

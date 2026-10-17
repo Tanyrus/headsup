@@ -322,7 +322,8 @@ namespace headsup
                     if (at != place || name == nullptr || *name == '\0') continue;
                     if (first && note != nullptr) section.rows.push_back(LineOf(note, Tone::Dim));
                     first = false;
-                    section.rows.push_back(Labeled(name, Text(Grouped(entry.price) + " gil")));
+                    // The name in the normal tone: the dim lines naming a place are the headings among them.
+                    section.rows.push_back(Labeled(Text(name), Text(Grouped(entry.price) + " gil")));
                 }
             };
             add(0, nullptr);
