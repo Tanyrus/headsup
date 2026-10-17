@@ -1511,8 +1511,8 @@ namespace
     {
         switch (item)
         {
-        case 4373: return "Sleepshroom";
-        case 4374: return "Woozyshroom";
+        case 4373: return "Woozyshroom";
+        case 4374: return "Sleepshroom";
         case 4375: return "Danceshroom";
         case 1823: return "Shrimp Lantern";
         case 4112: return "Potion";
@@ -1549,7 +1549,7 @@ namespace
 
 TEST(a_qms_popup_says_what_to_trade_it_and_what_that_pops)
 {
-    // Carpenters' Landing's qm_mycophile (its script): a Sleepshroom, Woozyshroom or Danceshroom pops Mycophile.
+    // Carpenters' Landing's qm_mycophile (its script): a Woozyshroom, Sleepshroom or Danceshroom pops Mycophile.
     Settings settings;
     const ActorInfo qm = NpcTarget(16785729, "???");
     BarState state;
@@ -1560,7 +1560,7 @@ TEST(a_qms_popup_says_what_to_trade_it_and_what_that_pops)
     CHECK(Joined(p.title) == "???");
     CHECK(Headings(p) == (std::vector<std::string>{"", "Trade", "Pops"}));
     CHECK(SectionLines(p, "") == (std::vector<std::string>{"ID 141"}));
-    CHECK(SectionLines(p, "Trade") == (std::vector<std::string>{"Sleepshroom", "Woozyshroom", "Danceshroom"}));
+    CHECK(SectionLines(p, "Trade") == (std::vector<std::string>{"Woozyshroom", "Sleepshroom", "Danceshroom"}));
     CHECK(SectionLines(p, "Pops") == (std::vector<std::string>{"Mycophile"}));
 }
 

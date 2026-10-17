@@ -11,7 +11,7 @@ validate = load('tools/phoenix/validate.py')
 
 # The server's constant tables as the dump writes them: Carpenters' Landing's mushrooms are the item numbers its
 # qm_mycophile script names (Sleepshroom, Woozyshroom, Danceshroom), the rest made up for these tests.
-ITEMS = {'SLEEPSHROOM': 4373, 'WOOZYSHROOM': 4374, 'DANCESHROOM': 4375, 'PINCH_OF_VALKURM_SUNSAND': 1416,
+ITEMS = {'WOOZYSHROOM': 4373, 'SLEEPSHROOM': 4374, 'DANCESHROOM': 4375, 'PINCH_OF_VALKURM_SUNSAND': 1416,
          'ANTLION_TRAP': 1594, 'POTION': 4112, 'ETHER': 4128, 'ANTIDOTE': 4148, 'CHAMOMILE': 949, 'SCROLL_OF_RAISE': 4609,
          'MIRATETES_MEMOIRS': 1590}
 KEY_ITEMS = {'SILVER_BELL': 87, 'CORUSCANT_ROSARY': 88, 'MAP_OF_THE_CAVES': 400}
