@@ -11,6 +11,7 @@
 #include "zones.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <span>
 #include <string_view>
@@ -288,6 +289,160 @@ namespace headsup
             return names;
         }
 
+        constexpr size_t kNpcTextChars = 44;           // a message's line in the popup
+        constexpr const char* kResult  = "\xE2\x86\x92 "; // an arrow before what an act leads to
+
+        std::string JoinedNames(const std::vector<std::string>& names)
+        {
+            std::string text;
+            for (const std::string& name : names)
+                text += (text.empty() ? "" : ", ") + name;
+            return text;
+        }
+
+        // A message's words with its parameters in their <item>, <keyitem> and <number>, in order; other marks stay.
+        std::string SayWords(const NpcSay& say, const BarState& state)
+        {
+            const char* words = WordsOf(say);
+            if (words == nullptr) return {};
+            const std::span<const uint32_t> params = ParamsOf(say);
+            size_t next = 0;
+            std::string out;
+            for (std::string_view rest = words; !rest.empty();)
+            {
+                const size_t open  = rest.find('<');
+                const size_t close = open == std::string_view::npos ? open : rest.find('>', open);
+                if (close == std::string_view::npos)
+                {
+                    out += rest;
+                    break;
+                }
+                out += rest.substr(0, open);
+                const std::string_view tag = rest.substr(open + 1, close - open - 1);
+                std::string filled(rest.substr(open, close - open + 1));
+                if ((tag == "item" || tag == "keyitem" || tag == "number") && next < params.size())
+                {
+                    const uint32_t value = params[next++];
+                    const char* name     = tag == "number"   ? nullptr
+                                           : tag == "keyitem" ? KeyItemNameOf(static_cast<uint16_t>(value))
+                                           : state.itemName != nullptr ? state.itemName(static_cast<uint16_t>(value))
+                                                                       : nullptr;
+                    if (tag == "number") filled = std::to_string(value);
+                    else if (name != nullptr && *name != '\0') filled = name;
+                }
+                out += filled;
+                rest = rest.substr(close + 1);
+            }
+            return out;
+        }
+
+        // "22:00", or "22:00-03:59" for a run of hours.
+        std::string HourRange(int from, int to) { return from == to ? Hour(from) : Hour(from) + "-" + Printed("%02d:59", to); }
+
+        // An act's conditions in words, its quest and step first: "In A Chocobos Tale, step 4, after its NM falls".
+        std::string WhenWords(const NpcAct& act, bool capital = true)
+        {
+            std::vector<std::string> first, rest;
+            for (const NpcWhenEntry& when : WhenOf(act))
+            {
+                const auto keyItem = [&] {
+                    const char* name = KeyItemNameOf(when.a);
+                    return std::string(name != nullptr ? name : "a key item");
+                };
+                switch (when.kind)
+                {
+                case kWhenHour: rest.push_back("at " + HourRange(when.a, when.b)); break;
+                case kWhenWeather:
+                    if (const std::optional<Weather> weather = WeatherFromId(when.a))
+                        rest.push_back(std::string("in ") + WeatherName(*weather));
+                    break;
+                case kWhenJob: rest.push_back(std::string("as ") + JobName(static_cast<uint8_t>(when.a))); break;
+                case kWhenDay: rest.push_back(std::string("on ") + WeekdayName(when.a)); break;
+                case kWhenNation:
+                    rest.push_back(std::string("for ") + NationName(static_cast<Nation>(when.a + 1)) + "'s citizens");
+                    break;
+                case kWhenKeyItem: rest.push_back("holding " + keyItem()); break;
+                case kWhenNoKeyItem: rest.push_back("without " + keyItem()); break;
+                case kWhenKeyItems: rest.push_back("holding its key items"); break;
+                case kWhenQuest: rest.push_back("during its quest"); break;
+                case kWhenLink:
+                    if (const NpcLink* link = LinkAt(when.a)) first.insert(first.begin(), std::string("in ") + link->name);
+                    break;
+                case kWhenStep: first.push_back("step " + std::to_string(when.a)); break;
+                case kWhenPrimed: rest.push_back("once readied"); break;
+                case kWhenNmKilled: rest.push_back("after its NM falls"); break;
+                case kWhenRoll: rest.push_back("on a lucky roll"); break;
+                case kWhenMob: rest.push_back(std::string("when ") + when.name + " dies"); break;
+                case kWhenZoneStart: rest.push_back("as the zone starts"); break;
+                default: break;
+                }
+            }
+            first.insert(first.end(), rest.begin(), rest.end());
+            std::string text = JoinedNames(first);
+            if (capital && !text.empty()) text[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(text[0])));
+            return text;
+        }
+
+        // An act's rows: its conditions, dim, what it says, then what follows it.
+        void AddActRows(PopupSection& section, const NpcAct& act, const BarState& state)
+        {
+            if (const std::string when = WhenWords(act); !when.empty()) section.rows.push_back(LineOf(when, Tone::Dim));
+            for (const NpcSay& say : SaysOf(act))
+                for (const std::string& line : WrapWords(SayWords(say, state), kNpcTextChars))
+                    section.rows.push_back(LineOf(line));
+            if (const std::vector<std::string> pops = MobNames(PopsOf(act)); !pops.empty())
+                section.rows.push_back(LineOf(kResult + std::string("Pops ") + JoinedNames(pops)));
+            if (const std::vector<std::string> gives = ItemNames(GivesOf(act), state); !gives.empty())
+                section.rows.push_back(LineOf(kResult + std::string("Gives ") + JoinedNames(gives)));
+            if (const std::vector<std::string> keyItems = KeyItemNames(KeyItemsOf(act)); !keyItems.empty())
+                section.rows.push_back(LineOf(kResult + std::string("Gives key item ") + JoinedNames(keyItems)));
+            if (act.event) section.rows.push_back(LineOf(kResult + std::string("A cutscene"), Tone::Dim));
+        }
+
+        // What clicking it does, and what each trade the probe found does, its items first; none when the probe saw
+        // nothing. A trade the probe found takes the place of the plain list of what its scripts check for.
+        bool AddActs(std::vector<PopupSection>& sections, const NpcRecord& npc, const BarState& state)
+        {
+            PopupSection click{"Click", {}}, trade{"Trade", {}};
+            for (const NpcAct& act : ActsOf(npc))
+            {
+                if (act.kind == kActClick) AddActRows(click, act, state);
+                if (act.kind != kActTrade) continue;
+                std::vector<std::string> items;
+                for (const NpcActItem& entry : ItemsOf(act))
+                {
+                    const std::vector<std::string> named = ItemNames(std::span<const uint16_t>(&entry.item, 1), state);
+                    const std::string name = named.empty() ? "an item" : named.front();
+                    items.push_back(entry.qty > 1 ? std::to_string(entry.qty) + " x " + name : name);
+                }
+                std::string line;
+                for (const std::string& item : items)
+                    line += (line.empty() ? "" : " + ") + item;
+                trade.rows.push_back(LineOf(line));
+                AddActRows(trade, act, state);
+            }
+            if (!click.rows.empty()) sections.push_back(std::move(click));
+            const bool traded = !trade.rows.empty();
+            if (traded) sections.push_back(std::move(trade));
+            return traded;
+        }
+
+        // When its zone shows and hides it: "Appears at 22:00, gone at 07:00"; empty for a ??? always there.
+        std::string AppearsWords(const NpcRecord& npc)
+        {
+            std::vector<std::string> shows, hides;
+            for (const NpcAct& act : ActsOf(npc))
+            {
+                const auto when = WhenOf(act);
+                if (when.size() == 1 && when[0].kind == kWhenZoneStart) continue;
+                if (act.kind == kActShows) shows.push_back(WhenWords(act, false));
+                if (act.kind == kActHides) hides.push_back("gone " + WhenWords(act, false));
+            }
+            if (shows.empty()) return {};
+            shows.insert(shows.end(), hides.begin(), hides.end());
+            return "Appears " + JoinedNames(shows);
+        }
+
         // A name a line, and a dim note when its scripts do more of it than the data could read; none when there is
         // neither.
         void AddListing(std::vector<PopupSection>& sections, std::string heading, const std::vector<std::string>& names,
@@ -372,8 +527,10 @@ namespace headsup
             for (const char* purpose : PurposesOf(npc))
                 purposes.cells.push_back(Cell(Text(purpose, Tone::Tag)));
             if (!purposes.cells.empty()) sections[0].rows.push_back(std::move(purposes));
+            if (const std::string appears = AppearsWords(npc); !appears.empty()) sections[0].rows.push_back(LineOf(appears));
             AddShop(sections, npc, state);
-            AddListing(sections, "Trade", ItemNames(TradesOf(npc), state), (npc.unread & kNpcUnreadTrade) != 0);
+            if (!AddActs(sections, npc, state))
+                AddListing(sections, "Trade", ItemNames(TradesOf(npc), state), (npc.unread & kNpcUnreadTrade) != 0);
             AddListing(sections, "Pops", MobNames(PopsOf(npc)), (npc.unread & kNpcUnreadPops) != 0);
             AddListing(sections, "Gives", ItemNames(GivesOf(npc), state), (npc.unread & kNpcUnreadGives) != 0);
             AddListing(sections, "Key items", KeyItemNames(KeyItemsOf(npc)));

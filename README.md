@@ -265,7 +265,7 @@ A bar of widgets across the top of the screen, on by default, with these widgets
 | Job | Your jobs and levels, and the EXP to your next level (your merits at 75), over a bar of it; its Layout can put the EXP first, as the larger line, or show the EXP alone | EXP per hour, the time to level, limit points |
 | Party | How many are in your party, with the lowest HP and MP in your zone | Each member's jobs, levels, HP, MP and TP |
 | Signet | The time left on Signet or Sanction, only while one is on | What it gives and whether it works where you are |
-| Target | A monster's name in its border color, its level and con | Its jobs, weaknesses, resistances, absorbs, immunities, tags, stats, TP moves, spells, spawn, drops at Treasure Hunter 0 and what can be stolen; for an NPC or ??? in Phoenix's NPC data, what it is for, its shop, what to trade it, what it pops and gives, the key items it gives and checks for, and its quests, missions and battlefields; for a player you checked, their jobs, master level, linkshell and title, as of your check |
+| Target | A monster's name in its border color, its level and con | Its jobs, weaknesses, resistances, absorbs, immunities, tags, stats, TP moves, spells, spawn, drops at Treasure Hunter 0 and what can be stolen; for an NPC or ??? in Phoenix's NPC data, what it is for, when it appears, what clicking it says and does, its shop, what to trade it, what it pops and gives, the key items it gives and checks for, and its quests, missions and battlefields; for a player you checked, their jobs, master level, linkshell and title, as of your check |
 | Gil | Your gil, or the currency picked in its section | Gil and every currency you have |
 | Bags | Your inventory's used and maximum space | Every bag you have |
 | Connection | The game's own S and R, bytes sent and received a second; amber when no data arrives, red once the game's meter drops, with the latency if switched on | Latency, the last server data, this session's totals |
@@ -303,7 +303,10 @@ what it is for as tags (a logging point, a home point, a guild's points, where i
 and checks for, and the quests (with their log), missions (with theirs) and battlefields it takes part in, leaving out
 those of expansions Phoenix has off; when a script works the stock, the trade or the monster out as it runs, the popup
 says so. Names of key items, quests, missions and battlefields come from Phoenix's scripts and lack the game's
-punctuation. A shop's prices are before fame, which moves a nation's and some others'
+punctuation. For a ??? the data refresh also clicks and trades it on Phoenix's own server and keeps what it saw: Click
+gives what clicking it says, in the game's words, and what follows (a monster, an item, a key item), and Trade gives
+each set of items it takes with what that does, each with what it needs (an hour, a weather, a job, a quest's step, a
+key item); a ??? its zone hides by day says when it appears. A shop's prices are before fame, which moves a nation's and some others'
 prices up to 10% either way, and what a nation's shop stocks only while the nation places 1st or 2nd in conquest comes
 under the place it needs. Any other player or NPC shows just its name. The weather widget reads the
 weather the game keeps; if HeadsUp cannot find it, it goes by the server's weather changes and shows the day's usual

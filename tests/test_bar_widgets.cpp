@@ -1559,9 +1559,13 @@ TEST(a_qms_popup_says_what_to_trade_it_and_what_that_pops)
     CHECK(BarWidgetContent(BarWidget::Target, state, settings).hasPopup);
     const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
     CHECK(Joined(p.title) == "???");
-    CHECK(Headings(p) == (std::vector<std::string>{"", "Trade", "Pops"}));
+    CHECK(Headings(p) == (std::vector<std::string>{"", "Click", "Trade", "Pops"}));
     CHECK(SectionLines(p, "") == (std::vector<std::string>{"ID 141"}));
-    CHECK(SectionLines(p, "Trade") == (std::vector<std::string>{"Woozyshroom", "Sleepshroom", "Danceshroom"}));
+    // Its hint in the game's words, and the three mushrooms as one trade, as the probe saw on the server.
+    CHECK(SectionLines(p, "Click") ==
+          (std::vector<std::string>{"There is a rotten mushroom here. There are 3", "openings in its cap."}));
+    CHECK(SectionLines(p, "Trade") ==
+          (std::vector<std::string>{"Woozyshroom + Sleepshroom + Danceshroom", "\xE2\x86\x92 Pops Mycophile"}));
     CHECK(SectionLines(p, "Pops") == (std::vector<std::string>{"Mycophile"}));
 }
 
@@ -1590,17 +1594,51 @@ TEST(a_spot_whose_script_works_out_what_it_pops_says_so)
     if (const PopupSection* pops = Section(p, "Pops")) CHECK(pops->rows[0].cells[0].text[0].tone == Tone::Dim);
 }
 
-TEST(a_qm_shows_the_nm_the_probe_saw_it_pop)
+TEST(a_qm_shows_the_nm_the_probe_saw_it_pop_and_what_it_says)
 {
-    // Bibiki Bay's qm_shen: a Shrimp Lantern pops Shen, which only the probe on the server found.
+    // Bibiki Bay's qm_shen, as the probe saw it on the server: its click's shrimp shells line, and a Shrimp Lantern's
+    // skimming line and Shen, the words from its IDs.lua wrapped at 44 characters, the lantern in its <item>.
     Settings settings;
     const ActorInfo qm = NpcTarget(16793970, "???");
     BarState state;
     state.target   = &qm;
     state.itemName = NpcItemName;
     const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
-    CHECK(SectionLines(p, "Trade") == (std::vector<std::string>{"Shrimp Lantern"}));
+    CHECK(SectionLines(p, "Click") ==
+          (std::vector<std::string>{"Innumerable shrimp shells are floating in", "the water here."}));
+    CHECK(SectionLines(p, "Trade") ==
+          (std::vector<std::string>{"Shrimp Lantern", "The Shrimp Lantern begins skimming quietly",
+              "across the surface of the water. ...What's", "this!? An enormous creature is chasing after",
+              "it from below!!!", "\xE2\x86\x92 Pops Shen"}));
     CHECK(SectionLines(p, "Pops") == (std::vector<std::string>{"Shen"}));
+}
+
+TEST(a_hidden_qm_says_when_it_appears_and_what_a_readied_one_does)
+{
+    // Carpenters' Landing's Hercules Beetle tree: its zone shows it at 22:00 and hides it at 07:00, and once honeyed
+    // and ready it pops the Hercules Beetle (globals.lua and qm_hercules_beetle.lua).
+    Settings settings;
+    const ActorInfo tree = NpcTarget(16785730, "???");
+    BarState state;
+    state.target         = &tree;
+    const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
+    CHECK(SectionLines(p, "") == (std::vector<std::string>{"ID 142", "Appears at 22:00, gone at 07:00"}));
+    CHECK(SectionLines(p, "Click") == (std::vector<std::string>{"Once readied", "\xE2\x86\x92 Pops Hercules Beetle"}));
+    if (const PopupSection* click = Section(p, "Click")) CHECK(click->rows[0].cells[0].text[0].tone == Tone::Dim);
+}
+
+TEST(a_quest_steps_acts_name_the_quest_its_step_and_what_it_needs)
+{
+    // Batallia Downs' qm_chocobotale: a click finds nothing; at step 4 of A Chocobo's Tale it calls Badshah's pack, and
+    // once the NM is down it gives the Silver Comet's Collar (quests/jeuno/A_Chocobos_Tale.lua).
+    Settings settings;
+    const ActorInfo qm = NpcTarget(17207852, "???");
+    BarState state;
+    state.target = &qm;
+    CHECK(SectionLines(BarPopupContent(BarWidget::Target, state, settings), "Click") ==
+          (std::vector<std::string>{"You find nothing.", "In A Chocobos Tale, step 4", "You are being attacked!",
+              "\xE2\x86\x92 Pops Badshah", "In A Chocobos Tale, step 4, after its NM falls",
+              "\xE2\x86\x92 Gives key item Silver Comets Collar"}));
 }
 
 TEST(an_npcs_popup_names_the_key_items_it_gives_and_checks_for)
@@ -1612,7 +1650,13 @@ TEST(an_npcs_popup_names_the_key_items_it_gives_and_checks_for)
     BarState state;
     state.target         = &qm;
     const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
-    CHECK(Headings(p) == (std::vector<std::string>{"", "Pops", "Key items", "Checks for", "Quests"}));
+    CHECK(Headings(p) == (std::vector<std::string>{"", "Click", "Pops", "Key items", "Checks for", "Quests"}));
+    CHECK(SectionLines(p, "Click") ==
+          (std::vector<std::string>{"There is nothing out of the ordinary here.", "In Elderly Pursuits, step 1",
+              "You are overwhelmed by the putrid stench of", "decay!", "\xE2\x86\x92 Pops Para",
+              "In Elderly Pursuits, step 2, holding its key items", "You polish the Antique Amulet with the",
+              "glowing mushroom spores!", "Obtained key item: Cathedral Medallion.",
+              "\xE2\x86\x92 Gives key item Cathedral Medallion"}));
     CHECK(SectionLines(p, "Quests") == (std::vector<std::string>{"Elderly Pursuits Other Areas"}));
     CHECK(SectionLines(p, "Pops") == (std::vector<std::string>{"Para"}));
     CHECK(SectionLines(p, "Key items") == (std::vector<std::string>{"Cathedral Medallion"}));
