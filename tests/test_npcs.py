@@ -362,7 +362,8 @@ class Format(unittest.TestCase):
     def test_lists_count_from_1_and_every_entry_is_named(self):
         links = gen.parse_links('\t'.join(gen.LINK_COLUMNS) + '\n1\tquest\t0\t4\tA Squires Test\t\t\t1\n')
         shops = gen.parse_shops('list\titem\tprice\trank\tfame\n1\t4112\t910\t0\t0\n')
-        systems = gen.parse_systems('system\tfamily\tcall\n1\thelm\thelm.onTrade(player)\n')
+        systems = gen.parse_systems('system\tfamily\tcall\n'
+                                    '1\thelm\thelm.onTrade(player, npc, trade, xi.helmType.MINING, 10)\n')
         key_items = gen.parse_key_items('id\tname\n400\tMap of the Caves\n')
         row = gen.parse_npcs(NPC_HEADER + '\n' + NPC_ROW + '\n')
         gen.check(row, shops, links, systems, key_items)

@@ -38,7 +38,7 @@ namespace headsup
     {
         std::vector<const NpcLink*> links;
         for (const uint16_t index : SpanOf(kNpcLinkIds, npc.links))
-            if (index > 0 && index < std::size(kNpcLinks)) links.push_back(&kNpcLinks[index]);
+            if (index < std::size(kNpcLinks)) links.push_back(&kNpcLinks[index]);
         return links;
     }
 
@@ -48,6 +48,14 @@ namespace headsup
         if (link.kind == kLinkMission)
             return link.log < std::size(kMissionLogNames) ? kMissionLogNames[link.log] : nullptr;
         return nullptr;
+    }
+
+    std::vector<const char*> PurposesOf(const NpcRecord& npc)
+    {
+        std::vector<const char*> purposes;
+        for (const uint16_t index : SpanOf(kNpcPurposeIds, npc.purposes))
+            if (index < std::size(kNpcPurposes)) purposes.push_back(kNpcPurposes[index]);
+        return purposes;
     }
 
     const NpcShop* ShopOf(const NpcRecord& npc)

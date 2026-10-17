@@ -66,6 +66,7 @@ namespace headsup
         NpcSpan needs;    // the key items it checks for
         NpcSpan pops;     // the mobs it spawns, by server ID
         NpcSpan links;    // the quests, missions and battlefields live has that it takes part in
+        NpcSpan purposes; // what the shared systems it calls make it, in words
         uint16_t shop;    // its shop in the table ShopOf reads; 0 for none
         uint8_t unread;   // NpcUnread bits
     };
@@ -90,6 +91,9 @@ namespace headsup
     std::vector<const NpcLink*> LinksOf(const NpcRecord& npc);
     // The name of a quest's or mission's log ("Jeuno", "CoP"); nullptr for a battlefield or hidden quest.
     const char* LogNameOf(const NpcLink& link);
+
+    // What the shared systems it calls make it ("Logging point", "Home point", "Teleports to Mineshaft"), each once.
+    std::vector<const char*> PurposesOf(const NpcRecord& npc);
 
     // Its shop; nullptr when it sells nothing the data could read.
     const NpcShop* ShopOf(const NpcRecord& npc);

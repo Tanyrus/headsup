@@ -104,3 +104,20 @@ TEST(an_npcs_links_are_the_quests_and_missions_live_has_with_their_logs)
     // Southern San d'Oria [S]'s Mystic Retriever is only in an RoV mission, which live has off.
     CHECK(NpcById(17105705) == nullptr);
 }
+
+TEST(what_an_npcs_systems_make_it_is_in_words)
+{
+    // Carpenters' Landing's Logging Point (xi.helm, LOGGING), Oldton Movalpolos' Twinkbrix (teleport.to MINESHAFT)
+    // and Southern San d'Oria's Alivatand (crafting's guild points, LEATHERCRAFT).
+    const auto purposes = [](uint32_t id) {
+        std::vector<std::string> words;
+        if (const NpcRecord* npc = NpcById(id))
+            for (const char* purpose : PurposesOf(*npc))
+                words.emplace_back(purpose);
+        return words;
+    };
+    CHECK(purposes(16785774) == (std::vector<std::string>{"Logging point"}));
+    CHECK(purposes(16822535) == (std::vector<std::string>{"Teleports to Mineshaft"}));
+    CHECK(purposes(17719548) == (std::vector<std::string>{"Leathercraft guild points"}));
+    CHECK(NpcById(16974393) == nullptr); // Aht Urhgan's Najaaj only walks a path
+}

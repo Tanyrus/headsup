@@ -1709,3 +1709,19 @@ TEST(battlefields_and_hidden_quests_have_sections_and_what_live_has_off_is_left_
     state.target              = &retriever;
     CHECK(!BarWidgetContent(BarWidget::Target, state, settings).hasPopup);
 }
+
+TEST(what_an_npc_is_for_shows_as_tags_under_its_id)
+{
+    // Oldton Movalpolos' Twinkbrix takes a trade and teleports to the Mineshaft (its script).
+    Settings settings;
+    const ActorInfo twinkbrix = NpcTarget(16822535, "Twinkbrix");
+    BarState state;
+    state.target         = &twinkbrix;
+    const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
+    CHECK(!p.sections.empty() && p.sections[0].heading.empty());
+    if (p.sections.empty()) return;
+    const std::vector<PopupRow>& rows = p.sections[0].rows;
+    CHECK(rows.size() == 2 && rows.back().kind == RowKind::Tags);
+    if (rows.size() != 2) return;
+    CHECK(Joined(rows[1].cells[0].text) == "Teleports to Mineshaft" && rows[1].cells[0].text[0].tone == Tone::Tag);
+}

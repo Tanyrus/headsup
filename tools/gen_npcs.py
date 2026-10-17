@@ -60,6 +60,69 @@ SYSTEM_COLUMNS = ['system', 'family', 'call']
 # phoenix_key_items.tsv: the name of each key item an NPC gives or checks for, by its ID: its identifier in Phoenix's
 # scripts in words, which drops the game's punctuation ("C L Report" for the game's "C.L. Report").
 KEY_ITEM_COLUMNS = ['id', 'name']
+# What a shared system's call makes an NPC, in words, for the popup: the first rule of its system whose pattern the
+# call matches gives the label, {} filled with the pattern's group in words, or None for a call that says nothing a
+# player looks for (a walking path, a debug print, a part of a system that has its own label elsewhere). Every system
+# an NPC calls needs a rule, so a new one fails the check until it is named here.
+ANY = ''
+SYSTEM_RULES = {
+    'appraisal': [(ANY, 'Appraisal')],
+    'armorStorage': [(ANY, 'Armor storage')],
+    'assault': [(ANY, 'Assault')],
+    'automaton': [(ANY, None)],
+    'barge': [(r'timekeeper', 'Barge timekeeper'), (r'TicketShop', 'Barge tickets')],
+    'battlefield': [(ANY, 'Battlefield entrance')],
+    'beastmenTreasure': [(ANY, "Beastmen's treasure")],
+    'besieged': [(r'RunicPortal\(player, xi\.teleport\.runic_portal\.([A-Z_]+)\)', 'Runic portal to {}'),
+                 (r'besieged\.shop\(', 'Besieged shop'), (r'besieged\.on', 'Besieged'), (ANY, None)],
+    'brigandsChart': [(ANY, "Brigand's chart")],
+    'caskets': [(ANY, 'Treasure casket')],
+    'chocoboRacing': [(ANY, 'Chocobo racing')],
+    'chocoboRaising': [(r'Debug', None), (ANY, 'Chocobo raising')],
+    'clamming': [(ANY, 'Clamming')],
+    'conquest': [(r'\.overseer', 'Conquest overseer'), (r'\.vendor', 'Outpost vendor'),
+                 (r'\.teleporter', 'Outpost teleporter')],
+    'crafting': [(r'guildPoint.*xi\.guild\.([A-Z_]+)', '{} guild points'), (r'guildMaster', 'Guild master'),
+                 (r'ImageSupport', 'Image support'), (r'ephemeralMoogle', 'Crystal storage'), (ANY, None)],
+    'dealerMoogle': [(ANY, 'Mog Bonanza')],
+    'dynamis': [(r'entryNpc', 'Dynamis entrance'), (r'hourglassAndCurrency', 'Dynamis hourglasses and currency'),
+                (r'debugPrint', None), (ANY, 'Dynamis')],
+    'einherjar': [(ANY, 'Einherjar')],
+    'enm': [(ANY, 'ENM timer')],
+    'equipment': [(ANY, None)],
+    'eventStorage': [(ANY, 'Event item storage')],
+    'expeditionaryForce': [(ANY, 'Expeditionary Force')],
+    'extravaganza': [(ANY, None)],  # the Alter Ego Extravaganza, of trusts, which live has not
+    'festiveMoogle': [(ANY, 'Festive moogle')],
+    'fishingContest': [(ANY, 'Fishing contest')],
+    'goblinfootprint': [(ANY, 'Cutscene replay')],
+    'guildShops': [(ANY, 'Guild shop')],
+    'helm': [(r'helmType\.([A-Z_]+)', '{} point')],
+    'homepoint': [(ANY, 'Home point')],
+    'instance': [(r'xi\.zone\.([A-Z_]+)', 'Entrance to {}'), (ANY, None)],
+    'kidMithraShop': [(ANY, None)],
+    'limbus': [(ANY, 'Limbus')],
+    'linkshellConcierge': [(ANY, 'Linkshell concierge')],
+    'manaclipper': [(ANY, 'Manaclipper timekeeper')],
+    'mannequin': [(ANY, None)],
+    'maps': [(ANY, 'Maps')],
+    'maws': [(ANY, 'Cavernous Maw')],
+    'moghouse': [(r'MogLocker', 'Mog Locker'), (r'moogle', 'Mog House moogle'), (ANY, None)],
+    'path': [(ANY, None)],
+    'pirates': [(ANY, None)],
+    'piratesChart': [(ANY, "Pirate's chart")],
+    'rentalChocobo': [(ANY, 'Chocobo rental')],
+    'seals': [(ANY, 'Seals and crests')],
+    'shop': [(r'handleRegionalShop', 'Regional goods, by conquest'), (r'handleValerianoShop', 'Troupe Valeriano')],
+    'strangeApparatus': [(ANY, 'Strange apparatus')],
+    'teleport': [(r'xi\.teleport\.id\.([A-Z_]+)', 'Teleports to {}'), (r'toChamberOfPassage', 'Teleports to the Chamber of Passage'),
+                 (ANY, 'Teleports')],
+    'titleChanger': [(ANY, 'Title changer')],
+    'transport': [(r'Timekeeper', 'Boat timekeeper'), (r'Message\(', None)],
+    'treasure': [(ANY, 'Treasure chest or coffer')],
+    'waypoint': [(ANY, 'Waypoint')],
+}
+SMALL_WORDS = {'of', 'the', 'and', 'a', 'an', 'in', 'on', 'to', 'for', 'with', 'from', 'at', 'by'}
 POSITION = re.compile(r'-?[0-9]+\.[0-9]{3},-?[0-9]+\.[0-9]{3},-?[0-9]+\.[0-9]{3},[0-9]{1,3}')
 
 
@@ -164,6 +227,23 @@ def parse_key_items(text: str, source: str = KEY_ITEMS_NAME) -> dict:
     return names
 
 
+def words(identifier: str) -> str:
+    """CLOISTER_OF_FLAMES -> Cloister of Flames, THE_ASHU_TALIF -> The Ashu Talif."""
+    return ' '.join(word if n and word in SMALL_WORDS else word.capitalize()
+                    for n, word in enumerate(identifier.lower().split('_')))
+
+
+def purpose(family: str, call: str):
+    """A system call in words, or None when it says nothing of what an NPC is for (SYSTEM_RULES)."""
+    if family not in SYSTEM_RULES:
+        raise DataError(f'system {family} has no rule in SYSTEM_RULES ({call})')
+    for pattern, label in SYSTEM_RULES[family]:
+        found = re.search(pattern, call)
+        if found:
+            return label.format(*(words(group) for group in found.groups())) if label else None
+    raise DataError(f'no rule of {family} matches {call}')
+
+
 def check(npcs, shops, links, systems, key_items) -> None:
     """Every number an NPC names is in its list, every key item it names has a name, and every list entry and name is
     named."""
@@ -184,6 +264,8 @@ def check(npcs, shops, links, systems, key_items) -> None:
         unused = sorted(set(range(1, count + 1)) - used)
         if unused:
             raise DataError(f'{name}: {len(unused)} entries no NPC names, the first {unused[0]}')
+    for system in systems:
+        purpose(system['family'], system['call'])
     unused = sorted(set(key_items) - {k for npc in npcs for k in npc['keyItems'] + npc['needs']})
     if unused:
         raise DataError(f'{KEY_ITEMS_NAME}: {len(unused)} key items no NPC names, the first {unused[0]}')
@@ -198,10 +280,12 @@ def load(data: pathlib.Path):
 
 
 # The lists of an NPC's row that npcdata.inc carries, each into the pool of its kind: NpcRecord's spans, in its order.
-# links holds the NPC's live links by their number in kNpcLinks, which has only those.
+# links holds the NPC's live links by their number in kNpcLinks, which has only those; purposes what its systems make
+# it, by their place in kNpcPurposes.
 POOLS = {'trades': 'kNpcItems', 'gives': 'kNpcItems', 'keyItems': 'kNpcKeyItems', 'needs': 'kNpcKeyItems',
-         'pops': 'kNpcMobs', 'links': 'kNpcLinkIds'}
-POOL_TYPES = {'kNpcItems': 'uint16_t', 'kNpcKeyItems': 'uint16_t', 'kNpcMobs': 'uint32_t', 'kNpcLinkIds': 'uint16_t'}
+         'pops': 'kNpcMobs', 'links': 'kNpcLinkIds', 'purposes': 'kNpcPurposeIds'}
+POOL_TYPES = {'kNpcItems': 'uint16_t', 'kNpcKeyItems': 'uint16_t', 'kNpcMobs': 'uint32_t', 'kNpcLinkIds': 'uint16_t',
+              'kNpcPurposeIds': 'uint16_t'}
 SHOWN_UNREAD = ['trade', 'gives', 'pops', 'shop']  # what the popup says the data cannot name
 VALUES_A_LINE = 16
 
@@ -236,17 +320,28 @@ def link_tables(live) -> list:
     return lines + ['};']
 
 
-def generate(npcs, shops, links, key_items, commit: str) -> str:
+def purpose_table(purposes) -> list:
+    return ['', 'const char* const kNpcPurposes[] = {'] + [f'    {c_string(label)},' for label in purposes] + ['};']
+
+
+def generate(npcs, shops, links, systems, key_items, commit: str) -> str:
     """npcdata.inc: kNpcs, each NPC shown() in ID order with where its lists sit in their pools, each pool holding
     each distinct list once after the empty entry at 0; the shops by number; the links live has, which alone the
-    popup shows; and kKeyItemNames in ID order."""
+    popup shows; what its systems make it in words; and kKeyItemNames in ID order."""
     live = [link for link in links if link['live']]
     numbers = {link['link']: n for n, link in enumerate(live, start=1)}
+    labels = [purpose(s['family'], s['call']) for s in systems]
+    purposes = {'': 0}
+    for label in labels:
+        if label is not None:
+            purposes.setdefault(label, len(purposes))
     pools = {pool: [0] for pool in POOL_TYPES}
     starts = {pool: {(): 0} for pool in POOL_TYPES}
     records = []
     for npc in npcs:
-        npc = dict(npc, links=[numbers[n] for n in npc['links'] if n in numbers])
+        said = [purposes[labels[n - 1]] for n in npc['systems'] if labels[n - 1] is not None]
+        npc = dict(npc, links=[numbers[n] for n in npc['links'] if n in numbers],
+                   purposes=[p for i, p in enumerate(said) if p not in said[:i]])
         if not shown(npc):
             continue
         spans = []
@@ -276,7 +371,7 @@ def generate(npcs, shops, links, key_items, commit: str) -> str:
         lines += ['    ' + ', '.join(f'{v}u' if kind == 'uint32_t' else str(v) for v in values[n:n + VALUES_A_LINE]) +
                   ',' for n in range(0, len(values), VALUES_A_LINE)]
         lines.append('};')
-    lines += shop_tables(shops) + link_tables(live)
+    lines += shop_tables(shops) + link_tables(live) + purpose_table(purposes)
     lines += ['', 'const NpcRecord kNpcs[] = {'] + records + ['};', '', 'const KeyItemName kKeyItemNames[] = {']
     lines += [f'    {{{key_item}, {c_string(name)}}},' for key_item, name in key_items.items()] + ['};', '']
     return '\n'.join(lines)
@@ -293,8 +388,8 @@ def main(argv) -> int:
         return 2
     try:
         npcs, shops, links, systems, key_items = load(data)
-        text = generate(npcs, shops, links, key_items, read_commit(root / 'data' / META_NAME)) if len(argv) == 1 \
-            else None
+        text = generate(npcs, shops, links, systems, key_items, read_commit(root / 'data' / META_NAME)) \
+            if len(argv) == 1 else None
     except (OSError, DataError) as error:
         print(f'gen_npcs: {error}', file=sys.stderr)
         return 1

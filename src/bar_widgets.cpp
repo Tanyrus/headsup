@@ -360,12 +360,17 @@ namespace headsup
                 if (!s->rows.empty()) sections.push_back(std::move(*s));
         }
 
-        // Its shop, what it takes in trade and what that pops, what it gives, the key items it gives and checks for,
-        // and its quests, missions and battlefields.
+        // What it is for, its shop, what it takes in trade and what that pops, what it gives, the key items it gives
+        // and checks for, and its quests, missions and battlefields.
         std::vector<PopupSection> NpcSections(const ActorInfo& target, const NpcRecord& npc, const BarState& state)
         {
             std::vector<PopupSection> sections = ListOf(PopupSection{"",
                 ListOf(Line(Cell(Text("ID " + Printed("%03X", target.serverId & kTargetIndexBits), Tone::Dim))))});
+            // What it is for, as a mob's tags say what it does.
+            PopupRow purposes{RowKind::Tags, 0, {}};
+            for (const char* purpose : PurposesOf(npc))
+                purposes.cells.push_back(Cell(Text(purpose, Tone::Tag)));
+            if (!purposes.cells.empty()) sections[0].rows.push_back(std::move(purposes));
             AddShop(sections, npc, state);
             AddListing(sections, "Trade", ItemNames(TradesOf(npc), state), (npc.unread & kNpcUnreadTrade) != 0);
             AddListing(sections, "Pops", MobNames(PopsOf(npc)), (npc.unread & kNpcUnreadPops) != 0);
