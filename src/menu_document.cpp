@@ -110,7 +110,7 @@ namespace headsup
                color(c.muted) + ";transform:rotate(45deg);}";
         css += ".cross.back{transform:rotate(-45deg);}";
         css += std::string("#") + kMenuCloseId + ":hover .cross{background-color:" + color(c.text) + ";}";
-        // A developer's Reload and Export, left of the close button.
+        // A developer's Reload, left of the close button.
         css += "#tools{position:absolute;display:flex;flex-direction:row;right:" + Em(kGutter + kFrame + kControlGap) + ";top:" +
                Em(kGutter) + ";}";
         css += "#tools .btn{margin-left:" + Em(kControlGap) + ";}";
@@ -369,8 +369,8 @@ namespace headsup
         return "<rml><head><style>" + MenuStyle(look) + "</style></head><body>"
                "<handle id=\"head\" move_target=\"#document\"><div id=\"title\">HeadsUp</div><div id=\"" +
                kMenuVersionId + "\"></div></handle><div id=\"head-line\"></div>" +
-               (look.developer ? std::string("<div id=\"tools\"><div class=\"") + kRaisedPill + "\" id=\"" + kMenuExportId +
-                                     "\"></div><div class=\"" + kRaisedPill + "\" id=\"" + kMenuReloadId + "\"></div></div>"
+               (look.developer ? std::string("<div id=\"tools\"><div class=\"") + kRaisedPill + "\" id=\"" + kMenuReloadId +
+                                     "\"></div></div>"
                                : std::string()) +
                "<div id=\"" + kMenuCloseId +
                "\"><div class=\"cross\"></div><div class=\"cross back\"></div></div><div id=\"columns\"><div id=\"" +

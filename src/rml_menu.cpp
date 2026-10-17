@@ -133,7 +133,7 @@ namespace headsup
     bool RmlMenu::TakeDebugRequest() { return std::exchange(m_State.debugRequested, false); }
     bool RmlMenu::TakeWatchRequest() { return std::exchange(m_State.watchRequested, false); }
     bool RmlMenu::TakeReloadRequest() { return std::exchange(m_Reload, false); }
-    bool RmlMenu::TakeExportRequest() { return std::exchange(m_Export, false); }
+    bool RmlMenu::TakeExportRequest() { return std::exchange(m_State.exportRequested, false); }
     bool RmlMenu::TakeCursorsRequest() { return std::exchange(m_State.cursorsRequested, false); }
 
     bool RmlMenu::OpenPage(const std::string& name)
@@ -427,7 +427,6 @@ namespace headsup
         case Rml::EventId::Click:
             if (id == kMenuCloseId) m_Closed = true;
             m_Reload |= id == kMenuReloadId;
-            m_Export |= id == kMenuExportId;
             // The picker's own ground, between its sliders, is the picker: a click there is one on its control.
             // A click in a line box beside its stretches is a click at its end.
             if (target->IsClassSet(kLineBoxClass))
@@ -577,12 +576,11 @@ namespace headsup
             char text[32];
             std::snprintf(text, sizeof(text), "v%g", version);
             if (Rml::Element* shown = m_Document->GetElementById(kMenuVersionId)) shown->SetInnerRML(text);
-            for (const auto& [tool, word] : {std::pair{kMenuReloadId, WindowWord::Reload}, std::pair{kMenuExportId, WindowWord::Export}})
-                if (Rml::Element* button = m_Document->GetElementById(tool))
-                {
-                    button->SetInnerRML(EscapedRml(host.layout->WordOf(word).name));
-                    button->SetAttribute(kMenuTipAttribute, std::string(Said(host.layout->WordOf(word).tip)));
-                }
+            if (Rml::Element* button = m_Document->GetElementById(kMenuReloadId))
+            {
+                button->SetInnerRML(EscapedRml(host.layout->WordOf(WindowWord::Reload).name));
+                button->SetAttribute(kMenuTipAttribute, std::string(Said(host.layout->WordOf(WindowWord::Reload).tip)));
+            }
         }
         const bool moved = Place(host, settings, pixels);
 

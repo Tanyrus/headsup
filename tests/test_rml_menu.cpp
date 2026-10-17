@@ -285,7 +285,8 @@ namespace
         // The window of a developer's build, which has its layout's Reload and Export buttons.
         void Developer()
         {
-            m_Host.developer = true;
+            m_Host.developer      = true;
+            m_Readings.exportable = true;
             Frames(2);
         }
         // The window takes this layout from its next frame on, as after a reload of the layout's file.
@@ -1366,21 +1367,23 @@ TEST(the_reset_button_stands_under_the_cards_as_wide_as_one_taller_and_in_capita
     CHECK_EQ(window.Said(), "");
 }
 
-TEST(a_developers_window_has_reload_and_export_left_of_its_close_button_and_each_asks_once)
+TEST(a_developers_window_has_reload_left_of_its_close_button_and_export_in_the_debug_card_and_each_asks_once)
 {
+    constexpr const char* kExport = "configmenu-debug-mode-export";
     Window window;
-    CHECK(window.Find(kMenuReloadId) == nullptr && window.Find(kMenuExportId) == nullptr);
+    window.settings.debugMode = true;
+    window.Page("configmenu");
+    CHECK(window.Find(kMenuReloadId) == nullptr && window.Find(kExport) == nullptr);
     window.Developer();
     auto left  = [&](const char* id) { return window.Find(id)->GetAbsoluteOffset(Rml::BoxArea::Border).x; };
     auto right = [&](const char* id) { return left(id) + window.Find(id)->GetBox().GetSize(Rml::BoxArea::Border).x; };
-    CHECK(window.Shows(kMenuReloadId) && window.Shows(kMenuExportId));
+    CHECK(window.Shows(kMenuReloadId) && window.Shows(kExport));
     CHECK(right(kMenuReloadId) <= left(kMenuCloseId) && left(kMenuCloseId) - right(kMenuReloadId) < kEm);
-    CHECK(right(kMenuExportId) <= left(kMenuReloadId));
     CHECK(!window.menu.TakeReloadRequest() && !window.menu.TakeExportRequest());
     window.Click(kMenuReloadId);
     CHECK(window.menu.TakeReloadRequest() && !window.menu.TakeReloadRequest() && !window.menu.TakeExportRequest());
-    window.Click(kMenuExportId);
-    CHECK(window.menu.TakeExportRequest() && window.menu.open);
+    window.Click(kExport);
+    CHECK(window.menu.TakeExportRequest() && !window.menu.TakeExportRequest() && window.menu.open);
     CHECK_EQ(window.Said(), "");
 }
 

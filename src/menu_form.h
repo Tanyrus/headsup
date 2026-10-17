@@ -33,6 +33,7 @@ namespace headsup
         const std::vector<std::string>* cursorFiles = nullptr; // the cursors folder's files, without their extensions
         std::optional<bool> watching;            // whether the debug watch runs; none in a build without one
         const std::string* lastReport = nullptr; // the file the last report went to, empty before one
+        bool exportable = false; // a developer's build, which can write its built-in layout out as a file
     };
 
     // The Game Windows card's own state: its filter and whether it lists every window.
@@ -51,6 +52,7 @@ namespace headsup
         bool confirmReset  = false; // the reset button was pressed once and asks for a second press
         bool debugRequested = false;
         bool watchRequested = false; // the debug watch is to start, or stop
+        bool exportRequested = false;
         bool cursorsRequested = false; // a list of pictures was opened: the cursors folder is to be read again
         KeyCapture keyCapture;      // the Mouse Cursor page's
         KeyCapture shotKeyCapture;  // screenshot mode's

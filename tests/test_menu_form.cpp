@@ -207,6 +207,26 @@ TEST(a_build_that_watches_has_a_watch_button_and_the_card_says_where_the_last_re
     CHECK(Has(saved, "debug-20261015-101500.txt") && !Has(saved, "PhoenixXI"));
 }
 
+TEST(a_build_that_exports_its_layout_has_an_export_button_after_the_report_and_the_watch)
+{
+    Window w;
+    w.state.page         = Page::ConfigMenu;
+    w.settings.debugMode = true;
+    const char* exporting = "configmenu-debug-mode-export";
+    CHECK(!Has(Block(w.Pass(), "configmenu-debug-mode")->rml, exporting)); // a release build
+    w.readings.watching   = false;
+    w.readings.exportable = true;
+    const FormBlock* card = Block(w.Pass(), "configmenu-debug-mode");
+    CHECK(At(card, "configmenu-debug-mode-debug-report") < At(card, "configmenu-debug-mode-watch"));
+    CHECK(At(card, "configmenu-debug-mode-watch") < At(card, exporting));
+    w.Pass({{exporting, kClickEvent, ""}});
+    CHECK(w.state.exportRequested);
+    w.state.exportRequested = false;
+    w.settings.debugMode    = false; // the card is its title alone
+    w.Pass({{exporting, kClickEvent, ""}});
+    CHECK(!w.state.exportRequested);
+}
+
 TEST(a_key_row_takes_the_next_key_pressed_that_was_not_held)
 {
     Window w;

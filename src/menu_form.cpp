@@ -1215,6 +1215,9 @@ namespace headsup
                     form.Button(Labeled(Word(c, *r.watching ? WindowWord::DebugReportStop : WindowWord::DebugReportWatch), "watch").c_str(),
                         "watch", kWashPill, WordTip(c, WindowWord::DebugReportWatch)))
                     c.state.watchRequested = true;
+                if (r.exportable && form.Button(Labeled(Word(c, WindowWord::Export), "export").c_str(), "export", kWashPill,
+                                        WordTip(c, WindowWord::Export)))
+                    c.state.exportRequested = true;
                 form.EndLine();
                 if (r.lastReport != nullptr && !r.lastReport->empty())
                     form.Note(Filled(Word(c, WindowWord::DebugReportSaved), kFileMark, FileName(*r.lastReport)).c_str());

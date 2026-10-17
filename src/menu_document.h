@@ -60,7 +60,6 @@ namespace headsup
     constexpr const char* kMenuVersionId   = "version";
     constexpr const char* kMenuCloseId     = "close";
     constexpr const char* kMenuReloadId    = "reload";
-    constexpr const char* kMenuExportId    = "export";
     constexpr const char* kMenuPopupId     = "popup";
     constexpr const char* kMenuTipId       = "tip";
     constexpr const char* kMenuCardClass   = "card";

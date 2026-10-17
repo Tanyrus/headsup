@@ -818,6 +818,9 @@ public:
                 .watching         = std::nullopt,
 #endif
                 .lastReport       = &m_LastReport,
+#ifdef HEADSUP_DEV
+                .exportable       = true,
+#endif
             };
             if (m_RmlMenu.Update(MenuHostNow(), m_Settings, readings, m_Fonts.Choices(m_Settings.defaultFont), kVersion))
             {

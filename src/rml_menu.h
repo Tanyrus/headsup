@@ -113,6 +113,6 @@ namespace headsup
         MenuFormState m_State;
         std::optional<float> m_ScrollTo;
         bool m_Closed = false; // its close button was clicked
-        bool m_Reload = false, m_Export = false;
+        bool m_Reload = false;
     };
 }
