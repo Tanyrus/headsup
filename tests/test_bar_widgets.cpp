@@ -1565,7 +1565,7 @@ TEST(a_qms_popup_says_what_to_trade_it_and_what_that_pops)
     CHECK(SectionLines(p, "Click") ==
           (std::vector<std::string>{"There is a rotten mushroom here. There are 3", "openings in its cap."}));
     CHECK(SectionLines(p, "Trade") ==
-          (std::vector<std::string>{"Woozyshroom + Sleepshroom + Danceshroom", "\xC2\xBB Pops Mycophile"}));
+          (std::vector<std::string>{"Woozyshroom + Sleepshroom + Danceshroom", "\xE2\x86\x92 Pops Mycophile"}));
     CHECK(SectionLines(p, "Pops") == (std::vector<std::string>{"Mycophile"}));
 }
 
@@ -1609,7 +1609,7 @@ TEST(a_qm_shows_the_nm_the_probe_saw_it_pop_and_what_it_says)
     CHECK(SectionLines(p, "Trade") ==
           (std::vector<std::string>{"Shrimp Lantern", "The Shrimp Lantern begins skimming quietly",
               "across the surface of the water. ...What's", "this!? An enormous creature is chasing after",
-              "it from below!!!", "\xC2\xBB Pops Shen"}));
+              "it from below!!!", "\xE2\x86\x92 Pops Shen"}));
     CHECK(SectionLines(p, "Pops") == (std::vector<std::string>{"Shen"}));
 }
 
@@ -1623,7 +1623,7 @@ TEST(a_hidden_qm_says_when_it_appears_and_what_a_readied_one_does)
     state.target         = &tree;
     const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
     CHECK(SectionLines(p, "") == (std::vector<std::string>{"ID 142", "Appears at 22:00, gone at 07:00"}));
-    CHECK(SectionLines(p, "Click") == (std::vector<std::string>{"Once readied", "\xC2\xBB Pops Hercules Beetle"}));
+    CHECK(SectionLines(p, "Click") == (std::vector<std::string>{"Once readied", "\xE2\x86\x92 Pops Hercules Beetle"}));
     if (const PopupSection* click = Section(p, "Click")) CHECK(click->rows[0].cells[0].text[0].tone == Tone::Dim);
 }
 
@@ -1637,8 +1637,8 @@ TEST(a_quest_steps_acts_name_the_quest_its_step_and_what_it_needs)
     state.target = &qm;
     CHECK(SectionLines(BarPopupContent(BarWidget::Target, state, settings), "Click") ==
           (std::vector<std::string>{"You find nothing.", "In A Chocobos Tale, step 4", "You are being attacked!",
-              "\xC2\xBB Pops Badshah", "In A Chocobos Tale, step 4, after its NM falls",
-              "\xC2\xBB Gives key item Silver Comets Collar"}));
+              "\xE2\x86\x92 Pops Badshah", "In A Chocobos Tale, step 4, after its NM falls",
+              "\xE2\x86\x92 Gives key item Silver Comets Collar"}));
 }
 
 TEST(an_npcs_popup_names_the_key_items_it_gives_and_checks_for)
@@ -1653,10 +1653,10 @@ TEST(an_npcs_popup_names_the_key_items_it_gives_and_checks_for)
     CHECK(Headings(p) == (std::vector<std::string>{"", "Click", "Pops", "Key items", "Checks for", "Quests"}));
     CHECK(SectionLines(p, "Click") ==
           (std::vector<std::string>{"There is nothing out of the ordinary here.", "In Elderly Pursuits, step 1",
-              "You are overwhelmed by the putrid stench of", "decay!", "\xC2\xBB Pops Para",
+              "You are overwhelmed by the putrid stench of", "decay!", "\xE2\x86\x92 Pops Para",
               "In Elderly Pursuits, step 2, holding its key items", "You polish the Antique Amulet with the",
               "glowing mushroom spores!", "Obtained key item: Cathedral Medallion.",
-              "\xC2\xBB Gives key item Cathedral Medallion"}));
+              "\xE2\x86\x92 Gives key item Cathedral Medallion"}));
     CHECK(SectionLines(p, "Quests") == (std::vector<std::string>{"Elderly Pursuits Other Areas"}));
     CHECK(SectionLines(p, "Pops") == (std::vector<std::string>{"Para"}));
     CHECK(SectionLines(p, "Key items") == (std::vector<std::string>{"Cathedral Medallion"}));

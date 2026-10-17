@@ -31,4 +31,9 @@ namespace headsup
             return std::tolower(static_cast<unsigned char>(x)) == std::tolower(static_cast<unsigned char>(y));
         });
     }
+
+    bool IsFallbackFont(std::string_view family)
+    {
+        return SameFamily(family, kMontserratSemiBold);
+    }
 }

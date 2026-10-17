@@ -290,8 +290,8 @@ namespace headsup
         }
 
         constexpr size_t kNpcTextChars = 44; // a message's line in the popup
-        // Before what an act leads to: a mark every bundled font has (three of the five lack an arrow).
-        constexpr const char* kResult = "\xC2\xBB ";
+        // Before what an act leads to; a font without the arrow draws Montserrat's (IsFallbackFont).
+        constexpr const char* kResult = "\xE2\x86\x92 ";
 
         std::string JoinedNames(const std::vector<std::string>& names)
         {
