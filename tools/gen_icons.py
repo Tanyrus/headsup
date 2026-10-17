@@ -32,6 +32,10 @@ ICONS = [(name, f'mobdb-icons/{name}.png', '') for name in
 ] + [(name, f'mobdb-icons/Immune{name}.png', '') for name in
      ['LightSleep', 'DarkSleep', 'Gravity', 'Bind', 'Stun', 'Silence', 'Paralyze', 'Blind', 'Slow', 'Poison', 'Elegy',
       'Requiem', 'Petrify']]
+# The icons the renderer tints with a color of the game's, the linkshell's: XIUI's pearl is a grey shaded sphere, which
+# the color multiplies, so the pearl would show at half the color the game shows. Its shading is halved toward white.
+TINTED = {'Linkshell'}
+TINT_SHADE = 0.5  # what is left of a tinted icon's shading
 POINTER = 'playonline-chocobo/chocobo.ani'  # under third_party
 PNG_SIGNATURE = b'\x89PNG\r\n\x1a\n'
 RGBA_8_BIT = (8, 6)     # bit depth, color type
@@ -147,6 +151,15 @@ def trim_square(width: int, height: int, bgra: bytes) -> tuple[int, int, bytes]:
     return side, side, bytes(out)
 
 
+def lifted(bgra: bytes) -> bytes:
+    """The pixels with each color channel's shading, what it lacks of white, cut to TINT_SHADE; alpha kept."""
+    out = bytearray(bgra)
+    for i in range(len(out)):
+        if i % BYTES_PER_PIXEL != BYTES_PER_PIXEL - 1:
+            out[i] = int(255 - (255 - out[i]) * TINT_SHADE + 0.5)
+    return bytes(out)
+
+
 def c_bytes(name: str, data: bytes) -> str:
     lines = [f'const unsigned char {name}[] = {{']
     for start in range(0, len(data), BYTES_PER_LINE):
@@ -167,7 +180,8 @@ def generate(third_party: pathlib.Path) -> str:
         if not path.is_file():
             raise IconError(f'missing icon {path}')
         try:
-            parts.append(c_bitmap(name, *trim_square(*decode_bgra(path.read_bytes()))))
+            width, height, bgra = trim_square(*decode_bgra(path.read_bytes()))
+            parts.append(c_bitmap(name, width, height, lifted(bgra) if name in TINTED else bgra))
         except IconError as error:
             raise IconError(f'{path}: {error}') from None
     parts.append('const IconBitmap kIcons[] = {' + ', '.join(f'kIcon{name}' for name, _, _ in ICONS) + '};')
