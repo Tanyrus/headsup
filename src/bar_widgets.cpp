@@ -289,8 +289,9 @@ namespace headsup
             return names;
         }
 
-        constexpr size_t kNpcTextChars = 44;           // a message's line in the popup
-        constexpr const char* kResult  = "\xE2\x86\x92 "; // an arrow before what an act leads to
+        constexpr size_t kNpcTextChars = 44; // a message's line in the popup
+        // Before what an act leads to: a mark every bundled font has (three of the five lack an arrow).
+        constexpr const char* kResult = "\xC2\xBB ";
 
         std::string JoinedNames(const std::vector<std::string>& names)
         {
