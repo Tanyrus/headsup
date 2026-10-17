@@ -164,6 +164,10 @@ class Parse(unittest.TestCase):
         self.assertBad('the row "calm" of "palette" has no name',
                        lambda t: t['pages'][0]['cards'][1]['settings'][0]['rows'][0].pop('name'))
 
+    def test_an_indent_is_true_or_false(self):
+        self.assertBad('the indent of "size" must be true or false',
+                       lambda t: t['pages'][-1]['cards'][0]['settings'][0].update(indent='yes'))
+
     def test_a_name_or_a_tip_that_is_no_text(self):
         self.assertBad('the name of the setting "size" must be text', lambda t: t['pages'][-1]['cards'][0]['settings'][0].update(name=3))
         self.assertBad('the name of the setting "size" must be text', lambda t: t['pages'][-1]['cards'][0]['settings'][0].update(name=''))
@@ -294,11 +298,18 @@ class Generate(unittest.TestCase):
     def test_what_a_reader_of_the_file_takes_from_the_code(self):
         # A row order the code keeps, the kinds the code has a setting on, and each word's key and its setting's.
         _, tables = gen.generate(parse(fixture()), PIECES)
-        self.assertRegex(tables, r'\{SettingPiece::Palette, "palette", .*, true, kEveryKind\},')
-        self.assertRegex(tables, r'\{SettingPiece::Lines, "lines", .*, false, kEveryKind\},')
-        self.assertRegex(tables, r'\{SettingPiece::MaxIcons, "max-icons", .*, false, 6\},')
+        self.assertRegex(tables, r'\{SettingPiece::Palette, "palette", .*, true, kEveryKind, false\},')
+        self.assertRegex(tables, r'\{SettingPiece::Lines, "lines", .*, false, kEveryKind, false\},')
+        self.assertRegex(tables, r'\{SettingPiece::MaxIcons, "max-icons", .*, false, 6, false\},')
         self.assertIn('{WindowWord::RowsHead, "Nameplates", nullptr, "head", "rows"},', tables)
         self.assertIn('{WindowWord::EveryWindow, nullptr, "All.", "every-window", nullptr},', tables)
+
+    def test_a_setting_the_file_indents_is_indented_in_its_table(self):
+        tree = fixture()
+        tree['pages'][0]['cards'][0]['settings'][1]['indent'] = True
+        _, tables = gen.generate(parse(tree), PIECES)
+        self.assertRegex(tables, r'\{SettingPiece::Speed, "speed", .*, kEveryKind, true\},')
+        self.assertRegex(tables, r'\{SettingPiece::Size, "size", .*, kEveryKind, false\},')
 
     def test_the_file_itself_and_its_version_go_with_the_tables(self):
         text = json.dumps(fixture())
@@ -334,6 +345,13 @@ class Format(unittest.TestCase):
         written = gen.format_file(tree)
         self.assertEqual(json.loads(written), tree)
         self.assertEqual(gen.format_file(json.loads(written)), written)
+
+    def test_an_indent_is_written_after_the_name_and_only_where_it_is_true(self):
+        tree = fixture()
+        tree['pages'][0]['cards'][0]['settings'][1] = {'indent': True, 'name': 'Speed', 'key': 'speed'}
+        written = gen.format_file(tree)
+        self.assertIn('{"key": "speed", "name": "Speed", "indent": true}', written)
+        self.assertEqual(json.loads(written), tree)
 
     def test_the_version_comes_first(self):
         tree = fixture()

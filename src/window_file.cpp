@@ -306,7 +306,7 @@ namespace headsup
                 const auto built = std::ranges::find(m_Built.settings, given, [](const LayoutSetting& s) { return std::string_view(s.key); });
                 const bool known = built != m_Built.settings.end();
                 const bool hasWords = known && std::ranges::any_of(m_Built.words, [&](const LayoutWord& w) { return w.setting != nullptr && given == w.setting; });
-                std::vector<std::string_view> allowed{"key", "name", "tip", "kinds"};
+                std::vector<std::string_view> allowed{"key", "name", "tip", "kinds", "indent"};
                 if (known && built->optionCount > 0) allowed.push_back("options");
                 if (known && built->rowCount > 0) allowed.push_back("rows");
                 if (hasWords) allowed.push_back("words");
@@ -334,6 +334,8 @@ namespace headsup
                         Bad(owner + " would show on " + std::to_string(std::popcount(*shown)) +
                             " pages: a setting that is not of an entity's design needs one kind in the entity cards, on it or on its card");
                 }
+                const JsonValue* indent = value.Field("indent");
+                if (indent != nullptr && indent->kind != JsonValue::Kind::Flag) Bad("the indent of " + owner + " must be true or false");
                 const Words tip     = TextOf(value, "tip", owner, shown);
                 const bool unnamed  = built->name == nullptr && built->nameByKind == nullptr;
                 const Words name    = Named(value, what, !unnamed, shown);
@@ -349,7 +351,8 @@ namespace headsup
                 }
                 m_Out.settings.push_back(LayoutSetting{built->piece, built->key, name.shared, tip.shared, name.byKind, tip.byKind,
                     kinds.value_or(kEveryKind), built->entity, firstOption, static_cast<int>(m_Out.options.size()) - firstOption,
-                    firstRow, static_cast<int>(m_Out.rows.size()) - firstRow, built->rowsFixed, built->codeKinds});
+                    firstRow, static_cast<int>(m_Out.rows.size()) - firstRow, built->rowsFixed, built->codeKinds,
+                    indent != nullptr && indent->flag});
                 if (hasWords)
                 {
                     const JsonValue* words = value.Field("words");

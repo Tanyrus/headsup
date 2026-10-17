@@ -41,6 +41,7 @@ namespace
             CHECK(x.piece == y.piece && SameText(x.key, y.key) && SameText(x.name, y.name) && SameText(x.tip, y.tip));
             CHECK(SameByKind(x.nameByKind, y.nameByKind) && SameByKind(x.tipByKind, y.tipByKind));
             CHECK(x.kinds == y.kinds && x.entity == y.entity && x.rowsFixed == y.rowsFixed && x.codeKinds == y.codeKinds);
+            CHECK_EQ(x.indent, y.indent);
             CHECK(x.firstOption == y.firstOption && x.optionCount == y.optionCount && x.firstRow == y.firstRow && x.rowCount == y.rowCount);
         }
         for (size_t i = 0; i < a.rows.size(); ++i)
@@ -98,6 +99,20 @@ TEST(the_built_in_file_reads_back_as_the_built_in_tables)
     OwnedLayout owned;
     CHECK_EQ(ReadWindowFile(kWindowFileText, kWindowLayout, kWindowFileVersion, owned), "");
     CheckSame(owned.View(), kWindowLayout);
+}
+
+TEST(a_setting_the_file_indents_reads_back_indented_and_an_indent_is_true_or_false)
+{
+    const std::string shipped = Shipped();
+    const std::string stack   = R"({"key": "stack-names", "name": "Stack Names")";
+    OwnedLayout owned;
+    CHECK_EQ(ReadWindowFile(Replaced(shipped, stack, stack + R"(, "indent": true)"), kWindowLayout, kWindowFileVersion, owned), "");
+    const WindowLayout layout = owned.View();
+    const auto indented       = [&](std::string_view key) {
+        return std::ranges::find_if(layout.settings, [&](const LayoutSetting& s) { return key == s.key; })->indent;
+    };
+    CHECK(indented("stack-names") && !indented("vertical-offset"));
+    CHECK(Has(Problem(Replaced(shipped, stack, stack + R"(, "indent": "yes")")), "the indent of \"stack-names\" must be true or false"));
 }
 
 TEST(a_file_reads_back_in_its_own_order_and_words)

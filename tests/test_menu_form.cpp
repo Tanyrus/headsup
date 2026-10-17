@@ -488,6 +488,24 @@ TEST(a_page_moved_in_the_layout_moves_in_the_sidebar_and_opens_by_its_key)
     CHECK(!w.layout.PageNamed("debug"));
 }
 
+TEST(a_setting_is_indented_where_the_layout_says_so)
+{
+    const auto indented = [](const Form& form, const char* row) {
+        return Has(Block(form, "entities-nameplates")->rml, (std::string("class=\"row indent\" id=\"") + row + "\"").c_str());
+    };
+    constexpr const char* kStack = "entities-nameplates-stack-names-label-row";
+    constexpr const char* kMin   = "entities-nameplates-min-size-label-row";
+    Window w;
+    CHECK(indented(w.Pass(), kMin) && !indented(w.Pass(), kStack)); // the sizes under Scale with Distance
+    test::EditedLayout edited;
+    edited.SetIndent("stack-names", true);
+    edited.SetIndent("min-size", false);
+    w.layout        = edited.Layout();
+    const Form form = w.Pass();
+    CHECK(indented(form, kStack) && !indented(form, kMin));
+    CHECK(!indented(form, "entities-nameplates-vertical-offset-label-row")); // the indent ends with its setting
+}
+
 TEST(renaming_a_page_a_card_and_a_setting_changes_no_control_id)
 {
     test::EditedLayout edited;

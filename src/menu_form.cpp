@@ -882,10 +882,8 @@ namespace headsup
             case SettingPiece::MinSize:
             case SettingPiece::MaxSize:
                 form.Fade(!plates || !s.scaleWithDistance);
-                form.Indent(true);
                 form.SliderPercent(label.c_str(), e.piece == SettingPiece::MinSize ? s.scaleMin : s.scaleMax,
                     kMinSizePercent, kMaxSizePercent, tip);
-                form.Indent(false);
                 break;
             case SettingPiece::VerticalOffset:
                 form.Fade(!plates);
@@ -1363,7 +1361,12 @@ namespace headsup
                 continue;
             CardNote(card.piece, c);
             for (const LayoutSetting& setting : layout.SettingsOf(card))
-                if ((setting.kinds & kinds) != 0 && (!setting.entity || c.kind)) DrawSetting(c, setting);
+            {
+                if ((setting.kinds & kinds) == 0 || (setting.entity && !c.kind)) continue;
+                form.Indent(setting.indent);
+                DrawSetting(c, setting);
+                form.Indent(false);
+            }
             form.EndCard();
         }
         form.Fade(false);

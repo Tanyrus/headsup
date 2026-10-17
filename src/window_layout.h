@@ -65,6 +65,7 @@ namespace headsup
         int firstOption, optionCount, firstRow, rowCount;
         bool rowsFixed;    // its rows come in the code's order
         uint8_t codeKinds; // the kinds the code has it on, whatever the file says
+        bool indent;       // drawn in from the card's edge, under the setting it belongs to
     };
     struct LayoutCard
     {

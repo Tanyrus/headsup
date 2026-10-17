@@ -18,7 +18,7 @@ KINDS = ('mobs', 'players', 'self', 'npcs', 'pets')  # PlateKind's order; also t
 KEY = re.compile(r'[a-z0-9]+(?:-[a-z0-9]+)*\Z')
 ID_MARK = '##'  # what a label holds before the name of its control's id
 SOURCE = 'settings_window.json'
-FIELDS = ('version', 'key', 'name', 'child', 'description', 'tip', 'tipOnClaimRows', 'tipBottomLine', 'kinds', 'options',
+FIELDS = ('version', 'key', 'name', 'child', 'indent', 'description', 'tip', 'tipOnClaimRows', 'tipBottomLine', 'kinds', 'options',
           'rows', 'settings', 'cards', 'pages', 'entity', 'lists', 'words')  # the order --format writes them in
 
 
@@ -68,6 +68,7 @@ class Entry:
     tip: object = None
     extra: str = None  # a second tip
     child: bool = False
+    indent: bool = False
     description: str = None
     kinds: tuple = None
     piece: str = None  # a card's key in the code; None for a card of the file's own
@@ -367,7 +368,7 @@ class Reader:
         if isinstance(value, dict) and key is None:
             self.bad(f'a setting of {place} has no key')
         known = self.pieces.settings.get(key)
-        allowed = ['key', 'name', 'tip', 'kinds']
+        allowed = ['key', 'name', 'tip', 'kinds', 'indent']
         if known is not None:
             allowed += (['options'] if known.options else []) + (['rows'] if known.rows else []) + (
                 ['words'] if known.words else [])
@@ -395,7 +396,10 @@ class Reader:
             if not known.entity and len(shown) != 1:
                 self.bad(f'{owner} would show on {len(shown)} pages: a setting that is not of an entity\'s design needs '
                          'one kind in the entity cards, on it or on its card')
-        entry = Entry(key=key, kinds=kinds, tip=self.text(value, 'tip', owner, shown))
+        indent = value.get('indent', False)
+        if not isinstance(indent, bool):
+            self.bad(f'the indent of {owner} must be true or false')
+        entry = Entry(key=key, kinds=kinds, indent=indent, tip=self.text(value, 'tip', owner, shown))
         entry.name = self.named(value, f'the setting "{key}"', not known.unnamed, shown)
         if known.unnamed and entry.name is not None:
             self.bad(f'the setting "{key}" has a name, and the code shows none')
@@ -593,7 +597,8 @@ def generate(layout: Layout, pieces: Pieces = PIECES, text: str = ''):
             settings.append(f'    {{SettingPiece::{pascal(s.key)}, "{s.key}", {shared(s.name)}, {shared(s.tip)}, '
                             f'{text_by_kind(s.name)}, {text_by_kind(s.tip)}, {bits(s.kinds)}, '
                             f'{"true" if known.entity else "false"}, {first_option}, {len(s.options)}, {first_row}, '
-                            f'{len(s.rows)}, {"true" if known.rows_fixed else "false"}, {bits(known.kinds)}}},')
+                            f'{len(s.rows)}, {"true" if known.rows_fixed else "false"}, {bits(known.kinds)}, '
+                            f'{"true" if s.indent else "false"}}},')
             for word in s.words:
                 layout_words.append(f'    {{WindowWord::{pascal(s.key) + pascal(word.key)}, {c_text(word.name)}, '
                                     f'{c_text(word.tip)}, "{word.key}", "{s.key}"}},')

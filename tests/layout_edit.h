@@ -67,6 +67,13 @@ namespace test
             });
         }
         void SetKinds(std::string_view card, uint8_t kinds) { CardNamed(card).card.kinds = kinds; }
+        void SetIndent(std::string_view key, bool indent)
+        {
+            ForEachCard([&](Card& card) {
+                for (headsup::LayoutSetting& setting : card.settings)
+                    if (key == setting.key) setting.indent = indent;
+            });
+        }
         // Two of a setting's rows trade places, by their places among its rows.
         void SwapRows(std::string_view setting, size_t a, size_t b)
         {
