@@ -288,6 +288,21 @@ TEST(only_the_lines_above_the_bottom_one_have_an_alignment)
     }
 }
 
+TEST(badge_text_goes_with_the_nameplates)
+{
+    Window w;
+    w.state.page = Page::Mobs;
+    CHECK(!ClassOn(w.Pass(), "mobs-badges", "off"));
+    w.settings.nameplates = false;
+    const Form off        = w.Pass();
+    CHECK(ClassOn(off, "mobs-badges", "off"));
+    // Moved to a card that stays, the settings still go with the nameplates.
+    test::EditedLayout edited;
+    edited.MoveSetting("weak-color", "visibility", 0);
+    w.layout = edited.Layout();
+    CHECK(ClassOn(w.Pass(), "mobs-visibility-weak-color-label-row", "off"));
+}
+
 TEST(a_page_whose_cards_are_all_switched_off_says_what_switches_them_on)
 {
     const auto shown = [](const Form& form) {

@@ -1010,33 +1010,33 @@ namespace headsup
                     "%.0f yalms", tip);
                 break;
             case SettingPiece::Detection: Detection(c, e); break;
-            // The Target widget's popup reads the ranks switch and these colors too, whatever the nameplates do or hold.
+            // The Target widget's popup reads these too, but they are set with the nameplates.
             case SettingPiece::BadgeFont:
-                form.Fade(!on);
+                form.Fade(!plates);
                 form.FontDropdown(label.c_str(), s.badgeFontName, c.plateFonts, tip, Word(c, WindowWord::DefaultFont));
                 break;
             case SettingPiece::BadgeNumbers:
-                form.Fade(!on);
+                form.Fade(!plates);
                 OptionsDropdown(form, label, s.rankDisplay, c.layout.OptionsOf(e), tip);
                 break;
             case SettingPiece::CountYourAccuracy:
-                form.Fade(!on || s.rankDisplay != RankDisplay::IncreasedChance);
+                form.Fade(!plates || s.rankDisplay != RankDisplay::IncreasedChance);
                 form.Switch(label.c_str(), s.countAccuracy, tip);
                 break;
             case SettingPiece::WeakColor:
-                form.Fade(!on);
+                form.Fade(!plates);
                 form.Swatch(label.c_str(), s.weakBadgeColor, tip, &kDefaults.weakBadgeColor);
                 break;
             case SettingPiece::ResistColor:
-                form.Fade(!on);
+                form.Fade(!plates);
                 form.Swatch(label.c_str(), s.resistBadgeColor, tip, &kDefaults.resistBadgeColor);
                 break;
             case SettingPiece::StatusResistColor:
-                form.Fade(!on);
+                form.Fade(!plates);
                 form.Swatch(label.c_str(), s.rankBadgeColor, tip, &kDefaults.rankBadgeColor);
                 break;
             case SettingPiece::ImmuneColor:
-                form.Fade(!on);
+                form.Fade(!plates);
                 form.Swatch(label.c_str(), s.immuneBadgeColor, tip, &kDefaults.immuneBadgeColor);
                 break;
             case SettingPiece::WeakFrom:
@@ -1298,9 +1298,9 @@ namespace headsup
             case CardPiece::ColorsTargeting:
             case CardPiece::ColorsEntityType:
             case CardPiece::Visibility:
-            case CardPiece::Badges:
             case CardPiece::PlaceholderTimers:
             case CardPiece::MousePointer: return {false, !on};
+            case CardPiece::Badges: return {false, !plates};
             case CardPiece::OutlineDesign: return {c.kind && !c.outlineColors, !on || !s.outlines};
             case CardPiece::NameplateDesign:
             case CardPiece::LineStyle:
