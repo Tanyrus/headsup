@@ -89,6 +89,9 @@ namespace headsup
     // A plate's rise seconds later, on its way to where it should be: most of the way in a fraction of a second, and
     // there once within half a pixel.
     float EaseRise(float shown, float target, double seconds);
+    // The line from a risen plate's bottom down to where it stood, width wide around the plate's center: none for a
+    // plate that rose less than a pixel.
+    std::optional<PlateBox> StackLeader(float centerX, float bottom, float rise, float width);
 
     float CursorBob(double seconds, float height, bool floating);
 
@@ -114,8 +117,6 @@ namespace headsup
     // texture a frame longer. One with nothing to show yet is always drawn.
     constexpr double kRedrawBudgetMs = 3.0;
     bool RedrawNow(bool drawn, double spentMs);
-    // Whether a plate's size follows the distance: yours only with scaleOwnName on.
-    bool ScalesWithDistance(const Settings& settings, bool self);
     // Plates of a higher rank draw over every plate of a lower one: your target's, and over it the one you are picking.
     constexpr int kPlainRank = 0, kTargetRank = 1, kPickedRank = 2;
     int PlateRank(uint16_t index, const CursorTargets& targets);

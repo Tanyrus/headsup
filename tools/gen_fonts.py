@@ -13,6 +13,7 @@ from gen_icons import c_bytes  # noqa: E402
 # The fonts in the order the font dropdown offers them: the family GDI matches on, the name of its constants (k<name>
 # for the family, kFont<name> for the bytes), and the file.
 FONTS = [
+    ('Montserrat SemiBold', 'MontserratSemiBold', 'Montserrat-SemiBold.ttf'),
     ('Marcellus SC', 'MarcellusSC', 'MarcellusSC-Regular.ttf'),
     ('Cinzel', 'Cinzel', 'Cinzel-Regular.ttf'),
     ('Cormorant SC', 'CormorantSC', 'CormorantSC-SemiBold.ttf'),

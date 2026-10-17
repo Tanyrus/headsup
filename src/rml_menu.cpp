@@ -8,6 +8,9 @@
 
 #include <RmlUi/Core/Elements/ElementFormControl.h>
 #include <RmlUi/Core/Elements/ElementFormControlInput.h>
+#include <RmlUi/Core/Factory.h>
+#include <RmlUi/Core/FontEngineInterface.h>
+#include <RmlUi/Core/StyleSheetContainer.h>
 
 #include <algorithm>
 #include <array>
@@ -19,6 +22,17 @@ namespace headsup
 {
     namespace
     {
+        // The window's text font's lift at its size, or none while RmlUi has no such font.
+        int LiftOf(const std::string& family, int pixels)
+        {
+            Rml::FontEngineInterface* fonts = Rml::GetFontEngineInterface();
+            const Rml::FontFaceHandle face  = fonts->GetFontFaceHandle(Rml::StringUtilities::ToLower(family),
+                Rml::Style::FontStyle::Normal, Rml::Style::FontWeight::Normal, pixels);
+            if (face == 0) return 0;
+            const Rml::FontMetrics& metrics = fonts->GetFontMetrics(face);
+            return TextLift(metrics.ascent, metrics.descent, pixels);
+        }
+
         constexpr const char* kDocumentName = "settings";
         constexpr float kPopupDrop  = 2.0f;  // pixels between a control and its popup
         constexpr float kTipDrop    = 18.0f; // pixels from the pointer to its tip
@@ -117,6 +131,9 @@ namespace headsup
     }
 
     bool RmlMenu::TakeDebugRequest() { return std::exchange(m_State.debugRequested, false); }
+    bool RmlMenu::TakeWatchRequest() { return std::exchange(m_State.watchRequested, false); }
+    bool RmlMenu::TakeReloadRequest() { return std::exchange(m_Reload, false); }
+    bool RmlMenu::TakeExportRequest() { return std::exchange(m_State.exportRequested, false); }
     bool RmlMenu::TakeCursorsRequest() { return std::exchange(m_State.cursorsRequested, false); }
 
     bool RmlMenu::OpenPage(const std::string& name)
@@ -168,8 +185,15 @@ namespace headsup
 
     bool RmlMenu::Document(const MenuHost& host, const Settings& settings)
     {
-        MenuLook look{settings.menuTheme, host.textFont, kMarcellusSC};
+        MenuLook look{settings.menuTheme, host.textFont, kMarcellusSC, settings.menuFontSize, m_Look.textLift, host.developer};
         if (m_Document != nullptr && look == m_Look) return true;
+        look.textLift = LiftOf(host.textFont, settings.menuFontSize);
+        if (m_Document != nullptr && look.SameFrame(m_Look))
+        {
+            m_Document->SetStyleSheetContainer(Rml::Factory::InstanceStyleSheetString(MenuStyle(look)));
+            m_Look = std::move(look);
+            return true;
+        }
         Close();
         m_Document = host.context->LoadDocumentFromMemory(MenuDocument(look), kDocumentName);
         if (m_Document == nullptr) return false;
@@ -216,7 +240,8 @@ namespace headsup
             }
             if (!same)
             {
-                page += std::string("<div class=\"") + kMenuCardClass + "\" id=\"" + block.id + "\">" + block.rml + "</div>";
+                page += std::string("<div class=\"") + (block.bare ? kMenuFootClass : kMenuCardClass) + "\" id=\"" + block.id + "\">" +
+                        block.rml + "</div>";
                 continue;
             }
             Card& shown = m_Cards[card++];
@@ -338,13 +363,19 @@ namespace headsup
     }
 
     // A key in a stretch that is not the stretch's own: Backspace at its start and Delete at its end are for the tag
-    // beside it, and the arrows step past it. True when the keyboard moved: the stretch left must not get the key.
+    // beside it, the arrows step past it and Enter breaks the line at the caret. True when the stretch must not get
+    // the key: the keyboard moved, or the line takes it.
     bool RmlMenu::RunKey(Rml::ElementFormControlInput* input, const std::string& id, Rml::Input::KeyIdentifier key)
     {
         const std::string value = input->GetValue();
         int start = 0, end = 0;
         input->GetSelection(&start, &end, nullptr);
         const bool atStart = start == 0 && end == 0, atEnd = start == end && ByteOf(value, start) == value.size();
+        if (key == Rml::Input::KI_RETURN || key == Rml::Input::KI_NUMPADENTER)
+        {
+            m_Events.push_back(FormEvent{id, kBreakEvent, value, {}, ByteOf(value, start)});
+            return true;
+        }
         if (key == Rml::Input::KI_BACK && atStart)
             m_Events.push_back(FormEvent{id, kKillEvent, kKillBack + value});
         else if (key == Rml::Input::KI_DELETE && atEnd)
@@ -401,6 +432,7 @@ namespace headsup
         {
         case Rml::EventId::Click:
             if (id == kMenuCloseId) m_Closed = true;
+            m_Reload |= id == kMenuReloadId;
             // The picker's own ground, between its sliders, is the picker: a click there is one on its control.
             // A click in a line box beside its stretches is a click at its end.
             if (target->IsClassSet(kLineBoxClass))
@@ -444,18 +476,27 @@ namespace headsup
                     if (const auto was = m_FocusValue.find(id); was != m_FocusValue.end()) input->SetValue(was->second);
                     input->Blur();
                 }
-                else if (key == Rml::Input::KI_RETURN || key == Rml::Input::KI_NUMPADENTER)
-                    input->Blur();
                 // RmlUi's text box shows its caret for every arrow it is given, with or without the keyboard.
                 else if (target->IsClassSet(kRunClass) && RunKey(input, id, key))
                     event.StopPropagation();
+                else if (key == Rml::Input::KI_RETURN || key == Rml::Input::KI_NUMPADENTER)
+                    input->Blur();
             }
             break;
         case Rml::EventId::Dragdrop:
             if (auto* dragged = static_cast<Rml::Element*>(event.GetParameter<void*>("drag_element", nullptr));
                 dragged != nullptr && !LetGoOn(dragged, event))
-                m_Events.push_back(FormEvent{id, kDropEvent, dragged->GetId(),
-                    dragged->GetAttribute<Rml::String>(kCarriesAttribute, "")});
+            {
+                FormEvent drop{id, kDropEvent, dragged->GetId(), dragged->GetAttribute<Rml::String>(kCarriesAttribute, "")};
+                // A stretch is as wide as its letters from its content's left: the pointer says between which.
+                if (Rml::ElementFormControlInput* run = named != nullptr && named->IsClassSet(kRunClass) ? AsInput(named) : nullptr)
+                    drop.at = ByteUnder(run->GetValue(),
+                        static_cast<float>(event.GetParameter<int>("mouse_x", 0)) - run->GetAbsoluteOffset(Rml::BoxArea::Content).x,
+                        [&](std::string_view start) {
+                            return static_cast<float>(Rml::ElementUtilities::GetStringWidth(run, Rml::String(start)));
+                        });
+                m_Events.push_back(std::move(drop));
+            }
             break;
         case Rml::EventId::Dragend:
             if (!LetGoOn(target, event)) m_Events.push_back(FormEvent{id, kDragEndEvent, {}, {}});
@@ -550,6 +591,11 @@ namespace headsup
             char text[32];
             std::snprintf(text, sizeof(text), "v%g", version);
             if (Rml::Element* shown = m_Document->GetElementById(kMenuVersionId)) shown->SetInnerRML(text);
+            if (Rml::Element* button = m_Document->GetElementById(kMenuReloadId))
+            {
+                button->SetInnerRML(EscapedRml(host.layout->WordOf(WindowWord::Reload).name));
+                button->SetAttribute(kMenuTipAttribute, std::string(Said(host.layout->WordOf(WindowWord::Reload).tip)));
+            }
         }
         const bool moved = Place(host, settings, pixels);
 

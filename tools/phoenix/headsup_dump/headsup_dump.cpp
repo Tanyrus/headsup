@@ -5,19 +5,35 @@
  * zones have spawned their mobs, it spawns the rest, so every mob runs its
  * spawn script, and watches them all live a while, noting any it sees
  * attacking, then writes every loaded mob, with its immunities, damage
- * taken, resistance ranks and loot, and the /check and aggro rules the
- * server loaded to $HEADSUP_DUMP_PATH as JSON and exits.
+ * taken, resistance ranks, magic evasion, resist traits, jobs, spawn
+ * window, lottery chance, senses, absorbs, traits, TP moves, spells, stats
+ * and combat stats at each level and loot, every item with magic accuracy,
+ * the TP move and spell lists, every NPC content restriction leaves on
+ * with where its script and quest handlers are defined and the constant
+ * tables they name, the /check and aggro rules the server loaded and the
+ * settings it ran with to $HEADSUP_DUMP_PATH as JSON and exits.
  ************************************************************************/
 
 #include "common/lua.h"
 #include "map/ai/ai_container.h"
 #include "map/entities/mob_entity.h"
+#include "map/entities/npc_entity.h"
+#include "map/items/item_equipment.h"
+#include "map/items/item_weapon.h"
+#include "map/mob_spell_list.h"
+#include "map/mobskill.h"
+#include "map/spawn_slot.h"
+#include "map/status_effect_container.h"
+#include "map/utils/battleutils.h"
 #include "map/utils/charutils.h"
 #include "map/utils/itemutils.h"
+#include "map/utils/mobutils.h"
 #include "map/utils/moduleutils.h"
 #include "map/utils/zoneutils.h"
 #include "map/zone.h"
 
+#include <algorithm>
+#include <array>
 #include <cerrno>
 #include <chrono>
 #include <cstdio>
@@ -53,6 +69,30 @@ namespace
     constexpr xi::Mod kStatusRankMods[] = {xi::Mod::PARALYZE_RES_RANK, xi::Mod::BIND_RES_RANK, xi::Mod::SILENCE_RES_RANK,
         xi::Mod::SLOW_RES_RANK, xi::Mod::POISON_RES_RANK, xi::Mod::LIGHT_SLEEP_RES_RANK, xi::Mod::DARK_SLEEP_RES_RANK,
         xi::Mod::BLIND_RES_RANK, xi::Mod::STUN_RES_RANK, xi::Mod::GRAVITY_RES_RANK};
+    constexpr xi::Mod kElementMevaMods[] = {xi::Mod::FIRE_MEVA, xi::Mod::ICE_MEVA, xi::Mod::WIND_MEVA, xi::Mod::EARTH_MEVA,
+        xi::Mod::THUNDER_MEVA, xi::Mod::WATER_MEVA, xi::Mod::LIGHT_MEVA, xi::Mod::DARK_MEVA};
+    // scripts/data/status_effect_tables.lua's magic evasion and resist trait of each status; both sleeps are SLEEP_I's.
+    constexpr xi::Mod kStatusMevaMods[] = {xi::Mod::PARALYZE_MEVA, xi::Mod::BIND_MEVA, xi::Mod::SILENCE_MEVA,
+        xi::Mod::SLOW_MEVA, xi::Mod::POISON_MEVA, xi::Mod::SLEEP_MEVA, xi::Mod::SLEEP_MEVA, xi::Mod::BLIND_MEVA,
+        xi::Mod::STUN_MEVA, xi::Mod::GRAVITY_MEVA};
+    constexpr xi::Mod kStatusResistMods[] = {xi::Mod::PARALYZERES, xi::Mod::BINDRES, xi::Mod::SILENCERES, xi::Mod::SLOWRES,
+        xi::Mod::POISONRES, xi::Mod::SLEEPRES, xi::Mod::SLEEPRES, xi::Mod::BLINDRES, xi::Mod::STUNRES, xi::Mod::GRAVITYRES};
+    constexpr xi::Mod kElementMaccMods[] = {xi::Mod::FIRE_MACC, xi::Mod::ICE_MACC, xi::Mod::WIND_MACC, xi::Mod::EARTH_MACC,
+        xi::Mod::THUNDER_MACC, xi::Mod::WATER_MACC, xi::Mod::LIGHT_MACC, xi::Mod::DARK_MACC};
+    constexpr xi::Mod kStaffBonusMods[] = {xi::Mod::FIRE_STAFF_BONUS, xi::Mod::ICE_STAFF_BONUS, xi::Mod::WIND_STAFF_BONUS,
+        xi::Mod::EARTH_STAFF_BONUS, xi::Mod::THUNDER_STAFF_BONUS, xi::Mod::WATER_STAFF_BONUS, xi::Mod::LIGHT_STAFF_BONUS,
+        xi::Mod::DARK_STAFF_BONUS};
+    // In tools/gen_mobdata.py's STAT_ORDER: STR to CHR as the magic hit rate reads them (getStat), magic evasion,
+    // then HP, MP, attack, defense, evasion and accuracy.
+    using Stats = std::array<int, 14>;
+    // In tools/phoenix/compact.py's DAMAGE_MODS: the uncapped and capped damage taken of each kind, and DMG.
+    constexpr xi::Mod kDamageMods[] = {xi::Mod::UDMGPHYS, xi::Mod::DMGPHYS, xi::Mod::UDMGMAGIC, xi::Mod::DMGMAGIC,
+        xi::Mod::DMGMAGIC_II, xi::Mod::UDMGRANGE, xi::Mod::DMGRANGE, xi::Mod::UDMGBREATH, xi::Mod::DMGBREATH, xi::Mod::DMG};
+    constexpr xi::Mod kAbsorbMods[] = {xi::Mod::FIRE_ABSORB, xi::Mod::ICE_ABSORB, xi::Mod::WIND_ABSORB,
+        xi::Mod::EARTH_ABSORB, xi::Mod::LTNG_ABSORB, xi::Mod::WATER_ABSORB, xi::Mod::LIGHT_ABSORB, xi::Mod::DARK_ABSORB};
+    // In compact.py's TRAIT_MODS.
+    constexpr xi::Mod kTraitMods[] = {xi::Mod::REGEN, xi::Mod::REFRESH, xi::Mod::REGAIN, xi::Mod::BLINK,
+        xi::Mod::UTSUSEMI, xi::Mod::COUNTER, xi::Mod::SPIKES, xi::Mod::ENSPELL};
 
     template <size_t N>
     void WriteMods(FILE* out, const char* key, CMobEntity* PMob, const xi::Mod (&mods)[N])
@@ -61,6 +101,86 @@ namespace
         for (size_t i = 0; i < N; ++i)
             std::fprintf(out, "%s%d", i ? "," : "", static_cast<int>(PMob->getMod(mods[i])));
         std::fputs("]", out);
+    }
+
+    // Each status's value with what every status shares added, as the magic hit rate and the resist trait roll add it.
+    template <size_t N>
+    void WriteModsWith(FILE* out, const char* key, CMobEntity* PMob, const xi::Mod (&mods)[N], xi::Mod shared)
+    {
+        std::fprintf(out, ",\"%s\":[", key);
+        for (size_t i = 0; i < N; ++i)
+            std::fprintf(out, "%s%d", i ? "," : "", static_cast<int>(PMob->getMod(mods[i]) + PMob->getMod(shared)));
+        std::fputs("]", out);
+    }
+
+    Stats StatsOf(CMobEntity* PMob)
+    {
+        return {PMob->STR(), PMob->DEX(), PMob->VIT(), PMob->AGI(), PMob->INT(), PMob->MND(), PMob->CHR(),
+            PMob->getMod(xi::Mod::MEVA), PMob->GetMaxHP(), PMob->GetMaxMP(), PMob->ATT(SLOT_MAIN), PMob->DEF(), PMob->EVA(),
+            PMob->ACC(0, 0)};
+    }
+
+    // What the server's calculation gives at a level, set as CMobEntity::Spawn sets it. Only a recovering calculation
+    // works out HP and MP; it also ends the mob's effects, which its record has been written with.
+    Stats CalculatedAt(CMobEntity* PMob, uint8 level)
+    {
+        PMob->TraitList.clear();
+        PMob->SetMLevel(level);
+        PMob->SetSLevel(level);
+        mobutils::CalculateMobStats(PMob, true);
+        return StatsOf(PMob);
+    }
+
+    // Its stats at each level of its range from minLevel, with what its SQL mods and spawn script added at the level it
+    // spawned at; none for a mob whose script sets its level. It recalculates the mob, so it comes last in its record.
+    void WriteLevelStats(FILE* out, CMobEntity* PMob)
+    {
+        std::fputs(",\"stats\":[", out);
+        const uint8 spawned = PMob->GetMLevel();
+        if (PMob->m_minLevel > 0 && spawned > 0)
+        {
+            const Stats seen       = StatsOf(PMob);
+            const Stats calculated = CalculatedAt(PMob, spawned);
+            for (int level = PMob->m_minLevel; level <= PMob->m_maxLevel; ++level)
+            {
+                const Stats at = CalculatedAt(PMob, static_cast<uint8>(level));
+                std::fputs(level == PMob->m_minLevel ? "[" : ",[", out);
+                for (size_t i = 0; i < at.size(); ++i)
+                    std::fprintf(out, "%s%d", i ? "," : "", at[i] + seen[i] - calculated[i]);
+                std::fputs("]", out);
+            }
+        }
+        std::fputs("]", out);
+    }
+
+    // Every piece of equipment the magic hit rate reads: its magic accuracy, each element's and each elemental staff
+    // bonus, and an instrument's skill, as songs add a wind instrument's.
+    void WriteItems(FILE* out)
+    {
+        std::fputs("\"items\":[", out);
+        bool first = true;
+        for (uint32 id = 0; id < MAX_ITEMID; ++id)
+        {
+            const auto* item = xi::items::lookup<CItemEquipment>(static_cast<uint16>(id));
+            if (item == nullptr) continue;
+            const auto* weapon  = dynamic_cast<const CItemWeapon*>(item);
+            const auto skill    = weapon != nullptr ? weapon->getSkillType() : xi::SkillType::None;
+            const bool instrument = skill == xi::SkillType::WindInstrument || skill == xi::SkillType::StringInstrument;
+            bool any            = instrument || item->getModifier(xi::Mod::MACC) != 0;
+            for (size_t i = 0; i < std::size(kElementMaccMods); ++i)
+                any = any || item->getModifier(kElementMaccMods[i]) != 0 || item->getModifier(kStaffBonusMods[i]) != 0;
+            if (!any) continue;
+            std::fprintf(out, "%s\n{\"id\":%u,\"macc\":%d,\"elementMacc\":[", first ? "" : ",", id,
+                static_cast<int>(item->getModifier(xi::Mod::MACC)));
+            first = false;
+            for (size_t i = 0; i < std::size(kElementMaccMods); ++i)
+                std::fprintf(out, "%s%d", i ? "," : "", static_cast<int>(item->getModifier(kElementMaccMods[i])));
+            std::fputs("],\"staffBonus\":[", out);
+            for (size_t i = 0; i < std::size(kStaffBonusMods); ++i)
+                std::fprintf(out, "%s%d", i ? "," : "", static_cast<int>(item->getModifier(kStaffBonusMods[i])));
+            std::fprintf(out, "],\"skill\":%d}", instrument ? static_cast<int>(skill) : 0);
+        }
+        std::fputs("\n]", out);
     }
 
     std::string JsonEscape(const std::string& text)
@@ -73,10 +193,11 @@ namespace
                 out += '\\';
                 out += c;
             }
-            else if (static_cast<unsigned char>(c) < 0x20)
+            else if (static_cast<unsigned char>(c) < 0x20 || static_cast<unsigned char>(c) >= 0x80)
             {
+                // A byte past ASCII (the game's Shift-JIS) as the code point of that byte, so the file stays UTF-8.
                 char escaped[8];
-                std::snprintf(escaped, sizeof(escaped), "\\u%04x", c);
+                std::snprintf(escaped, sizeof(escaped), "\\u%04x", static_cast<unsigned char>(c));
                 out += escaped;
             }
             else
@@ -85,11 +206,23 @@ namespace
         return out;
     }
 
-    // Every NM script's lottery placeholders (entity.phList, as the server loaded it): placeholder server ID to the NM's,
-    // the first when it can roll several.
+    // Every lottery placeholder: placeholder server ID to the NM's, the first when it can roll several. A spawn slot
+    // (a zone's mobs.yaml `slots`) holds its NM as the member with a spawn chance; an NM script's entity.phList, as the
+    // server loaded it, names the rest.
     std::unordered_map<uint32, uint32> Placeholders()
     {
         std::unordered_map<uint32, uint32> nmOf;
+        zoneutils::ForEachZone([&](CZone* PZone) {
+            PZone->ForEachMob([&](CMobEntity* PMob) {
+                const SpawnSlot* slot = PMob->GetSpawnSlot();
+                if (slot == nullptr) return;
+                const auto& entries = slot->GetEntries();
+                const auto own = std::ranges::find(entries, PMob, &SpawnSlotEntry::mob);
+                const auto nm  = std::ranges::find_if(entries, [](const SpawnSlotEntry& e) { return e.spawnChance > 0; });
+                if (own != entries.end() && own->spawnChance == 0 && nm != entries.end())
+                    nmOf.try_emplace(PMob->id, nm->mob->id);
+            });
+        });
         const auto zones = ::lua["xi"]["zones"].get<sol::optional<sol::table>>();
         if (!zones) return nmOf;
         for (const auto& [zoneName, zone] : *zones)
@@ -164,6 +297,53 @@ namespace
         std::fputs("\n]", out);
     }
 
+    // Every TP move list a mob reads, with its moves, and each move's name as the server holds it.
+    void WriteSkillLists(FILE* out, const std::vector<uint16>& lists)
+    {
+        std::fputs("\"skillLists\":[", out);
+        std::vector<uint16> moves;
+        for (size_t i = 0; i < lists.size(); ++i)
+        {
+            std::fprintf(out, "%s\n{\"id\":%u,\"skills\":[", i ? "," : "", lists[i]);
+            const std::vector<uint16>& skills = battleutils::GetMobSkillList(lists[i]);
+            for (size_t j = 0; j < skills.size(); ++j)
+            {
+                std::fprintf(out, "%s%u", j ? "," : "", skills[j]);
+                if (std::ranges::find(moves, skills[j]) == moves.end()) moves.push_back(skills[j]);
+            }
+            std::fputs("]}", out);
+        }
+        std::fputs("\n],\n\"mobSkills\":[", out);
+        bool first = true;
+        for (const uint16 id : moves)
+        {
+            CMobSkill* skill = battleutils::GetMobSkill(id);
+            if (skill == nullptr) continue;
+            std::fprintf(out, "%s\n{\"id\":%u,\"name\":\"%s\"}", first ? "" : ",", id, JsonEscape(skill->getName()).c_str());
+            first = false;
+        }
+        std::fputs("\n]", out);
+    }
+
+    // Each spell list a mob casts from, numbered from 1 in the order the mobs name them: [spell, min level, max level].
+    void WriteSpellLists(FILE* out, const std::vector<const CMobSpellList*>& lists)
+    {
+        std::fputs("\"spellLists\":[", out);
+        for (size_t i = 0; i < lists.size(); ++i)
+        {
+            std::fputs(i ? ",\n[" : "\n[", out);
+            bool first = true;
+            for (const MobSpell_t& spell : lists[i]->m_spellList)
+            {
+                std::fprintf(out, "%s[%u,%u,%u]", first ? "" : ",", static_cast<unsigned>(spell.spellId), spell.min_level,
+                    spell.max_level);
+                first = false;
+            }
+            std::fputs("]", out);
+        }
+        std::fputs("\n]", out);
+    }
+
     // isSitting reads only the entity's animation: try each on one mob, then give it its own back.
     void WriteSittingAnimations(FILE* out, CMobEntity* PMob)
     {
@@ -179,6 +359,197 @@ namespace
         }
         std::fputs("]", out);
         PMob->animation = own;
+    }
+
+    // Every setting of main.lua and map.lua that is a boolean or a number, as the server ran with it. Strings are
+    // left out: some hold the game's Shift-JIS text, which JSON cannot carry.
+    void WriteSettings(FILE* out)
+    {
+        std::fputs("\"settings\":{", out);
+        bool firstTable = true;
+        for (const char* table : {"main", "map"})
+        {
+            std::fprintf(out, "%s\"%s\":{", firstTable ? "" : ",", table);
+            firstTable = false;
+            bool first        = true;
+            const auto values = ::lua["xi"]["settings"][table].get<sol::optional<sol::table>>();
+            if (values)
+                for (const auto& [key, value] : *values)
+                {
+                    if (!key.is<std::string>()) continue;
+                    std::string text;
+                    if (value.get_type() == sol::type::boolean)
+                        text = value.as<bool>() ? "true" : "false";
+                    else if (value.get_type() == sol::type::number)
+                    {
+                        char number[32];
+                        std::snprintf(number, sizeof(number), "%.17g", value.as<double>());
+                        text = number;
+                    }
+                    else
+                        continue;
+                    std::fprintf(out, "%s\"%s\":%s", first ? "" : ",", JsonEscape(key.as<std::string>()).c_str(), text.c_str());
+                    first = false;
+                }
+            std::fputs("}", out);
+        }
+        std::fputs("}", out);
+    }
+
+    // Every NPC content restriction leaves on (a turned-off one sits at 0,0,0, hidden): its zone, script and shown name
+    // and its place.
+    void WriteNpcs(FILE* out)
+    {
+        std::fputs("\"npcs\":[", out);
+        bool first = true;
+        zoneutils::ForEachZone([&](CZone* PZone) {
+            PZone->ForEachNpc([&](CNpcEntity* PNpc) {
+                if (PNpc->contentDisabled()) return;
+                std::fprintf(out,
+                    "%s\n{\"id\":%u,\"zone\":%u,\"zoneName\":\"%s\",\"script\":\"%s\",\"name\":\"%s\","
+                    "\"pos\":[%.3f,%.3f,%.3f,%u]}",
+                    first ? "" : ",", PNpc->id, static_cast<unsigned>(PZone->GetID()),
+                    JsonEscape(PZone->getName()).c_str(), JsonEscape(PNpc->getName()).c_str(),
+                    JsonEscape(PNpc->getPacketName()).c_str(), PNpc->loc.p.x, PNpc->loc.p.y, PNpc->loc.p.z,
+                    static_cast<unsigned>(PNpc->loc.p.rotation));
+                first = false;
+            });
+        });
+        std::fputs("\n]", out);
+    }
+
+    // Where each NPC script function and each interaction handler is defined ([file, first line, last line], the
+    // version a module's override left), and the constant tables the scripts name: zone name -> script -> handler;
+    // zone ID -> entity -> handler -> [{container, check, handler}], a handler that is an action written as its
+    // fields; item and key item names to IDs; each zone's ID table of mobs; quest and mission logs and IDs and the
+    // battlefields' IDs.
+    constexpr const char* kNpcLua = R"lua(
+local function str(s)
+    return '"' .. tostring(s):gsub('[%c"\\\128-\255]', function(c) return string.format('\\u%04x', c:byte()) end) .. '"'
+end
+local function fn(f)
+    local i = debug.getinfo(f, 'S')
+    local file = i.source:gsub('^@', ''):gsub('^%./', '')
+    return '[' .. str(file) .. ',' .. i.linedefined .. ',' .. i.lastlinedefined .. ']'
+end
+local function value(v, depth)
+    local t = type(v)
+    if t == 'function' then return fn(v) end
+    if t == 'number' then
+        if v ~= v or v == math.huge or v == -math.huge then return nil end
+        return v == math.floor(v) and string.format('%d', v) or string.format('%.17g', v)
+    end
+    if t == 'boolean' then return v and 'true' or 'false' end
+    if t == 'string' then return str(v) end
+    if t ~= 'table' or depth <= 0 then return nil end
+    local parts = {}
+    for k, x in pairs(v) do
+        local e = value(x, depth - 1)
+        if e then parts[#parts + 1] = str(k) .. ':' .. e end
+    end
+    return '{' .. table.concat(parts, ',') .. '}'
+end
+local function names(t)
+    local parts = {}
+    for k, v in pairs(t or {}) do
+        if type(v) == 'number' then parts[#parts + 1] = str(k) .. ':' .. string.format('%d', v) end
+    end
+    return '{' .. table.concat(parts, ',') .. '}'
+end
+local function each(t, f)
+    local parts = {}
+    for k, v in pairs(t or {}) do
+        local e = f(v)
+        if e then parts[#parts + 1] = str(k) .. ':' .. e end
+    end
+    return '{' .. table.concat(parts, ',') .. '}'
+end
+
+local scripts = each(xi.zones, function(zone)
+    return type(zone) == 'table' and each(zone.npcs, function(script)
+        if type(script) ~= 'table' then return nil end
+        local parts = {}
+        for k, f in pairs(script) do
+            if type(f) == 'function' then parts[#parts + 1] = str(k) .. ':' .. fn(f) end
+        end
+        return '{' .. table.concat(parts, ',') .. '}'
+    end) or nil
+end)
+
+local function container(c)
+    if type(c) ~= 'table' then return 'null' end
+    return '{"id":' .. str(c.id) .. ',"file":' .. (c.filename and str(c.filename) or 'null') .. ',"log":' ..
+        (c.areaId and string.format('%d', c.areaId) or 'null') .. ',"quest":' ..
+        (c.questId and string.format('%d', c.questId) or 'null') .. ',"mission":' ..
+        (c.missionId and string.format('%d', c.missionId) or 'null') .. ',"name":' ..
+        (c.name and str(c.name) or 'null') .. '}'
+end
+local lookup = InteractionGlobal and InteractionGlobal.lookup and InteractionGlobal.lookup.data or {}
+local interactions = each(lookup, function(entities)
+    return each(entities, function(handlers)
+        return type(handlers) == 'table' and each(handlers, function(entries)
+            if type(entries) ~= 'table' then return nil end
+            local list = {}
+            for _, entry in ipairs(entries) do
+                list[#list + 1] = '{"container":' .. container(entry.container) .. ',"check":' ..
+                    (entry.check and fn(entry.check) or 'null') .. ',"handler":' ..
+                    (value(entry.handler, 3) or 'null') .. '}'
+            end
+            return '[' .. table.concat(list, ',') .. ']'
+        end) or nil
+    end)
+end)
+
+-- A zone's mob IDs by name: a number; a plain list of them in its order, so ID.mob.X[n] reads; or, for any other
+-- table (keyed or nested, whose order pairs does not keep), {"ids": the entity IDs in it, sorted, each once}.
+local function entityIds(t)
+    local found, seen = {}, {}
+    local function walk(x, depth)
+        for _, v in pairs(x) do
+            if type(v) == 'number' and v >= 0x1000000 and not seen[v] then
+                seen[v] = true
+                found[#found + 1] = v
+            elseif type(v) == 'table' and depth > 0 then
+                walk(v, depth - 1)
+            end
+        end
+    end
+    walk(t, 2)
+    table.sort(found)
+    return found
+end
+local mobIds = each(zones, function(ids)
+    return type(ids) == 'table' and each(ids.mob, function(v)
+        if type(v) == 'number' then return string.format('%d', v) end
+        if type(v) ~= 'table' then return nil end
+        local count = 0
+        for _ in pairs(v) do count = count + 1 end
+        local plain = count == #v
+        for i = 1, #v do plain = plain and type(v[i]) == 'number' end
+        local list = {}
+        for _, x in ipairs(plain and v or entityIds(v)) do list[#list + 1] = string.format('%d', x) end
+        local text = '[' .. table.concat(list, ',') .. ']'
+        return plain and text or '{"ids":' .. text .. '}'
+    end) or nil
+end)
+
+return '{"scripts":' .. scripts .. ',"interactions":' .. interactions .. ',"items":' .. names(xi.item) ..
+    ',"keyItems":' .. names(xi.keyItem or xi.ki) .. ',"mobs":' .. mobIds .. ',"questLogs":' .. names(xi.questLog) ..
+    ',"quests":' .. each(xi.quest and xi.quest.id, names) .. ',"missionLogs":' ..
+    names(xi.mission and xi.mission.log_id) .. ',"missions":' .. each(xi.mission and xi.mission.id, names) ..
+    ',"battlefields":' .. names(xi.battlefield and xi.battlefield.id) .. '}'
+)lua";
+
+    void WriteNpcLua(FILE* out)
+    {
+        auto result = ::lua.safe_script(kNpcLua, sol::script_pass_on_error);
+        if (!result.valid())
+        {
+            const sol::error error = result;
+            ShowError("headsup_dump: the NPC scripts: %s", error.what());
+            std::_Exit(1);
+        }
+        std::fprintf(out, "\"npcLua\":%s", result.get<std::string>().c_str());
     }
 
     void WriteRules(FILE* out, CMobEntity* PMob)
@@ -283,9 +654,14 @@ class HeadsUpDumpModule : public CPPModule
         // Every mob of one template shares its drop list, so each list is written once and the mobs give its index.
         std::vector<const DropList_t*> dropLists;
         std::unordered_map<const DropList_t*, size_t> dropListIndex;
+        std::vector<uint16> skillLists;
+        std::vector<const CMobSpellList*> spellLists;
+        std::unordered_map<const CMobSpellList*, size_t> spellListIndex;
         std::fputs("{\"mobs\":[\n", out);
         zoneutils::ForEachZone([&](CZone* PZone) {
             PZone->ForEachMob([&](CMobEntity* PMob) {
+                // Idle mobs cast buffs on themselves (Protect, spikes, Regen): the record is of the mob without them.
+                PMob->StatusEffectContainer->KillAllStatusEffect();
                 const auto respawn = std::chrono::duration_cast<std::chrono::seconds>(PMob->m_RespawnTime).count();
                 const bool follows = (PMob->m_roamFlags & xi::RoamFlag::Follow) != xi::RoamFlag::None;
                 std::fprintf(out,
@@ -313,9 +689,40 @@ class HeadsUpDumpModule : public CPPModule
                 WriteMods(out, "sdt", PMob, kSdtMods);
                 WriteMods(out, "elementRanks", PMob, kElementRankMods);
                 WriteMods(out, "statusRanks", PMob, kStatusRankMods);
+                WriteMods(out, "elementMeva", PMob, kElementMevaMods);
+                WriteModsWith(out, "statusMeva", PMob, kStatusMevaMods, xi::Mod::STATUS_MEVA);
+                WriteModsWith(out, "statusResist", PMob, kStatusResistMods, xi::Mod::STATUSRES);
                 if (const auto seen = seenAttacking.find(PMob); seen != seenAttacking.end())
                     std::fprintf(out, ",\"seenAttacking\":{\"aggro\":%s,\"alwaysAggro\":%d,\"noAggro\":%d}",
                         seen->second.aggro ? "true" : "false", seen->second.alwaysAggro, seen->second.noAggro);
+                // Its script is scripts/zones/<zoneName>/mobs/<script>.lua, as luautils finds it.
+                std::fprintf(out, ",\"script\":\"%s\",\"zoneName\":\"%s\",\"jobs\":[%d,%d]",
+                    JsonEscape(PMob->getName()).c_str(), JsonEscape(PZone->getName()).c_str(),
+                    static_cast<int>(PMob->GetMJob()), static_cast<int>(PMob->GetSJob(true)));
+                if (const auto& window = PMob->spawnWindow())
+                    std::fprintf(out, ",\"window\":[%u,%u]", window->spawnHour, window->despawnHour);
+                if (const SpawnSlot* slot = PMob->GetSpawnSlot())
+                    for (const SpawnSlotEntry& e : slot->GetEntries())
+                        if (e.mob == PMob && e.spawnChance > 0)
+                            std::fprintf(out, ",\"lottery\":[%u,%lld]", static_cast<unsigned>(e.spawnChance),
+                                static_cast<long long>(std::chrono::duration_cast<std::chrono::seconds>(e.cooldown).count()));
+                std::fprintf(out, ",\"charmable\":%d,\"senses\":[%d,%d],\"addEffect\":%d,\"skillList\":%d",
+                    PMob->getMobMod(xi::MobMod::Charmable), PMob->getMobMod(xi::MobMod::SightRange),
+                    PMob->getMobMod(xi::MobMod::SoundRange), PMob->getMobMod(xi::MobMod::AddEffect),
+                    PMob->getMobMod(xi::MobMod::SkillList));
+                WriteMods(out, "damageMods", PMob, kDamageMods);
+                WriteMods(out, "absorb", PMob, kAbsorbMods);
+                WriteMods(out, "traits", PMob, kTraitMods);
+                if (const int16 list = PMob->getMobMod(xi::MobMod::SkillList); list > 0 &&
+                    std::ranges::find(skillLists, static_cast<uint16>(list)) == skillLists.end())
+                    skillLists.push_back(static_cast<uint16>(list));
+                if (const CMobSpellList* spells = PMob->m_SpellListContainer; spells != nullptr && !spells->m_spellList.empty())
+                {
+                    const auto [entry, added] = spellListIndex.try_emplace(spells, spellLists.size() + 1);
+                    if (added) spellLists.push_back(spells);
+                    std::fprintf(out, ",\"spellList\":%zu", entry->second);
+                }
+                WriteLevelStats(out, PMob);
                 std::fputs("}", out);
                 anyMob = PMob;
                 ++count;
@@ -329,7 +736,19 @@ class HeadsUpDumpModule : public CPPModule
         std::fputs("\n],\n", out);
         WriteDropLists(out, dropLists);
         std::fputs(",\n", out);
+        WriteSkillLists(out, skillLists);
+        std::fputs(",\n", out);
+        WriteSpellLists(out, spellLists);
+        std::fputs(",\n", out);
+        WriteItems(out);
+        std::fputs(",\n", out);
         WriteRules(out, anyMob);
+        std::fputs(",\n", out);
+        WriteNpcs(out);
+        std::fputs(",\n", out);
+        WriteNpcLua(out);
+        std::fputs(",\n", out);
+        WriteSettings(out);
         std::fputs("}\n", out);
         if (std::ferror(out) != 0 || std::fclose(out) != 0)
         {

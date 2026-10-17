@@ -1,6 +1,7 @@
 #include "plate_settings.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace headsup
 {
@@ -28,7 +29,8 @@ namespace headsup
             {{1.00f, 0.60f, 0.10f}}, {{0.70f, 0.30f, 1.00f}}, {{0.70f, 0.70f, 0.70f}}};
         const Color toughness[kLabelShadeCount] = {{{0.60f, 0.60f, 0.60f}}, {{0.60f, 0.60f, 0.60f}}, {{0.40f, 1.00f, 0.40f}},
             {{0.45f, 0.70f, 1.00f}}, {{1.00f, 1.00f, 1.00f}}, {{1.00f, 1.00f, 0.35f}}, {{1.00f, 0.35f, 0.35f}}, {{0.72f, 0.08f, 0.08f}}};
-        const Color claim[kClaimStateCount] = {{{1.00f, 0.95f, 0.60f}}, {{0.55f, 0.45f, 0.40f}}, {{0.30f, 0.65f, 1.00f}}};
+        const Color claim[kClaimStateCount] = {{{1.00f, 0.95f, 0.60f}}, {{0.55f, 0.45f, 0.40f}}, {{0.30f, 0.65f, 1.00f}},
+            {{1.00f, 0.60f, 0.00f}}};
         const Color target[kTargetStateCount] = {{{1.00f, 1.00f, 1.00f}}, ColorFromRgb(kPhoenixRed), {{0.65f, 0.40f, 1.00f}},
             {{0.99f, 0.82f, 0.09f}}, {{1.00f, 0.25f, 0.25f}}};
         const Color type[kTargetTypeCount] = {{{1.00f, 1.00f, 1.00f}}, {{1.00f, 1.00f, 1.00f}}, {{1.00f, 0.90f, 0.55f}},
@@ -54,10 +56,9 @@ namespace headsup
         }
         mobs.lines[0].text         = kTagDetect;
         mobs.lines[1].text         = kTagLevelCon;
-        mobs.lines[1].textSize     = 87; // 13 px of 15
+        mobs.lines[1].textSize     = 85;
         mobs.lines[1].color.source = ColorSource::Toughness;
         mobs.lines[2]              = NameLine(kTagName);
-        mobs.lines[2].glow         = 100;
         for (LineDesign& line : mobs.lines)
             line.glowOffInCombat = true;
         mobs.ornament.place        = OrnamentPlace::BelowMiddle;
@@ -141,4 +142,6 @@ namespace headsup
         static_assert(static_cast<int>(OutlineMode::ByNature) == kOutlineModeCount - 1);
         return CanOutlineByNature(kind, row) ? kOutlineModeCount : kOutlineModeCount - 1;
     }
+
+    int Stepped(int value, int step) { return static_cast<int>(std::lround(static_cast<double>(value) / step)) * step; }
 }

@@ -1,6 +1,8 @@
 #include "rml_menu.h"
 
 #include "fonts.h"
+#include "game_font.h"
+#include "layout_edit.h"
 #include "menu_state.h"
 #include "plate_template.h"
 #include "rml_session.h"
@@ -9,6 +11,7 @@
 #include <RmlUi/Core.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <map>
 #include <string>
@@ -23,6 +26,34 @@ namespace
     constexpr int kLeftButton = 0;
     constexpr double kFrameSeconds = 1.0 / 30.0; // the game's frame
     constexpr const char* kLongFont = "Franklin Gothic Demi Condensed"; // a family too long for its dropdown
+
+    // A bundled font's capital height in pixels at a size: its OS/2 table's sCapHeight over the head's units per em.
+    float CapHeight(const char* family, float pixels)
+    {
+        size_t count             = 0;
+        const BundledFont* fonts = BundledFonts(count);
+        const BundledFont* font  = std::find_if(fonts, fonts + count, [&](const BundledFont& f) { return std::string(f.family) == family; });
+        CHECK(font != fonts + count);
+        const unsigned char* data = font->data;
+        const auto u16 = [&](size_t at) { return static_cast<unsigned>(data[at] << 8 | data[at + 1]); };
+        const auto table = [&](const char* tag) {
+            for (unsigned i = 0; i < u16(4); ++i)
+                if (std::equal(tag, tag + 4, data + 12 + 16 * i)) return static_cast<size_t>(u16(12 + 16 * i + 8)) << 16 | u16(12 + 16 * i + 10);
+            return size_t{0};
+        };
+        const size_t head = table("head"), os2 = table("OS/2");
+        CHECK(head != 0 && os2 != 0 && u16(os2) >= 2);
+        return static_cast<float>(static_cast<int16_t>(u16(os2 + 88))) * pixels / static_cast<float>(u16(head + 18));
+    }
+    // How far below the middle of a box a line of capitals stands: RmlUi puts a line's baseline half the leading and
+    // the font's ascent under the line's top.
+    float CapsBelowMiddle(Rml::Element* text, Rml::Element* box, float capHeight)
+    {
+        const Rml::FontMetrics& m = Rml::GetFontEngineInterface()->GetFontMetrics(text->GetFontFaceHandle());
+        const float baseline = text->GetAbsoluteOffset(Rml::BoxArea::Content).y + (text->GetLineHeight() - m.ascent - m.descent) / 2.0f + m.ascent;
+        const float middle = box->GetAbsoluteOffset(Rml::BoxArea::Border).y + box->GetBox().GetSize(Rml::BoxArea::Border).y / 2.0f;
+        return baseline - capHeight / 2.0f - middle;
+    }
 
     // The settings window on a screen of its own, worked as a player works it: by where its controls are.
     class Window
@@ -251,12 +282,27 @@ namespace
             return found;
         }
 
+        // The window of a developer's build, which has its layout's Reload and Export buttons.
+        void Developer()
+        {
+            m_Host.developer      = true;
+            m_Readings.exportable = true;
+            Frames(2);
+        }
+        // The window takes this layout from its next frame on, as after a reload of the layout's file.
+        void Laid(const WindowLayout& layout)
+        {
+            m_Layout      = layout;
+            m_Host.layout = &m_Layout;
+        }
+
     private:
         static constexpr int kDragSteps    = 6;
         static constexpr int kEaseFrames   = 8; // longer than a control takes between two looks
         static constexpr float kFromTheEnd = 6.0f; // pixels
         test::RmlSession m_Rml; // before the menu: its document is closed while RmlUi still runs
         MenuHost m_Host;
+        WindowLayout m_Layout;
         MenuReadings m_Readings;
         std::vector<std::string> m_Fonts = {"Arial", kBarlowCondensed, kMarcellusSC, kLongFont};
     };
@@ -270,6 +316,32 @@ TEST(the_window_opens_on_its_first_page_and_the_sidebar_opens_the_others)
     CHECK(window.Shows("mobs-line-style-head"));
     window.Click("close");
     CHECK(!window.menu.open);
+}
+
+TEST(text_in_a_box_stands_in_its_middle_by_its_fonts_capitals)
+{
+    struct Size
+    {
+        const char* font;
+        int pixels;
+    };
+    for (const Size size : {Size{kBarlowCondensed, 18}, Size{kBarlowCondensed, 24}, Size{kCinzel, 18}})
+    {
+        Window window(MenuTheme::Phoenix, size.font);
+        window.settings.menuFontSize = size.pixels;
+        window.Frames(2);
+        const float cap = CapHeight(size.font, static_cast<float>(size.pixels));
+        const std::pair<const char*, const char*> boxed[] = {
+            {"entities-nameplates-vertical-offset-val", "entities-nameplates-vertical-offset-box"},
+            {"entities-nameplates-default-font-val", "entities-nameplates-default-font"},
+            {"entities-nameplates-stack-names-state", "entities-nameplates-stack-names"},
+            {"entities-nameplates-stack-names-label", "entities-nameplates-stack-names-label-row"}};
+        for (const auto& [text, box] : boxed)
+            CHECK(std::abs(CapsBelowMiddle(window.Find(text), window.Find(box), cap)) <= 0.5f);
+        window.Page("mobs");
+        Rml::Element* chip = window.Find("mobs-nameplate-design-design-mobs-2-c-0");
+        CHECK(std::abs(CapsBelowMiddle(chip, chip, cap)) <= 0.5f);
+    }
 }
 
 TEST(a_pages_name_stays_on_one_line_under_the_pointer_and_its_highlight_goes_on_past_it)
@@ -287,7 +359,7 @@ TEST(a_pages_name_stays_on_one_line_under_the_pointer_and_its_highlight_goes_on_
             Rml::Element* entry  = window.Find(id);
             window.PointAt(id);
             const float height = entry->GetBox().GetSize(Rml::BoxArea::Border).y;
-            CHECK(entry->GetScrollHeight() <= entry->GetClientHeight() + 0.5f);
+            CHECK(entry->GetScrollHeight() < 1.5f * entry->GetLineHeight()); // one line
             const float nameEnd = entry->GetAbsoluteOffset(Rml::BoxArea::Content).x +
                                   static_cast<float>(Rml::ElementUtilities::GetStringWidth(entry, Rml::String(info.name)));
             CHECK(right(entry) - nameEnd >= height / 4.0f);
@@ -331,6 +403,32 @@ TEST(a_dropdown_lists_its_choices_under_it_and_a_pick_sets_the_setting)
     CHECK(window.Click("mobs-line-style-text-color-mobs1-o-0"));
     CHECK(window.settings.Kind(PlateKind::Mobs).lines[1].color.source == ColorSource::Custom);
     CHECK(!window.Shows("mobs-line-style-text-color-mobs1-o-0"));
+}
+
+TEST(badge_numbers_is_a_dropdown_whose_closed_control_holds_each_choice_on_one_line)
+{
+    for (const char* font : {kBarlowCondensed, kCinzel})
+    {
+        Window window(MenuTheme::Phoenix, font);
+        window.Page("mobs");
+        std::string control;
+        for (Rml::Element* element : window.OfClass("dd"))
+            if (element->GetId().find("badge-numbers") != std::string::npos) control = element->GetId();
+        CHECK(!control.empty());
+        if (control.empty()) continue;
+        for (const RankDisplay each : {RankDisplay::Rank, RankDisplay::TotalChance, RankDisplay::IncreasedChance})
+        {
+            window.Click(control);
+            CHECK(window.Click(control + "-o-" + std::to_string(static_cast<int>(each))));
+            CHECK(window.settings.rankDisplay == each);
+            // The closed control cuts off what is past its edge rather than wrapping it.
+            Rml::Element* shown = window.Find(control + "-val");
+            CHECK(shown != nullptr && !shown->GetInnerRML().empty());
+            if (shown == nullptr) continue;
+            const float text = static_cast<float>(Rml::ElementUtilities::GetStringWidth(shown, shown->GetInnerRML()));
+            CHECK(text <= shown->GetBox().GetSize(Rml::BoxArea::Content).x);
+        }
+    }
 }
 
 TEST(a_list_of_checks_stays_open_while_its_rows_are_checked)
@@ -436,7 +534,7 @@ TEST(the_list_of_pages_scrolls_in_a_window_too_short_for_it)
     window.Click("nav-configmenu");
     Rml::Element* last = window.Find("nav-configmenu");
     CHECK(last->GetAbsoluteOffset(Rml::BoxArea::Border).y + last->GetBox().GetSize(Rml::BoxArea::Border).y <= bottom);
-    CHECK(window.Shows("configmenu-headsup-head") || last->IsClassSet("picked"));
+    CHECK(window.Shows("configmenu-settings-window-head") || last->IsClassSet("picked"));
 }
 
 TEST(a_dash_mark_is_shown_as_its_shape_in_the_list_and_in_the_closed_control)
@@ -499,6 +597,53 @@ TEST(a_line_box_keeps_what_is_typed_once_it_is_left)
     CHECK_EQ(window.settings.Kind(PlateKind::Players).lines[2].text, was);
     CHECK(window.Click("page-title"));
     CHECK_EQ(window.settings.Kind(PlateKind::Players).lines[2].text, was + " hi");
+}
+
+TEST(enter_in_a_design_line_breaks_it_onto_a_row_of_its_own_and_typing_goes_on_there)
+{
+    Window window;
+    window.Page("players");
+    const std::string box = "players-nameplate-design-design-players-1";
+    std::string& text     = window.settings.Kind(PlateKind::Players).lines[1].text;
+    text                  = "ab";
+    window.Frames(2);
+    window.Click(box + "-t-0");
+    window.Key(Rml::Input::KI_END);
+    window.Key(Rml::Input::KI_RETURN);
+    CHECK_EQ(text, "ab$break");
+    CHECK(window.Shows(box + "-c-0") && window.Find(box + "-c-0")->IsClassSet("break"));
+    const auto top = [&](const std::string& id) { return window.Find(id)->GetAbsoluteOffset(Rml::BoxArea::Border).y; };
+    CHECK(top(box + "-t-1") > top(box + "-t-0"));
+    window.Type("x");
+    window.Click("page-title");
+    CHECK_EQ(text, "ab${break}x");
+    window.Click(box + "-t-1");
+    window.Key(Rml::Input::KI_HOME);
+    window.Key(Rml::Input::KI_BACK);
+    window.Click("page-title");
+    CHECK_EQ(text, "abx");
+    CHECK_EQ(window.Said(), "");
+}
+
+TEST(a_tag_dropped_inside_a_stretch_goes_in_between_the_letters_under_the_pointer)
+{
+    Window window;
+    window.Page("players");
+    const std::string run = "players-nameplate-design-design-players-1-t-0";
+    std::string& text     = window.settings.Kind(PlateKind::Players).lines[1].text;
+    const auto dropAt     = [&](const char* before) {
+        text = "abcd";
+        window.Frames(2);
+        Rml::Element* input = window.Find(run);
+        const float x = input->GetAbsoluteOffset(Rml::BoxArea::Content).x +
+                        static_cast<float>(Rml::ElementUtilities::GetStringWidth(input, Rml::String(before))) + 1.0f;
+        window.Drag("tag-0", Rml::Vector2f(x, window.Center(run).y) - window.Center("tag-0"));
+        return text;
+    };
+    CHECK_EQ(dropAt(""), "${name}abcd");
+    CHECK_EQ(dropAt("ab"), "ab${name}cd");
+    CHECK_EQ(dropAt("abcd"), "abcd$name");
+    CHECK_EQ(window.Said(), "");
 }
 
 TEST(a_tag_chip_goes_in_at_the_caret_by_click_and_after_what_it_is_dropped_on_by_drag)
@@ -692,12 +837,6 @@ TEST(every_switch_of_every_page_flips_a_setting_of_its_own_and_flips_it_back)
 {
     // Not settings: what the window itself is showing.
     const std::vector<std::string> windowsOwn{"userinterface-game-windows-all-windows"};
-    // The windows moved under the panel are a set: one taken out and put back stands last in the list.
-    const auto same = [](Settings a, Settings b) {
-        std::ranges::sort(a.movedWindows);
-        std::ranges::sort(b.movedWindows);
-        return a == b;
-    };
     for (const LayoutPage& info : kWindowLayout.pages)
     {
         Window window;
@@ -717,7 +856,7 @@ TEST(every_switch_of_every_page_flips_a_setting_of_its_own_and_flips_it_back)
             flipped.emplace_back(id, window.settings);
             if (!window.Shows(id)) continue; // it switched off what it stands in
             window.Click(id);
-            if (!same(window.settings, fresh)) throw test::Failure{"the switch " + id + " does not flip back"};
+            if (window.settings != fresh) throw test::Failure{"the switch " + id + " does not flip back"};
         }
         for (size_t a = 0; a < flipped.size(); ++a)
             for (size_t b = a + 1; b < flipped.size(); ++b)
@@ -851,9 +990,10 @@ TEST(every_dropdown_slider_row_of_choices_and_number_of_every_page_and_tab_sets_
             }
         }
     }
-    // Keys that hold many settings in one value, each window's offsets or each section's widgets: two controls
-    // of these are the same setting only when they write the same value.
-    const std::vector<std::string> lists{"windowOffsets", "barLeft", "barCenter", "barRight"};
+    // Keys that hold many settings in one value, each window's offsets, each view's shift or each section's widgets:
+    // two controls of these are the same setting only when they write the same value.
+    const std::vector<std::string> lists{"windowOffsets", "viewShiftsHelpOn", "viewShiftsHelpOff", "barLeft", "barCenter",
+        "barRight"};
     const auto same = [&](const std::map<std::string, std::string>& a, const std::map<std::string, std::string>& b) {
         if (!std::ranges::equal(a, b, {}, &std::pair<const std::string, std::string>::first,
                 &std::pair<const std::string, std::string>::first))
@@ -934,7 +1074,7 @@ TEST(the_font_arrows_step_through_the_fonts_and_a_slider_follows_the_pointer)
     window.Page("players");
     CHECK(window.settings.Kind(PlateKind::Players).lines[0].font.empty());
     CHECK(window.Click("players-line-style-font-players0-next"));
-    CHECK_EQ(window.settings.Kind(PlateKind::Players).lines[0].font, "Arial");
+    CHECK_EQ(window.settings.Kind(PlateKind::Players).lines[0].font, kGameFontName); // the list's first
     CHECK(window.Click("players-line-style-font-players0-previous"));
     CHECK(window.settings.Kind(PlateKind::Players).lines[0].font.empty());
 
@@ -943,6 +1083,24 @@ TEST(the_font_arrows_step_through_the_fonts_and_a_slider_follows_the_pointer)
     CHECK(window.Drag("entities-nameplates-vertical-offset", Rml::Vector2f(60.0f, 0.0f)));
     CHECK(window.settings.nameRaise > was);
     CHECK_EQ(window.TextOf("entities-nameplates-vertical-offset-val"), std::to_string(window.settings.nameRaise) + " px");
+}
+
+TEST(a_percent_slider_lands_on_steps_of_five_while_it_is_dragged_and_stepped)
+{
+    Window window;
+    window.Page("entities");
+    const std::string slider = "entities-nameplates-min-size";
+    const int was            = window.settings.scaleMin;
+    for (const float by : {7.0f, 3.0f, 11.0f})
+    {
+        CHECK(window.Drag(slider, Rml::Vector2f(by, 0.0f)));
+        CHECK_EQ(window.settings.scaleMin % 5, 0);
+        CHECK_EQ(window.TextOf(slider + "-val"), std::to_string(window.settings.scaleMin) + "%");
+    }
+    CHECK(window.settings.scaleMin != was);
+    const int dragged = window.settings.scaleMin;
+    CHECK(window.Key(Rml::Input::KI_RIGHT));
+    CHECK_EQ(window.settings.scaleMin, dragged + 5);
 }
 
 TEST(a_slider_takes_the_arrow_keys_only_while_the_pointer_is_on_the_window)
@@ -986,6 +1144,32 @@ TEST(a_card_folds_on_its_title_and_a_switch_takes_a_click)
     CHECK(!window.Shows("entities-nameplates-stack-names"));
     window.Click("entities-nameplates-head");
     CHECK(window.Shows("entities-nameplates-stack-names"));
+}
+
+TEST(switching_off_nameplates_and_outlines_takes_the_kind_pages_from_the_sidebar)
+{
+    Window window;
+    CHECK(window.Shows("nav-mobs"));
+    window.Click("entities-nameplates-on");
+    CHECK(window.Shows("nav-mobs"));
+    window.Click("entities-outline-style-on");
+    CHECK(!window.settings.nameplates && !window.settings.outlines);
+    window.Frames(2);
+    CHECK(!window.Shows("nav-mobs") && !window.Shows("nav-pets") && window.Shows("nav-entities"));
+    window.Click("entities-outline-style-on");
+    window.Frames(2);
+    CHECK(window.Shows("nav-mobs"));
+    CHECK_EQ(window.Said(), "");
+}
+
+TEST(hide_during_conversation_is_a_switch_of_the_nameplates_card)
+{
+    Window window;
+    CHECK(window.Click("entities-nameplates-hide-during-conversation"));
+    CHECK(window.settings.hideInEvent);
+    window.Click("entities-nameplates-on");
+    CHECK(!window.settings.nameplates);
+    CHECK(!window.Shows("entities-nameplates-hide-during-conversation"));
 }
 
 TEST(a_color_is_typed_into_the_pickers_hex_box)
@@ -1056,10 +1240,10 @@ TEST(a_font_list_holds_its_longest_name_whole_and_says_each_name_under_the_point
     CHECK_EQ(window.Find(control)->GetAttribute<Rml::String>("tip", ""), kLongFont);
     window.Click(control);
     window.Frames(10);
-    Rml::Element* row = window.Find(control + "-o-3");
+    Rml::Element* row = window.Find(control + "-o-5"); // after the game's two fonts, Arial, Barlow Condensed and Marcellus SC
     CHECK(row != nullptr && row->IsVisible(true));
     CHECK_EQ(row->GetAttribute<Rml::String>("tip", ""), kLongFont);
-    CHECK_EQ(window.Find(control + "-o-0")->GetAttribute<Rml::String>("tip", ""), "Arial");
+    CHECK_EQ(window.Find(control + "-o-2")->GetAttribute<Rml::String>("tip", ""), "Arial");
     // The list is wider than its control, as wide as the name needs.
     CHECK(width(window.Find("popup")) > width(window.Find(control)) + 20.0f);
     CHECK(row->GetScrollWidth() <= row->GetClientWidth() + 0.5f);
@@ -1123,79 +1307,162 @@ TEST(a_list_drops_in_in_both_themes)
     }
 }
 
-TEST(a_toggles_knob_slides_across_its_track_in_both_themes)
+TEST(a_toggle_is_a_sliders_width_and_its_wide_peg_slides_across_its_track_in_both_themes)
 {
-    const std::string box = "entities-nameplates-stack-names";
+    const std::string box = "entities-nameplates-stack-names", slider = "entities-nameplates-vertical-offset";
     auto size = [](Rml::Element* element) { return element->GetBox().GetSize(Rml::BoxArea::Border); };
     auto left = [](Rml::Element* mark) {
         return mark->GetAbsoluteOffset(Rml::BoxArea::Border).x - mark->GetParentNode()->GetAbsoluteOffset(Rml::BoxArea::Border).x;
+    };
+    auto middle = [](Rml::Element* element) {
+        return element->GetAbsoluteOffset(Rml::BoxArea::Border).x + element->GetBox().GetSize(Rml::BoxArea::Border).x / 2.0f;
     };
     for (const MenuTheme theme : {MenuTheme::Phoenix, MenuTheme::Aurora})
     {
         Window window(theme);
         Rml::Element* track = window.Find(box);
-        // Much wider than tall, with its knob at the left end while off.
-        const float width = size(track).x, height = size(track).y, knob = size(track->GetChild(0)).x;
-        CHECK(width > 2.0f * height && knob > 0.0f && knob < height);
+        const float width = size(track).x, height = size(track).y, peg = size(track->GetChild(0)).x;
+        // As wide as the slider above it and right under it, with a peg wider than the track is tall.
+        CHECK(std::abs(width - size(window.Find(slider)).x) < 0.5f);
+        CHECK(std::abs(middle(track) - middle(window.Find(slider))) < 1.0f);
+        CHECK(peg > height && peg < width / 2.0f);
+        // Rounded as a dropdown is, not as a pill.
+        const float radius = track->GetComputedValues().border_top_left_radius();
+        CHECK(radius > 0.0f && radius < height / 2.0f);
+        CHECK_EQ(radius, window.Find("entities-nameplates-default-font")->GetComputedValues().border_top_left_radius());
         const float inset = left(track->GetChild(0));
-        CHECK(inset > 0.0f && inset < knob);
+        CHECK(inset > 0.0f && inset < height / 2.0f);
         CHECK(window.Click(box));
         const float early = left(window.Find(box)->GetChild(0));
-        CHECK(early > inset + 0.5f && early < width - knob - inset - 0.5f); // on its way
+        CHECK(early > inset + 0.5f && early < width - peg - inset - 0.5f); // on its way
         window.Frames(30);
         const float end = left(window.Find(box)->GetChild(0));
-        CHECK(end > width - knob - inset - 0.5f && end < width - knob - inset + 0.5f);
-        // It stands in the middle of the controls' column: under the middle of the slider above it.
-        auto middle = [](Rml::Element* element) {
-            return element->GetAbsoluteOffset(Rml::BoxArea::Border).x + element->GetBox().GetSize(Rml::BoxArea::Border).x / 2.0f;
-        };
-        const float off = middle(window.Find(box)) - middle(window.Find("entities-nameplates-vertical-offset"));
-        CHECK(off > -1.0f && off < 1.0f);
-        // And it is nearly as wide as that slider.
-        const float slider = size(window.Find("entities-nameplates-vertical-offset")).x;
-        CHECK(width > 0.8f * slider && width < slider);
+        CHECK(end > width - peg - inset - 0.5f && end < width - peg - inset + 0.5f);
     }
 }
 
-TEST(a_toggles_word_sits_inside_its_track_clear_of_the_knob_at_either_end)
+TEST(a_cards_title_toggle_is_about_twice_as_wide_as_before_and_a_tables_stays_small_and_wordless)
 {
+    constexpr float kOldTitleToggle = 3.2f; // ems, before the tester's fourth round
     Window window;
+    const float title = window.Find("entities-nameplates-on")->GetBox().GetSize(Rml::BoxArea::Border).x;
+    CHECK(title >= 2.0f * kOldTitleToggle * kEm && title <= 2.5f * kOldTitleToggle * kEm);
     window.Page("mobs");
-    const std::string box = "mobs-detection-icons-links";
+    Rml::Element* cell = window.Find("mobs-statuses-status-paralyze");
+    CHECK(cell != nullptr && window.Find("mobs-statuses-status-paralyze-state") == nullptr);
+    CHECK(cell->GetBox().GetSize(Rml::BoxArea::Border).x < title);
+}
+
+TEST(a_toggles_word_says_its_state_in_capitals_inside_its_track_clear_of_the_peg)
+{
     auto edges = [](Rml::Element* element) {
         const float x = element->GetAbsoluteOffset(Rml::BoxArea::Border).x;
         return std::pair{x, x + element->GetBox().GetSize(Rml::BoxArea::Border).x};
     };
-    Rml::Element* track = window.Find(box);
-    Rml::Element* word  = window.Find(box + "-state");
-    CHECK(track != nullptr && word != nullptr && !word->GetInnerRML().empty());
-    const auto [trackLeft, trackRight] = edges(track);
-    // The word's own letters, wherever its box reaches: they are centered in it.
-    const auto text = [&] {
-        const auto [left, right] = edges(word);
-        const float middle = (left + right) / 2.0f;
-        const float half   = static_cast<float>(Rml::ElementUtilities::GetStringWidth(word, word->GetInnerRML())) / 2.0f;
-        return std::pair{middle - half, middle + half};
+    auto argb = [](const Rml::Colourb& c) {
+        return static_cast<uint32_t>(c.alpha) << 24 | static_cast<uint32_t>(c.red) << 16 | static_cast<uint32_t>(c.green) << 8 | c.blue;
     };
-    for (int flip = 0; flip < 2; ++flip)
+    struct Toggle
     {
-        const auto [left, right] = text();
-        const auto [knobLeft, knobRight] = edges(window.Find(box)->GetChild(0));
-        CHECK(left > trackLeft && right < trackRight);
-        CHECK(right < knobLeft || left > knobRight);
-        window.Click(box);
-        window.Frames(30);
-    }
+        const char* page;
+        const char* id;
+        const char* off;
+        const char* on;
+    };
+    const Toggle toggles[] = {{"entities", "entities-nameplates-stack-names", "OFF", "ON"},
+        {"entities", "entities-nameplates-on", "OFF", "ON"}, {"mobs", "mobs-detection-icons-links", "HIDDEN", "SHOWN"}};
+    for (const MenuTheme theme : {MenuTheme::Phoenix, MenuTheme::Aurora})
+        for (const char* font : {kBarlowCondensed, kCinzel})
+            for (const Toggle& toggle : toggles)
+            {
+                Window window(theme, font);
+                window.Page(toggle.page);
+                const std::string box = toggle.id;
+                for (int flip = 0; flip < 2; ++flip)
+                {
+                    Rml::Element* track = window.Find(box);
+                    Rml::Element* word  = window.Find(box + "-state");
+                    CHECK(word != nullptr);
+                    const bool on = track->IsClassSet("on");
+                    std::string shown = word->GetInnerRML();
+                    std::ranges::transform(shown, shown.begin(), [](unsigned char ch) { return static_cast<char>(std::toupper(ch)); });
+                    CHECK_EQ(shown, on ? toggle.on : toggle.off);
+                    CHECK(word->GetComputedValues().text_transform() == Rml::Style::TextTransform::Uppercase);
+                    CHECK_EQ(argb(word->GetComputedValues().color()), MenuColorsOf(theme).text);
+                    // Its capitals, centered in the word's box, stand inside the track and clear of the peg.
+                    const auto [trackLeft, trackRight] = edges(track);
+                    const auto [boxLeft, boxRight]     = edges(word);
+                    const float half = static_cast<float>(Rml::ElementUtilities::GetStringWidth(word, shown)) / 2.0f;
+                    const float left = (boxLeft + boxRight) / 2.0f - half, right = (boxLeft + boxRight) / 2.0f + half;
+                    const auto [pegLeft, pegRight] = edges(track->GetChild(0));
+                    CHECK(left > trackLeft && right < trackRight);
+                    CHECK(right < pegLeft || left > pegRight);
+                    window.Click(box);
+                    window.Frames(30);
+                }
+            }
 }
 
 TEST(the_debug_report_button_on_the_headsup_config_page_asks_for_one_report)
 {
     Window window;
     window.Page("configmenu");
+    window.Click("configmenu-debug-mode-on");
     CHECK(!window.menu.TakeDebugRequest());
-    window.Click("configmenu-headsup-debug-report");
+    window.Click("configmenu-debug-mode-debug-report");
     CHECK(window.menu.TakeDebugRequest());
     CHECK(!window.menu.TakeDebugRequest()); // once
+    CHECK_EQ(window.Said(), "");
+}
+
+TEST(the_reset_button_stands_under_the_cards_as_wide_as_one_taller_and_in_capitals)
+{
+    Window window;
+    window.Page("configmenu");
+    auto size = [&](const char* id) { return window.Find(id)->GetBox().GetSize(Rml::BoxArea::Border); };
+    const char* button = "configmenu-reset-reset-all-settings";
+    CHECK(!window.Find("configmenu-reset")->IsClassSet(kMenuCardClass));
+    CHECK(std::abs(size(button).x - size("configmenu-settings-window").x) < 1.0f);
+    CHECK(size(button).y > size("configmenu-settings-window-size-next").y);
+    CHECK(window.Find(button)->GetComputedValues().text_transform() == Rml::Style::TextTransform::Uppercase);
+    window.Click(button);
+    CHECK(window.Shows("configmenu-reset-reset-everything"));
+    CHECK_EQ(window.Said(), "");
+}
+
+TEST(a_developers_window_has_reload_left_of_its_close_button_and_export_in_the_debug_card_and_each_asks_once)
+{
+    constexpr const char* kExport = "configmenu-debug-mode-export";
+    Window window;
+    window.settings.debugMode = true;
+    window.Page("configmenu");
+    CHECK(window.Find(kMenuReloadId) == nullptr && window.Find(kExport) == nullptr);
+    window.Developer();
+    auto left  = [&](const char* id) { return window.Find(id)->GetAbsoluteOffset(Rml::BoxArea::Border).x; };
+    auto right = [&](const char* id) { return left(id) + window.Find(id)->GetBox().GetSize(Rml::BoxArea::Border).x; };
+    CHECK(window.Shows(kMenuReloadId) && window.Shows(kExport));
+    CHECK(right(kMenuReloadId) <= left(kMenuCloseId) && left(kMenuCloseId) - right(kMenuReloadId) < kEm);
+    CHECK(!window.menu.TakeReloadRequest() && !window.menu.TakeExportRequest());
+    window.Click(kMenuReloadId);
+    CHECK(window.menu.TakeReloadRequest() && !window.menu.TakeReloadRequest() && !window.menu.TakeExportRequest());
+    window.Click(kExport);
+    CHECK(window.menu.TakeExportRequest() && !window.menu.TakeExportRequest() && window.menu.open);
+    CHECK_EQ(window.Said(), "");
+}
+
+TEST(a_layout_read_anew_shows_on_the_windows_next_frame)
+{
+    Window window;
+    test::EditedLayout edited;
+    edited.RenamePage("entities", "Everything");
+    edited.MoveCard("target-cursor", "entities", 0);
+    window.Laid(edited.Layout());
+    window.Frames(2);
+    CHECK_EQ(window.Find("nav-entities")->GetInnerRML(), "Everything");
+    CHECK_EQ(window.Find("page")->GetChild(0)->GetId(), "entities-target-cursor");
+    window.menu.Close(); // and from scratch, as a reload builds it
+    window.Frames(2);
+    CHECK_EQ(window.Find("page")->GetChild(0)->GetId(), "entities-target-cursor");
     CHECK_EQ(window.Said(), "");
 }
 

@@ -1,3 +1,4 @@
+#include "game_font.h"
 #include "layout_edit.h"
 #include "menu_form.h"
 #include "settings.h"
@@ -81,6 +82,27 @@ TEST(the_window_is_its_sidebar_and_the_open_pages_cards)
     CHECK(Block(form, "entities-nameplates") != nullptr && Block(form, "entities-colors-entity-type") != nullptr);
 }
 
+TEST(the_kind_pages_leave_the_sidebar_while_nameplates_and_outlines_are_both_off)
+{
+    const char* kKindNavs[] = {"nav-mobs", "nav-players", "nav-self", "nav-npcs", "nav-pets"};
+    Window w;
+    w.settings.nameplates = false;
+    w.settings.outlines   = false;
+    const std::string side = w.Pass().blocks.front().rml;
+    CHECK(Has(side, "nav-entities") && Has(side, "nav-toppanel"));
+    for (const char* nav : kKindNavs)
+        CHECK(!Has(side, nav));
+    w.settings.outlines = true;
+    for (const char* nav : kKindNavs)
+        CHECK(Has(w.Pass().blocks.front().rml, nav));
+    // A kind's page open as both go off gives way to Entities, where they are switched on again.
+    w.state.page        = Page::Mobs;
+    w.settings.outlines = false;
+    const Form form     = w.Pass();
+    CHECK(w.state.page == Page::Entities);
+    CHECK(Block(form, "entities-nameplates") != nullptr && Block(form, "mobs-nameplate-design") == nullptr);
+}
+
 TEST(a_click_in_the_sidebar_opens_that_page_at_its_top)
 {
     Window w;
@@ -159,6 +181,71 @@ TEST(the_reset_card_asks_twice)
     CHECK(w.state.confirmReset && w.settings.barHeight == 60);
     const Form form = w.Pass({{"configmenu-reset-reset-everything", kClickEvent, ""}});
     CHECK(form.changed && !w.state.confirmReset && w.settings.barHeight == Settings{}.barHeight);
+    // It stands under the cards on its own, with no card around it.
+    const FormBlock* reset = Block(form, "configmenu-reset");
+    CHECK(reset != nullptr && reset->bare && !Has(reset->rml, "card-head"));
+    CHECK(!Block(form, "configmenu-settings-window")->bare);
+}
+
+TEST(the_debug_mode_card_shows_its_switch_alone_until_debug_mode_is_on)
+{
+    Window w;
+    w.state.page   = Page::ConfigMenu;
+    const Form off = w.Pass();
+    CHECK(ClassOn(off, "configmenu-debug-mode-debug-report", kOffClass));
+    CHECK(ClassOn(off, "configmenu-debug-mode-mobs-outlined-label-row", kOffClass));
+    w.Pass({{"configmenu-debug-mode-debug-report", kClickEvent, ""}});
+    CHECK(!w.state.debugRequested);
+    const Form on = w.Pass({{"configmenu-debug-mode-on", kClickEvent, ""}});
+    CHECK(w.settings.debugMode && on.changed);
+    CHECK(!ClassOn(on, "configmenu-debug-mode-mobs-outlined-label-row", kOffClass));
+    const Form asked = w.Pass({{"configmenu-debug-mode-debug-report", kClickEvent, ""}});
+    CHECK(w.state.debugRequested);
+    // What this frame read comes after the buttons.
+    const FormBlock* card = Block(asked, "configmenu-debug-mode");
+    CHECK(At(card, "configmenu-debug-mode-debug-report") < At(card, "configmenu-debug-mode-mobs-outlined"));
+}
+
+TEST(a_build_that_watches_has_a_watch_button_and_the_card_says_where_the_last_report_went)
+{
+    Window w;
+    w.state.page         = Page::ConfigMenu;
+    w.settings.debugMode = true;
+    const char* watch    = "configmenu-debug-mode-watch";
+    CHECK(!Has(Block(w.Pass(), "configmenu-debug-mode")->rml, watch)); // a build with nothing to watch
+    w.readings.watching = false;
+    const std::string start = Block(w.Pass(), "configmenu-debug-mode")->rml;
+    CHECK(Has(start, w.layout.WordOf(WindowWord::DebugReportWatch).name));
+    w.Pass({{watch, kClickEvent, ""}});
+    CHECK(w.state.watchRequested);
+    w.readings.watching = true;
+    CHECK(Has(Block(w.Pass(), "configmenu-debug-mode")->rml, w.layout.WordOf(WindowWord::DebugReportStop).name));
+    // No report yet, no line for one; then the file's name.
+    CHECK(!Has(start, "debug-20261015"));
+    const std::string report = "C:\\PhoenixXI\\logs\\headsup\\debug-20261015-101500.txt";
+    w.readings.lastReport    = &report;
+    const std::string saved  = Block(w.Pass(), "configmenu-debug-mode")->rml;
+    CHECK(Has(saved, "debug-20261015-101500.txt") && !Has(saved, "PhoenixXI"));
+}
+
+TEST(a_build_that_exports_its_layout_has_an_export_button_after_the_report_and_the_watch)
+{
+    Window w;
+    w.state.page         = Page::ConfigMenu;
+    w.settings.debugMode = true;
+    const char* exporting = "configmenu-debug-mode-export";
+    CHECK(!Has(Block(w.Pass(), "configmenu-debug-mode")->rml, exporting)); // a release build
+    w.readings.watching   = false;
+    w.readings.exportable = true;
+    const FormBlock* card = Block(w.Pass(), "configmenu-debug-mode");
+    CHECK(At(card, "configmenu-debug-mode-debug-report") < At(card, "configmenu-debug-mode-watch"));
+    CHECK(At(card, "configmenu-debug-mode-watch") < At(card, exporting));
+    w.Pass({{exporting, kClickEvent, ""}});
+    CHECK(w.state.exportRequested);
+    w.state.exportRequested = false;
+    w.settings.debugMode    = false; // the card is its title alone
+    w.Pass({{exporting, kClickEvent, ""}});
+    CHECK(!w.state.exportRequested);
 }
 
 TEST(a_key_row_takes_the_next_key_pressed_that_was_not_held)
@@ -201,6 +288,34 @@ TEST(only_the_lines_above_the_bottom_one_have_an_alignment)
     }
 }
 
+TEST(show_line_to_entity_shows_under_stack_names_only_while_that_is_on)
+{
+    Window w;
+    const char* row = "entities-nameplates-stack-line-to-entity-label-row";
+    CHECK(ClassOn(w.Pass(), row, "off")); // Stack Names starts off
+    w.settings.stackNames = true;
+    const Form on         = w.Pass();
+    CHECK(!ClassOn(on, row, "off"));
+    CHECK(Has(Block(on, "entities-nameplates")->rml, (std::string("class=\"row indent\" id=\"") + row + "\"").c_str()));
+    CHECK(w.Pass({{"entities-nameplates-stack-line-to-entity", kClickEvent, ""}}).changed);
+    CHECK(!w.settings.stackLine);
+}
+
+TEST(badge_text_goes_with_the_nameplates)
+{
+    Window w;
+    w.state.page = Page::Mobs;
+    CHECK(!ClassOn(w.Pass(), "mobs-badges", "off"));
+    w.settings.nameplates = false;
+    const Form off        = w.Pass();
+    CHECK(ClassOn(off, "mobs-badges", "off"));
+    // Moved to a card that stays, the settings still go with the nameplates.
+    test::EditedLayout edited;
+    edited.MoveSetting("weak-color", "visibility", 0);
+    w.layout = edited.Layout();
+    CHECK(ClassOn(w.Pass(), "mobs-visibility-weak-color-label-row", "off"));
+}
+
 TEST(a_page_whose_cards_are_all_switched_off_says_what_switches_them_on)
 {
     const auto shown = [](const Form& form) {
@@ -216,7 +331,7 @@ TEST(a_page_whose_cards_are_all_switched_off_says_what_switches_them_on)
     CHECK_EQ(off.size(), size_t{1}); // the one card that says HeadsUp is off
     // The HeadsUp Config page, which switches HeadsUp on, keeps its cards.
     w.state.page = Page::ConfigMenu;
-    const Form config = w.Pass({{"configmenu-headsup-on", kClickEvent, ""}});
+    const Form config = w.Pass({{"configmenu-settings-window-enable-headsup", kClickEvent, ""}});
     CHECK(w.settings.enabled && config.changed);
     // With the top panel off, its widgets' page has nothing to set either.
     w.settings.showBar = false;
@@ -325,27 +440,32 @@ TEST(the_games_own_cursor_has_no_settings_and_a_picture_no_color)
     CHECK(!hidden(vanilla, "entities-target-cursor-cursor-style-label-row")); // the list stays, to pick another
 }
 
-TEST(every_kind_has_a_nameplate_opacity_card_and_yours_none_of_its_fading)
+TEST(one_nameplate_opacity_card_sits_under_nameplates_on_the_entities_page)
 {
+    const std::string card = "entities-nameplate-opacity";
     Window w;
+    const Form form = w.Pass();
+    const auto at   = [&](const char* id) {
+        return std::ranges::find_if(form.blocks, [&](const FormBlock& b) { return b.id == id; }) - form.blocks.begin();
+    };
+    CHECK_EQ(at(card.c_str()), at("entities-nameplates") + 1);
+    const FormBlock* block = Block(form, card.c_str());
+    for (const char* control : {"-no-target", "-not-targeted", "-is-targeted", "-fade-in"})
+        CHECK(Has(block->rml, (card + control).c_str()));
+    // The range is the fade's own: it shows once Fade In is on.
+    CHECK(ClassOn(form, (card + "-range-label-row").c_str(), "off"));
+    const Form faded = w.Pass({{card + "-fade-in", kClickEvent, ""}});
+    CHECK(faded.changed && w.settings.opacity.fadeIn);
+    CHECK(!ClassOn(faded, (card + "-range-label-row").c_str(), "off"));
+    w.Pass({{card + "-not-targeted", kChangeEvent, "35"}});
+    CHECK_EQ(w.settings.opacity.notTargeted, 35);
+    w.settings.nameplates = false;
+    CHECK(ClassOn(w.Pass(), card.c_str(), "off"));
+    w.settings.nameplates = true;
     for (const Page page : {Page::Mobs, Page::Players, Page::Npcs, Page::Pets, Page::Self})
     {
         w.state.page = page;
-        const std::string card = std::string(kWindowLayout.PageOf(page).key) + "-nameplate-opacity";
-        const Form form        = w.Pass();
-        const FormBlock* block = Block(form, card.c_str());
-        CHECK(block != nullptr);
-        CHECK(Has(block->rml, (card + "-no-target").c_str()) && Has(block->rml, (card + "-not-targeted").c_str()) &&
-              Has(block->rml, (card + "-is-targeted").c_str()));
-        CHECK_EQ(Has(block->rml, (card + "-fade-in").c_str()), page != Page::Self);
-        if (page == Page::Self) continue;
-        // The range is the fade's own: it shows once Fade In is on.
-        CHECK(ClassOn(form, (card + "-range-label-row").c_str(), "off"));
-        const Form faded = w.Pass({{card + "-fade-in", kClickEvent, ""}});
-        CHECK(faded.changed && w.settings.Kind(*KindOfPage(page)).opacity.fadeIn);
-        CHECK(!ClassOn(faded, (card + "-range-label-row").c_str(), "off"));
-        w.Pass({{card + "-not-targeted", kChangeEvent, "35"}});
-        CHECK_EQ(w.settings.Kind(*KindOfPage(page)).opacity.notTargeted, 35);
+        CHECK(Block(w.Pass(), (std::string(kWindowLayout.PageOf(page).key) + "-nameplate-opacity").c_str()) == nullptr);
     }
 }
 
@@ -370,11 +490,22 @@ TEST(the_pages_of_the_kinds_with_status_icons_set_how_many_a_nameplate_shows)
     }
 }
 
+TEST(a_lines_padding_slides_below_zero_to_sink_it_into_the_line_under_it)
+{
+    Window w;
+    w.state.page = Page::Mobs;
+    CHECK(w.Pass({{"mobs-line-style-padding-mobs0", kChangeEvent, "-5"}}).changed);
+    CHECK_EQ(w.settings.Kind(PlateKind::Mobs).lines[0].padding, -5);
+    w.Pass({{"mobs-line-style-padding-mobs0", kChangeEvent, "-8"}});
+    CHECK_EQ(w.settings.Kind(PlateKind::Mobs).lines[0].padding, kMinLinePadding);
+}
+
 TEST(a_lines_glow_can_be_switched_off_for_combat_once_it_has_a_glow)
 {
     Window w;
     w.state.page = Page::Players;
     const char* row = "players-line-style-disable-glow-in-combat-players0-label-row";
+    w.settings.Kind(PlateKind::Players).lines[0].glow = 0;
     CHECK(ClassOn(w.Pass(), row, "off")); // no glow, nothing to switch off
     w.settings.Kind(PlateKind::Players).lines[0].glow = 80;
     CHECK(!ClassOn(w.Pass(), row, "off"));
@@ -392,6 +523,9 @@ TEST(a_color_off_its_default_has_an_arrow_that_puts_it_back)
     const Form moved = w.Pass();
     CHECK(!ClassOn(moved, arrow, "hidden"));
     CHECK(ClassOn(moved, "entities-colors-claim-status-unclaimed-claim-colors-reset", "hidden")); // each color its own
+    w.settings.palette.claim[static_cast<int>(ClaimState::CalledForHelp)] = Color{{0.1f, 0.2f, 0.3f}};
+    w.Pass({{"entities-colors-claim-status-called-for-help-claim-colors-reset", kClickEvent, ""}});
+    CHECK(w.settings.palette.claim[static_cast<int>(ClaimState::CalledForHelp)] == Settings{}.palette.claim[static_cast<int>(ClaimState::CalledForHelp)]);
     const Form back = w.Pass({{arrow, kClickEvent, ""}});
     CHECK(back.changed && w.settings.palette.claim[static_cast<int>(ClaimState::Yours)] == original);
     CHECK(ClassOn(back, arrow, "hidden"));
@@ -426,6 +560,24 @@ TEST(a_page_moved_in_the_layout_moves_in_the_sidebar_and_opens_by_its_key)
     CHECK(w.state.page == Page::ConfigMenu);
     CHECK(w.layout.PageNamed("configmenu") == Page::ConfigMenu);
     CHECK(!w.layout.PageNamed("debug"));
+}
+
+TEST(a_setting_is_indented_where_the_layout_says_so)
+{
+    const auto indented = [](const Form& form, const char* row) {
+        return Has(Block(form, "entities-nameplates")->rml, (std::string("class=\"row indent\" id=\"") + row + "\"").c_str());
+    };
+    constexpr const char* kStack = "entities-nameplates-stack-names-label-row";
+    constexpr const char* kMin   = "entities-nameplates-min-size-label-row";
+    Window w;
+    CHECK(indented(w.Pass(), kMin) && !indented(w.Pass(), kStack)); // the sizes under Scale with Distance
+    test::EditedLayout edited;
+    edited.SetIndent("stack-names", true);
+    edited.SetIndent("min-size", false);
+    w.layout        = edited.Layout();
+    const Form form = w.Pass();
+    CHECK(indented(form, kStack) && !indented(form, kMin));
+    CHECK(!indented(form, "entities-nameplates-vertical-offset-label-row")); // the indent ends with its setting
 }
 
 TEST(renaming_a_page_a_card_and_a_setting_changes_no_control_id)
@@ -465,16 +617,16 @@ TEST(a_setting_moved_to_another_card_works_there_and_sets_only_its_own_key)
 TEST(a_setting_moved_to_another_page_hides_as_it_would_at_home)
 {
     test::EditedLayout edited;
-    edited.MoveSetting("min-size", "this-frame", 0);
+    edited.MoveSetting("min-size", "debug-mode", 0);
     Window w;
     w.layout                     = edited.Layout();
     w.state.page                 = Page::ConfigMenu;
     w.settings.scaleWithDistance = false;
-    CHECK(ClassOn(w.Pass(), "configmenu-this-frame-min-size-label-row", kOffClass));
+    CHECK(ClassOn(w.Pass(), "configmenu-debug-mode-min-size-label-row", kOffClass));
     w.settings.scaleWithDistance = true;
-    const Form form = w.Pass({{"configmenu-this-frame-min-size", kChangeEvent, "77"}});
-    CHECK(!ClassOn(form, "configmenu-this-frame-min-size-label-row", kOffClass));
-    CHECK(form.changed && w.settings.scaleMin == 77);
+    const Form form = w.Pass({{"configmenu-debug-mode-min-size", kChangeEvent, "75"}});
+    CHECK(!ClassOn(form, "configmenu-debug-mode-min-size-label-row", kOffClass));
+    CHECK(form.changed && w.settings.scaleMin == 75);
 }
 
 TEST(a_card_moved_to_another_page_shows_there_with_its_settings)
@@ -546,4 +698,76 @@ TEST(a_card_kept_to_some_kinds_shows_on_their_pages_alone)
     CHECK(Block(w.Pass(), "mobs-placeholder-timers") != nullptr);
     w.state.page = Page::Self;
     CHECK(Block(w.Pass(), "self-placeholder-timers") == nullptr);
+}
+
+namespace
+{
+    // The text the window gives a control this pass.
+    std::string ValueOn(const Form& form, const std::string& id)
+    {
+        for (const FormValue& v : form.values)
+            if (v.id == id && v.kind == FormValueKind::Value) return v.text;
+        return {};
+    }
+    // Status, whose highest window, the portrait, the game puts at 16.
+    const std::string kStatusShift = "userinterface-window-groups-status-shift";
+    const std::string kStatusReset = "userinterface-window-groups-status-reset";
+    constexpr int kPortraitTop     = 16;
+    constexpr auto kOn = static_cast<size_t>(HelpMode::On), kOff = static_cast<size_t>(HelpMode::Off);
+}
+
+TEST(a_views_shift_shows_its_default_until_one_is_typed_for_the_help_mode_shown_and_its_arrow_puts_it_back)
+{
+    Window w;
+    w.state.page = Page::UserInterface;
+    const int on = w.settings.placedUnder[kOn], off = w.settings.placedUnder[kOff];
+    CHECK(WindowHelpMode(w.settings) == HelpMode::On);
+    CHECK_EQ(ValueOn(w.Pass(), kStatusShift), std::to_string(on - kPortraitTop));
+    CHECK(ClassOn(w.Pass(), kStatusReset.c_str(), "hidden"));
+    CHECK(w.Pass({{kStatusShift, kCommitEvent, "30"}}).changed);
+    const std::vector<ViewShift> typed = {{"status", 30}};
+    CHECK(w.settings.viewShifts[kOn] == typed && w.settings.viewShifts[kOff].empty());
+    CHECK(!ClassOn(w.Pass(), kStatusReset.c_str(), "hidden"));
+    // The other mode's shifts, picked by its button, are its own.
+    w.Pass({{"userinterface-window-groups-help-off", kClickEvent, ""}});
+    CHECK_EQ(ValueOn(w.Pass(), kStatusShift), std::to_string(off - kPortraitTop));
+    w.Pass({{"userinterface-window-groups-help-on", kClickEvent, ""}});
+    CHECK(w.Pass({{kStatusReset, kClickEvent, ""}}).changed);
+    CHECK(w.settings.viewShifts[kOn].empty());
+    // The default typed is no shift of the player's.
+    w.Pass({{kStatusShift, kCommitEvent, "30"}});
+    w.Pass({{kStatusShift, kCommitEvent, std::to_string(on - kPortraitTop)}});
+    CHECK(w.settings.viewShifts[kOn].empty());
+}
+
+TEST(auto_adjust_places_the_views_under_the_line_the_windows_last_went_under)
+{
+    Window w;
+    w.state.page = Page::UserInterface;
+    const char* button = "userinterface-game-windows-auto-adjust";
+    const Settings before = w.settings;
+    w.Pass({{button, kClickEvent, ""}}); // no frame of windows placed yet
+    CHECK(w.settings == before);
+    w.readings.windowsBand = 80; // a taller panel's help line
+    w.readings.barBand     = 50;
+    w.settings.viewShifts[kOn] = {{"status", 3}};
+    CHECK(w.Pass({{button, kClickEvent, ""}}).changed);
+    CHECK(w.settings.placedUnder[kOn] == 80 && w.settings.placedUnder[kOff] == 50);
+    CHECK(w.settings.viewShifts[kOn].empty());
+    CHECK_EQ(ValueOn(w.Pass(), kStatusShift), std::to_string(80 - kPortraitTop));
+}
+
+TEST(the_nameplate_fonts_lead_with_the_games_font_and_the_top_panels_leave_it_out)
+{
+    Window w;
+    w.state.page = Page::Entities;
+    w.Pass({{"entities-nameplates-default-font", kClickEvent, ""}});
+    w.Pass({{"entities-nameplates-default-font-o-0", kClickEvent, ""}});
+    CHECK(w.settings.defaultFont == kGameFontName);
+    w.Pass({{"entities-nameplates-default-font", kClickEvent, ""}});
+    w.Pass({{"entities-nameplates-default-font-o-1", kClickEvent, ""}});
+    CHECK(w.settings.defaultFont == kGameFontNarrowName);
+    w.state.page = Page::TopPanel;
+    const Form open = w.Pass({{"toppanel-top-panel-title-font", kClickEvent, ""}});
+    CHECK(open.popup && Has(open.popup->rml, "Arial") && !Has(open.popup->rml, kGameFontName));
 }

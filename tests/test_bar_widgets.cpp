@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <map>
 #include <string>
 #include <utility>
 
@@ -165,8 +166,8 @@ TEST(a_dead_mob_with_data_keeps_its_aggro_icon_and_popup_but_has_no_level)
     const PopupContent popup = BarPopupContent(BarWidget::Target, state, settings);
     CHECK(popup.icon == Icon::AggroNQ);
     const PopupRow& top = popup.sections[0].rows[0];
-    CHECK(top.cells.size() == 1);
-    CHECK(Joined(top.cells[0].text) == "ID 220");
+    CHECK(top.cells.size() == 2);
+    CHECK(Joined(top.cells[0].text) == "WAR/WAR" && Joined(top.cells[1].text) == "ID 220");
     CHECK(Section(popup, "Spawn") != nullptr);
 }
 
@@ -180,19 +181,34 @@ TEST(the_target_popup_has_every_element_and_status_with_its_percent)
     std::vector<std::string> headings;
     for (const PopupSection& s : popup.sections)
         headings.push_back(s.heading);
-    CHECK(headings == (std::vector<std::string>{"", "Damage taken", "Elements", "Statuses", "Immune", "Spawn"}));
+    CHECK(headings == (std::vector<std::string>{"", "Damage taken", "Elements", "Statuses", "Immune", "Stats at Lv 20",
+                                                "TP moves", "Spawn"}));
     const PopupRow& elements = Section(popup, "Elements")->rows[0];
     CHECK(elements.kind == RowKind::Grid && elements.columns == 4 && elements.cells.size() == 8);
     CHECK(elements.cells[6].icon == Icon::Light);
-    CHECK(elements.cells[6].text == (std::vector<Span>{{"+50%", Tone::Weak}}));
+    // Unchecked, at the top of its range: magic evasion 58 at 20 (rank C+, Phoenix's sql/skill_caps.sql), light -3
+    // takes floor(58 * 0.95) = 55 off it, fire -2 floor(58 * 0.96019) = 55; dark is 0.
+    CHECK(elements.cells[6].text == (std::vector<Span>{{"+3%", Tone::Weak}}));
     CHECK(elements.cells[7].text == (std::vector<Span>{{"0%", Tone::Neutral}}));
-    CHECK(elements.cells[0].text == (std::vector<Span>{{"+30%", Tone::Weak}}));
+    CHECK(elements.cells[0].text == (std::vector<Span>{{"+3%", Tone::Weak}}));
+    // Its combat stats at 20 from data/phoenix_mob_info.tsv, then STR to CHR and its magic evasion.
+    const PopupRow& combat = Section(popup, "Stats at Lv 20")->rows[0];
+    CHECK(combat.kind == RowKind::Grid && combat.cells.size() == 6);
+    CHECK(combat.cells[0].text == (std::vector<Span>{{"HP", Tone::Dim}, {" 414", Tone::Normal}}));
+    CHECK(combat.cells[3].text == (std::vector<Span>{{"DEF", Tone::Dim}, {" 85", Tone::Normal}}));
+    const PopupRow& stats = Section(popup, "Stats at Lv 20")->rows[1];
+    CHECK(stats.kind == RowKind::Grid && stats.cells.size() == 8);
+    CHECK(stats.cells[7].text == (std::vector<Span>{{"MEva", Tone::Dim}, {" 58", Tone::Normal}}));
+    const PopupRow& moves = Section(popup, "TP moves")->rows[0];
+    CHECK(moves.kind == RowKind::Grid && moves.columns == 3 && moves.cells.size() == 3);
+    CHECK(Joined(moves.cells[0].text) == "Goblin Rush" && Joined(moves.cells[2].text) == "Bomb Toss Suicide");
     const PopupRow& statuses = Section(popup, "Statuses")->rows[0];
     CHECK(statuses.columns == 5 && statuses.cells.size() == 10 && statuses.cells[0].icon == Icon::Paralyze);
     CHECK(Section(popup, "Immune")->rows[0].cells[0].text == (std::vector<Span>{{"None", Tone::Neutral}}));
     CHECK(Joined(Section(popup, "Spawn")->rows[0].cells[0].text) == "Respawn 5:00");
-    CHECK(Joined(popup.sections[0].rows[0].cells[1].text) == "ID 220"); // 17199648 is 0x1067220
-    settings.showRanks = true;
+    CHECK(Joined(popup.sections[0].rows[0].cells[1].text) == "WAR/WAR");
+    CHECK(Joined(popup.sections[0].rows[0].cells[2].text) == "ID 220"); // 17199648 is 0x1067220
+    settings.rankDisplay = RankDisplay::Rank;
     CHECK(Section(BarPopupContent(BarWidget::Target, state, settings), "Elements")->rows[0].cells[6].text ==
           (std::vector<Span>{{"-3", Tone::Weak}}));
 }
@@ -209,7 +225,7 @@ TEST(a_placeholder_names_its_nm_and_counts_down)
     state.targetPhSeconds = 299.0;
     const PopupContent popup  = BarPopupContent(BarWidget::Target, state, settings);
     const PopupSection* spawn = Section(popup, "Spawn");
-    CHECK(Joined(spawn->rows[1].cells[0].text) == "Placeholder for Bigmouth Billy");
+    CHECK(Joined(spawn->rows[1].cells[0].text) == "Placeholder for Bigmouth Billy (15%)"); // his slot's chance
     CHECK(Joined(spawn->rows[2].cells[0].text) == "Back in 4:59");
     target.mob      = MobById(17191196);
     target.serverId = 17191196;
@@ -239,19 +255,23 @@ TEST(the_tags_say_how_a_mob_aggros_links_and_detects)
     BarState state;
     state.target              = &target;
     const PopupContent goblin = BarPopupContent(BarWidget::Target, state, settings);
-    CHECK(TagsOf(goblin) == (std::vector<std::string>{"Aggressive", "Links", "Sight"}));
+    CHECK(TagsOf(goblin) == (std::vector<std::string>{"Aggressive", "Links", "Sight 15y"}));
     target                        = MobTarget(16797799);
     const PopupContent brontotaur = BarPopupContent(BarWidget::Target, state, settings);
-    CHECK(TagsOf(brontotaur) == (std::vector<std::string>{"Aggressive", "Links", "True sight"}));
+    CHECK(TagsOf(brontotaur) == (std::vector<std::string>{"Aggressive", "Links", "True sight 15y", "Counter"}));
+    // Qufim Island's Clipper, a crab: it hears from 8 yalms and a beastmaster can charm it.
+    target = MobTarget(17293331);
+    CHECK(TagsOf(BarPopupContent(BarWidget::Target, state, settings)) == (std::vector<std::string>{"Passive", "Sound 8y", "Charmable"}));
 }
 
 TEST(a_tags_words_take_the_tag_tone_and_nothing_else_in_the_popup_does)
 {
     // The words sit in their frames, drawn in the tag's text color; the ID beside them and the rows after keep theirs.
-    // data/phoenix_mobs.tsv: the Brontotaur, 16797799, has three tags (Aggressive, Links, True sight); Bloodtear
-    // Baldurf, 17195318, flags 11 and detects 257, four (Aggressive, Sight, Scent, NM).
+    // data/phoenix_mobs.tsv: the Brontotaur, 16797799, has three tags (Aggressive, Links, True sight) and counters
+    // (a fourth, data/phoenix_mob_info.tsv); Bloodtear Baldurf, 17195318, flags 11 and detects 257, four (Aggressive,
+    // Sight, Scent, NM).
     Settings settings;
-    for (const auto& [id, tags] : {std::pair{16797799u, size_t{3}}, {17195318u, size_t{4}}})
+    for (const auto& [id, tags] : {std::pair{16797799u, size_t{4}}, {17195318u, size_t{4}}})
     {
         ActorInfo target = MobTarget(id);
         BarState state;
@@ -269,6 +289,87 @@ TEST(a_tags_words_take_the_tag_tone_and_nothing_else_in_the_popup_does)
                     }
         CHECK(tagged == tags && others > 0);
     }
+}
+
+namespace
+{
+    const char* SpellNumber(uint16_t spell)
+    {
+        static std::map<uint16_t, std::string> names;
+        return names.try_emplace(spell, "S" + std::to_string(spell)).first->second.c_str();
+    }
+}
+
+TEST(a_lottery_nm_shows_its_jobs_window_chance_and_cooldown_and_its_placeholder_its_chance)
+{
+    // Attohwa Chasm (data/zones/attohwa_chasm/mobs.yaml): Citipati is THF/BLM, out from 20:00 to 04:00, 15% from his
+    // slot with three hours out after his kill, and takes a quarter less magic damage and half breath damage; the
+    // Corse is his placeholder.
+    Settings settings;
+    BarState state;
+    const ActorInfo citipati = MobTarget(16806162);
+    state.target             = &citipati;
+    const PopupContent popup = BarPopupContent(BarWidget::Target, state, settings);
+    CHECK(Joined(popup.sections[0].rows[0].cells[1].text) == "THF/BLM");
+    CHECK(Lines(*Section(popup, "Spawn")) == (std::vector<std::string>{"Respawn 5:00", "Spawns 20:00 to 04:00",
+                                                 "15% pop chance", "3:00:00 cooldown after its kill",
+                                                 "1 placeholder in this zone"}));
+    const PopupRow& kinds = Section(popup, "Damage taken")->rows[1];
+    CHECK(kinds.cells.size() == 2);
+    CHECK(kinds.cells[0].text == (std::vector<Span>{{"Magic", Tone::Dim}, {" ", Tone::Normal}, {"-25%", Tone::Resist}}));
+    CHECK(kinds.cells[1].text == (std::vector<Span>{{"Breath", Tone::Dim}, {" ", Tone::Normal}, {"-50%", Tone::Resist}}));
+    const ActorInfo corse = MobTarget(16806161);
+    state.target          = &corse;
+    CHECK(Lines(*Section(BarPopupContent(BarWidget::Target, state, settings), "Spawn"))[1] ==
+          "Placeholder for Citipati (15%)");
+    // A mob with no other kind of damage taken has only its SDT row.
+    const ActorInfo goblin = Goblin();
+    state.target           = &goblin;
+    CHECK(Section(BarPopupContent(BarWidget::Target, state, settings), "Damage taken")->rows.size() == 1);
+}
+
+TEST(a_casters_spells_are_the_ones_it_casts_at_its_level)
+{
+    // The Corse's list (data/phoenix_spells.tsv, list 8), at 67, the top of its range: each spell whose levels
+    // hold 67, in the list's order.
+    Settings settings;
+    BarState state;
+    const ActorInfo corse = MobTarget(16806161);
+    state.target          = &corse;
+    state.spellName       = SpellNumber;
+    std::vector<std::string> expected;
+    for (const int spell : {254, 258, 245, 250, 253, 216, 225, 247, 231, 259, 252, 206, 210, 274, 146, 191, 151, 166, 186})
+        expected.push_back("S" + std::to_string(spell));
+    const PopupContent popup   = BarPopupContent(BarWidget::Target, state, settings);
+    const PopupSection* spells = Section(popup, "Spells");
+    CHECK(spells != nullptr);
+    if (spells == nullptr) return;
+    CHECK(spells->rows[0].kind == RowKind::Grid && spells->rows[0].columns == 3);
+    std::vector<std::string> names;
+    for (const PopupCell& cell : spells->rows[0].cells)
+        names.push_back(Joined(cell.text));
+    CHECK(names == expected);
+    state.spellName = nullptr; // without the game's names there is nothing to list
+    CHECK(Section(BarPopupContent(BarWidget::Target, state, settings), "Spells") == nullptr);
+}
+
+TEST(an_element_it_absorbs_and_what_it_does_by_itself)
+{
+    // data/phoenix_mob_info.tsv: Puk WW (Windurst Waters' Puk, 16986223) absorbs wind; the Stubborn Dredvodd,
+    // 16781327, regenerates; a Water Elemental of zone 37, 16928885, poisons with its hits.
+    Settings settings;
+    BarState state;
+    const ActorInfo puk = MobTarget(16986223);
+    state.target        = &puk;
+    const PopupContent pukPopup = BarPopupContent(BarWidget::Target, state, settings);
+    const PopupRow& elements    = Section(pukPopup, "Elements")->rows[0];
+    CHECK(elements.cells[static_cast<int>(Element::Wind)].text == (std::vector<Span>{{"Absorbs", Tone::Immune}}));
+    const ActorInfo dredvodd = MobTarget(16781327);
+    state.target             = &dredvodd;
+    CHECK(Lines(BarPopupContent(BarWidget::Target, state, settings).sections[0]).back() == "Regen");
+    const ActorInfo elemental = MobTarget(16928885);
+    state.target              = &elemental;
+    CHECK(Lines(BarPopupContent(BarWidget::Target, state, settings).sections[0]).back() == "Additional effect: Poison");
 }
 
 TEST(a_resisted_damage_type_shows_its_percent_in_the_resist_tone)
@@ -1392,4 +1493,297 @@ TEST(a_mobs_popup_lists_what_it_drops_at_its_treasure_hunter_0_chance_and_what_c
     CHECK(steal != nullptr && Lines(*steal) == (std::vector<std::string>{"Gold Ore"}));
     state.itemName = nullptr; // no names: no lists
     CHECK(Section(BarPopupContent(BarWidget::Target, state, settings), "Drops") == nullptr);
+}
+
+namespace
+{
+    ActorInfo NpcTarget(uint32_t serverId, const char* name)
+    {
+        ActorInfo npc;
+        npc.kind     = EntityKind::Npc;
+        npc.serverId = serverId;
+        npc.index    = serverId & 0xFFF;
+        std::snprintf(npc.name, sizeof(npc.name), "%s", name);
+        return npc;
+    }
+
+    const char* NpcItemName(uint16_t item)
+    {
+        switch (item)
+        {
+        case 4373: return "Woozyshroom";
+        case 4374: return "Sleepshroom";
+        case 4375: return "Danceshroom";
+        case 1823: return "Shrimp Lantern";
+        case 4389: return "San d'Orian Carrot";
+        case 4112: return "Potion";
+        case 4128: return "Ether";
+        case 4148: return "Antidote";
+        case 4150: return "Eye Drops";
+        case 4151: return "Echo Drops";
+        case 17389: return "Bamboo Fishing Rod";
+        case 17390: return "Yew Fishing Rod";
+        case 17391: return "Willow Fishing Rod";
+        case 17395: return "Lugworm";
+        case 17396: return "Little Worm";
+        case 5066: return "Scroll of Lightning Threnody";
+        case 5068: return "Scroll of Light Threnody";
+        default: return nullptr; // left out, as a drop the game has no name for is
+        }
+    }
+
+    // A section's lines; none when the popup has no such section.
+    std::vector<std::string> SectionLines(const PopupContent& popup, const std::string& heading)
+    {
+        const PopupSection* section = Section(popup, heading);
+        return section != nullptr ? Lines(*section) : std::vector<std::string>{"(no " + heading + ")"};
+    }
+
+    std::vector<std::string> Headings(const PopupContent& popup)
+    {
+        std::vector<std::string> headings;
+        for (const PopupSection& s : popup.sections)
+            headings.push_back(s.heading);
+        return headings;
+    }
+}
+
+TEST(a_qms_popup_says_what_to_trade_it_and_what_that_pops)
+{
+    // Carpenters' Landing's qm_mycophile (its script): a Woozyshroom, Sleepshroom or Danceshroom pops Mycophile.
+    Settings settings;
+    const ActorInfo qm = NpcTarget(16785729, "???");
+    BarState state;
+    state.target   = &qm;
+    state.itemName = NpcItemName;
+    CHECK(BarWidgetContent(BarWidget::Target, state, settings).hasPopup);
+    const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
+    CHECK(Joined(p.title) == "???");
+    CHECK(Headings(p) == (std::vector<std::string>{"", "Click", "Trade", "Pops"}));
+    CHECK(SectionLines(p, "") == (std::vector<std::string>{"ID 141"}));
+    // Its hint in the game's words, and the three mushrooms as one trade, as the probe saw on the server.
+    CHECK(SectionLines(p, "Click") ==
+          (std::vector<std::string>{"There is a rotten mushroom here. There are 3", "openings in its cap."}));
+    CHECK(SectionLines(p, "Trade") ==
+          (std::vector<std::string>{"Woozyshroom + Sleepshroom + Danceshroom", "\xE2\x86\x92 Pops Mycophile"}));
+    CHECK(SectionLines(p, "Pops") == (std::vector<std::string>{"Mycophile"}));
+}
+
+TEST(a_qm_that_pops_two_of_one_nm_names_it_once)
+{
+    // Al'Taieu's qm_jailer_of_prudence spawns both Jailers of Prudence, 16912846 and 16912847.
+    Settings settings;
+    const ActorInfo qm = NpcTarget(16912886, "???");
+    BarState state;
+    state.target = &qm;
+    CHECK(SectionLines(BarPopupContent(BarWidget::Target, state, settings), "Pops") ==
+          (std::vector<std::string>{"Jailer of Prudence"}));
+}
+
+TEST(a_spot_whose_script_works_out_what_it_pops_says_so)
+{
+    // Uleguerand Range's Rabbit Footprint takes a San d'Orian Carrot and pops a coney the moon picks.
+    Settings settings;
+    const ActorInfo footprint = NpcTarget(16798100, "Rabbit Footprint");
+    BarState state;
+    state.target   = &footprint;
+    state.itemName = NpcItemName;
+    const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
+    CHECK(SectionLines(p, "Trade") == (std::vector<std::string>{"San d'Orian Carrot"}));
+    CHECK(SectionLines(p, "Pops") == (std::vector<std::string>{"Worked out by its script"}));
+    if (const PopupSection* pops = Section(p, "Pops")) CHECK(pops->rows[0].cells[0].text[0].tone == Tone::Dim);
+}
+
+TEST(a_qm_shows_the_nm_the_probe_saw_it_pop_and_what_it_says)
+{
+    // Bibiki Bay's qm_shen, as the probe saw it on the server: its click's shrimp shells line, and a Shrimp Lantern's
+    // skimming line and Shen, the words from its IDs.lua wrapped at 44 characters, the lantern in its <item>.
+    Settings settings;
+    const ActorInfo qm = NpcTarget(16793970, "???");
+    BarState state;
+    state.target   = &qm;
+    state.itemName = NpcItemName;
+    const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
+    CHECK(SectionLines(p, "Click") ==
+          (std::vector<std::string>{"Innumerable shrimp shells are floating in", "the water here."}));
+    CHECK(SectionLines(p, "Trade") ==
+          (std::vector<std::string>{"Shrimp Lantern", "The Shrimp Lantern begins skimming quietly",
+              "across the surface of the water. ...What's", "this!? An enormous creature is chasing after",
+              "it from below!!!", "\xE2\x86\x92 Pops Shen"}));
+    CHECK(SectionLines(p, "Pops") == (std::vector<std::string>{"Shen"}));
+}
+
+TEST(a_hidden_qm_says_when_it_appears_and_what_a_readied_one_does)
+{
+    // Carpenters' Landing's Hercules Beetle tree: its zone shows it at 22:00 and hides it at 07:00, and once honeyed
+    // and ready it pops the Hercules Beetle (globals.lua and qm_hercules_beetle.lua).
+    Settings settings;
+    const ActorInfo tree = NpcTarget(16785730, "???");
+    BarState state;
+    state.target         = &tree;
+    const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
+    CHECK(SectionLines(p, "") == (std::vector<std::string>{"ID 142", "Appears at 22:00, gone at 07:00"}));
+    CHECK(SectionLines(p, "Click") == (std::vector<std::string>{"Once readied", "\xE2\x86\x92 Pops Hercules Beetle"}));
+    if (const PopupSection* click = Section(p, "Click")) CHECK(click->rows[0].cells[0].text[0].tone == Tone::Dim);
+}
+
+TEST(a_quest_steps_acts_name_the_quest_its_step_and_what_it_needs)
+{
+    // Batallia Downs' qm_chocobotale: a click finds nothing; at step 4 of A Chocobo's Tale it calls Badshah's pack, and
+    // once the NM is down it gives the Silver Comet's Collar (quests/jeuno/A_Chocobos_Tale.lua).
+    Settings settings;
+    const ActorInfo qm = NpcTarget(17207852, "???");
+    BarState state;
+    state.target = &qm;
+    CHECK(SectionLines(BarPopupContent(BarWidget::Target, state, settings), "Click") ==
+          (std::vector<std::string>{"You find nothing.", "In A Chocobos Tale, step 4", "You are being attacked!",
+              "\xE2\x86\x92 Pops Badshah", "In A Chocobos Tale, step 4, after its NM falls",
+              "\xE2\x86\x92 Gives key item Silver Comets Collar"}));
+}
+
+TEST(an_npcs_popup_names_the_key_items_it_gives_and_checks_for)
+{
+    // Carpenters' Landing's qm_para: with the Antique Amulet it pops Para, and it gives the Cathedral Medallion, for
+    // the quest Elderly Pursuits (quests/otherAreas).
+    Settings settings;
+    const ActorInfo qm = NpcTarget(16785781, "???");
+    BarState state;
+    state.target         = &qm;
+    const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
+    CHECK(Headings(p) == (std::vector<std::string>{"", "Click", "Pops", "Key items", "Checks for", "Quests"}));
+    CHECK(SectionLines(p, "Click") ==
+          (std::vector<std::string>{"There is nothing out of the ordinary here.", "In Elderly Pursuits, step 1",
+              "You are overwhelmed by the putrid stench of", "decay!", "\xE2\x86\x92 Pops Para",
+              "In Elderly Pursuits, step 2, holding its key items", "You polish the Antique Amulet with the",
+              "glowing mushroom spores!", "Obtained key item: Cathedral Medallion.",
+              "\xE2\x86\x92 Gives key item Cathedral Medallion"}));
+    CHECK(SectionLines(p, "Quests") == (std::vector<std::string>{"Elderly Pursuits Other Areas"}));
+    CHECK(SectionLines(p, "Pops") == (std::vector<std::string>{"Para"}));
+    CHECK(SectionLines(p, "Key items") == (std::vector<std::string>{"Cathedral Medallion"}));
+    CHECK(SectionLines(p, "Checks for") == (std::vector<std::string>{"Antique Amulet"}));
+}
+
+TEST(a_trade_of_gil_reads_gil_and_an_item_without_a_name_is_left_out)
+{
+    // Whitegate's Cacaroon takes an Imperial Bronze Piece (2184, which NpcItemName cannot name) and gil.
+    Settings settings;
+    const ActorInfo cacaroon = NpcTarget(16982252, "Cacaroon");
+    BarState state;
+    state.target   = &cacaroon;
+    state.itemName = NpcItemName;
+    CHECK(SectionLines(BarPopupContent(BarWidget::Target, state, settings), "Trade") == (std::vector<std::string>{"Gil"}));
+}
+
+TEST(an_npc_the_data_has_nothing_of_gets_only_its_name)
+{
+    Settings settings;
+    const ActorInfo blank = NpcTarget(16781329, "Door");
+    BarState state;
+    state.target = &blank;
+    const WidgetContent w = BarWidgetContent(BarWidget::Target, state, settings);
+    CHECK(Joined(w.title) == "Door" && !w.hasPopup);
+    CHECK(BarPopupContent(BarWidget::Target, state, settings).sections.empty());
+}
+
+TEST(a_shops_popup_lists_its_stock_with_prices)
+{
+    // Maera's stock, aboard the ship to Selbina (her script), at prices fame does not move.
+    Settings settings;
+    const ActorInfo maera = NpcTarget(17678362, "Maera");
+    BarState state;
+    state.target   = &maera;
+    state.itemName = NpcItemName;
+    CHECK(BarWidgetContent(BarWidget::Target, state, settings).hasPopup);
+    const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
+    CHECK(Headings(p) == (std::vector<std::string>{"", "Shop"}));
+    CHECK(SectionLines(p, "Shop") == (std::vector<std::string>{"Potion 910 gil", "Ether 4,832 gil", "Antidote 316 gil",
+                                         "Eye Drops 2,595 gil", "Echo Drops 800 gil"}));
+}
+
+TEST(a_nation_shop_puts_what_conquest_holds_back_under_its_place_and_says_fame_moves_its_prices)
+{
+    // Southern San d'Oria's Lusiane, by xi.shop.nation: rank 3 always, 2 while San d'Oria is 1st or 2nd, 1 while it is
+    // 1st and only to its citizens.
+    Settings settings;
+    const ActorInfo lusiane = NpcTarget(17719350, "Lusiane");
+    BarState state;
+    state.target   = &lusiane;
+    state.itemName = NpcItemName;
+    CHECK(SectionLines(BarPopupContent(BarWidget::Target, state, settings), "Shop") ==
+          (std::vector<std::string>{"Little Worm 4 gil", "Willow Fishing Rod 72 gil", "Scroll of Light Threnody 120 gil",
+              "Scroll of Lightning Threnody 1,376 gil", "When its nation is 1st or 2nd in conquest", "Lugworm 12 gil",
+              "Yew Fishing Rod 236 gil", "When its nation is 1st in conquest, to its citizens",
+              "Bamboo Fishing Rod 540 gil", "Prices before fame, which moves them up to 10% either way"}));
+    // The items in the normal tone, so the dim lines naming a place read as headings over them.
+    const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
+    if (const PopupSection* shop = Section(p, "Shop"))
+        CHECK(shop->rows[0].cells[0].text[0].tone == Tone::Normal && shop->rows[4].cells[0].text[0].tone == Tone::Dim);
+}
+
+TEST(a_shop_whose_stock_its_script_works_out_says_so)
+{
+    Settings settings;
+    const ActorInfo dabih = NpcTarget(17772597, "Dabih Jajalioh"); // Ru'Lude Gardens: the stock follows the season
+    BarState state;
+    state.target   = &dabih;
+    state.itemName = NpcItemName;
+    CHECK(SectionLines(BarPopupContent(BarWidget::Target, state, settings), "Shop") ==
+          (std::vector<std::string>{"Worked out by its script"}));
+}
+
+TEST(an_npcs_popup_lists_its_quests_and_missions_with_their_logs)
+{
+    // The Gate of the Gods (quests/jeuno/Apocalypse_Nigh, missions/cop/8_1 and 8_2).
+    Settings settings;
+    const ActorInfo gate = NpcTarget(16916828, "Gate of the Gods");
+    BarState state;
+    state.target = &gate;
+    CHECK(BarWidgetContent(BarWidget::Target, state, settings).hasPopup);
+    const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
+    CHECK(Headings(p) == (std::vector<std::string>{"", "Quests", "Missions"}));
+    CHECK(SectionLines(p, "Quests") == (std::vector<std::string>{"Apocalypse Nigh Jeuno"}));
+    CHECK(SectionLines(p, "Missions") == (std::vector<std::string>{"Garden of Antiquity CoP", "A Fate Decided CoP"}));
+    if (const PopupSection* quests = Section(p, "Quests"))
+        CHECK(quests->rows[0].kind == RowKind::Pair && quests->rows[0].cells[0].text[0].tone == Tone::Normal &&
+              quests->rows[0].cells[1].text[0].tone == Tone::Dim);
+}
+
+TEST(battlefields_and_hidden_quests_have_sections_and_what_live_has_off_is_left_out)
+{
+    Settings settings;
+    BarState state;
+    const ActorInfo circle = NpcTarget(16818249, "Memento Circle"); // battlefields/The_Shrouded_Maw
+    state.target           = &circle;
+    CHECK(SectionLines(BarPopupContent(BarWidget::Target, state, settings), "Battlefields") ==
+          (std::vector<std::string>{"Darkness Named", "Test Your Mite", "Waking Dreams"}));
+    const ActorInfo luminant = NpcTarget(16806290, "Luminant"); // quests/hiddenQuests/Mimeo_Stone
+    state.target             = &luminant;
+    CHECK(SectionLines(BarPopupContent(BarWidget::Target, state, settings), "Quests") ==
+          (std::vector<std::string>{"Mimeo Stone Hidden"}));
+    // Misareaux Coast's Dilapidated Gate: three CoP missions, the three mobs of one's fight, and a trust quest live
+    // has off.
+    const ActorInfo gate = NpcTarget(16879936, "Dilapidated Gate");
+    state.target         = &gate;
+    const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
+    CHECK(Headings(p) == (std::vector<std::string>{"", "Pops", "Missions"}));
+    CHECK(SectionLines(p, "Missions").size() == 3);
+    const ActorInfo retriever = NpcTarget(17105705, "Mystic Retriever"); // only in an RoV mission
+    state.target              = &retriever;
+    CHECK(!BarWidgetContent(BarWidget::Target, state, settings).hasPopup);
+}
+
+TEST(what_an_npc_is_for_shows_as_tags_under_its_id)
+{
+    // Oldton Movalpolos' Twinkbrix takes a trade and teleports to the Mineshaft (its script).
+    Settings settings;
+    const ActorInfo twinkbrix = NpcTarget(16822535, "Twinkbrix");
+    BarState state;
+    state.target         = &twinkbrix;
+    const PopupContent p = BarPopupContent(BarWidget::Target, state, settings);
+    CHECK(!p.sections.empty() && p.sections[0].heading.empty());
+    if (p.sections.empty()) return;
+    const std::vector<PopupRow>& rows = p.sections[0].rows;
+    CHECK(rows.size() == 2 && rows.back().kind == RowKind::Tags);
+    if (rows.size() != 2) return;
+    CHECK(Joined(rows[1].cells[0].text) == "Teleports to Mineshaft" && rows[1].cells[0].text[0].tone == Tone::Tag);
 }

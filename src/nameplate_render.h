@@ -42,7 +42,7 @@ namespace headsup
             float nameX, nameY;
             int nameHeight;
             uint32_t nameColor;
-            ShownLine lines[kPlateLines];
+            std::vector<ShownLine> lines; // the plate's lines, a design line's rows each
             int lineCount;
         };
 
@@ -69,6 +69,8 @@ namespace headsup
         void SetCoveredTop(float pixels) { m_CoveredTop = pixels; }
         // The picture a cursor of the File style draws, or none for a file that could not be read.
         void SetCursorFile(std::optional<Image> picture);
+        // The game's own font, for the text set in it; every plate is drawn again with it.
+        void SetGameFont(std::optional<GameFontFace> face);
         // The game's cursor is blocked over these.
         const std::vector<CursorName>& CursorNames() const { return m_CursorNames; }
         bool NamesFailed() const { return m_NamesFailed; }
@@ -172,6 +174,11 @@ namespace headsup
         std::unordered_map<uint16_t, Plate> m_Plates;
         FrameCache<BadgeKey, PlateTexture> m_Badges;
         IconTextures m_Icons;
+        // A white pixel, stretched and tinted into the lines from risen plates to where they stood; none once Direct3D
+        // refused it, and then no lines.
+        IDirect3DTexture8* m_Solid = nullptr;
+        float m_SolidU = 0.0f, m_SolidV = 0.0f;
+        bool m_SolidRefused = false;
         std::vector<Quad> m_Quads;
         std::vector<Shown> m_Shown;
         std::vector<CursorName> m_CursorNames;
@@ -179,8 +186,10 @@ namespace headsup
         PlateTexture m_LoneCursor;
         PlateTexture m_LoneCursorUnder; // the target's own, while it is also the candidate being picked
         // Kept from plate to plate so measuring one allocates nothing: its lines as the layout takes them, the text
-        // boxes of the line being measured, a badge for each of its icons (null without one) and which texts are left out.
-        std::array<LineInput, kPlateLines> m_Inputs;
+        // boxes of the line being measured, a badge for each of its icons (null without one), which texts are left out
+        // and where each line's texts start among its design line's.
+        std::vector<LineInput> m_Inputs;
+        std::vector<size_t> m_TextStart;
         std::vector<ItemSize> m_TextSizes;
         std::vector<const PlateTexture*> m_IconBadges;
         std::vector<uint8_t> m_LeftOut;

@@ -416,19 +416,19 @@ TEST(a_nameplates_opacity_goes_by_what_you_target_and_by_distance_when_it_fades_
     CHECK_EQ(PlateAlpha(o, kPickedRank, true, 5.0f), 230u); // or this is the one you are picking
     CHECK_EQ(PlateAlpha(o, kPickedRank, false, 5.0f), 230u);
     CHECK_EQ(PlateAlpha(o, kPlainRank, true, 45.0f), 102u); // distance counts for nothing unless it fades in
-    // Fading in, what you do not target is whole within 10 yalms and a hundredth at the range, evenly between.
+    // Fading in, what you do not target is whole within 10 yalms and a hundredth at the range, quick to come in.
     o.fadeIn = true;
     o.range  = 50.0f;
     CHECK_EQ(PlateAlpha(o, kPlainRank, true, 8.0f), 102u);
-    CHECK_EQ(PlateAlpha(o, kPlainRank, true, 30.0f), 52u); // 102 * 0.505
+    CHECK_EQ(PlateAlpha(o, kPlainRank, true, 30.0f), 77u); // 102 * 0.7525
     CHECK_EQ(PlateAlpha(o, kPlainRank, true, 50.0f), 1u);
-    CHECK_EQ(PlateAlpha(o, kPlainRank, false, 30.0f), 103u); // 204 * 0.505
+    CHECK_EQ(PlateAlpha(o, kPlainRank, false, 30.0f), 154u); // 204 * 0.7525
     // Your target's, and the one you are picking, never fades with distance: it is as opaque as Is Targeted says.
     CHECK_EQ(PlateAlpha(o, kTargetRank, true, 30.0f), 230u);
     CHECK_EQ(PlateAlpha(o, kTargetRank, true, 50.0f), 230u);
     CHECK_EQ(PlateAlpha(o, kPickedRank, true, 45.0f), 230u);
     o.range = 30.0f;
-    CHECK_EQ(PlateAlpha(o, kPlainRank, false, 20.0f), 103u); // half way to a nearer range
+    CHECK_EQ(PlateAlpha(o, kPlainRank, false, 20.0f), 154u); // half way to a nearer range
     CHECK_EQ(PlateAlpha(OpacitySettings{}, kPlainRank, true, 45.0f), kOpaqueAlpha); // a new install's: whole
     CHECK_EQ(WithAlpha(0xFF123456, 102), 0x66123456u);
     CHECK_EQ(WithAlpha(0x80123456, kOpaqueAlpha), 0x80123456u);
@@ -480,6 +480,18 @@ TEST(plates_stack_one_above_another_and_a_rise_onto_a_third_goes_over_it_too)
     CHECK(StackRises(boxes, kStackGap) == (std::vector<float>{0.0f, 0.0f, 77.0f}));
 }
 
+TEST(a_risen_plates_line_runs_from_its_bottom_down_to_where_it_stood)
+{
+    // A plate centered on 150 whose bottom stood at 230, risen 42: a line 1 px wide from 188 down to 230.
+    const std::optional<PlateBox> line = StackLeader(150.0f, 230.0f, 42.0f, 1.0f);
+    CHECK(line.has_value());
+    CHECK(line->left == 149.5f && line->right == 150.5f && line->top == 188.0f && line->bottom == 230.0f);
+    const std::optional<PlateBox> wide = StackLeader(150.0f, 230.0f, 42.0f, 3.0f);
+    CHECK(wide->left == 148.5f && wide->right == 151.5f);
+    // Not risen, or by less than a pixel, it has none.
+    CHECK(!StackLeader(150.0f, 230.0f, 0.0f, 1.0f) && !StackLeader(150.0f, 230.0f, 0.5f, 1.0f));
+}
+
 TEST(a_plates_rise_eases_to_where_it_should_be_and_settles_there)
 {
     CHECK(EaseRise(0.0f, 40.0f, 0.0) == 0.0f);
@@ -505,18 +517,6 @@ TEST(a_plates_size_follows_how_far_it_is_as_the_games_own_names_do)
     CHECK(Near(ScaleAtDistance(1.0f, 0.8f, 1.2f), 1.2f) && Near(ScaleAtDistance(0.0f, 0.8f, 1.2f), 1.2f));
     CHECK(Near(ScaleAtDistance(500.0f, 0.8f, 1.2f), 0.8f));
     CHECK(Near(ScaleAtDistance(14.55f, 0.8f, 2.0f), 1.740f, 0.03f));
-}
-
-TEST(your_own_name_can_keep_one_size)
-{
-    Settings s;
-    CHECK(ScalesWithDistance(s, true) && ScalesWithDistance(s, false));
-    s.scaleOwnName = false;
-    CHECK(!ScalesWithDistance(s, true));
-    CHECK(ScalesWithDistance(s, false)); // everyone else still scales
-    s.scaleOwnName      = true;
-    s.scaleWithDistance = false; // the main switch turns every name off
-    CHECK(!ScalesWithDistance(s, true) && !ScalesWithDistance(s, false));
 }
 
 TEST(a_cursor_is_kept_inside_the_screen)

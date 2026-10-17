@@ -1,0 +1,324 @@
+text	zone	message	words
+1	2	7515	There is a rotten mushroom here. There are 3 openings in its cap.
+2	2	7270	A tree has fallen here...
+3	2	7271	You feel a wave of hatred wash over you!
+4	2	6409	There is nothing out of the ordinary here.
+5	2	7494	You are overwhelmed by the putrid stench of decay!
+6	2	7499	You polish the <keyitem> with the glowing mushroom spores!
+7	2	6398	Obtained key item: <keyitem>.
+8	4	7635	Innumerable shrimp shells are floating in the water here.
+9	4	7636	The <item> begins skimming quietly across the surface of the water. ...What's this!? An enormous creature is chasing after it from below!!!
+10	4	6409	There is nothing out of the ordinary here.
+11	4	7463	It was a trap!
+12	4	7464	You are not alone!
+13	4	7634	There is nothing left of interest here.
+14	5	7360	You see something glittering below the surface here, but the ice encases it completely.
+15	5	7358	You see something glittering beneath the surface of the ice.
+16	5	7359	There are many cold <item> scattered around the area. Could someone be trying to melt the ice to retrieve what lies beneath?
+17	5	6422	There is nothing out of the ordinary here.
+18	7	7368	Occasionally lumps arise in the ground here, then settle down again. It seems that there is something beneath the earth.
+19	7	7369	You set the <item>. The acidic smell of antlion wafts through the air. Suddenly, a sharp clang rings through the air! You have caught something!
+20	9	7495	A broken knife blade can be seen among the rubble...
+21	9	6409	There is nothing out of the ordinary here.
+22	16	7237	The sphere is emitting an eerie green glow.
+23	16	6409	There is nothing out of the ordinary here.
+24	16	119	Nothing happens...
+25	18	7237	The sphere is emitting an eerie green glow.
+26	18	6409	There is nothing out of the ordinary here.
+27	18	119	Nothing happens...
+28	20	7237	The sphere is emitting an eerie green glow.
+29	20	6409	There is nothing out of the ordinary here.
+30	20	119	Nothing happens...
+31	22	7321	Remnants of a cerebrator lie scattered about the area.
+32	22	7239	You sense a dark, empty presence...
+33	22	7241	The sphere is emitting an eerie green glow.
+34	22	6409	There is nothing out of the ordinary here.
+35	22	119	Nothing happens...
+36	24	7803	A message has been engraved into the rock: Offer up the ancient shield, and the pact shall be honored.
+37	24	7807	The stench of rotten flesh fills the air around you. Some scavenger must have made this place its territory.
+38	24	7762	You can see for malms in every direction.
+39	24	7760	You survey the surroundings but see nothing out of the ordinary.
+40	24	7761	Wait, you sense a murderous presence...!
+41	24	6409	There is nothing out of the ordinary here.
+42	24	6410	You are suddenly overcome with a sense of foreboding...
+43	24	7764	You sense a spine-chilling presence!
+44	25	7680	The ground here is littered with the pieces of a shattered shield...
+45	25	7681	The <item> is suddenly snatched away!
+46	25	7687	There appears to be some kind of trap here. Bits of fish are lying around the area.
+47	25	7686	The trap already contains <item>.
+48	25	7689	You put <item> in the trap.
+49	25	6409	There is nothing out of the ordinary here.
+50	25	7600	You sense the foul stench of death...
+51	26	6409	There is nothing out of the ordinary here.
+52	26	11769	There is a <keyitem> lying on the ground here! <player> obtains the <keyitem>!
+53	26	11770	There is a trail of water here. It is still fresh.
+54	27	6409	There is nothing out of the ordinary here.
+55	28	7283	You open the drawer.
+56	28	7284	There is nothing inside.
+57	28	7285	The drawer is jammed shut.
+58	28	7282	You sense an evil presence!
+59	28	7382	There is nothing here but a handful of musty old manuscripts.
+60	29	7621	The ground here is giving off heat.
+61	29	6409	There is nothing out of the ordinary here.
+62	30	6409	There is nothing out of the ordinary here.
+63	34	7404	You hear something vaguely resembling a voice emanating from the depths of your soul. Bring me...aer...reccceptac...
+64	35	7780	You hear something vaguely resembling a voice emanating from the depths of your soul. Bring...mem...ries...hrah...
+65	35	7781	You sense some unknown presence...
+66	35	7786	You hear something vaguely resembling a voice emanating from the depths of your soul. Bring me...euv...recccepta...
+67	36	7825	The air before you appears warped and distorted...
+68	51	8516	Broken shards of insect wing are scattered all over...
+69	51	8544	Something draws near!
+70	51	8518	Piles of pamama peels litter the ground...
+71	51	8514	The heady fragrance of wine pervades the air...
+72	51	6409	There is nothing out of the ordinary here.
+73	52	7685	The ground is smeared with bloodstains...
+74	52	7710	Something draws near!
+75	52	7683	The ground is strewn with shed leaves...
+76	52	119	Nothing happens...
+77	54	8942	The ground here is slimy to the touch...
+78	54	8924	Minute glittering fragments are scattered all over...
+79	54	8948	Light, fluttery objects litter the ground...
+80	54	8937	A stifling stench pervades the air...
+81	54	6409	There is nothing out of the ordinary here.
+82	54	8392	You must bring %.
+83	54	8404	You feel a chill run down your spine!
+84	61	7577	The ground is strewn with shed leaves...
+85	61	7604	Something draws near!
+86	61	7582	A sickly sweet fragrance pervades the air...
+87	61	7588	A stifling stench pervades the air...
+88	61	7583	An acidic odor pervades the air...
+89	61	7584	A putrid odor threatens to overwhelm you...
+90	61	7386	There is nothing out of the ordinary here.
+91	61	7388	Obtained key item: %. You think it may fit the large keyhole.
+92	61	7562	There is a detached part here...
+93	62	8005	You can see blue flames flickering from a hole in the ground here...
+94	62	8057	A sickly sweet fragrance pervades the air...
+95	62	8079	Something draws near!
+96	62	8064	The ground is carpeted in a thin layer of cinder.
+97	62	8080	A dull piece of metal lies on the ground. It appears to be a bracelet of sorts, but the layers of grime covering its surface render it wholly unwearable.
+98	65	8687	A sickly sweet fragrance pervades the air...
+99	65	8709	Something draws near!
+100	65	8685	Numerous strands of hair are scattered all over...
+101	65	7045	Nothing out of the ordinary happens.
+102	68	8034	The ground is smeared with bloodstains...
+103	68	8059	Something draws near!
+104	68	8028	You sense an ominous presence...
+105	68	6409	There is nothing out of the ordinary here.
+106	70	9511	You find <keyitem> on the counter.
+107	70	9513	You already possess <keyitem>.
+108	72	7771	The ground here is slimy to the touch...
+109	72	7782	Something draws near!
+110	72	7752	The heady fragrance of wine pervades the air...
+111	72	7753	Minute glittering fragments are scattered all over...
+112	78	6409	There is nothing out of the ordinary here.
+113	79	8088	A sickly sweet fragrance pervades the air...
+114	79	8110	Something draws near!
+115	79	8083	The ground is strewn with shed leaves...
+116	79	8101	Shredded scraps of paper are scattered all over...
+117	79	8094	A stifling stench pervades the air...
+118	79	6409	There is nothing out of the ordinary here.
+119	79	7600	It looks like someone slipped here...
+120	79	7601	A hideous beast emerges from the depths of the swamp!
+121	79	119	Nothing happens...
+122	84	119	Nothing happens...
+123	91	119	Nothing happens...
+124	98	119	Nothing happens...
+125	100	7433	You find some worthless scraps of paper.
+126	100	7907	Something is amiss.
+127	102	7590	Surrounded by these pillars, you feel a strange energy.
+128	103	7377	Just a pile of sand.
+129	103	6431	There is nothing out of the ordinary here.
+130	103	7729	You sense a foul presence.
+131	103	7739	You sense an evil presence...
+132	103	7743	You feel a sudden chill in the air.
+133	103	7849	Long ago, monsters killed many adventurers and merchants just off the coast here. If you find any vestige of the victims and return it to the sea, perhaps it would appease the spirits of the dead.
+134	104	8033	Something was dug up here...
+135	104	8034	For some reason, you are unable to investigate this spot. There is a preternatural force at work here...
+136	104	8035	A sense of foreboding fills the air...
+137	105	7451	Someone or something has dug a hole here.
+138	105	7452	You sense an evil presence.
+139	105	6431	There is nothing out of the ordinary here.
+140	105	7453	Someone has buried something here.
+141	105	7503	There is no grass growing here...
+142	105	7643	You find nothing.
+143	105	7640	You are being attacked!
+144	106	7463	The shining object slips through your fingers and is washed further down the stream.
+145	106	6590	There is nothing out of the ordinary here.
+146	106	7358	You sense an evil presence...
+147	107	7425	You see monster tracks on the ground.
+148	107	7428	You put <item> down.
+149	107	7429	The fire seems to be good enough for cooking.
+150	107	7431	You take <item> out of the fire.
+151	107	7430	You put <item> in the fire.
+152	107	7433	The <item> is already in the fire.
+153	108	7475	Gimme everything ya got in your bag.
+154	108	7413	You thought you saw something, but find nothing.
+155	108	7461	There is a blackened spot on the ground...
+156	108	7463	You place <item> on the blackened spot.
+157	108	7462	This is the blackened spot you were told about. You should place <item> here.
+158	109	7928	Harvesting is possible here if you have <item>.
+159	112	6422	There is nothing out of the ordinary here.
+160	112	7375	You can sense an evil force around you.
+161	112	7742	Only shards of ice lie upon the ground.
+162	112	7830	It looks like something was buried here.
+163	112	7801	The cavern continues on for quite a distance.
+164	112	7249	A monster appears from deep within the cave!
+165	112	7802	There is nothing more to be done here.
+166	113	6409	There is nothing out of the ordinary here.
+167	113	7711	You sense an ominous presence...
+168	114	7688	These are remnants of a past age, made from a rare kind of stone.
+169	114	7689	You feel a hostile gaze upon you!
+170	114	6409	There is nothing out of the ordinary here.
+171	117	7574	There is something sprouting from the ground here. It looks a little withered.
+172	117	7578	The sprout is looking better.
+173	117	7575	A repulsive creature emerges from the ground!
+174	118	7850	It seems that long ago, a ship sank near here. If you find any vestige of the wreck and return it to the sea, perhaps it would appease the spirits of the dead.
+175	119	7513	You find nothing.
+176	120	6431	There is nothing out of the ordinary here.
+177	120	7459	It is impossible to climb this wall with your bare hands.
+178	120	7440	Something has come down from the tower!
+179	121	6409	There is nothing out of the ordinary here.
+180	121	7868	You sense an ominous presence...
+181	121	7788	It is a beautiful, sturdy branch.
+182	121	7787	This looks like a sturdy branch. You will need <item> to cut it off.
+183	121	7793	You no longer sense the evil presence, but there is still a feeling of unrest throughout the forest.
+184	121	7794	The newly sprouted <item> is glowing softly. You no longer feel as if you are being watched.
+185	121	6410	You are suddenly overcome with a sense of foreboding...
+186	122	6409	There is nothing out of the ordinary here.
+187	122	7419	You sense an ominous presence...
+188	122	7415	It is nothing but a pile of rubble.
+189	122	7416	A chill runs down your spine.
+190	123	6409	There is nothing out of the ordinary here.
+191	123	7845	A swarm has appeared!
+192	123	7772	It looks like something is buried here. If you had <item> you could dig it up.
+193	124	7706	There is an Opo-opo drinking well here. It seems they feast here, too.
+194	124	7707	You hear the cry of a famished Opo-opo!
+195	124	7710	You might be able to draw an Opo-opo here if you had more pamamas.
+196	124	6409	There is nothing out of the ordinary here.
+197	124	7702	The hole in this tree is filled with a sweet-smelling liquid.
+198	124	7703	Your wine barrel is already full.
+199	124	7704	A chill runs down your spine...
+200	124	7747	It looks like something is buried here. If you had <item> you could dig it up.
+201	125	6409	There is nothing out of the ordinary here.
+202	125	7415	You sense an ominous presence...
+203	125	7393	Many stones litter the area.
+204	125	7394	You sense something evil looming above you.
+205	125	7433	It looks like something is buried here. If you had <item> you could dig it up.
+206	127	6413	An aura of irrepressible might threatens to overwhelm you...
+207	127	6409	There is nothing out of the ordinary here.
+208	127	7333	There are some symbols inscribed upon it.
+209	127	7335	You hear a noise behind you.
+210	128	6413	An aura of irrepressible might threatens to overwhelm you...
+211	128	6409	There is nothing out of the ordinary here.
+212	128	7333	It looks like something was buried here.
+213	130	7385	A strange insignia pointing north is carved into the wall.
+214	143	6409	There is nothing out of the ordinary here.
+215	143	6410	You are suddenly overcome with a sense of foreboding...
+216	145	6409	There is nothing out of the ordinary here.
+217	147	7374	Foul-smelling soil is spilling out.
+218	148	7276	You find nothing.
+219	149	6409	There is nothing out of the ordinary here.
+220	149	7945	This is where the Tonberry from Carpenters' Landing told you to bring the <item>...
+221	149	7946	You have nothing left to do here.
+222	150	6409	There is nothing out of the ordinary here.
+223	151	7457	A mysterious flame is burning.
+224	151	7458	You hold <item> over the flame... A peculiar scent covers the area.
+225	151	6594	There is nothing out of the ordinary here.
+226	153	6409	There is nothing out of the ordinary here.
+227	153	7418	You sense an ominous presence...
+228	153	7197	You cannot see the moon right now.
+229	153	7195	You can see the sky from here.
+230	153	7196	Something is not right!
+231	154	6409	There is nothing out of the ordinary here.
+232	157	6572	There is nothing out of the ordinary here.
+233	157	7354	You sense a foul presence.
+234	159	6409	There is nothing out of the ordinary here.
+235	159	7520	It looks like some sort of device. A thin thread leads down to the floor...
+236	159	7524	It is a beehive...
+237	159	7525	Bits of vegetable matter are strewn around. They appear to have been gnawed on by insects...
+238	159	7527	You sense an ominous presence...
+239	159	7465	This platform looks a place for an offering.
+240	159	7466	Something is written here, but you cannot make out the words.
+241	159	7467	The <keyitem> slightly quivers, but there is no sign of Lightbringer here.
+242	159	7470	Some sort of ceremony was performed here...
+243	160	7377	Five dried eyeballs are stuck to the surface of the rock...
+244	160	6409	There is nothing out of the ordinary here.
+245	160	7379	You sense an ominous presence...
+246	161	7575	You find nothing.
+247	161	7573	You see a Moblin earplug lying on the ground. Could Zeelozok have met his end here...?
+248	161	7574	Marquis Andrealphus and his minions attack!
+249	161	6557	Obtained key item: <keyitem>.
+250	167	6568	There is nothing out of the ordinary here.
+251	167	7443	You sense an ominous presence...
+252	173	7354	It appears to be a hole made by some kind of animal. Fragments of iron ore are scattered around the area...
+253	173	6409	There is nothing out of the ordinary here.
+254	173	7353	The hair on the back of your neck begins to stand on end!
+255	174	7374	Fish bones lie scattered about the area...
+256	174	6409	There is nothing out of the ordinary here.
+257	174	7376	You sense an ominous presence...
+258	174	7356	You do not see anything out of the ordinary.
+259	174	7359	The piece of wood fell off the cliff!
+260	174	7360	You sense an evil presence...
+261	176	6409	There is nothing out of the ordinary here.
+262	176	7387	You sense an ominous presence...
+263	176	7575	Your body goes numb with dread!
+264	177	6395	Obtained: <item>.
+265	177	6387	You cannot obtain the <item>. Come back after sorting your inventory.
+266	177	7250	You sense an evil presence lurking in the shadows...
+267	178	7361	There is a small hole here. It appears to be damp inside...
+268	178	6409	There is nothing out of the ordinary here.
+269	191	7513	There is a small hole here.
+270	191	7365	The area is littered with a white crystalline dust.
+271	191	7368	You place <item> down.
+272	191	7366	A plant extract is smeared around the area.
+273	191	7387	You hear a voice... (Grasswix don't waste time with losers...)
+274	191	7367	A number of broken eggs lie scattered about.
+275	191	7398	You hear a voice... (...just won't do...nope...nope...)
+276	193	6568	There is nothing out of the ordinary here.
+277	193	7381	You place your hands into the pool.
+278	193	7384	The dew from the stalactite slips through your fingers.
+279	193	7385	You have already obtained the dew.
+280	193	7438	You sense a foul presence.
+281	195	6568	There is nothing out of the ordinary here.
+282	195	7436	The <item> emits a putrid odor and burns up. Your attempt this time has failed...
+283	196	7365	You see monster tracks on the ground.
+284	196	7368	You put <item> down.
+285	196	7366	You see fresh monster tracks on the ground.
+286	196	7407	Something resembling letters is written here.
+287	196	7409	<item> is on this seal.
+288	196	7408	You have found the location of the seal. You place <item> on it.
+289	196	7410	There is a small opening here.
+290	196	6409	There is nothing out of the ordinary here.
+291	197	7291	Nothing seems to happen.
+292	197	7284	Someone has been digging here.
+293	197	7290	It seems that nothing will happen yet.
+294	197	6600	You are suddenly overcome with a sense of foreboding...
+295	198	6409	There is nothing out of the ordinary here.
+296	200	7317	You find nothing special.
+297	200	7318	There is a hole in the ceiling.
+298	200	7319	You sense a presence from in the ceiling.
+299	200	7324	The presence in the ceiling seems to have moved to the east.
+300	204	7423	You find nothing.
+301	204	7425	You are able to make out the blurred letters. The soul of Tavnazia will never perish.
+302	204	7424	You feel a conspicuously evil presence.
+303	205	7291	Eggshells lie scattered around the place...
+304	205	6409	There is nothing out of the ordinary here.
+305	205	7294	You sense an ominous presence...
+306	205	7290	Lava flows slowly through the rocks.
+307	208	6409	There is nothing out of the ordinary here.
+308	208	7393	You sense an ominous presence...
+309	208	7383	You find nothing out of the ordinary.
+310	208	7358	Ancient letters are carved here, but you are unable to read them.
+311	208	6410	You are suddenly overcome with a sense of foreboding...
+312	208	7389	Something is buried in this fallen pillar.
+313	208	7388	Something is attacking from behind you!
+314	208	7384	You find nothing.
+315	212	6409	There is nothing out of the ordinary here.
+316	212	7335	You sense an ominous presence...
+317	212	7333	You have a bad feeling about this place.
+318	213	6409	There is nothing out of the ordinary here.
+319	213	7357	You sense an ominous presence...
+320	213	7349	It looks like the nest of a very large bird.
+321	230	6453	There is nothing out of the ordinary here.
+322	243	6549	There is nothing out of the ordinary here.
+323	246	7318	You find a grimy old box.

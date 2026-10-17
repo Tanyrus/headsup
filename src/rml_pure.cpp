@@ -1,6 +1,7 @@
 #include "rml_pure.h"
 
 #include "argb.h"
+#include "utf16.h"
 
 #include <algorithm>
 #include <cmath>
@@ -166,4 +167,20 @@ namespace headsup
     }
 
     float WheelNotches(int delta) { return -static_cast<float>(delta) / static_cast<float>(kWheelDelta); }
+
+    size_t ByteUnder(std::string_view text, float x, FunctionRef<float(std::string_view)> widthOf)
+    {
+        size_t nearest = 0;
+        float off      = std::abs(x);
+        for (size_t at = 1; at <= text.size(); ++at)
+        {
+            if (at < text.size() && ContinuesCharacter(text[at])) continue;
+            if (const float here = std::abs(x - widthOf(text.substr(0, at))); here < off)
+            {
+                nearest = at;
+                off     = here;
+            }
+        }
+        return nearest;
+    }
 }

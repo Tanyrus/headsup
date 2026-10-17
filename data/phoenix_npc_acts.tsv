@@ -1,0 +1,1006 @@
+npc	act	items	when	says	pops	gives	keyItems	event
+16785729	click			1				0
+16785729	trade	4373,4374,4375			16785722			0
+16785730	click		primed		16785723			0
+16785730	hides		zoneStart					0
+16785730	hides		hour:7-7					0
+16785730	shows		hour:22-22					0
+16785731	click		primed		16785723			0
+16785731	hides		zoneStart					0
+16785731	hides		hour:7-7					0
+16785731	shows		hour:22-22					0
+16785732	click		primed		16785723			0
+16785732	hides		zoneStart					0
+16785732	hides		hour:7-7					0
+16785732	shows		hour:22-22					0
+16785733	click		primed		16785723			0
+16785733	hides		zoneStart					0
+16785733	hides		hour:7-7					0
+16785733	shows		hour:22-22					0
+16785734	click		primed		16785723			0
+16785734	hides		zoneStart					0
+16785734	hides		hour:7-7					0
+16785734	shows		hour:22-22					0
+16785735	click		primed		16785723			0
+16785735	hides		zoneStart					0
+16785735	hides		hour:7-7					0
+16785735	shows		hour:22-22					0
+16785752	click			2				0
+16785752	click		link:724	3	16785710			0
+16785781	click			4				0
+16785781	click		link:399,step:1	5	16785716			0
+16785781	click		keyItems,link:399,step:2	6:680,7:681			681	0
+16785782	click			4				0
+16785782	click		link:401,step:1	5	16785721			0
+16785782	click		link:401,step:2				704	0
+16793970	click			8				0
+16793970	trade	1823		9:1823	16793929			0
+16794008	click			10				0
+16794008	click		link:241	11,12	16793711,16793712,16793713,16793714,16793715,16793716			0
+16794014	click			13				0
+16794014	click		link:724,nmKilled,step:0					1
+16798097	trade	1824			16798078			0
+16798128	click			14				0
+16798128	click		quest	15,16:0:1729				0
+16798128	click		quest	17				0
+16798128	trade	1729	quest					1
+16806296	click			18				0
+16806296	trade	1825		19:1825	16806242			0
+16814434	click			20				0
+16814434	trade	18014			16814432			0
+16814434	trade	18016			16814432			0
+16814501	click			21				0
+16814504	click			21				0
+16826573	trade	1827			16826569			0
+16843071	click			22				0
+16843071	click		keyItems	23				0
+16843071	trade	1720						1
+16843071	trade	1720	keyItems	24				0
+16851295	click			25				0
+16851295	click		keyItems	26				0
+16851295	trade	1721						1
+16851295	trade	1721	keyItems	27				0
+16859500	click			28				0
+16859500	click		keyItems	29				0
+16859500	trade	1722						1
+16859500	trade	1722	keyItems	30				0
+16867707	click			31				0
+16867707	trade	1756		32	16867465			0
+16867708	trade	1757		32	16867554			0
+16867709	trade	1758			16867657			0
+16867735	click			33				0
+16867735	click		keyItems	34				0
+16867735	trade	1723						1
+16867735	trade	1723	keyItems	35				0
+16875824	click			36				0
+16875824	trade	15066			16875779			0
+16875825	click			37				0
+16875825	trade	5210			16875778			0
+16875853	click			38				0
+16875853	click		link:389	39,40	16875774			0
+16875854	click			41				0
+16875854	click		link:721,step:1					1
+16875854	click		link:721,step:1			14657		0
+16875890	click			41				0
+16875890	click		link:391,step:1				602	0
+16875890	click		link:391,step:2	42	16875775,16875776			0
+16875891	click			41				0
+16875891	click		link:398,step:3,weather:3	43	16875777			0
+16875891	click		link:398,nmKilled,step:3				679	1
+16879918	click			44				0
+16879918	trade	12370		45:12370	16879899			0
+16879918	trade	12359		45:12359	16879899			0
+16879919	click		hour:22-3	46				0
+16879919	click		hour:4-6	47:16994				0
+16879919	trade	16994		48:16994				0
+16879919	hides		zoneStart					0
+16879919	hides		hour:4-4,hour:7-7					0
+16879919	shows		hour:22-3					0
+16879920	click		hour:22-3	46				0
+16879920	click		hour:4-6	47:16994				0
+16879920	trade	16994		48:16994				0
+16879920	hides		zoneStart					0
+16879920	hides		hour:4-4,hour:7-7					0
+16879920	shows		hour:22-3					0
+16879921	click		hour:22-3	46				0
+16879921	click		hour:4-6	47:16994				0
+16879921	trade	16994		48:16994				0
+16879921	hides		zoneStart					0
+16879921	hides		hour:4-4,hour:7-7					0
+16879921	shows		hour:22-3					0
+16879922	click		hour:22-3	46				0
+16879922	click		hour:4-6	47:16994				0
+16879922	trade	16994		48:16994				0
+16879922	hides		zoneStart					0
+16879922	hides		hour:4-4,hour:7-7					0
+16879922	shows		hour:22-3					0
+16879923	click		hour:22-3	46				0
+16879923	click		hour:4-6	47:16994				0
+16879923	trade	16994		48:16994				0
+16879923	hides		zoneStart					0
+16879923	hides		hour:4-4,hour:7-7					0
+16879923	shows		hour:22-3					0
+16879924	click		hour:22-3	46				0
+16879924	click		hour:4-6	47:16994				0
+16879924	trade	16994		48:16994				0
+16879924	hides		zoneStart					0
+16879924	hides		hour:4-4,hour:7-7					0
+16879924	shows		hour:22-3					0
+16879972	click			49				0
+16879972	click		link:392,step:2	50	16879896			0
+16879972	click		link:392,nmKilled,step:2				603	0
+16879979	click		keyItems,link:402,step:2					1
+16879979	click		link:402,step:3					1
+16879979	click		link:402,step:3		16879898			0
+16879979	click		link:402,step:4					1
+16879979	click		link:402,step:4				713	0
+16879984	click		link:402,step:2				709	0
+16883785	click			51				0
+16883785	click		link:396				609	0
+16883860	click			51				0
+16883860	click		link:404	52:718			718	0
+16883860	click		keyItems,link:404	53				0
+16883861	click			51				0
+16883861	click		keyItems,link:404,step:1	53				0
+16883862	click			51				0
+16883862	click		keyItems,link:404,step:2	53				0
+16883863	click			51				0
+16883863	click		keyItems,link:404,step:3	53				0
+16883864	click			51				0
+16883864	click		keyItems,link:404,step:4					1
+16888051	click							1
+16888054	click							1
+16888106	click							1
+16888107	click						441	0
+16888124	click			54				0
+16888124	click		link:397				622	0
+16892156	click			55,56				0
+16892156	click		primed	57				0
+16892156	click		link:712,nmKilled,step:3				582	0
+16892156	click		link:712,primed,step:3	58	16891970			0
+16892157	click			55,56				0
+16892157	click		primed	57				0
+16892157	click		link:712,nmKilled,step:3				582	0
+16892157	click		link:712,primed,step:3	58	16891970			0
+16892158	click			55,56				0
+16892158	click		primed	57				0
+16892158	click		link:712,nmKilled,step:3				582	0
+16892158	click		link:712,primed,step:3	58	16891970			0
+16892159	click			55,56				0
+16892159	click		primed	57				0
+16892159	click		link:712,nmKilled,step:3				582	0
+16892159	click		link:712,primed,step:3	58	16891970			0
+16892160	click			55,56				0
+16892160	click		primed	57				0
+16892160	click		link:712,nmKilled,step:3				582	0
+16892160	click		link:712,primed,step:3	58	16891970			0
+16892161	click			55,56				0
+16892161	click		primed	57				0
+16892161	click		link:712,nmKilled,step:3				582	0
+16892161	click		link:712,primed,step:3	58	16891970			0
+16892185	click			59				0
+16892185	click		link:397				622	0
+16896175	click			60				0
+16896175	trade	1880			16896155			0
+16896236	click			61				0
+16896236	click		link:72				621	0
+16900393	click			62				0
+16900393	click		link:72				621	0
+16912884	click							1
+16912884	trade	1850,1851,1852			16912838			0
+16912885	click							1
+16912885	trade	1853,1854,1855			16912839			0
+16912886	click							1
+16912886	trade	1856,1870,1871			16912846,16912847			0
+16912887	click							1
+16912887	trade	1847,1848,1849			16912848			0
+16916819	click			63				0
+16916819	trade	1900*3			16916815,16916816,16916817			0
+16916819	trade	1900*2			16916815,16916816			0
+16916819	trade	1900			16916815			0
+16916896	click							1
+16916897	click							1
+16921027	click			64				0
+16921027	trade	1872*12			16921015,16921016,16921017			0
+16921028	click			65				0
+16921028	click		primed	65				0
+16921029	click			66				0
+16921029	trade	1899			16921021			0
+16924791	click			67				0
+16924791	click		link:316					1
+16937394	click						739	0
+16937394	shows		mob:Cirrate_Christelle					0
+16941489	click						740	0
+16941489	shows		mob:Aitvaras					0
+16941489	shows		mob:Alklha					0
+16941489	shows		mob:Apocalyptic_Beast					0
+16941489	shows		mob:Barong					0
+16941489	shows		mob:Basilic					0
+16941489	shows		mob:Jurik					0
+16941489	shows		mob:Koshchei					0
+16941489	shows		mob:Stihi					0
+16941489	shows		mob:Stollenwurm					0
+16941489	shows		mob:Tarasca					0
+16941489	shows		mob:Vishap					0
+16945563	click						741	0
+16945563	shows		mob:Antaeus					0
+16945563	shows		mob:Scolopendra					0
+16945563	shows		mob:Stringes					0
+16945563	shows		mob:Suttung					0
+16949653	click						742	0
+16949654	click				16949281,16949284,16949287,16949290,16949337,16949343,16949348,16949352,16949359,16949364,16949369,16949374,16949391,16949394,16949397,16949399,16949411,16949414,16949417,16949419,16949431,16949434,16949437,16949439,16949451,16949454,16949457,16949459			0
+16949655	click				16949473,16949476,16949479,16949482,16949545,16949550,16949557,16949562,16949567,16949574,16949581,16949585,16949592,16949597,16949600,16949604,16949617,16949620,16949632,16949635,16949638,16949647,16949650			0
+16986621	click			68				0
+16986621	trade	2580		69	16986428			0
+16986622	click			70				0
+16986622	trade	2577		69	16986429			0
+16986623	click			68				0
+16986623	trade	2575		69	16986430			0
+16986624	click			71				0
+16986624	trade	2573		69	16986431			0
+16986733	click			72				0
+16986733	click		link:470			5562		0
+16990604	click			73				0
+16990604	trade	2578		74	16990506			0
+16990605	click			75				0
+16990605	trade	2576		74	16990507			0
+16990638	click			76				0
+16990638	click		link:497					1
+16990638	click		link:497		16990417			0
+16998898	click			77				0
+16998898	trade	2601			16998871			0
+16998899	click			78				0
+16998899	trade	2600			16998872			0
+16998900	click			79				0
+16998900	trade	2598			16998873			0
+16998901	click			80				0
+16998901	trade	2596			16998874			0
+16999019	click			81				0
+16999019	click		link:481					1
+16999019	click		link:481,step:3					1
+16999019	click		link:490					1
+16999019	click		link:490	82:2332				0
+16999019	click		link:467,step:2					1
+16999019	click		link:482					1
+16999019	click		link:482,step:3					1
+16999051	click			81				0
+16999051	click		link:474					1
+16999051	click		link:474	83	16998834			0
+16999051	click		link:474				790	0
+16999052	click			81				0
+16999052	click		link:468,step:1					1
+16999052	click		link:468,step:1				798	0
+17010918	click		link:467,step:3					1
+17010918	click		link:467,step:3				791	0
+17027515	click			84				0
+17027515	trade	2590		85	17027471			0
+17027516	click			86				0
+17027516	trade	2591		85	17027472			0
+17027517	click			87				0
+17027517	trade	2587		85	17027473			0
+17027518	click			88				0
+17027518	trade	2585		85	17027474			0
+17027519	click			89				0
+17027519	trade	2583		85	17027485			0
+17027553	click			90				0
+17027553	click		quest	91:774			774	0
+17027569	click			92				0
+17027569	click		link:486,step:1				844	0
+17031608	click			93				0
+17031608	trade	2384			17031401			0
+17031609	click			94				0
+17031609	trade	2589		95	17031598			0
+17031610	click			96				0
+17031610	trade	2588		95	17031599			0
+17031611	click			94				0
+17031611	trade	2586		95	17031600			0
+17031724	click		link:491				855	0
+17031737	click			97				0
+17031737	trade	8801					2579	0
+17031737	trade	8801	keyItems	97				0
+17043917	click			98				0
+17043917	trade	2581		99	17043887			0
+17043918	click			100				0
+17043918	trade	2579		99	17043888			0
+17043994	click		link:469,step:2					1
+17044023	click			101				0
+17044023	click		link:487,step:2					1
+17056369	click			102				0
+17056369	trade	2584		103	17056157			0
+17056370	click			104				0
+17056370	trade	2572		103	17056167			0
+17056372	click			102				0
+17056372	trade	2602		103	17056186			0
+17056409	click			105				0
+17056409	click		keyItems,link:476,step:3					1
+17056409	click		keyItems,link:476,step:3				1861	0
+17056462	click			105				0
+17056462	trade	2463	link:495					1
+17064113	click			106:1872				1
+17064113	click						1872	0
+17064113	click		keyItems	107:1872:0:6				0
+17064114	click			106:1872				1
+17064114	click						1872	0
+17064114	click		keyItems	107:1872:0:6				0
+17072279	click			108				0
+17072279	trade	2592		109	17072171			0
+17072280	click			110				0
+17072280	trade	2582		109	17072172			0
+17072281	click			111				0
+17072281	trade	2574		109	17072178			0
+17072282	click			111				0
+17072282	trade	2597		109	17072179			0
+17097389	click			112				0
+17101292	click			113				0
+17101292	trade	2599		114	17101198			0
+17101293	click			115				0
+17101293	trade	2595		114	17101201			0
+17101294	click			116				0
+17101294	trade	2594		114	17101200			0
+17101295	click			117				0
+17101295	trade	2593		114	17101199			0
+17101334	click			118				0
+17101365	click					2219		0
+17101365	click		quest	118				0
+17101373	click			119				0
+17101373	click		quest					1
+17101373	click		quest	120	17101145			0
+17101374	click			118				0
+17101374	click		quest					1
+17101379	click		link:511					1
+17101384	click			121				0
+17101384	click		link:501,step:1					1
+17101384	click		link:501,step:3					1
+17122293	click			122				0
+17150851	click			123				0
+17179535	click			124				0
+17187510	click			125				0
+17187510	click		link:7,step:1				129	0
+17187511	click			125				0
+17187511	click		link:7,step:2				129	0
+17187512	click			125				0
+17187512	click		link:7,step:3				129	0
+17187514	click		link:565,step:1	126	17187273			0
+17187514	click		link:565,nmKilled,step:1				283	0
+17195640	trade	605	link:223,quest					1
+17195640	trade	605	link:223,nation:1,quest					1
+17195640	trade	605	link:223,nation:2,quest					1
+17195653	click			127				0
+17195653	trade	1125	link:227					1
+17195653	click		link:716					1
+17195653	click		link:388					1
+17195653	click		link:388				363	0
+17195653	click		link:388,step:1				363	0
+17199699	click					503		0
+17199699	click		quest	128				0
+17199699	hides		weather:0					0
+17199699	hides		weather:1					0
+17199699	hides		weather:2					0
+17199699	hides		weather:3					0
+17199699	hides		weather:4					0
+17199699	hides		weather:5					0
+17199699	hides		weather:6					0
+17199699	hides		weather:7					0
+17199699	shows		weather:8					0
+17199699	hides		weather:9					0
+17199699	hides		weather:10					0
+17199699	hides		weather:11					0
+17199699	hides		weather:12					0
+17199699	hides		weather:13					0
+17199699	hides		weather:14					0
+17199699	hides		weather:15					0
+17199699	hides		weather:16					0
+17199699	hides		weather:17					0
+17199699	hides		weather:18					0
+17199699	hides		weather:19					0
+17199727	click			129				0
+17199727	click		link:52	130	17199566			0
+17199727	hides		zoneStart					0
+17199727	hides		hour:5-5					0
+17199727	shows		hour:18-18					0
+17199731	click			131				0
+17199731	click		hour:18-4,keyItems,link:440,step:0					1
+17199731	click		hour:18-4,keyItems,link:440,step:0	132	17199567,17199568			0
+17199731	click		keyItems,link:440,nmKilled,step:0					1
+17199731	click		keyItems,link:440,nmKilled,step:0				464	0
+17199740	click			133				0
+17203824	click			134				0
+17203824	click		link:68,step:5	135				0
+17203824	click		hour:18-5,link:68,step:5	136	17203666,17203667			0
+17203824	click		link:68,nmKilled,step:5					1
+17207824	click			137				0
+17207824	click		link:60	137:6				0
+17207824	click		link:60,step:1				299	0
+17207824	click		link:60,step:5	138:6	17207696			0
+17207825	click			139				0
+17207825	click		link:569	140				0
+17207825	click		link:569,step:3					1
+17207825	click		link:569,step:3				481	0
+17207826	click			141				0
+17207826	click		link:716,step:6					1
+17207852	click			142				0
+17207852	click		link:309,step:4	143	17207699,17207700,17207701,17207702,17207703			0
+17207852	click		link:309,nmKilled,step:4				611	0
+17212046	click							1
+17212046	click					576		0
+17212046	click		quest	144				0
+17212075	click			145				0
+17212075	click		link:222,step:4	146	17211848			0
+17212075	click		link:222,step:5					1
+17212075	click		link:222,step:5			1092		0
+17216172	click			147				0
+17216172	trade	4514		148:4514	17215494			0
+17216172	trade	5793		148:4514	17215494			0
+17216173	click			149:6				0
+17216173	click		quest	150:4395		4395		0
+17216173	trade	4372		151:4372				0
+17216173	trade	4372	quest	152:4372				0
+17220107	click			153				0
+17220137	click			154				0
+17220137	click		link:100				109	0
+17220158	click			155				0
+17220158	trade	1151	link:428	156:1151	17219999			0
+17220158	click		link:428	157:1151				0
+17224342	click			158:1020				0
+17224342	trade	1020				1102		1
+17224342	trade	1020	primed			1102		1
+17224342	trade	1020	primed,quest			1102		1
+17224342	trade	1020	roll					1
+17236283	click			159				0
+17236283	click		quest	160				0
+17236283	trade	613	quest		17236201			0
+17236312	click			161				0
+17236312	click		link:349				222	0
+17236313	click			161				0
+17236313	click		link:349				223	0
+17236314	click			161				0
+17236314	click		link:349				224	0
+17236316	click			159				0
+17236316	click		link:569	162				0
+17236316	click		link:569,step:2					1
+17236316	click		link:569,step:2				482	0
+17236317	click			163				0
+17236317	click		quest					1
+17236317	click		quest			17323		0
+17236322	click			163				0
+17236322	click		quest					1
+17236322	click		quest	164	17236205			0
+17236322	click		quest	165				0
+17240443	click			166				0
+17240443	click		keyItem:344,link:236,noKeyItem:345,step:0	167	17240424			0
+17240443	click		link:236,nmKilled,step:0				345	0
+17244622	click			168				0
+17244622	click		quest				297	0
+17244622	click		quest	169	17244523			0
+17244651	click			170				0
+17244651	click		quest				460	0
+17244651	click		quest	169	17244524,17244525			0
+17257006	click			171				0
+17257006	trade	4509		172				0
+17257006	trade	4509	primed	172				0
+17257006	trade	4509	primed	173	17256900			0
+17261187	click			174				0
+17265243	click			175				0
+17269231	click			176				0
+17269231	trade	17474	link:222					1
+17269231	click		link:222	177				0
+17269231	click		link:222,primed,step:0	178	17269107			0
+17269232	click			176				0
+17269232	click		link:222	177				0
+17269232	click		link:222,primed,step:0	178	17269107			0
+17269233	click			176				0
+17269233	click		link:222	177				0
+17269233	click		link:222,primed,step:0	178	17269107			0
+17269234	click			176				0
+17269234	click		link:222	177				0
+17269234	click		link:222,primed,step:0	178	17269107			0
+17269235	click			176				0
+17269235	click		link:222	177				0
+17269235	click		link:222,primed,step:0	178	17269107			0
+17269236	click			176				0
+17269236	click		link:222	177				0
+17269236	click		link:222,primed,step:0	178	17269107			0
+17273334	click			179				0
+17273334	click		keyItem:344,link:143,noKeyItem:345,step:0	180	17273295			0
+17273334	click		link:143,nmKilled,step:0				345	0
+17273394	click			181				0
+17273394	click		link:428	182:1021				0
+17273394	click		link:428,step:1	183				0
+17273394	click		link:428,step:2	184:1198				0
+17273395	click			179				0
+17273395	trade	1168	link:439	185	17273285			0
+17273395	click		link:439,nmKilled,step:0				453	0
+17273396	click			179				0
+17273396	click		hour:17-17,link:140,step:0					1
+17277169	click			186				0
+17277169	click		keyItem:344,link:237,noKeyItem:345,step:0	187	17277126			0
+17277169	click		link:237,nmKilled,step:0				345	0
+17277208	click			188				0
+17277208	click		link:590,step:1	189	17276929,17276930			0
+17277208	click		link:590,nmKilled,step:1				289	0
+17277209	click						485	0
+17277209	click		keyItems	186				0
+17277209	click		roll				485	0
+17281590	click			190				0
+17281590	click		quest					1
+17281590	click		quest	191	17281491,17281492,17281493,17281494,17281495			0
+17281643	click			190				0
+17281644	click			190				0
+17281644	click		quest	192:605				0
+17281645	click			190				0
+17281646	click			190				0
+17281647	click			190				0
+17281648	click			190				0
+17281649	click			190				0
+17281650	click			190				0
+17285616	click			193				0
+17285616	trade	4468		194	17285571			0
+17285616	trade	4596		194	17285571			0
+17285616	trade	4468	roll	195				0
+17285616	trade	4596	roll	195				0
+17285646	click			196				0
+17285646	click		keyItems,link:431	197			261	0
+17285646	click		keyItem:261,link:431,noKeyItem:260,step:0	198				0
+17285684	click			196				0
+17285684	click		quest	199	17285544,17285545,17285546			0
+17285684	click		quest				470	0
+17285689	click			196				0
+17285690	click			196				0
+17285690	click		quest	200:605				0
+17285691	click			196				0
+17285692	click			196				0
+17285693	click			196				0
+17285694	click			196				0
+17285695	click			196				0
+17285696	click			196				0
+17289719	click			201				0
+17289719	click		keyItem:344,link:145,noKeyItem:345,step:0	202	17289656			0
+17289719	click		link:145,nmKilled,step:0				345	0
+17289760	click			203				0
+17289760	click		link:588,step:2	204	17289654,17289655			0
+17289760	click		link:588,nmKilled,step:0				266	0
+17289775	click			201				0
+17289776	click			201				0
+17289776	click		quest	205:605				0
+17289777	click			201				0
+17289778	click			201				0
+17289779	click			201				0
+17289780	click			201				0
+17289781	click			201				0
+17289782	click			201				0
+17297459	click			206				0
+17297459	trade	3341			17297440			0
+17297459	trade	3342			17297441			0
+17297484	click			207				0
+17297484	click		link:133	208				1
+17297484	click		link:133	209	17297446,17297447,17297448			0
+17301543	click			210				0
+17301543	trade	3343			17301537			0
+17301543	trade	3344			17301538			0
+17301568	click			211				0
+17301568	click		link:569	212				0
+17301568	click		link:569,step:1					1
+17301568	click		link:569,step:1				483	0
+17310000	click			213				0
+17310000	trade	1424,1425			17309980			0
+17310001	trade	1418,1419			17309981			0
+17310002	trade	1422,1423			17309982			0
+17310003	trade	1420,1421			17309983			0
+17310107	click			213				0
+17310107	trade	1424,1425			17309980			0
+17326616	click						490	0
+17326616	shows		mob:Angra_Mainyu					0
+17326616	shows		mob:Dagourmarche					0
+17326616	shows		mob:Goublefaupe					0
+17326616	shows		mob:Mildaunegeux					0
+17326616	shows		mob:Quiebitiel					0
+17326616	shows		mob:Velosareon					0
+17330839	click						491	0
+17330839	shows		mob:Animated_Claymore					0
+17330839	shows		mob:Animated_Dagger					0
+17330839	shows		mob:Animated_Great_Axe					0
+17330839	shows		mob:Animated_Gun					0
+17330839	shows		mob:Animated_Hammer					0
+17330839	shows		mob:Animated_Horn					0
+17330839	shows		mob:Animated_Knuckles					0
+17330839	shows		mob:Animated_Kunai					0
+17330839	shows		mob:Animated_Longbow					0
+17330839	shows		mob:Animated_Longsword					0
+17330839	shows		mob:Animated_Scythe					0
+17330839	shows		mob:Animated_Shield					0
+17330839	shows		mob:Animated_Spear					0
+17330839	shows		mob:Animated_Staff					0
+17330839	shows		mob:Animated_Tabar					0
+17330839	shows		mob:Animated_Tachi					0
+17330839	shows		mob:Dynamis_Lord					0
+17363376	click			214				0
+17363376	click		link:132	215	17363318			0
+17371607	click			216				0
+17371607	click		link:134,step:3				235	0
+17379801	click			217				0
+17379801	click		link:110				140	0
+17379801	hides		weather:0					0
+17379801	hides		weather:1					0
+17379801	hides		weather:2					0
+17379801	hides		weather:3					0
+17379801	hides		weather:4					0
+17379801	hides		weather:5					0
+17379801	shows		weather:6					0
+17379801	shows		weather:7					0
+17379801	hides		weather:8					0
+17379801	hides		weather:9					0
+17379801	hides		weather:10					0
+17379801	hides		weather:11					0
+17379801	hides		weather:12					0
+17379801	hides		weather:13					0
+17379801	hides		weather:14					0
+17379801	hides		weather:15					0
+17379801	hides		weather:16					0
+17379801	hides		weather:17					0
+17379801	hides		weather:18					0
+17379801	hides		weather:19					0
+17383483	click			218				0
+17383483	click		link:350				337	0
+17388012	click		quest				153	0
+17388032	click			219				0
+17388032	click		link:71,step:3	220:0:1682				0
+17388032	click		link:71,step:4					1
+17388032	click		link:71,step:5	221				0
+17391852	click			222				0
+17391852	click		link:350				336	0
+17396213	click			223				0
+17396213	trade	4558	link:130	224:4558	17396140			0
+17396216	click			225				0
+17396216	click		link:350				338	0
+17404358	click			226				0
+17404358	click		keyItem:344,link:144,noKeyItem:345,step:0	227	17404338			0
+17404358	click		link:144,nmKilled,step:0				345	0
+17404387	click			228				0
+17404387	click		hour:19-3	229				0
+17404387	click		hour:19-3,link:303,step:3	230	17404337			0
+17404387	click		hour:19-3,link:303,step:4					1
+17404387	click		hour:19-3,link:303,step:4				476	0
+17408033	click			231				0
+17408033	trade	3339			17408018			0
+17408033	trade	3340			17408019			0
+17420664	click			232				0
+17420664	trade	1114	link:136	233	17420629,17420630,17420631			0
+17424518	trade	2385			17424480			0
+17424519	trade	2386			17424444			0
+17424550	click							1
+17428859	click					1266		0
+17428859	click		quest	234				0
+17428860	click					1183		0
+17428860	click		quest	234				0
+17428861	click					1184		0
+17428861	click		quest	234				0
+17428862	click			235				0
+17428862	trade	1266			17428809			0
+17428863	trade	1183			17428813,17428815			0
+17428864	click			234				0
+17428864	trade	1184			17428816			0
+17428865	click			236				0
+17428865	trade	1267			17428810			0
+17428866	click			237				0
+17428866	trade	4366*12			17428811			0
+17428866	trade	4366*12	roll		17428812			0
+17428867	click			234				0
+17428867	click		keyItem:344,link:296,noKeyItem:345,step:0	238	17428817			0
+17428867	click		link:296,nmKilled,step:0				345	0
+17428868	click			234				0
+17428868	trade	2387			17428751			0
+17428898	click			239				0
+17428898	click		link:568,step:2				285	0
+17428898	click		link:568,step:3				285	0
+17428898	click		link:568,step:4				285	0
+17428898	click		link:568,step:5				285	0
+17428898	click		link:568,step:6				285	0
+17428899	click			239				0
+17428899	click		link:568,step:2				286	0
+17428899	click		link:568,step:3				286	0
+17428899	click		link:568,step:4				286	0
+17428899	click		link:568,step:5				286	0
+17428899	click		link:568,step:6				286	0
+17428900	click			239				0
+17428900	click		link:568,step:2				287	0
+17428900	click		link:568,step:3				287	0
+17428900	click		link:568,step:4				287	0
+17428900	click		link:568,step:5				287	0
+17428900	click		link:568,step:6				287	0
+17428901	click			240				0
+17428901	click		link:568	241:284				0
+17428902	click			242				0
+17428902	click		quest					1
+17428921	click			234				0
+17428921	click		link:620,step:1					1
+17428921	click		link:620,step:1				480	0
+17433012	click			243				0
+17433012	trade	1298			17433005			0
+17433013	click			244				0
+17433013	click		keyItem:344,link:64,noKeyItem:345,step:0	245	17433006			0
+17433013	click		link:64,nmKilled,step:0				345	0
+17437002	click			246				0
+17437002	click		link:414,step:2	247,248	17436966,17436967,17436968,17436969,17436970			0
+17437002	click		link:414,nmKilled,step:2	249:634			634	0
+17461487	click			250				0
+17461487	click		keyItem:344,link:146,noKeyItem:345,step:0	251	17461479			0
+17461487	click		link:146,nmKilled,step:0				345	0
+17469816	click		quest					1
+17469817	click		quest					1
+17469818	click		quest					1
+17469818	click		quest		17469516			0
+17486216	click			252				0
+17486216	trade	643			17486190			0
+17486242	click			253				0
+17486242	click		link:137,step:2	254	17486187,17486188,17486189			0
+17486242	click		link:137,nmKilled,step:2				257	0
+17490253	trade	645			17490233			0
+17490254	click			255				0
+17490254	trade	4514			17490231			0
+17490254	trade	4514	roll		17490232			0
+17490255	click			256				0
+17490255	click		keyItem:344,link:445,noKeyItem:345,step:0	257	17490235			0
+17490255	click		link:445,nmKilled,step:0				345	0
+17490293	click			258				0
+17490293	click		link:593,step:1					1
+17490293	click		link:593,step:1	259				0
+17490294	click			258				0
+17490294	click		link:593,step:2	260	17489926,17489927,17489928			0
+17490294	click		link:593,step:3					1
+17490294	click		link:593,step:3				293	0
+17498578	click			261				0
+17498578	click		keyItem:344,link:63,noKeyItem:345,step:0	262	17498565			0
+17498578	click		link:63,nmKilled,step:0				345	0
+17498628	click		link:435					1
+17498628	click		link:435				296	0
+17498631	click		quest				295	0
+17498654	click			261				0
+17498654	click		quest	263	17498566			0
+17502581	click			264:16575		16575		0
+17502581	click		quest	265:16575				0
+17502581	click		roll	264:16575		16575		0
+17502582	click			266				0
+17502582	trade	16575			17502568			0
+17502583	click							1
+17506692	click			267				0
+17506692	trade	1195			17506667			0
+17506693	click							1
+17506693	trade	1404,1405,1406,1407						1
+17506694	click			268				0
+17506694	trade	2388			17506418			0
+17535486	click						486	0
+17535486	shows		mob:Overlords_Tombstone					0
+17539610	click						487	0
+17539610	shows		mob:GuDha_Effigy					0
+17543676	click						488	0
+17543676	shows		mob:Tzee_Xicu_Idol					0
+17547777	click						489	0
+17547777	shows		mob:Goblin_Golem					0
+17556004	click							1
+17559876	click			269				0
+17559876	trade	1898			17559869			0
+17559876	trade	1898	roll		17559869			0
+17559912	click							1
+17559912	click					553		0
+17559912	shows		weather:0					0
+17559912	shows		weather:1					0
+17559912	hides		weather:2					0
+17559912	hides		weather:3					0
+17559912	hides		weather:4					0
+17559912	hides		weather:5					0
+17559912	hides		weather:6					0
+17559912	hides		weather:7					0
+17559912	hides		weather:8					0
+17559912	hides		weather:9					0
+17559912	hides		weather:10					0
+17559912	hides		weather:11					0
+17559912	hides		weather:12					0
+17559912	hides		weather:13					0
+17559912	hides		weather:14					0
+17559912	hides		weather:15					0
+17559912	hides		weather:16					0
+17559912	hides		weather:17					0
+17559912	hides		weather:18					0
+17559912	hides		weather:19					0
+17559918	click			270				0
+17559918	trade	936	link:222,quest	271:0:936				1
+17559918	trade	936	link:222,quest,roll	271:0:936				1
+17559919	click			272				0
+17559919	trade	534	link:222	273				0
+17559920	click			274				0
+17559920	trade	4362	link:222	275				0
+17568147	hides		hour:0-23					0
+17568172	click			276				0
+17568172	click		link:17	277				0
+17568172	click		keyItems,link:17	277				0
+17568173	click			276				0
+17568173	click		link:17	278				0
+17568173	click		keyItems,link:17	279				0
+17568177	click			276				0
+17568177	trade	654	link:135	280	17568135			0
+17568178	click			276				0
+17568178	trade	16681	link:135	280	17568136			0
+17568179	click			276				0
+17568179	trade	16940	link:135	280	17568137			0
+17568182	click			276				0
+17568182	click		link:62,step:1				472	0
+17576359	click			281				0
+17576359	click		keyItems,link:216					1
+17576359	click		keyItems,link:216	282:175				0
+17580347	hides		hour:0-23					0
+17580371	click			283				0
+17580371	trade	4358	link:583	284:4358	17580038			0
+17580371	click		link:583	285				0
+17580405	click			286				0
+17580405	click		quest	287:177				0
+17580405	click		quest	288:177				0
+17580406	click			289				0
+17580408	click			290				0
+17580408	click		link:142,step:1				473	0
+17584456	trade	4365			17584129			0
+17584456	trade	4365	roll	291				0
+17584457	trade	4365			17584130			0
+17584457	trade	4365	roll	291				0
+17584458	trade	4529			17584131			0
+17584458	trade	4529	roll	291				0
+17584459	trade	4529			17584132			0
+17584459	trade	4529	roll	291				0
+17584460	trade	4530			17584133			0
+17584460	trade	4530	roll	291				0
+17584461	trade	4530			17584134			0
+17584461	trade	4530	roll	291				0
+17584462	trade	4531			17584135			0
+17584462	trade	4531	roll	291				0
+17584465	click			292				0
+17584465	click		link:50,step:2					1
+17584466	click			293				0
+17584466	click		quest	294	17584425			0
+17588711	shows		hour:0-23					0
+17588761	click			295				0
+17588761	click		link:235,step:1				474	0
+17596815	click			296				0
+17596815	click		link:126				173	0
+17596821	click			297				0
+17596821	click		keyItems,link:223,step:2	298				1
+17596822	click			297				0
+17596822	click		keyItems,link:223,step:1	298				1
+17596825	click			297				0
+17596825	click		keyItems,link:223,step:6	298				1
+17596825	click		keyItems,link:223,step:6	299				0
+17596826	click			297				0
+17596826	click		keyItems,link:223,step:5	298				1
+17596828	click			297				0
+17596828	click		keyItems,link:223,step:3	298				1
+17596828	click		keyItems,link:223,step:3	299				0
+17596829	click			297				0
+17596829	click		keyItems,link:223,step:4	298				1
+17596829	click		keyItems,link:223,step:4	299				0
+17596831	click			297				0
+17613246	click			300				0
+17613246	click		quest	301				0
+17613246	trade	1098	quest	302	17612836			0
+17617179	click			303				0
+17617179	trade	1189			17617164			0
+17617180	click			304				0
+17617180	trade	1186,1187*3			17617158			0
+17617181	click			304				0
+17617181	click		keyItem:344,link:238,noKeyItem:345,step:0	305	17617165			0
+17617181	click		link:238,nmKilled,step:0				345	0
+17617215	click			306				0
+17629668	click			307				0
+17629669	click			307				0
+17629669	trade	1190			17629643			0
+17629670	click			307				0
+17629670	click		keyItem:344,link:67,noKeyItem:345,step:0	308	17629645			0
+17629670	click		link:67,nmKilled,step:0				345	0
+17629733	click			309				0
+17629733	click		link:592,step:3					1
+17629736	click			307				0
+17629736	click		link:455,roll,step:0				274	0
+17629747	click			310				0
+17629747	click		link:592,step:1	311	17629187,17629188,17629189			0
+17629747	click		link:592,step:2					1
+17629749	click			312				0
+17629749	click		link:633					1
+17629749	click		link:633	313:6	17629642			0
+17629749	click		link:633,nmKilled,step:0					1
+17629749	click		link:633,nmKilled,step:0				451	0
+17629749	click		link:633	314:6				0
+17629753	click			307				0
+17629754	click			307				0
+17629755	click			307				0
+17629756	click			307				0
+17629757	click			307				0
+17629758	click			307				0
+17629759	click			307				0
+17629760	click			307				0
+17629761	click			307				0
+17629762	click			307				0
+17629763	click			307				0
+17629764	click			307				0
+17629765	click			307				0
+17629766	click			307				0
+17629767	click			307				0
+17629768	click			307				0
+17629769	click			307				0
+17629770	click					1190		0
+17629770	click		roll			1190		0
+17629771	click			307				0
+17629772	click			307				0
+17645850	click			315				0
+17645850	click		keyItem:344,link:426,noKeyItem:345,step:0	316	17645809			0
+17645850	click		link:426,nmKilled,step:0				345	0
+17645885	click			315				0
+17645885	click		link:594,step:2	317	17645794			0
+17645885	click		link:594,step:3				477	0
+17649866	click			318				0
+17649866	click		keyItem:344,link:446,noKeyItem:345,step:0	319	17649861			0
+17649866	click		link:446,nmKilled,step:0				345	0
+17649902	click			320				0
+17649902	click		keyItems,link:440					1
+17649902	click		keyItems,link:440		17649860			0
+17649902	click		link:440,step:1					1
+17649902	click		link:440,step:1				462	0
+17690628	click		link:119				162	0
+17719506	click			321				0
+17719507	click			321				0
+17719507	click		quest					1
+17719507	click		quest				220	0
+17719508	click			321				0
+17740184	trade	13457,17161	link:409					1
+17740184	trade	12474,13593	link:411					1
+17740184	trade	615,17402	link:410					1
+17740184	click		link:981					1
+17740184	click		link:409					1
+17740184	click		link:409,step:1					1
+17740184	click		link:411					1
+17740184	click		link:411,step:1					1
+17740184	click		link:410					1
+17740184	click		link:410,step:1					1
+17772587	click			322				0
+17784903	click			323				0
+17784903	click		link:295,step:3					1
+17784903	click		link:295,step:4					1
+17784903	click		keyItems,link:295,step:5					1
+17784903	click		link:291,step:3					1
+17784903	click		link:291,step:4					1
+17784903	click		keyItems,link:291,step:5					1
+17784903	click		link:294,step:3					1
+17784903	click		link:294,step:4					1
+17784903	click		keyItems,link:294,step:5					1
+17784903	click		link:290,step:3					1
+17784903	click		link:290,step:4					1
+17784903	click		keyItems,link:290,step:5					1
+17784903	click		link:283,step:3					1
+17784903	click		link:283,step:4					1
+17784903	click		keyItems,link:283,step:5					1
+17784903	click		link:292,step:3					1
+17784903	click		link:292,step:4					1
+17784903	click		keyItems,link:292,step:5					1
+17784903	click		link:293,step:3					1
+17784903	click		link:293,step:4					1
+17784903	click		keyItems,link:293,step:5					1
+17784903	click		link:288,step:3					1
+17784903	click		link:288,step:4					1
+17784903	click		keyItems,link:288,step:5					1
+17784903	click		link:286,step:3					1
+17784903	click		link:286,step:4					1
+17784903	click		keyItems,link:286,step:5					1
+17784903	click		link:284,step:3					1
+17784903	click		link:284,step:4					1
+17784903	click		keyItems,link:284,step:5					1
+17784903	click		link:287,step:3					1
+17784903	click		link:287,step:4					1
+17784903	click		keyItems,link:287,step:5					1
+17784903	click		link:282,step:3					1
+17784903	click		link:282,step:4					1
+17784903	click		keyItems,link:282,step:5					1
+17784903	click		link:285,step:3					1
+17784903	click		link:285,step:4					1
+17784903	click		keyItems,link:285,step:5					1
+17784903	click		link:281,step:3					1
+17784903	click		link:281,step:4					1
+17784903	click		keyItems,link:281,step:5					1
+17784903	click		link:289,step:3					1
+17784903	click		link:289,step:4					1
+17784903	click		keyItems,link:289,step:5					1

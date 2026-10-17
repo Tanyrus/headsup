@@ -42,6 +42,7 @@ namespace
         int height    = 45;
         int theme     = 1;
         float thick   = 1.0f;
+        int opacity   = 85;
         int quality   = 1;
         std::string name;
     };
@@ -57,6 +58,7 @@ namespace
             form.SliderInt("Height", b.height, 24, 64, "%d px", nullptr);
             form.SliderFloat("Thickness", b.thick, 0.5f, 3.0f, "%.1f px", nullptr);
             form.SliderNamed("Quality", b.quality, kQualities, 4, nullptr);
+            form.SliderPercent("Opacity", b.opacity, 10, 100, nullptr);
             form.NumberDropdown("Theme", b.theme, 0, 2, [](int t) { return "Theme " + std::to_string(t); }, nullptr, 0.0f,
                 [](int t) { return "What theme " + std::to_string(t) + " is."; });
             form.Row("Name", nullptr);
@@ -109,13 +111,16 @@ TEST(a_card_holds_its_rows_and_what_they_show)
     CHECK(Has(rml, "<div class=\"card-body\"><div class=\"note\">A &lt;tip&gt;</div>"));
     CHECK(Has(rml, "<div class=\"arrow open\"></div><div class=\"card-title\">Mouse Pointer</div>"));
     CHECK(Has(rml, "<div class=\"label\" id=\"page-mouse-pointer-chocobo-label\" tip=\"The chocobo.\">Chocobo</div>"));
-    CHECK(Has(rml, "<div class=\"check wide\" id=\"page-mouse-pointer-chocobo\"><div class=\"mark\"></div></div>"));
+    CHECK(Has(rml, "<div class=\"check wide\" id=\"page-mouse-pointer-chocobo\"><div class=\"mark\"></div><div class=\"state\" "
+                   "id=\"page-mouse-pointer-chocobo-state\"></div></div>"));
     CHECK(Has(rml, "<input type=\"range\" id=\"page-mouse-pointer-height\" min=\"24\" max=\"64\" step=\"1\"/>"));
     CHECK(Has(rml, "min=\"0.5\" max=\"3\" step=\"0.1\"")); // a float slider steps by its format's last decimal
     // What they show is no part of the markup.
     CHECK(!ClassOn(form, "page-mouse-pointer-chocobo", "on") && ClassOn(form, "page-mouse-pointer-on", "on"));
     CHECK_EQ(ValueText(form, "page-mouse-pointer-height"), "45");
     CHECK_EQ(TextOf(form, "page-mouse-pointer-height-val"), "45 px");
+    CHECK_EQ(TextOf(form, "page-mouse-pointer-chocobo-state"), "Off"); // the kit's own words, from the layout
+    CHECK_EQ(TextOf(form, "page-mouse-pointer-on-state"), "On");
     CHECK_EQ(TextOf(form, "page-mouse-pointer-thickness-val"), "1.0 px");
     CHECK_EQ(TextOf(form, "page-mouse-pointer-theme-val"), "Theme 1");
     CHECK(!form.changed && !form.popup);
@@ -129,6 +134,7 @@ TEST(a_click_flips_a_switch_and_the_markup_stays_the_same)
     const Form form = Pass({{"page-mouse-pointer-chocobo", kClickEvent, ""}}, state, b);
     CHECK(b.chocobo && form.changed);
     CHECK(ClassOn(form, "page-mouse-pointer-chocobo", "on"));
+    CHECK_EQ(TextOf(form, "page-mouse-pointer-chocobo-state"), "On");
     CHECK_EQ(form.blocks[0].rml, before);
     // The card's own checkbox, at its title's right.
     const Form off = Pass({{"page-mouse-pointer-on", kClickEvent, ""}}, state, b);
@@ -171,6 +177,20 @@ TEST(a_slider_takes_its_newest_value_within_its_ends)
     const Form lowest = Pass({{"page-mouse-pointer-quality", kChangeEvent, "-4"}}, state, b);
     CHECK_EQ(b.quality, 0);
     CHECK_EQ(TextOf(lowest, "page-mouse-pointer-quality-val"), "Low");
+}
+
+TEST(a_percent_slider_steps_by_five_whatever_value_it_is_given)
+{
+    FormState state;
+    Bound b;
+    const Form form = Pass({}, state, b);
+    CHECK(Has(form.blocks[0].rml, "id=\"page-mouse-pointer-opacity\" min=\"10\" max=\"100\" step=\"5\""));
+    CHECK_EQ(TextOf(form, "page-mouse-pointer-opacity-val"), "85%");
+    const Form moved = Pass({{"page-mouse-pointer-opacity", kChangeEvent, "88"}}, state, b);
+    CHECK(b.opacity == 90 && moved.changed);
+    CHECK_EQ(TextOf(moved, "page-mouse-pointer-opacity-val"), "90%");
+    Pass({{"page-mouse-pointer-opacity", kChangeEvent, "12"}}, state, b);
+    CHECK_EQ(b.opacity, 10);
 }
 
 TEST(a_dropdown_opens_a_popup_of_its_rows_and_takes_the_one_clicked)
@@ -592,12 +612,42 @@ TEST(a_tag_chip_dropped_in_a_line_box_goes_after_what_it_is_dropped_on)
     const Form onStretch = card.Pass({Drop("p-c-line-t-0", kConChip, "$con")}); // on a stretch: after it
     CHECK_EQ(card.text, "Lv $con$level end");
     CHECK(onStretch.changed && card.edited);
+    // Let go inside a stretch, between the letters the pointer was nearest.
+    card.text       = "Lv $level end";
+    FormEvent split = Drop("p-c-line-t-0", kConChip, "$con");
+    split.at        = 1;
+    card.Pass({split});
+    CHECK_EQ(card.text, "L${con}v $level end");
+    CHECK((card.draft.caret == RunCaret{1, 0}));
+    card.text = "Lv $con$level end";
     // Anything else dropped is nothing, and a click on the chip under the box is the page's to place.
     card.Pass({{"p-c-line", kDropEvent, "page-title"}});
     card.Pass({Drop("p-c-line", "page-title", "no tag")});
     CHECK_EQ(card.text, "Lv $con$level end");
     card.Pass({{kConChip, kClickEvent, ""}});
     CHECK(card.chip && card.text == "Lv $con$level end");
+}
+
+TEST(enter_in_a_stretch_breaks_the_line_there_and_typing_goes_on_after_the_break)
+{
+    BoxCard card;
+    card.text = "Lv $level end";
+    FormEvent enter{"p-c-line-t-0", kBreakEvent, "Lv ", {}, 2};
+    const Form broken = card.Pass({enter});
+    CHECK_EQ(card.text, "Lv$break $level end");
+    CHECK(broken.changed && card.edited);
+    CHECK((broken.focus == FormFocus{"p-c-line-t-1", 0}));
+    CHECK((card.draft.caret == RunCaret{1, 0}));
+    CHECK(Has(broken.blocks[0].rml, "class=\"btn accent chip in drag break\" id=\"p-c-line-c-0\""));
+    // Nothing joins a break, and Backspace at the start of the row after it takes it out.
+    card.Pass({Drop("p-c-line-c-0", kConChip, "$con")});
+    CHECK_EQ(card.text, "Lv$break $level end");
+    card.Pass({{"p-c-line-t-1", kKillEvent, std::string(1, kKillBack) + " "}});
+    CHECK_EQ(card.text, "Lv $level end");
+    // A line too long for one more tag keeps what was typed and breaks nowhere.
+    card.text = std::string(kMaxTemplate - 5, 'a');
+    card.Pass({{"p-c-line-t-0", kBreakEvent, card.text + "b", {}, 1}});
+    CHECK_EQ(card.text, std::string(kMaxTemplate - 5, 'a') + "b");
 }
 
 TEST(a_tag_dropped_on_a_chip_shares_its_slot)

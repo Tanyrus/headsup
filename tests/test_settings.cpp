@@ -1,3 +1,4 @@
+#include "game_font.h"
 #include "pointer_keys.h"
 #include "settings.h"
 #include "release_file.h"
@@ -320,6 +321,8 @@ expBar=beside
 jobNames=false
 clock24=false
 stackNames=true
+hideInEvent=true
+debugMode=true
 barTitleFont=Cinzel
 barTextFont=
 barSubtitle=before
@@ -356,7 +359,7 @@ helpBarY=8.0000
         s.enabled           = false;
         s.phTimers          = true;
         s.scaleWithDistance = false;
-        s.scaleOwnName      = false;
+        s.opacity.notTargeted = 40; // untargetedOpacity
         s.scaleCursor       = true; // apart from the names': a dropped key would take theirs
         s.cursorStyle = CursorStyle::Vanilla; // the cursor was switched off
         s.pointerIcon    = PointerIcon::Chocobo;
@@ -370,7 +373,7 @@ helpBarY=8.0000
         s.elementWeakRank     = -3;
         s.elementResistRank   = 6;
         s.maxElements         = 3;
-        s.showRanks           = true;
+        s.rankDisplay         = RankDisplay::Rank; // from the old ranks switch
         s.badgeFontName       = "Tahoma";
         s.showBar      = false;
         s.barTheme     = BarTheme::UmbraDark;
@@ -381,8 +384,6 @@ helpBarY=8.0000
         s.menuFont         = "Tahoma";
         s.menuFontSize     = 21; // 125 percent of Ashita's 18 pixels, in Tahoma, which was drawn at 0.95 of its size
         s.windowOffsets    = {WindowOffset{"equip", 10, -20}};
-        s.windowGroups     = {WindowGroup{"Bags", 0, 30, true, {"inventor", "iteminfo"}}};
-        s.allUnderBar      = true;
         s.moveGameHelp     = true;
         s.helpBarBackground = false;
         s.helpBarX         = 12;
@@ -393,6 +394,8 @@ helpBarY=8.0000
         s.jobNames   = false;
         s.clock24    = false;
         s.stackNames = true;
+        s.hideInEvent = true;
+        s.debugMode = true;
         s.barTitleFont = "Cinzel";
         s.barSubtitle = SubtitlePlace::Before;
         s.cursorOutlineThickness = 120; // 60 of before
@@ -405,7 +408,6 @@ helpBarY=8.0000
         s.hideNetstat  = true;
         s.screenshotKey       = 0x79; // F10
         s.screenshotHidesGame = false;
-        s.movedWindows = {"equip", "levmerit"};
         for (int w = 0; w < kBarWidgetCount; ++w)
             s.barWidgets[w] = !kBarWidgetDefaults[w];
         s.barSections = DefaultPlacement();
@@ -423,7 +425,7 @@ helpBarY=8.0000
 
     // The keys of kSavedFile that only an older build's file carries: a migration reads them, or nothing does, and
     // nothing writes them.
-    const char* const kOldKeys[] = {"menuScale", "chocoboPointer", "untargetedOpacity", "glowOffWhenFighting", "thickness", "cursorSize", "cursorOutline", "replaceCursor", "cursorFeather", "barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
+    const char* const kOldKeys[] = {"showRanks", "scaleOwnName", "movedWindows", "windowGroups", "allUnderBar", "menuScale", "chocoboPointer", "untargetedOpacity", "glowOffWhenFighting", "thickness", "cursorSize", "cursorOutline", "replaceCursor", "cursorFeather", "barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
         "serverClockZone", "showLabels", "replaceMobNames", "showIcons", "hideInCombat", "hideClaimed", "hideTooWeak",
         "hideWhileEngaged", "markPlaceholders", "fontBold", "nameGlow", "scalePlayerNames",
         "labelFontBold", "showOrnament", "ownGlowColor", "ownOrnamentColor", "labelFontName", "glowSize",
@@ -573,7 +575,8 @@ TEST(the_font_list_puts_the_bundled_fonts_first_then_the_installed_ones_sorted_o
 {
     // GDI lists a family once per character set, vertical variants with an @, and a bundled font may be installed too.
     const std::vector<std::string> choices = FontChoices({"Verdana", "arial", "Arial", "@Meiryo", "", "Cinzel"}, "Verdana");
-    const std::vector<std::string> expected{"Marcellus SC", "Cinzel", "Cormorant SC", "Barlow Condensed", "arial", "Verdana"};
+    const std::vector<std::string> expected{"Montserrat SemiBold", "Marcellus SC", "Cinzel", "Cormorant SC", "Barlow Condensed",
+        "arial", "Verdana"};
     CHECK(choices == expected);
 }
 
@@ -581,7 +584,7 @@ TEST(a_font_that_is_not_installed_is_still_offered_so_it_can_be_kept)
 {
     const std::vector<std::string> choices = FontChoices({"Verdana"}, "Papyrus");
     CHECK(std::ranges::find(choices, "Papyrus") != choices.end());
-    CHECK(choices[0] == "Marcellus SC"); // the bundled ones still lead
+    CHECK(choices[0] == "Montserrat SemiBold"); // the bundled ones still lead
 }
 
 TEST(clamp_bounds_every_field)
@@ -639,6 +642,103 @@ TEST(clamp_bounds_every_field)
     CHECK(c.badgeFontName.empty()); // no font of its own: the default font
     CHECK_EQ(c.barHeight, kMaxBarHeight);
     CHECK(c.barTheme == BarTheme::PhoenixGold && c.barCurrency == kGilCurrency);
+}
+
+TEST(the_target_cursor_rises_or_sinks_up_to_twenty_pixels)
+{
+    MapStore up = ReleaseFile({{"cursorRaise", "15.0000"}}), down = ReleaseFile({{"cursorRaise", "-18.0000"}});
+    CHECK_EQ(LoadSettings(up).cursorRaise, 15);
+    CHECK_EQ(LoadSettings(down).cursorRaise, -18);
+    Settings s;
+    s.cursorRaise = 25;
+    CHECK_EQ(Clamp(s).cursorRaise, 20);
+}
+
+TEST(a_file_from_before_badge_numbers_keeps_its_ranks_and_trades_the_skillchain_percents_for_chances)
+{
+    const auto display = [](std::vector<std::pair<std::string, std::string>> values)
+    {
+        MapStore file;
+        file.values.insert(values.begin(), values.end());
+        return LoadSettings(file).rankDisplay;
+    };
+    CHECK(display({{"enabled", "true"}, {"showRanks", "true"}}) == RankDisplay::Rank);
+    CHECK(display({{"enabled", "true"}, {"showRanks", "false"}}) == RankDisplay::IncreasedChance);
+    CHECK(display({{"enabled", "true"}, {"rankDisplay", "total"}, {"showRanks", "true"}}) == RankDisplay::TotalChance);
+    CHECK(display({{"enabled", "true"}, {"rankDisplay", "tens"}}) == RankDisplay::IncreasedChance);
+    for (const RankDisplay each : {RankDisplay::Rank, RankDisplay::IncreasedChance, RankDisplay::TotalChance})
+    {
+        Settings s;
+        s.rankDisplay   = each;
+        s.countAccuracy = false;
+        MapStore file;
+        SaveSettings(s, file);
+        CHECK(LoadSettings(file).rankDisplay == each && !LoadSettings(file).countAccuracy);
+        CHECK(!file.values.contains("showRanks"));
+    }
+}
+
+TEST(your_accuracy_starts_left_out_even_in_a_file_where_an_early_build_wrote_it_on)
+{
+    MapStore early;
+    early.values = {{"enabled", "true"}, {"countAccuracy", "true"}};
+    CHECK(!LoadSettings(early).countAccuracy);
+    Settings s;
+    s.countAccuracy = true;
+    MapStore file;
+    SaveSettings(s, file);
+    CHECK(LoadSettings(file).countAccuracy);
+}
+
+TEST(a_file_from_before_hide_during_conversation_keeps_plates_in_conversations)
+{
+    MapStore file = ReleaseFile();
+    CHECK(!LoadSettings(file).hideInEvent);
+    CHECK(!LoadSettings(file).debugMode); // nor had it a debug mode
+}
+
+TEST(called_for_help_has_its_own_color_orange_until_one_is_saved)
+{
+    const int help = static_cast<int>(ClaimState::CalledForHelp);
+    MapStore release = ReleaseFile();
+    CHECK_EQ(ToArgb(LoadSettings(release).palette.claim[help]), 0xFFFF9900u);
+    Settings s;
+    s.palette.claim[help] = {{0.25f, 0.5f, 0.75f}};
+    MapStore file;
+    SaveSettings(s, file);
+    CHECK(LoadSettings(file).palette.claim[help] == (Color{{0.25f, 0.5f, 0.75f}}));
+    CHECK(LoadSettings(file).palette.claim[static_cast<int>(ClaimState::Yours)] == Settings{}.palette.claim[static_cast<int>(ClaimState::Yours)]);
+}
+
+TEST(percents_load_and_clamp_onto_steps_of_five)
+{
+    Settings s;
+    s.timerPercent           = 87;
+    s.scaleMin               = 88;
+    s.outlineOpacity         = 12;
+    s.menuOpacity            = 33;
+    s.cursorOutlineThickness = 52;
+    LineDesign& line = s.Kind(PlateKind::Players).lines[0];
+    line.textSize    = 87;
+    line.iconSize    = 112;
+    line.shadow      = 3;
+    line.glow        = 298;
+    line.glowSize    = 26;
+    OpacitySettings& o = s.opacity;
+    o.noTarget         = 87;
+    o.notTargeted      = 41;
+    o.targeted         = 99;
+    const Settings c = Clamp(s);
+    CHECK(c.timerPercent == 85 && c.scaleMin == 90 && c.outlineOpacity == 10 && c.menuOpacity == 35);
+    CHECK_EQ(c.cursorOutlineThickness, 50);
+    const LineDesign& l = c.Kind(PlateKind::Players).lines[0];
+    CHECK(l.textSize == 85 && l.iconSize == 110 && l.shadow == 5 && l.glow == 300 && l.glowSize == 25);
+    const OpacitySettings& co = c.opacity;
+    CHECK(co.noTarget == 85 && co.notTargeted == 40 && co.targeted == 100);
+    CHECK(Clamp(Settings{}) == Settings{}); // every default is on the steps already
+    MapStore file = ReleaseFile({{"timerPercent", "87.0000"}, {"mobsLine2TextSize", "87.0000"}});
+    const Settings loaded = LoadSettings(file);
+    CHECK(loaded.timerPercent == 85 && loaded.Kind(PlateKind::Mobs).lines[1].textSize == 85);
 }
 
 TEST(non_finite_values_fall_back_to_defaults)
@@ -832,7 +932,8 @@ TEST(a_file_from_before_the_badge_group_takes_its_defaults)
     old.values = {{"enabled", "true"}, {"showIcons", "true"}};
     const Settings s = LoadSettings(old);
     CHECK_EQ(s.Kind(PlateKind::Mobs).lines[0].text, "$detect"); // no badges: the top bar's popup shows them
-    CHECK(s.elementWeakRank == -1 && s.elementResistRank == 4 && s.maxElements == kElementCount && !s.showRanks);
+    CHECK(s.elementWeakRank == -1 && s.elementResistRank == 4 && s.maxElements == kElementCount);
+    CHECK(s.rankDisplay == RankDisplay::IncreasedChance && !s.countAccuracy);
     CHECK_EQ(s.badgeFontName, "Barlow Condensed"); // the font badges had, where a new install's are in the default font
     CHECK_EQ(s.detectionShown, kAllDetection); // and every icon, the aggression one too, which a new install hides
     for (const StatusBadgeRule& status : s.statusBadges)
@@ -840,13 +941,68 @@ TEST(a_file_from_before_the_badge_group_takes_its_defaults)
     CHECK(s.weakBadgeColor == Settings{}.weakBadgeColor && s.immuneBadgeColor == Settings{}.immuneBadgeColor);
 }
 
-TEST(a_file_from_before_windows_moved_moves_the_equipment_group_and_an_empty_list_moves_none)
+TEST(the_window_placement_saves_and_loads_back_its_switches_places_and_each_modes_shifts)
 {
-    MapStore old;
-    CHECK(LoadSettings(old).movedWindows == DefaultMovedWindows());
-    MapStore none;
-    none.values["movedWindows"] = "";
-    CHECK(LoadSettings(none).movedWindows.empty());
+    const std::string_view first = WindowViews()[0].id, second = WindowViews()[1].id;
+    Settings s;
+    s.moveWindows = false;
+    s.keepClear   = false;
+    s.placedUnder = {30, 70};
+    s.viewShifts[static_cast<int>(HelpMode::On)]  = {ViewShift{std::string(first), 20}};
+    s.viewShifts[static_cast<int>(HelpMode::Off)] = {
+        ViewShift{std::string(second), -6}, ViewShift{std::string(first), 3}};
+    MapStore file;
+    SaveSettings(s, file);
+    CHECK(LoadSettings(file) == s);
+    file.values["viewShiftsHelpOn"]   = "nowhere:4|" + std::string(first) + ":5000";
+    file.values["placedUnderHelpOff"] = "99999.0000";
+    const Settings read = LoadSettings(file);
+    const std::vector<ViewShift> clamped = {{std::string(first), kMaxWindowOffset}};
+    CHECK(read.viewShifts[static_cast<int>(HelpMode::On)] == clamped);
+    CHECK_EQ(read.placedUnder[static_cast<int>(HelpMode::Off)], kMaxWindowOffset);
+}
+
+TEST(the_windows_help_mode_follows_the_panels_help_line_and_the_games_own_strip)
+{
+    Settings s;
+    s.barWidgets[static_cast<int>(BarWidget::GameHelp)] = true;
+    s.hideHelpBar = true;
+    CHECK(WindowHelpMode(s) == HelpMode::On);
+    s.showBar = false; // no panel, no help line on it
+    CHECK(WindowHelpMode(s) == HelpMode::Off);
+    s.hideHelpBar = false;
+    CHECK(WindowHelpMode(s) == HelpMode::On);
+}
+
+TEST(auto_adjust_places_the_views_under_the_band_of_now_and_drops_the_players_shifts_for_it)
+{
+    Settings s;
+    s.barWidgets[static_cast<int>(BarWidget::GameHelp)] = true;
+    s.hideHelpBar = true;
+    const std::string id(WindowViews()[0].id);
+    s.viewShifts = {std::vector<ViewShift>{{id, 4}}, std::vector<ViewShift>{{id, 9}}};
+    AutoAdjustWindows(s, 80, 50); // a taller panel: its help line ends at 80, the panel itself at 50
+    CHECK(s.placedUnder[static_cast<int>(HelpMode::On)] == 80 && s.placedUnder[static_cast<int>(HelpMode::Off)] == 50);
+    CHECK(s.viewShifts[0].empty() && s.viewShifts[1].empty());
+    s.hideHelpBar = false;
+    s.barWidgets[static_cast<int>(BarWidget::GameHelp)] = false;
+    s.viewShifts[static_cast<int>(HelpMode::Off)] = {{id, 2}};
+    AutoAdjustWindows(s, 71, 38); // the game's own strip moved under the panel, under which the windows go
+    CHECK(s.placedUnder[static_cast<int>(HelpMode::On)] == 71 && s.placedUnder[static_cast<int>(HelpMode::Off)] == 38);
+    CHECK(s.viewShifts[static_cast<int>(HelpMode::Off)].empty());
+    const Settings before = s;
+    AutoAdjustWindows(s, 0, 0); // the panel off: nothing to place under
+    CHECK(s == before);
+}
+
+TEST(a_new_install_places_the_windows_under_the_panel_at_its_reference_band_and_keeps_them_clear)
+{
+    MapStore fresh;
+    const Settings s = LoadSettings(fresh);
+    CHECK(s.moveWindows && s.keepClear);
+    CHECK_EQ(s.placedUnder[static_cast<int>(HelpMode::On)], ReferenceBand(HelpMode::On));
+    CHECK_EQ(s.placedUnder[static_cast<int>(HelpMode::Off)], ReferenceBand(HelpMode::Off));
+    CHECK(s.viewShifts[0].empty() && s.viewShifts[1].empty());
 }
 
 TEST(a_theme_that_is_not_one_keeps_the_default_and_old_files_get_the_bar)
@@ -1062,22 +1218,28 @@ TEST(the_windows_font_size_is_pixels_and_an_old_percent_becomes_the_pixels_it_dr
     CHECK(std::ranges::find(file.sets, "menuScale") == file.sets.end());
 }
 
-TEST(the_window_defaults_set_every_window_under_the_bar_or_leave_them_all_to_the_game)
+TEST(the_window_defaults_place_every_view_by_headsups_defaults_or_leave_them_all_to_the_game)
 {
     Settings s;
     s.windowOffsets = {WindowOffset{"equip", 10, -20}};
+    s.viewShifts[static_cast<int>(HelpMode::On)] = {ViewShift{std::string(WindowViews()[0].id), 20}};
+    s.placedUnder = {1, 2};
+    s.keepClear   = false;
+    s.moveWindows = false;
     UseHeadsUpWindowDefaults(s);
-    CHECK(s.allUnderBar && s.moveGameHelp && s.windowOffsets.empty() && s.windowGroups == DefaultWindowGroups());
-    CHECK(s.movedWindows == DefaultMovedWindows());
+    CHECK(s.moveWindows && s.keepClear && s.windowOffsets.empty() && s.viewShifts == Settings{}.viewShifts);
+    CHECK(s.placedUnder == Settings{}.placedUnder);
+    s.windowOffsets = {WindowOffset{"equip", 10, -20}};
+    s.moveGameHelp  = true;
     UseGameWindowDefaults(s);
-    CHECK(!s.allUnderBar && !s.moveGameHelp && s.movedWindows.empty() && s.windowGroups.empty());
+    CHECK(!s.moveWindows && !s.moveGameHelp && s.windowOffsets.empty());
     s.hideHelpBar = false;
     s.barWidgets[static_cast<int>(BarWidget::GameHelp)] = false;
     UseHelpTextDefaults(s);
-    CHECK(s.allUnderBar && !s.moveGameHelp && s.hideHelpBar && s.barWidgets[static_cast<int>(BarWidget::GameHelp)]);
+    CHECK(s.moveWindows && !s.moveGameHelp && s.hideHelpBar && s.barWidgets[static_cast<int>(BarWidget::GameHelp)]);
 }
 
-TEST(a_new_install_looks_as_the_release_did_for_one_but_for_the_reviews_four_changes)
+TEST(a_new_install_looks_as_the_release_did_for_one_but_for_five_changes)
 {
     MapStore file = ReleaseFile();
     const Settings release = LoadSettings(file);
@@ -1091,12 +1253,17 @@ TEST(a_new_install_looks_as_the_release_did_for_one_but_for_the_reviews_four_cha
         const KindSettings& then = release.kinds[static_cast<size_t>(k)];
         for (int l = 0; l < kPlateLines; ++l)
         {
-            // A shadow half again as strong as the release's, and icons of 16 px where a name's were of its 15 px.
-            CHECK(std::abs(static_cast<float>(now.lines[l].shadow) - 1.5f * static_cast<float>(then.lines[l].shadow)) <= 1.0f);
+            // A shadow half again as strong as the release's, on the steps of five, and icons of 16 px where a name's
+            // were of its 15 px.
+            CHECK(std::abs(static_cast<float>(now.lines[l].shadow) - 1.5f * static_cast<float>(then.lines[l].shadow)) <= 2.5f);
             const float grown = iconPixels(fresh, now.lines[l]) - iconPixels(release, then.lines[l]);
             CHECK(grown >= 0.0f && grown < 1.0f);
+            // Every line glows at full strength, where the release's mob name alone did.
+            CHECK_EQ(now.lines[l].glow, 100);
+            CHECK_EQ(then.lines[l].glow, k == static_cast<int>(PlateKind::Mobs) && l == kBottomLine ? 100 : 0);
             now.lines[l].shadow   = then.lines[l].shadow;
             now.lines[l].iconSize = then.lines[l].iconSize;
+            now.lines[l].glow     = then.lines[l].glow;
         }
         // Pets, one row in the release, show their nameplates only when targeted.
         if (k == static_cast<int>(PlateKind::Pets))
@@ -1112,6 +1279,17 @@ TEST(a_new_install_looks_as_the_release_did_for_one_but_for_the_reviews_four_cha
     CHECK_EQ(fresh.detectionShown, release.detectionShown & ~DetectionBit(DetectionIcon::Aggro));
     CHECK(fresh.baseSize == release.baseSize && fresh.baseIconSize == release.baseIconSize);
     CHECK(fresh.scaleMin == release.scaleMin && fresh.scaleMax == release.scaleMax);
+}
+
+TEST(show_line_to_entity_starts_on_and_keeps_what_was_saved)
+{
+    MapStore file = ReleaseFile();
+    CHECK(LoadSettings(file).stackLine);
+    Settings off;
+    off.stackLine = false;
+    MapStore saved;
+    SaveSettings(off, saved);
+    CHECK(!LoadSettings(saved).stackLine);
 }
 
 TEST(an_entity_types_color_is_saved_under_its_own_name)
@@ -1181,8 +1359,7 @@ TEST(every_designer_key_round_trips)
     line.glowColor     = ColorPick{ColorSource::Type};
     line.glowOffInCombat = false;
     mobs.ornament      = OrnamentSettings{OrnamentPlace::Top, 120, 9, ColorPick{ColorSource::Target}};
-    mobs.opacity       = OpacitySettings{70, 35, 95, true, 22.0f};
-    s.Kind(PlateKind::Self).opacity.noTarget = 55;
+    s.opacity          = OpacitySettings{70, 35, 95, true, 22.0f};
     s.Kind(PlateKind::Pets).lines[0].text = "$owner's $name";
     s.palette.claim[static_cast<int>(ClaimState::Yours)] = {{0.7f, 0.8f, 0.9f}};
     s.nameplates = false;
@@ -1367,9 +1544,9 @@ TEST(an_old_file_migrates_field_by_field)
     const int base = static_cast<int>(std::strtof(store.values.at("mobNameSize").c_str(), nullptr));
     CHECK_EQ(s.baseSize, base);
     CHECK_EQ(mobs.lines[2].textSize, 100);
-    CHECK_EQ(mobs.lines[1].textSize, std::lround(100.0f * std::strtof(store.values.at("labelSize").c_str(), nullptr) / static_cast<float>(base)));
+    CHECK_EQ(mobs.lines[1].textSize, Stepped(static_cast<int>(std::lround(100.0f * std::strtof(store.values.at("labelSize").c_str(), nullptr) / static_cast<float>(base))), kPercentStep));
     CHECK_EQ(mobs.lines[0].iconSize, 150); // iconSize=24 px, of the 16 px base icon
-    CHECK_EQ(s.Kind(PlateKind::Self).lines[2].textSize, std::lround(100.0f * std::strtof(store.values.at("selfNameSize").c_str(), nullptr) / static_cast<float>(base)));
+    CHECK_EQ(s.Kind(PlateKind::Self).lines[2].textSize, Stepped(static_cast<int>(std::lround(100.0f * std::strtof(store.values.at("selfNameSize").c_str(), nullptr) / static_cast<float>(base))), kPercentStep));
     // showLabels=false with mobId=lastThree leaves the ID alone on line 2; showIcons=false with the three badge
     // switches on leaves the badge tags on line 1; hideClaimed shows both lines on unclaimed mobs only.
     // mobIconPlace=inline with the level text "$id": the icons move onto line 2, left of the ID (badgeSide=left;
@@ -1382,17 +1559,20 @@ TEST(an_old_file_migrates_field_by_field)
     CHECK(mobs.rows[CategoryIndex(Category::PartyClaim)].outline == OutlineMode::Shown); // its own switch was on
     CHECK(mobs.rows[CategoryIndex(Category::PartyClaim)].outlineColor.source == ColorSource::Claim);
     CHECK_EQ(mobs.lines[2].glow, 0); // nameGlow=false
+    for (const KindSettings& k : s.kinds) // and nothing else glowed before the designer
+        for (const LineDesign& line : k.lines)
+            CHECK_EQ(line.glow, 0);
     CHECK(mobs.ornament.place == OrnamentPlace::Disabled); // showOrnament=false
     CHECK(mobs.ornament.color.source == ColorSource::Custom); // ownOrnamentColor=true
     CHECK_EQ(mobs.ornament.width, static_cast<int>(std::strtof(store.values.at("ornamentWidth").c_str(), nullptr)));
     CHECK_EQ(mobs.ornament.height, static_cast<int>(std::strtof(store.values.at("ornamentThickness").c_str(), nullptr)));
-    CHECK_EQ(mobs.lines[2].shadow, 33); // nameShadow=50, of a unit that is now one and a half of it
+    CHECK_EQ(mobs.lines[2].shadow, 35); // nameShadow=50, of a unit that is now one and a half of it: 33, on the steps of five
     // ownNameColor, nameShadow and the player icon size reach the players' name line too.
     const LineDesign& playerName = s.Kind(PlateKind::Players).lines[2];
     CHECK(mobs.lines[2].color.source == ColorSource::Custom && playerName.color.source == ColorSource::Custom);
     CHECK_EQ(playerName.shadow, mobs.lines[2].shadow);
-    CHECK_EQ(playerName.iconSize, 98); // playerIconSize=120 of playerNameSize=13 is 15.6 px, of the 16 px base icon
-    CHECK_EQ(s.Kind(PlateKind::Self).lines[2].iconSize, 128); // of selfNameSize=17: 20.4 px
+    CHECK_EQ(playerName.iconSize, 100); // playerIconSize=120 of playerNameSize=13 is 15.6 px, 98 of the 16 px base icon
+    CHECK_EQ(s.Kind(PlateKind::Self).lines[2].iconSize, 130); // of selfNameSize=17: 20.4 px, 128 of 16
     CHECK_EQ(playerName.text, "$name"); // showPlayerIcons=false
     // Saved again, the file carries the new version and the new keys.
     MapStore again;
@@ -1522,7 +1702,7 @@ TEST(a_players_name_line_carries_the_icons_the_old_settings_showed_on_each_side)
 TEST(a_players_icons_are_a_percent_of_that_players_own_name_size)
 {
     const Settings s = Load2({{"mobNameSize", "20"}, {"playerNameSize", "14"}, {"selfNameSize", "24"}, {"playerIconSize", "100"}});
-    CHECK_EQ(s.Kind(PlateKind::Players).lines[2].iconSize, 88); // 14 px of the 16 px base icon
+    CHECK_EQ(s.Kind(PlateKind::Players).lines[2].iconSize, 90); // 14 px of the 16 px base icon, on the steps of five
     CHECK_EQ(s.Kind(PlateKind::Self).lines[2].iconSize, 150); // 24 px
 }
 
@@ -1560,10 +1740,10 @@ TEST(the_old_glow_and_shadow_settings_reach_the_mob_lines_and_the_cursor_edge)
     const Settings shadow = Load2({{"labelShadow", "40"}, {"labelShadowColorR", "0.1"}, {"labelShadowColorG", "0.2"},
         {"labelShadowColorB", "0.3"}, {"nameShadow", "170"}});
     const KindSettings& mobs = shadow.Kind(PlateKind::Mobs);
-    CHECK_EQ(mobs.lines[1].shadow, 27); // 40 of the unit before, which was two thirds of this one
+    CHECK_EQ(mobs.lines[1].shadow, 25); // 40 of the unit before, which was two thirds of this one, on the steps of five
     CHECK(mobs.lines[1].shadowColor.custom == (Color{{0.1f, 0.2f, 0.3f}}));
-    CHECK_EQ(mobs.lines[2].shadow, 113); // 170 likewise
-    CHECK_EQ(shadow.Kind(PlateKind::Players).lines[2].shadow, 113);
+    CHECK_EQ(mobs.lines[2].shadow, 115); // 170 likewise
+    CHECK_EQ(shadow.Kind(PlateKind::Players).lines[2].shadow, 115);
     const Settings outline = Load2({{"textOutlineR", "0.6"}, {"textOutlineG", "0.7"}, {"textOutlineB", "0.8"}});
     const Color edge{{0.6f, 0.7f, 0.8f}};
     CHECK((outline.cursorEdgeColor == ColorPick{ColorSource::Custom, edge}));
@@ -1892,23 +2072,24 @@ TEST(a_row_saved_as_expanding_shows_its_nameplate)
 
 TEST(a_shadow_saved_before_its_unit_grew_keeps_its_look)
 {
-    // 100 percent is now one and a half of the shadow it was: 150 from before is 100, and 100 is 67.
+    // 100 percent is now one and a half of the shadow it was: 150 from before is 100, and 100 is 67, or 65 on the
+    // steps of five.
     MapStore file = ReleaseFile({{"mobsLine3Shadow", "150.0000"}, {"mobsLine2Shadow", "100.0000"}});
     const Settings loaded = LoadSettings(file);
     CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[2].shadow, 100);
-    CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[1].shadow, 67);
+    CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[1].shadow, 65);
     // Such a file is owed a save, which gives it the new keys and leaves the old ones as they were.
     ChangedKeys keys(file);
     const Settings again = keys.Load();
     CHECK(keys.Outdated() && again == loaded);
     keys.Save(again);
-    CHECK_EQ(file.values.at("mobsLine2ShadowStrength"), "67.0000");
+    CHECK_EQ(file.values.at("mobsLine2ShadowStrength"), "65.0000");
     CHECK_EQ(file.values.at("mobsLine2Shadow"), "100.0000");
     CHECK(std::ranges::find(file.sets, "mobsLine2Shadow") == file.sets.end());
     CHECK_EQ(file.values.at("settingsVersion"), "4.0000");
     // The build before, run again, writes its own key: this build goes by its own.
     file.values["mobsLine2Shadow"] = "200.0000";
-    CHECK_EQ(LoadSettings(file).Kind(PlateKind::Mobs).lines[1].shadow, 67);
+    CHECK_EQ(LoadSettings(file).Kind(PlateKind::Mobs).lines[1].shadow, 65);
     // A file with neither key has the default.
     file.values.erase("mobsLine2Shadow");
     file.values.erase("mobsLine2ShadowStrength");
@@ -1918,12 +2099,12 @@ TEST(a_shadow_saved_before_its_unit_grew_keeps_its_look)
 TEST(an_icon_size_saved_as_a_share_of_the_font_size_keeps_its_pixels)
 {
     // A line's icons were a percent of the base font size, and are one of the base icon size, 16 px: 107 percent of a
-    // 20 px font was 21.4 px, which is 134 percent of 16.
+    // 20 px font was 21.4 px, which is 134 percent of 16, and 135 on the steps of five.
     MapStore file = ReleaseFile({{"baseSize", "20.0000"}, {"mobsLine1IconSize", "107.0000"}, {"playersLine3IconSize", "50.0000"}});
     const Settings loaded = LoadSettings(file);
     CHECK_EQ(loaded.baseIconSize, 16);
-    CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[0].iconSize, 134);
-    CHECK_EQ(loaded.Kind(PlateKind::Players).lines[2].iconSize, 63); // 10 px
+    CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[0].iconSize, 135);
+    CHECK_EQ(loaded.Kind(PlateKind::Players).lines[2].iconSize, 65); // 10 px
     // Saved under its own key, it is read back as it is, whatever the base sizes become.
     Settings changed    = loaded;
     changed.baseSize    = 30;
@@ -1962,7 +2143,7 @@ TEST(a_number_of_before_is_converted_in_a_store_that_adds_what_a_typed_read_miss
         {"npcsOrnamentPlace", "lines12"}, {"petsRowPetPlate", "hidden"}});
     const Settings loaded = LoadSettings(file);
     CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[2].shadow, 60); // 90 of the unit that was two thirds of today's
-    CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[0].iconSize, 28); // 30 percent of a 15 px font is 4.5 px, of 16
+    CHECK_EQ(loaded.Kind(PlateKind::Mobs).lines[0].iconSize, 30); // 30 percent of a 15 px font is 4.5 px, 28 of 16
     CHECK(loaded.Kind(PlateKind::Npcs).ornament.place == OrnamentPlace::AboveMiddle);
     for (int row = 0; row < kPetRowCount; ++row)
         CHECK(loaded.Kind(PlateKind::Pets).rows[row].plate == PlateMode::Hidden);
@@ -1977,17 +2158,14 @@ TEST(a_cursors_edge_color_of_before_is_its_custom_color_and_its_own_color_follow
     CHECK(loaded.cursorColor.source == ColorSource::Target);
 }
 
-TEST(the_one_opacity_and_glow_switch_of_before_go_to_the_mobs_and_pets_they_were_for)
+TEST(the_one_opacity_and_glow_switch_of_before_go_to_the_nameplates_opacity_and_the_mobs)
 {
-    // Other mobs' plates had one opacity while you had a target, pets among them, and one switch took the glow
-    // off every line of a mob your party had claimed.
+    // Other mobs' plates had one opacity while you had a target, and one switch took the glow off every line of a
+    // mob your party had claimed.
     MapStore file = ReleaseFile({{"untargetedOpacity", "40.0000"}, {"glowOffWhenFighting", "false"}});
     const Settings loaded = LoadSettings(file);
-    CHECK_EQ(loaded.Kind(PlateKind::Mobs).opacity.notTargeted, 40);
-    CHECK_EQ(loaded.Kind(PlateKind::Pets).opacity.notTargeted, 40);
-    for (const PlateKind kind : {PlateKind::Players, PlateKind::Self, PlateKind::Npcs})
-        CHECK_EQ(loaded.Kind(kind).opacity.notTargeted, 100);
-    CHECK_EQ(loaded.Kind(PlateKind::Mobs).opacity.targeted, 100);
+    CHECK_EQ(loaded.opacity.notTargeted, 40);
+    CHECK_EQ(loaded.opacity.targeted, 100);
     for (const LineDesign& line : loaded.Kind(PlateKind::Mobs).lines)
         CHECK(!line.glowOffInCombat);
     // The switch as the release had it, on, takes the glow from the mobs' lines alone.
@@ -2003,7 +2181,7 @@ TEST(the_one_opacity_and_glow_switch_of_before_go_to_the_mobs_and_pets_they_were
             CHECK_EQ(line.glowOffInCombat, static_cast<PlateKind>(k) == PlateKind::Mobs);
     // Keys of their own stand, and the two of before are never written again.
     Settings own;
-    own.Kind(PlateKind::Mobs).opacity.notTargeted     = 75;
+    own.opacity.notTargeted                            = 75;
     own.Kind(PlateKind::Mobs).lines[0].glowOffInCombat = false;
     MapStore saved = OwnFileWith(own, {{"untargetedOpacity", "40.0000"}, {"glowOffWhenFighting", "true"}});
     CHECK(LoadSettings(saved) == own);
@@ -2012,16 +2190,39 @@ TEST(the_one_opacity_and_glow_switch_of_before_go_to_the_mobs_and_pets_they_were
     CHECK(std::ranges::find(saved.sets, "glowOffWhenFighting") == saved.sets.end());
 }
 
-TEST(a_kinds_opacity_is_bounded_and_your_own_nameplate_never_fades_with_distance)
+TEST(the_nameplates_opacity_is_bounded)
 {
     Settings s;
-    s.Kind(PlateKind::Npcs).opacity = OpacitySettings{0, 500, -3, true, 900.0f};
-    s.Kind(PlateKind::Self).opacity.fadeIn = true;
+    s.opacity        = OpacitySettings{0, 500, -3, true, 900.0f};
     const Settings c = Clamp(s);
-    CHECK((c.Kind(PlateKind::Npcs).opacity == OpacitySettings{kMinOpacity, kMaxOpacity, kMinOpacity, true, kMaxOutlineDistance}));
-    CHECK(!c.Kind(PlateKind::Self).opacity.fadeIn);
-    s.Kind(PlateKind::Npcs).opacity.range = 1.0f;
-    CHECK_EQ(Clamp(s).Kind(PlateKind::Npcs).opacity.range, kMinOutlineDistance);
+    CHECK((c.opacity == OpacitySettings{kMinOpacity, kMaxOpacity, kMinOpacity, true, kMaxOutlineDistance}));
+    s.opacity.range = 1.0f;
+    CHECK_EQ(Clamp(s).opacity.range, kMinOutlineDistance);
+}
+
+TEST(the_one_nameplate_opacity_takes_the_mobs_values_from_a_file_that_had_one_a_kind)
+{
+    MapStore file = ReleaseFile({{"mobsOpacityNoTarget", "60.0000"}, {"mobsOpacityNotTargeted", "45.0000"},
+        {"mobsOpacityTargeted", "90.0000"}, {"mobsOpacityFadeIn", "true"}, {"mobsOpacityRange", "30.0000"},
+        {"playersOpacityNoTarget", "80.0000"}, {"petsOpacityNotTargeted", "20.0000"}, {"selfOpacityTargeted", "50.0000"},
+        {"untargetedOpacity", "40.0000"}});
+    CHECK((LoadSettings(file).opacity == OpacitySettings{60, 45, 90, true, 30.0f}));
+    // Its own keys win over the mobs'.
+    file.values["plateOpacityNoTarget"] = "70.0000";
+    file.values["plateOpacityFadeIn"]   = "false";
+    file.values["plateOpacityRange"]    = "25.0000";
+    const Settings own = LoadSettings(file);
+    CHECK((own.opacity == OpacitySettings{70, 45, 90, false, 25.0f}));
+    // A save writes its own five keys and no kind's.
+    MapStore saved;
+    SaveSettings(own, saved);
+    for (const char* key : {"plateOpacityNoTarget", "plateOpacityNotTargeted", "plateOpacityTargeted", "plateOpacityFadeIn",
+             "plateOpacityRange"})
+        CHECK(saved.values.contains(key));
+    for (int k = 0; k < kPlateKindCount; ++k)
+        for (const auto& [key, value] : saved.values)
+            CHECK(!key.starts_with(std::string(KindKey(static_cast<PlateKind>(k))) + "Opacity"));
+    CHECK(LoadSettings(saved).opacity == own.opacity);
 }
 
 TEST(a_kinds_icon_limit_is_kept_for_the_kinds_that_show_status_icons_and_is_bounded)
@@ -2189,12 +2390,14 @@ TEST(a_kinds_lines_and_ornament_are_bounded_and_a_condition_its_page_does_not_of
     pets.padding       = kMaxLinePadding + 5;
     pets.show.when     = ConditionBit(ShowCondition::OwnerIsYou) | ConditionBit(ShowCondition::TooWeak);
     LineDesign& mobs   = s.Kind(PlateKind::Mobs).lines[0];
-    mobs.padding       = -4;
+    mobs.padding       = -9;
     mobs.show.when     = ConditionBit(ShowCondition::OwnerIsYou) | ConditionBit(ShowCondition::TooWeak);
     s.Kind(PlateKind::Npcs).ornament.place = static_cast<OrnamentPlace>(42);
     const Settings bounded = Clamp(s);
     CHECK_EQ(bounded.Kind(PlateKind::Pets).lines[0].padding, kMaxLinePadding);
-    CHECK_EQ(bounded.Kind(PlateKind::Mobs).lines[0].padding, 0);
+    CHECK_EQ(bounded.Kind(PlateKind::Mobs).lines[0].padding, kMinLinePadding);
+    s.Kind(PlateKind::Mobs).lines[0].padding = -3; // a line may sink into the one under it
+    CHECK_EQ(Clamp(s).Kind(PlateKind::Mobs).lines[0].padding, -3);
     // A pet's page asks whose it is and a mob's whether it is too weak, and neither asks the other's.
     CHECK_EQ(bounded.Kind(PlateKind::Pets).lines[0].show.when, ConditionBit(ShowCondition::OwnerIsYou));
     CHECK_EQ(bounded.Kind(PlateKind::Mobs).lines[0].show.when, ConditionBit(ShowCondition::TooWeak));
@@ -2300,12 +2503,15 @@ TEST(pets_migrate_as_the_mobs_they_were_drawn_as)
     CHECK_EQ(petName.font, "Georgia");
     CHECK_EQ(petName.style, StyleBit(FontStyle::Bold));
     CHECK(fonts.Kind(PlateKind::Pets).lines[0].font.empty() && fonts.Kind(PlateKind::Pets).lines[0].style == 0);
-    // But for its shadows, which were of the unit before, such a file's pets are today's.
+    // But for its shadows, which were of the unit before, and a glow it never had, such a file's pets are today's.
     // And it shows their nameplates, as it showed any mob's.
     const Settings plain   = Load2({});
     KindSettings expected  = Settings{}.Kind(PlateKind::Pets);
     for (LineDesign& line : expected.lines)
-        line.shadow = 67;
+    {
+        line.shadow = 65; // 67, on the steps of five
+        line.glow   = 0;
+    }
     for (int row = 0; row < kPetRowCount; ++row)
         expected.rows[row].plate = PlateMode::Shown;
     CHECK(plain.Kind(PlateKind::Pets) == expected);
@@ -2366,4 +2572,29 @@ TEST(a_font_name_of_31_characters_is_kept_and_one_of_32_refused)
     const Settings refused = Clamp(s), d;
     CHECK(refused.defaultFont == d.defaultFont && refused.badgeFontName == d.badgeFontName);
     CHECK(refused.barTitleFont == d.barTitleFont && refused.barTextFont == d.barTextFont);
+}
+
+TEST(the_game_font_is_in_use_when_the_default_a_line_or_the_badges_name_it)
+{
+    Settings s;
+    CHECK(!UsesGameFont(s));
+    s.defaultFont = kGameFontName;
+    CHECK(UsesGameFont(s));
+    s = Settings{};
+    s.Kind(PlateKind::Npcs).lines[2].font = "game font narrow";
+    CHECK(UsesGameFont(s));
+    s = Settings{};
+    s.badgeFontName = kGameFontNarrowName;
+    CHECK(UsesGameFont(s));
+    s = Settings{};
+    s.barTitleFont = kGameFontName; // the top panel never draws it
+    CHECK(!UsesGameFont(s));
+}
+
+TEST(the_nameplate_fonts_are_the_games_two_then_the_font_list_which_never_holds_them)
+{
+    const std::vector<std::string> choices = NameplateFontChoices(FontChoices({"Arial", "game font"}, kGameFontNarrowName));
+    const std::vector<std::string> expected{kGameFontName, kGameFontNarrowName, "Montserrat SemiBold", "Marcellus SC", "Cinzel",
+        "Cormorant SC", "Barlow Condensed", "Arial"};
+    CHECK(choices == expected);
 }

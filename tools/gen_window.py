@@ -18,7 +18,7 @@ KINDS = ('mobs', 'players', 'self', 'npcs', 'pets')  # PlateKind's order; also t
 KEY = re.compile(r'[a-z0-9]+(?:-[a-z0-9]+)*\Z')
 ID_MARK = '##'  # what a label holds before the name of its control's id
 SOURCE = 'settings_window.json'
-FIELDS = ('key', 'name', 'child', 'description', 'tip', 'tipOnClaimRows', 'tipBottomLine', 'kinds', 'options',
+FIELDS = ('version', 'key', 'name', 'child', 'indent', 'description', 'tip', 'tipOnClaimRows', 'tipBottomLine', 'kinds', 'options',
           'rows', 'settings', 'cards', 'pages', 'entity', 'lists', 'words')  # the order --format writes them in
 
 
@@ -68,6 +68,7 @@ class Entry:
     tip: object = None
     extra: str = None  # a second tip
     child: bool = False
+    indent: bool = False
     description: str = None
     kinds: tuple = None
     piece: str = None  # a card's key in the code; None for a card of the file's own
@@ -84,6 +85,7 @@ class Layout:
     entity: list
     lists: list
     words: list
+    version: str = None  # the plugin's version the file was made for
 
 
 def rows(*keys, kinds=None):
@@ -109,15 +111,14 @@ PIECES = Pieces(
         'weaknesses': Card(), 'statuses': Card(), 'placeholder-timers': Card(),
         'screenshot-mode': Card(), 'window-groups': Card(), 'game-windows': Card(),
         'top-panel': Card(switch=True), 'help-bar': Card(switch=True), 'widgets': Card(), 'layout': Card(),
-        'mouse-pointer': Card(), 'settings-window': Card(), 'reset': Card(), 'headsup': Card(switch=True),
-        'this-frame': Card(),
+        'mouse-pointer': Card(), 'settings-window': Card(), 'reset': Card(), 'debug-mode': Card(switch=True),
     },
     settings={
         # Entities
         'base-font-size': Setting(), 'default-font': Setting(), 'base-icon-size': Setting(), 'auto-check': Setting(),
         'replace-dashes': Setting(options=4, nameless=frozenset({1, 2, 3})), 'scale-with-distance': Setting(),
-        'min-size': Setting(), 'max-size': Setting(), 'scale-your-own-name': Setting(), 'vertical-offset': Setting(),
-        'stack-names': Setting(),
+        'min-size': Setting(), 'max-size': Setting(), 'stack-line-to-entity': Setting(), 'vertical-offset': Setting(),
+        'stack-names': Setting(), 'hide-during-conversation': Setting(),
         'thickness': Setting(), 'opacity': Setting(), 'smoothness': Setting(), 'outline-range': Setting(),
         'outline-fade-in': Setting(), 'stencil-note': Setting(),
         'cursor-style': Setting(options=5, nameless=frozenset({4})), 'width': Setting(), 'cursor-height': Setting(),
@@ -128,7 +129,7 @@ PIECES = Pieces(
         'toughness-colors': Setting(unnamed=True, rows=rows(
             'unknown-level', 'too-weak', 'easy-prey', 'decent-challenge', 'even-match', 'tough', 'very-tough',
             'incredibly-tough')),
-        'claim-colors': Setting(unnamed=True, rows=rows('unclaimed', 'claimed-others', 'claimed-yours')),
+        'claim-colors': Setting(unnamed=True, rows=rows('unclaimed', 'claimed-others', 'claimed-yours', 'called-for-help')),
         'targeting-colors': Setting(unnamed=True, rows=rows(
             'not-targeted', 'targeted', 'locked-on', 'sub-target', 'out-of-range')),
         'entity-type-colors': Setting(unnamed=True, rows=rows(
@@ -146,14 +147,14 @@ PIECES = Pieces(
             'disable-glow-in-combat'), row_extra={'padding': 'tipBottomLine'},
             words={'do-not-sync': True, 'sync-with': True, 'uses-style': True}),
         'ornament': Setting(entity=True, unnamed=True, rows=rows('visibility', 'width', 'height', 'color')),
-        'no-target': Setting(entity=True), 'not-targeted': Setting(entity=True), 'is-targeted': Setting(entity=True),
-        'fade-in': Setting(entity=True, kinds=('mobs', 'players', 'npcs', 'pets')),
-        'range': Setting(entity=True, kinds=('mobs', 'players', 'npcs', 'pets')),
+        'no-target': Setting(), 'not-targeted': Setting(), 'is-targeted': Setting(), 'fade-in': Setting(),
+        'range': Setting(),
         'detection': Setting(unnamed=True, rows_fixed=True, rows=rows(
             'aggression', 'links', 'sight', 'true-sight', 'sound', 'scent', 'use-of-spells', 'use-of-abilities',
             'low-player-hp'),
             words={'senses': True, 'hide': True, 'show': True}),
-        'badge-font': Setting(), 'use-rank-system': Setting(), 'weak-color': Setting(), 'resist-color': Setting(),
+        'badge-font': Setting(), 'badge-numbers': Setting(options=3), 'count-your-accuracy': Setting(),
+        'weak-color': Setting(), 'resist-color': Setting(),
         'status-resist-color': Setting(), 'immune-color': Setting(),
         'weak-from': Setting(), 'resist-from': Setting(), 'max-elements': Setting(),
         'status-table': Setting(unnamed=True, rows=rows(
@@ -162,9 +163,9 @@ PIECES = Pieces(
         'respawn-timers': Setting(), 'timer-size': Setting(),
         # User Interface
         'key': Setting(), 'hide-game-windows': Setting(),
-        'groups': Setting(unnamed=True, words={'note': True, 'under-bar': False, 'remove': False, 'add-window': True,
-                                               'new-group': True}),
-        'every-window': Setting(), 'game-help': Setting(),
+        'groups': Setting(unnamed=True, words={'note': True, 'help-on': True, 'help-off': True, 'starts-at': True,
+                                               'row-tip': False}),
+        'move-windows': Setting(), 'keep-clear': Setting(), 'game-help': Setting(), 'auto-adjust': Setting(),
         'window-defaults': Setting(unnamed=True, words={'headsup-defaults': True, 'headsup-help': True,
                                                         'game-defaults': True}),
         'window-list': Setting(unnamed=True, words={'note': True, 'find': True, 'name-hint': True, 'all-windows': False,
@@ -180,9 +181,10 @@ PIECES = Pieces(
         'trays': Setting(unnamed=True), 'reset-layout': Setting(),
         # Mouse Cursor and HeadsUp Config
         'pointer-icon': Setting(options=3, nameless=frozenset({2})), 'pointer-fix': Setting(), 'keep-pointer': Setting(),
-        'window-theme': Setting(), 'font': Setting(), 'size': Setting(), 'window-opacity': Setting(),
+        'enable-headsup': Setting(), 'window-theme': Setting(), 'font': Setting(), 'size': Setting(),
+        'window-opacity': Setting(),
         'reset-all-settings': Setting(words={'note': True, 'reset-everything': True, 'keep-them': True}),
-        'debug-report': Setting(),
+        'debug-report': Setting(words={'watch': True, 'stop': True, 'saved': True}),
         'mobs-outlined': Setting(), 'meshes-outlined': Setting(), 'stencil-buffer': Setting(), 'nameplates': Setting(),
         'drawn': Setting(), 'game-s-names': Setting(), 'frame-time': Setting(), 'last-save': Setting(),
         'your-level': Setting(),
@@ -191,11 +193,12 @@ PIECES = Pieces(
         'plate-mode': List(4), 'outline-mode': List(4, extra={3: 'tipOnClaimRows'}), 'color-source': List(7),
         'show-condition': List(13), 'ornament-place': List(5), 'align': List(3), 'font-style': List(3),
         'smoothness': List(4), 'bar-theme': List(5), 'menu-theme': List(2), 'bar-sections': List(3),
-        'bar-widgets': List(14), 'plate-lines': List(3), 'job-layout': List(3), 'exp-bar': List(3), 'tags': List(22),
+        'bar-widgets': List(14), 'plate-lines': List(3), 'job-layout': List(3), 'exp-bar': List(3), 'tags': List(24),
     },
-    words={'switched-off': True, 'switched-off-top-panel': True, 'switched-off-headsup': True, 'key-add': True,
-           'key-waiting': True, 'always': True, 'never': True, 'conditions': True, 'local': True, 'themes-font': True,
-           'default-font': True, 'unused-tags-these': True, 'unused-tags-name': True, 'or': True, 'slot-tip': False},
+    words={'switched-off': True, 'switch-off': True, 'switch-on': True, 'switched-off-top-panel': True,
+           'switched-off-headsup': True, 'key-add': True, 'key-waiting': True, 'always': True, 'never': True, 'conditions': True, 'local': True, 'themes-font': True,
+           'default-font': True, 'unused-tags-these': True, 'unused-tags-name': True, 'or': True, 'slot-tip': False,
+           'reload': True, 'export': True},
 )
 
 
@@ -209,9 +212,10 @@ def pascal(key: str) -> str:
 
 
 class Reader:
-    def __init__(self, source: str, pieces: Pieces):
+    def __init__(self, source: str, pieces: Pieces, version: str = None):
         self.source = source
         self.pieces = pieces
+        self.version = version
         self.placed = {}  # setting key: the card it is in, for "used twice"
         self.seen_cards = set()
 
@@ -280,13 +284,18 @@ class Reader:
         return name
 
     def layout(self, top) -> Layout:
-        if not isinstance(top, dict) or set(top) != {'pages', 'entity', 'lists', 'words'}:
-            self.bad('the top level must be an object with pages, entity, lists and words')
+        if not isinstance(top, dict) or set(top) != {'version', 'pages', 'entity', 'lists', 'words'}:
+            self.bad('the top level must be an object with version, pages, entity, lists and words')
+        version = top['version']
+        if not isinstance(version, str) or not version:
+            self.bad('the version must be text')
+        if self.version is not None and version != self.version:
+            self.bad(f'version {version} is not the plugin\'s {self.version}: run tools/gen_window.py --format')
         self.fields(top['entity'], 'the entity part', ('cards',))
         pages = self.pages(top['pages'])
         entity = self.cards(top['entity'].get('cards'), 'the entity cards', in_entity=True)
         self.left_out()
-        return Layout(pages, entity, self.lists(top['lists']), self.window_words(top['words']))
+        return Layout(pages, entity, self.lists(top['lists']), self.window_words(top['words']), version)
 
     def listed(self, value, what: str) -> list:
         if not isinstance(value, list):
@@ -358,7 +367,7 @@ class Reader:
         if isinstance(value, dict) and key is None:
             self.bad(f'a setting of {place} has no key')
         known = self.pieces.settings.get(key)
-        allowed = ['key', 'name', 'tip', 'kinds']
+        allowed = ['key', 'name', 'tip', 'kinds', 'indent']
         if known is not None:
             allowed += (['options'] if known.options else []) + (['rows'] if known.rows else []) + (
                 ['words'] if known.words else [])
@@ -386,7 +395,10 @@ class Reader:
             if not known.entity and len(shown) != 1:
                 self.bad(f'{owner} would show on {len(shown)} pages: a setting that is not of an entity\'s design needs '
                          'one kind in the entity cards, on it or on its card')
-        entry = Entry(key=key, kinds=kinds, tip=self.text(value, 'tip', owner, shown))
+        indent = value.get('indent', False)
+        if not isinstance(indent, bool):
+            self.bad(f'the indent of {owner} must be true or false')
+        entry = Entry(key=key, kinds=kinds, indent=indent, tip=self.text(value, 'tip', owner, shown))
         entry.name = self.named(value, f'the setting "{key}"', not known.unnamed, shown)
         if known.unnamed and entry.name is not None:
             self.bad(f'the setting "{key}" has a name, and the code shows none')
@@ -499,20 +511,32 @@ class Reader:
                 self.bad(f'the card "{key}" is left out: its switch is the only one of its setting')
 
 
-def parse(text: str, source: str = SOURCE, pieces: Pieces = PIECES) -> Layout:
+def parse(text: str, source: str = SOURCE, pieces: Pieces = PIECES, version: str = None) -> Layout:
+    """The file's layout; with a version, the file must be of it."""
     try:
         top = json.loads(text)
     except json.JSONDecodeError as error:
         raise DataError(f'{source}: not JSON ({error})') from None
-    return Reader(source, pieces).layout(top)
+    return Reader(source, pieces, version).layout(top)
+
+
+PLUGIN_VERSION = re.compile(r'constexpr double kVersion\s*=\s*([0-9.]+);')
+
+
+def plugin_version(source: str) -> str:
+    """kVersion as src/plugin.cpp writes it."""
+    found = PLUGIN_VERSION.search(source)
+    if found is None:
+        raise DataError('src/plugin.cpp: no kVersion')
+    return found.group(1)
 
 
 def c_text(text) -> str:
     return 'nullptr' if text is None else c_string(text)
 
 
-def generate(layout: Layout, pieces: Pieces = PIECES):
-    """The enums of every piece the code draws, and the file's tables in its order."""
+def generate(layout: Layout, pieces: Pieces = PIECES, text: str = ''):
+    """The enums of every piece the code draws, and the file's tables in its order with the file itself."""
     with_rows = [key for key, setting in pieces.settings.items() if setting.rows]
     words = [(pascal(key), key) for key in pieces.words] + [
         (pascal(setting) + pascal(word), word) for setting in pieces.settings for word in pieces.settings[setting].words]
@@ -557,9 +581,10 @@ def generate(layout: Layout, pieces: Pieces = PIECES):
         lists.append(f'    {{WindowList::{pascal(listed.key)}, "{listed.key}", {first}, {len(listed.options)}}},')
     all_cards = [card for page in layout.pages for card in page.cards] + layout.entity
     for card in all_cards:
+        switched = card.piece is not None and pieces.cards[card.piece].switch
         cards.append(f'    {{CardPiece::{pascal(card.piece) if card.piece else "Plain"}, "{card.key}", '
                      f'{c_text(card.name)}, {c_text(card.description)}, {bits(card.kinds)}, {len(settings)}, '
-                     f'{len(card.settings)}}},')
+                     f'{len(card.settings)}, {"true" if switched else "false"}}},')
         for s in card.settings:
             known = pieces.settings[s.key]
             first_option = add_options(s.options)
@@ -571,10 +596,11 @@ def generate(layout: Layout, pieces: Pieces = PIECES):
             settings.append(f'    {{SettingPiece::{pascal(s.key)}, "{s.key}", {shared(s.name)}, {shared(s.tip)}, '
                             f'{text_by_kind(s.name)}, {text_by_kind(s.tip)}, {bits(s.kinds)}, '
                             f'{"true" if known.entity else "false"}, {first_option}, {len(s.options)}, {first_row}, '
-                            f'{len(s.rows)}}},')
+                            f'{len(s.rows)}, {"true" if known.rows_fixed else "false"}, {bits(known.kinds)}, '
+                            f'{"true" if s.indent else "false"}}},')
             for word in s.words:
                 layout_words.append(f'    {{WindowWord::{pascal(s.key) + pascal(word.key)}, {c_text(word.name)}, '
-                                    f'{c_text(word.tip)}}},')
+                                    f'{c_text(word.tip)}, "{word.key}", "{s.key}"}},')
     entity_first = len(cards) - len(layout.entity)
     for page in layout.pages:
         first, count = (entity_first, len(layout.entity)) if page.key in KINDS else (
@@ -582,7 +608,8 @@ def generate(layout: Layout, pieces: Pieces = PIECES):
         pages.append(f'    {{Page::{pieces.pages[page.key]}, "{page.key}", {c_text(page.name)}, '
                      f'{"true" if page.child else "false"}, {first}, {count}}},')
     for word in layout.words:
-        layout_words.append(f'    {{WindowWord::{pascal(word.key)}, {c_text(word.name)}, {c_text(word.tip)}}},')
+        layout_words.append(f'    {{WindowWord::{pascal(word.key)}, {c_text(word.name)}, {c_text(word.tip)}, "{word.key}", '
+                            'nullptr},')
 
     tables = ['// Generated by tools/gen_window.py from data/settings_window.json. Do not edit.']
     tables += [f'constexpr const char* kByKind{i}[] = {array};' for i, array in enumerate(by_kind)]
@@ -591,6 +618,8 @@ def generate(layout: Layout, pieces: Pieces = PIECES):
                               ('kLayoutPages', 'LayoutPage', pages), ('kLayoutLists', 'LayoutList', lists),
                               ('kLayoutWords', 'LayoutWord', layout_words)):
         tables += [f'constexpr {kind} {name}[] = {{'] + lines + ['};']
+    tables += [f'constexpr const char* kLayoutVersion = {c_text(layout.version)};',
+               f'constexpr const char* kLayoutText = {c_string(text)};']
     return '\n'.join(header) + '\n', '\n'.join(tables) + '\n'
 
 
@@ -627,18 +656,22 @@ def main(argv) -> int:
     root = pathlib.Path(__file__).resolve().parent.parent
     path = root / 'data' / 'settings_window.json'
     try:
+        version = plugin_version((root / 'src' / 'plugin.cpp').read_text(encoding='utf-8'))
         text = path.read_text(encoding='utf-8')
         if len(argv) == 2:
             try:
-                path.write_text(format_file(json.loads(text)), encoding='utf-8')
+                tree = json.loads(text)
             except json.JSONDecodeError as error:
                 raise DataError(f'{SOURCE}: not JSON ({error})') from None
+            if isinstance(tree, dict):
+                tree['version'] = version
+            path.write_text(format_file(tree), encoding='utf-8')
             text = path.read_text(encoding='utf-8')
-        layout = parse(text)
+        layout = parse(text, version=version)
     except (OSError, DataError) as error:
         print(f'gen_window: {error}', file=sys.stderr)
         return 1
-    header, tables = generate(layout)
+    header, tables = generate(layout, PIECES, text)
     out = root / 'src' / 'generated'
     out.mkdir(parents=True, exist_ok=True)
     (out / 'window_pieces.h').write_text(header, encoding='utf-8')

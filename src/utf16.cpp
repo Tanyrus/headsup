@@ -6,7 +6,7 @@ namespace headsup
 {
     namespace
     {
-        constexpr wchar_t kReplacement    = 0xFFFD;
+        constexpr char32_t kReplacement   = 0xFFFD;
         constexpr uint32_t kMaxCodePoint  = 0x10FFFF;
         // UTF-8: a lead byte's top bits give its sequence's length, and each continuation byte carries six bits.
         constexpr uint8_t kAsciiEnd          = 0x80;
@@ -37,9 +37,9 @@ namespace headsup
         }
     }
 
-    std::wstring Utf16(const std::string& utf8)
+    std::u32string CodePoints(const std::string& utf8)
     {
-        std::wstring out;
+        std::u32string out;
         for (size_t i = 0; i < utf8.size();)
         {
             const auto lead  = static_cast<uint8_t>(utf8[i]);
@@ -65,6 +65,17 @@ namespace headsup
                 i += taken;
                 continue;
             }
+            out.push_back(code);
+            i += static_cast<size_t>(length);
+        }
+        return out;
+    }
+
+    std::wstring Utf16(const std::string& utf8)
+    {
+        std::wstring out;
+        for (const char32_t code : CodePoints(utf8))
+        {
             if (code >= kSurrogateBase)
             {
                 const uint32_t rest = code - kSurrogateBase;
@@ -73,7 +84,6 @@ namespace headsup
             }
             else
                 out.push_back(static_cast<wchar_t>(code));
-            i += length;
         }
         return out;
     }

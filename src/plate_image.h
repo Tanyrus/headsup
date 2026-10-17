@@ -86,6 +86,9 @@ namespace headsup
     Coverage Joined(const std::vector<Coverage>& pieces, std::span<const int> room, int margin);
     // A line under the whole of a text inside its margin: thickness rows from the row top, as far as the image goes.
     void Underline(Coverage& text, int top, int thickness, int margin);
+    // How thick an underline is drawn under a text pixelHeight tall whose font gives fontThickness: never one row,
+    // which comes and goes as the text is drawn a little smaller or larger than its image.
+    int UnderlineThickness(int pixelHeight, int fontThickness);
 
     // A picture at another size: each new pixel is the average of what it covers of the old, weighted by alpha so a
     // clear pixel's color darkens nothing.

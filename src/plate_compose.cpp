@@ -19,6 +19,7 @@ namespace headsup
     {
         constexpr char kSpace          = ' ';
         constexpr const char* kJobJoin = "/";
+        constexpr const char* kLevelWord = "Level "; // before a player's level known without their job
 
         // Follows a chain of syncs to the line whose look is shown; a cycle leaves the line its own style.
         const LineDesign& StyleLine(const KindSettings& kind, int line)
@@ -62,6 +63,7 @@ namespace headsup
             case Tag::ServerId:
             case Tag::Ph:
             case Tag::Job:
+            case Tag::JobLevel:
             case Tag::Owner:
             case Tag::Title:
                 return true;
@@ -119,6 +121,13 @@ namespace headsup
                 return IsPlayer(info) && info.jobs && info.jobs->mainJob != 0 ? JobText(*info.jobs) : std::string();
             case Tag::Title:
                 return IsPlayer(info) ? TitleName(info.title) : std::string();
+            case Tag::JobLevel:
+            {
+                if (!IsPlayer(info) || !info.jobs) return {};
+                const PlayerJobs& jobs = *info.jobs;
+                if (jobs.mainJob == 0) return jobs.mainLevel != 0 ? kLevelWord + std::to_string(jobs.mainLevel) : std::string();
+                return jobs.mainLevel != 0 ? std::to_string(jobs.mainLevel) + kSpace + JobText(jobs) : JobText(jobs);
+            }
             default:
                 return {};
             }
@@ -159,7 +168,8 @@ namespace headsup
             }
         }
 
-        std::vector<IconDraw> TagIcons(Tag tag, const ActorInfo& info, const Settings& s, std::optional<BadgeRules>& badgeRules)
+        std::vector<IconDraw> TagIcons(Tag tag, const ActorInfo& info, const PlayerState& player, const Settings& s,
+            std::optional<BadgeRules>& badgeRules)
         {
             std::vector<IconDraw> out;
             switch (tag)
@@ -184,10 +194,12 @@ namespace headsup
                     std::ranges::copy(s.statusBadges, badgeRules->status);
                 }
                 const InfoIconSet set = InfoIconsOf(info.mob ? &ResistancesOf(*info.mob) : nullptr, *badgeRules, GroupOf(tag));
+                const RankNumbers numbers{s.rankDisplay, s.countAccuracy, player.caster ? &*player.caster : nullptr,
+                    info.mob ? MagicTargetOf(*info.mob, info.checked ? info.checked->level : 0) : std::nullopt};
                 for (int i = 0; i < set.count; ++i)
                 {
                     IconDraw draw = DrawOf(set.icons[i].icon);
-                    draw.badge      = BadgeText(set.icons[i], s.showRanks);
+                    draw.badge      = BadgeText(set.icons[i], numbers);
                     draw.badgeColor = BadgeColor(set.icons[i].badge, s);
                     out.push_back(std::move(draw));
                 }
@@ -282,10 +294,11 @@ namespace headsup
         return static_cast<float>(s.baseSize) * static_cast<float>(percent) / kPercent;
     }
 
-    HookAction HookActionFor(const EntityState& state, const Settings& s, bool screenshot, bool namesFailed)
+    HookAction HookActionFor(const EntityState& state, const Settings& s, const PlayerState& player, bool screenshot, bool namesFailed)
     {
         if (screenshot) return HookAction::Hide;
         if (!s.enabled || !s.nameplates) return HookAction::Keep;
+        if (player.inEvent && s.hideInEvent) return HookAction::Hide;
         const HookAction drawn = namesFailed ? HookAction::Keep : HookAction::Replace;
         switch (s.Kind(PlateKindOf(state)).rows[RowOf(state)].plate)
         {
@@ -300,7 +313,7 @@ namespace headsup
     {
         ComposedPlate plate;
         const EntityState& st = info.state;
-        if (!s.enabled || !s.nameplates) return plate;
+        if (!s.enabled || !s.nameplates || (player.inEvent && s.hideInEvent)) return plate;
         const KindSettings& kind = s.Kind(PlateKindOf(st));
         const PlateMode mode     = kind.rows[RowOf(st)].plate;
         if (!DrawsPlate(mode)) return plate;
@@ -308,7 +321,6 @@ namespace headsup
         // An NPC has no life to lose, whatever its health reads.
         const bool dead     = !st.alive && st.kind != EntityKind::Npc;
         const bool deadMob  = dead && st.kind == EntityKind::Mob;
-        const bool nameOnly = deadMob || player.inEvent;
         const auto marked   = [dash = DashChar(s.dashMark)](std::string text) {
             std::ranges::replace(text, kDash, dash);
             return text;
@@ -320,19 +332,35 @@ namespace headsup
         {
             const LineDesign& style = StyleLine(kind, i);
             if (!LineShows(style.show, st, player.inCombat)) continue;
+            LineLook look = LookOf(style, st, s, gameArgb);
+            if (deadMob || (player.inCombat && style.glowOffInCombat)) look.glow = 0.0f;
+            if (dead) look.color = kDeadTextArgb;
+            // A break ends a row: each row with something in it is a line of the plate in the design line's look.
+            const size_t firstRow = plate.lines.size();
             LineBuilder builder;
+            const auto endRow = [&] {
+                builder.Finish();
+                if (!builder.items.empty())
+                    plate.lines.push_back(ComposedLine{i, std::move(builder.items), look, static_cast<int>(plate.lines.size() - firstRow)});
+                builder = LineBuilder{};
+            };
             for (const Atom& atom : ParseTemplate(kind.lines[i].text))
             {
+                if (!atom.slot.empty() && atom.slot.front() == Tag::Break)
+                {
+                    endRow();
+                    continue;
+                }
                 if (atom.slot.empty())
                 {
-                    if (!nameOnly) builder.Literal(marked(atom.text));
+                    if (!deadMob) builder.Literal(marked(atom.text));
                     continue;
                 }
                 // A slot is the first of its tags that has something to show, or as one tag with nothing.
                 bool drawn = false;
                 for (const Tag tag : atom.slot)
                 {
-                    if (drawn || (nameOnly && tag != Tag::Name)) continue;
+                    if (drawn || (deadMob && tag != Tag::Name)) continue;
                     if (IsTextTag(tag))
                     {
                         const std::string text = TagText(tag, info, player);
@@ -342,18 +370,16 @@ namespace headsup
                     }
                     const bool counted = IsCountedIcon(tag);
                     if (counted && statusIcons >= kind.maxIcons) continue;
-                    std::vector<IconDraw> icons = TagIcons(tag, info, s, badgeRules);
+                    std::vector<IconDraw> icons = TagIcons(tag, info, player, s, badgeRules);
                     drawn                       = !icons.empty();
                     if (drawn && counted) ++statusIcons;
                     if (drawn) builder.Icons(std::move(icons), IsBadgeTag(tag));
                 }
-                if (!drawn && !nameOnly) builder.Empty();
+                if (!drawn && !deadMob) builder.Empty();
             }
-            builder.Finish();
-            if (builder.items.empty()) continue;
-            plate.lines.push_back(ComposedLine{i, std::move(builder.items), LookOf(style, st, s, gameArgb)});
-            if (deadMob || (player.inCombat && style.glowOffInCombat)) plate.lines.back().look.glow = 0.0f;
-            if (dead) plate.lines.back().look.color = kDeadTextArgb;
+            endRow();
+            for (size_t row = firstRow; row + 1 < plate.lines.size(); ++row)
+                plate.lines[row].lastRow = false;
         }
         plate.ornament      = kind.ornament.place;
         plate.ornamentColor = ResolveColor(kind.ornament.color, st, s.palette, gameArgb);
@@ -426,6 +452,7 @@ namespace headsup
     {
         LineLook look = LookOf(LineDesign{}, EntityState{}, s, kWhite);
         look.textSize = BasePixels(s, s.timerPercent);
+        look.glow     = 0.0f;
         return look;
     }
 

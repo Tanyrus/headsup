@@ -25,6 +25,7 @@ namespace headsup
         std::vector<std::string> menuFonts;   // the fonts it can be set in, by their kMenuFonts names
         std::function<bool(uint8_t)> keyDown; // whether a key is down now, by its virtual-key code
         const WindowLayout* layout = &kWindowLayout; // its pages, cards and settings, in order, with their words
+        bool developer = false; // a developer's build, whose window can read its layout's file anew and write it out
     };
 
     // The /headsup settings window as an RmlUi document in the host's overlay. While it is open, each frame runs
@@ -42,6 +43,9 @@ namespace headsup
         void Close();
         // True once after the Debug Report button was pressed: write the /hu debug report.
         bool TakeDebugRequest();
+        bool TakeWatchRequest();
+        bool TakeReloadRequest(); // the layout's file is to be read again and the window built anew
+        bool TakeExportRequest(); // the built-in layout is to be written out as a file
         // True once after a list of pictures (Target Cursor, Cursor Icon) was opened: read the cursors folder again.
         bool TakeCursorsRequest();
         // Opens the window at the page named, as its sidebar spells it in lower case without spaces ("toppanel");
@@ -109,5 +113,6 @@ namespace headsup
         MenuFormState m_State;
         std::optional<float> m_ScrollTo;
         bool m_Closed = false; // its close button was clicked
+        bool m_Reload = false;
     };
 }

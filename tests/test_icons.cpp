@@ -286,16 +286,16 @@ TEST(either_cutoff_can_be_off)
     CHECK(Info(s, Statuses(kNoWeakRank, 1)) == (std::vector<InfoIcon>{{Icon::Paralyze, BadgeKind::StatusRank, 11}}));
 }
 
-TEST(the_element_limit_keeps_the_biggest_differences_and_weaknesses_win_ties)
+TEST(the_element_limit_keeps_the_ranks_that_move_magic_evasion_most)
 {
     MobResistances r                     = Neutral();
-    ElementRankOf(r, Element::Fire)      = -2; // +30%
-    ElementRankOf(r, Element::Ice)       = 4;  // -50%
-    ElementRankOf(r, Element::Wind)      = -3; // +50%
-    ElementRankOf(r, Element::Earth)     = -1; // +15%
-    ElementRankOf(r, Element::Lightning) = 11; // -95%
+    ElementRankOf(r, Element::Fire)      = -2; // magic evasion x0.96019
+    ElementRankOf(r, Element::Ice)       = 4;  // x1.126
+    ElementRankOf(r, Element::Wind)      = -3; // x0.95
+    ElementRankOf(r, Element::Earth)     = -1; // x0.98
+    ElementRankOf(r, Element::Lightning) = 11; // x2.35
     const auto limit = [](int most) { return BadgeRules{.elementWeakRank = -1, .elementResistRank = 1, .maxElements = most}; };
-    CHECK(Info(r, limit(2)) == (std::vector<InfoIcon>{{Icon::Wind, BadgeKind::WeakRank, -3}, {Icon::Lightning, BadgeKind::ResistRank, 11}}));
+    CHECK(Info(r, limit(2)) == (std::vector<InfoIcon>{{Icon::Lightning, BadgeKind::ResistRank, 11}, {Icon::Ice, BadgeKind::ResistRank, 4}}));
     CHECK(Info(r, limit(4)) == (std::vector<InfoIcon>{{Icon::Wind, BadgeKind::WeakRank, -3}, {Icon::Fire, BadgeKind::WeakRank, -2},
                                    {Icon::Lightning, BadgeKind::ResistRank, 11}, {Icon::Ice, BadgeKind::ResistRank, 4}}));
     CHECK(Info(r, limit(0)).empty());
@@ -321,36 +321,44 @@ TEST(a_mob_with_everything_fits_the_set)
     CHECK(all.size() <= static_cast<size_t>(kMaxInfoIcons));
 }
 
-TEST(badges_read_as_percents_like_mobdbs)
+TEST(rank_badges_read_as_the_chance_their_rank_moves)
 {
-    CHECK(BadgeText({Icon::Piercing, BadgeKind::Weak, 25}, false) == "+25%");
-    CHECK(BadgeText({Icon::Slashing, BadgeKind::Resist, 50}, false) == "-50%");
-    CHECK(BadgeText({Icon::Light, BadgeKind::WeakRank, -3}, false) == "+50%"); // rank -3: the wikis' 150%
-    CHECK(BadgeText({Icon::Fire, BadgeKind::WeakRank, -1}, false) == "+15%");
-    CHECK(BadgeText({Icon::Dark, BadgeKind::ResistRank, 4}, false) == "-50%");
-    CHECK(BadgeText({Icon::Paralyze, BadgeKind::StatusWeak, -2}, false) == "+30%");
-    CHECK(BadgeText({Icon::Sleep, BadgeKind::StatusRank, 11}, false) == "-95%");
-    CHECK(BadgeText({Icon::Bind, BadgeKind::Immune, 0}, false) == "\xC3\x97");
+    // A level 29 Clipper of Qufim Island: magic evasion 83 (rank C+, Phoenix's sql/skill_caps.sql), no evasion mods.
+    MobStats stats{};
+    stats.value[static_cast<int>(Stat::MagicEvasion)] = 83;
+    const MobResistances res                          = Neutral();
+    const RankNumbers mobs{RankDisplay::IncreasedChance, true, nullptr, MagicTarget{29, stats, res}};
+    CHECK(BadgeText({Icon::Piercing, BadgeKind::Weak, 25}, mobs) == "+25%"); // damage taken stays a damage percent
+    CHECK(BadgeText({Icon::Slashing, BadgeKind::Resist, 50}, mobs) == "-50%");
+    CHECK(BadgeText({Icon::Light, BadgeKind::WeakRank, -3}, mobs) == "+5%");       // 83 - floor(83 * 0.95)
+    CHECK(BadgeText({Icon::Dark, BadgeKind::ResistRank, 4}, mobs) == "-10%");      // 83 - floor(83 * 1.126)
+    CHECK(BadgeText({Icon::Paralyze, BadgeKind::StatusWeak, -2}, mobs) == "+4%");  // 83 - floor(83 * 0.96019)
+    CHECK(BadgeText({Icon::Sleep, BadgeKind::StatusRank, 11}, mobs) == "-90%");    // no further than 95% to 5%
+    CHECK(BadgeText({Icon::Bind, BadgeKind::Immune, 0}, mobs) == "\xC3\x97");
 }
 
-TEST(rank_badges_can_read_as_ranks_instead)
+TEST(rank_badges_can_read_as_ranks_and_do_without_the_mob_s_stats)
 {
-    CHECK(BadgeText({Icon::Piercing, BadgeKind::Weak, 25}, true) == "+25%"); // a damage percent stays one
-    CHECK(BadgeText({Icon::Light, BadgeKind::WeakRank, -3}, true) == "-3");
-    CHECK(BadgeText({Icon::Dark, BadgeKind::ResistRank, 6}, true) == "6");
-    CHECK(BadgeText({Icon::Paralyze, BadgeKind::StatusWeak, -2}, true) == "-2");
-    CHECK(BadgeText({Icon::Sleep, BadgeKind::StatusRank, 11}, true) == "11");
-    CHECK(BadgeText({Icon::Bind, BadgeKind::Immune, 0}, true) == "\xC3\x97");
+    const RankNumbers ranks{RankDisplay::Rank, true, nullptr, std::nullopt};
+    CHECK(BadgeText({Icon::Piercing, BadgeKind::Weak, 25}, ranks) == "+25%");
+    CHECK(BadgeText({Icon::Light, BadgeKind::WeakRank, -3}, ranks) == "-3");
+    CHECK(BadgeText({Icon::Dark, BadgeKind::ResistRank, 6}, ranks) == "6");
+    CHECK(BadgeText({Icon::Paralyze, BadgeKind::StatusWeak, -2}, ranks) == "-2");
+    CHECK(BadgeText({Icon::Sleep, BadgeKind::StatusRank, 11}, ranks) == "11");
+    const RankNumbers unknown{RankDisplay::TotalChance, true, nullptr, std::nullopt};
+    CHECK(BadgeText({Icon::Light, BadgeKind::WeakRank, -3}, unknown) == "-3");
 }
 
-TEST(every_rank_reads_as_the_wikis_percent_and_ranks_past_the_ends_as_the_ends)
+TEST(a_mob_s_chances_are_figured_at_its_checked_level_or_the_top_of_its_range)
 {
-    const char* const expected[] = {"+50%", "+30%", "+15%", "0%", "-15%", "-30%", "-40%", "-50%", "-60%", "-70%", "-75%", "-80%",
-        "-85%", "-90%", "-95%"};
-    for (int rank = kMinRank; rank <= kMaxRank; ++rank)
-        CHECK(RankText(rank, false) == expected[rank - kMinRank]);
-    CHECK(RankText(kMinRank - 1, false) == "+50%" && RankText(kMaxRank + 1, false) == "-95%"); // Phoenix clamps them so
-    CHECK(RankText(-2, true) == "-2" && RankText(12, true) == "12");
+    // Goblin Bounty Hunter, Valkurm Dunes, 17 to 20, no level mod; magic evasion 58 at 20 and 52 at 18 (rank C+,
+    // Phoenix's sql/skill_caps.sql).
+    const MobRecord& hunter = *MobById(17199648);
+    const std::optional<MagicTarget> top = MagicTargetOf(hunter, 0);
+    CHECK(top && top->level == 20 && top->stats.value[static_cast<int>(Stat::MagicEvasion)] == 58);
+    const std::optional<MagicTarget> checked = MagicTargetOf(hunter, 18);
+    CHECK(checked && checked->level == 18 && checked->stats.value[static_cast<int>(Stat::MagicEvasion)] == 52);
+    CHECK(!MagicTargetOf(hunter, 30)); // a level its data has no stats for
 }
 
 TEST(detection_icons_can_be_filtered_by_kind)

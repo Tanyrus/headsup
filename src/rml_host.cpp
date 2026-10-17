@@ -45,9 +45,11 @@ namespace headsup
         Rml::SetRenderInterface(&m_Render);
         if (!Rml::Initialise()) return false;
         size_t count = 0;
+        // A character a font lacks comes from the fallback one (IsFallbackFont).
         for (const BundledFont* font = BundledFonts(count); count-- > 0; ++font)
-            m_Fonts[Rml::StringUtilities::ToLower(font->family)] = Rml::LoadFontFace(
-                Rml::Span<const Rml::byte>(font->data, font->bytes), font->family, Rml::Style::FontStyle::Normal);
+            m_Fonts[Rml::StringUtilities::ToLower(font->family)] =
+                Rml::LoadFontFace(Rml::Span<const Rml::byte>(font->data, font->bytes), font->family,
+                    Rml::Style::FontStyle::Normal, Rml::Style::FontWeight::Auto, IsFallbackFont(font->family));
         m_Width   = width;
         m_Height  = height;
         m_Bar     = Rml::CreateContext(kBarContext, Rml::Vector2i(width, height));

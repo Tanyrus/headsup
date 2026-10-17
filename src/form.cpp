@@ -126,14 +126,14 @@ namespace headsup
 
     void Form::BeginBlock(const char* id)
     {
-        blocks.push_back(FormBlock{id, {}});
+        blocks.push_back(FormBlock{id, {}, false});
         m_CardId = id;
     }
 
     bool Form::BeginCard(const char* title, bool* enabled, const char* about)
     {
         m_CardId = Slug(pageKey + "/" + std::string(IdName(title)));
-        blocks.push_back(FormBlock{m_CardId, {}});
+        blocks.push_back(FormBlock{m_CardId, {}, false});
         m_CardOff       = values.size();
         m_CardSwitched  = enabled != nullptr;
         m_ShownInCard   = 0;
@@ -152,7 +152,10 @@ namespace headsup
                 *enabled = !*enabled;
                 changed  = true;
             }
-            Out() += std::string("<div class=\"") + kCardCheck + "\" id=\"" + check + "\"><div class=\"mark\"></div></div>";
+            const char* word = layout->WordOf(*enabled ? WindowWord::SwitchOn : WindowWord::SwitchOff).name;
+            Out() += std::string("<div class=\"") + kCardCheck + "\" id=\"" + check + "\"><div class=\"mark\"></div><div class=\"state\" id=\"" +
+                     check + "-state\"></div></div>";
+            Set(check + "-state", FormValueKind::Text, {}, word);
             Set(check, FormValueKind::Class, "on", {}, *enabled);
         }
         Out() += "</div>";
@@ -160,6 +163,18 @@ namespace headsup
         Out() += "<div class=\"card-body\">";
         if (about != nullptr && *about != '\0') Out() += "<div class=\"note\">" + EscapedRml(about) + "</div>";
         return true;
+    }
+
+    void Form::BeginBare(const char* title)
+    {
+        m_CardId = Slug(pageKey + "/" + std::string(IdName(title)));
+        blocks.push_back(FormBlock{m_CardId, {}, true});
+        m_CardOff      = values.size();
+        m_CardSwitched = false;
+        m_ShownInCard  = 0;
+        Set(m_CardId, FormValueKind::Class, kOffClass, {}, m_Off);
+        if (!m_Off) ++m_CardsShown;
+        Out() += "<div>";
     }
 
     void Form::EndCard()
@@ -186,7 +201,8 @@ namespace headsup
     void Form::Line(const char* classes) { Out() += std::string("<div class=\"") + classes + "\">"; }
     void Form::EndLine() { Out() += "</div>"; }
 
-    std::string Form::Check(const char* id, bool& on, const char* tip, const char* classes)
+    std::string Form::Check(const char* id, bool& on, const char* tip, const char* classes, const char* offWord,
+        const char* onWord)
     {
         const std::string check = Id(id);
         if (!m_Off && Clicked(check))
@@ -194,7 +210,13 @@ namespace headsup
             on      = !on;
             changed = true;
         }
-        Out() += "<div class=\"" + std::string(classes) + "\" id=\"" + check + "\"" + TipAttribute(tip) + "><div class=\"mark\"></div></div>";
+        Out() += "<div class=\"" + std::string(classes) + "\" id=\"" + check + "\"" + TipAttribute(tip) + "><div class=\"mark\"></div>";
+        if (offWord != nullptr && onWord != nullptr)
+        {
+            Out() += "<div class=\"state\" id=\"" + check + "-state\"></div>";
+            Set(check + "-state", FormValueKind::Text, {}, on ? onWord : offWord);
+        }
+        Out() += "</div>";
         Set(check, FormValueKind::Class, "on", {}, on);
         Set(check, FormValueKind::Class, kOffClass, {}, m_Off);
         return check;
@@ -205,14 +227,8 @@ namespace headsup
     void Form::Switch(const char* label, bool& on, const char* tip, const char* offWord, const char* onWord)
     {
         Row(label, tip);
-        Out() += "<div class=\"switch-room\">";
-        const std::string check = Check(label, on, nullptr, kWideCheck);
-        if (offWord != nullptr && onWord != nullptr)
-        {
-            Out() += "<div class=\"state\" id=\"" + check + "-state\"></div>";
-            Set(check + "-state", FormValueKind::Text, {}, on ? onWord : offWord);
-        }
-        Out() += "</div>";
+        Check(label, on, nullptr, kWideCheck, offWord != nullptr ? offWord : layout->WordOf(WindowWord::SwitchOff).name,
+            onWord != nullptr ? onWord : layout->WordOf(WindowWord::SwitchOn).name);
         EndRow();
     }
 
@@ -263,11 +279,11 @@ namespace headsup
         return m_State.popup == control && Clicked(control);
     }
 
-    void Form::TakeWhole(const std::string& slider, int& value, int lo, int hi)
+    void Form::TakeWhole(const std::string& slider, int& value, int lo, int hi, int step)
     {
         const FormEvent* moved = Took(slider, kChangeEvent);
         if (moved == nullptr || m_Off) return;
-        const int to = std::clamp(static_cast<int>(std::lround(std::strtof(moved->value.c_str(), nullptr))), lo, hi);
+        const int to = std::clamp(Stepped(static_cast<int>(std::lround(std::strtof(moved->value.c_str(), nullptr))), step), lo, hi);
         if (to == value) return;
         value   = to;
         changed = true;
@@ -279,6 +295,14 @@ namespace headsup
         TakeWhole(slider, value, lo, hi);
         Slider(slider, label, static_cast<float>(value), static_cast<float>(lo), static_cast<float>(hi), 1.0f,
             Formatted(format, value), tip);
+    }
+
+    void Form::SliderPercent(const char* label, int& value, int lo, int hi, const char* tip)
+    {
+        const std::string slider = Id(label);
+        TakeWhole(slider, value, lo, hi, kPercentStep);
+        Slider(slider, label, static_cast<float>(value), static_cast<float>(lo), static_cast<float>(hi),
+            static_cast<float>(kPercentStep), Formatted("%d%%", value), tip);
     }
 
     void Form::Stepper(const char* label, int& value, int lo, int hi, const char* format, const char* tip)
@@ -478,20 +502,23 @@ namespace headsup
     void Form::Swatch(const char* label, Color& color, const char* tip, const Color* original)
     {
         Row(label, tip);
-        if (original != nullptr)
+        if (original != nullptr && ResetAt((std::string(label) + " reset").c_str(), color != *original))
         {
-            const std::string reset = Id(std::string(label) + " reset");
-            if (!m_Off && Clicked(reset) && color != *original)
-            {
-                color   = *original;
-                changed = true;
-            }
-            // In the markup either way, hidden while there is nothing to put back: a color changed builds nothing.
-            Out() += "<div class=\"reset\" id=\"" + reset + "\" tip=\"Back to its default.\"></div>";
-            Set(reset, FormValueKind::Class, kHiddenClass, {}, color == *original);
+            color   = *original;
+            changed = true;
         }
         SwatchAt(label, color);
         EndRow();
+    }
+
+    bool Form::ResetAt(const char* id, bool differs)
+    {
+        const std::string reset = Id(id);
+        const bool clicked      = !m_Off && differs && Clicked(reset);
+        // In the markup either way, hidden while there is nothing to put back: a value changed builds nothing.
+        Out() += "<div class=\"reset\" id=\"" + reset + "\" tip=\"Back to its default.\"></div>";
+        Set(reset, FormValueKind::Class, kHiddenClass, {}, !differs || clicked);
+        return clicked;
     }
 
     void Form::ColorPickRow(const char* label, ColorPick& pick, const std::vector<ColorSource>& sources, const char* tip)
@@ -696,7 +723,8 @@ namespace headsup
         {
             const auto tips = layout.OptionsOf(WindowList::Tags);
             if (slot.size() == 1)
-                return TagMarkup(layout, id, slot.front(), "btn accent chip in drag", tips[static_cast<size_t>(slot.front())].tip);
+                return TagMarkup(layout, id, slot.front(), slot.front() == Tag::Break ? "btn accent chip in drag break" : "btn accent chip in drag",
+                    tips[static_cast<size_t>(slot.front())].tip);
             const char* shared = layout.WordOf(WindowWord::SlotTip).tip;
             std::string parts;
             for (size_t tag = 0; tag < slot.size(); ++tag)
@@ -749,6 +777,20 @@ namespace headsup
                 text     = WithRun(text, run, typed->value);
                 reshaped = RunsOf(text).slots != had.slots;
             }
+            else if (const FormEvent* enter = Took(input, kBreakEvent))
+            {
+                // The stretch as it stands typed, then a break where the caret was, and the keyboard on the row
+                // after it; typing that made or unmade a tag, or a line with no room for one more, keeps the typing.
+                text     = WithRun(text, run, enter->value);
+                reshaped = true;
+                RunCaret at{run, enter->at};
+                if (std::string broken = text; RunsOf(text).slots == had.slots && PutTag(broken, at, {Tag::Break}))
+                {
+                    text        = std::move(broken);
+                    draft.caret = at;
+                    focus       = FormFocus{runId(at.run), at.at};
+                }
+            }
         }
         // Where a chip can be let go in the box: on the box, a stretch, a chip, or one tag of a chip of several.
         struct Place
@@ -772,8 +814,8 @@ namespace headsup
             }
         }
         RunCaret nowhere;
-        // A tag dropped on a stretch goes after it, on a chip into that chip's slot, on another tag of its own chip
-        // into that tag's place, and anywhere else in the box at its end.
+        // A tag dropped on a stretch goes in at the pointer, on a chip into that chip's slot, on another tag of its own
+        // chip into that tag's place, and anywhere else in the box at its end.
         for (const Place& place : places)
         {
             if (reshaped) break;
@@ -791,7 +833,7 @@ namespace headsup
                     text = WithoutTag(text, taken->slot, taken->tag, nowhere);
                 continue;
             }
-            RunCaret at = place.run < 0 ? RunCaret{} : RunCaret{place.run, std::string::npos};
+            RunCaret at = place.run < 0 ? RunCaret{} : RunCaret{place.run, drop->at};
             if (!PutTag(text, at, dropped)) continue;
             // The slot went in before the stretch the caret is in: one of the line's own then leaves the place it
             // had, which is a slot further on when the new one stands before it.

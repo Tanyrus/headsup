@@ -2,13 +2,18 @@
 
 #include "argb.h"
 #include "bar_game_help.h"
+#include "bar_job.h"
 #include "bar_server_time.h"
+#include "npcdata.h"
 #include "ph_timers.h"
 #include "titles.h"
 #include "vanadiel.h"
 #include "zones.h"
 
+#include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <span>
 #include <string_view>
 #include <utility>
 
@@ -22,7 +27,14 @@ namespace headsup
         constexpr const char* kItemsMenu = "Items";
         constexpr uint32_t kElementColors[kElementCount] = {0xFFFF8A3C, 0xFF8FD8FF, kBarGreen, 0xFFD8B25A, 0xFFC58CFF,
             0xFF5B9DFF, 0xFFFFFFFF, 0xFF9A8AA8};
-        constexpr int kDamageColumns = 4, kElementColumns = 4, kStatusColumns = 5, kBagColumns = 2;
+        constexpr int kDamageColumns = 4, kElementColumns = 4, kStatusColumns = 5, kStatColumns = 4, kBagColumns = 2;
+        constexpr int kListColumns = 3; // TP moves and spells
+        constexpr const char* kStatNames[kStatCount] = {"STR", "DEX", "VIT", "AGI", "INT", "MND", "CHR", "MEva"};
+        constexpr const char* kCombatNames[kCombatCount] = {"HP", "MP", "ATT", "DEF", "EVA", "ACC"};
+        constexpr const char* kDamageKindNames[kDamageKindCount] = {"Physical", "Magic", "Ranged", "Breath"};
+        constexpr std::pair<MobTrait, const char*> kTraitNames[] = {{kTraitRegen, "Regen"}, {kTraitRefresh, "Refresh"},
+            {kTraitRegain, "Regain"}, {kTraitShadows, "Shadows"}, {kTraitCounter, "Counter"}};
+        constexpr int kWholeAbsorb = 100; // percent
         constexpr int kForecastDays = 5, kForecastColumns = 4;
         constexpr uint16_t kGilItem  = 0xFFFF;
 
@@ -31,9 +43,9 @@ namespace headsup
             return Text(PercentText(percent), percent > 0 ? Tone::Weak : percent < 0 ? Tone::Resist : Tone::Neutral);
         }
 
-        Span Rank(int rank, bool ranks)
+        Span Ranked(std::string text, int rank)
         {
-            return Text(RankText(rank, ranks), rank < 0 ? Tone::Weak : rank > 0 ? Tone::Resist : Tone::Neutral);
+            return Text(std::move(text), rank < 0 ? Tone::Weak : rank > 0 ? Tone::Resist : Tone::Neutral);
         }
 
         // The data gives zone 0, the unknown one, a calendar of its own, so only a known zone has odds.
@@ -46,6 +58,12 @@ namespace headsup
         bool IsMob(const ActorInfo* target)
         {
             return target != nullptr && target->kind == EntityKind::Mob && target->mob != nullptr;
+        }
+
+        // An NPC target's record; nullptr for anything else, or an NPC the data has nothing to show of.
+        const NpcRecord* NpcOf(const ActorInfo* target)
+        {
+            return target != nullptr && target->kind == EntityKind::Npc ? NpcById(target->serverId) : nullptr;
         }
 
         // "WAR 75 / NIN 37", or the game's "? ? ?" for an anonymous player, whose jobs come as 0.
@@ -78,17 +96,81 @@ namespace headsup
             return ToArgb(settings.palette.toughness[static_cast<int>(target.level.shade)]);
         }
 
-        // The nameplate's icons as words, so the popup and the plates say the same, then NM.
+        // "15y": a sense's range in yalms.
+        std::string Yalms(int yalms) { return std::to_string(yalms) + "y"; }
+
+        // The nameplate's icons as words, so the popup and the plates say the same, sight and sound with how far
+        // they reach, then NM and whether a beastmaster can charm it.
         PopupRow Tags(const MobRecord& mob)
         {
             const IconSet icons = IconsFor(&mob, kAllDetection);
+            const MobInfo& info = InfoOf(mob);
             PopupRow row{RowKind::Tags, 0, {}};
-            row.cells.reserve(static_cast<size_t>(icons.count) + 1);
             for (int i = 0; i < icons.count; ++i)
-                row.cells.push_back(Cell(Text(IconTag(icons.icons[i]), Tone::Tag)));
+            {
+                std::string tag = IconTag(icons.icons[i]);
+                if (icons.icons[i] == Icon::Sight || icons.icons[i] == Icon::TrueSight) tag += " " + Yalms(info.sight);
+                if (icons.icons[i] == Icon::Sound) tag += " " + Yalms(info.sound);
+                row.cells.push_back(Cell(Text(std::move(tag), Tone::Tag)));
+            }
             if (mob.flags & kMobNotorious) row.cells.push_back(Cell(Text("NM", Tone::Tag)));
+            if (mob.flags & kMobCharmable) row.cells.push_back(Cell(Text("Charmable", Tone::Tag)));
             return row;
         }
+
+        // What it does by itself, and what its melee hits add.
+        PopupRow Traits(const MobRecord& mob)
+        {
+            const MobInfo& info = InfoOf(mob);
+            PopupRow row{RowKind::Tags, 0, {}};
+            for (const auto& [trait, name] : kTraitNames)
+                if (info.traits & trait) row.cells.push_back(Cell(Text(name, Tone::Tag)));
+            if (*info.addEffect != '\0')
+                row.cells.push_back(Cell(Text(std::string_view(info.addEffect) == kUnknownAddEffect
+                                                  ? std::string("Additional effect")
+                                                  : std::string("Additional effect: ") + info.addEffect,
+                    Tone::Tag)));
+            return row;
+        }
+
+        // "THF/BLM"; nothing for a mob without a job.
+        std::string MobJobs(const MobInfo& info)
+        {
+            const std::string main = JobName(info.mainJob), sub = JobName(info.subJob);
+            return main.empty() ? std::string() : sub.empty() ? main : main + "/" + sub;
+        }
+
+        // A cell of a name and its number, as the stats are.
+        PopupCell Numbered(const char* name, int64_t value)
+        {
+            return Cell(ListOf(Text(name, Tone::Dim), Text(" " + std::to_string(value))));
+        }
+
+        // A grid of names, kListColumns a line; none when there are no names.
+        std::optional<PopupSection> NameList(std::string heading, const std::vector<std::string>& names)
+        {
+            if (names.empty()) return std::nullopt;
+            PopupRow grid = Grid(kListColumns, names.size());
+            for (const std::string& name : names)
+                grid.cells.push_back(Cell(Text(name)));
+            return PopupSection{std::move(heading), ListOf(std::move(grid))};
+        }
+
+        // The spells it casts at a level: each whose levels hold it, by the game's name.
+        std::vector<std::string> SpellsAt(const MobRecord& mob, int level, const BarState& state)
+        {
+            std::vector<std::string> names;
+            if (state.spellName == nullptr) return names;
+            for (const MobSpell& spell : SpellsOf(mob))
+            {
+                const char* name = level >= spell.minLevel && level <= spell.maxLevel ? state.spellName(spell.spell) : nullptr;
+                if (name != nullptr && *name != '\0') names.emplace_back(name);
+            }
+            return names;
+        }
+
+        // "20:00"
+        std::string Hour(int hour) { return Printed("%02d:00", hour); }
 
         // Phoenix's Treasure Hunter tiers in per mille: a rate rolls as the highest at or below it (mobdata.h).
         constexpr uint16_t kDropTiers[] = {1000, 240, 150, 100, 50, 10, 5, 1};
@@ -143,11 +225,22 @@ namespace headsup
         PopupSection Spawn(const MobRecord& mob, const BarState& state)
         {
             PopupSection spawn{"Spawn", {}};
+            const MobInfo& info = InfoOf(mob);
             spawn.rows.push_back(LineOf(mob.respawn > 0 ? "Respawn " + Countdown(mob.respawn) : "No respawn timer"));
+            if (info.windowStart != kNoWindow)
+                spawn.rows.push_back(LineOf("Spawns " + Hour(info.windowStart) + " to " + Hour(info.windowEnd)));
+            if (info.lotteryChance > 0)
+            {
+                spawn.rows.push_back(LineOf(std::to_string(info.lotteryChance) + "% pop chance"));
+                if (info.lotteryCooldown > 0)
+                    spawn.rows.push_back(LineOf(Countdown(info.lotteryCooldown) + " cooldown after its kill"));
+            }
             if (mob.placeholderOf != 0)
             {
                 const MobRecord* nm = MobById(mob.placeholderOf);
-                spawn.rows.push_back(LineOf(std::string("Placeholder for ") + (nm != nullptr ? nm->name : "an NM")));
+                const int chance    = nm != nullptr ? InfoOf(*nm).lotteryChance : 0;
+                spawn.rows.push_back(LineOf(std::string("Placeholder for ") + (nm != nullptr ? nm->name : "an NM") +
+                    (chance > 0 ? " (" + std::to_string(chance) + "%)" : "")));
                 if (state.targetPhSeconds)
                 {
                     const double left = *state.targetPhSeconds;
@@ -160,6 +253,291 @@ namespace headsup
             if (mob.placeholderOf == 0 && mob.placeholders == 0)
                 spawn.rows.push_back(LineOf("Not a placeholder", Tone::Dim));
             return spawn;
+        }
+
+        // Items by the game's names, gil as "Gil", without those it has no name for.
+        std::vector<std::string> ItemNames(std::span<const uint16_t> items, const BarState& state)
+        {
+            std::vector<std::string> names;
+            for (const uint16_t item : items)
+            {
+                const char* name = item == kGilItem              ? "Gil"
+                                   : state.itemName != nullptr ? state.itemName(item)
+                                                               : nullptr;
+                if (name != nullptr && *name != '\0') names.emplace_back(name);
+            }
+            return names;
+        }
+
+        // The mobs it pops by Phoenix's names, each once.
+        std::vector<std::string> MobNames(std::span<const uint32_t> mobs)
+        {
+            std::vector<std::string> names;
+            for (const uint32_t id : mobs)
+            {
+                const MobRecord* mob = MobById(id);
+                if (mob != nullptr && std::ranges::find(names, mob->name) == names.end()) names.emplace_back(mob->name);
+            }
+            return names;
+        }
+
+        std::vector<std::string> KeyItemNames(std::span<const uint16_t> keyItems)
+        {
+            std::vector<std::string> names;
+            for (const uint16_t keyItem : keyItems)
+                if (const char* name = KeyItemNameOf(keyItem)) names.emplace_back(name);
+            return names;
+        }
+
+        constexpr size_t kNpcTextChars = 44; // a message's line in the popup
+        // Before what an act leads to; a font without the arrow draws Montserrat's (IsFallbackFont).
+        constexpr const char* kResult = "\xE2\x86\x92 ";
+
+        std::string JoinedNames(const std::vector<std::string>& names)
+        {
+            std::string text;
+            for (const std::string& name : names)
+                text += (text.empty() ? "" : ", ") + name;
+            return text;
+        }
+
+        // A message's words with its parameters in their <item>, <keyitem> and <number>, in order; other marks stay.
+        std::string SayWords(const NpcSay& say, const BarState& state)
+        {
+            const char* words = WordsOf(say);
+            if (words == nullptr) return {};
+            const std::span<const uint32_t> params = ParamsOf(say);
+            size_t next = 0;
+            std::string out;
+            for (std::string_view rest = words; !rest.empty();)
+            {
+                const size_t open  = rest.find('<');
+                const size_t close = open == std::string_view::npos ? open : rest.find('>', open);
+                if (close == std::string_view::npos)
+                {
+                    out += rest;
+                    break;
+                }
+                out += rest.substr(0, open);
+                const std::string_view tag = rest.substr(open + 1, close - open - 1);
+                std::string filled(rest.substr(open, close - open + 1));
+                if ((tag == "item" || tag == "keyitem" || tag == "number") && next < params.size())
+                {
+                    const uint32_t value = params[next++];
+                    const char* name     = tag == "number"   ? nullptr
+                                           : tag == "keyitem" ? KeyItemNameOf(static_cast<uint16_t>(value))
+                                           : state.itemName != nullptr ? state.itemName(static_cast<uint16_t>(value))
+                                                                       : nullptr;
+                    if (tag == "number") filled = std::to_string(value);
+                    else if (name != nullptr && *name != '\0') filled = name;
+                }
+                out += filled;
+                rest = rest.substr(close + 1);
+            }
+            return out;
+        }
+
+        // "22:00", or "22:00-03:59" for a run of hours.
+        std::string HourRange(int from, int to) { return from == to ? Hour(from) : Hour(from) + "-" + Printed("%02d:59", to); }
+
+        // An act's conditions in words, its quest and step first: "In A Chocobos Tale, step 4, after its NM falls".
+        std::string WhenWords(const NpcAct& act, bool capital = true)
+        {
+            std::vector<std::string> first, rest;
+            for (const NpcWhenEntry& when : WhenOf(act))
+            {
+                const auto keyItem = [&] {
+                    const char* name = KeyItemNameOf(when.a);
+                    return std::string(name != nullptr ? name : "a key item");
+                };
+                switch (when.kind)
+                {
+                case kWhenHour: rest.push_back("at " + HourRange(when.a, when.b)); break;
+                case kWhenWeather:
+                    if (const std::optional<Weather> weather = WeatherFromId(when.a))
+                        rest.push_back(std::string("in ") + WeatherName(*weather));
+                    break;
+                case kWhenJob: rest.push_back(std::string("as ") + JobName(static_cast<uint8_t>(when.a))); break;
+                case kWhenDay: rest.push_back(std::string("on ") + WeekdayName(when.a)); break;
+                case kWhenNation:
+                    rest.push_back(std::string("for ") + NationName(static_cast<Nation>(when.a + 1)) + "'s citizens");
+                    break;
+                case kWhenKeyItem: rest.push_back("holding " + keyItem()); break;
+                case kWhenNoKeyItem: rest.push_back("without " + keyItem()); break;
+                case kWhenKeyItems: rest.push_back("holding its key items"); break;
+                case kWhenQuest: rest.push_back("during its quest"); break;
+                case kWhenLink:
+                    if (const NpcLink* link = LinkAt(when.a)) first.insert(first.begin(), std::string("in ") + link->name);
+                    break;
+                case kWhenStep: first.push_back("step " + std::to_string(when.a)); break;
+                case kWhenPrimed: rest.push_back("once readied"); break;
+                case kWhenNmKilled: rest.push_back("after its NM falls"); break;
+                case kWhenRoll: rest.push_back("on a lucky roll"); break;
+                case kWhenMob: rest.push_back(std::string("when ") + when.name + " dies"); break;
+                case kWhenZoneStart: rest.push_back("as the zone starts"); break;
+                default: break;
+                }
+            }
+            first.insert(first.end(), rest.begin(), rest.end());
+            std::string text = JoinedNames(first);
+            if (capital && !text.empty()) text[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(text[0])));
+            return text;
+        }
+
+        // An act's rows: its conditions, dim, what it says, then what follows it.
+        void AddActRows(PopupSection& section, const NpcAct& act, const BarState& state)
+        {
+            if (const std::string when = WhenWords(act); !when.empty()) section.rows.push_back(LineOf(when, Tone::Dim));
+            for (const NpcSay& say : SaysOf(act))
+                for (const std::string& line : WrapWords(SayWords(say, state), kNpcTextChars))
+                    section.rows.push_back(LineOf(line));
+            if (const std::vector<std::string> pops = MobNames(PopsOf(act)); !pops.empty())
+                section.rows.push_back(LineOf(kResult + std::string("Pops ") + JoinedNames(pops)));
+            if (const std::vector<std::string> gives = ItemNames(GivesOf(act), state); !gives.empty())
+                section.rows.push_back(LineOf(kResult + std::string("Gives ") + JoinedNames(gives)));
+            if (const std::vector<std::string> keyItems = KeyItemNames(KeyItemsOf(act)); !keyItems.empty())
+                section.rows.push_back(LineOf(kResult + std::string("Gives key item ") + JoinedNames(keyItems)));
+            if (act.event) section.rows.push_back(LineOf(kResult + std::string("A cutscene"), Tone::Dim));
+        }
+
+        // What clicking it does, and what each trade the probe found does, its items first; none when the probe saw
+        // nothing. A trade the probe found takes the place of the plain list of what its scripts check for.
+        bool AddActs(std::vector<PopupSection>& sections, const NpcRecord& npc, const BarState& state)
+        {
+            PopupSection click{"Click", {}}, trade{"Trade", {}};
+            for (const NpcAct& act : ActsOf(npc))
+            {
+                if (act.kind == kActClick) AddActRows(click, act, state);
+                if (act.kind != kActTrade) continue;
+                std::vector<std::string> items;
+                for (const NpcActItem& entry : ItemsOf(act))
+                {
+                    const std::vector<std::string> named = ItemNames(std::span<const uint16_t>(&entry.item, 1), state);
+                    const std::string name = named.empty() ? "an item" : named.front();
+                    items.push_back(entry.qty > 1 ? std::to_string(entry.qty) + " x " + name : name);
+                }
+                std::string line;
+                for (const std::string& item : items)
+                    line += (line.empty() ? "" : " + ") + item;
+                trade.rows.push_back(LineOf(line));
+                AddActRows(trade, act, state);
+            }
+            if (!click.rows.empty()) sections.push_back(std::move(click));
+            const bool traded = !trade.rows.empty();
+            if (traded) sections.push_back(std::move(trade));
+            return traded;
+        }
+
+        // When its zone shows and hides it: "Appears at 22:00, gone at 07:00"; empty for a ??? always there.
+        std::string AppearsWords(const NpcRecord& npc)
+        {
+            std::vector<std::string> shows, hides;
+            for (const NpcAct& act : ActsOf(npc))
+            {
+                const auto when = WhenOf(act);
+                if (when.size() == 1 && when[0].kind == kWhenZoneStart) continue;
+                if (act.kind == kActShows) shows.push_back(WhenWords(act, false));
+                if (act.kind == kActHides) hides.push_back("gone " + WhenWords(act, false));
+            }
+            if (shows.empty()) return {};
+            shows.insert(shows.end(), hides.begin(), hides.end());
+            return "Appears " + JoinedNames(shows);
+        }
+
+        // A name a line, and a dim note when its scripts do more of it than the data could read; none when there is
+        // neither.
+        void AddListing(std::vector<PopupSection>& sections, std::string heading, const std::vector<std::string>& names,
+            bool unread = false)
+        {
+            if (names.empty() && !unread) return;
+            PopupSection section{std::move(heading), {}};
+            for (const std::string& name : names)
+                section.rows.push_back(LineOf(name));
+            if (unread)
+                section.rows.push_back(
+                    LineOf(names.empty() ? "Worked out by its script" : "And more its script works out", Tone::Dim));
+            sections.push_back(std::move(section));
+        }
+
+        // What a shop always stocks, then what a nation's shop holds back until the nation places well in conquest,
+        // under the place it needs (NpcStockItem's ranks).
+        constexpr std::pair<uint8_t, const char*> kStockPlaces[] = {
+            {2, "When its nation is 1st or 2nd in conquest"}, {1, "When its nation is 1st in conquest, to its citizens"}};
+
+        void AddShop(std::vector<PopupSection>& sections, const NpcRecord& npc, const BarState& state)
+        {
+            const NpcShop* shop  = ShopOf(npc);
+            const bool unread    = (npc.unread & kNpcUnreadShop) != 0;
+            PopupSection section = {"Shop", {}};
+            const auto add = [&](uint8_t place, const char* note) {
+                bool first = true;
+                for (const NpcStockItem& entry : shop != nullptr ? StockOf(*shop) : std::span<const NpcStockItem>())
+                {
+                    const uint8_t at  = entry.rank == 1 || entry.rank == 2 ? entry.rank : 0;
+                    const char* name = state.itemName != nullptr ? state.itemName(entry.item) : nullptr;
+                    if (at != place || name == nullptr || *name == '\0') continue;
+                    if (first && note != nullptr) section.rows.push_back(LineOf(note, Tone::Dim));
+                    first = false;
+                    // The name in the normal tone: the dim lines naming a place are the headings among them.
+                    section.rows.push_back(Labeled(Text(name), Text(Grouped(entry.price) + " gil")));
+                }
+            };
+            add(0, nullptr);
+            for (const auto& [place, note] : kStockPlaces)
+                add(place, note);
+            if (section.rows.empty() && !unread) return;
+            if (!section.rows.empty() && shop->fame)
+                section.rows.push_back(LineOf("Prices before fame, which moves them up to 10% either way", Tone::Dim));
+            if (unread)
+                section.rows.push_back(LineOf(
+                    section.rows.empty() ? "Worked out by its script" : "And more its script works out", Tone::Dim));
+            sections.push_back(std::move(section));
+        }
+
+        // Its quests (hidden ones too), missions and battlefields, each by name, a quest's and mission's log after it.
+        void AddLinks(std::vector<PopupSection>& sections, const NpcRecord& npc)
+        {
+            PopupSection quests{"Quests", {}}, missions{"Missions", {}}, battlefields{"Battlefields", {}};
+            for (const NpcLink* link : LinksOf(npc))
+            {
+                const char* log = LogNameOf(*link);
+                switch (link->kind)
+                {
+                case kLinkQuest:
+                case kLinkHidden:
+                    quests.rows.push_back(Labeled(Text(link->name), Text(log != nullptr ? log : "Hidden", Tone::Dim)));
+                    break;
+                case kLinkMission:
+                    missions.rows.push_back(Labeled(Text(link->name), Text(log != nullptr ? log : "", Tone::Dim)));
+                    break;
+                default: battlefields.rows.push_back(LineOf(link->name)); break;
+                }
+            }
+            for (PopupSection* s : {&quests, &missions, &battlefields})
+                if (!s->rows.empty()) sections.push_back(std::move(*s));
+        }
+
+        // What it is for, its shop, what it takes in trade and what that pops, what it gives, the key items it gives
+        // and checks for, and its quests, missions and battlefields.
+        std::vector<PopupSection> NpcSections(const ActorInfo& target, const NpcRecord& npc, const BarState& state)
+        {
+            std::vector<PopupSection> sections = ListOf(PopupSection{"",
+                ListOf(Line(Cell(Text("ID " + Printed("%03X", target.serverId & kTargetIndexBits), Tone::Dim))))});
+            // What it is for, as a mob's tags say what it does.
+            PopupRow purposes{RowKind::Tags, 0, {}};
+            for (const char* purpose : PurposesOf(npc))
+                purposes.cells.push_back(Cell(Text(purpose, Tone::Tag)));
+            if (!purposes.cells.empty()) sections[0].rows.push_back(std::move(purposes));
+            if (const std::string appears = AppearsWords(npc); !appears.empty()) sections[0].rows.push_back(LineOf(appears));
+            AddShop(sections, npc, state);
+            if (!AddActs(sections, npc, state))
+                AddListing(sections, "Trade", ItemNames(TradesOf(npc), state), (npc.unread & kNpcUnreadTrade) != 0);
+            AddListing(sections, "Pops", MobNames(PopsOf(npc)), (npc.unread & kNpcUnreadPops) != 0);
+            AddListing(sections, "Gives", ItemNames(GivesOf(npc), state), (npc.unread & kNpcUnreadGives) != 0);
+            AddListing(sections, "Key items", KeyItemNames(KeyItemsOf(npc)));
+            AddListing(sections, "Checks for", KeyItemNames(NeedsOf(npc)));
+            AddLinks(sections, npc);
+            return sections;
         }
 
         PopupContent TargetPopup(const BarState& state, const Settings& settings)
@@ -190,37 +568,56 @@ namespace headsup
                     rows.rows.push_back(LineOf("As of your check", Tone::Dim));
                     popup.sections = ListOf(std::move(rows));
                 }
+                else if (const NpcRecord* npc = NpcOf(target))
+                    popup.sections = NpcSections(*target, *npc, state);
                 return popup;
             }
             const MobRecord& mob      = *target->mob;
             const MobResistances& res = ResistancesOf(mob);
             popup.icon  = MobIcon(*target);
             popup.title = ListOf(Colored(target->name, NameColor(*target, settings)));
+            const MobDefenses& defenses = DefensesOf(mob);
             PopupRow identity{RowKind::Line, 0, {}};
             if (HasLevel(*target))
                 identity.cells.push_back(Cell(Colored(target->level.text, ShadeColor(*target, settings))));
+            if (const std::string jobs = MobJobs(InfoOf(mob)); !jobs.empty()) identity.cells.push_back(Cell(Text(jobs)));
             identity.cells.push_back(Cell(Text("ID " + Printed("%03X", target->serverId & kTargetIndexBits), Tone::Dim)));
 
             PopupRow damage = Grid(kDamageColumns, kFirstElementSdt);
             for (int i = 0; i < kFirstElementSdt; ++i)
                 damage.cells.push_back(Cell(Percent(SdtPercent(res.sdt[i])), SdtIcon(i)));
+            PopupSection damageTaken{"Damage taken", ListOf(std::move(damage))};
+            PopupRow kinds = Grid(kDamageColumns, kDamageKindCount);
+            for (int k = 0; k < kDamageKindCount; ++k)
+                if (const int percent = SdtPercent(defenses.damageTaken[k]); percent != 0)
+                    kinds.cells.push_back(Cell(ListOf(Text(kDamageKindNames[k], Tone::Dim), Text(" "), Percent(percent))));
+            if (!kinds.cells.empty()) damageTaken.rows.push_back(std::move(kinds));
 
+            const RankNumbers numbers{settings.rankDisplay, settings.countAccuracy, state.caster ? &*state.caster : nullptr,
+                MagicTargetOf(mob, target->checked ? target->checked->level : 0)};
             PopupRow elements = Grid(kElementColumns, kElementCount);
             for (int e = 0; e < kElementCount; ++e)
             {
                 const int percent = SdtPercent(res.sdt[kFirstElementSdt + e]);
-                elements.cells.push_back(
-                    Cell(percent != 0 ? Percent(percent) : Rank(res.elementRanks[e], settings.showRanks),
-                        SdtIcon(kFirstElementSdt + e)));
+                const int rank    = res.elementRanks[e];
+                const int absorb  = defenses.absorb[e];
+                elements.cells.push_back(Cell(absorb > 0 ? Text(absorb >= kWholeAbsorb ? std::string("Absorbs")
+                                                                                       : "Absorbs " + std::to_string(absorb) + "%",
+                                                               Tone::Immune)
+                                              : percent != 0
+                                                  ? Percent(percent)
+                                                  : Ranked(ElementRankText(static_cast<Element>(e), rank, numbers), rank),
+                    SdtIcon(kFirstElementSdt + e)));
             }
 
             PopupRow statuses = Grid(kStatusColumns, kStatusRankCount);
             for (int s = 0; s < kStatusRankCount; ++s)
             {
                 const bool immuneTo = (res.immunity & StatusImmunity(s)) != 0;
-                statuses.cells.push_back(
-                    Cell(immuneTo ? Text(kTimesSign, Tone::Immune) : Rank(res.statusRanks[s], settings.showRanks),
-                        StatusIcon(s)));
+                const int rank      = res.statusRanks[s];
+                statuses.cells.push_back(Cell(immuneTo ? Text(kTimesSign, Tone::Immune)
+                                                       : Ranked(StatusRankText(static_cast<StatusRank>(s), rank, numbers), rank),
+                    StatusIcon(s)));
             }
 
             PopupRow immune{RowKind::Line, 0, {}};
@@ -229,11 +626,37 @@ namespace headsup
                 immune.cells.push_back(PopupCell{immunities.icons[i].icon, true, {}});
             if (immune.cells.empty()) immune.cells.push_back(Cell(Text("None", Tone::Neutral)));
 
-            popup.sections = ListOf(PopupSection{"", ListOf(std::move(identity), Tags(mob))},
-                PopupSection{"Damage taken", ListOf(std::move(damage))},
+            PopupSection identityRows{"", ListOf(std::move(identity), Tags(mob))};
+            if (PopupRow traits = Traits(mob); !traits.cells.empty()) identityRows.rows.push_back(std::move(traits));
+            popup.sections = ListOf(std::move(identityRows), std::move(damageTaken),
                 PopupSection{"Elements", ListOf(std::move(elements))},
                 PopupSection{"Statuses", ListOf(std::move(statuses))},
-                PopupSection{"Immune", ListOf(std::move(immune))}, Spawn(mob, state));
+                PopupSection{"Immune", ListOf(std::move(immune))});
+            // At the level the chances are figured for: the check's, else the top of its range.
+            const int level = numbers.target ? numbers.target->level : mob.maxLevel;
+            if (numbers.target)
+            {
+                PopupSection stats{"Stats at Lv " + std::to_string(level), {}};
+                if (const MobCombat* combat = CombatAt(mob, level))
+                {
+                    PopupRow row = Grid(kStatColumns, kCombatCount);
+                    for (int i = 0; i < kCombatCount; ++i)
+                        row.cells.push_back(Numbered(kCombatNames[i], combat->value[i]));
+                    stats.rows.push_back(std::move(row));
+                }
+                PopupRow row = Grid(kStatColumns, kStatCount);
+                for (int i = 0; i < kStatCount; ++i)
+                    row.cells.push_back(Numbered(kStatNames[i], numbers.target->stats.value[i]));
+                stats.rows.push_back(std::move(row));
+                popup.sections.push_back(std::move(stats));
+            }
+            std::vector<std::string> moves;
+            for (const MobSkill& skill : SkillsOf(mob))
+                moves.emplace_back(skill.name);
+            if (std::optional<PopupSection> list = NameList("TP moves", moves)) popup.sections.push_back(std::move(*list));
+            if (std::optional<PopupSection> list = NameList("Spells", SpellsAt(mob, level, state)))
+                popup.sections.push_back(std::move(*list));
+            popup.sections.push_back(Spawn(mob, state));
             for (PopupSection& loot : Loot(mob, state))
                 popup.sections.push_back(std::move(loot));
             return popup;
@@ -404,6 +827,7 @@ namespace headsup
                     w.subtitle = ListOf(Text(CheckedJobs(state.targetCheck->general), Tone::Dim));
                     w.hasPopup = true;
                 }
+                w.hasPopup = w.hasPopup || NpcOf(state.target) != nullptr;
             }
             else
             {

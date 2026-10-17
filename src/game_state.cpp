@@ -24,6 +24,7 @@ namespace headsup
             m_PlayerStatus.clear(); // target indexes are reused in the next zone
             m_PlayerSyncs.clear();
             m_Untargetable.clear();
+            m_CalledForHelp.clear();
             m_ConquestOwed   = true;
             m_CurrenciesOwed = true;
             m_Shares.reset();
@@ -72,6 +73,10 @@ namespace headsup
                     m_Untargetable.erase(update->index);
                 else if (update->untargetable == true)
                     m_Untargetable.insert(update->index);
+                if (update->despawn || update->calledForHelp == false)
+                    m_CalledForHelp.erase(update->index);
+                else if (update->calledForHelp == true)
+                    m_CalledForHelp.insert(update->index);
             }
             break;
         case kCharSyncPacket:
@@ -117,6 +122,7 @@ namespace headsup
     }
 
     bool GameState::Untargetable(uint16_t index) const { return m_Untargetable.count(index) != 0; }
+    bool GameState::CalledForHelp(uint16_t index) const { return m_CalledForHelp.count(index) != 0; }
 
     bool GameState::ConquestRequestDue(double now, bool open, bool refresh) const
     {

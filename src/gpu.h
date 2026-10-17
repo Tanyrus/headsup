@@ -2,6 +2,7 @@
 
 #include "Ashita.h"
 #include "frame_cache.h"
+#include "game_font.h"
 #include "icons.h"
 #include "plate_image.h"
 
@@ -14,6 +15,7 @@
 #include <string>
 #include <string_view>
 #include <tuple>
+#include <utility>
 
 namespace headsup
 {
@@ -54,12 +56,16 @@ namespace headsup
         // sizes would otherwise keep every one.
         void Sweep();
         void Release();
+        // The game's own font, which kGameFontName and kGameFontNarrowName draw from; without it they draw in the
+        // default font. Release keeps it.
+        void SetGameFont(std::optional<GameFontFace> face) { m_GameFont = std::move(face); }
 
     private:
         // The device context with the font selected and tracking pixels after each character, or null when GDI made
         // neither.
         HDC WithFont(std::string_view family, int pixelHeight, uint8_t style, int tracking);
 
+        std::optional<GameFontFace> m_GameFont;
         HDC m_Context = nullptr;
         FrameCache<std::tuple<std::string, int, uint8_t>, HFONT> m_Fonts;
         std::map<std::tuple<std::string, int, std::string>, LineInk, std::less<>> m_Inks;

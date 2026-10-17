@@ -56,6 +56,8 @@ namespace headsup
         int source = 0; // the design line, 0 to 2
         std::vector<PlateItem> items;
         LineLook look;
+        int row      = 0;    // of its design line's rows that show, which a break in its text starts
+        bool lastRow = true;
     };
     // ornament: where the kind's ornament goes, while the plate's lines allow it.
     struct ComposedPlate
@@ -77,7 +79,8 @@ namespace headsup
 
     // Screenshot mode hides names first, even after /hu off; then the game's stay while HeadsUp or its nameplates are
     // off, and the row decides the rest: a name HeadsUp cannot draw (namesFailed) is the game's, a hidden one hidden.
-    HookAction HookActionFor(const EntityState& state, const Settings& settings, bool screenshot, bool namesFailed);
+    HookAction HookActionFor(const EntityState& state, const Settings& settings, const PlayerState& player, bool screenshot,
+        bool namesFailed);
     // The lines this entity shows now, with every tag rendered; empty for a mode that shows nothing.
     ComposedPlate ComposePlate(const ActorInfo& info, const PlayerState& player, const Settings& settings, uint32_t gameArgb);
     // The percent of the base size as pixels.

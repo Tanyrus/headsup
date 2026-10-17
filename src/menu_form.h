@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -25,8 +26,14 @@ namespace headsup
         int level = 0;             // yours; 0 while unknown
         bool sitting = false;
         int barTitlePixels = 0;    // the title size the bar drew last frame, 0 when it is off
+        // In the game's menu pixels: the line the game's windows went under last frame, and the panel's own lowest
+        // reach without its help line; 0 while the panel is off.
+        int windowsBand = 0, barBand = 0;
         const std::vector<std::string>* seenWindows = nullptr; // the game's windows seen under Game help's bar
         const std::vector<std::string>* cursorFiles = nullptr; // the cursors folder's files, without their extensions
+        std::optional<bool> watching;            // whether the debug watch runs; none in a build without one
+        const std::string* lastReport = nullptr; // the file the last report went to, empty before one
+        bool exportable = false; // a developer's build, which can write its built-in layout out as a file
     };
 
     // The Game Windows card's own state: its filter and whether it lists every window.
@@ -44,10 +51,13 @@ namespace headsup
         int widget         = 0;     // the Widgets page's picked widget, by BarWidget
         bool confirmReset  = false; // the reset button was pressed once and asks for a second press
         bool debugRequested = false;
+        bool watchRequested = false; // the debug watch is to start, or stop
+        bool exportRequested = false;
         bool cursorsRequested = false; // a list of pictures was opened: the cursors folder is to be read again
         KeyCapture keyCapture;      // the Mouse Cursor page's
         KeyCapture shotKeyCapture;  // screenshot mode's
         WindowFilter windows;
+        std::optional<HelpMode> shiftsFor; // the Window Groups card's mode shown; none for the one the help is in
         DesignEditor design;
 
         // What a page was in the middle of is dropped when it is left, by another page or by the window closing: a

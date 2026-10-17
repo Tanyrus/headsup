@@ -36,6 +36,7 @@ namespace headsup
         std::string type;
         std::string value; // a change's or commit's new value, a drop's dragged control, a caret's place in bytes
         std::string carried = {}; // a drop's: what the dragged control carries (kCarriesAttribute), a tag chip's slot
+        size_t at = std::string::npos; // a drop's on a stretch of text: the byte the pointer was nearest, none for its end
     };
     constexpr const char* kClickEvent  = "click";
     constexpr const char* kChangeEvent = "change"; // a slider moved, a text box typed in
@@ -53,13 +54,15 @@ namespace headsup
     // A tag beside a stretch of a line box is to go: Backspace at the stretch's start, or Delete at its end. Its
     // value is which (kKillBack or kKillForward) and then the stretch as it is typed.
     constexpr const char* kKillEvent   = "kill";
+    // Enter in a stretch of a line box: value is the stretch as it is typed and at the caret's byte in it.
+    constexpr const char* kBreakEvent  = "break";
     constexpr char kKillBack = 'b', kKillForward = 'f';
     // The ids of a line box's parts, after the box's own: a stretch of text and a tag, each with its number.
     // Classes the kit writes, the window sets and the stylesheet draws: one name each for the three.
     constexpr const char* kOffClass     = "off";     // a setting of something switched off: not shown
     constexpr const char* kCompactCheck = "check";       // a toggle among other controls
-    constexpr const char* kWideCheck    = "check wide";  // a row's toggle, nearly as wide as a slider
-    constexpr const char* kCardCheck    = "check card-on"; // a card title's switch, compact
+    constexpr const char* kWideCheck    = "check wide";  // a row's toggle, as wide as a slider
+    constexpr const char* kCardCheck    = "check card-on"; // a card title's switch
     constexpr const char* kPickedClass  = "picked";  // the chosen one of a row of choices
     constexpr const char* kLineBoxClass = "linebox"; // a design line's box
     constexpr const char* kRunClass     = "run";     // a stretch of text in it
@@ -95,6 +98,7 @@ namespace headsup
     struct FormBlock
     {
         std::string id, rml;
+        bool bare = false; // on the page itself under the cards, with no card around it
         bool operator==(const FormBlock&) const = default;
     };
     constexpr const char* kSidebarBlock = "sidebar";
@@ -128,6 +132,7 @@ namespace headsup
     constexpr const char* kRaisedPill = "btn raised";
     constexpr const char* kFlatPill   = "btn flat";
     constexpr const char* kAccentPill = "btn accent";
+    constexpr const char* kWashPill   = "btn wash"; // a slider's filled part
 
     // The settings window's kit. A pass runs the page's code against it, as an immediate-mode window is drawn:
     // each call takes what the player did to its control since the last pass from the events, changes what it is
@@ -165,6 +170,8 @@ namespace headsup
         // A card, its title row folding it; an enabled checkbox sits at the title's right, and what the card is for
         // is written under the title. False when it is folded, with nothing more to do; true, with EndCard to call.
         bool BeginCard(const char* title, bool* enabled = nullptr, const char* about = nullptr);
+        // A block with the id a card of that title would have and no title or card of its own; EndCard ends it.
+        void BeginBare(const char* title);
         void EndCard();
 
         // A row: its label at the left, with its tip, and the controls that follow at the right, until EndRow.
@@ -192,6 +199,7 @@ namespace headsup
             EndRow();
         }
         void SliderInt(const char* label, int& value, int lo, int hi, const char* format, const char* tip);
+        void SliderPercent(const char* label, int& value, int lo, int hi, const char* tip);
         // A number stepped one at a time by the arrows either side of it, for one whose change moves the window under
         // the pointer, as a slider's would.
         void Stepper(const char* label, int& value, int lo, int hi, const char* format, const char* tip);
@@ -274,6 +282,8 @@ namespace headsup
         // A whole number to type, with its name before it: "X [ 12 ]".
         void NumberAt(const char* name, const char* id, int& value, int limit);
         void SwatchAt(const char* id, Color& color);
+        // The arrow that puts a value back to its default, hidden while it is the default. True when it was clicked.
+        bool ResetAt(const char* id, bool differs);
         // A pill. classes: kRaisedPill and the like, and any more for the page's own looks. True when clicked.
         bool Button(const char* label, const char* id, const char* classes = kRaisedPill, const char* tip = nullptr);
         // A text box. Committed: true when it was left by Enter or a click elsewhere with its text changed, which
@@ -319,11 +329,13 @@ namespace headsup
         // Opens the popup with rows, and tells which of them was clicked.
         bool ListChoice(const std::string& control, std::string rows, int count, int& chosen);
         // A slider's newest whole value, when it moved.
-        void TakeWhole(const std::string& slider, int& value, int lo, int hi);
+        void TakeWhole(const std::string& slider, int& value, int lo, int hi, int step = 1);
         void Slider(const std::string& slider, const char* label, float value, float lo, float hi, float step,
             const std::string& shown, const char* tip);
         // A toggle, and its id: a row's is wide, one among other controls compact.
-        std::string Check(const char* id, bool& on, const char* tip, const char* classes = kCompactCheck);
+        // With words, the toggle says its state in its middle.
+        std::string Check(const char* id, bool& on, const char* tip, const char* classes = kCompactCheck,
+            const char* offWord = nullptr, const char* onWord = nullptr);
         // A button of any markup inside. True when clicked.
         bool Pressable(const std::string& inside, const char* id, const char* classes, const char* tip);
         // The left (previous) or right (next) arrow beside a control, its id the label's with that word.

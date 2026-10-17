@@ -235,6 +235,21 @@ TEST(a_placeholder_is_outlined_by_its_own_row_in_its_own_color)
     CHECK(!t.Find(0x2000)->outline && !t.Find(0x4000)->outline); // a placeholder takes its own row, aggressive or not
 }
 
+TEST(a_mob_called_for_help_has_a_claim_state_of_its_own_in_the_claim_row_of_others)
+{
+    Tracker t;
+    Settings s;
+    ActorInput helped    = BountyHunter(0x2000);
+    helped.calledForHelp = true; // the server drops the claim when help is called, and says no more of whose it was
+    t.Update({helped, BountyHunter(0x3000)}, kLevel20, s, CursorTargets{});
+    CHECK(t.Find(0x2000)->state.claim == ClaimState::CalledForHelp && t.Find(0x2000)->state.row == Category::OtherClaim);
+    CHECK(t.Find(0x3000)->state.claim == ClaimState::Unclaimed && t.Find(0x3000)->state.row == Category::WillAttack);
+    // A claim row that outlines by claim draws it in Called for Help's orange.
+    SetMobOutline(s, Category::OtherClaim, OutlineMode::Shown);
+    t.Update({helped}, kLevel20, s, CursorTargets{});
+    CHECK(t.Find(0x2000)->outline && t.Find(0x2000)->argb == 0xFFFF9900u);
+}
+
 TEST(a_claimed_mob_takes_its_claim_rows_mode_and_color)
 {
     Tracker t;
@@ -302,11 +317,11 @@ TEST(an_outline_is_as_opaque_as_the_setting_and_fainter_with_distance_only_when_
     t.Update({BountyHunter(0x2000, 8.0f), BountyHunter(0x3000, 30.0f), BountyHunter(0x4000, s.maxDistance)}, kLevel20, s,
         CursorTargets{});
     CHECK_EQ(t.Find(0x2000)->outlineAlpha, 255);
-    CHECK_EQ(t.Find(0x3000)->outlineAlpha, 129); // half way from 10 yalms to the range of 50
+    CHECK_EQ(t.Find(0x3000)->outlineAlpha, 192); // half way from 10 yalms to the range of 50: 255 * 0.7525
     CHECK_EQ(t.Find(0x4000)->outlineAlpha, 3);   // a hundredth, at the range
     s.maxDistance = 30.0f;
     t.Update({BountyHunter(0x3000, 20.0f)}, kLevel20, s, CursorTargets{});
-    CHECK_EQ(t.Find(0x3000)->outlineAlpha, 129); // the fade ends at the range, wherever that is set
+    CHECK_EQ(t.Find(0x3000)->outlineAlpha, 192); // the fade ends at the range, wherever that is set
 }
 
 TEST(disabled_outlines_nothing)

@@ -35,6 +35,19 @@ namespace headsup
 
     namespace
     {
+        // What stands before a line's first text item or after its last, with the gap beside each: icons, and the
+        // spaces between them and the text, which hang past the text as it aligns. Nothing on a line without text.
+        float Hang(const LineInput& line, bool before)
+        {
+            if (line.firstText < 0) return 0.0f;
+            const size_t from = before ? 0 : static_cast<size_t>(line.lastText) + 1;
+            const size_t to   = before ? static_cast<size_t>(line.firstText) : line.items.size();
+            float hang        = 0.0f;
+            for (size_t j = from; j < to; ++j)
+                hang += line.items[j].width + kItemGap;
+            return hang;
+        }
+
         void PlaceOrnament(LinePlace& place, const LineInput& in, float centerX, float top)
         {
             place.ornamentWidth  = in.ornamentWidth;
@@ -58,20 +71,24 @@ namespace headsup
                 place.height = std::max(place.height, lines[i].items[j].height);
             }
         }
-        // The bottom line stays centered on the game's name. Another starts where it starts or ends where it ends,
-        // whichever is further to the side it is set to: one wider than the name hangs out on that side.
-        const float against = lines.empty() ? 0.0f : layout.lines.back().width;
+        // A line's text aligns, and the icons at its ends hang past it. The bottom line's stays centered on the game's
+        // name. Another starts where it starts or ends where it ends, whichever is further to the side it is set to:
+        // one wider than the name hangs out on that side.
+        const auto core     = [&](size_t i) { return layout.lines[i].width - Hang(lines[i], true) - Hang(lines[i], false); };
+        const float against = lines.empty() ? 0.0f : core(lines.size() - 1);
         for (size_t i = 0; i < lines.size(); ++i)
         {
             LinePlace& place    = layout.lines[i];
+            const float width   = core(i);
             const float starts  = layout.centerX - against / 2.0f;
-            const float ends    = layout.centerX + against / 2.0f - place.width;
+            const float ends    = layout.centerX + against / 2.0f - width;
             switch (lines[i].align)
             {
             case Align::Left: place.left = std::min(starts, ends); break;
-            case Align::Center: place.left = layout.centerX - place.width / 2.0f; break;
+            case Align::Center: place.left = layout.centerX - width / 2.0f; break;
             case Align::Right: place.left = std::max(starts, ends); break;
             }
+            place.left -= Hang(lines[i], true);
         }
 
         if (!lines.empty()) layout.lines.back().top = anchor.CenterY() - layout.lines.back().height / 2.0f;
@@ -205,13 +222,16 @@ namespace headsup
         into.align          = line.look.align;
         into.textHeight     = 0.0f;
         into.hasIcons       = false;
-        // The bottom design line stays on the game's name, so its padding is the space over it.
+        // The bottom design line stays on the game's name, so its padding is the space over it. A line broken into
+        // rows has it under its last row, or over the first.
         const bool bottom   = line.source == kBottomLine;
-        into.padBelow       = bottom ? 0.0f : line.look.padding * scale;
-        into.padAbove       = bottom ? line.look.padding * scale : 0.0f;
+        into.padBelow       = !bottom && line.lastRow ? line.look.padding * scale : 0.0f;
+        into.padAbove       = bottom && line.row == 0 ? line.look.padding * scale : 0.0f;
         into.ornamentWidth  = 0.0f;
         into.ornamentHeight = 0.0f;
         into.ornamentUnder  = false;
+        into.firstText      = -1;
+        into.lastText       = -1;
         size_t text         = 0;
         for (size_t i = 0; i < line.items.size(); ++i)
         {
@@ -219,6 +239,8 @@ namespace headsup
             switch (item.kind)
             {
             case ItemKind::Text:
+                if (into.firstText < 0) into.firstText = static_cast<int>(i);
+                into.lastText   = static_cast<int>(i);
                 into.textHeight = std::max(into.textHeight, texts[text].height);
                 into.items.push_back(texts[text++]);
                 break;

@@ -28,7 +28,7 @@ opens them at a page, such as `/hu menu entities`, `/hu menu mobs` or `/hu menu 
 
 | Page | Holds |
 |---|---|
-| Entities | What every kind shares: the Nameplates card, the outline style, the target cursor and the five color palettes. Under it, a page for each kind: Mobs, Players, Self, NPCs and Pets |
+| Entities | What every kind shares: the Nameplates card, the nameplates' opacity, the outline style, the target cursor and the five color palettes. Under it, a page for each kind: Mobs, Players, Self, NPCs and Pets |
 | User Interface | Screenshot mode and the Window Groups and Game Windows cards, which move the game's windows. Under it, the Top Panel, Widgets and Mouse Cursor pages |
 | HeadsUp Config | Switches HeadsUp off as a whole, writes a report for bug reports, sets the settings window's own theme, font, size and opacity, and holds the button that puts every setting back to its default |
 
@@ -108,9 +108,12 @@ row's outline to Show Outline to outline those mobs too.
 
 The Nameplate Design card holds three lines: Top Line, Middle Line and Bottom Line, which sits where the game's own
 name does. You type in a line as you would anywhere, and put tags in it: a tag draws something, such as the name or
-the level. Click a tag under the lines to put it where you last typed, or drag it into a line. A tag stands in its line
+the level. Click a tag under the lines to put it where you last typed, or drag it into a line, where it goes in
+between the letters you let it go on. A tag stands in its line
 as the same button, with text to type before and after it, and Backspace or Delete beside a tag takes the whole tag
 out. A tag in a line can be dragged too: to another place in a line, or out of the lines altogether, which removes it.
+Enter breaks a line where you are typing: what follows goes on a row of its own under the rest, in the line's own
+style, and Backspace at the start of that row joins the two again.
 Typed by hand a tag is a dollar sign and its word, such as `$name`, and `$$` is one dollar sign.
 
 Tags can share one place. Drop a tag onto a tag that is already in a line and the two become one button, such as
@@ -128,10 +131,11 @@ out. Typed by hand it is `${sync|bazaar}`.
 | ID | `$id` | Mobs | The last three hex digits of its ID, which players name placeholders by, such as [106] |
 | Server ID | `$serverid` | Mobs | Its whole ID in decimal |
 | Placeholder | `$ph` | Mobs | [PH] on a lottery placeholder, whose death can pop a notorious monster |
-| Weaknesses, Resistances | `$weak`, `$resist` | Mobs | The damage types and elements it is weak to or resists, with percents or ranks |
+| Weaknesses, Resistances | `$weak`, `$resist` | Mobs | The damage types and elements it is weak to or resists: damage taken in percent, or an element's rank as a chance or the rank itself |
 | Statuses | `$status` | Mobs | The statuses it is weak to or resists, as the Statuses card picks |
 | Immunities | `$immune` | Mobs | The statuses it cannot take |
 | Job | `$job` | Players, Self | Jobs, such as WAR/MNK: yours, your party's, and another player's once you have checked them |
+| Job & Level | `$joblevel` | Players, Self | Both when known, such as 75 WAR/MNK; Level 75 when only the level is known, and nothing when neither is |
 | Title | `$title` | Players, Self | The title: yours, and another player's once you have checked them |
 | GM, Mentor, New Adventurer, Level Sync, Away | `$gm`, `$mentor`, `$new`, `$sync`, `$away` | Players, Self | Their icons |
 | Linkshell, Bazaar, Seeking Party | `$linkshell`, `$bazaar`, `$seeking` | Players, Self | The linkshell icon in its color, the bazaar icon and the seeking party icon |
@@ -143,21 +147,27 @@ Players and Self pages, Max Icons Shown limits how many of a player's icons a na
 lines from the top; the GM icon always shows.
 
 Weaknesses, resistances, statuses and immunities are shown as small badges on icons. The Badges card sets their font,
-colors and whether they show ranks; the Weaknesses and Statuses cards pick what is worth a badge.
+colors and what a rank's badge says. A rank changes how often magic lands, not how hard it hits, so Badge Numbers
+offers Increased Chance (the default: how much more often magic lands than without the weakness, or less often with a
+resistance), Total Chance (how often your spell lands: an unresisted tier I nuke for an element, the effect for a
+status, from your level, skill, stats and gear against the mob's at its checked level or the top of its range) and
+Rank. By default Increased Chance is the mob's side alone, the magic evasion the rank takes away or adds; Count Your
+Accuracy figures it with your own accuracy instead, so it shrinks once you land 95% of the time anyway. Merits, food and weather are not counted. The Weaknesses and Statuses cards pick what is worth a
+badge.
 
-After the design come a Line Style card, with a tab for each line, an Ornament card and a Nameplate Opacity card. A
-line has these settings:
+After the design come a Line Style card, with a tab for each line, and an Ornament card. A line has these settings:
 
 - **Sync Line Style:** borrows every setting from another line, so the two always match
 - **Line Visibility:** Always, or only when any picked condition holds: When Targeted, When Unclaimed, When Claimed by
   You, When Claimed by Others, When Engaged in Combat, When Too Weak, When Aggressive, When Passive, When Party Member,
   When Friend, When Linkshell Member or When Owner is You (the ones that fit the kind)
 - **Alignment:** left, center or right against the bottom line, which itself stays on the game's name. A line wider
-  than the name hangs out past it on the side it is set to
+  than the name hangs out past it on the side it is set to. Only a line's text is aligned: icons before or after it
+  stand outside, so a name with the linkshell icon before it stays centered on the game's name
 - **Font and Font Style:** a line's own font, or the Default Font from the Entities page, in bold, italics, underline
   or any of them together
 - **Text Size and Icon Size:** a percent of the Base Font Size and the Base Icon Size set on the Entities page
-- **Padding:** up to 10 pixels of room under the line (over it, for the bottom line)
+- **Padding:** from -5 to 10 pixels of room under the line (over it, for the bottom line); below 0 the lines close up
 - **Text Color:** a color of your own, the game's, or from a palette
 - **Shadow Strength and Shadow Color:** the soft dark shadow behind the letters
 - **Glow Strength, Glow Size and Glow Color:** a colored halo, such as a monster's name glowing in its outline color.
@@ -167,9 +177,10 @@ line has these settings:
 The Ornament is a diamond rule. Its Visibility puts it over the nameplate (Top), under it (Bottom), or between the
 middle line and the one above or below it, where it is drawn while both lines show.
 
-The Nameplate Opacity card sets how see-through a kind's nameplates are by what you target: with No Target, when the
-entity is Not Targeted while something else is, and when it Is Targeted. Fade In makes them fainter with distance, up to
-a Range of their own; your target's nameplate never fades with distance, and your own has no fading.
+The Nameplate Opacity card, on the Entities page under the Nameplates card, sets how see-through every nameplate is by
+what you target: with No Target, when the entity is Not Targeted while something else is, and when it Is Targeted. Fade
+In makes them fainter with distance, up to a Range of their own; your target's nameplate never fades with distance, and
+your own is always near enough to stay whole.
 
 ![A Goblin Leecher's red outline and nameplate](resources/nameplate_and_outline.png)
 
@@ -182,10 +193,10 @@ The Nameplates card, on the Entities page, sets what every nameplate shares:
   shows none
 - **Replace Dashes (-):** draws each dash typed in a nameplate's design as a dot, a square or a diamond. The dashes
   HeadsUp writes itself, as in a level range such as 20-23, and a name's own dash stay
-- **Scale with Distance:** names grow and shrink with distance between a Min Size and a Max Size; with Scale Your Own
-  Name off, your own nameplate stays one size
+- **Scale with Distance:** names grow and shrink with distance between a Min Size and a Max Size, your own too
 - **Vertical Offset and Stack Names:** how far over the game's own spot names sit, and whether names that would cover
-  each other rise one over another, while your target's keeps its place
+  each other rise one over another, while your target's keeps its place. Show Line to Entity, under Stack Names, draws a
+  line in the name's color from a risen nameplate down to where it would have stood
 
 ![A player's nameplate with their icons and the feather cursor](resources/player_nameplate.png)
 
@@ -259,7 +270,7 @@ A bar of widgets across the top of the screen, on by default, with these widgets
 | Job | Your jobs and levels, and the EXP to your next level (your merits at 75), over a bar of it; its Layout can put the EXP first, as the larger line, or show the EXP alone | EXP per hour, the time to level, limit points |
 | Party | How many are in your party, with the lowest HP and MP in your zone | Each member's jobs, levels, HP, MP and TP |
 | Signet | The time left on Signet or Sanction, only while one is on | What it gives and whether it works where you are |
-| Target | A monster's name in its border color, its level and con | Weaknesses, resistances, immunities, tags, spawn, drops at Treasure Hunter 0 and what can be stolen; for a player you checked, their jobs, master level, linkshell and title, as of your check |
+| Target | A monster's name in its border color, its level and con | Its jobs, weaknesses, resistances, absorbs, immunities, tags, stats, TP moves, spells, spawn, drops at Treasure Hunter 0 and what can be stolen; for an NPC or ??? in Phoenix's NPC data, what it is for, when it appears, what clicking it says and does, its shop, what to trade it, what it pops and gives, the key items it gives and checks for, and its quests, missions and battlefields; for a player you checked, their jobs, master level, linkshell and title, as of your check |
 | Gil | Your gil, or the currency picked in its section | Gil and every currency you have |
 | Bags | Your inventory's used and maximum space | Every bag you have |
 | Connection | The game's own S and R, bytes sent and received a second; amber when no data arrives, red once the game's meter drops, with the latency if switched on | Latency, the last server data, this session's totals |
@@ -286,8 +297,23 @@ help bar has an X and Y offset of its own, in screen pixels, in its card. Unload
 Hover a widget to open its details. Click it to keep them open; click it again to let them close once the pointer leaves
 the widget and its popup. Left and right clicks on the bar or an open popup never reach the game in windowed modes.
 
-Under Target, a monster in Phoenix's mob data has a popup; a player you have checked shows their jobs and levels, or
-? ? ? when anonymous, with a popup of the check; any other player or NPC shows just its name. The weather widget reads the
+Under Target, a monster in Phoenix's mob data has a popup. Its tags give how far it sees and hears, whether a
+beastmaster can charm it, what it does by itself (Regen, Refresh, Regain, Shadows, Counter) and what its melee hits add.
+Damage taken also gives its physical, magic, ranged and breath damage when not 100%, and Elements an element it absorbs.
+Its HP, MP, attack, defense, evasion, accuracy, stats and magic evasion are at its checked level or the top of its range,
+and so are the spells it casts, after its TP moves. Spawn gives the hours it spawns between, and a lottery NM's pop chance
+and cooldown, which its placeholder gives too; a player you have checked shows their jobs and levels, or
+? ? ? when anonymous, with a popup of the check. An NPC or ??? whose scripts Phoenix's NPC data can read has a popup of
+what it is for as tags (a logging point, a home point, a guild's points, where it teleports you), its shop, what it takes in trade, the monsters that pops, what it gives (quest rewards too), the key items it gives
+and checks for, and the quests (with their log), missions (with theirs) and battlefields it takes part in, leaving out
+those of expansions Phoenix has off; when a script works the stock, the trade or the monster out as it runs, the popup
+says so. Names of key items, quests, missions and battlefields come from Phoenix's scripts and lack the game's
+punctuation. For a ??? the data refresh also clicks and trades it on Phoenix's own server and keeps what it saw: Click
+gives what clicking it says, in the game's words, and what follows (a monster, an item, a key item), and Trade gives
+each set of items it takes with what that does, each with what it needs (an hour, a weather, a job, a quest's step, a
+key item); a ??? its zone hides by day says when it appears. A shop's prices are before fame, which moves a nation's and some others'
+prices up to 10% either way, and what a nation's shop stocks only while the nation places 1st or 2nd in conquest comes
+under the place it needs. Any other player or NPC shows just its name. The weather widget reads the
 weather the game keeps; if HeadsUp cannot find it, it goes by the server's weather changes and shows the day's usual
 weather until one comes. While the Gil widget is on, HeadsUp asks the server for your currencies with the two requests
 the game's Currencies menu sends: once after loading, once per zone and each minute while the widget's popup is open.

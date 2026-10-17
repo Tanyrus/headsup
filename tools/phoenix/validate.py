@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""Check phoenix_mobs.tsv and phoenix_drops.tsv against spawns whose values are known, and phoenix_rules.json against
-rules whose values are known. Exit 1 on any failure.
+"""Check phoenix_mobs.tsv, phoenix_drops.tsv and phoenix_mob_info.tsv with its tables against spawns whose values are
+known, phoenix_items.tsv against items whose values are known, phoenix_rules.json against rules whose values are
+known, and phoenix_npcs.tsv with its lists against NPCs whose scripts are known. Exit 1 on any failure.
 
 Usage: validate.py PHOENIX_MOBS_TSV PHOENIX_RULES_JSON [PHOENIX_DROPS_TSV]
 
-PHOENIX_DROPS_TSV defaults to the phoenix_drops.tsv beside PHOENIX_MOBS_TSV.
+PHOENIX_DROPS_TSV defaults to the phoenix_drops.tsv beside PHOENIX_MOBS_TSV; the other files are read from beside it.
 """
 import pathlib
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 import gen_mobdata as schema  # noqa: E402
+import gen_npcs  # noqa: E402
 import gen_rules  # noqa: E402
 
 SIGHT, HEARING = schema.Detect.SIGHT, schema.Detect.HEARING
@@ -26,6 +28,23 @@ MIN_MOBS, MIN_ZONES = 60000, 200
 # Phoenix, so fewer means the dump read those columns before they were set.
 MIN_RESISTING = 1000
 STRONG_RANK = 4
+# Mobs with stats: all but the few whose level a script sets (about 1,600 of 65,000), so fewer means the dump lost them.
+MIN_WITH_STATS = 55000
+# id: its magic evasion at each level, from minLevel. Clipper of Qufim Island, 28 and 29, has no magic evasion mods:
+# rank C+ at its level (Phoenix's sql/skill_caps.sql r7, mobutils::GetMagicEvasion).
+EXPECTED_MAGIC_EVASION = {
+    17293331: [80, 83],
+}
+MAGIC_EVASION = schema.STAT_ORDER.index('MagicEvasion')
+# Items with magic accuracy, an element's, an elemental staff bonus or an instrument's skill: about 1,400 in Phoenix's
+# sql/item_mods.sql and sql/item_weapon.sql, so fewer means the dump missed whole kinds.
+MIN_ITEMS = 1000
+ICE_STAFF, CORNETTE = 17547, 17344  # Phoenix sql/item_basic.sql
+# id: the item as phoenix_items.tsv has it, from sql/item_mods.sql and sql/item_weapon.sql (a wind instrument is 42).
+EXPECTED_ITEMS = {
+    ICE_STAFF: {'id': ICE_STAFF, 'macc': 0, 'elementMacc': [0] * 8, 'staffBonus': [0, 2, -2, 0, 0, 0, 0, 0], 'skill': 0},
+    CORNETTE: {'id': CORNETTE, 'macc': 0, 'elementMacc': [0] * 8, 'staffBonus': [0] * 8, 'skill': 42},
+}
 # id: EXP_LVL_MOD, set by the mob's spawn script
 EXPECTED_LEVEL_MODS = {
     17190918: -2,  # Wild Rabbit, scripts/zones/East_Ronfaure/mobs/Wild_Rabbit.lua
@@ -57,7 +76,49 @@ EXPECTED_DROPS = {
 EXPECTED_REMOVED = {
     (FLEDERMAUS_ZONE, 'Fledermaus'): {FIEND_BLOOD},
 }
-EVEN_MATCH_EXP = 100  # every bracket of every experience table Phoenix ships
+EVEN_MATCH_EXP = 100  # every bracket of the era table, which only content restricted to ToAU loads (200 without)
+CITIPATI, VALKURM_EMPEROR, CLIPPER = 16806162, 17199438, 17293331
+# id: columns of phoenix_mob_info.tsv as its template, spawn and spawn slot in data/zones/<zone>/mobs.yaml have them.
+# Citipati (attohwa_chasm) is THF/BLM, out from 20:00 to 04:00, 15% with 10,800 s out after his kill.
+EXPECTED_INFO = {
+    CITIPATI: {'jobs': [6, 4], 'window': [20, 4], 'lottery': [15, 10800]},
+}
+# id: its lottery chance; a module sets Valkurm Emperor's cooldown (valkurm_dunes' slot says 15 alone).
+EXPECTED_CHANCES = {VALKURM_EMPEROR: 15}
+# id: HP at every level, from a template's flat stats.hp (Citipati's 8000).
+EXPECTED_FLAT_HP = {CITIPATI: 8000}
+# id: TP moves its list must have, by the game's names (a crab's).
+EXPECTED_MOVES = {CLIPPER: {'Bubble Shower', 'Bubble Curtain', 'Big Scissors', 'Scissor Guard', 'Metallic Body'}}
+HP = schema.COMBAT_ORDER.index('Hp')
+MAGIC = schema.DAMAGE_ORDER.index('Magic')
+# Each kind of value thousands of Phoenix's mobs have (tens of thousands with TP moves, hundreds with an added
+# effect), so fewer means the dump read it wrong or not at all. Most mobs' HP grows with their level; a dump that
+# worked HP out without recovering the mob gives every level the same.
+MIN_INFO = {'combat stats': 55000, 'TP moves': 50000, 'spells': 10000, 'HP that grows with the level': 20000,
+            'more or less magic damage taken': 5000, 'an added effect': 500}
+MIN_CHARMABLE = 10000
+# NPCs whose scripts say what they do. Carpenters' Landing's qm_mycophile takes Sleepshroom, Woozyshroom and
+# Danceshroom (4373 to 4375, its script) and pops Mycophile (16785722, carpenters_landing/mobs.yaml); Valkurm Dunes' qm1
+# gives a Pinch of Valkurm Sunsand (503, scripts/enum/item.lua); Maera on the ship to Selbina sells what her script's
+# stock lists.
+EXPECTED_NPCS = {
+    16785729: {'trades': [4373, 4374, 4375], 'pops': [16785722]},
+    17199699: {'gives': [503]},
+}
+EXPECTED_STOCK = {17678362: [(4112, 910, 0), (4128, 4832, 0), (4148, 316, 0), (4150, 2595, 0), (4151, 800, 0)]}
+# NPCs live's settings turn off by their content tag: Valkurm Dunes' Field Manual (field_manuals), Southern San
+# d'Oria's Mystrix (daily_tally, a Gobbie Mystery Box NPC) and Port Bastok's Clarion Star (trust_quests).
+ABSENT_NPCS = {17199755: 'Field_Manual', 17719641: 'Mystrix', 17744189: 'Clarion_Star'}
+# What the probe must find two ??? do on the server: Bibiki Bay's qm_shen pops Shen for a Shrimp Lantern (its script
+# looks Shen up by name, so no reading of it finds him), and Carpenters' Landing's qm_mycophile pops the Mycophile for
+# all three mushrooms at once.
+EXPECTED_ACTS = {16793970: ([(1823, 1)], 16793929), 16785729: ([(4373, 1), (4374, 1), (4375, 1)], 16785722)}
+# A key item and its name in scripts/enum/key_item.lua (AIRSHIP_PASS = 8), which Jeuno's airship NPCs check for.
+EXPECTED_KEY_ITEMS = {8: 'Airship Pass'}
+# Each kind thousands or hundreds of Phoenix's NPCs have, so fewer means the dump or the read of the scripts broke.
+MIN_NPC = {'NPCs': 20000, 'NPCs that take a trade': 300, '??? that take a trade': 80, '??? that pop a mob': 100,
+           'shops': 120, 'links': 900, 'links live has off': 50, 'system calls': 300, 'key items': 300,
+           'acts': 600, 'texts': 200}
 RESTING, SITTING = 33, 47  # xi::Animation Healing and Sit, which CBattleEntity::isSitting names
 
 
@@ -66,7 +127,7 @@ def load(path):
     return {r['id']: r for r in schema.parse(pathlib.Path(path).read_text(encoding='utf-8'), str(path))}
 
 
-def check(records, min_mobs=MIN_MOBS, min_zones=MIN_ZONES, min_resisting=MIN_RESISTING):
+def check(records, min_mobs=MIN_MOBS, min_zones=MIN_ZONES, min_resisting=MIN_RESISTING, min_with_stats=MIN_WITH_STATS):
     problems = []
     if len(records) < min_mobs:
         problems.append(f'only {len(records)} mobs (expected at least {min_mobs})')
@@ -101,6 +162,14 @@ def check(records, min_mobs=MIN_MOBS, min_zones=MIN_ZONES, min_resisting=MIN_RES
     for what, count in counts.items():
         if count < min_resisting:
             problems.append(f'only {count} mobs with {what} (expected at least {min_resisting})')
+    with_stats = sum(1 for r in records.values() if r['stats'])
+    if with_stats < min_with_stats:
+        problems.append(f'only {with_stats} mobs with stats (expected at least {min_with_stats})')
+    for mob_id, expected in EXPECTED_MAGIC_EVASION.items():
+        r = records.get(mob_id)
+        got = None if r is None else [level[MAGIC_EVASION] for level in r['stats']]
+        if got != expected:
+            problems.append(f"{mob_id} {'' if r is None else r['name']}: expected magic evasion {expected}, got {got}")
     for (zone, name), bits in EXPECTED_IMMUNITIES.items():
         found = [r for r in records.values() if r['zone'] == zone and r['name'] == name]
         if not found:
@@ -149,6 +218,52 @@ def check_drops(records, lists, min_looting=MIN_LOOTING, min_lists=MIN_DROP_LIST
     return problems
 
 
+def check_items(items, min_items=MIN_ITEMS):
+    problems = []
+    if len(items) < min_items:
+        problems.append(f'only {len(items)} items with magic accuracy or an instrument (expected at least {min_items})')
+    by_id = {item['id']: item for item in items}
+    for item_id, expected in EXPECTED_ITEMS.items():
+        if item_id not in by_id:
+            problems.append(f'item {item_id}: missing')
+        elif by_id[item_id] != expected:
+            problems.append(f'item {item_id}: expected {expected}, got {by_id[item_id]}')
+    return problems
+
+
+def check_info(records, info, skills, spells, min_info=None, min_charmable=MIN_CHARMABLE):
+    problems, by_id = [], {i['id']: i for i in info}
+    counts = {'combat stats': sum(1 for i in info if i['combat']), 'TP moves': sum(1 for i in info if i['skills']),
+              'spells': sum(1 for i in info if i['spells']),
+              'HP that grows with the level': sum(1 for i in info if i['combat'] and i['combat'][-1][HP] > i['combat'][0][HP]),
+              'more or less magic damage taken': sum(1 for i in info if i['damageTaken'][MAGIC]),
+              'an added effect': sum(1 for i in info if i['addEffect'])}
+    for what, least in (MIN_INFO if min_info is None else min_info).items():
+        if counts[what] < least:
+            problems.append(f'only {counts[what]} mobs with {what} (expected at least {least})')
+    charmable = sum(1 for r in records.values() if r['flags'] & schema.MobFlag.CHARMABLE)
+    if charmable < min_charmable:
+        problems.append(f'only {charmable} charmable mobs (expected at least {min_charmable})')
+    for mob_id, expected in EXPECTED_INFO.items():
+        got = {column: by_id[mob_id][column] for column in expected} if mob_id in by_id else None
+        if got != expected:
+            problems.append(f'{mob_id}: expected {expected}, got {got}')
+    for mob_id, chance in EXPECTED_CHANCES.items():
+        got = by_id[mob_id]['lottery'][0] if mob_id in by_id else None
+        if got != chance:
+            problems.append(f'{mob_id}: expected a lottery chance of {chance}, got {got}')
+    for mob_id, hp in EXPECTED_FLAT_HP.items():
+        got = [level[HP] for level in by_id[mob_id]['combat']] if mob_id in by_id else None
+        if not got or any(value != hp for value in got):
+            problems.append(f'{mob_id}: expected {hp} HP at every level, got {got}')
+    for mob_id, moves in EXPECTED_MOVES.items():
+        number = by_id[mob_id]['skills'] if mob_id in by_id else 0
+        got = {move['name'] for move in skills[number - 1]} if 0 < number <= len(skills) else set()
+        if not moves <= got:
+            problems.append(f'{mob_id}: its TP moves have no {sorted(moves - got)}')
+    return problems
+
+
 def check_rules(rules):
     problems = []
     even = rules['baseExp'][-rules['firstDifference']] if 0 <= -rules['firstDifference'] < len(rules['baseExp']) else None
@@ -156,6 +271,37 @@ def check_rules(rules):
         problems.append(f'an even match should give {EVEN_MATCH_EXP} experience in every bracket, got {even}')
     if not {RESTING, SITTING} <= set(rules['sittingAnimations']):
         problems.append(f"resting ({RESTING}) and /sit ({SITTING}) should count as sitting, got {rules['sittingAnimations']}")
+    return problems
+
+
+def check_npcs(npcs, shops, links, systems, key_items, acts=(), texts=(), min_npc=None):
+    problems, by_id = [], {npc['id']: npc for npc in npcs}
+    counts = {'NPCs': len(npcs), 'NPCs that take a trade': sum(1 for n in npcs if n['trades']),
+              '??? that take a trade': sum(1 for n in npcs if n['name'] == '???' and n['trades']),
+              '??? that pop a mob': sum(1 for n in npcs if n['name'] == '???' and n['pops']),
+              'shops': len(shops), 'links': len(links), 'links live has off': sum(1 for l in links if not l['live']),
+              'system calls': len(systems), 'key items': len(key_items), 'acts': len(acts), 'texts': len(texts)}
+    for what, least in (MIN_NPC if min_npc is None else min_npc).items():
+        if counts[what] < least:
+            problems.append(f'only {counts[what]} {what} (expected at least {least})')
+    for npc_id, expected in EXPECTED_NPCS.items():
+        got = {column: by_id[npc_id][column] for column in expected} if npc_id in by_id else None
+        if got is None or any(not set(want) <= set(got[column]) for column, want in expected.items()):
+            problems.append(f'NPC {npc_id}: expected at least {expected}, got {got}')
+    for npc_id, stock in EXPECTED_STOCK.items():
+        shop = by_id[npc_id]['shop'] if npc_id in by_id else 0
+        got = [(e['item'], e['price'], e['rank']) for e in shops[shop - 1]] if 0 < shop <= len(shops) else None
+        if got != stock:
+            problems.append(f'NPC {npc_id}: expected the stock {stock}, got {got}')
+    for npc_id, (items, mob) in EXPECTED_ACTS.items():
+        if not any(a['npc'] == npc_id and a['act'] == 'trade' and a['items'] == items and mob in a['pops'] for a in acts):
+            problems.append(f'NPC {npc_id}: expected a trade of {items} that pops {mob}')
+    for key_item, name in EXPECTED_KEY_ITEMS.items():
+        if key_items.get(key_item) != name:
+            problems.append(f'key item {key_item}: expected the name {name!r}, got {key_items.get(key_item)!r}')
+    for npc_id, script in ABSENT_NPCS.items():
+        if npc_id in by_id:
+            problems.append(f'NPC {npc_id} ({script}) should be turned off by live\'s settings')
     return problems
 
 
@@ -168,9 +314,17 @@ def main(argv) -> int:
         drops_path = pathlib.Path(argv[3] if len(argv) == 4 else pathlib.Path(argv[1]).parent / schema.DROPS_NAME)
         records = load(argv[1])
         lists = schema.parse_drops(drops_path.read_text(encoding='utf-8'), str(drops_path))
-        problems = (check(records) + check_drops(records, lists) +
-                    check_rules(gen_rules.parse(rules_path.read_text(encoding='utf-8'), str(rules_path))))
-    except schema.DataError as error:
+        items_path = pathlib.Path(argv[1]).parent / schema.ITEMS_NAME
+        items = schema.parse_items(items_path.read_text(encoding='utf-8'), str(items_path))
+        tables = []
+        for parse, name in ((schema.parse_info, schema.INFO_NAME), (schema.parse_skills, schema.SKILLS_NAME),
+                            (schema.parse_spells, schema.SPELLS_NAME)):
+            path = pathlib.Path(argv[1]).parent / name
+            tables.append(parse(path.read_text(encoding='utf-8'), str(path)))
+        problems = (check(records) + check_drops(records, lists) + check_items(items) + check_info(records, *tables) +
+                    check_rules(gen_rules.parse(rules_path.read_text(encoding='utf-8'), str(rules_path))) +
+                    check_npcs(*gen_npcs.load(pathlib.Path(argv[1]).parent)))
+    except (schema.DataError, OSError) as error:
         problems = [str(error)]
     for problem in problems:
         print(f'validate: {problem}', file=sys.stderr)

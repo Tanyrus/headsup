@@ -12,6 +12,7 @@
 #include "d3d_util.h"
 #include "debug_report.h"
 #include "fonts.h"
+#include "game_font.h"
 #include "game_cursor.h"
 #include "game_names.h"
 #include "game_state.h"
@@ -31,6 +32,7 @@
 #include "settings.h"
 #include "shot_watch.h"
 #include "tracker.h"
+#include "window_file.h"
 #ifdef HEADSUP_DEV
 #include "codedump.h"
 #include "drawdump.h"
@@ -47,6 +49,7 @@
 #include <deque>
 #include <fstream>
 #include <iterator>
+#include <memory>
 #include <mutex>
 #include <unordered_map>
 #include <cstdio>
@@ -64,9 +67,10 @@ namespace
     constexpr const char* kName              = "headsup";
     // Ashita takes a plugin's version as one number, so it holds the release tag's major.minor; the release workflow
     // checks the two agree.
-    constexpr double kVersion                = 0.65;
+    constexpr double kVersion                = 0.7;
     constexpr const char* kConfigAlias       = "headsup";
     constexpr const char* kConfigFolder      = "config";
+    constexpr const char* kWindowFile        = "settings_window.json"; // a developer's build reads one in its config folder
     constexpr const char* kLogsFolder        = "logs";
     constexpr const char* kFolder            = "headsup"; // inside Ashita's config and logs folders
     constexpr const char* kCursorsFolder     = "cursors"; // inside HeadsUp's config folder: the player's cursor files
@@ -85,6 +89,11 @@ namespace
     constexpr const char* kMenuWidth         = "0037";
     constexpr float kWindowClearance         = 4.0f; // back buffer pixels between the help bar and a window it moved
     constexpr const char* kMenuHeight        = "0038";
+    // XIPivot, which puts its overlays' DAT files in place of the game's, and where it keeps its config and overlays.
+    constexpr const char* kPivotModule       = "pivot.dll";
+    constexpr const char* kPivotConfig       = "config\\pivot\\pivot.ini";
+    constexpr const char* kPivotDats         = "\\DATs";
+    constexpr uint64_t kMaxFontFileBytes     = 64u << 20; // the game's own is 4 MB
     constexpr uint32_t kPartyIconMembers     = 5;  // the other members of your party, whose buffs the game keeps
     constexpr uint32_t kPartyMembers         = 18; // you, your party and the two other alliance parties
     constexpr uint32_t kEngagedStatus        = 1;  // an entity's status while it fights
@@ -162,6 +171,12 @@ namespace
     const char* ItemName(uint16_t item)
     {
         const IItem* found = g_Resources != nullptr ? g_Resources->GetItemById(item) : nullptr;
+        return found != nullptr ? found->Name[0] : nullptr;
+    }
+
+    const char* SpellName(uint16_t spell)
+    {
+        const ISpell* found = g_Resources != nullptr ? g_Resources->GetSpellById(spell) : nullptr;
         return found != nullptr ? found->Name[0] : nullptr;
     }
 
@@ -282,6 +297,9 @@ class HeadsUp final : public IPlugin
 #ifdef HEADSUP_DEV
     headsup::DrawDump m_DrawDump;
     headsup::PointerWatch m_PointerWatch;
+    // config/headsup/settings_window.json, the window's layout in place of the built-in one while one is read.
+    std::unique_ptr<headsup::OwnedLayout> m_WindowFile;
+    headsup::WindowLayout m_WindowFileView;
     // Input played into HeadsUp's own mouse and keyboard handlers as Ashita would hand it over, a step a frame:
     // what /hu play queued, for trying the windows where no real pointer is.
     struct PlayedInput
@@ -305,15 +323,19 @@ class HeadsUp final : public IPlugin
     headsup::CursorTargets m_CursorTargets;
     float m_MenuWidth   = 0.0f;
     // The windows the hook moves, as last given it (none until the first frame), and those it has seen.
-    std::optional<headsup::WindowMoves> m_WindowMoves;
+    std::vector<headsup::ViewShift> m_PlacedShifts;      // what the window hook was last given
+    std::vector<headsup::WindowOffset> m_PlacedOffsets;
     std::optional<std::string> m_WindowLog;   // /hu windowlog's file, while it runs
     std::vector<std::string> m_LastOpen;      // the open windows it wrote last // what the window hook has: the settings' windows and groups
     std::vector<std::string> m_SeenWindows;
     std::vector<std::string> m_CursorFiles;      // the cursors folder's, as the Target Cursor and Cursor Icon lists offer them
     std::optional<std::string> m_CursorFileRead; // the File cursor read last, whether or not it was one
+    std::string m_GameFontFailure;                // why the game's font could not be read; empty when it was
+    bool m_GameFontWarned = false;
     float m_MenuHeight  = 0.0f;
     int m_CaptureLeft   = 0;
     std::string m_CapturePath;
+    std::string m_LastReport; // the file the last report or watch went to, which the settings window names
     std::string m_Capture;
     double m_CaptureLast = 0.0;
     LARGE_INTEGER m_QpcFrequency{};
@@ -361,6 +383,9 @@ public:
         }
         LoadSettings();
         ScanCursors();
+#ifdef HEADSUP_DEV
+        ReadWindowFile(false);
+#endif
         g_Gui       = core->GetGuiManager();
         g_BarClicks = &m_BarClicks;
         core->GetInputManager()->GetMouse()->AddCallback(kName, OnMouse);
@@ -497,6 +522,14 @@ public:
             {
                 m_WindowLog = OwnFolder(kLogsFolder) + "\\windows.log";
                 m_LastOpen.clear();
+                // The line the windows are placed under, with and without the help bar, in the game's menu pixels.
+                if (const std::optional<headsup::HelpBand> band = HelpBandNow())
+                    if (FILE* log = std::fopen(m_WindowLog->c_str(), "a"))
+                    {
+                        std::fprintf(log, "band %d topBar %d screen %dx%d\n", band->bottom, band->topBar,
+                            band->screenRight, band->screenBottom);
+                        std::fclose(log);
+                    }
                 Print("windowlog: writing which game windows are open to " + *m_WindowLog + "; /hu windowlog stop ends it.");
             }
         }
@@ -708,8 +741,9 @@ public:
         const headsup::HiddenWindows hidden{.helpBar = m_Settings.enabled && helpGone,
             .netstat = m_Settings.enabled && m_Settings.hideNetstat};
         const std::optional<headsup::HelpBand> band = HelpBandNow();
-        const bool movesWindows = (band && band->bottom != 0) || !m_Settings.windowOffsets.empty() ||
-                                  !m_Settings.windowGroups.empty() || m_Settings.allUnderBar || m_Settings.moveGameHelp;
+        const auto mode         = static_cast<size_t>(headsup::WindowHelpMode(m_Settings));
+        const bool movesWindows = (band && band->bottom != 0 && m_Settings.moveWindows) ||
+                                  !m_Settings.windowOffsets.empty() || m_Settings.moveGameHelp;
         if ((hidden.Any() || movesWindows) && !std::exchange(m_WindowHookTried, true))
         {
             if (const std::string failure = m_WindowHook.Start(); !failure.empty())
@@ -722,14 +756,22 @@ public:
         m_LoneCursorsDrawn = false;
         m_WindowHook.Hide(hidden);
         m_WindowHook.NewFrame();
-        m_WindowHook.MoveFrom(band);
-        if (headsup::WindowMoves moves =
-                headsup::CombinedMoves(m_Settings.movedWindows, m_Settings.windowOffsets, m_Settings.windowGroups);
-            moves != m_WindowMoves)
+        m_WindowHook.Place(band ? std::optional<headsup::WindowPlacing>(headsup::WindowPlacing{
+                                      .band         = *band,
+                                      .placedUnder  = m_Settings.placedUnder[mode],
+                                      .moveWindows  = m_Settings.moveWindows,
+                                      .keepClear    = m_Settings.keepClear,
+                                      .moveGameHelp = m_Settings.moveGameHelp && !m_Settings.hideHelpBar})
+                                : std::nullopt);
+        if (m_Settings.viewShifts[mode] != m_PlacedShifts)
         {
-            m_WindowHook.Move(moves.underBar);
-            m_WindowHook.Offset(moves.offsets);
-            m_WindowMoves = std::move(moves);
+            m_PlacedShifts = m_Settings.viewShifts[mode];
+            m_WindowHook.Shift(m_PlacedShifts);
+        }
+        if (m_Settings.windowOffsets != m_PlacedOffsets)
+        {
+            m_PlacedOffsets = m_Settings.windowOffsets;
+            m_WindowHook.Offset(m_PlacedOffsets);
         }
         if (m_WindowHook.SeenCount() != m_SeenWindows.size()) m_SeenWindows = m_WindowHook.SeenWindows();
         if (std::vector<std::string> open = m_WindowHook.TakeOpen(); m_WindowLog && open != m_LastOpen)
@@ -766,12 +808,41 @@ public:
                 .level            = m_Player.level,
                 .sitting          = m_Player.sitting,
                 .barTitlePixels   = m_RmlBar.TitlePixels(),
+                .windowsBand      = m_WindowHook.WindowsBand(),
+                .barBand          = HelpBandNow().value_or(headsup::HelpBand{}).topBar,
                 .seenWindows      = &m_SeenWindows,
                 .cursorFiles      = &m_CursorFiles,
+#ifdef HEADSUP_DEV
+                .watching         = m_DrawDump.Watching(),
+#else
+                .watching         = std::nullopt,
+#endif
+                .lastReport       = &m_LastReport,
+#ifdef HEADSUP_DEV
+                .exportable       = true,
+#endif
             };
             if (m_RmlMenu.Update(MenuHostNow(), m_Settings, readings, m_Fonts.Choices(m_Settings.defaultFont), kVersion))
+            {
                 m_SettingsChangedAt = now;
+                SayGameFontFailure();
+            }
             if (m_RmlMenu.TakeDebugRequest()) m_DebugPending = true;
+#ifdef HEADSUP_DEV
+            if (m_RmlMenu.TakeWatchRequest())
+            {
+                const bool stopping = m_DrawDump.Watching();
+                Print(m_DrawDump.Start(stopping ? headsup::kDrawDumpStop : headsup::kDrawDumpWatch, Now(), m_AshitaCore,
+                    OwnFolder(kLogsFolder)));
+                if (stopping) m_LastReport = m_DrawDump.LogPath();
+            }
+            if (m_RmlMenu.TakeReloadRequest())
+            {
+                ReadWindowFile(true);
+                m_RmlMenu.Close(); // built anew from the layout on the next frame
+            }
+            if (m_RmlMenu.TakeExportRequest()) ExportWindowFile();
+#endif
             if (m_RmlMenu.TakeCursorsRequest()) ScanCursors();
         }
         if (headsup::SaveDue(m_SettingsChangedAt, now, m_RmlMenu.open)) SaveSettings();
@@ -891,11 +962,10 @@ private:
         };
         return headsup::HelpBand{
             .bottom       = menuUnits(reach ? reach->y + reach->height : barBottom),
+            .clearance    = static_cast<int>(std::ceil(kWindowClearance * down)),
             .screenRight  = static_cast<int>(m_MenuWidth),
             .screenBottom = static_cast<int>(m_MenuHeight),
             .topBar       = menuUnits(barBottom),
-            .allUnderBar  = m_Settings.allUnderBar,
-            .moveGameHelp = m_Settings.moveGameHelp && !m_Settings.hideHelpBar,
         };
     }
 
@@ -1099,7 +1169,7 @@ private:
         for (const headsup::ActorPtr actor : m_Tracker.Actors())
             if (const headsup::ActorInfo* info = m_Tracker.Find(actor))
                 owners.push_back({actor, info->index,
-                    headsup::HookActionFor(info->state, m_Settings, m_Screenshot, m_Nameplates.NamesFailed())});
+                    headsup::HookActionFor(info->state, m_Settings, m_Player, m_Screenshot, m_Nameplates.NamesFailed())});
         return owners;
     }
 
@@ -1113,6 +1183,59 @@ private:
             Print("could not hook the game's target arrows, so it draws its own and HeadsUp none: " + failure + ".");
         if (const std::string failure = m_PointerFix.Start(); !failure.empty())
             Print("could not fix the game's mouse pointer: " + failure + ".");
+        ReadGameFont();
+        SayGameFontFailure();
+    }
+
+    // The font the game writes its names in, from the file it reads it from: while XIPivot is loaded, the first of
+    // its overlays that holds the file.
+    void ReadGameFont()
+    {
+        std::string pivotIni;
+        const std::string pivotFolder = headsup::ModuleFolder(kPivotModule);
+        if (!pivotFolder.empty())
+        {
+            std::ifstream in(std::string(m_AshitaCore->GetInstallPath()) + kPivotConfig, std::ios::binary);
+            pivotIni.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+        }
+        const std::string gameFolder = headsup::ModuleFolder(headsup::kGameModule);
+        for (const std::string& path : headsup::GameFontCandidates(pivotIni, pivotFolder + kPivotDats, gameFolder))
+        {
+            std::ifstream in(path, std::ios::binary | std::ios::ate);
+            const std::streamoff size = in.tellg();
+            if (!in || size <= 0) continue;
+            m_GameFontFailure = path + ": ";
+            if (static_cast<uint64_t>(size) > kMaxFontFileBytes)
+            {
+                m_GameFontFailure += "it is too large";
+                return;
+            }
+            std::vector<uint8_t> bytes(static_cast<size_t>(size));
+            in.seekg(0);
+            if (!in.read(reinterpret_cast<char*>(bytes.data()), size))
+            {
+                m_GameFontFailure += "it could not be read";
+                return;
+            }
+            headsup::Read<headsup::GameFontFace> font = headsup::ReadGameFont(bytes);
+            if (!font.value)
+            {
+                m_GameFontFailure += font.failure;
+                return;
+            }
+            m_GameFontFailure.clear();
+            m_Nameplates.SetGameFont(std::move(font.value));
+            return;
+        }
+        m_GameFontFailure = "the game's ROM\\119\\51.DAT was not found under " + gameFolder;
+    }
+
+    // Once, when a nameplate is set in the game's font and it could not be read.
+    void SayGameFontFailure()
+    {
+        if (m_GameFontFailure.empty() || !headsup::UsesGameFont(m_Settings) || std::exchange(m_GameFontWarned, true)) return;
+        Print("the game's font could not be read (" + m_GameFontFailure + "): nameplates set in it are drawn in " +
+              headsup::kDefaultFont + " until HeadsUp is reloaded.");
     }
 
 #ifdef HEADSUP_DEV
@@ -1292,8 +1415,55 @@ private:
             host.textFont = font->name;
         for (const headsup::MenuFont& choice : headsup::kMenuFonts)
             if (headsup::MenuFontInstalled(choice)) host.menuFonts.emplace_back(choice.name);
+#ifdef HEADSUP_DEV
+        host.developer = true;
+        if (m_WindowFile != nullptr) host.layout = &m_WindowFileView;
+#endif
         return host;
     }
+
+#ifdef HEADSUP_DEV
+    std::string WindowFilePath() { return OwnFolder(kConfigFolder) + "\\" + kWindowFile; }
+
+    // Takes config/headsup/settings_window.json as the window's layout when it is of this build's version, and the
+    // built-in one when there is none or it does not fit. said: a line in the chat however it went.
+    void ReadWindowFile(bool said)
+    {
+        const std::string path = WindowFilePath();
+        std::ifstream in(path, std::ios::binary);
+        m_WindowFile.reset();
+        if (!in)
+        {
+            if (said) Print("no " + path + "; the window is the built-in one");
+            return;
+        }
+        const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        auto read = std::make_unique<headsup::OwnedLayout>();
+        if (const std::string problem = headsup::ReadWindowFile(text, headsup::kWindowLayout, headsup::kWindowFileVersion, *read);
+            !problem.empty())
+        {
+            Print(std::string(kWindowFile) + ": " + problem + "; the window is the built-in one");
+            return;
+        }
+        m_WindowFile     = std::move(read);
+        m_WindowFileView = m_WindowFile->View();
+        if (said) Print("read " + path);
+    }
+
+    // Writes the built-in layout to config/headsup/settings_window.json, never over a file already there.
+    void ExportWindowFile()
+    {
+        const std::string path = WindowFilePath();
+        if (std::ifstream(path).good())
+        {
+            Print(path + " is already there; move it away to export again");
+            return;
+        }
+        std::ofstream out(path, std::ios::binary);
+        out.write(headsup::kWindowFileText.data(), static_cast<std::streamsize>(headsup::kWindowFileText.size()));
+        Print(out ? "wrote " + path : "could not write " + path);
+    }
+#endif
 
 #ifdef HEADSUP_DEV
     // /hu play click X Y [right] | move X Y | drag X Y TOX TOY | wheel X Y NOTCHES | key NAME | type TEXT
@@ -1363,10 +1533,12 @@ private:
             m_Played.push_back(PlayedInput{true, 0, kKeys.at(args[3]), 1});
             m_Played.push_back(PlayedInput{true, 0, kKeys.at(args[3]), static_cast<LPARAM>(kUp)});
         }
-        else if (what == "theme" || what == "height" || what == "seps" || what == "text" || what == "popuptext")
+        else if (what == "theme" || what == "height" || what == "seps" || what == "text" || what == "popuptext" ||
+                 what == "moves")
         {
             // A bar setting by number, saved as a change in the window is.
             const int value = static_cast<int>(number(3));
+            if (what == "moves") m_Settings.moveWindows = value != 0;
             if (what == "theme") m_Settings.barTheme = static_cast<headsup::BarTheme>(value);
             if (what == "height") m_Settings.barHeight = value;
             if (what == "seps") m_Settings.barSeparators = static_cast<headsup::BarSeparators>(value);
@@ -1706,8 +1878,10 @@ private:
         }
         if (needs.target)
         {
-            s.target   = m_Tracker.FindIndex(m_CursorTargets.target);
-            s.itemName = ItemName;
+            s.target    = m_Tracker.FindIndex(m_CursorTargets.target);
+            s.itemName  = ItemName;
+            s.spellName = SpellName;
+            s.caster    = m_Player.caster;
         }
         if (s.target != nullptr)
             s.targetDistance = headsup::DistanceFromSquared(
@@ -1808,6 +1982,36 @@ private:
             if (party->GetStatusIconsServerId(member) != 0 &&
                 headsup::LevelSyncInPartyIcons(party->GetStatusIcons(member), party->GetStatusIconsBitMask(member)))
                 m_BuffSynced.insert(static_cast<uint16_t>(party->GetStatusIconsTargetIndex(member)));
+    }
+
+    // Your magic accuracy as the game knows it; nullopt before the game reports your level.
+    std::optional<headsup::Caster> CasterNow() const
+    {
+        // Ashita's stat IDs of INT, MND and CHR, in CasterStat order; an equipped item's index holds its container
+        // over its slot.
+        constexpr uint32_t kStatIds[headsup::kCasterStatCount] = {4, 5, 6};
+        constexpr uint32_t kContainerShift = 8, kSlotBits = 0xFF;
+        IPlayer* player                   = m_AshitaCore->GetMemoryManager()->GetPlayer();
+        const Ashita::FFXI::player_t* raw = player->GetRawStructure();
+        if (raw == nullptr || player->GetMainJobLevel() == 0) return std::nullopt;
+        headsup::CasterReading reading;
+        reading.level = player->GetMainJobLevel();
+        static_assert(sizeof(raw->CombatSkills) == sizeof(reading.combatSkills));
+        std::memcpy(reading.combatSkills, &raw->CombatSkills, sizeof(reading.combatSkills));
+        for (int i = 0; i < headsup::kCasterStatCount; ++i)
+            reading.stat[i] = player->GetStat(kStatIds[i]) + player->GetStatModifier(kStatIds[i]);
+        IInventory* inventory = m_AshitaCore->GetMemoryManager()->GetInventory();
+        for (uint32_t slot = 0; slot < headsup::kEquipSlotCount; ++slot)
+        {
+            const Ashita::FFXI::equipmententry_t* entry = inventory->GetEquippedItem(slot);
+            if (entry == nullptr || entry->Index == 0) continue;
+            const Ashita::FFXI::item_t* item =
+                inventory->GetContainerItem((entry->Index >> kContainerShift) & kSlotBits, entry->Index & kSlotBits);
+            if (item != nullptr) reading.equipped[slot] = item->Id;
+        }
+        if (const int16_t* buffs = player->GetBuffs(); buffs != nullptr)
+            reading.buffs = std::span(buffs, headsup::kStatusIconSlots);
+        return headsup::CasterOf(reading);
     }
 
     // The names of the linkshells you wear, from their items: Phoenix equips a linkshell from any container.
@@ -1925,6 +2129,7 @@ private:
                 .linkshell      = isPlayer && headsup::SharesLinkshell(m_GameState.PlayerCheckOf(serverId), m_Linkshells),
                 .engaged        = state == kEngagedStatus,
                 .untargetable   = m_GameState.Untargetable(index),
+                .calledForHelp  = isMob && m_GameState.CalledForHelp(index),
                 .self           = self,
                 .jobs           = isPlayer ? JobsOf(index, serverId) : std::nullopt,
                 .title          = isPlayer ? TitleOf(self, serverId, player) : 0,
@@ -1944,6 +2149,7 @@ private:
         for (headsup::CheckCandidate& candidate : checkable)
             candidate.pet = petOwners.contains(candidate.index);
         m_Player.level   = player->GetMainJobLevel();
+        m_Player.caster  = CasterNow();
         m_Player.sitting = headsup::IsSittingStatus(entity->GetStatus(m_SelfIndex));
         // The status the server gave you says an event runs: your own stayed 0 through an NPC's dialog, a cutscene
         // and one begun at zone-in.
@@ -1978,6 +2184,7 @@ private:
         std::fclose(out);
         Print("wrote " + path + "; recording " + std::to_string(kCaptureFrames) + " frames");
         m_CapturePath = path;
+        m_LastReport  = path;
         m_Capture     = headsup::kCaptureHeading;
         m_CaptureLeft = kCaptureFrames;
         m_CaptureLast = Now();

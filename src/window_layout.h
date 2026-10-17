@@ -63,6 +63,9 @@ namespace headsup
         uint8_t kinds;
         bool entity; // part of an entity's design: drawn for its page's kind
         int firstOption, optionCount, firstRow, rowCount;
+        bool rowsFixed;    // its rows come in the code's order
+        uint8_t codeKinds; // the kinds the code has it on, whatever the file says
+        bool indent;       // drawn in from the card's edge, under the setting it belongs to
     };
     struct LayoutCard
     {
@@ -72,6 +75,7 @@ namespace headsup
         const char* about;
         uint8_t kinds;
         int firstSetting, settingCount;
+        bool switched; // its title's switch is the only one of its setting, so it cannot go
     };
     struct LayoutPage
     {
@@ -92,6 +96,8 @@ namespace headsup
         WindowWord word;
         const char* name;
         const char* tip;
+        const char* key;
+        const char* setting; // the key of the setting it is a word of, none for the window's own
     };
 
     struct WindowLayout
@@ -115,6 +121,8 @@ namespace headsup
         const LayoutWord& WordOf(WindowWord word) const;
     };
     extern const WindowLayout kWindowLayout;
+    // data/settings_window.json as it was built in, and the plugin's version it is of.
+    extern const std::string_view kWindowFileText, kWindowFileVersion;
 
     // A word of the layout as text: a tip the file leaves out is none.
     inline std::string_view Said(const char* text) { return text != nullptr ? std::string_view(text) : std::string_view(); }
@@ -122,6 +130,7 @@ namespace headsup
     // In a word of the layout, where the code puts what it stands for: a line's name, a count, the yalms a fade starts
     // at, the tags a note names.
     constexpr std::string_view kLineMark = "{line}", kCountMark = "{count}", kNearMark = "{near}", kTagsMark = "{tags}";
+    constexpr std::string_view kFileMark = "{file}";
     // The text with every mark in it replaced by what it stands for.
     std::string Filled(std::string_view text, std::string_view mark, std::string_view with);
 

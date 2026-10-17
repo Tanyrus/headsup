@@ -10,21 +10,40 @@ from tooling import load
 compact = load('tools/phoenix/compact.py')
 validate = load('tools/phoenix/validate.py')
 
-MOBS = [
+# What the dump writes of a mob that has nothing of these: its script's name and zone, its jobs, charm, senses, added
+# effect, TP move list, the damage taken mods (headsup_dump.cpp's kDamageMods), its absorbs and its trait mods
+# (kTraitMods). Each level of its stats ends with COMBAT, its HP, MP, attack, defense, evasion and accuracy.
+PLAIN = {'script': 'Ice_Elemental', 'zoneName': 'Garlaige_Citadel', 'jobs': [4, 4], 'charmable': 0, 'senses': [15, 8],
+         'addEffect': 0, 'skillList': 0, 'damageMods': [0] * 10, 'absorb': [0] * 8, 'traits': [0] * 8}
+COMBAT = [100, 50, 30, 31, 32, 33]
+
+
+def dumped(mob):
+    return dict(mob, **PLAIN, stats=[level + COMBAT for level in mob['stats']])
+
+
+MOBS = [dumped(m) for m in [
     {'id': 17199648, 'zone': 103, 'name': 'Goblin_Bounty_Hunter', 'minLevel': 17, 'maxLevel': 20, 'respawn': 300,
      'aggro': True, 'alwaysAggro': 0, 'noAggro': 0, 'type': 0,
      'link': True, 'detects': 0x001 | 0x002, 'trueDetection': False, 'expLevelMod': 0, 'follows': False,
      'placeholderOf': 17199700, 'immunity': 0x1000 | 0x10, 'sdt': [0, 2500] + [0] * 10,
-     'elementRanks': [-2] * 6 + [-3, 0], 'statusRanks': [0] * 10, 'dropList': 1},
+     'elementRanks': [-2] * 6 + [-3, 0], 'statusRanks': [0] * 10, 'dropList': 1,
+     'elementMeva': [0, 10] + [0] * 6, 'statusMeva': [0] * 5 + [15, 15] + [0] * 3, 'statusResist': [5] * 10,
+     'stats': [[30 + n, 28, 29, 27, 25, 24, 23, 70 + 2 * n] for n in range(4)]},
     {'id': 17199105, 'zone': 103, 'name': 'Stag_Crab', 'minLevel': 15, 'maxLevel': 17, 'respawn': 0,
      'aggro': True, 'alwaysAggro': 1, 'noAggro': 0, 'type': 0x04,
      'link': False, 'detects': 0x002, 'trueDetection': False, 'expLevelMod': 0, 'follows': False, 'placeholderOf': 0,
-     'immunity': 0, 'sdt': [0] * 12, 'elementRanks': [0] * 8, 'statusRanks': [0] * 10, 'dropList': 0},
+     'immunity': 0, 'sdt': [0] * 12, 'elementRanks': [0] * 8, 'statusRanks': [0] * 10, 'dropList': 0,
+     'elementMeva': [0] * 8, 'statusMeva': [0] * 10, 'statusResist': [0] * 10, 'stats': []},
     {'id': 17272838, 'zone': 121, 'name': 'Guardian_Treant', 'minLevel': 32, 'maxLevel': 32, 'respawn': 960,
      'aggro': False, 'alwaysAggro': 0, 'noAggro': 1, 'type': 0x02 | 0x10,
      'link': False, 'detects': 0x100, 'trueDetection': True, 'expLevelMod': -2, 'follows': True, 'placeholderOf': 0,
-     'immunity': 0, 'sdt': [0] * 12, 'elementRanks': [0] * 8, 'statusRanks': [0] * 10},
-]
+     'immunity': 0, 'sdt': [0] * 12, 'elementRanks': [0] * 8, 'statusRanks': [0] * 10,
+     'elementMeva': [0] * 8, 'statusMeva': [0] * 10, 'statusResist': [0] * 10, 'stats': [[40, 41, 42, 43, 44, 45, 46, 90]]},
+]]
+# As the dump module writes them: an Ice Staff and a wind instrument (skill 42).
+ITEMS = [{'id': 17547, 'macc': 0, 'elementMacc': [0] * 8, 'staffBonus': [0, 1] + [0] * 6, 'skill': 0},
+         {'id': 17352, 'macc': 0, 'elementMacc': [0] * 8, 'staffBonus': [0] * 8, 'skill': 42}]
 
 # As the dump module writes them: differences out past the table, which GetBaseExp clamps to, and cons as numbers.
 # As the dump module writes them: [DROP_TYPE, item, rate, fixed], 0 normal, 1 grouped, 2 steal, 4 despoil.
@@ -46,25 +65,60 @@ RULES = {'firstDifference': -3,
          'sittingAnimations': [33, 47]}
 
 
-ZERO_LISTS = ['0', ','.join(['0'] * 12), ','.join(['0'] * 8), ','.join(['0'] * 10)]
-ZEROS_RECORD = {'immunity': 0, 'sdt': [0] * 12, 'elementRanks': [0] * 8, 'statusRanks': [0] * 10, 'drops': 0}
+ZERO_LISTS = ['0', ','.join(['0'] * 12), ','.join(['0'] * 8), ','.join(['0'] * 10), ','.join(['0'] * 8),
+              ','.join(['0'] * 10), ','.join(['0'] * 10), '']
+ZEROS_RECORD = {'immunity': 0, 'sdt': [0] * 12, 'elementRanks': [0] * 8, 'statusRanks': [0] * 10, 'elementMeva': [0] * 8,
+                'statusMeva': [0] * 10, 'statusResist': [0] * 10, 'stats': [], 'drops': 0}
 
 
-def dump(mobs, rules=RULES, drop_lists=DROP_LISTS):
-    return {'mobs': mobs, 'dropLists': drop_lists, 'rules': rules}
+# What live_settings.lua sets, as LIVE_SETTINGS_TEXT spells it and a dump writes it back.
+LIVE_SETTINGS_TEXT = """-- live's
+xi = xi or {}
+xi.settings = xi.settings or {}
+
+-- content
+xi.settings.main.RESTRICT_CONTENT = 1
+xi.settings.main.ENABLE_WOTG      = 0
+
+xi.settings.main.USE_ADOULIN_WEAPON_SKILL_CHANGES = false
+xi.settings.map.DROP_RATE_MULTIPLIER = 1.5
+"""
+SETTINGS = {'main': {'RESTRICT_CONTENT': 1, 'ENABLE_WOTG': 0, 'ENABLE_SOA': 1,
+                     'USE_ADOULIN_WEAPON_SKILL_CHANGES': False, 'SERVER_NAME': 'Nameless'},
+            'map': {'DROP_RATE_MULTIPLIER': 1.5, 'MOB_STAT_MULTIPLIER': 1.0}}
 
 
-def run_compact(tmp, *dumps):
+def dump(mobs, rules=RULES, drop_lists=DROP_LISTS, settings=SETTINGS, items=ITEMS, skill_lists=(), mob_skills=(),
+         spell_lists=()):
+    return {'mobs': mobs, 'dropLists': drop_lists, 'skillLists': list(skill_lists), 'mobSkills': list(mob_skills),
+            'spellLists': list(spell_lists), 'rules': rules, 'settings': settings, 'items': items}
+
+
+def tsv(path):
+    return [line.split('\t') for line in path.read_text().splitlines()]
+
+
+def run_compact(tmp, *dumps, scripts=None):
+    """Compacts the dumps against a checkout holding scripts, {(zone, script): text}. The new files' rows are in
+    run_compact.items, .info, .skills and .spells."""
     paths = []
     for n, contents in enumerate(dumps):
         path = pathlib.Path(tmp) / f'run-{n}.json'
         path.write_text(json.dumps(contents))
         paths.append(path)
-    compact.compact(paths, tmp, 'abc123')
-    out = pathlib.Path(tmp)
-    rows = [line.split('\t') for line in (out / 'phoenix_mobs.tsv').read_text().splitlines()]
-    drops = [line.split('\t') for line in (out / 'phoenix_drops.tsv').read_text().splitlines()]
-    return rows, (out / 'phoenix_mobs.meta').read_text(), json.loads((out / 'phoenix_rules.json').read_text()), drops
+    settings = pathlib.Path(tmp) / 'live_settings.lua'
+    settings.write_text(LIVE_SETTINGS_TEXT)
+    server = pathlib.Path(tmp) / 'server'
+    for (zone, script), text in (scripts or {}).items():
+        path = server / 'scripts' / 'zones' / zone / 'mobs' / f'{script}.lua'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+    out = pathlib.Path(tmp) / 'out'
+    compact.compact(paths, out, 'abc123', settings, server)
+    for name in ('items', 'mob_info', 'skills', 'spells'):
+        setattr(run_compact, name.removeprefix('mob_'), tsv(out / f'phoenix_{name}.tsv'))
+    return (tsv(out / 'phoenix_mobs.tsv'), (out / 'phoenix_mobs.meta').read_text(),
+            json.loads((out / 'phoenix_rules.json').read_text()), tsv(out / 'phoenix_drops.tsv'))
 
 
 class Compact(unittest.TestCase):
@@ -75,11 +129,20 @@ class Compact(unittest.TestCase):
     def test_rows_are_sorted_by_id_with_display_names(self):
         self.assertEqual(self.rows[0], ['id', 'zone', 'name', 'minLevel', 'maxLevel', 'flags', 'respawn', 'detects',
                                         'expLevelMod', 'placeholderOf', 'immunity', 'sdt', 'elementRanks', 'statusRanks',
-                                        'drops'])
+                                        'elementMeva', 'statusMeva', 'statusResist', 'stats', 'drops'])
         self.assertEqual([row[0] for row in self.rows[1:]], ['17199105', '17199648', '17272838'])
         self.assertEqual(self.rows[2], ['17199648', '103', 'Goblin Bounty Hunter', '17', '20', '33', '300', '3', '0',
                                         '17199700', '4112', '0,2500,0,0,0,0,0,0,0,0,0,0', '-2,-2,-2,-2,-2,-2,-3,0',
-                                        '0,0,0,0,0,0,0,0,0,0', '2'])
+                                        '0,0,0,0,0,0,0,0,0,0', '0,10,0,0,0,0,0,0', '0,0,0,0,0,15,15,0,0,0',
+                                        '5,5,5,5,5,5,5,5,5,5',
+                                        '30,28,29,27,25,24,23,70;31,28,29,27,25,24,23,72;32,28,29,27,25,24,23,74;'
+                                        '33,28,29,27,25,24,23,76', '2'])
+        self.assertEqual(self.rows[1][17], '')  # a mob the dump never saw spawned has no stats
+
+    def test_items_are_written_by_id(self):
+        self.assertEqual(run_compact.items, [['id', 'macc', 'elementMacc', 'staffBonus', 'skill'],
+                                             ['17352', '0', '0,0,0,0,0,0,0,0', '0,0,0,0,0,0,0,0', '42'],
+                                             ['17547', '0', '0,0,0,0,0,0,0,0', '0,1,0,0,0,0,0,0', '0']])
 
     def test_flags_respawn_detection_and_the_level_mod(self):
         self.assertEqual(self.rows[1][5:10], [str(1 | 2), '0', '2', '0', '0'])  # aggro + always aggro (fished ignored)
@@ -129,7 +192,9 @@ def mob(**fields):
     base = {'id': 16797854, 'zone': 5, 'name': 'Ice_Elemental', 'minLevel': 76, 'maxLevel': 77, 'respawn': 300,
             'aggro': False, 'alwaysAggro': 0, 'noAggro': 0, 'type': 0, 'link': False, 'detects': 0x020,
             'trueDetection': False, 'expLevelMod': 0, 'follows': False, 'placeholderOf': 0, 'immunity': 0,
-            'sdt': [0] * 12, 'elementRanks': [0] * 8, 'statusRanks': [0] * 10, 'dropList': 0}
+            'sdt': [0] * 12, 'elementRanks': [0] * 8, 'statusRanks': [0] * 10, 'dropList': 0,
+            'elementMeva': [0] * 8, 'statusMeva': [0] * 10, 'statusResist': [0] * 10, 'stats': []}
+    base.update(PLAIN)
     base.update(fields)
     return base
 
@@ -178,8 +243,24 @@ class MergeSnapshots(unittest.TestCase):
                     trueDetection=True, follows=True, immunity=0x2, dropList=1)
         rows, _ = self.compact_rows([first], [later])
         self.assertEqual(rows[0], ['16797854', '5', 'Ice Elemental', '75', '78', '32', '300', '2', '-2', '16797860',
-                                   '2048', ','.join(['0'] * 12), ','.join(['0'] * 8), '0,0,0,0,0,6,0,0,0,0', '1'])
+                                   '2048', ','.join(['0'] * 12), ','.join(['0'] * 8), '0,0,0,0,0,6,0,0,0,0',
+                                   ','.join(['0'] * 8), ','.join(['0'] * 10), ','.join(['0'] * 10), '', '1'])
         self.assertEqual(self.drops, DROPS_ROWS[:4])
+
+    def test_stats_cover_the_merged_range_level_by_level_or_are_left_out(self):
+        def at(level):
+            return [level, 1, 1, 1, level + 1, 1, 1, 2 * level]
+
+        def dumped_at(*levels):
+            return [at(level) + [10 * level, 0, level, level, level, level] for level in levels]
+        first = mob(minLevel=76, maxLevel=77, stats=dumped_at(76, 77))
+        rows, _ = self.compact_rows([first], [mob(minLevel=75, maxLevel=78, stats=dumped_at(75, 76, 77, 78))])
+        self.assertEqual(rows[0][17], ';'.join(','.join(str(v) for v in at(level)) for level in range(75, 79)))
+        self.assertEqual(run_compact.info[1][-1], ';'.join(f'{10 * n},0,{n},{n},{n},{n}' for n in range(75, 79)))
+        rows, _ = self.compact_rows([first], [mob(minLevel=75, maxLevel=76, stats=dumped_at(75, 76)),
+                                              mob(id=16797855)], [mob(minLevel=78, maxLevel=78)])
+        self.assertEqual(rows[0][17], '')  # level 78 never had stats
+        self.assertEqual(run_compact.info[1][-1], '')
 
     def test_a_drop_list_that_differs_in_a_later_snapshot_is_named(self):
         self.compact_rows([mob(), mob(id=16797855)], [mob(dropList=1), mob(id=16797855)])
@@ -207,6 +288,114 @@ class MergeSnapshots(unittest.TestCase):
         self.assertIn('dumps\t2\n', meta)
 
 
+# Attohwa Chasm's Citipati, as its template and spawn there have him: THF/BLM, 8,000 HP whatever his level, out from
+# 20:00 to 04:00 and a lottery NM at 15% with three hours out after his kill; his Corse family takes a quarter less
+# magic damage and half breath damage. Its script adds HP Drain.
+CITIPATI = dict(id=16806162, zone=7, name='Citipati', minLevel=67, maxLevel=68, script='Citipati', zoneName='Attohwa_Chasm',
+                jobs=[6, 4], window=[20, 4], lottery=[15, 10800], charmable=1, senses=[20, 8], addEffect=1,
+                skillList=74, spellList=1,
+                damageMods=[0, 0, -2500, 0, 0, 0, 0, -5000, 0, 0], absorb=[0, 0, 100, 0, 0, 0, 0, 0],
+                traits=[1, 0, 0, 2, 0, 10, 2, 0],  # Regen 1, Blink, Counter; spikes are not a trait
+                stats=[[1] * 8 + [8000, 1926, 274, 261, 312, 275], [1] * 8 + [8000, 1957, 279, 266, 317, 280]])
+CITIPATI_SCRIPT = """entity.onAdditionalEffect = function(mob, target, damage)
+    return xi.mob.onAddEffect(mob, target, damage, xi.mob.ae.HP_DRAIN)
+end
+"""
+SKILL_LISTS = [{'id': 74, 'skills': [442, 443, 999]}]  # 999 has no move: GetMobSkill found none
+MOB_SKILLS = [{'id': 442, 'name': 'bubble_shower'}, {'id': 443, 'name': 'gates_of_hades'}]
+SPELL_LISTS = [[[159, 1, 8], [220, 3, 25]]]
+
+
+class Info(unittest.TestCase):
+    def compact_info(self, *mobs, scripts=None, **lists):
+        lists = dict({'skill_lists': SKILL_LISTS, 'mob_skills': MOB_SKILLS, 'spell_lists': SPELL_LISTS}, **lists)
+        with tempfile.TemporaryDirectory() as tmp:
+            self.rows, _, _, _ = run_compact(tmp, dump(list(mobs), **lists), scripts=scripts)
+        return run_compact.info
+
+    def test_a_mob_s_row(self):
+        info = self.compact_info(mob(**CITIPATI), scripts={('Attohwa_Chasm', 'Citipati'): CITIPATI_SCRIPT})
+        self.assertEqual(info[0], ['id', 'jobs', 'senses', 'window', 'lottery', 'traits', 'addEffect', 'absorb',
+                                   'damageTaken', 'skills', 'spells', 'combat'])
+        self.assertEqual(info[1], ['16806162', '6,4', '20,8', '20,4', '15,10800', str(1 | 8 | 16), 'HP Drain',
+                                   '0,0,100,0,0,0,0,0', '0,-2500,0,-5000', '1', '1',
+                                   '8000,1926,274,261,312,275;8000,1957,279,266,317,280'])
+        self.assertEqual(int(self.rows[1][5]) & 16, 16)  # charmable, in phoenix_mobs.tsv's flags
+        self.assertEqual(run_compact.skills, [['list', 'skill', 'name'], ['1', '442', 'Bubble Shower'],
+                                              ['1', '443', 'Gates of Hades']])
+        self.assertEqual(run_compact.spells, [['list', 'spell', 'minLevel', 'maxLevel'], ['1', '159', '1', '8'],
+                                              ['1', '220', '3', '25']])
+
+    def test_a_mob_with_none_of_it(self):
+        info = self.compact_info(mob())
+        self.assertEqual(info[1], ['16797854', '4,4', '15,8', '', '0,0', '0', '', ','.join(['0'] * 8), '0,0,0,0', '0',
+                                   '0', ''])
+
+    def test_what_melee_hits_add_comes_from_the_script(self):
+        def effect(script, adds=1):
+            scripts = {('Attohwa_Chasm', 'Citipati'): script} if script is not None else None
+            return self.compact_info(mob(**dict(CITIPATI, addEffect=adds)), scripts=scripts)[1][6]
+        paralyze = 'entity.onAdditionalEffect = function(mob, target, damage)\n    local p = { effectId = xi.effect.PARALYSIS }\n'
+        wind = 'entity.onAdditionalEffect = function(mob, target, damage)\n    local p = { magicalElement = xi.element.WIND }\n'
+        self.assertEqual(effect(paralyze), 'Paralysis')
+        self.assertEqual(effect(wind), 'Wind Damage')
+        self.assertEqual(effect(CITIPATI_SCRIPT.replace('HP_DRAIN', 'ENAMNESIA')), 'Amnesia')
+        self.assertEqual(effect(None), 'Unknown')  # a mixin or family adds it
+        self.assertEqual(effect(CITIPATI_SCRIPT, adds=0), '')  # the server calls the script only with the mob mod
+
+    def test_equal_lists_are_numbered_once_by_their_first_mob(self):
+        info = self.compact_info(mob(skillList=74, spellList=1), mob(id=16797855, skillList=74, spellList=1),
+                                 mob(id=16797856, skillList=75, spellList=2),
+                                 skill_lists=SKILL_LISTS + [{'id': 75, 'skills': [443]}],
+                                 spell_lists=SPELL_LISTS + [[[159, 1, 8]]])
+        self.assertEqual([row[9:11] for row in info[1:]], [['1', '1'], ['1', '1'], ['2', '2']])
+        self.assertEqual(run_compact.skills[3:], [['2', '443', 'Gates of Hades']])
+
+    def test_a_level_of_stats_must_be_as_wide_as_the_dump_writes_it(self):
+        with self.assertRaises(compact.schema.DataError) as caught:
+            self.compact_info(mob(minLevel=76, maxLevel=76, stats=[[1] * 8]))
+        self.assertIn('mob 16797854 has a level of stats that is not the 14 values', str(caught.exception))
+        with self.assertRaises(compact.schema.DataError) as caught:
+            self.compact_info(mob(spellList=2))
+        self.assertIn('mob 16797854 has spell list 2, past the 1 dumped', str(caught.exception))
+
+
+class DamageTaken(unittest.TestCase):
+    """battleutils' PhysicalDmgTaken, MagicDmgTaken, RangedDmgTaken and its breath damage, the mods in kDamageMods'
+    order: uncapped and capped physical, uncapped, capped and second magic, ranged, breath, then DMG."""
+
+    def taken(self, **mods):
+        return compact.damage_taken([mods.get(name, 0) for name in compact.DAMAGE_MODS])
+
+    def test_none_is_no_change(self):
+        self.assertEqual(self.taken(), [0, 0, 0, 0])
+
+    def test_the_capped_mods_stop_at_half_and_the_uncapped_go_on(self):
+        self.assertEqual(self.taken(dmgphys=-6000)[0], -5000)
+        self.assertEqual(self.taken(udmgphys=-6000)[0], -6000)
+        self.assertEqual(self.taken(udmgmagic=-12000)[1], -10000)  # never below nothing
+        self.assertEqual(self.taken(udmgphys=-5000, dmgphys=-5000)[0], -7500)  # one after the other
+
+    def test_dmg_counts_for_every_capped_kind_and_breath_stops_at_one_and_a_half(self):
+        self.assertEqual(self.taken(dmg=-1000), [-1000] * 4)
+        self.assertEqual(self.taken(dmgbreath=8000)[3], 5000)
+        self.assertEqual(self.taken(dmgrange=8000)[2], 8000)
+
+    def test_magic_s_second_kind_goes_past_its_half_to_an_eighth(self):
+        self.assertEqual(self.taken(dmgmagic=-6000, dmgmagic_ii=-2000)[1], -7000)
+        self.assertEqual(self.taken(dmgmagic=-6000, dmgmagic_ii=-5000)[1], -8750)
+
+
+class Titles(unittest.TestCase):
+    def test_a_name_as_the_game_writes_it(self):
+        self.assertEqual(compact.title('gates_of_hades'), 'Gates of Hades')
+        self.assertEqual(compact.title('HP_DRAIN'), 'HP Drain')
+        self.assertEqual(compact.title('self-destruct'), 'Self-Destruct')
+        self.assertEqual(compact.title('of_the_wind'), 'Of the Wind')
+        self.assertEqual(compact.title('blizzard_ii'), 'Blizzard II')
+        self.assertEqual(compact.title('1000_needles'), '1000 Needles')
+
+
 class Rules(unittest.TestCase):
     def assertCompactFails(self, message, *dumps):
         with tempfile.TemporaryDirectory() as tmp:
@@ -217,6 +406,7 @@ class Rules(unittest.TestCase):
     def test_dumps_that_disagree_are_an_error(self):
         other = dict(RULES, sittingAnimations=[33])
         self.assertCompactFails('run-1.json: its rules differ from those of', dump([mob()]), dump([mob()], other))
+        self.assertCompactFails('run-1.json: its items differ from those of', dump([mob()]), dump([mob()], items=ITEMS[:1]))
 
     def test_an_unknown_difficulty_is_an_error(self):
         broken = dict(RULES, difficulty=[{'minExp': 1, 'con': 8}])
@@ -227,6 +417,20 @@ class Rules(unittest.TestCase):
     def test_rules_the_plugin_cannot_hold_are_an_error(self):
         broken = dict(RULES, baseExp=[[0] * 19])
         self.assertCompactFails('phoenix_rules.json: baseExp row 0 must have 20 columns', dump([mob()], broken))
+
+    def test_a_dump_run_with_other_settings_than_live_s_names_each(self):
+        # XI_MAIN_USE_ADOULIN_WEAPON_SKILL_CHANGES=0 runs with the number 0, which Lua counts as true.
+        other = {'main': dict(SETTINGS['main'], RESTRICT_CONTENT=0, USE_ADOULIN_WEAPON_SKILL_CHANGES=0),
+                 'map': SETTINGS['map']}
+        self.assertCompactFails('run-1.json: the server ran with main.RESTRICT_CONTENT 0 and '
+                                'main.USE_ADOULIN_WEAPON_SKILL_CHANGES 0, where live_settings.lua has 1 and False',
+                                dump([mob()]), dump([mob()], settings=other))
+
+    def test_a_dump_missing_a_live_setting_names_it(self):
+        other = {'main': SETTINGS['main'], 'map': {}}
+        self.assertCompactFails('run-0.json: the server ran with main.RESTRICT_CONTENT', dump([mob()], settings={}))
+        self.assertCompactFails('map.DROP_RATE_MULTIPLIER None, where live_settings.lua has 1.5',
+                                dump([mob()], settings=other))
 
     def test_a_dump_without_mobs_or_rules_names_its_file(self):
         self.assertCompactFails('run-0.json: not a dump this compact.py reads', {'rules': RULES})
@@ -264,7 +468,9 @@ class CompactRejects(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = pathlib.Path(tmp) / 'run-1.json'
             path.write_text(text)
-            compact.compact([path], tmp, 'abc123')
+            settings = pathlib.Path(tmp) / 'live_settings.lua'
+            settings.write_text(LIVE_SETTINGS_TEXT)
+            compact.compact([path], tmp, 'abc123', settings, tmp)
 
     def test_a_value_the_plugin_cannot_hold(self):
         for fields, message in (({'detects': 0x10000}, 'detects must be a whole number from 0 to 65535'),
@@ -285,10 +491,15 @@ class CompactRejects(unittest.TestCase):
         self.assertIn('run-1.json: not a complete dump', str(caught.exception))
 
 
-def record(mob_id, zone, name, lo, hi, flags, respawn, detects, level_mod=0, placeholder_of=0, immunity=0, drops=0):
+def record(mob_id, zone, name, lo, hi, flags, respawn, detects, level_mod=0, placeholder_of=0, immunity=0, drops=0,
+           stats=()):
     return mob_id, dict({'id': mob_id, 'zone': zone, 'name': name, 'minLevel': lo, 'maxLevel': hi, 'flags': flags,
                          'respawn': respawn, 'detects': detects, 'expLevelMod': level_mod, 'placeholderOf': placeholder_of},
-                        **dict(ZEROS_RECORD, immunity=immunity, drops=drops))
+                        **dict(ZEROS_RECORD, immunity=immunity, drops=drops, stats=list(stats)))
+
+
+# Clipper of Qufim Island, levels 28 and 29: magic evasion is rank C+ at the level (Phoenix's sql/skill_caps.sql r7).
+CLIPPER = record(17293331, 126, 'Clipper', 28, 29, 0, 300, 2, stats=[[11, 10, 12, 9, 8, 8, 8, 80], [11, 10, 12, 9, 8, 8, 8, 83]])
 
 
 class Validate(unittest.TestCase):
@@ -301,10 +512,22 @@ class Validate(unittest.TestCase):
         record(17191194, 101, 'Carrion Worm', 4, 5, 0, 180, 2, 0, 17191196),
         record(17191195, 101, 'Carrion Worm', 4, 5, 0, 180, 2, 0, 17191196),
         record(17199999, 103, 'Doman', 76, 76, 8, 0, 0, immunity=0x1000 | 0x10 | 0x8),
+        CLIPPER,
     ])
 
     def check(self, records, **limits):
-        return validate.check(records, **dict(dict(min_mobs=5, min_zones=3, min_resisting=0), **limits))
+        return validate.check(records, **dict(dict(min_mobs=5, min_zones=3, min_resisting=0, min_with_stats=1), **limits))
+
+    def test_too_few_mobs_with_stats_fail(self):
+        self.assertEqual(self.check(self.RECORDS, min_with_stats=2), ['only 1 mobs with stats (expected at least 2)'])
+
+    def test_clipper_s_magic_evasion_must_be_its_level_s(self):
+        records = dict(self.RECORDS)
+        records.update([record(17293331, 126, 'Clipper', 28, 29, 0, 300, 2,
+                               stats=[[11, 10, 12, 9, 8, 8, 8, 80], [11, 10, 12, 9, 8, 8, 8, 80]])])
+        self.assertEqual(self.check(records), ['17293331 Clipper: expected magic evasion [80, 83], got [80, 80]'])
+        records.update([record(17293331, 126, 'Clipper', 28, 29, 0, 300, 2)])
+        self.assertEqual(self.check(records, min_with_stats=0), ['17293331 Clipper: expected magic evasion [80, 83], got []'])
 
     def test_known_spawns_pass(self):
         self.assertEqual(self.check(self.RECORDS), [])
@@ -332,8 +555,8 @@ class Validate(unittest.TestCase):
         self.assertEqual(self.check(records), ['17191195: expected a placeholder of 17191196, got 0'])
 
     def test_too_few_mobs_or_zones_fail(self):
-        self.assertEqual(self.check(self.RECORDS, min_mobs=9, min_zones=4),
-                         ['only 8 mobs (expected at least 9)', 'only 3 zones (expected at least 4)'])
+        self.assertEqual(self.check(self.RECORDS, min_mobs=10, min_zones=5),
+                         ['only 9 mobs (expected at least 10)', 'only 4 zones (expected at least 5)'])
 
     def test_some_mobs_must_resist_something_or_the_columns_were_read_wrong(self):
         self.assertEqual(self.check(self.RECORDS, min_resisting=1), [
@@ -359,14 +582,80 @@ class Validate(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = pathlib.Path(tmp) / 'mobs.tsv'
             path.write_text('id\tzone\tname\tminLevel\tmaxLevel\tflags\trespawn\tdetects\texpLevelMod\tplaceholderOf'
-                            '\timmunity\tsdt\telementRanks\tstatusRanks\tdrops\n'
+                            '\timmunity\tsdt\telementRanks\tstatusRanks\telementMeva\tstatusMeva\tstatusResist\tstats\tdrops\n'
                             '17191194\t101\tCarrion Worm\t4\t5\t0\t180\t2\t0\t17191196\t' + '\t'.join(ZERO_LISTS) +
                             '\t0\n')
             self.assertEqual(validate.load(path), dict([record(17191194, 101, 'Carrion Worm', 4, 5, 0, 180, 2, 0, 17191196)]))
 
 
+def info_row(mob_id, **fields):
+    return dict({'id': mob_id, 'jobs': [1, 1], 'senses': [15, 8], 'window': None, 'lottery': [0, 0], 'traits': 0,
+                 'addEffect': '', 'absorb': [0] * 8, 'damageTaken': [0] * 4, 'skills': 0, 'spells': 0, 'combat': []},
+                **fields)
+
+
+CRAB_MOVES = ['Bubble Shower', 'Bubble Curtain', 'Big Scissors', 'Scissor Guard', 'Metallic Body']
+
+
+class ValidateInfo(unittest.TestCase):
+    INFO = [info_row(validate.CITIPATI, jobs=[6, 4], window=[20, 4], lottery=[15, 10800], combat=[[8000, 0, 1, 1, 1, 1]] * 4),
+            info_row(validate.VALKURM_EMPEROR, lottery=[15, 3600]),
+            info_row(validate.CLIPPER, skills=1,
+                     combat=[[667, 739, 111, 116, 89, 99], [703, 768, 114, 120, 92, 102]])]
+    SKILLS = [[{'list': 1, 'skill': 442 + n, 'name': name} for n, name in enumerate(CRAB_MOVES)]]
+
+    def check(self, info=None, skills=None, **limits):
+        return validate.check_info(Validate.RECORDS, info or self.INFO, skills or self.SKILLS, [],
+                                   **dict(dict(min_info={}, min_charmable=0), **limits))
+
+    def changed(self, mob_id, **fields):
+        return [dict(i, **fields) if i['id'] == mob_id else i for i in self.INFO]
+
+    def test_known_mobs_pass(self):
+        self.assertEqual(self.check(), [])
+
+    def test_a_wrong_window_or_jobs_fails(self):
+        self.assertEqual(self.check(self.changed(validate.CITIPATI, window=[20, 5])),
+                         [f"{validate.CITIPATI}: expected {{'jobs': [6, 4], 'window': [20, 4], 'lottery': [15, 10800]}}, "
+                          "got {'jobs': [6, 4], 'window': [20, 5], 'lottery': [15, 10800]}"])
+
+    def test_a_flat_hp_must_hold_at_every_level(self):
+        self.assertEqual(self.check(self.changed(validate.CITIPATI, combat=[[8000, 0, 1, 1, 1, 1], [7999, 0, 1, 1, 1, 1]])),
+                         [f'{validate.CITIPATI}: expected 8000 HP at every level, got [8000, 7999]'])
+
+    def test_a_lottery_chance_and_the_crab_s_moves(self):
+        self.assertEqual(self.check(self.changed(validate.VALKURM_EMPEROR, lottery=[10, 3600])),
+                         [f'{validate.VALKURM_EMPEROR}: expected a lottery chance of 15, got 10'])
+        self.assertEqual(self.check(skills=[self.SKILLS[0][:4]]),
+                         [f"{validate.CLIPPER}: its TP moves have no ['Metallic Body']"])
+
+    def test_too_few_of_a_kind_fail(self):
+        self.assertEqual(self.check(min_info={'HP that grows with the level': 2, 'TP moves': 1}),
+                         ['only 1 mobs with HP that grows with the level (expected at least 2)'])
+        self.assertEqual(self.check(min_charmable=1), ['only 0 charmable mobs (expected at least 1)'])
+
+
 def entry(kind, item, rate, group=0, group_rate=0, list_number=1):
     return {'list': list_number, 'kind': kind, 'group': group, 'groupRate': group_rate, 'item': item, 'rate': rate}
+
+
+def item(item_id, macc=0, element_macc=(0,) * 8, staff_bonus=(0,) * 8, skill=0):
+    return {'id': item_id, 'macc': macc, 'elementMacc': list(element_macc), 'staffBonus': list(staff_bonus), 'skill': skill}
+
+
+class ValidateItems(unittest.TestCase):
+    # Phoenix's sql/item_mods.sql and sql/item_weapon.sql.
+    ICE_STAFF = item(validate.ICE_STAFF, staff_bonus=(0, 2, -2, 0, 0, 0, 0, 0))
+    CORNETTE  = item(validate.CORNETTE, skill=42)
+
+    def test_known_items_pass(self):
+        self.assertEqual(validate.check_items([self.CORNETTE, self.ICE_STAFF], min_items=2), [])
+
+    def test_too_few_or_wrong_items_fail(self):
+        self.assertEqual(validate.check_items([self.CORNETTE, item(validate.ICE_STAFF)], min_items=3), [
+            'only 2 items with magic accuracy or an instrument (expected at least 3)',
+            f'item {validate.ICE_STAFF}: expected {self.ICE_STAFF}, got {item(validate.ICE_STAFF)}'])
+        self.assertEqual(validate.check_items([self.ICE_STAFF], min_items=1), [f'item {validate.CORNETTE}: missing'])
 
 
 class ValidateDrops(unittest.TestCase):
@@ -434,3 +723,19 @@ class ValidateRules(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class LiveSettings(unittest.TestCase):
+    def test_each_table_s_keys_are_read_with_their_lua_values(self):
+        self.assertEqual(compact.live_settings(LIVE_SETTINGS_TEXT, 'live_settings.lua'),
+                         {('main', 'RESTRICT_CONTENT'): 1, ('main', 'ENABLE_WOTG'): 0,
+                          ('main', 'USE_ADOULIN_WEAPON_SKILL_CHANGES'): False, ('map', 'DROP_RATE_MULTIPLIER'): 1.5})
+
+    def test_a_value_it_cannot_compare_is_an_error(self):
+        for line in ("xi.settings.main.SERVER_NAME = 'Phoenix'", 'xi.settings.main.EGG_HUNT = { START = 1 }',
+                     'xi.settings.main = { RESTRICT_CONTENT = 1 }'):
+            with self.subTest(line=line):
+                text = LIVE_SETTINGS_TEXT.replace('xi.settings.main.RESTRICT_CONTENT = 1', line)
+                with self.assertRaises(compact.schema.DataError) as caught:
+                    compact.live_settings(text, 'live_settings.lua')
+                self.assertIn('live_settings.lua:', str(caught.exception))

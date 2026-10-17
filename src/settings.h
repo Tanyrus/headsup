@@ -10,11 +10,13 @@
 #include "fonts.h"
 #include "icons.h"
 #include "ini_text.h"
+#include "magic_chance.h"
 #include "menu_document.h"
 #include "menu_fonts.h"
 #include "native_locate.h"
 #include "outline_math.h"
 #include "plate_settings.h"
+#include "window_views.h"
 
 #include <array>
 #include <cstddef>
@@ -31,7 +33,7 @@ namespace headsup
     constexpr int kMinTextSize = 8, kMaxTextSize = 48;   // pixels: the base font and base icon sizes
     constexpr int kDefaultIconSize = 16;                 // pixels: the base icon size
     constexpr int kMinNameRaise = 0, kMaxNameRaise = 40; // pixels
-    constexpr const char* kDefaultFont = kMarcellusSC;
+    constexpr const char* kDefaultFont = kMontserratSemiBold;
     constexpr const char* kBadgeFont   = kBarlowCondensed; // what badges were set in before they took the default font
     constexpr size_t kMaxFontName      = 31; // a Windows font name's longest, without its terminator
 
@@ -60,7 +62,7 @@ namespace headsup
     constexpr int kDefaultCursorHeight = 20;
     int DefaultCursorWidth(); // the default style's at that height
     constexpr int kMinCursorEdge = 50, kMaxCursorEdge = 400; // percent
-    constexpr int kMaxCursorRaise = 10; // pixels, up or down
+    constexpr int kMaxCursorRaise = 20; // pixels, up or down
     constexpr int kMinOpacity = 10, kMaxOpacity = 100; // percent
 
     constexpr int kMinMenuFontSize = 10, kMaxMenuFontSize = 40, kDefaultMenuFontSize = 18; // pixels
@@ -82,7 +84,8 @@ namespace headsup
         int elementResistRank = BadgeRules{}.elementResistRank;
         int maxElements       = BadgeRules{}.maxElements;
         StatusBadgeRule statusBadges[kStatusRankCount] = {}; // by StatusRank
-        bool showRanks = false; // rank badges as ranks rather than the wikis' percents
+        RankDisplay rankDisplay = RankDisplay::IncreasedChance; // what a rank badge's number says
+        bool countAccuracy      = false; // Increased Chance with your own magic accuracy, not the mob's evasion alone
         std::string badgeFontName; // badges' numbers; empty for the default font
         bool showBar       = true;
         BarTheme barTheme  = BarTheme::PhoenixGold;
@@ -96,8 +99,11 @@ namespace headsup
         int barCurrency = kGilCurrency; // the Gil widget's, by kCurrencyTable
         std::optional<ClockZone> clockZone;           // the Clock widget's; none for the computer's own
         std::vector<WindowOffset> windowOffsets; // each game window's move from where the game puts it
-        std::vector<WindowGroup> windowGroups;   // windows moved together
-        bool allUnderBar  = false; // every game window opening in the screen's upper half goes under the bar
+        bool moveWindows  = true;  // the game's windows that hang from the top go under the panel, a view at a time
+        bool keepClear    = true;  // and none is left under it, whatever a view's shift says
+        // By HelpMode: where a view's highest window goes, in the game's menu pixels, and the player's own shifts.
+        std::array<int, kHelpModes> placedUnder = {ReferenceBand(HelpMode::Off), ReferenceBand(HelpMode::On)};
+        std::array<std::vector<ViewShift>, kHelpModes> viewShifts;
         bool moveGameHelp = false; // the game's own help bar goes under the top bar, and the windows under it
         int helpBarX = 0, helpBarY = 0;          // back-buffer pixels from the help bar's place under the top bar
         bool helpBarBackground = true;           // off, the help text alone
@@ -124,11 +130,8 @@ namespace headsup
         bool hideNetstat = false; // and its connection readout (S, R and %) at the top right
         int screenshotKey        = 0;    // the virtual-key code that turns screenshot mode on and off, 0 for none
         bool screenshotHidesGame = true; // screenshot mode takes the game's own windows and chat too
-        // The game's windows moved out from under Game help's bar, by short name (native_locate.h's ShortName).
-        std::vector<std::string> movedWindows = DefaultMovedWindows();
         bool phTimers          = false; // above your name, a respawn timer for each placeholder or NM that dies near you
         bool scaleWithDistance = true;  // sizes follow how far a name's owner is from you
-        bool scaleOwnName      = true;  // your own plate too
         bool scaleCursor       = false; // the target cursor's size follows the distance too, apart from the names
         std::vector<uint8_t> keepPointerKeys; // keys that set off a command without hiding the game's pointer
         CursorStyle cursorStyle = kDefaultCursorStyle;
@@ -143,6 +146,9 @@ namespace headsup
         int cursorRaise        = 5;     // pixels over its place
         int nameRaise          = 6;     // pixels the names HeadsUp draws sit above the game's, with all above them
         bool stackNames        = false; // names HeadsUp draws that would cover each other rise over one another
+        bool stackLine         = true;  // and a risen one has a line down to where it stood
+        bool hideInEvent       = false; // no nameplate, HeadsUp's or the game's, while you are in a conversation
+        bool debugMode         = false; // the HeadsUp Config page shows its readings and reports
         Color weakBadgeColor   = {{0.40f, 1.00f, 0.40f}};
         Color resistBadgeColor = {{1.00f, 0.35f, 0.35f}};
         Color rankBadgeColor   = {{1.00f, 0.85f, 0.30f}};
@@ -155,8 +161,9 @@ namespace headsup
         bool autoCheck    = false; // every mob that comes near is checked by HeadsUp, for its exact level
         std::string defaultFont = kDefaultFont;
         int scaleMin = 50, scaleMax = 250; // percent: the distance scale's limits
-        int timerPercent = 87;
+        int timerPercent = 85;
         std::array<KindSettings, kPlateKindCount> kinds = DefaultKinds();
+        OpacitySettings opacity; // every kind's nameplates
         Palette palette = DefaultPalette();
         uint32_t detectionShown = kDefaultDetection;
         ColorPick cursorColor{ColorSource::Target};
@@ -167,22 +174,32 @@ namespace headsup
     };
 
     bool NameplatesOn(const Settings& s);
-    // How game windows move: HeadsUp's way, every window under the bar in the groups the game opens them in, or the
-    // game's, where it puts them. Each clears the windows' own offsets.
+    // How game windows move: HeadsUp's way, every view under the panel at its reference place with nothing of the
+    // player's, or the game's, where it puts them. Each clears the windows' own offsets.
     void UseHeadsUpWindowDefaults(Settings& s);
     void UseGameWindowDefaults(Settings& s);
-    // HeadsUp's help text in place of the game's help bar, which is hidden, and every window under it as the HeadsUp
-    // defaults have them.
+    // HeadsUp's help text in place of the game's help bar, which is hidden, and the windows as the HeadsUp defaults
+    // have them.
     void UseHelpTextDefaults(Settings& s);
     bool BarOn(const Settings& s);
+    // Whether the game's help shows under the panel, for the windows: the panel's help line or the game's own strip.
+    HelpMode WindowHelpMode(const Settings& s);
+    // Places every view under the band of now (in the game's menu pixels; 0 while the panel is off): band for the
+    // mode the help is in, and barOnly, the panel's own, for the mode without help. The player's shifts for each mode
+    // placed go.
+    void AutoAdjustWindows(Settings& s, int band, int barOnly);
     // IPlayer::GetLoginStatus() once the character is in the world; 0 and 1 are the title screen and character select.
     inline constexpr uint8_t kLoginInGame = 2;
     // The bar's settings are on and the character is in game.
     bool BarRuns(const Settings& s, uint8_t loginStatus);
 
     // The fonts to offer: the installed families (as GDI lists them, once per character set and with vertical variants
-    // named @...), each once and sorted, with current added when it is not installed.
+    // named @...), each once and sorted, with current added when it is not installed, and never the game's own two.
     std::vector<std::string> FontChoices(std::vector<std::string> installed, const std::string& current);
+    // The fonts a nameplate can be set in: the game's own two, then the font list.
+    std::vector<std::string> NameplateFontChoices(const std::vector<std::string>& fonts);
+    // Whether a nameplate is set in the game's own font: the default, a line's or the badges'.
+    bool UsesGameFont(const Settings& s);
 
     // Key/value persistence: Ashita's configuration manager in the plugin, an in-memory map in tests.
     class SettingsStore

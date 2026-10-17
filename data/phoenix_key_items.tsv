@@ -1,0 +1,387 @@
+id	name
+1	Zeruhn Report
+2	Palborough Mines Logs
+3	Blue Acidity Tester
+4	Red Acidity Tester
+6	Letter to the Consuls Bastok
+8	Airship Pass
+9	Airship Pass for Kazham
+10	Overdue Book Notifications Early Bird
+11	Letter from Domien
+12	C L Report
+13	Kindred Crest
+14	Magicite Optistone
+15	Magicite Aurastone
+16	Magicite Orastone
+19	Clock Tower Oil
+20	Yagudo Torch
+21	Crest of Davoi
+23	Bouquet for the Pioneers
+24	Old Toolbox
+25	Note from Hariga Origa
+26	Note from Ipupu
+29	Kindred Report
+31	Sword Offering
+32	Shield Offering
+33	Dull Sword
+36	Starway Stairway Bauble
+39	Off Offering
+40	Windurst Waters Scoop
+41	Windurst Walls Scoop
+42	Port Windurst Scoop
+43	Windurst Woods Scoop
+44	Temple Knights Davoi Report
+45	Silver Bell
+46	Coruscant Rosary
+47	Black Matinee Necklace
+48	Ducal Guards Lantern
+50	Holy Candle
+56	Archducal Audience Permit
+57	Super Soup Pot
+58	Two of Swords
+69	Message to Jeuno Sandoria
+70	Message to Jeuno Bastok
+71	Message to Jeuno Windurst
+73	Burnt Seal
+74	Shadow Fragment
+90	Aragoneu Pizza
+93	Etched Ring
+94	Traders Sack
+95	Fake Moustache
+99	Small Bag
+101	Ferry Ticket
+103	Lost Document
+104	East Block Code
+105	South Block Code
+106	North Block Code
+107	Letter from Roh Latteh
+108	Painting of a Windmill
+109	Tattered Mission Orders
+113	Wonder Magic Set
+114	Unfinished Letter
+115	New Model Hat
+117	Old Tigers Fang
+118	Tenshodo Members Card
+119	Receipt for the Prince
+121	Tenshodo Application Form
+126	A Song of Love
+127	Steaming Sheep Invitation
+128	Broken Wand
+129	Gulemonts Document
+130	Old Ring
+136	Crimson Orb
+138	Chocobo License
+140	Corrupted Dirt
+141	Stalactite Dew
+144	Book of the East
+145	Book of the West
+146	Knights Soul
+147	Cold Medicine
+148	Amauras Formula
+149	Overdue Book Notification Chasing Tales
+150	Scripture of Water
+151	Scripture of Wind
+153	Thyme Moss
+154	Cough Medicine
+155	Scroll of Treasure
+158	Star Crested Summons 1
+162	Carrier Pigeon Letter
+163	Carmelos Song Sheet
+164	Curillas Bottle Empty
+165	Curillas Bottle Full
+167	Goldsmithing Order
+168	Mythril Hearts
+171	Shantottos New Spell
+172	Shantottos Ex Spell
+173	Bucket of Divine Paint
+174	Letter from Virnage
+175	Spirit Incense
+176	Gantineuxs Letter
+177	Seal of Banishing
+178	Magical Pattern
+179	Feiyin Magic Tome
+180	Sluice Surveyor Mk I
+181	Foe Finder Mk I
+183	Letter from the Tenshodo
+185	Signed Envelope
+189	First Signed Forged Envelope
+190	Second Signed Forged Envelope
+191	Letter from Dalzakk
+192	San Dorian Martial Arts Scroll
+193	Bomb Incense
+195	Portal Charm
+196	Orcish Dried Food
+198	Old Boots
+199	Balga Champion Certificate
+201	Crawler Blood
+208	Sword Grip Material
+209	Yasins Sword
+211	Shadow Flames
+215	Ripped Final Fantasy Painting
+217	Tamers Whistle
+218	Knights Boots
+219	Miques Paintbrush
+220	Strange Sheet of Paper
+221	Knights Confession
+222	Round Frigicite
+223	Square Frigicite
+224	Triangular Frigicite
+225	Star Ring1
+228	Mertaires Bracelet
+229	Aquaflora1
+230	Aquaflora2
+231	Aquaflora3
+232	Guiding Bell
+235	Darksteel Formula
+236	Kohs Letter
+239	Fire Fragment
+240	Water Fragment
+241	Earth Fragment
+242	Wind Fragment
+243	Lightning Fragment
+244	Ice Fragment
+245	Light Fragment
+247	Prismatic Fragment
+250	Optistery Ring
+252	Book of the Gods
+254	Sublime Statue of the Goddess
+255	Rauteinots Parcel
+256	Treasure Map
+257	Strangely Shaped Coral
+260	Empty Barrel
+261	Barrel of Opo Opo Brew
+264	Joker Card
+266	Altepa Moonpebble
+267	Rhinostery Certificate
+269	Ancient San Dorian Book
+271	Invisible Man Sticker
+272	Paintbrush of Souls
+273	Old Rusty Key
+274	Ancient Tablet Fragment
+275	Star Seeker
+276	Aurastery Ring
+279	Magic Drained Star Seeker
+280	Rhinostery Ring
+283	Ancient San Dorian Tablet
+285	Piece of a Broken Key1
+286	Piece of a Broken Key2
+287	Piece of a Broken Key3
+288	Drops of Amnio
+289	Reinforced Cermet
+291	Tonberry Priest Key
+293	Old Piece of Wood
+294	Dragon Curse Remedy
+295	Sealed Iron Box
+296	Sea Serpent Statue
+297	Altepa Polishing Stone
+298	Challenge to the Royal Knights
+299	Ranchuriomes Legacy
+320	Whisper of Flames
+321	Whisper of Tremors
+322	Whisper of Tides
+323	Whisper of Gales
+324	Whisper of Frost
+325	Whisper of Storms
+327	Whisper of Dreams
+328	Tuning Fork of Fire
+329	Tuning Fork of Earth
+330	Tuning Fork of Water
+331	Tuning Fork of Wind
+332	Tuning Fork of Ice
+333	Tuning Fork of Lightning
+335	Vial of Dream Incense
+336	Orcish Crest
+337	Quadav Crest
+338	Yagudo Crest
+339	Un Moment
+340	Lephemere
+341	Lancienne
+344	Map to the Annals of Truth
+345	Annals of Truth
+352	Holla Gate Crystal
+353	Dem Gate Crystal
+354	Mea Gate Crystal
+355	Vahzl Gate Crystal
+356	Yhoator Gate Crystal
+357	Altepa Gate Crystal
+358	Promyvion Holla Sliver
+359	Promyvion Dem Sliver
+360	Promyvion Mea Sliver
+363	Rainbow Resonator
+385	Map of the San Doria Area
+386	Map of the Bastok Area
+387	Map of the Windurst Area
+388	Map of the Jeuno Area
+431	Map of the Uleguerand Range
+436	Map of Promyvion Holla
+437	Map of Promyvion Dem
+438	Map of Promyvion Mea
+439	Map of Promyvion Vahzl
+441	Map of the Aqueducts
+445	Map of Huxzoi
+448	Daze Breaker Charm
+450	Carbuncles Tear
+451	Scrap of Papyrus
+452	Cerulean Crystal
+453	Handful of Crystal Scales
+454	Charred Helm
+460	Trick Box
+461	Washus Tasty Wurst
+462	Yomotsu Feather
+463	Yomotsu Hirasaka
+464	Faded Yomotsu Hirasaka
+466	Smiling Stone
+467	Scowling Stone
+468	Somber Stone
+469	Spirited Stone
+470	Old Trick Box
+471	Large Trick Box
+472	Indigested Stalagmite
+473	Indigested Ore
+474	Indigested Meat
+476	Moondrop
+477	Miraclesalt
+478	Ancient Verse of Romaeve
+479	Ancient Verse of Altepa
+480	Ancient Verse of Uggalepih
+481	Figure of Leviathan
+482	Figure of Garuda
+483	Figure of Titan
+484	Dark Mana Orb
+485	Moongate Pass
+486	Hydra Corps Command Scepter
+487	Hydra Corps Eyeglass
+488	Hydra Corps Lantern
+489	Hydra Corps Tactical Map
+490	Hydra Corps Insignia
+491	Hydra Corps Battle Standard
+493	Diary of Mukunda
+582	Reliquiarium Key
+583	Mimeo Stone
+584	Mystic Ice
+586	Mimeo Jewel
+587	Mimeo Feather
+595	Blue Bracelet
+596	Green Bracelet
+597	Dusty Tome
+598	Pointed Jug
+599	Cracked Club
+600	Peeling Hairpin
+601	Old Nametag
+602	Tiny Wristlet
+603	Whispering Conch
+604	Psoxja Pass
+605	Piece of Ripped Floorplans
+606	Limit Breaker
+609	Alabaster Hairpin
+610	Dawn Talisman
+611	Silver Comets Collar
+613	Delkfutt Recognition Device
+617	Manaclipper Ticket
+621	Rivernewort
+622	Tavnazian Cookbook
+623	Washus Flask
+624	Flask of Clam Water
+625	Pungent Providence Pot
+626	Torn Out Pages
+627	Tonberry Blackboard
+628	Letter from Muckvix
+629	Letter from Magriffon
+630	Providence Pot
+633	Storeroom Key
+634	Zeelozoks Earplug
+653	Manaclipper Multi Ticket
+674	Monarch Beard
+675	Astral Covenant
+676	Shaft 2716 Operating Lever
+677	Zephyr Fan
+678	Miasma Filter
+679	Particularly Poignant Petal
+680	Antique Amulet
+681	Cathedral Medallion
+701	Letters from Ulmia and Prishe
+704	Red Oil
+706	Lamp Lighters Membership Card
+707	Shaft Gate Operating Dial
+709	Mire Incense
+710	Brand of Dawn
+711	Brand of Twilight
+713	Better Humes and Mannequins
+715	Caliginous Blade
+718	Shaded Cruse
+719	Letter from Shikaree X
+720	Monarch Linn Patrol Permit
+721	Letter from Shikaree Y
+734	Cosmo Cleanse
+739	Dynamis Valkurm Sliver
+740	Dynamis Buburimu Sliver
+741	Dynamis Qufim Sliver
+742	Dynamis Tavnazia Sliver
+760	Silver Sea Ferry Ticket
+761	Moonlight Ore
+762	Leujaoam Assault Orders
+763	Mamool Ja Assault Orders
+764	Lebros Assault Orders
+765	Periqia Assault Orders
+766	Ilrusi Assault Orders
+774	Cast Metal Plate
+775	Supplies Package
+776	Rainbow Berry
+780	Psc Wildcat Badge
+782	Runic Portal Use Permit
+785	Raillefals Letter
+786	Ephramadian Gold Coin
+787	Imperial Army Id Tag
+790	Bag of Gold Pieces
+791	Forgotten Hexagun
+796	Pot of Tsetseroons Stew
+797	Assault Armband
+798	Antique Automaton
+807	Confidential Imperial Order
+808	Secret Imperial Order
+809	Handkerchief
+813	Vial of Spectral Scent
+829	Brand of the Springserpent
+830	Brand of the Galeserpent
+831	Brand of the Flameserpent
+832	Brand of the Skyserpent
+833	Brand of the Stoneserpent
+844	Toggle Switch
+848	Life Float
+854	Remnants Permit
+855	Lilac Ribbon
+860	Periqia Assault Area Entry Permit
+878	Nyzul Isle Assault Orders
+891	Mark of the Einherjar
+898	Nyzul Isle Route
+899	Mythril Mirror
+909	Captain Wildcat Badge
+911	Stardust Pebble
+1016	Sicklemoon Salt
+1017	Silver Sea Salt
+1018	Cyan Deep Salt
+1052	Torn Patches of Leather
+1053	Repaired Handbag
+1111	Delkfutt Key
+1240	Imperial Missive
+1241	San Dorian Approval Letter
+1242	Bastokan Approval Letter
+1243	Windurstian Approval Letter
+1244	Jeunoan Approval Letter
+1245	Present for Megomak
+1246	Lightning Cell
+1247	Megomaks Shopping List
+1856	Map of Al Zahbi
+1861	Map of Aydeewa Subterrane
+1865	Map of Alzadaal Ruins
+1872	Map of the Chocobo Circuit
+1977	Serpent Rumors
+2497	Windurst Trust Permit
+2499	Bastok Trust Permit
+2501	San Doria Trust Permit
+2506	Temple Knight Key
+2544	Job Breaker
+2579	Bracelet of Verve
+2825	Gilgameshs Introductory Letter
+2886	Rhapsody in Azure
+2889	Rhapsody in Mauve

@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <string>
+#include <vector>
 
 using namespace headsup;
 
@@ -23,7 +24,7 @@ TEST(passive_and_notorious_flags)
 {
     const MobRecord* snipper = MobById(17199322);
     CHECK(snipper != nullptr);
-    CHECK_EQ(snipper->flags, 0);
+    CHECK_EQ(snipper->flags, kMobCharmable); // passive, and a beastmaster can charm a crab
     CHECK_EQ(snipper->detects, kDetectHearing); // crabs detect by sound
     const MobRecord* monk = MobById(17199603);
     CHECK(monk != nullptr);
@@ -189,4 +190,83 @@ TEST(a_lottery_nm_knows_how_long_its_placeholder_takes_to_come_back)
     CHECK_EQ(MobById(17191196)->placeholderRespawn, 180u); // Bigmouth Billy, whose Carrion Worms return in 3 minutes
     CHECK_EQ(MobById(17191194)->placeholderRespawn, 0u);   // a worm itself
     CHECK_EQ(MobById(17199648)->placeholderRespawn, 0u);   // no lottery at all
+}
+
+TEST(a_mob_s_stats_by_level_within_its_range)
+{
+    // Clipper of Qufim Island, levels 28 and 29, has no magic evasion mods: rank C+ at its level (Phoenix's
+    // sql/skill_caps.sql r7) is 80 at 28 and 83 at 29.
+    const MobRecord* clipper = MobById(17293331);
+    CHECK(clipper != nullptr);
+    CHECK(StatsAt(*clipper, 28) != nullptr && StatsAt(*clipper, 29) != nullptr);
+    CHECK_EQ(StatsAt(*clipper, 28)->value[static_cast<int>(Stat::MagicEvasion)], 80);
+    CHECK_EQ(StatsAt(*clipper, 29)->value[static_cast<int>(Stat::MagicEvasion)], 83);
+    CHECK(StatsAt(*clipper, 27) == nullptr && StatsAt(*clipper, 30) == nullptr);
+    CHECK(StatsAt(MobRecord{1, "Mob", 5, 6, 0, 0, 0, 0, 0, 0, 0}, 5) == nullptr); // no run of stats
+}
+
+TEST(what_equipment_adds_to_magic_accuracy)
+{
+    // Phoenix's sql/item_mods.sql: the Ice Staff's ice staff bonus 2 and wind -2; sql/item_weapon.sql: the Cornette is
+    // a wind instrument (skill 42). The Wizard's Petasos adds INT and thunder magic evasion, nothing to accuracy.
+    const ItemMagic* staff = ItemMagicOf(17547);
+    CHECK(staff != nullptr);
+    CHECK_EQ(staff->staffBonus[static_cast<int>(Element::Ice)], 2);
+    CHECK_EQ(staff->staffBonus[static_cast<int>(Element::Wind)], -2);
+    CHECK_EQ(staff->macc, 0);
+    const ItemMagic* cornette = ItemMagicOf(17344);
+    CHECK(cornette != nullptr);
+    CHECK_EQ(cornette->skill, 42);
+    CHECK(ItemMagicOf(13856) == nullptr);
+}
+
+// Attohwa Chasm's Citipati as data/zones/attohwa_chasm/mobs.yaml has him: THF/BLM, a flat 8,000 HP, out from 20:00 to
+// 04:00, 15% from his slot with 10,800 s out after his kill; his Corse family takes a quarter less magic damage and
+// half breath damage.
+TEST(a_mobs_jobs_spawn_window_and_lottery)
+{
+    const MobRecord* citipati = MobById(16806162);
+    CHECK(citipati != nullptr);
+    if (citipati == nullptr) return;
+    const MobInfo& info = InfoOf(*citipati);
+    CHECK(info.mainJob == 6 && info.subJob == 4);
+    CHECK(info.windowStart == 20 && info.windowEnd == 4);
+    CHECK(info.lotteryChance == 15 && info.lotteryCooldown == 10800u);
+    const MobDefenses& defenses = DefensesOf(*citipati);
+    CHECK_EQ(defenses.damageTaken[static_cast<int>(DamageKind::Magic)], -2500);
+    CHECK_EQ(defenses.damageTaken[static_cast<int>(DamageKind::Breath)], -5000);
+    CHECK_EQ(defenses.damageTaken[static_cast<int>(DamageKind::Physical)], 0);
+    for (int level = citipati->minLevel; level <= citipati->maxLevel; ++level)
+    {
+        const MobCombat* combat = CombatAt(*citipati, level);
+        CHECK(combat != nullptr && combat->value[static_cast<int>(Combat::Hp)] == 8000);
+    }
+    CHECK(CombatAt(*citipati, citipati->maxLevel + 1) == nullptr);
+    // His Corse placeholder spawns at any hour and is no lottery NM.
+    const MobInfo& corse = InfoOf(*MobById(16806161));
+    CHECK(corse.windowStart == kNoWindow && corse.lotteryChance == 0);
+}
+
+// Qufim Island's Clipper, a crab, has a crab's TP moves.
+TEST(a_crabs_tp_moves)
+{
+    const MobRecord* clipper = MobById(17293331);
+    CHECK(clipper != nullptr);
+    if (clipper == nullptr) return;
+    std::vector<std::string> moves;
+    for (const MobSkill& skill : SkillsOf(*clipper))
+        moves.emplace_back(skill.name);
+    for (const char* move : {"Bubble Shower", "Bubble Curtain", "Big Scissors", "Scissor Guard", "Metallic Body"})
+        CHECK(std::ranges::find(moves, move) != moves.end());
+}
+
+// Corse casts from its list (attohwa_chasm's template names spell list 1), each spell from its own level.
+TEST(a_casters_spells_and_a_mob_without_any)
+{
+    const std::span<const MobSpell> spells = SpellsOf(*MobById(16806161));
+    CHECK(!spells.empty());
+    for (const MobSpell& spell : spells)
+        CHECK(spell.spell > 0 && spell.minLevel <= spell.maxLevel);
+    CHECK(SpellsOf(*MobById(17293331)).empty()); // a crab casts nothing
+    CHECK(SkillsOf(*MobById(17293331)).size() >= 5);
 }

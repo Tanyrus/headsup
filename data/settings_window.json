@@ -1,4 +1,5 @@
 {
+  "version": "0.7",
   "pages": [
     {
       "key": "entities",
@@ -25,11 +26,24 @@
             },
             {"key": "vertical-offset", "name": "Vertical Offset", "tip": "Offsets the entire nameplate upward by this many pixels."},
             {"key": "scale-with-distance", "name": "Scale with Distance", "tip": "Automatically scales nameplates based on distance to the player character."},
-            {"key": "min-size", "name": "Min Scale", "tip": "The minimum scale for the nameplate. This affects its size when far away."},
-            {"key": "max-size", "name": "Max Size", "tip": "The maximum scale for the nameplate. This affects its size when very close."},
-            {"key": "scale-your-own-name", "name": "Scale Your Own Name", "tip": "If enabled, the player's name is scaled by how close the camera is to the player character."},
+            {"key": "min-size", "name": "Min Scale", "indent": true, "tip": "The minimum scale for the nameplate. This affects its size when far away."},
+            {"key": "max-size", "name": "Max Size", "indent": true, "tip": "The maximum scale for the nameplate. This affects its size when very close."},
             {"key": "auto-check", "name": "Auto-Check", "tip": "Automatically checks all nearby enemies to get their exact level and difficulty. Players are never checked: their level is read from what the server already sends, unless they are anonymous."},
-            {"key": "stack-names", "name": "Stack Names", "tip": "If enabled, when nameplates would overlap, they instead stack on top of each other. NOTE: Your target's nameplate will be prioritized and stay in place."}
+            {"key": "stack-names", "name": "Stack Names", "tip": "If enabled, when nameplates would overlap, they instead stack on top of each other. NOTE: Your target's nameplate will be prioritized and stay in place."},
+            {"key": "stack-line-to-entity", "name": "Show Line to Entity", "indent": true, "tip": "When a name is stacked upward, draw a line from the bottom of the nameplate down to it's original position to indicate the player it is attached to."},
+            {"key": "hide-during-conversation", "name": "Hide During Conversation", "tip": "Hides all nameplates if you are in a conversation with an NPC."}
+          ]
+        },
+        {
+          "key": "nameplate-opacity",
+          "name": "Nameplate Opacity",
+          "description": "Allows you to make nameplates more transparent under certain conditions.",
+          "settings": [
+            {"key": "no-target", "name": "No Target", "tip": "The opacity used for all nameplates whenever you currently have no target."},
+            {"key": "not-targeted", "name": "Not Targeted", "tip": "When you are targeting any entity, this is the opacity used for all nameplates of entities that are not your target."},
+            {"key": "is-targeted", "name": "Is Targeted", "tip": "The opacity used for any entity that you are currently targeting, regardless of distance."},
+            {"key": "fade-in", "name": "Fade In", "tip": "If enabled, nameplates will fade in as you get closer. Does not apply to your current target."},
+            {"key": "range", "name": "Max Range", "tip": "At what range (in yalms) the nameplate will become fully transparent."}
           ]
         },
         {
@@ -120,7 +134,8 @@
               "rows": [
                 {"key": "unclaimed", "name": "Unclaimed"},
                 {"key": "claimed-others", "name": "Claimed (Others')"},
-                {"key": "claimed-yours", "name": "Claimed (Yours)"}
+                {"key": "claimed-yours", "name": "Claimed (Yours)"},
+                {"key": "called-for-help", "name": "Called for Help", "tip": "Used when the mob is engaged in combat and the player who claimed it has used the 'Call for Help' feature, allowing anyone to attack it."}
               ]
             }
           ]
@@ -182,43 +197,45 @@
           ]
         },
         {
+          "key": "game-windows",
+          "name": "Game Windows",
+          "settings": [
+            {"key": "move-windows", "name": "Move Game Windows", "tip": "The game's windows that open under the top panel go below it, each menu's together."},
+            {"key": "keep-clear", "name": "Don't Allow Overlap", "tip": "No window is left under the top panel, whatever a shift says: a taller panel takes them further down."},
+            {"key": "game-help", "name": "Game Help", "tip": "The game's own help bar goes under the top panel, and the windows under it. Off while it is hidden."},
+            {"key": "auto-adjust", "name": "Auto Adjust Windows", "tip": "Places every menu's windows right under the top panel as it is now, for the game help on and off. Your own shifts go."},
+            {
+              "key": "window-defaults",
+              "words": [
+                {"key": "headsup-defaults", "name": "HeadsUp Defaults", "tip": "Every menu's windows under the top panel as HeadsUp places them. Your shifts and offsets are cleared."},
+                {"key": "headsup-help", "name": "HeadsUp Help", "tip": "HeadsUp's help text in place of the game's help bar, which is hidden, and the windows as HeadsUp places them."},
+                {"key": "game-defaults", "name": "Game Defaults", "tip": "Every window where the game puts it: nothing moved, no offsets."}
+              ]
+            },
+            {
+              "key": "window-list",
+              "words": [
+                {"key": "note", "name": "X and Y move one window further, after its menu's shift. Type a number, then Enter."},
+                {"key": "find", "name": "Find"},
+                {"key": "name-hint", "name": "Name"},
+                {"key": "all-windows", "tip": "Every window the game has, not only the named ones and yours."},
+                {"key": "row-tip", "tip": "Its X and Y offset."}
+              ]
+            }
+          ]
+        },
+        {
           "key": "window-groups",
           "name": "Window Groups",
           "settings": [
             {
               "key": "groups",
               "words": [
-                {"key": "note", "name": "Windows in a group move by its offset together, keeping their places beside each other. Each window's own X and Y below still moves it within the group."},
-                {"key": "under-bar", "tip": "Under Bar: the whole group goes below the help bar."},
-                {"key": "remove", "tip": "Removes the group; its windows stay where the game puts them."},
-                {"key": "add-window", "name": "+ Add Window"},
-                {"key": "new-group", "name": "+ New Group"}
-              ]
-            }
-          ]
-        },
-        {
-          "key": "game-windows",
-          "name": "Game Windows",
-          "settings": [
-            {"key": "every-window", "name": "Every Window", "tip": "Every window that opens under the bar goes below it, not only those switched on or grouped."},
-            {"key": "game-help", "name": "Game Help", "tip": "The game's own help bar goes under the top panel, and the windows under it. Off while it is hidden."},
-            {
-              "key": "window-defaults",
-              "words": [
-                {"key": "headsup-defaults", "name": "HeadsUp Defaults", "tip": "Every window under the bar, the game's help too, in the groups the game opens them in. Offsets are cleared."},
-                {"key": "headsup-help", "name": "HeadsUp Help", "tip": "HeadsUp's help text in place of the game's help bar, which is hidden, and every window under it."},
-                {"key": "game-defaults", "name": "Game Defaults", "tip": "Every window where the game puts it: nothing moved, no groups, no offsets."}
-              ]
-            },
-            {
-              "key": "window-list",
-              "words": [
-                {"key": "note", "name": "Under Bar takes a window below the help bar, all together; X and Y move it from where the game puts it. Type a number, then Enter."},
-                {"key": "find", "name": "Find"},
-                {"key": "name-hint", "name": "Name"},
-                {"key": "all-windows", "tip": "Every window the game has, not only the named ones and yours."},
-                {"key": "row-tip", "tip": "Under Bar, then its X and Y offset."}
+                {"key": "note", "name": "The windows each menu opens move together by one shift, so they keep their places beside each other. Your own shift replaces the default, which brings the menu's highest window to Windows Start At. Type a number, then Enter."},
+                {"key": "help-on", "name": "Game Help On", "tip": "The shifts while the game's help shows under the top panel: its help line, or the game's own help bar."},
+                {"key": "help-off", "name": "Game Help Off", "tip": "The shifts while no help shows under the top panel."},
+                {"key": "starts-at", "name": "Windows Start At", "tip": "Where each menu's highest window goes, in the game's menu pixels from the top of the screen."},
+                {"key": "row-tip", "tip": "Its shift down from where the game puts its windows, up when below zero."}
               ]
             }
           ]
@@ -347,17 +364,10 @@
       "name": "HeadsUp Config",
       "cards": [
         {
-          "key": "headsup",
-          "name": "HeadsUp",
-          "description": "All of HeadsUp, as /hu on and /hu off.",
-          "settings": [
-            {"key": "debug-report", "name": "Debug Report", "tip": "As /hu debug: writes a report to logs/headsup."}
-          ]
-        },
-        {
           "key": "settings-window",
           "name": "Config Window",
           "settings": [
+            {"key": "enable-headsup", "name": "Enable HeadsUp", "tip": "If turned off, all HeadsUp features will be disabled."},
             {"key": "window-theme", "name": "Window Theme", "tip": "The color and style of this config window."},
             {"key": "font", "name": "Font", "tip": "The font used for this config window."},
             {"key": "size", "name": "Font Size", "tip": "The font size used for this config window, in pixels."},
@@ -365,9 +375,19 @@
           ]
         },
         {
-          "key": "this-frame",
-          "name": "This Frame",
+          "key": "debug-mode",
+          "name": "Debug Mode",
           "settings": [
+            {
+              "key": "debug-report",
+              "name": "Generate Report",
+              "tip": "As /hu debug: writes a report to logs/headsup.",
+              "words": [
+                {"key": "watch", "name": "Start Watching", "tip": "As /hu drawdump watch: watches every frame for names that jump, flicker or vanish, and writes what it finds to logs/headsup until stopped."},
+                {"key": "stop", "name": "Stop Watching"},
+                {"key": "saved", "name": "Report saved to: {file}"}
+              ]
+            },
             {"key": "mobs-outlined", "name": "Mobs Outlined"},
             {"key": "meshes-outlined", "name": "Meshes Outlined"},
             {"key": "stencil-buffer", "name": "Stencil Buffer"},
@@ -510,18 +530,6 @@
         ]
       },
       {
-        "key": "nameplate-opacity",
-        "name": "Nameplate Opacity",
-        "description": "Allows you to make nameplates more transparent under certain conditions.",
-        "settings": [
-          {"key": "no-target", "name": "No Target", "tip": "The opacity used for all nameplates whenever you currently have no target."},
-          {"key": "not-targeted", "name": "Not Targeted", "tip": "When you are targeting any entity, this is the opacity used for all nameplates of entities that are not your target."},
-          {"key": "is-targeted", "name": "Is Targeted", "tip": "The opacity used for any entity that you are currently targeting, regardless of distance."},
-          {"key": "fade-in", "name": "Fade In", "tip": "If enabled, nameplates will fade in as you get closer. Does not apply to your current target.", "kinds": ["mobs", "players", "npcs", "pets"]},
-          {"key": "range", "name": "Max Range", "tip": "At what range (in yalms) the nameplate will become fully transparent.", "kinds": ["mobs", "players", "npcs", "pets"]}
-        ]
-      },
-      {
         "key": "detection-icons",
         "name": "Detection Icons",
         "description": "Settings that determine which MobDB icons will be included when the Detection tag is part of the nameplate.",
@@ -542,8 +550,8 @@
             ],
             "words": [
               {"key": "senses", "name": "Senses:"},
-              {"key": "hide", "name": "Hide"},
-              {"key": "show", "name": "Show"}
+              {"key": "hide", "name": "Hidden"},
+              {"key": "show", "name": "Shown"}
             ]
           }
         ]
@@ -555,7 +563,17 @@
         "kinds": ["mobs"],
         "settings": [
           {"key": "badge-font", "name": "Badge Font"},
-          {"key": "use-rank-system", "name": "Use Rank System", "tip": "Phoenix's ranks, -3 to 11, instead of percents. -3 is +50% and 4 is -50%."},
+          {
+            "key": "badge-numbers",
+            "name": "Badge Numbers",
+            "tip": "What the badge of a weakness or resistance by rank says. A rank changes the mob's magic evasion, so it changes how often magic lands, not how hard it hits.",
+            "options": [
+              {"name": "Rank", "tip": "Phoenix's rank, -3 to 11."},
+              {"name": "Increased Chance", "tip": "How much more often magic lands than on a mob without the weakness, or how much less often with a resistance."},
+              {"name": "Total Chance", "tip": "How often your spell lands: an unresisted tier I nuke for an element, the effect for a status, from your level, skill, stats and gear against the mob's."}
+            ]
+          },
+          {"key": "count-your-accuracy", "name": "Count Your Accuracy", "tip": "Increased Chance from your own magic accuracy, so it shrinks once you land 95% of the time anyway. Off, it is the magic evasion the rank takes away or adds alone."},
           {"key": "weak-color", "name": "Weakness Color", "tip": "The color used for badge text with Weakness icons."},
           {"key": "resist-color", "name": "Resistance Color", "tip": "The color used for badge text with Resistance icons."},
           {"key": "status-resist-color", "name": "Status Resist Color", "tip": "The color used for badge text with Status icons."},
@@ -788,12 +806,16 @@
         {"name": "Seeking Party", "tip": "Shows an icon indicating the player is looking to join a party."},
         {"name": "Job", "tip": "Shows the player's job and subjob (example: WAR/NIN). NOTE: Only shows after you use /check on the player."},
         {"name": "Owner", "tip": "Shows the name of the pet's owner."},
-        {"name": "Title", "tip": "Shows the player's title. NOTE: Only shows after you use /check on the player."}
+        {"name": "Title", "tip": "Shows the player's title. NOTE: Only shows after you use /check on the player."},
+        {"name": "Job & Level", "tip": "Shows both the job and level when known. If only level is known, displays 'Level X' where 'X' is the level. If both are known, it displays 'X JOB/SUB'. If neither are known, shows nothing."},
+        {"name": "Line Break", "tip": "Puts what follows on a row of its own under the rest of the line, in the line's own style. Press Enter in a line to make one."}
       ]
     }
   ],
   "words": [
     {"key": "switched-off", "name": "Switched Off"},
+    {"key": "switch-off", "name": "Off"},
+    {"key": "switch-on", "name": "On"},
     {"key": "switched-off-top-panel", "name": "These settings are the top panel's, which is off: the Top Panel page switches it on."},
     {"key": "switched-off-headsup", "name": "HeadsUp is off: the HeadsUp Config page switches it on."},
     {"key": "key-add", "name": "+ Add Key"},
@@ -807,6 +829,8 @@
     {"key": "unused-tags-these", "name": "Put the {tags} tag on a line of the design to show these on a nameplate."},
     {"key": "unused-tags-name", "name": "Put the {tags} tag on a line of the design to show a name: the game's own is hidden where HeadsUp draws the nameplate."},
     {"key": "or", "name": "or"},
-    {"key": "slot-tip", "tip": "These share one place, tried from the left: the first that has something to show is drawn. Drop one on another to change their order, or drag one out."}
+    {"key": "slot-tip", "tip": "These share one place, tried from the left: the first that has something to show is drawn. Drop one on another to change their order, or drag one out."},
+    {"key": "reload", "name": "Reload", "tip": "Reads settings_window.json from config/headsup again and builds this window from it, or from the built-in one when there is none."},
+    {"key": "export", "name": "Export", "tip": "Writes the built-in settings_window.json to config/headsup, where it can be edited and read with Reload."}
   ]
 }

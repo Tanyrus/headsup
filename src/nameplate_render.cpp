@@ -18,6 +18,7 @@ namespace headsup
     {
         constexpr float kOutlinePerHeight = 0.1f; // a badge's outline width, per pixel of its height
         constexpr float kStackGap         = 2.0f; // screen pixels between plates stacked over one another
+        constexpr float kStackLineWidth   = 1.0f; // screen pixels: the line from a risen plate to where it stood
         constexpr const char* kLineSample = "H"; // any letter: GDI gives a line's height with it
         // From the mockup's CSS: a 22 px name's shadows blur 2 and 3 px, 1 px lower, and its glow 14 px.
         constexpr float kShadowDropPerHeight = 0.05f;
@@ -164,14 +165,24 @@ namespace headsup
         const Style style = styleAt(*height);
         Coverage coverage;
         auto rasterize = [&] {
-            if (!marked) return m_Gdi.Rasterize(text, font, *height, look.line.style, 0, style.margin, coverage);
-            const int line = lineHeight(*height);
-            // GDI underlines each stretch of letters it draws and knows nothing of the marks between them: where the
-            // font says where its underline goes, the letters are drawn without and one line is drawn under them all.
+            // GDI's underline is the font's one row, which comes and goes as the text is drawn a little smaller or
+            // larger than its image, and it underlines each stretch of letters apart, knowing nothing of the marks
+            // between them: where the font says where its underline goes, the letters are drawn without and one line
+            // thick enough to hold is drawn under them all.
             int under = 0, thick = 0;
             const bool underlined = HasStyle(look.line.style, FontStyle::Underline) &&
                                     m_Gdi.UnderlineBand(font, *height, look.line.style, under, thick);
             const uint8_t letterStyle = underlined ? look.line.style & ~StyleBit(FontStyle::Underline) : look.line.style;
+            const auto underline = [&] {
+                if (underlined) Underline(coverage, style.margin + under, UnderlineThickness(*height, thick), style.margin);
+            };
+            if (!marked)
+            {
+                if (!m_Gdi.Rasterize(text, font, *height, letterStyle, 0, style.margin, coverage)) return false;
+                underline();
+                return true;
+            }
+            const int line = lineHeight(*height);
             std::vector<Coverage> drawn(pieces.size());
             for (size_t i = 0; i < pieces.size(); ++i)
             {
@@ -182,7 +193,7 @@ namespace headsup
                 room[i] = pieces[i].mark == DashMark::None ? ItalicLean(*height, look.line.style) : 0;
             }
             coverage = Joined(drawn, room, style.margin);
-            if (underlined) Underline(coverage, style.margin + under, thick, style.margin);
+            underline();
             return line > 0;
         };
         if (!sized || !rasterize())
@@ -262,6 +273,12 @@ namespace headsup
         ++m_CursorFileSerial;
     }
 
+    void NameplateRenderer::SetGameFont(std::optional<GameFontFace> face)
+    {
+        ReleasePlates();
+        m_Gdi.SetGameFont(std::move(face));
+    }
+
     bool NameplateRenderer::Upload(PlateTexture& t, const Image& image, TextureKey key)
     {
         float u = 0.0f, v = 0.0f;
@@ -332,6 +349,9 @@ namespace headsup
             float depth;
             uint16_t index;
             size_t quads, quadsEnd, cursors, cursorsEnd, shown;
+            float centerX;     // where its line down to where it stood goes
+            uint32_t color;    // its bottom line's text color, the line's
+            uint32_t alpha;    // and its opacity
         };
         std::vector<Stacked> stacked;
         if (NameplatesOn(settings) && !m_NamesFailed && m_Device != nullptr)
@@ -357,7 +377,7 @@ namespace headsup
                 if (composed.lines.empty() && !showCursor && !timersHere) continue;
                 Plate& p = m_Plates[info->index];
                 rank     = PlateRank(info->index, targets);
-                opaque   = PlateAlpha(settings.Kind(PlateKindOf(info->state)).opacity, rank, targets.target != 0, info->distance);
+                opaque   = PlateAlpha(settings.opacity, rank, targets.target != 0, info->distance);
                 p.frame  = m_Frame;
 
                 const bool self = info->index == selfIndex;
@@ -367,7 +387,7 @@ namespace headsup
                                         : NameScale(gameName.depth, gameName.box.Height(), screenHeight, minScale, maxScale);
                 p.scale                 = EaseScale(p.scale, sized, now - p.scaleTime);
                 p.scaleTime             = now;
-                const bool scales       = ScalesWithDistance(settings, self);
+                const bool scales       = settings.scaleWithDistance;
                 const float scale       = scales ? p.scale : 1.0f;
                 const float timerShown  = timerLook.textSize * scale * toY;
                 const float cursorScale = settings.scaleCursor ? p.scale : 1.0f;
@@ -384,7 +404,8 @@ namespace headsup
 
                 bool lineUsed[kPlateLines] = {};
                 m_LeftOut.clear();
-                // Each line's text textures. False once GDI or Direct3D refused one.
+                // Each design line's text textures, its rows' one after another. False once GDI or Direct3D refused one.
+                size_t textsUsed[kPlateLines] = {};
                 auto prepareTexts = [&]() {
                     for (const ComposedLine& line : composed.lines)
                     {
@@ -398,7 +419,7 @@ namespace headsup
                             look.glowStrength = line.look.glow;
                             look.glowSize     = line.look.glowSize;
                         }
-                        size_t texts = 0;
+                        size_t& texts = textsUsed[line.source];
                         for (const PlateItem& item : line.items)
                         {
                             if (item.kind != ItemKind::Text) continue;
@@ -407,9 +428,13 @@ namespace headsup
                             if (!Prepare(text, item.text.c_str(), look, lt.raster)) return false;
                             m_LeftOut.push_back(text.unfit);
                         }
-                        for (size_t extra = texts; extra < lt.texts.size(); ++extra)
+                    }
+                    for (int source = 0; source < kPlateLines; ++source)
+                    {
+                        LineTextures& lt = p.lines[source];
+                        for (size_t extra = textsUsed[source]; extra < lt.texts.size(); ++extra)
                             ReleaseTexture(lt.texts[extra].texture);
-                        lt.texts.resize(texts);
+                        lt.texts.resize(textsUsed[source]);
                     }
                     return true;
                 };
@@ -426,13 +451,17 @@ namespace headsup
                 };
                 bool anyBadge = false;
                 m_IconBadges.clear();
+                if (m_Inputs.size() < lineCount) m_Inputs.resize(lineCount);
+                m_TextStart.resize(lineCount);
+                size_t textAt[kPlateLines] = {};
                 // Each line's sizes for the layout, with its badges and the ornament over it. False as above.
                 auto measureLines = [&]() {
                     for (size_t i = 0; i < lineCount; ++i)
                     {
                         const ComposedLine& line = composed.lines[i];
                         LineTextures& lt         = p.lines[line.source];
-                        size_t text              = 0;
+                        m_TextStart[i]           = textAt[line.source];
+                        size_t& text             = textAt[line.source];
                         m_TextSizes.clear();
                         for (size_t j = 0; j < line.items.size(); ++j)
                         {
@@ -515,7 +544,7 @@ namespace headsup
                     const ComposedLine& line = composed.lines[i];
                     const LineTextures& lt   = p.lines[line.source];
                     const LinePlace& place   = layout.lines[i];
-                    size_t text              = 0;
+                    size_t text              = m_TextStart[i];
                     for (size_t j = 0; j < line.items.size(); ++j)
                         if (line.items[j].kind == ItemKind::Text)
                             addText(nextText(lt, text), place.items[j].x, place.items[j].y, textShown(line));
@@ -529,6 +558,7 @@ namespace headsup
                 shown.nameHeight = 0;
                 shown.nameColor  = kWhite;
                 shown.lineCount  = static_cast<int>(lineCount);
+                shown.lines.resize(lineCount);
                 bool named       = false;
                 // Icons after every text, over the shadows beside them, in the order their badges were prepared in.
                 size_t firstBadge = 0;
@@ -609,7 +639,8 @@ namespace headsup
                 // Only a name HeadsUp draws can move: the game's own stays where the game puts it.
                 if (settings.stackNames && lineCount > 0)
                     stacked.push_back(Stacked{&p, BoxOf(layout), rank, depth, info->index, firstQuad,
-                        m_Quads.size(), firstCursor, cursorQuads.size(), shownCount - 1});
+                        m_Quads.size(), firstCursor, cursorQuads.size(), shownCount - 1, layout.centerX,
+                        composed.lines.back().look.color, opaque});
                 else
                     p.rise = 0.0f;
             }
@@ -625,6 +656,11 @@ namespace headsup
         for (const Stacked& s : stacked)
             boxes.push_back(s.box);
         const std::vector<float> rises = StackRises(boxes, kStackGap);
+        if (settings.stackLine && !stacked.empty() && m_Solid == nullptr && !m_SolidRefused)
+        {
+            m_Solid        = CreateTexture(m_Device, &kWhite, 1, 1, m_SolidU, m_SolidV);
+            m_SolidRefused = m_Solid == nullptr;
+        }
         for (size_t i = 0; i < stacked.size(); ++i)
         {
             const Stacked& s = stacked[i];
@@ -640,6 +676,15 @@ namespace headsup
                 GpuQuad& cursor = cursorQuads[q].gpu;
                 cursor.y = KeepOnScreen(CursorSpot{cursor.x, cursor.y - up}, cursor.width, cursor.height, screenWidth * toX,
                     screenHeight * toY, m_CoveredTop * toY).y;
+            }
+            // Drawn after the plate it belongs to, in the plate's rank and at its depth.
+            if (const std::optional<PlateBox> line = StackLeader(s.centerX, s.box.bottom, p.rise, kStackLineWidth);
+                line && settings.stackLine && m_Solid != nullptr)
+            {
+                rank   = s.rank;
+                opaque = s.alpha;
+                addQuad(m_Quads, m_Solid, line->left, line->top, std::max(1.0f, std::round((line->right - line->left) * toX)),
+                    (line->bottom - line->top) * toY, m_SolidU, m_SolidV, s.depth, s.color);
             }
             Shown& shown = m_Shown[s.shown];
             if (shown.nameHeight > 0) shown.nameY -= p.rise;
@@ -746,6 +791,8 @@ namespace headsup
         ReleaseTexture(m_LoneCursorUnder.texture);
         for (PlateTexture& badge : m_Badges.TakeAll())
             ReleaseTexture(badge.texture);
+        ReleaseTexture(m_Solid);
+        m_SolidRefused = false;
         m_Gdi.Release();
     }
 

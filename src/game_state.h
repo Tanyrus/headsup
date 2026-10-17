@@ -58,6 +58,8 @@ namespace headsup
         PlayerSync SyncOf(uint16_t index) const;
         // Whether the server has made this mob or NPC untargetable, from its last update that said.
         bool Untargetable(uint16_t index) const;
+        // Whether this mob's claimer called for help, from its last update that said.
+        bool CalledForHelp(uint16_t index) const;
         const std::optional<Weather>& ZoneWeather() const { return m_Weather; }
         const std::optional<RegionOwners>& Owners() const { return m_Owners; }
         const std::optional<RegionShares>& Shares() const { return m_Shares; }
@@ -83,6 +85,7 @@ namespace headsup
         std::unordered_map<uint16_t, PlayerStatus> m_PlayerStatus; // other players, by target index
         std::unordered_map<uint16_t, PlayerSync> m_PlayerSyncs;    // players, you included, by target index
         std::unordered_set<uint16_t> m_Untargetable;               // mobs and NPCs, by target index
+        std::unordered_set<uint16_t> m_CalledForHelp;              // mobs, by target index
         std::optional<PlayerStatus> m_OwnStatus;
         std::optional<Weather> m_Weather;
         std::optional<RegionOwners> m_Owners; // kept across zoning

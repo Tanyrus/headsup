@@ -144,6 +144,36 @@ class Trim(unittest.TestCase):
             gen.trim_square(2, 2, bytes(16))
 
 
+class Tint(unittest.TestCase):
+    """An icon the renderer tints with a color of the game's: its grey shading multiplied by the color could only
+    darken it, so the shading is halved toward white."""
+
+    def test_a_tinted_icons_shading_is_halved_toward_white_and_its_alpha_kept(self):
+        # 255 less half of what each channel lacks of 255, rounded half up.
+        self.assertEqual(gen.lifted(bytes([64, 64, 64, 255, 200, 200, 200, 128, 0, 3, 255, 0])),
+                         bytes([160, 160, 160, 255, 228, 228, 228, 128, 128, 129, 255, 0]))
+
+
+class Bleed(unittest.TestCase):
+    """An icon is drawn smaller than its pixels with linear filtering: its clear pixels' colors mix into its edge, and
+    black ones darkened it. Clear pixels near the edge take the colors beside them, still clear."""
+
+    RED, BLUE, CLEAR = bytes([0, 0, 255, 255]), bytes([255, 0, 0, 255]), bytes(4)
+
+    def test_two_rings_of_clear_pixels_take_the_mean_color_beside_them_and_stay_clear(self):
+        out = gen.bled(4, 1, self.RED + self.CLEAR * 3)
+        self.assertEqual(out, self.RED + bytes([0, 0, 255, 0]) * 2 + self.CLEAR)  # the third ring stays as it was
+        self.assertEqual(gen.bled(3, 1, self.RED + self.CLEAR + self.BLUE),
+                         self.RED + bytes([128, 0, 128, 0]) + self.BLUE)  # (255 + 0) / 2, rounded half up
+
+    def test_corners_count_and_visible_pixels_never_change(self):
+        # Diagonal neighbors are beside a pixel too; a soft edge is visible and keeps its color.
+        soft = bytes([10, 20, 30, 1])
+        out = gen.bled(2, 2, soft + self.CLEAR + self.CLEAR + self.CLEAR)
+        self.assertEqual(out, soft + bytes([10, 20, 30, 0]) * 3)
+        self.assertEqual(gen.bled(1, 1, self.RED), self.RED)
+
+
 class GenIcons(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -157,10 +187,16 @@ class GenIcons(unittest.TestCase):
 
     def test_one_bitmap_per_icon(self):
         text = gen.generate(self.dir)
-        # The 2x1 test icon, trimmed to a square: its row, then a transparent one.
-        self.assertIn('const unsigned char kBgraAggroNQ[] = {\n    0x03, 0x02, 0x01, 0x04, 0x07, 0x06, 0x05, 0x08, 0x00, 0x00, '
-                      '0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\n};\nconst IconBitmap kIconAggroNQ = {kBgraAggroNQ, 2, 2};', text)
+        # The 2x1 test icon, trimmed to a square: its row, then a clear one that takes the row's mean color.
+        self.assertIn('const unsigned char kBgraAggroNQ[] = {\n    0x03, 0x02, 0x01, 0x04, 0x07, 0x06, 0x05, 0x08, 0x05, 0x04, '
+                      '0x03, 0x00, 0x05, 0x04, 0x03, 0x00,\n};\nconst IconBitmap kIconAggroNQ = {kBgraAggroNQ, 2, 2};', text)
         self.assertEqual(len(re.findall(r'const IconBitmap kIcon\w+ = ', text)), len(gen.ICONS))
+
+    def test_the_linkshell_icon_alone_is_lifted(self):
+        text = gen.generate(self.dir)
+        trimmed = gen.trim_square(*gen.decode_bgra(png(2, 1, bytes([1, 2, 3, 4, 5, 6, 7, 8]))))
+        self.assertIn(gen.c_bitmap('Linkshell', 2, 2, gen.lifted(gen.bled(2, 2, trimmed[2]))), text)
+        self.assertIn(gen.c_bitmap('Bazaar', 2, 2, gen.bled(2, 2, trimmed[2])), text)
 
     def test_the_enum_and_the_table_follow_one_order(self):
         table = gen.generate(self.dir).split('const IconBitmap kIcons[] = {')[1].split('}')[0]

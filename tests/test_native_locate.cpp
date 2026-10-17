@@ -1,3 +1,4 @@
+#include "code_patch.h"
 #include "native_locate.h"
 #include "test.h"
 
@@ -24,7 +25,7 @@ namespace
 
     struct Image
     {
-        std::vector<uint8_t> text  = std::vector<uint8_t>(0x180000, 0xCC);
+        std::vector<uint8_t> text  = std::vector<uint8_t>(0x200000, 0xCC);
         std::vector<uint8_t> rdata = std::vector<uint8_t>(0x26000, 0x00);
 
         uint8_t* At(uint32_t rva)
@@ -401,11 +402,16 @@ namespace
         image.Put(at + 7, kLoopTail);
     }
 
+    // Before the loop, its list: xor bl,bl; mov ecx,list; call First, as the client of 2026-10-13 held it at
+    // 0x15F6E8 with its list at 0x03AE1838.
+    constexpr uint32_t kWindowListMove = 0x15F6E8, kWindowListAt = 0x03AE1838;
+
     Image WindowClient()
     {
         Image image;
         PutWindowLoop(image, kWindowLoop);
         image.Put(kWindowRoutine, {0x83, 0xEC, 0x24, 0x53, 0x55, 0x56, 0x57, 0x8B, 0xE9, 0xE8});
+        image.Put(kWindowListMove, {0x32, 0xDB, 0xB9, 0x38, 0x18, 0xAE, 0x03, 0xE8, 0x0C, 0x6E, 0xFC, 0xFF});
         return image;
     }
 }
@@ -421,6 +427,19 @@ TEST(the_window_draw_call_is_found_by_its_loop_and_checked_by_the_routines_start
     PutWindowLoop(twice, 0x160000);
     CHECK(LocateWindowDraw(twice.Text()).problem == LocateProblem::AmbiguousWindowDraw);
     CHECK(LocateWindowDraw(Image{}.Text()).problem == LocateProblem::NoWindowDraw);
+}
+
+TEST(the_window_list_is_the_one_the_draw_loop_starts_on)
+{
+    CHECK(LocateWindowDraw(WindowClient().Text()).list == kWindowListAt);
+    Image otherRegister = WindowClient();
+    otherRegister.Put(kWindowListMove + 2, {0xBA}); // mov edx: not the list the loop's call is given
+    const WindowDraw without = LocateWindowDraw(otherRegister.Text());
+    CHECK(without.problem == LocateProblem::None && without.list == 0);
+    Image farBack = WindowClient();
+    farBack.Put(kWindowListMove, {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90});
+    farBack.Put(kWindowListMove - 0x40, {0x32, 0xDB, 0xB9, 0x38, 0x18, 0xAE, 0x03, 0xE8, 0x0C, 0x6E, 0xFC, 0xFF});
+    CHECK(LocateWindowDraw(farBack.Text()).list == 0);
 }
 
 TEST(a_window_draw_call_that_leaves_the_code_is_a_changed_client)
@@ -639,6 +658,70 @@ TEST(the_window_move_is_found_once_by_its_start)
     CHECK(LocateWindowMove(changed.Text()).problem == LocateProblem::NoWindowMove);
 }
 
+namespace
+{
+    // MCD::GetRect's start, at RVA 0x118F70 in the client of 2026-10-13: sub esp,0Ch; push esi; mov esi,ecx; mov al,
+    // [esi+99h]; test al,al; jz, its rectangle copied into the place it is given.
+    constexpr uint32_t kGetRectRva = 0x118F70;
+    void PutGetRect(Image& image, uint32_t at)
+    {
+        image.Put(at, {0x83, 0xEC, 0x0C, 0x56, 0x8B, 0xF1, 0x8A, 0x86, 0x99, 0x00, 0x00, 0x00, 0x84, 0xC0, 0x0F, 0x84});
+    }
+}
+
+TEST(the_windows_rectangle_copy_is_found_beside_its_move)
+{
+    Image image;
+    PutMoveTo(image, kMoveToRva);
+    PutGetRect(image, kGetRectRva);
+    CHECK(LocateWindowMove(image.Text()).getRect == kGetRectRva);
+    PutGetRect(image, kGetRectRva + 0x2000);
+    CHECK(LocateWindowMove(image.Text()).getRect == 0); // two: neither is taken
+    Image without;
+    PutMoveTo(without, kMoveToRva);
+    const WindowMoveSite found = LocateWindowMove(without.Text());
+    CHECK(found.problem == LocateProblem::None && found.getRect == 0); // the move works without it
+}
+
+namespace
+{
+    // Where Wide Scan draws its grid label, at RVA 0x1FAA75 in the client of 2026-10-13: the strip title's owner from a
+    // global, its window's rectangle by MCD::GetRect, then the label at the left, 3 below the bottom.
+    constexpr uint32_t kScanLabelRva = 0x1FAA75;
+    constexpr uint32_t kScanLabelCall = kScanLabelRva + 17;
+    void PutScanLabel(Image& image, uint32_t at, uint32_t calls)
+    {
+        image.Put(at, {0x8B, 0x15, 0x7C, 0x84, 0xA3, 0x03, 0x83, 0xC4, 0x10, 0x8D, 0x4C, 0x24, 0x04, 0x51, 0x8B, 0x4A,
+                          0x08, 0xE8, 0x00, 0x00, 0x00, 0x00, 0x8B, 0x4C, 0x24, 0x0A, 0x8B, 0x54, 0x24, 0x04, 0x8D, 0x44,
+                          0x24, 0x10, 0x68, 0x80, 0x80, 0x80, 0x80, 0x83, 0xC1, 0x03});
+        image.Put32(at + 18, calls - (at + 17 + kBranchLength));
+    }
+}
+
+TEST(wide_scans_grid_label_takes_the_title_windows_place_from_one_call_to_get_rect)
+{
+    Image image;
+    PutScanLabel(image, kScanLabelRva, kGetRectRva);
+    const ScanLabelSite found = LocateScanLabel(image.Text(), kGetRectRva);
+    CHECK(found.problem == LocateProblem::None);
+    CHECK_EQ(found.call, kScanLabelCall);
+    CHECK(LocateScanLabel(image.Text(), 0).problem == LocateProblem::NoScanLabel); // GetRect itself not found
+    CHECK(LocateScanLabel(Image{}.Text(), kGetRectRva).problem == LocateProblem::NoScanLabel);
+    Image elsewhere;
+    PutScanLabel(elsewhere, kScanLabelRva, kGetRectRva + 0x40);
+    CHECK(LocateScanLabel(elsewhere.Text(), kGetRectRva).problem == LocateProblem::ScanLabelChanged);
+    PutScanLabel(image, 0x100000, kGetRectRva);
+    CHECK(LocateScanLabel(image.Text(), kGetRectRva).problem == LocateProblem::AmbiguousScanLabel);
+}
+
+TEST(only_a_countdown_above_zero_is_a_move_under_way)
+{
+    CHECK(!MoveUnderWay(kMoveIdle));
+    CHECK(!MoveUnderWay(0)); // the frame the game laid the window out, as a window opening is: it may be placed
+    CHECK(MoveUnderWay(1));
+    CHECK(MoveUnderWay(12));
+}
+
 TEST(a_window_is_known_by_its_name_past_menu_and_written_without_its_padding)
 {
     const std::optional<WindowKey> equip = WindowKeyOf("menu    equip   ");
@@ -650,26 +733,12 @@ TEST(a_window_is_known_by_its_name_past_menu_and_written_without_its_padding)
         CHECK(!KeyFromShortName(bad));
 }
 
-TEST(the_strip_windows_are_never_moved_and_the_equipment_group_is_by_default)
+TEST(the_strip_windows_are_never_moved_and_the_equipment_window_has_a_name)
 {
     for (const char* strip : {"menu    helpwind", "menu    titlewin", "menu    netstat "})
         CHECK(!MovableWindow(*WindowKeyOf(strip)));
     CHECK(MovableWindow(*KeyFromShortName("equip")));
-    CHECK(DefaultMovedWindows() == (std::vector<std::string>{"equip", "inventor", "iteminfo", "itemctrl", "itmsortw",
-                                       "itmsort2", "statcom", "statcom2"}));
     CHECK(std::string(WindowLabel("equip")) == "Equipment" && WindowLabel("chmkface") == nullptr);
-}
-
-TEST(saved_window_names_keep_only_those_a_window_could_have_once_each)
-{
-    CHECK(MovedWindowsFrom("equip  levmerit equip helpwind Bad toolongname") ==
-          (std::vector<std::string>{"equip", "levmerit"}));
-    CHECK(MovedWindowsFrom("").empty()); // the player moved none
-    CHECK(MovedWindowNames({"equip", "levmerit"}) == "equip levmerit");
-    std::string many;
-    for (size_t i = 0; i < kMaxWindowKeys + 8; ++i)
-        many += "w" + std::to_string(i) + " ";
-    CHECK_EQ(MovedWindowsFrom(many).size(), kMaxWindowKeys);
 }
 
 TEST(the_window_list_holds_each_key_once_and_no_more_than_it_has_room_for)
@@ -694,18 +763,10 @@ namespace
         int shift)
     {
         const std::optional<WindowSpot> to = placements.PlaceFor(mcd, key, WindowSpot{kLeft, top}, kWidth, height, 0,
-            0, shift, INT_MAX, kScreenRight, kScreenBottom);
+            shift, kScreenRight, kScreenBottom);
         if (to) CHECK_EQ(to->left, kLeft); // a shift moves nothing sideways
         return to ? std::optional<int>(to->top) : std::nullopt;
     }
-}
-
-TEST(the_windows_go_down_from_under_the_games_strip_to_under_the_help_bar)
-{
-    const HelpBand band{.bottom = 200, .screenRight = kScreenRight, .screenBottom = kScreenBottom};
-    CHECK_EQ(WindowShift(band, 70), 130);
-    CHECK_EQ(WindowShift(band, 250), 0); // a help bar shorter than the strip moves nothing up
-    CHECK_EQ(WindowShift(HelpBand{.bottom = 0, .screenBottom = kScreenBottom}, 70), 0); // no help bar, no shift
 }
 
 TEST(every_moved_window_goes_down_by_the_same_shift_and_keeps_its_place_beside_the_others)
@@ -745,15 +806,14 @@ TEST(an_offset_moves_a_window_either_way_from_where_the_game_puts_it_and_keeps_i
 {
     WindowPlacements placements;
     const WindowKey equip = *KeyFromShortName("equip");
-    const auto place = [&](uint32_t mcd, WindowSpot now, int dx, int dy, int shift) {
-        return placements.PlaceFor(mcd, equip, now, kWidth, 300, dx, dy, shift, INT_MAX, kScreenRight, kScreenBottom);
+    const auto place = [&](uint32_t mcd, WindowSpot now, int dx, int dy) {
+        return placements.PlaceFor(mcd, equip, now, kWidth, 300, dx, dy, kScreenRight, kScreenBottom);
     };
-    CHECK(place(0x1000, {100, 60}, 40, -20, 0) == (WindowSpot{140, 40}));
-    CHECK(!place(0x1000, {140, 40}, 40, -20, 0)); // where it was put: no more
-    CHECK(place(0x2000, {100, 60}, 0, 30, 130) == (WindowSpot{100, 220})); // the shift and the offset together
+    CHECK(place(0x1000, {100, 60}, 40, -20) == (WindowSpot{140, 40}));
+    CHECK(!place(0x1000, {140, 40}, 40, -20)); // where it was put: no more
     // Kept on screen: not past either side, the top or the bottom.
-    CHECK(place(0x3000, {100, 60}, -500, -500, 0) == (WindowSpot{0, 0}));
-    CHECK(place(0x4000, {100, 60}, 5000, 5000, 0) == (WindowSpot{kScreenRight - kWidth, kScreenBottom - 300}));
+    CHECK(place(0x3000, {100, 60}, -500, -500) == (WindowSpot{0, 0}));
+    CHECK(place(0x4000, {100, 60}, 5000, 5000) == (WindowSpot{kScreenRight - kWidth, kScreenBottom - 300}));
 }
 
 TEST(window_offsets_read_back_what_they_wrote_and_drop_what_no_window_could_take)
@@ -803,62 +863,15 @@ TEST(every_client_window_is_listed_once_named_ones_first_and_never_the_strips)
     CHECK(std::all_of(firstUnnamed, all.end(), [](const std::string& n) { return WindowLabel(n) == nullptr; }));
 }
 
-TEST(window_groups_read_back_what_they_wrote_and_keep_each_window_in_one)
+TEST(where_the_game_put_a_window_is_where_it_came_from_once_moved_else_where_it_is)
 {
-    const std::vector<WindowGroup> groups =
-        WindowGroupsFrom("Equipment:20,-10,1:equip+inventor+iteminfo|Status:0,40,0:statcom+equip+money");
-    CHECK(groups.size() == 2);
-    CHECK(groups[0] == (WindowGroup{"Equipment", 20, -10, true, {"equip", "inventor", "iteminfo"}}));
-    CHECK(groups[1] == (WindowGroup{"Status", 0, 40, false, {"statcom", "money"}})); // equip is the first group's
-    CHECK(WindowGroupsFrom(WindowGroupsText(groups)) == groups);
-    // A name keeps letters, digits and spaces; a group without one goes; a strip window and a bad name go.
-    CHECK(WindowGroupsFrom("My Group!:1,2,0:helpwind+Bad+equip")[0] == (WindowGroup{"My Group", 1, 2, false, {"equip"}}));
-    CHECK(WindowGroupsFrom(":1,2,0:equip").empty() && WindowGroupsFrom("").empty());
-}
-
-TEST(a_groups_offset_adds_to_its_windows_own_and_its_under_bar_takes_them_all_down)
-{
-    const std::vector<WindowGroup> groups = {WindowGroup{"Equipment", 20, -10, true, {"equip", "inventor"}},
-        WindowGroup{"Still", 0, 0, false, {"money"}}};
-    const WindowMoves moves = CombinedMoves({"statcom"}, {WindowOffset{"equip", 5, 5}}, groups);
-    CHECK(moves.underBar == (std::vector<std::string>{"statcom", "equip", "inventor"}));
-    CHECK(moves.offsets == (std::vector<WindowOffset>{{"equip", 25, -5}, {"inventor", 20, -10}}));
-}
-
-TEST(with_the_game_help_moved_the_windows_go_under_it_and_only_upper_ones_when_every_window_goes)
-{
-    // The top bar 50 tall, the help bar's bottom at 200, the game's strip 70 tall: moved under the top bar, the strip
-    // ends at 120, under the help bar still, so windows go to 200; a strip taller than that sets the line itself.
-    HelpBand band{.bottom = 200, .screenRight = kScreenRight, .screenBottom = kScreenBottom, .topBar = 50,
-        .moveGameHelp = true};
-    CHECK_EQ(WindowShift(band, 70), 130);
-    CHECK_EQ(WindowShift(band, 180), 50); // under the strip, now at 230
-    band.moveGameHelp = false;
-    CHECK_EQ(WindowShift(band, 180), 20);
-    // The shift goes only to a window the game put above shiftAbove: the chat log at the bottom stays.
     WindowPlacements placements;
-    const WindowKey log = *KeyFromShortName("logwindo"), menu = *KeyFromShortName("menuwind");
-    CHECK(!placements.PlaceFor(0x1000, log, {0, 800}, 600, 200, 0, 0, 130, kScreenBottom / 2, kScreenRight, kScreenBottom));
-    CHECK(placements.PlaceFor(0x2000, menu, {0, 60}, 200, 300, 0, 0, 130, kScreenBottom / 2, kScreenRight, kScreenBottom) ==
+    const WindowKey menu = *KeyFromShortName("menuwind");
+    CHECK(placements.PlaceFor(0x2000, menu, {0, 60}, 200, 300, 0, 130, kScreenRight, kScreenBottom) ==
           (WindowSpot{0, 190}));
-    // Where the game put it is where it came from once moved, else where it is.
     CHECK(placements.OriginOf(0x2000, menu, {0, 190}) == (WindowSpot{0, 60}));
     CHECK(placements.OriginOf(0x2000, menu, {0, 75}) == (WindowSpot{0, 75}));
     CHECK(HelpStripWindow(*WindowKeyOf("menu    helpwind")) && !HelpStripWindow(*WindowKeyOf("menu    netstat ")));
-}
-
-TEST(the_default_groups_name_the_menus_the_game_opens_together_each_window_once)
-{
-    const std::vector<WindowGroup> groups = DefaultWindowGroups();
-    CHECK(groups.size() == 17 && groups[0].name == "Equipment" && groups[0].windows.front() == "equip");
-    CHECK(WindowGroupsFrom(WindowGroupsText(groups)) == groups); // all of them fit what the settings keep
-    size_t windows = 0;
-    for (const WindowGroup& g : groups)
-    {
-        CHECK(!g.windows.empty() && g.underBar && g.x == 0 && g.y == 0);
-        windows += g.windows.size();
-    }
-    CHECK(windows > 80);
 }
 
 TEST(an_equipment_figure_still_in_the_windows_old_place_moves_with_it_and_no_other)
@@ -875,8 +888,8 @@ TEST(the_windows_to_put_back_are_those_moved_that_drew_lately)
     WindowPlacements placements;
     const WindowKey equip = *KeyFromShortName("equip"), status = *KeyFromShortName("statcom");
     placements.SetFrame(1);
-    CHECK(placements.PlaceFor(0x1000, equip, WindowSpot{10, 20}, 100, 100, 0, 5, 0, INT_MAX, 1000, 1000));
-    CHECK(!placements.PlaceFor(0x2000, status, WindowSpot{30, 40}, 100, 100, 0, 0, 0, INT_MAX, 1000, 1000)); // not moved
+    CHECK(placements.PlaceFor(0x1000, equip, WindowSpot{10, 20}, 100, 100, 0, 5, 1000, 1000));
+    CHECK(!placements.PlaceFor(0x2000, status, WindowSpot{30, 40}, 100, 100, 0, 0, 1000, 1000)); // not moved
     placements.SetFrame(5);
     CHECK(placements.MovedSince(1).size() == 1);
     const WindowPlacements::Placed moved = placements.MovedSince(1).front();
@@ -891,7 +904,7 @@ namespace
     std::optional<WindowSpot> PlaceCastBar(WindowPlacements& placements, uint32_t frame, WindowSpot now)
     {
         placements.SetFrame(frame);
-        return placements.PlaceFor(0x1000, *KeyFromShortName("casttime"), now, 128, 24, 0, 0, 23, INT_MAX, 1920, 1080);
+        return placements.PlaceFor(0x1000, *KeyFromShortName("casttime"), now, 128, 24, 0, 23, 1920, 1080);
     }
 }
 
@@ -957,70 +970,64 @@ TEST(a_text_moved_less_than_its_windows_height_is_not_moved_twice)
     CHECK(fresh.Natural({20, 24}) == (WindowSpot{20, 24}));
 }
 
-namespace
+
+TEST(an_owners_copy_of_its_windows_place_moves_with_the_window)
 {
-    // The Equipment menu on the test client with only Every Window on (2026-10-12), in the menu's 1920 by 1080: the
-    // status window opens under the bar's line and goes down 40; the gil box right under it does not open there.
-    constexpr int kPushShift = 40, kBarLine = 80;
-    std::optional<WindowSpot> Pushable(WindowPlacements& placements, uint32_t mcd, const char* name, WindowSpot now,
-        int width, int height, bool follow = true)
-    {
-        return placements.PlaceFor(mcd, *KeyFromShortName(name), now, width, height, 0, 0, kPushShift, kBarLine, 1920,
-            1080, follow);
-    }
+    // As read from the test client (2026-10-15): the Level box's owner keeps its window's rectangle at +0x14 exactly,
+    // the craft skill list's keeps the same left, top and right with the list's full height.
+    using Place = std::array<int16_t, 4>;
+    CHECK((MovedPlaceCopy(Place{16, 208, 128, 296}, Place{16, 208, 128, 296}, 0, 48) == Place{16, 256, 128, 344}));
+    CHECK((MovedPlaceCopy(Place{130, 48, 382, 184}, Place{130, 48, 382, 140}, 0, 48) == Place{130, 96, 382, 232}));
+    CHECK((MovedPlaceCopy(Place{130, 48, 382, 184}, Place{130, 48, 382, 140}, 6, -10) == Place{136, 38, 388, 174}));
+    // Whatever else an owner keeps there is left alone.
+    CHECK(!MovedPlaceCopy(Place{0, 48, 382, 184}, Place{130, 48, 382, 140}, 0, 48));
+    CHECK(!MovedPlaceCopy(Place{130, 49, 382, 184}, Place{130, 48, 382, 140}, 0, 48));
+    CHECK(!MovedPlaceCopy(Place{130, 48, 380, 184}, Place{130, 48, 382, 140}, 0, 48));
+    CHECK(!MovedPlaceCopy(Place{130, 48, 382, 20}, Place{130, 48, 382, 140}, 0, 48)); // a bottom above its top
+    // Where the class's layout says nothing, only a copy that is the window's rectangle exactly is taken for one.
+    CHECK((MovedPlaceCopy(Place{16, 48, 382, 104}, Place{16, 48, 382, 104}, 0, 16, PlaceMatch::Exact) == Place{16, 64, 382, 120}));
+    CHECK(!MovedPlaceCopy(Place{130, 48, 382, 184}, Place{130, 48, 382, 140}, 0, 48, PlaceMatch::Exact));
 }
 
-TEST(a_window_a_moved_one_would_cover_goes_down_with_it_when_every_window_goes)
+TEST(an_owners_place_copy_is_found_in_its_layouts_call_for_the_windows_rectangle)
 {
-    WindowPlacements placements;
-    placements.SetFrame(1);
-    CHECK(Pushable(placements, 0x1000, "statcom", {16, 47}, 150, 250) == (WindowSpot{16, 87}));
-    CHECK(!Pushable(placements, 0x2000, "money", {16, 297}, 150, 40));    // not known to be covered until a frame ends
-    CHECK(!Pushable(placements, 0x3000, "moneyctr", {16, 337}, 150, 30)); // under the gil box
-    CHECK(!Pushable(placements, 0x4000, "equip", {400, 297}, 150, 40));   // beside them: the status window never reaches it
-    CHECK(!Pushable(placements, 0x5000, "logwindo", {16, 800}, 600, 200)); // far below
-    placements.SetFrame(2);
-    CHECK(!Pushable(placements, 0x1000, "statcom", {16, 87}, 150, 250)); // where it was put
-    CHECK(Pushable(placements, 0x2000, "money", {16, 297}, 150, 40) == (WindowSpot{16, 337}));
-    CHECK(Pushable(placements, 0x3000, "moneyctr", {16, 337}, 150, 30) == (WindowSpot{16, 377})); // pushed by the box
-    CHECK(!Pushable(placements, 0x4000, "equip", {400, 297}, 150, 40));
-    CHECK(!Pushable(placements, 0x5000, "logwindo", {16, 800}, 600, 200));
-    placements.SetFrame(3); // all in place: nothing more to do, frame after frame
-    CHECK(!Pushable(placements, 0x1000, "statcom", {16, 87}, 150, 250));
-    CHECK(!Pushable(placements, 0x2000, "money", {16, 337}, 150, 40));
-    CHECK(!Pushable(placements, 0x3000, "moneyctr", {16, 377}, 150, 30));
-    // The status window closes: what it pushed goes back, each one frame after nothing moved covers it.
-    placements.SetFrame(4);
-    CHECK(!Pushable(placements, 0x2000, "money", {16, 337}, 150, 40));
-    CHECK(!Pushable(placements, 0x3000, "moneyctr", {16, 377}, 150, 30));
-    placements.SetFrame(5);
-    CHECK(Pushable(placements, 0x2000, "money", {16, 337}, 150, 40) == (WindowSpot{16, 297}));
-    CHECK(Pushable(placements, 0x3000, "moneyctr", {16, 377}, 150, 30) == (WindowSpot{16, 337}));
-}
-
-TEST(only_every_window_pushes_and_two_pushed_windows_do_not_hold_each_other_down)
-{
-    WindowPlacements picked; // windows picked one by one: a window under a moved one stays
-    picked.SetFrame(1);
-    CHECK(Pushable(picked, 0x1000, "statcom", {16, 47}, 150, 250, false) == (WindowSpot{16, 87}));
-    CHECK(!Pushable(picked, 0x2000, "money", {16, 297}, 150, 40, false));
-    picked.SetFrame(2);
-    CHECK(!Pushable(picked, 0x2000, "money", {16, 297}, 150, 40, false));
-
-    // Two windows that lie over each other, both pushed by a third: once it closes, neither keeps the other moved.
-    WindowPlacements placements;
-    placements.SetFrame(1);
-    Pushable(placements, 0x1000, "statcom", {16, 47}, 150, 250);
-    Pushable(placements, 0x2000, "money", {16, 200}, 150, 200);
-    Pushable(placements, 0x3000, "moneyctr", {16, 220}, 150, 200);
-    placements.SetFrame(2);
-    CHECK(Pushable(placements, 0x1000, "statcom", {16, 87}, 150, 250) == std::nullopt);
-    CHECK(Pushable(placements, 0x2000, "money", {16, 200}, 150, 200) == (WindowSpot{16, 240}));
-    CHECK(Pushable(placements, 0x3000, "moneyctr", {16, 220}, 150, 200) == (WindowSpot{16, 260}));
-    placements.SetFrame(3); // the status window is gone from here on
-    Pushable(placements, 0x2000, "money", {16, 240}, 150, 200);
-    Pushable(placements, 0x3000, "moneyctr", {16, 260}, 150, 200);
-    placements.SetFrame(4);
-    CHECK(Pushable(placements, 0x2000, "money", {16, 240}, 150, 200) == (WindowSpot{16, 200}));
-    CHECK(Pushable(placements, 0x3000, "moneyctr", {16, 260}, 150, 200) == (WindowSpot{16, 220}));
+    // The client's own bytes (2026-10-13 build): each layout pushes the address of its copy and calls MCD::GetRect.
+    constexpr uintptr_t getRect = 0x118F70;
+    // Combat and magic skills: lea eax,[ecx+18h]; mov ecx,[ecx+8]; push eax; call GetRect.
+    const std::vector<uint8_t> skills{0x8D, 0x41, 0x18, 0x8B, 0x49, 0x08, 0x50, 0xE8, 0xC4, 0x0B, 0xFD, 0xFF};
+    CHECK(PlaceCopyOffset(skills, 0x1483A0, getRect) == std::optional<uint32_t>(0x18));
+    // Craft skills: mov ecx,[esi+8]; lea eax,[esi+14h]; push eax; call GetRect.
+    const std::vector<uint8_t> craft{0x8B, 0x4E, 0x08, 0x8D, 0x46, 0x14, 0x50, 0xE8, 0x3A, 0x07, 0xFD, 0xFF};
+    CHECK(PlaceCopyOffset(craft, 0x14882A, getRect) == std::optional<uint32_t>(0x14));
+    // The Level box moves its window first (a call to MCD::MoveTo), then: mov ecx,[esi+8]; lea edx,[esi+14h]; push edx.
+    const std::vector<uint8_t> level{0xE8, 0x78, 0x1A, 0xFD, 0xFF, 0x8B, 0x4E, 0x08, 0x8D, 0x56, 0x14, 0x52, 0xE8, 0xCC, 0x18,
+        0xFD, 0xFF};
+    CHECK(PlaceCopyOffset(level, 0x147693, getRect) == std::optional<uint32_t>(0x14));
+    // Trade (the owner of your side): mov ecx,[esi+8]; lea eax,[esi+18h]; push eax; mov word [esi+0BCh],1; call.
+    const std::vector<uint8_t> trade{0x8B, 0x4E, 0x08, 0x8D, 0x46, 0x18, 0x50, 0x66, 0xC7, 0x86, 0xBC, 0x00, 0x00, 0x00, 0x01,
+        0x00, 0xE8, 0xD7, 0x7B, 0xFC, 0xFF};
+    CHECK(PlaceCopyOffset(trade, 0x151384, getRect) == std::optional<uint32_t>(0x18));
+    // A layout that returns before any such call keeps none: the code after its ret and padding is another
+    // function's (the client's 0x12BF50 is three instructions and a ret, before a layout that does call it).
+    std::vector<uint8_t> shortLayout{0x8B, 0x49, 0x08, 0x6A, 0x00, 0x6A, 0x01, 0xE8, 0x54, 0xD3, 0xFE, 0xFF, 0xC3, 0x90, 0x90, 0x90};
+    shortLayout.insert(shortLayout.end(), craft.begin(), craft.end());
+    constexpr uintptr_t landsAt = 0xFC6A6; // where the craft bytes' call lands when they start at 0x12BF60
+    CHECK(!PlaceCopyOffset(shortLayout, 0x12BF50, landsAt));
+    // A ret in the middle of a layout, with its code going on after it, does not end the search.
+    std::vector<uint8_t> earlyReturn{0x85, 0xC0, 0x75, 0x01, 0xC3};
+    earlyReturn.insert(earlyReturn.end(), craft.begin(), craft.end());
+    CHECK(PlaceCopyOffset(earlyReturn, 0x148825, getRect) == std::optional<uint32_t>(0x14));
+    // Font Colors' sample (0x198C16): add ecx,14h; push ecx; mov ecx,eax; call, with ecx the owner.
+    const std::vector<uint8_t> sample{0x83, 0xC1, 0x14, 0x51, 0x8B, 0xC8, 0xE8, 0x4F, 0x03, 0xF8, 0xFF};
+    CHECK(PlaceCopyOffset(sample, 0x198C16, getRect) == std::optional<uint32_t>(0x14));
+    const std::vector<uint8_t> subtracted{0x83, 0xE9, 0x14, 0x51, 0x8B, 0xC8, 0xE8, 0x4F, 0x03, 0xF8, 0xFF};
+    CHECK(!PlaceCopyOffset(subtracted, 0x198C16, getRect)); // sub ecx,14h: no field of the owner
+    // No call for the rectangle, another register pushed than the one loaded, or the call elsewhere: no copy.
+    CHECK(!PlaceCopyOffset(craft, 0x14882A, getRect + 0x10));
+    const std::vector<uint8_t> otherPush{0x8B, 0x4E, 0x08, 0x8D, 0x46, 0x14, 0x52, 0xE8, 0x3A, 0x07, 0xFD, 0xFF};
+    CHECK(!PlaceCopyOffset(otherPush, 0x14882A, getRect));
+    CHECK(!PlaceCopyOffset(std::vector<uint8_t>{0x50, 0xE8, 0x3A, 0x07, 0xFD, 0xFF}, 0x148830, getRect));
+    // lea eax,[esi]; nop; push eax: no displacement, and no copy read off the byte after it.
+    const std::vector<uint8_t> noDisplacement{0x8D, 0x06, 0x90, 0x50, 0xE8, 0x3A, 0x07, 0xFD, 0xFF};
+    CHECK(!PlaceCopyOffset(noDisplacement, 0x14882D, getRect));
 }

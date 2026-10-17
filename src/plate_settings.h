@@ -57,8 +57,9 @@ namespace headsup
     };
     enum class Nature : uint8_t { Passive, Aggressive, PassiveNm, AggressiveNm, Placeholder, NoData };
     constexpr int kNatureCount = 6;
-    enum class ClaimState : uint8_t { Unclaimed, Others, Yours };
-    constexpr int kClaimStateCount = 3;
+    // CalledForHelp: its claimer called for help, so anyone may fight it (the server drops the claim then).
+    enum class ClaimState : uint8_t { Unclaimed, Others, Yours, CalledForHelp };
+    constexpr int kClaimStateCount = 4;
     enum class TargetState : uint8_t { None, Targeted, Locked, SubTarget, OutOfRange };
     constexpr int kTargetStateCount = 5;
     enum class TargetType : uint8_t { Mob, Player, Friend, PartyMember, LinkshellMember, Npc, Pet }; // the menu's order
@@ -115,7 +116,7 @@ namespace headsup
     constexpr int kMinGlowSize = 25, kMaxGlowSize = 200;
     constexpr int kMinShadow = 0, kMaxShadow = 200;
     constexpr float kShadowUnit = 1.5f; // a shadow strength of 100 percent, in the mockup's shadows
-    constexpr int kMaxLinePadding = 10; // pixels
+    constexpr int kMinLinePadding = -5, kMaxLinePadding = 10; // pixels
     constexpr int kMinOrnamentWidth = 20, kMaxOrnamentWidth = 300;       // pixels
     constexpr int kMinOrnamentThickness = 3, kMaxOrnamentThickness = 24; // pixels
     constexpr size_t kMaxTemplate = 255;                                 // bytes of a line's text
@@ -160,7 +161,7 @@ namespace headsup
         ColorPick color;
         int shadow = 100;
         ColorPick shadowColor{ColorSource::Custom, ColorFromRgb(0x000000)};
-        int glow     = 0;
+        int glow     = 100;
         int glowSize = 100;
         ColorPick glowColor{ColorSource::Aggression};
         bool glowOffInCombat = false; // no glow while you fight: on for a mob's lines
@@ -190,6 +191,8 @@ namespace headsup
     // How opaque a kind's nameplates are, in percent, by what you target: with no target, as another than your
     // target, and as your target. Fading in, each is whole within kFadeNearYalms and almost nothing at the range.
     constexpr float kPercent = 100.0f; // what a setting in percent is a share of
+    constexpr int kPercentStep = 5;    // what every setting in percent moves by
+    int Stepped(int value, int step);  // the multiple of step nearest value
     constexpr float kMinOutlineDistance = 15.0f, kMaxOutlineDistance = 50.0f; // yalms: the game draws no mob past 50
 
     struct OpacitySettings
@@ -206,7 +209,6 @@ namespace headsup
         RowSettings rows[kMaxRows];
         LineDesign lines[kPlateLines];
         OrnamentSettings ornament;
-        OpacitySettings opacity;
         int maxIcons = kCountedIcons; // the status icons a nameplate draws at most, GM's aside
         bool operator==(const KindSettings&) const = default;
     };

@@ -144,6 +144,13 @@ namespace headsup
         return std::fabs(target - next) < kSettled ? target : next;
     }
 
+    std::optional<PlateBox> StackLeader(float centerX, float bottom, float rise, float width)
+    {
+        constexpr float kShortest = 1.0f; // pixels: a line any shorter is none to see
+        if (rise < kShortest) return std::nullopt;
+        return PlateBox{centerX - width / 2.0f, bottom - rise, centerX + width / 2.0f, bottom};
+    }
+
     float CursorBob(double seconds, float height, bool floating)
     {
         if (!floating) return 0.0f;
@@ -188,11 +195,6 @@ namespace headsup
     bool RedrawNow(bool drawn, double spentMs)
     {
         return !drawn || spentMs < kRedrawBudgetMs;
-    }
-
-    bool ScalesWithDistance(const Settings& settings, bool self)
-    {
-        return settings.scaleWithDistance && (!self || settings.scaleOwnName);
     }
 
     int PlateRank(uint16_t index, const CursorTargets& targets)

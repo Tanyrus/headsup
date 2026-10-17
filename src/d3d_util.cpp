@@ -113,4 +113,25 @@ namespace headsup
         return FindOwnerAboveCaller(reinterpret_cast<const uint32_t*>(sp & ~uintptr_t{3}),
             reinterpret_cast<const uint32_t*>(end & ~uintptr_t{3}), tracker, game.begin, game.end);
     }
+
+    __attribute__((noinline)) std::vector<StackOwner> OwnersOnStack(const Tracker& tracker)
+    {
+        const auto sp       = reinterpret_cast<uintptr_t>(__builtin_frame_address(0));
+        const auto* tib     = reinterpret_cast<const NT_TIB*>(NtCurrentTeb());
+        const uintptr_t end = std::min<uintptr_t>(reinterpret_cast<uintptr_t>(tib->StackBase), sp + kStackScanBytes);
+        static const CodeRange game = GameCode();
+        const auto* p    = reinterpret_cast<const uint32_t*>(sp & ~uintptr_t{3});
+        const auto* stop = reinterpret_cast<const uint32_t*>(end & ~uintptr_t{3});
+        while (p < stop && !(*p >= game.begin && *p < game.end))
+            ++p;
+        std::vector<StackOwner> found;
+        uint32_t frames = 0;
+        for (const uint32_t* q = p; q < stop; ++q)
+        {
+            if (*q >= game.begin && *q < game.end) ++frames;
+            else if (const ActorInfo* info = tracker.Find(*q))
+                found.push_back(StackOwner{info->index, static_cast<uint32_t>((q - p) * sizeof(uint32_t)), frames});
+        }
+        return found;
+    }
 }

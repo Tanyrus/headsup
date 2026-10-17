@@ -64,18 +64,18 @@ namespace headsup
     constexpr const char* kDotMark     = "<div class=\"dash dot\"></div>";
     constexpr const char* kSquareMark  = "<div class=\"dash square\"></div>";
     constexpr const char* kDiamondMark = "<div class=\"dash diamond\"></div>";
-    // A cutoff as its dropdown shows it: the rank as badges read it, or Off past the end.
-    inline std::string CutoffText(int rank, bool ranks)
+    // A cutoff as its dropdown shows it: the rank, which no chance stands for without a mob, or Off past the end.
+    inline std::string CutoffText(int rank)
     {
-        return rank == kNoWeakRank || rank == kNoResistRank ? "Off" : RankText(rank, ranks);
+        return rank == kNoWeakRank || rank == kNoResistRank ? "Off" : std::to_string(rank);
     }
 
     // weak: the cutoff is a weakness's; a resistance's otherwise.
-    inline std::string CutoffTip(int rank, bool ranks, bool weak)
+    inline std::string CutoffTip(int rank, bool weak)
     {
         const char* what = weak ? "weaknesses" : "resistances";
         if (rank == kNoWeakRank || rank == kNoResistRank) return std::string("No badges for ") + what + ".";
-        return std::string("A badge for ") + what + " of " + RankText(rank, ranks) + " and stronger.";
+        return std::string("A badge for ") + what + " of rank " + std::to_string(rank) + " and stronger.";
     }
 
     inline std::string ElementCountText(int count)

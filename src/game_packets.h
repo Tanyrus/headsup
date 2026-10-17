@@ -88,9 +88,11 @@ namespace headsup
         uint16_t index; // entity target index
         bool despawn;
         std::optional<bool> untargetable; // when the update carries the entity's flags
+        std::optional<bool> calledForHelp;
     };
     // From Phoenix's src/map/packets/entity_update.cpp: a mob or an NPC set untargetable, as a Chigoe is until it
-    // engages, has the flags' Untargetable bit (the packet's TargetOffFlag) in every update that carries them.
+    // engages, has the flags' Untargetable bit (the packet's TargetOffFlag) in every update that carries them, and a
+    // mob whose claimer called for help the CallForHelp bit.
     std::optional<EntityUpdate> ParseEntityUpdate(const uint8_t* data, uint32_t size);
 
     // A linkshell's name as Phoenix packs it (EncodeStringLinkshell): 6-bit codes from the first byte's top bits,

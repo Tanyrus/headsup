@@ -13,6 +13,8 @@ namespace headsup
         return changedAt && (!windowOpen || now - *changedAt >= kSaveSettleSeconds);
     }
 
+    bool KindPagesShown(const Settings& s) { return s.nameplates || s.outlines; }
+
     std::optional<PlateKind> KindOfPage(Page page)
     {
         switch (page)

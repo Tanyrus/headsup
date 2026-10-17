@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -59,6 +60,9 @@ namespace headsup
         NetStatsChanged,
         NoWindowMove,
         AmbiguousWindowMove,
+        NoScanLabel,
+        AmbiguousScanLabel,
+        ScanLabelChanged,
         NoWeather,
         AmbiguousWeather,
     };
@@ -137,18 +141,29 @@ namespace headsup
     KeyHide LocateKeyHide(const ImageSection& text);
 
     // The draw loop's call to the menu window draw: a thiscall on the window's MCD with no stack arguments. RVAs of the
-    // five-byte call and of the routine.
+    // five-byte call and of the routine, and the address of the window list the loop walks (0 where it is not found).
     struct WindowDraw
     {
         LocateProblem problem = LocateProblem::None;
         uint32_t call = 0, draw = 0;
+        uint32_t list = 0;
     };
     WindowDraw LocateWindowDraw(const ImageSection& text);
     struct WindowMoveSite
     {
         LocateProblem problem = LocateProblem::None;
-        uint32_t moveTo = 0; // RVA
+        uint32_t moveTo  = 0; // RVA
+        uint32_t getRect = 0; // RVA of MCD::GetRect, 0 when it was not found once
     };
+    struct ScanLabelSite
+    {
+        LocateProblem problem = LocateProblem::None;
+        uint32_t call = 0; // RVA of the call to MCD::GetRect for the strip title's rectangle
+    };
+    // Where Wide Scan's grid label asks for the strip title window's rectangle, which it is drawn under; `getRect` is
+    // MCD::GetRect's RVA, and the call must go there.
+    ScanLabelSite LocateScanLabel(const ImageSection& text, uint32_t getRect);
+
     // A window's MCD holds its descriptor at +0x04, whose 16-byte name is at +0x46, and its owner at +0x0C; the owner
     // holds its MCD at +0x08.
     constexpr uint32_t kWindowDescriptor = 0x04, kDescriptorName = 0x46, kMcdOwner = 0x0C, kOwnerMcd = 0x08;
@@ -167,8 +182,33 @@ namespace headsup
     // thiscall on the MCD that pops its two arguments. It moves the frame and every entry, so drawing and the mouse's
     // hit tests follow, then has the owner lay out its own content again.
     WindowMoveSite LocateWindowMove(const ImageSection& text);
+    // MCD::GetRect(int16* place) (RVA 0x118F70 in the client of 2026-10-13): a thiscall on the MCD that pops its one
+    // argument and writes the window's rectangle there. Many owners keep such a copy of their window's place and draw
+    // their values from it (the Level box's figures, the Profile window's values, Font Colors' sample, the skill
+    // lists' rows), refreshing it only when they lay the window out themselves.
+    constexpr size_t kWindowRectBytes = 4 * sizeof(int16_t);
+    using WindowRect                   = std::array<int16_t, 4>; // left, top, right, bottom
+    // An owner's copy, moved as its window moves by dx, dy: when it has the window's left, top and right (its bottom
+    // may reach further, as the craft skill list's covers the whole list), or with Exact when it is the window's
+    // rectangle itself, for a copy kept where the class's layout did not say. None when it is no such copy.
+    enum class PlaceMatch : uint8_t
+    {
+        Edges,
+        Exact,
+    };
+    std::optional<WindowRect> MovedPlaceCopy(const WindowRect& copy, const WindowRect& window, int dx, int dy,
+        PlaceMatch match = PlaceMatch::Edges);
+    constexpr uint32_t kUsualPlaceCopy = 0x14; // where most owners keep it
+    // Where an owner keeps that copy, from the start of its class's layout (vtable slot kOwnerLayoutSlot), at at: the
+    // displacement of `lea r, [base + disp8]` whose register it pushes for its call of MCD::GetRect, at getRect, with
+    // at most a `mov ecx, [r + 8]` (the MCD) between. None when the layout makes no such call: the class keeps none
+    // (the Level box and the craft skill list keep it at +0x14, the combat and magic skill lists at +0x18). An
+    // `add r, imm8` before the push counts as the lea does (Font Colors' sample).
+    constexpr uint32_t kOwnerLayoutSlot = 1;
+    constexpr size_t kLayoutScanBytes   = 0x200;
+    std::optional<uint32_t> PlaceCopyOffset(std::span<const uint8_t> layout, uintptr_t at, uintptr_t getRect);
     // An MCD's rectangle in the game's menu resolution: int16 left, top, right and bottom from +0x3A. +0x94 is a move's
-    // countdown, kMoveIdle while none is under way; +0x99 is set for windows kept in a 640 x 480 space instead; +0x10 is
+    // countdown (MoveUnderWay); +0x99 is set for windows kept in a 640 x 480 space instead; +0x10 is
     // kWindowOpening while the window has no owner to lay out yet.
     constexpr uint32_t kMcdType = 0x10, kMcdRect = 0x3A, kMcdMove = 0x94, kMcdVirtual = 0x99;
     // Where the window was last moved to (int16 x, y), which its move routine writes before it lays the window out.
@@ -176,6 +216,9 @@ namespace headsup
     // with their own spot every frame and move the window back when it differs.
     constexpr uint32_t kMcdAsked = 0x52;
     constexpr int32_t kMoveIdle      = -999;
+    // Whether the game is moving the window: its countdown above 0. Its layout sets 0 (RVA 0x11A6AE), which the next
+    // update turns into kMoveIdle (0x11774F), so a window drawn for the first time, opening, still shows 0.
+    bool MoveUnderWay(int32_t move);
     constexpr uint32_t kWindowOpening = 0x0E;
     // A menu window's name past its "menu    ", padded with spaces as the game's 16-byte names are: "equip   ".
     constexpr size_t kWindowKeyLength = 8;
@@ -187,12 +230,6 @@ namespace headsup
     std::optional<WindowKey> KeyFromShortName(std::string_view name);
     // Every window HeadsUp may move but the strip's own: the title, help and connection readout windows.
     bool MovableWindow(const WindowKey& key);
-    // The equipment window and those that open with it: what is moved until the player picks.
-    const std::vector<std::string>& DefaultMovedWindows();
-    // From the settings file, short names a space apart: one no window could have, a strip window and a repeat go, and
-    // so does any past kMaxWindowKeys.
-    std::vector<std::string> MovedWindowsFrom(std::string_view names);
-    std::string MovedWindowNames(const std::vector<std::string>& windows);
     // Window keys without allocating, for the game's draw loop: at most kMaxWindowKeys, each once.
     constexpr size_t kMaxWindowKeys = 128;
     class WindowKeyList
@@ -222,57 +259,21 @@ namespace headsup
     std::vector<WindowOffset> WindowOffsetsFrom(std::string_view text);
     std::string WindowOffsetText(const std::vector<WindowOffset>& offsets);
 
-    // Windows the player moves together: each goes down under the help bar when the group does, and moves by the
-    // group's offset before its own, so they keep their places beside each other. A window is in one group at most.
-    struct WindowGroup
-    {
-        std::string name;
-        int x = 0, y = 0;
-        bool underBar = false;
-        std::vector<std::string> windows; // short names
-        bool operator==(const WindowGroup&) const = default;
-    };
-    constexpr size_t kMaxWindowGroups = 24, kMaxGroupName = 24;
-    // From the settings file, "Equipment:20,-10,1:equip+inventor|Status:0,40,0:statcom": a group's name keeps
-    // letters, digits and spaces, up to kMaxGroupName; a window no group could hold, or one an earlier group has, goes,
-    // and so does any group past kMaxWindowGroups or without a name.
-    std::vector<WindowGroup> WindowGroupsFrom(std::string_view text);
-    // The windows the game opens together, as it opened them with HeadsUp watching (/hu windowlog), each named for its
-    // menu and going under the bar as one; a window shared by several menus is in the first.
-    std::vector<WindowGroup> DefaultWindowGroups();
-    std::string WindowGroupsText(const std::vector<WindowGroup>& groups);
-
-    // What the window hook is given: the windows that go under the bar and each window's whole offset, its own and
-    // its group's.
-    struct WindowMoves
-    {
-        std::vector<std::string> underBar;
-        std::vector<WindowOffset> offsets;
-        bool operator==(const WindowMoves&) const = default;
-    };
-    WindowMoves CombinedMoves(const std::vector<std::string>& underBar, const std::vector<WindowOffset>& offsets,
-        const std::vector<WindowGroup>& groups);
-
     // Every window HeadsUp can move, by short name: those it has a name for first, then the rest of the client's.
     const std::vector<std::string>& AllWindows();
     // What the player knows a window as, for those HeadsUp has a name for; nullptr for the rest.
     const char* WindowLabel(std::string_view shortName);
-    // In the menu resolution: the help bar's lowest reach (0 without it), and the screen's right and bottom.
+    // In the menu resolution: the line the game's windows go under (0 while the panel is off), what is kept between
+    // it and a window, and the screen's right and bottom.
     struct HelpBand
     {
-        int bottom = 0, screenRight = 0, screenBottom = 0;
-        int topBar        = 0;     // the top bar's lowest reach, the help bar's not counted; 0 without the bar
-        bool allUnderBar  = false; // every window opening under the bar goes below it, not only those picked
-        bool moveGameHelp = false; // the game's own help bar goes under the top bar, and the rest under it
+        int bottom = 0, clearance = 0, screenRight = 0, screenBottom = 0;
+        int topBar = 0; // the top bar's lowest reach, the help bar's not counted; 0 without the bar
     };
     // The game's own help bar's windows: its title and help.
     bool HelpStripWindow(const WindowKey& key);
     // The title alone.
     bool TitleWindow(const WindowKey& key);
-    // How far the moved windows go down: from under the game's own strip, whose bottom is stripBottom, to under band,
-    // or under the strip itself once it moved down under the top bar.
-    int WindowShift(const HelpBand& band, int stripBottom);
-
     struct WindowSpot
     {
         int left = 0, top = 0;
@@ -313,17 +314,14 @@ namespace headsup
     class WindowPlacements
     {
     public:
-        // Where to move the window at mcd, now at now and width by height, or none when it is where it should be:
-        // down by shift and over by dx, dy from where the game put it, kept on the screen. A window moved down only
+        // Where to move the window at mcd, now at now and width by height, or none when it is where it should be: dx
+        // over and dy down (up when negative) from where the game put it, kept on the screen. A window moved down
         // never goes up, however tall it is.
-        // The shift applies only to a window the game put above shiftAbove, and with follow to one that such a window,
-        // gone down, would lie over (the gil box under the status window), and so on down from it.
         std::optional<WindowSpot> PlaceFor(uint32_t mcd, const WindowKey& key, WindowSpot now, int width, int height,
-            int dx, int dy, int shift, int shiftAbove, int screenRight, int screenBottom, bool follow = false);
+            int dx, int dy, int screenRight, int screenBottom);
         // Where the game put the window at mcd, now at now: where HeadsUp moved it from, or now when it is not.
         WindowSpot OriginOf(uint32_t mcd, const WindowKey& key, WindowSpot now) const;
-        // The frame PlaceFor stamps the windows it sees with from now on. The frame that ends says which windows
-        // follow another down in the next.
+        // The frame PlaceFor stamps the windows it sees with from now on.
         void SetFrame(uint32_t frame);
         // Whether this window's owner places it itself: it was back where the game had it right after HeadsUp moved
         // it, kBounces times with at most kBounceFrames between, as no page change or relayout does. HeadsUp's move
@@ -337,10 +335,6 @@ namespace headsup
             uint32_t mcd = 0;
             WindowKey key{};
             WindowSpot from{}, to{};
-            int width = 0, height = 0;
-            int shift    = 0;     // what PlaceFor last offered it
-            bool root   = false; // it went down in its own right: above shiftAbove
-            bool pushed = false; // one that went down in the frame before would lie over where the game put it
             uint32_t frame = 0; // the last frame PlaceFor saw it
             uint32_t undone = 0; // the last frame it was found back where the game had it
             int bounces     = 0; // how many times running

@@ -18,9 +18,9 @@ namespace headsup
     enum class Tag : uint8_t
     {
         Name, Level, Con, Id, ServerId, Ph, Detect, Weak, Resist, Status, Immune, Gm, Mentor, New, Sync, Away, Linkshell,
-        Bazaar, Seeking, Job, Owner, Title
+        Bazaar, Seeking, Job, Owner, Title, JobLevel, Break
     };
-    constexpr int kTagCount = static_cast<int>(Tag::Title) + 1;
+    constexpr int kTagCount = static_cast<int>(Tag::Break) + 1;
     constexpr char kTagMark = '$';
 
     // The tags that share one place in a line, of which the first that has something to show is drawn: one tag,

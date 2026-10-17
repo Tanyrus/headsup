@@ -84,7 +84,8 @@ namespace test
             Rml::Initialise();
             size_t count = 0;
             for (const headsup::BundledFont* font = headsup::BundledFonts(count); count-- > 0; ++font)
-                Rml::LoadFontFace(Rml::Span<const Rml::byte>(font->data, font->bytes), font->family, Rml::Style::FontStyle::Normal);
+                Rml::LoadFontFace(Rml::Span<const Rml::byte>(font->data, font->bytes), font->family,
+                    Rml::Style::FontStyle::Normal, Rml::Style::FontWeight::Auto, headsup::IsFallbackFont(font->family));
             context = Rml::CreateContext("overlay", Rml::Vector2i(kWidth, kHeight));
         }
         ~RmlSession() { Rml::Shutdown(); }

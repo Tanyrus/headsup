@@ -75,6 +75,9 @@ namespace headsup
         constexpr int16_t kWindowLoop[] = {0x8B, 0xCE, 0xE8, -1, -1, -1, -1, 0x8B, 0x44, 0x24, 0x0C, 0x85, 0xC0, 0x75,
             0xC6, 0xFE, 0xC3, 0x80, 0xFB, 0x09, 0x7C, 0xAD};
         constexpr uint32_t kWindowLoopCall = 2;
+        // Before the loop, the list it walks: xor bl,bl; mov ecx,list; call First, within kWindowListReach bytes.
+        constexpr int16_t kWindowListMove[] = {0x32, 0xDB, 0xB9, -1, -1, -1, -1, 0xE8};
+        constexpr uint32_t kWindowListAddress = 3, kWindowListReach = 0x60;
         // The window draw's first ten bytes: sub esp,24h; push ebx, ebp, esi, edi; mov ebp,ecx; call. hudbegone patches
         // it from entry+14, so nothing past these is checked.
         constexpr uint8_t kWindowDrawEntry[] = {0x83, 0xEC, 0x24, 0x53, 0x55, 0x56, 0x57, 0x8B, 0xE9, 0xE8};
@@ -83,41 +86,49 @@ namespace headsup
         constexpr int16_t kWindowMoveTo[] = {0x83, 0xEC, 0x0C, 0x66, 0x8B, 0x44, 0x24, 0x14, 0x53, 0x55, 0x8B, 0x6C, 0x24,
             0x18, 0x56, 0x8B, 0xF1, 0x57, 0x33, 0xFF, 0x8D, 0x5E, 0x14, 0x66, 0x89, 0x6E, 0x52, 0x8B, 0xCB, 0x66, 0x89, 0x46,
             0x54};
+        // MCD::GetRect's start: sub esp,0Ch; push esi; mov esi,ecx; mov al,[esi+99h]; test al,al; jz.
+        // mov edx,[the strip title's owner]; add esp,10h; lea ecx,[esp+4]; push ecx; mov ecx,[edx+8]; call GetRect; then
+        // the label drawn at the rectangle's left and its bottom plus 3, in 80808080.
+        constexpr int16_t kScanLabel[] = {0x8B, 0x15, -1, -1, -1, -1, 0x83, 0xC4, 0x10, 0x8D, 0x4C, 0x24, 0x04, 0x51,
+            0x8B, 0x4A, 0x08, 0xE8, -1, -1, -1, -1, 0x8B, 0x4C, 0x24, 0x0A, 0x8B, 0x54, 0x24, 0x04, 0x8D, 0x44, 0x24, 0x10,
+            0x68, 0x80, 0x80, 0x80, 0x80, 0x83, 0xC1, 0x03};
+        constexpr uint32_t kScanLabelCall = 17;
+        constexpr int16_t kWindowGetRect[] = {0x83, 0xEC, 0x0C, 0x56, 0x8B, 0xF1, 0x8A, 0x86, 0x99, 0x00, 0x00, 0x00,
+            0x84, 0xC0, 0x0F, 0x84};
         constexpr char kMenuPrefix[] = "menu    ";
         constexpr size_t kMenuPrefixLength = sizeof(kMenuPrefix) - 1;
         static_assert(kMenuPrefixLength + kWindowKeyLength == kWindowNameLength);
-        // The windows players know, by key: the equipment window and those that open with it first.
+        // The windows players know, by key.
         struct KnownWindow
         {
             const char* key;
             const char* label;
-            bool moved; // by default
         };
         constexpr KnownWindow kKnownWindows[] = {
-            {"equip", "Equipment", true}, {"inventor", "Inventory", true}, {"iteminfo", "Item Details", true},
-            {"itemctrl", "Item Options", true}, {"itmsortw", "Sort", true}, {"itmsort2", "Sort Options", true},
-            {"statcom", "Status", true}, {"statcom2", "Status Details", true}, {"money", "Gil", false},
-            {"moneyctr", "Gil Amount", false}, {"menuwind", "Main Menu", false}, {"ability", "Abilities", false},
-            {"abimenu", "Ability Menu", false}, {"magic", "Magic", false}, {"mgcmenu", "Magic Menu", false},
-            {"magselec", "Magic List", false}, {"mgcsortw", "Magic Sort", false}, {"btlskill", "Combat Skills", false},
-            {"mgcskill", "Magic Skills", false}, {"trdskill", "Crafting Skills", false}, {"joblevel", "Job Levels", false},
-            {"jobchang", "Job Change", false}, {"levmerit", "Merit Points", false}, {"masterle", "Master Levels", false},
-            {"trade", "Trade", false}, {"bazaar", "Bazaar", false}, {"friend", "Friends", false},
-            {"flistmai", "Friend List", false}, {"social", "Social", false}, {"socialme", "Social Menu", false},
-            {"partywin", "Party", false}, {"prtyjoin", "Party Invite", false}, {"link1", "Linkshell", false},
-            {"map0", "Map", false}, {"mapframe", "Map Frame", false}, {"maplist", "Map List", false},
-            {"region", "Region Info", false}, {"conquer1", "Conquest", false}, {"quest00", "Quests", false},
-            {"miss00", "Missions", false}, {"missionm", "Mission Menu", false}, {"storage", "Storage", false},
-            {"mnstorag", "Mog Storage", false}, {"delivery", "Delivery Box", false}, {"post1", "Post", false},
-            {"shop", "Shop", false}, {"shopbuy", "Shop Buy", false}, {"shopsell", "Shop Sell", false},
-            {"shopmain", "Shop Menu", false}, {"auc1", "Auction House", false}, {"auclist", "Auction List", false},
-            {"auchisto", "Auction History", false}, {"guildsho", "Guild Shop", false}, {"loot", "Treasure Pool", false},
-            {"macro", "Macros", false}, {"mcrmenu", "Macro Menu", false}, {"config", "Config", false},
-            {"logwindo", "Log", false}, {"fulllog", "Full Log", false}, {"profile", "Profile", false},
-            {"blklist", "Blacklist", false}, {"emote", "Emotes", false}, {"compass", "Compass", false},
-            {"inspect", "Check", false}, {"titlehan", "Titles", false}, {"mount", "Mounts", false},
-            {"gift", "Gifts", false}, {"searchjo", "Search", false}, {"imperial", "Imperial Standing", false},
-            {"allied", "Allied Notes", false}};
+            {"equip", "Equipment"}, {"inventor", "Inventory"}, {"iteminfo", "Item Details"},
+            {"itemctrl", "Item Options"}, {"itmsortw", "Sort"}, {"itmsort2", "Sort Options"},
+            {"statcom", "Status"}, {"statcom2", "Status Details"}, {"money", "Gil"},
+            {"moneyctr", "Gil Amount"}, {"menuwind", "Main Menu"}, {"ability", "Abilities"},
+            {"abimenu", "Ability Menu"}, {"magic", "Magic"}, {"mgcmenu", "Magic Menu"},
+            {"magselec", "Magic List"}, {"mgcsortw", "Magic Sort"}, {"btlskill", "Combat Skills"},
+            {"mgcskill", "Magic Skills"}, {"trdskill", "Crafting Skills"}, {"joblevel", "Job Levels"},
+            {"jobchang", "Job Change"}, {"levmerit", "Merit Points"}, {"masterle", "Master Levels"},
+            {"trade", "Trade"}, {"bazaar", "Bazaar"}, {"friend", "Friends"},
+            {"flistmai", "Friend List"}, {"social", "Social"}, {"socialme", "Social Menu"},
+            {"partywin", "Party"}, {"prtyjoin", "Party Invite"}, {"link1", "Linkshell"},
+            {"map0", "Map"}, {"mapframe", "Map Frame"}, {"maplist", "Map List"},
+            {"region", "Region Info"}, {"conquer1", "Conquest"}, {"quest00", "Quests"},
+            {"miss00", "Missions"}, {"missionm", "Mission Menu"}, {"storage", "Storage"},
+            {"mnstorag", "Mog Storage"}, {"delivery", "Delivery Box"}, {"post1", "Post"},
+            {"shop", "Shop"}, {"shopbuy", "Shop Buy"}, {"shopsell", "Shop Sell"},
+            {"shopmain", "Shop Menu"}, {"auc1", "Auction House"}, {"auclist", "Auction List"},
+            {"auchisto", "Auction History"}, {"guildsho", "Guild Shop"}, {"loot", "Treasure Pool"},
+            {"macro", "Macros"}, {"mcrmenu", "Macro Menu"}, {"config", "Config"},
+            {"logwindo", "Log"}, {"fulllog", "Full Log"}, {"profile", "Profile"},
+            {"blklist", "Blacklist"}, {"emote", "Emotes"}, {"compass", "Compass"},
+            {"inspect", "Check"}, {"titlehan", "Titles"}, {"mount", "Mounts"},
+            {"gift", "Gifts"}, {"searchjo", "Search"}, {"imperial", "Imperial Standing"},
+            {"allied", "Allied Notes"}};
         // Every menu window the client knows (its menu catalog), but the strip's own, a space apart.
         constexpr const char* kAllWindows =
             "ability abimenu abiselec abisortw acoption actiom10 actionm1 actionm2 actionm3 actionm4 actionm5 "
@@ -314,6 +325,9 @@ namespace headsup
         case LocateProblem::AmbiguousWeather: return "the game's weather was found more than once";
         case LocateProblem::NoWindowMove: return "the game's window move was not found";
         case LocateProblem::AmbiguousWindowMove: return "the game's window move was found more than once";
+        case LocateProblem::NoScanLabel: return "where Wide Scan places its grid label was not found";
+        case LocateProblem::AmbiguousScanLabel: return "where Wide Scan places its grid label was found more than once";
+        case LocateProblem::ScanLabelChanged: return "Wide Scan's grid label is placed through an unexpected function";
         case LocateProblem::NoStripText: return "the game's help bar text was not found";
         case LocateProblem::AmbiguousStripText: return "the game's help bar text was found in more places than one";
         case LocateProblem::StripTextChanged: return "the game's help bar text is not laid out as HeadsUp expects";
@@ -451,7 +465,11 @@ namespace headsup
         // Below the section, draw - text.rva wraps past its end, which Matches rejects.
         if (!Matches(text, draw - text.rva, kWindowDrawEntry, sizeof(kWindowDrawEntry)))
             return WindowDraw{LocateProblem::WindowDrawChanged};
-        return WindowDraw{LocateProblem::None, call, draw};
+        const uint32_t from = found.front() >= kWindowListReach ? found.front() - kWindowListReach : 0;
+        const std::vector<uint32_t> moves =
+            FindAll(kWindowListMove, ImageSection{text.rva + from, text.bytes + from, found.front() - from});
+        const uint32_t list = moves.empty() ? 0 : ReadAt<uint32_t>(text.bytes, from + moves.back() + kWindowListAddress);
+        return WindowDraw{LocateProblem::None, call, draw, list};
     }
 
     NetStats LocateNetStats(const ImageSection& text)
@@ -494,7 +512,96 @@ namespace headsup
         const std::vector<uint32_t> found = FindAll(kWindowMoveTo, text);
         if (found.empty()) return WindowMoveSite{LocateProblem::NoWindowMove};
         if (found.size() > 1) return WindowMoveSite{LocateProblem::AmbiguousWindowMove};
-        return WindowMoveSite{LocateProblem::None, text.rva + found.front()};
+        const std::vector<uint32_t> getRect = FindAll(kWindowGetRect, text);
+        return WindowMoveSite{LocateProblem::None, text.rva + found.front(),
+            getRect.size() == 1 ? text.rva + getRect.front() : 0};
+    }
+
+    bool MoveUnderWay(int32_t move) { return move > 0; }
+
+    std::optional<uint32_t> PlaceCopyOffset(std::span<const uint8_t> layout, uintptr_t at, uintptr_t getRect)
+    {
+        constexpr uint8_t kCall = 0xE8, kLea = 0x8D, kMov = 0x8B, kPush = 0x50, kRegisters = 8;
+        constexpr uint8_t kModDisp8 = 1, kRmSib = 4, kEcx = 1, kMcdField = 0x08;
+        constexpr size_t kCallBytes = 5, kOperandBytes = 3; // lea and mov, each with a ModRM and a disp8
+        constexpr size_t kPushReach = 16;                   // bytes from the push to the call at most
+        const auto mod = [](uint8_t modrm) { return modrm >> 6; };
+        const auto reg = [](uint8_t modrm) { return (modrm >> 3) & 7; };
+        const auto rm  = [](uint8_t modrm) { return modrm & 7; };
+        // A `lea pushed, [base + disp8]` ending at end: its displacement.
+        const auto leaAt = [&](size_t end, int pushed) -> std::optional<uint32_t> {
+            if (end < kOperandBytes) return std::nullopt;
+            const uint8_t* lea = layout.data() + end - kOperandBytes;
+            if (lea[0] != kLea || mod(lea[1]) != kModDisp8 || reg(lea[1]) != pushed || rm(lea[1]) == kRmSib)
+                return std::nullopt;
+            return lea[2];
+        };
+        // An `add pushed, imm8` ending at end: its immediate, the register's own offset into the owner.
+        constexpr uint8_t kGroup1Imm8 = 0x83, kModRegister = 3, kAddOp = 0;
+        const auto addAt = [&](size_t end, int pushed) -> std::optional<uint32_t> {
+            if (end < kOperandBytes) return std::nullopt;
+            const uint8_t* add = layout.data() + end - kOperandBytes;
+            if (add[0] != kGroup1Imm8 || mod(add[1]) != kModRegister || reg(add[1]) != kAddOp || rm(add[1]) != pushed)
+                return std::nullopt;
+            return add[2];
+        };
+        // The argument pushed at push, its lea or add right before it or before the MCD's fetch for the call.
+        const auto argumentAt = [&](size_t push) -> std::optional<uint32_t> {
+            if (layout[push] < kPush || layout[push] >= kPush + kRegisters) return std::nullopt;
+            const int pushed = layout[push] - kPush;
+            if (const std::optional<uint32_t> offset = leaAt(push, pushed)) return offset;
+            if (const std::optional<uint32_t> offset = addAt(push, pushed)) return offset;
+            if (push < kOperandBytes) return std::nullopt;
+            const size_t mov = push - kOperandBytes;
+            if (layout[mov] == kMov && mod(layout[mov + 1]) == kModDisp8 && reg(layout[mov + 1]) == kEcx &&
+                layout[mov + 2] == kMcdField)
+                return leaAt(mov, pushed);
+            return std::nullopt;
+        };
+        // The layout ends at a ret padded to the next 16-byte boundary, where the compiler starts the next function;
+        // a ret with code after it is an early return. Read no further: that code is another class's.
+        constexpr uint8_t kRet = 0xC3, kNop = 0x90, kInt3 = 0xCC;
+        constexpr uintptr_t kFunctionAlign = 16;
+        size_t end = layout.size();
+        for (size_t i = 0; i + 1 < layout.size() && end == layout.size(); ++i)
+        {
+            if (layout[i] != kRet || (layout[i + 1] != kNop && layout[i + 1] != kInt3)) continue;
+            size_t pad = i + 1;
+            while (pad < layout.size() && (at + pad) % kFunctionAlign != 0 && (layout[pad] == kNop || layout[pad] == kInt3))
+                ++pad;
+            if ((at + pad) % kFunctionAlign == 0) end = i + 1;
+        }
+        layout = layout.first(end);
+        for (size_t i = 1; i + kCallBytes <= layout.size(); ++i)
+        {
+            if (layout[i] != kCall ||
+                at + i + kCallBytes + static_cast<uintptr_t>(ReadAt<int32_t>(layout.data(), i + 1)) != getRect)
+                continue;
+            // The push may have an instruction or two after it before the call (Trade sets a flag there).
+            for (size_t back = 1; back <= kPushReach && back <= i; ++back)
+                if (const std::optional<uint32_t> offset = argumentAt(i - back)) return offset;
+        }
+        return std::nullopt;
+    }
+
+    std::optional<WindowRect> MovedPlaceCopy(const WindowRect& copy, const WindowRect& window, int dx, int dy, PlaceMatch match)
+    {
+        enum Edge { kLeft, kTop, kRight, kBottom };
+        if (copy[kLeft] != window[kLeft] || copy[kTop] != window[kTop] || copy[kRight] != window[kRight] ||
+            copy[kBottom] < copy[kTop] || (match == PlaceMatch::Exact && copy[kBottom] != window[kBottom]))
+            return std::nullopt;
+        const auto by = [](int16_t edge, int d) { return static_cast<int16_t>(edge + d); };
+        return WindowRect{by(copy[kLeft], dx), by(copy[kTop], dy), by(copy[kRight], dx), by(copy[kBottom], dy)};
+    }
+
+    ScanLabelSite LocateScanLabel(const ImageSection& text, uint32_t getRect)
+    {
+        const std::vector<uint32_t> found = FindAll(kScanLabel, text);
+        if (getRect == 0 || found.empty()) return ScanLabelSite{LocateProblem::NoScanLabel};
+        if (found.size() > 1) return ScanLabelSite{LocateProblem::AmbiguousScanLabel};
+        const uint32_t call = text.rva + found.front() + kScanLabelCall;
+        if (CallTarget(call, text) != getRect) return ScanLabelSite{LocateProblem::ScanLabelChanged};
+        return ScanLabelSite{LocateProblem::None, call};
     }
 
     std::optional<WindowKey> WindowKeyOf(const char* name)
@@ -542,40 +649,6 @@ namespace headsup
         return true;
     }
 
-    const std::vector<std::string>& DefaultMovedWindows()
-    {
-        static const std::vector<std::string> moved = [] {
-            std::vector<std::string> names;
-            for (const KnownWindow& w : kKnownWindows)
-                if (w.moved) names.emplace_back(w.key);
-            return names;
-        }();
-        return moved;
-    }
-
-    std::vector<std::string> MovedWindowsFrom(std::string_view names)
-    {
-        std::vector<std::string> windows;
-        while (!names.empty() && windows.size() < kMaxWindowKeys)
-        {
-            const size_t end = std::min(names.find(' '), names.size());
-            const std::string_view name = names.substr(0, end);
-            names.remove_prefix(std::min(end + 1, names.size()));
-            const std::optional<WindowKey> key = KeyFromShortName(name);
-            if (key && MovableWindow(*key) && std::ranges::find(windows, name) == windows.end())
-                windows.emplace_back(name);
-        }
-        return windows;
-    }
-
-    std::string MovedWindowNames(const std::vector<std::string>& windows)
-    {
-        std::string names;
-        for (const std::string& window : windows)
-            names += (names.empty() ? "" : " ") + window;
-        return names;
-    }
-
     std::vector<WindowOffset> WindowOffsetsFrom(std::string_view text)
     {
         std::vector<WindowOffset> offsets;
@@ -609,109 +682,6 @@ namespace headsup
         for (const WindowOffset& o : offsets)
             text += (text.empty() ? "" : " ") + o.name + ":" + std::to_string(o.x) + "," + std::to_string(o.y);
         return text;
-    }
-
-    std::vector<WindowGroup> DefaultWindowGroups()
-    {
-        return WindowGroupsFrom(
-            "Equipment:0,0,1:equip+inventor+iteminfo+itemctrl+itmsortw+itmsort2+money+moneyctr|"
-            "Status:0,0,1:statcom+statcom2+level+profile+evitem|"
-            "Main Menu:0,0,1:menuwind|"
-            "Records:0,0,1:ut_menu+ut_point+quest00+arealist|"
-            "Magic:0,0,1:mgcmenu+magic+mgcsortw+magselec|"
-            "Abilities:0,0,1:abimenu+ability+abisortw+abiselec+mount|"
-            "Synthesis:0,0,1:cmbmenu+cmbhwin+cmbhlst+tskill1+tskill2|"
-            "Search:0,0,1:prty1+scresult+searchma+searchjo+searchle+searchna+searchra|"
-            "Linkshell:0,0,1:link1+link2+link3+link4+link5+link6+link7+link8+link9+link10+link11+link12+link13|"
-            "Conquest:0,0,1:region+cnqframe+conq3pts+conq6sta|"
-            "Map:0,0,1:map0+mapframe+maplist+mapscan|"
-            "Social:0,0,1:socialme+commenu+flistmai+friend+titlehan+msglist+faqsub|"
-            "Config:0,0,1:configwi+conf1win+conf2win+conf3win+conf5win+conf6win+conf12wi+conf13wi|"
-            "Macros:0,0,1:mcrmenu+mcrselec+mcrselop+mcr1pall+mcr2pall|"
-            "Shop:0,0,1:bazaar+shop+shopbuy+shopsell+shopmain|"
-            "Mog House:0,0,1:mogcont+mnstorag|"
-            "Missions:0,0,1:missionm+miss00");
-    }
-
-    std::vector<WindowGroup> WindowGroupsFrom(std::string_view text)
-    {
-        std::vector<WindowGroup> groups;
-        std::vector<std::string> taken;
-        while (!text.empty() && groups.size() < kMaxWindowGroups)
-        {
-            const size_t end = std::min(text.find('|'), text.size());
-            std::string_view entry = text.substr(0, end);
-            text.remove_prefix(std::min(end + 1, text.size()));
-            const size_t nameEnd = entry.find(':');
-            if (nameEnd == std::string_view::npos) continue;
-            WindowGroup g;
-            for (const char c : entry.substr(0, nameEnd))
-                if ((std::isalnum(static_cast<unsigned char>(c)) || c == ' ') && g.name.size() < kMaxGroupName) g.name += c;
-            entry.remove_prefix(nameEnd + 1);
-            const size_t numbersEnd = std::min(entry.find(':'), entry.size());
-            std::string_view numbers = entry.substr(0, numbersEnd);
-            entry.remove_prefix(std::min(numbersEnd + 1, entry.size()));
-            int values[3] = {};
-            for (int& v : values)
-            {
-                const size_t comma = std::min(numbers.find(','), numbers.size());
-                std::from_chars(numbers.data(), numbers.data() + comma, v);
-                numbers.remove_prefix(std::min(comma + 1, numbers.size()));
-            }
-            g.x        = std::clamp(values[0], -kMaxWindowOffset, kMaxWindowOffset);
-            g.y        = std::clamp(values[1], -kMaxWindowOffset, kMaxWindowOffset);
-            g.underBar = values[2] != 0;
-            while (!entry.empty())
-            {
-                const size_t plus = std::min(entry.find('+'), entry.size());
-                const std::string_view window = entry.substr(0, plus);
-                entry.remove_prefix(std::min(plus + 1, entry.size()));
-                const std::optional<WindowKey> key = KeyFromShortName(window);
-                if (key && MovableWindow(*key) && std::ranges::find(taken, window) == taken.end() &&
-                    taken.size() < kMaxWindowKeys)
-                {
-                    taken.emplace_back(window);
-                    g.windows.emplace_back(window);
-                }
-            }
-            if (!g.name.empty()) groups.push_back(std::move(g));
-        }
-        return groups;
-    }
-
-    std::string WindowGroupsText(const std::vector<WindowGroup>& groups)
-    {
-        std::string text;
-        for (const WindowGroup& g : groups)
-        {
-            text += (text.empty() ? "" : "|") + g.name + ":" + std::to_string(g.x) + "," + std::to_string(g.y) + "," +
-                    (g.underBar ? "1" : "0") + ":";
-            for (size_t i = 0; i < g.windows.size(); ++i)
-                text += (i > 0 ? "+" : "") + g.windows[i];
-        }
-        return text;
-    }
-
-    WindowMoves CombinedMoves(const std::vector<std::string>& underBar, const std::vector<WindowOffset>& offsets,
-        const std::vector<WindowGroup>& groups)
-    {
-        WindowMoves moves{underBar, offsets};
-        for (const WindowGroup& g : groups)
-            for (const std::string& window : g.windows)
-            {
-                if (g.underBar && std::ranges::find(moves.underBar, window) == moves.underBar.end())
-                    moves.underBar.push_back(window);
-                if (g.x == 0 && g.y == 0) continue;
-                const auto own = std::ranges::find(moves.offsets, window, &WindowOffset::name);
-                if (own == moves.offsets.end())
-                    moves.offsets.push_back(WindowOffset{window, g.x, g.y});
-                else
-                {
-                    own->x += g.x;
-                    own->y += g.y;
-                }
-            }
-        return moves;
     }
 
     const std::vector<std::string>& AllWindows()
@@ -754,44 +724,10 @@ namespace headsup
         return true;
     }
 
-    int WindowShift(const HelpBand& band, int stripBottom)
-    {
-        const int under = std::max(band.bottom, band.moveGameHelp ? stripBottom + band.topBar : 0);
-        return std::max(0, under - stripBottom);
-    }
-
-    void WindowPlacements::SetFrame(uint32_t frame)
-    {
-        // Found afresh from the windows that went down in their own right, so two pushed ones that lie over each
-        // other never hold each other down once those are gone.
-        const auto drew = [&](const Placed& p) { return p.mcd != 0 && p.frame == m_Frame; };
-        const auto over = [](const Placed& upper, const Placed& lower) {
-            const WindowSpot at = upper.root ? upper.to : WindowSpot{upper.from.left, upper.from.top + upper.shift};
-            return at.left < lower.from.left + lower.width && lower.from.left < at.left + upper.width &&
-                   at.top < lower.from.top + lower.height && lower.from.top < at.top + upper.height;
-        };
-        for (Placed& p : m_Placed)
-            p.pushed = false;
-        for (bool grew = true; grew;)
-        {
-            grew = false;
-            for (Placed& lower : m_Placed)
-            {
-                if (!drew(lower) || lower.root || lower.pushed) continue;
-                for (const Placed& upper : m_Placed)
-                    if (drew(upper) && (upper.root || upper.pushed) && over(upper, lower))
-                    {
-                        lower.pushed = true;
-                        grew         = true;
-                        break;
-                    }
-            }
-        }
-        m_Frame = frame;
-    }
+    void WindowPlacements::SetFrame(uint32_t frame) { m_Frame = frame; }
 
     std::optional<WindowSpot> WindowPlacements::PlaceFor(uint32_t mcd, const WindowKey& key, WindowSpot now, int width,
-        int height, int dx, int dy, int shift, int shiftAbove, int screenRight, int screenBottom, bool follow)
+        int height, int dx, int dy, int screenRight, int screenBottom)
     {
         Placed* placed = nullptr;
         for (Placed& p : m_Placed)
@@ -814,14 +750,9 @@ namespace headsup
         }
         placed->frame = m_Frame;
         const WindowSpot from = placed->from;
-        placed->width  = width;
-        placed->height = height;
-        placed->shift  = shift;
-        placed->root   = shift != 0 && from.top < shiftAbove;
-        if (!placed->root && !(follow && placed->pushed)) shift = 0;
         int left = from.left;
         if (dx != 0) left = std::clamp(from.left + dx, 0, std::max(0, screenRight - width));
-        int top = std::min(from.top + shift + dy, screenBottom - height);
+        int top = std::min(from.top + dy, screenBottom - height);
         top     = dy >= 0 ? std::max(top, from.top) : std::max(top, 0);
         placed->to = WindowSpot{left, top};
         return placed->to != now ? std::optional<WindowSpot>(placed->to) : std::nullopt;

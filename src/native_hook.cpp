@@ -126,7 +126,6 @@ namespace headsup
 {
     namespace
     {
-        constexpr const char* kGameModule = "FFXiMain.dll";
         constexpr char kCodeSection[]     = ".text";
         constexpr char kConstSection[]    = ".rdata";
         constexpr char kDataSection[]     = ".data";
@@ -149,11 +148,11 @@ namespace headsup
         uint32_t g_PickedReturn = 0; // where the candidate's arrow call returns to
         bool g_HideArrows       = false;
         HiddenWindows g_HiddenWindows;
-        std::optional<HelpBand> g_HelpBand; // windows are moved out from under it while it is set
+        std::optional<WindowPlacing> g_Placing; // windows are placed while it is set
         uint32_t g_TitleText = 0;           // the strip title's text object in its owner; 0 when it was not found
         PlacedText g_TitlePlace;
-        WindowKeyList g_MovedWindows;       // those the player picked
         WindowKeyList g_SeenWindows;        // those that opened since HeadsUp loaded
+        std::vector<std::optional<int>> g_ViewShifts; // the player's, by view of WindowViews()
         struct KeyOffset
         {
             WindowKey key;
@@ -164,9 +163,18 @@ namespace headsup
         WindowKeyList g_DrawnWindows; // those that drew since TakeOpen last ran
         WindowPlacements g_Placements;      // where each moved window came from and went
         uint32_t g_WindowFrame = 0;         // counts WindowHook::NewFrame
-        int g_StripBottom = 0;              // the game's strip's lowest edge, 0 until its windows are seen
         uintptr_t g_WindowMoveTo = 0;       // MCD::MoveTo, or 0 when it was not found
+        uint32_t g_WindowList    = 0;       // the list the game's window draw loop walks, or 0 when it was not found
+        // The frame's windows from that list, read at its first window draw, and what they were found to need.
+        std::array<OpenWindow, kMaxWindowKeys> g_OpenWindows{};
+        std::array<FrameWindow, kMaxWindowKeys> g_FrameWindows{};
+        uint32_t g_PlannedFrame = 0;     // the frame whose first window draw placed its windows
+        WindowKeyList g_PlannedKeys;     // the windows shown at the last Present's plan
+        FrameShifts g_FrameShifts;
+        int g_StripShift = 0, g_WindowsBand = 0;
         using WindowMoveToFn     = void(__attribute__((thiscall))*)(uintptr_t mcd, int x, int y);
+        using WindowGetRectFn    = void(__attribute__((thiscall))*)(uintptr_t mcd, int16_t* place);
+        uintptr_t g_WindowGetRect = 0;     // MCD::GetRect, or 0 when it was not found
         uint32_t g_PickedColor  = 0;
         uintptr_t g_RangeColor  = 0; // the window's thiscall that picks the candidate arrow's color
         using RangeColorFn      = uint32_t(__attribute__((thiscall))*)(const void* window, uintptr_t you, uintptr_t candidate,
@@ -437,6 +445,11 @@ namespace headsup
 
 namespace headsup
 {
+    namespace
+    {
+        __attribute__((thiscall)) void ScanLabelRect(uintptr_t mcd, int16_t* place);
+    }
+
     std::string WindowHook::Start()
     {
         if (Running()) return "";
@@ -446,6 +459,7 @@ namespace headsup
         if (!FindSection(base, kCodeSection, text)) return kCodeNotRead;
         const WindowDraw found = LocateWindowDraw(text);
         if (found.problem != LocateProblem::None) return Describe(found.problem);
+        g_WindowList = found.list;
         // Without the strip's text objects its title stays where the game draws it when its window moves.
         ImageSection data{};
         const StripSites strip = FindSection(base, kDataSection, data) ? LocateStripText(text, data) : StripSites{};
@@ -458,13 +472,24 @@ namespace headsup
         // Without the move the windows stay where the game puts them; hiding works either way.
         const WindowMoveSite move = LocateWindowMove(text);
         g_WindowMoveTo            = move.problem == LocateProblem::None ? Address(base) + move.moveTo : 0;
-        m_MoveProblem             = move.problem == LocateProblem::None ? "" : Describe(move.problem);
+        g_WindowGetRect           = move.getRect != 0 ? Address(base) + move.getRect : 0;
+        // Without it Wide Scan's grid label stays under the strip's title where the game put it.
+        if (const ScanLabelSite label = LocateScanLabel(text, move.getRect); label.problem == LocateProblem::None)
+        {
+            uint8_t* at         = base + label.call;
+            CodePatch labelCall = Retarget(at, Address(at), Address(&ScanLabelRect));
+            if (PutIn({&labelCall, 1}).empty()) m_LabelCall = labelCall;
+        }
+        m_MoveProblem             = move.problem != LocateProblem::None ? Describe(move.problem)
+                                    : g_WindowList == 0 ? "the game's list of open windows was not found" : "";
+        if (g_WindowList == 0) g_WindowMoveTo = 0;
         return "";
     }
 
     namespace
     {
         void PutWindowBack(const WindowPlacements::Placed& placed);
+        void PlaceFrame(bool present);
     }
 
     std::string WindowHook::Stop()
@@ -478,18 +503,40 @@ namespace headsup
         g_TitlePlace         = {};
         const CodePatch call = std::exchange(m_Call, {});
         g_HiddenWindows      = {};
-        g_HelpBand.reset();
-        g_StripBottom = 0;
-        return KeptLoaded(PutBack({&call, 1},
+        g_Placing.reset();
+        g_PlannedFrame = 0;
+        g_PlannedKeys.Clear();
+        g_WindowsBand  = 0;
+        const CodePatch label       = std::exchange(m_LabelCall, {});
+        const std::string labelBack = label.at == nullptr ? "" : KeptLoaded(PutBack({&label, 1},
+            "Wide Scan's grid label was changed again after HeadsUp hooked it, so it was left as it is",
+            "Wide Scan's grid label could not be put back"));
+        const std::string drawBack = KeptLoaded(PutBack({&call, 1},
             "the game's window draw was changed again after HeadsUp hooked it, so it was left as it is",
             "the game's window draw could not be put back"));
+        return drawBack.empty() ? labelBack : drawBack;
     }
 
     void WindowHook::Hide(HiddenWindows hidden) { g_HiddenWindows = hidden; }
 
-    void WindowHook::NewFrame() { g_Placements.SetFrame(++g_WindowFrame); }
+    void WindowHook::NewFrame()
+    {
+        g_Placements.SetFrame(++g_WindowFrame);
+        if (g_Placing && g_WindowMoveTo != 0) PlaceFrame(true);
+    }
 
-    void WindowHook::MoveFrom(std::optional<HelpBand> band) { g_HelpBand = band; }
+    void WindowHook::Place(std::optional<WindowPlacing> placing) { g_Placing = placing; }
+
+    void WindowHook::Shift(const std::vector<ViewShift>& shifts)
+    {
+        const std::span<const WindowView> views = WindowViews();
+        g_ViewShifts.assign(views.size(), std::nullopt);
+        for (const ViewShift& s : shifts)
+            for (size_t v = 0; v < views.size(); ++v)
+                if (views[v].id == s.id) g_ViewShifts[v] = s.dy;
+    }
+
+    int WindowHook::WindowsBand() const { return g_WindowsBand; }
 
     void WindowHook::Offset(const std::vector<WindowOffset>& offsets)
     {
@@ -497,13 +544,6 @@ namespace headsup
         for (const WindowOffset& o : offsets)
             if (const std::optional<WindowKey> key = KeyFromShortName(o.name); key && g_OffsetCount < g_Offsets.size())
                 g_Offsets[g_OffsetCount++] = KeyOffset{*key, o.x, o.y};
-    }
-
-    void WindowHook::Move(const std::vector<std::string>& windows)
-    {
-        g_MovedWindows.Clear();
-        for (const std::string& name : windows)
-            if (const std::optional<WindowKey> key = KeyFromShortName(name)) g_MovedWindows.Add(*key);
     }
 
     std::vector<std::string> WindowHook::SeenWindows() const
@@ -748,13 +788,63 @@ namespace headsup
                 }
         }
 
+        // Where an owner keeps its copy of its window's place, read off its class's layout: none for a class that keeps
+        // none, or when the code cannot be read.
+        std::optional<uint32_t> PlaceCopyAt(uint32_t owner)
+        {
+            const auto* object = reinterpret_cast<const uint8_t*>(owner);
+            if (g_WindowGetRect == 0 || owner == 0 || !Readable(object, sizeof(uint32_t))) return std::nullopt;
+            const auto* slot = reinterpret_cast<const uint8_t*>(ReadAt<uint32_t>(object, 0) + kOwnerLayoutSlot * sizeof(uint32_t));
+            if (!Readable(slot, sizeof(uint32_t))) return std::nullopt;
+            const uint32_t layout = ReadAt<uint32_t>(slot, 0);
+            const auto* code      = reinterpret_cast<const uint8_t*>(layout);
+            if (layout == 0 || !Readable(code, kLayoutScanBytes)) return std::nullopt;
+            return PlaceCopyOffset({code, kLayoutScanBytes}, layout, g_WindowGetRect);
+        }
+
+        // The game's own move. An owner that keeps a copy of its window's place draws from it, and the move leaves it
+        // where the window was: the copy is moved with it. Nothing else of the owner is touched.
+        void MoveTo(uint32_t mcd, WindowSpot to)
+        {
+            WindowRect window{};
+            std::memcpy(window.data(), reinterpret_cast<const void*>(mcd + kMcdRect), kWindowRectBytes);
+            const uint32_t owner            = ReadAt<uint32_t>(reinterpret_cast<const uint8_t*>(mcd + kMcdOwner), 0);
+            const std::optional<uint32_t> at = PlaceCopyAt(owner);
+            // A class whose layout does not say may still keep the window's rectangle where most do.
+            const PlaceMatch match          = at ? PlaceMatch::Edges : PlaceMatch::Exact;
+            auto* copy                      = owner != 0 ? reinterpret_cast<uint8_t*>(owner + at.value_or(kUsualPlaceCopy)) : nullptr;
+            const bool readable             = copy != nullptr && Readable(copy, kWindowRectBytes);
+            WindowRect kept{};
+            if (readable) std::memcpy(kept.data(), copy, kWindowRectBytes);
+            reinterpret_cast<WindowMoveToFn>(g_WindowMoveTo)(mcd, to.left, to.top);
+            if (!readable) return;
+            if (const std::optional<WindowRect> moved = MovedPlaceCopy(kept, window, to.left - window[0], to.top - window[1], match))
+                std::memcpy(copy, moved->data(), kWindowRectBytes);
+        }
+
+        // In place of the call through which Wide Scan's grid label asks for the strip title's rectangle, inside the
+        // game's draw: the label sat over the list where the game put both, and goes where the list went.
+        __attribute__((thiscall)) void ScanLabelRect(uintptr_t mcd, int16_t* place)
+        {
+            reinterpret_cast<WindowGetRectFn>(g_WindowGetRect)(mcd, place);
+            if (!g_Placing || g_WindowMoveTo == 0) return;
+            const uint32_t descriptor = ReadAt<uint32_t>(reinterpret_cast<const uint8_t*>(mcd + kWindowDescriptor), 0);
+            const std::optional<WindowKey> key =
+                descriptor != 0 ? WindowKeyOf(reinterpret_cast<const char*>(descriptor + kDescriptorName)) : std::nullopt;
+            if (!key) return;
+            const auto* rect = reinterpret_cast<const int16_t*>(mcd + kMcdRect);
+            const WindowSpot now{rect[0], rect[1]};
+            LabelPlace(std::span<int16_t, 4>(place, 4), g_FrameShifts.left.shift,
+                now.top - g_Placements.OriginOf(mcd, *key, now).top);
+        }
+
         // HeadsUp's own move of a window. One whose owner puts it back each frame keeps the spot its owner last asked
         // for, so the owner's check passes and the window stays.
         void MoveWindow(uint32_t mcd, const WindowKey& key, WindowSpot to)
         {
             auto* asked     = reinterpret_cast<int16_t*>(mcd + kMcdAsked);
             const int16_t x = asked[0], y = asked[1];
-            reinterpret_cast<WindowMoveToFn>(g_WindowMoveTo)(mcd, to.left, to.top);
+            MoveTo(mcd, to);
             if (!g_Placements.PutsItselfBack(key)) return;
             asked[0] = x;
             asked[1] = y;
@@ -769,12 +859,12 @@ namespace headsup
             if (owner == 0 || !Readable(reinterpret_cast<const uint8_t*>(owner), kOwnerMcd + sizeof(uint32_t)) ||
                 ReadAt<uint32_t>(reinterpret_cast<const uint8_t*>(owner) + kOwnerMcd, 0) != placed.mcd ||
                 ReadAt<uint32_t>(mcd + kMcdType, 0) == kWindowOpening || mcd[kMcdVirtual] != 0 ||
-                ReadAt<int32_t>(mcd + kMcdMove, 0) != kMoveIdle)
+                MoveUnderWay(ReadAt<int32_t>(mcd + kMcdMove, 0)))
                 return;
             const auto edge = [&](int side) { return static_cast<int>(ReadAt<int16_t>(mcd + kMcdRect, 2 * side)); };
             const WindowSpot now{edge(0), edge(1)};
             if (now != placed.to) return; // moved since, by the game or the player
-            reinterpret_cast<WindowMoveToFn>(g_WindowMoveTo)(placed.mcd, placed.from.left, placed.from.top);
+            MoveTo(placed.mcd, placed.from);
             if (placed.key == g_EquipKey) MoveEquipNumbers(owner, now, edge(2) - edge(0), edge(3) - edge(1), placed.from);
             if (TitleWindow(placed.key) && g_TitleText != 0 &&
                 Readable(reinterpret_cast<const uint8_t*>(owner) + g_TitleText + kStripTextSpot, 2 * sizeof(int32_t)))
@@ -798,25 +888,77 @@ namespace headsup
             spot[1] = want.top;
         }
 
-        void MoveFromHelpBar(uint32_t mcd, const WindowKey& key)
+        void PlaceWindow(uint32_t mcd, const WindowKey& key);
+
+        // Twice a frame: at Present, from the whole list, the strip's shift, the line the windows go under and the
+        // view's shift, and every listed window placed, those its parent draws too (the job level and skill lists,
+        // which the list marks to skip while it draws); and at the first window draw, again with that plan unless a
+        // window opened since, so one opening is placed before it is first drawn.
+        void PlaceFrame(bool present)
+        {
+            const WindowPlacing& placing = *g_Placing;
+            const size_t count           = ReadWindowList(g_WindowList, kProcessMemory, g_OpenWindows);
+            std::optional<StripRows> strip;
+            bool opened = false;
+            for (size_t i = 0; i < count; ++i)
+            {
+                const OpenWindow& w     = g_OpenWindows[i];
+                const WindowSpot origin = g_Placements.OriginOf(w.mcd, w.key, WindowSpot{w.left, w.top});
+                g_FrameWindows[i] =
+                    FrameWindow{w.key, origin.left, origin.top, origin.left + (w.right - w.left), w.hidden};
+                opened |= !w.hidden && !g_PlannedKeys.Has(w.key);
+                if (HelpStripWindow(w.key) && !w.hidden && !g_HiddenWindows.helpBar)
+                {
+                    const int bottom = origin.top + (w.bottom - w.top);
+                    strip = StripRows{std::min(strip ? strip->top : origin.top, origin.top),
+                        std::max(strip ? strip->bottom : bottom, bottom)};
+                }
+            }
+            if (present || opened)
+            {
+                g_FrameShifts = {};
+                const StripPlace placed =
+                    PlaceStrip(placing.band.bottom, strip, placing.moveGameHelp, placing.band.clearance);
+                g_StripShift  = placed.shift;
+                g_WindowsBand = placed.band;
+                const std::span<const FrameWindow> frame(g_FrameWindows.data(), count);
+                const std::optional<int> top = FrameTop(frame, placing.band.screenBottom);
+                if (placing.moveWindows && placed.band != 0 && top)
+                {
+                    const std::optional<size_t> view = ViewOf(WindowViews(), frame);
+                    const std::optional<int> chosen =
+                        view && *view < g_ViewShifts.size() ? g_ViewShifts[*view] : std::nullopt;
+                    g_FrameShifts = ShiftsOf(frame, chosen, placing.placedUnder, placed.band, placing.keepClear,
+                        placing.band.screenRight, placing.band.screenBottom);
+                }
+            }
+            if (present)
+            {
+                g_PlannedKeys.Clear();
+                for (size_t i = 0; i < count; ++i)
+                    if (!g_OpenWindows[i].hidden) g_PlannedKeys.Add(g_OpenWindows[i].key);
+            }
+            for (size_t i = 0; i < count; ++i)
+                PlaceWindow(g_OpenWindows[i].mcd, g_OpenWindows[i].key);
+        }
+
+        void PlaceWindow(uint32_t mcd, const WindowKey& key)
         {
             const auto field = [mcd](uint32_t at) { return reinterpret_cast<const uint8_t*>(mcd + at); };
             if (ReadAt<uint32_t>(field(kMcdOwner), 0) == 0 || ReadAt<uint32_t>(field(kMcdType), 0) == kWindowOpening ||
-                *field(kMcdVirtual) != 0 || ReadAt<int32_t>(field(kMcdMove), 0) != kMoveIdle)
+                *field(kMcdVirtual) != 0 || MoveUnderWay(ReadAt<int32_t>(field(kMcdMove), 0)))
                 return;
             const auto edge = [&](int side) { return static_cast<int>(ReadAt<int16_t>(field(kMcdRect), 2 * side)); };
             const int left = edge(0), top = edge(1), right = edge(2), bottom = edge(3);
-            const HelpBand& band = *g_HelpBand;
+            const HelpBand& band = g_Placing->band;
             const WindowSpot now{left, top};
+            const WindowSpot origin = g_Placements.OriginOf(mcd, key, now);
             if (!MovableWindow(key))
             {
-                // The strip's bottom where the game put it; its help and title go under the top bar when asked.
-                const WindowSpot origin = g_Placements.OriginOf(mcd, key, now);
-                g_StripBottom           = std::max(g_StripBottom, origin.top + (bottom - top));
-                WindowSpot at           = now;
-                if (band.moveGameHelp && band.topBar != 0 && HelpStripWindow(key))
+                WindowSpot at = now;
+                if (HelpStripWindow(key))
                     if (const std::optional<WindowSpot> to = g_Placements.PlaceFor(mcd, key, now, right - left,
-                            bottom - top, 0, 0, band.topBar, INT_MAX, band.screenRight, band.screenBottom))
+                            bottom - top, 0, g_StripShift, band.screenRight, band.screenBottom))
                     {
                         MoveWindow(mcd, key, *to);
                         at = *to;
@@ -829,17 +971,12 @@ namespace headsup
             const KeyOffset* offset = nullptr;
             for (size_t i = 0; i < g_OffsetCount; ++i)
                 if (g_Offsets[i].key == key) offset = &g_Offsets[i];
-            // Down from under the game's strip once its windows were seen, so there is a shift to go by: a window
-            // picked (or in a group that goes) wherever it opens, any other that opens under the bar when every window
-            // goes, and with it those it would then lie over. A window whose area only reaches up there, as the chat
-            // log's, starts below it and stays.
-            const bool picked = g_MovedWindows.Has(key);
-            const bool down   = (picked || band.allUnderBar) && g_StripBottom != 0 && band.bottom != 0;
-            if (!down && offset == nullptr) return;
+            const int shift = HangsFromTop(origin.top, band.screenBottom)
+                                  ? g_FrameShifts.For(origin.left, origin.left + (right - left), band.screenRight)
+                                  : 0;
             if (const std::optional<WindowSpot> to = g_Placements.PlaceFor(mcd, key, now, right - left, bottom - top,
-                    offset != nullptr ? offset->x : 0, offset != nullptr ? offset->y : 0,
-                    down ? WindowShift(band, g_StripBottom) : 0, picked ? INT_MAX : band.bottom,
-                    band.screenRight, band.screenBottom, band.allUnderBar))
+                    offset != nullptr ? offset->x : 0, shift + (offset != nullptr ? offset->y : 0), band.screenRight,
+                    band.screenBottom))
             {
                 MoveWindow(mcd, key, *to);
                 if (key == g_EquipKey) MoveEquipNumbers(ReadAt<uint32_t>(field(kMcdOwner), 0), now, right - left,
@@ -847,18 +984,28 @@ namespace headsup
             }
         }
     }
+
+    std::string ModuleFolder(const char* module)
+    {
+        const HMODULE handle = GetModuleHandleA(module);
+        char path[MAX_PATH]{};
+        if (handle == nullptr || GetModuleFileNameA(handle, path, MAX_PATH) == 0) return {};
+        const std::string file(path);
+        const size_t slash = file.find_last_of("\\/");
+        return slash == std::string::npos ? std::string() : file.substr(0, slash);
+    }
 }
 
 // On the game's stack, inside its draw loop: nothing here may allocate, throw or call Ashita.
 extern "C" uint32_t HeadsUpOnWindowDraw(uint32_t mcd)
 {
     using namespace headsup;
-    if ((!g_HiddenWindows.Any() && !g_HelpBand) || mcd == 0) return 0;
+    if ((!g_HiddenWindows.Any() && !g_Placing) || mcd == 0) return 0;
     const uint32_t descriptor = *reinterpret_cast<const uint32_t*>(mcd + kWindowDescriptor);
     if (descriptor == 0) return 0;
     const auto* name = reinterpret_cast<const char*>(descriptor + kDescriptorName);
-    if (g_HelpBand && g_WindowMoveTo != 0)
-        if (const std::optional<WindowKey> key = WindowKeyOf(name)) MoveFromHelpBar(mcd, *key);
+    if (g_Placing && g_WindowMoveTo != 0 && std::exchange(g_PlannedFrame, g_WindowFrame) != g_WindowFrame)
+        PlaceFrame(false);
     return SkipsWindow(name, g_HiddenWindows) ? 1 : 0;
 }
 

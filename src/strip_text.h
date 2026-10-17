@@ -2,6 +2,7 @@
 
 #include "function_ref.h"
 #include "native_locate.h"
+#include "process_memory.h"
 
 #include <array>
 #include <cstddef>
@@ -27,14 +28,6 @@ namespace headsup
     std::string Cp932ToUtf8(const std::string& cp932, FunctionRef<std::string(const std::string&)> convert);
 
     using StripObject = std::array<uint8_t, kStripObjectBytes>;
-
-    // How a StripWindowReader reaches the game's memory: whether bytes there can be read (VirtualQuery, in the plugin),
-    // and a copy of bytes it found readable.
-    struct ProcessMemory
-    {
-        FunctionRef<bool(uint32_t at, size_t bytes)> readable;
-        FunctionRef<void(uint32_t at, void* into, size_t bytes)> copy;
-    };
 
     // One strip window's text object, read each frame through the chain to it: the owner the game's slot points at,
     // the owner's window record (MCD), which points back at it, and the record's descriptor, which names the window.
