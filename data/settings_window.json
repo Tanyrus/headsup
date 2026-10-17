@@ -805,7 +805,8 @@
         {"name": "Seeking Party", "tip": "Shows an icon indicating the player is looking to join a party."},
         {"name": "Job", "tip": "Shows the player's job and subjob (example: WAR/NIN). NOTE: Only shows after you use /check on the player."},
         {"name": "Owner", "tip": "Shows the name of the pet's owner."},
-        {"name": "Title", "tip": "Shows the player's title. NOTE: Only shows after you use /check on the player."}
+        {"name": "Title", "tip": "Shows the player's title. NOTE: Only shows after you use /check on the player."},
+        {"name": "Job & Level", "tip": "Shows both the job and level when known. If only level is known, displays 'Level X' where 'X' is the level. If both are known, it displays 'X JOB/SUB'. If neither are known, shows nothing."}
       ]
     }
   ],

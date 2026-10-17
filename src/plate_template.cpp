@@ -35,6 +35,7 @@ namespace headsup
             {Tag::Seeking, "$seeking", kPlayerKinds},
             {Tag::Job, "$job", kPlayerKinds},
             {Tag::Level, "$level", kMobKinds | kPlayerKinds},
+            {Tag::JobLevel, "$joblevel", kPlayerKinds},
             {Tag::Title, "$title", kPlayerKinds},
             {Tag::Con, "$con", kMobKinds},
             {Tag::Id, "$id", kMobKinds},

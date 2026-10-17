@@ -63,6 +63,8 @@ TEST(each_kind_offers_its_own_tags)
     const std::vector<Tag> players = TagsFor(PlateKind::Players);
     CHECK(std::ranges::find(players, Tag::Linkshell) != players.end());
     CHECK(std::ranges::find(players, Tag::Con) == players.end());
+    CHECK(std::ranges::find(players, Tag::JobLevel) == std::ranges::find(players, Tag::Level) + 1);
+    CHECK(std::ranges::find(mobs, Tag::JobLevel) == mobs.end());
     CHECK(TagsFor(PlateKind::Self) == players);
     CHECK(TagsFor(PlateKind::Npcs) == std::vector<Tag>{Tag::Name});
     CHECK((TagsFor(PlateKind::Pets) == std::vector<Tag>{Tag::Name, Tag::Owner}));
@@ -324,7 +326,8 @@ TEST(every_tag_is_offered_and_each_kind_lists_its_chips_in_order)
     CHECK((TagsFor(PlateKind::Mobs) == std::vector<Tag>{Tag::Name, Tag::Level, Tag::Con, Tag::Id, Tag::ServerId, Tag::Ph,
                                            Tag::Detect, Tag::Weak, Tag::Resist, Tag::Status, Tag::Immune}));
     CHECK((TagsFor(PlateKind::Players) == std::vector<Tag>{Tag::Name, Tag::Gm, Tag::Mentor, Tag::New, Tag::Sync, Tag::Away,
-                                              Tag::Linkshell, Tag::Bazaar, Tag::Seeking, Tag::Job, Tag::Level, Tag::Title}));
+                                              Tag::Linkshell, Tag::Bazaar, Tag::Seeking, Tag::Job, Tag::Level, Tag::JobLevel,
+                                              Tag::Title}));
 }
 
 TEST(a_tag_name_runs_to_the_last_letter_and_text_around_unknown_tags_stays_whole)

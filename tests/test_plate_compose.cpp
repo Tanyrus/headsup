@@ -419,6 +419,25 @@ TEST(player_tags_render_jobs_and_levels_when_known)
     CHECK_EQ(Rendered(ComposePlate(LinkshellPlayer(), kPlayer, s, kGame).lines[0]), "Chadmage");
 }
 
+TEST(the_job_and_level_tag_shows_what_is_known_of_the_two)
+{
+    Settings s;
+    s.Kind(PlateKind::Players).lines[2].text = "$name $joblevel";
+    const auto shown = [&](std::optional<PlayerJobs> jobs) {
+        ActorInfo player = LinkshellPlayer();
+        player.jobs      = jobs;
+        return Rendered(ComposePlate(player, kPlayer, s, kGame).lines[0]);
+    };
+    CHECK_EQ(shown(PlayerJobs{1, 75, 2, 37}), "Chadmage 75 WAR/MNK");
+    CHECK_EQ(shown(PlayerJobs{1, 75, 0, 0}), "Chadmage 75 WAR");
+    CHECK_EQ(shown(PlayerJobs{0, 75, 0, 0}), "Chadmage Level 75"); // a level that came without its job
+    CHECK_EQ(shown(PlayerJobs{1, 0, 2, 0}), "Chadmage WAR/MNK");
+    CHECK_EQ(shown(std::nullopt), "Chadmage");
+    // A mob has no such tag.
+    s.Kind(PlateKind::Mobs).lines[2].text = "$name $joblevel";
+    CHECK_EQ(Rendered(ComposePlate(AggressiveMob(), kPlayer, s, kGame).lines.back()), std::string(AggressiveMob().name));
+}
+
 TEST(the_hook_keeps_vanilla_names_hides_hidden_ones_and_replaces_the_rest)
 {
     Settings s;

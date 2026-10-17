@@ -132,6 +132,7 @@ out. Typed by hand it is `${sync|bazaar}`.
 | Statuses | `$status` | Mobs | The statuses it is weak to or resists, as the Statuses card picks |
 | Immunities | `$immune` | Mobs | The statuses it cannot take |
 | Job | `$job` | Players, Self | Jobs, such as WAR/MNK: yours, your party's, and another player's once you have checked them |
+| Job & Level | `$joblevel` | Players, Self | Both when known, such as 75 WAR/MNK; Level 75 when only the level is known, and nothing when neither is |
 | Title | `$title` | Players, Self | The title: yours, and another player's once you have checked them |
 | GM, Mentor, New Adventurer, Level Sync, Away | `$gm`, `$mentor`, `$new`, `$sync`, `$away` | Players, Self | Their icons |
 | Linkshell, Bazaar, Seeking Party | `$linkshell`, `$bazaar`, `$seeking` | Players, Self | The linkshell icon in its color, the bazaar icon and the seeking party icon |

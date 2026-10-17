@@ -19,6 +19,7 @@ namespace headsup
     {
         constexpr char kSpace          = ' ';
         constexpr const char* kJobJoin = "/";
+        constexpr const char* kLevelWord = "Level "; // before a player's level known without their job
 
         // Follows a chain of syncs to the line whose look is shown; a cycle leaves the line its own style.
         const LineDesign& StyleLine(const KindSettings& kind, int line)
@@ -62,6 +63,7 @@ namespace headsup
             case Tag::ServerId:
             case Tag::Ph:
             case Tag::Job:
+            case Tag::JobLevel:
             case Tag::Owner:
             case Tag::Title:
                 return true;
@@ -119,6 +121,13 @@ namespace headsup
                 return IsPlayer(info) && info.jobs && info.jobs->mainJob != 0 ? JobText(*info.jobs) : std::string();
             case Tag::Title:
                 return IsPlayer(info) ? TitleName(info.title) : std::string();
+            case Tag::JobLevel:
+            {
+                if (!IsPlayer(info) || !info.jobs) return {};
+                const PlayerJobs& jobs = *info.jobs;
+                if (jobs.mainJob == 0) return jobs.mainLevel != 0 ? kLevelWord + std::to_string(jobs.mainLevel) : std::string();
+                return jobs.mainLevel != 0 ? std::to_string(jobs.mainLevel) + kSpace + JobText(jobs) : JobText(jobs);
+            }
             default:
                 return {};
             }
