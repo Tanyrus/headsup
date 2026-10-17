@@ -393,15 +393,17 @@ TEST(bold_strikes_a_glyph_twice_half_a_unit_apart_and_italic_leans_its_top_by_th
     CHECK((InkColumns(leaning, 21) == std::vector<int>{5, 6}));
 }
 
-TEST(an_underline_runs_a_unit_under_the_baseline_a_unit_thick)
+TEST(an_underline_runs_a_unit_under_the_baseline_a_unit_thick_and_the_renderer_draws_it)
 {
     int top = 0, thickness = 0;
     GameFontUnderlineBand(24, top, thickness);
     CHECK(top == 21 && thickness == 2); // 10.5 and 1 units of 2 pixels
+    // The letters come without it, as GDI's do: the renderer draws one line under the whole text.
     GameFontFace face = Face();
     SetGlyph(face, 'A', 0, 0, 9, 11);
     const Coverage c = GameFontRasterize(face, GameFontVariant::Narrow, "A", 24, StyleBit(FontStyle::Underline), 0, 1);
-    CHECK(At(c, 1, 1 + 22) == 255 && At(c, 18, 1 + 23) == 0 && At(c, 1, 1 + 23) == 0 && At(c, 18, 1 + 21) == 255);
+    CHECK(At(c, 1, 1 + 22) == 0 && At(c, 18, 1 + 22) == 0); // the band's row past the letter's last
+    CHECK(c.alpha == GameFontRasterize(face, GameFontVariant::Narrow, "A", 24, kPlain, 0, 1).alpha);
 }
 
 TEST(a_glyph_drawn_smaller_averages_the_pixels_each_pixel_covers)

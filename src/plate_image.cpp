@@ -364,6 +364,13 @@ namespace headsup
                 text.alpha[static_cast<size_t>(y * text.width + x)] = kFullAlpha;
     }
 
+    int UnderlineThickness(int pixelHeight, int fontThickness)
+    {
+        constexpr int kThinnest      = 2;
+        constexpr float kHeightShare = 1.0f / 12.0f;
+        return std::max({fontThickness, kThinnest, static_cast<int>(std::lround(static_cast<float>(pixelHeight) * kHeightShare))});
+    }
+
     Image Resized(const Image& picture, int width, int height)
     {
         const int w = std::max(1, width), h = std::max(1, height);

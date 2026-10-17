@@ -274,12 +274,6 @@ namespace headsup
                     origin + static_cast<float>(strike) + static_cast<float>(g.right) * scale.x, y1);
         }
         if (lean > 0) Lean(out, lean, lineHeight, margin);
-        if (HasStyle(style, FontStyle::Underline))
-        {
-            int top = 0, thickness = 0;
-            GameFontUnderlineBand(pixelHeight, top, thickness);
-            Underline(out, margin + top, thickness, margin);
-        }
         return out;
     }
 

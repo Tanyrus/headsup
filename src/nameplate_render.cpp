@@ -164,14 +164,24 @@ namespace headsup
         const Style style = styleAt(*height);
         Coverage coverage;
         auto rasterize = [&] {
-            if (!marked) return m_Gdi.Rasterize(text, font, *height, look.line.style, 0, style.margin, coverage);
-            const int line = lineHeight(*height);
-            // GDI underlines each stretch of letters it draws and knows nothing of the marks between them: where the
-            // font says where its underline goes, the letters are drawn without and one line is drawn under them all.
+            // GDI's underline is the font's one row, which comes and goes as the text is drawn a little smaller or
+            // larger than its image, and it underlines each stretch of letters apart, knowing nothing of the marks
+            // between them: where the font says where its underline goes, the letters are drawn without and one line
+            // thick enough to hold is drawn under them all.
             int under = 0, thick = 0;
             const bool underlined = HasStyle(look.line.style, FontStyle::Underline) &&
                                     m_Gdi.UnderlineBand(font, *height, look.line.style, under, thick);
             const uint8_t letterStyle = underlined ? look.line.style & ~StyleBit(FontStyle::Underline) : look.line.style;
+            const auto underline = [&] {
+                if (underlined) Underline(coverage, style.margin + under, UnderlineThickness(*height, thick), style.margin);
+            };
+            if (!marked)
+            {
+                if (!m_Gdi.Rasterize(text, font, *height, letterStyle, 0, style.margin, coverage)) return false;
+                underline();
+                return true;
+            }
+            const int line = lineHeight(*height);
             std::vector<Coverage> drawn(pieces.size());
             for (size_t i = 0; i < pieces.size(); ++i)
             {
@@ -182,7 +192,7 @@ namespace headsup
                 room[i] = pieces[i].mark == DashMark::None ? ItalicLean(*height, look.line.style) : 0;
             }
             coverage = Joined(drawn, room, style.margin);
-            if (underlined) Underline(coverage, style.margin + under, thick, style.margin);
+            underline();
             return line > 0;
         };
         if (!sized || !rasterize())

@@ -621,3 +621,14 @@ TEST(a_line_is_drawn_under_the_whole_of_a_text_inside_its_margin)
     Underline(none, 9, 2, 1);
     CHECK(none.alpha == std::vector<uint8_t>(24, 0));
 }
+
+TEST(an_underline_is_two_pixels_thick_at_least_and_a_twelfth_of_a_tall_text)
+{
+    // A font's one row would come and go as its text is drawn a little smaller or larger than its image.
+    CHECK_EQ(UnderlineThickness(8, 1), 2);
+    CHECK_EQ(UnderlineThickness(15, 1), 2);
+    CHECK_EQ(UnderlineThickness(24, 1), 2);
+    CHECK_EQ(UnderlineThickness(48, 1), 4);
+    CHECK_EQ(UnderlineThickness(30, 1), 3); // 2.5, to the nearer whole pixel away from zero
+    CHECK_EQ(UnderlineThickness(24, 3), 3); // a font's own thicker band is kept
+}
