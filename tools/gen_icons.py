@@ -36,6 +36,9 @@ ICONS = [(name, f'mobdb-icons/{name}.png', '') for name in
 # the color multiplies, so the pearl would show at half the color the game shows. Its shading is halved toward white.
 TINTED = {'Linkshell'}
 TINT_SHADE = 0.5  # what is left of a tinted icon's shading
+# An icon is drawn at about a quarter of its pixels with linear filtering and no smaller copies, which mixes the clear
+# pixels two out from its edge into it: those take the colors beside them, so the edge keeps its own.
+BLEED_RINGS = 2
 POINTER = 'playonline-chocobo/chocobo.ani'  # under third_party
 PNG_SIGNATURE = b'\x89PNG\r\n\x1a\n'
 RGBA_8_BIT = (8, 6)     # bit depth, color type
@@ -151,6 +154,29 @@ def trim_square(width: int, height: int, bgra: bytes) -> tuple[int, int, bytes]:
     return side, side, bytes(out)
 
 
+def bled(width: int, height: int, bgra: bytes) -> bytes:
+    """The pixels with each fully clear one within BLEED_RINGS of a visible one given the mean color of those beside
+    it, a ring at a time, its alpha left 0."""
+    out = bytearray(bgra)
+    filled = [out[i * BYTES_PER_PIXEL + 3] != 0 for i in range(width * height)]
+    for _ in range(BLEED_RINGS):
+        ring = []
+        for y in range(height):
+            for x in range(width):
+                if filled[y * width + x]:
+                    continue
+                beside = [(nx, ny) for ny in range(y - 1, y + 2) for nx in range(x - 1, x + 2)
+                          if 0 <= nx < width and 0 <= ny < height and filled[ny * width + nx]]
+                if beside:
+                    starts = [(ny * width + nx) * BYTES_PER_PIXEL for nx, ny in beside]
+                    count = len(beside)
+                    ring.append((y * width + x, [(sum(out[s + c] for s in starts) + count // 2) // count for c in range(3)]))
+        for index, color in ring:
+            out[index * BYTES_PER_PIXEL:index * BYTES_PER_PIXEL + 3] = bytes(color)
+            filled[index] = True
+    return bytes(out)
+
+
 def lifted(bgra: bytes) -> bytes:
     """The pixels with each color channel's shading, what it lacks of white, cut to TINT_SHADE; alpha kept."""
     out = bytearray(bgra)
@@ -181,6 +207,7 @@ def generate(third_party: pathlib.Path) -> str:
             raise IconError(f'missing icon {path}')
         try:
             width, height, bgra = trim_square(*decode_bgra(path.read_bytes()))
+            bgra = bled(width, height, bgra)
             parts.append(c_bitmap(name, width, height, lifted(bgra) if name in TINTED else bgra))
         except IconError as error:
             raise IconError(f'{path}: {error}') from None
