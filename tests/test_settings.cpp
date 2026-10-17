@@ -1239,7 +1239,7 @@ TEST(the_window_defaults_place_every_view_by_headsups_defaults_or_leave_them_all
     CHECK(s.moveWindows && !s.moveGameHelp && s.hideHelpBar && s.barWidgets[static_cast<int>(BarWidget::GameHelp)]);
 }
 
-TEST(a_new_install_looks_as_the_release_did_for_one_but_for_the_reviews_four_changes)
+TEST(a_new_install_looks_as_the_release_did_for_one_but_for_five_changes)
 {
     MapStore file = ReleaseFile();
     const Settings release = LoadSettings(file);
@@ -1258,8 +1258,12 @@ TEST(a_new_install_looks_as_the_release_did_for_one_but_for_the_reviews_four_cha
             CHECK(std::abs(static_cast<float>(now.lines[l].shadow) - 1.5f * static_cast<float>(then.lines[l].shadow)) <= 2.5f);
             const float grown = iconPixels(fresh, now.lines[l]) - iconPixels(release, then.lines[l]);
             CHECK(grown >= 0.0f && grown < 1.0f);
+            // Every line glows at full strength, where the release's mob name alone did.
+            CHECK_EQ(now.lines[l].glow, 100);
+            CHECK_EQ(then.lines[l].glow, k == static_cast<int>(PlateKind::Mobs) && l == kBottomLine ? 100 : 0);
             now.lines[l].shadow   = then.lines[l].shadow;
             now.lines[l].iconSize = then.lines[l].iconSize;
+            now.lines[l].glow     = then.lines[l].glow;
         }
         // Pets, one row in the release, show their nameplates only when targeted.
         if (k == static_cast<int>(PlateKind::Pets))
@@ -1545,6 +1549,9 @@ TEST(an_old_file_migrates_field_by_field)
     CHECK(mobs.rows[CategoryIndex(Category::PartyClaim)].outline == OutlineMode::Shown); // its own switch was on
     CHECK(mobs.rows[CategoryIndex(Category::PartyClaim)].outlineColor.source == ColorSource::Claim);
     CHECK_EQ(mobs.lines[2].glow, 0); // nameGlow=false
+    for (const KindSettings& k : s.kinds) // and nothing else glowed before the designer
+        for (const LineDesign& line : k.lines)
+            CHECK_EQ(line.glow, 0);
     CHECK(mobs.ornament.place == OrnamentPlace::Disabled); // showOrnament=false
     CHECK(mobs.ornament.color.source == ColorSource::Custom); // ownOrnamentColor=true
     CHECK_EQ(mobs.ornament.width, static_cast<int>(std::strtof(store.values.at("ornamentWidth").c_str(), nullptr)));
@@ -2466,12 +2473,15 @@ TEST(pets_migrate_as_the_mobs_they_were_drawn_as)
     CHECK_EQ(petName.font, "Georgia");
     CHECK_EQ(petName.style, StyleBit(FontStyle::Bold));
     CHECK(fonts.Kind(PlateKind::Pets).lines[0].font.empty() && fonts.Kind(PlateKind::Pets).lines[0].style == 0);
-    // But for its shadows, which were of the unit before, such a file's pets are today's.
+    // But for its shadows, which were of the unit before, and a glow it never had, such a file's pets are today's.
     // And it shows their nameplates, as it showed any mob's.
     const Settings plain   = Load2({});
     KindSettings expected  = Settings{}.Kind(PlateKind::Pets);
     for (LineDesign& line : expected.lines)
+    {
         line.shadow = 65; // 67, on the steps of five
+        line.glow   = 0;
+    }
     for (int row = 0; row < kPetRowCount; ++row)
         expected.rows[row].plate = PlateMode::Shown;
     CHECK(plain.Kind(PlateKind::Pets) == expected);

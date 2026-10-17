@@ -431,6 +431,7 @@ TEST(a_lines_glow_can_be_switched_off_for_combat_once_it_has_a_glow)
     Window w;
     w.state.page = Page::Players;
     const char* row = "players-line-style-disable-glow-in-combat-players0-label-row";
+    w.settings.Kind(PlateKind::Players).lines[0].glow = 0;
     CHECK(ClassOn(w.Pass(), row, "off")); // no glow, nothing to switch off
     w.settings.Kind(PlateKind::Players).lines[0].glow = 80;
     CHECK(!ClassOn(w.Pass(), row, "off"));

@@ -429,6 +429,7 @@ namespace headsup
     {
         LineLook look = LookOf(LineDesign{}, EntityState{}, s, kWhite);
         look.textSize = BasePixels(s, s.timerPercent);
+        look.glow     = 0.0f;
         return look;
     }
 

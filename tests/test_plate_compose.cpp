@@ -88,6 +88,7 @@ TEST(the_default_player_design_puts_the_icons_before_the_name)
     CHECK(icons.icons[1].icon == Icon::Invite);
     CHECK(plate.lines[0].items[1].name);
     CHECK(!icons.name);
+    CHECK_EQ(plate.lines[0].look.glow, 1.0f);
 }
 
 TEST(text_around_a_tag_merges_into_one_run_and_spaces_beside_icons_become_gaps)

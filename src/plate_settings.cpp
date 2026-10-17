@@ -59,7 +59,6 @@ namespace headsup
         mobs.lines[1].textSize     = 85;
         mobs.lines[1].color.source = ColorSource::Toughness;
         mobs.lines[2]              = NameLine(kTagName);
-        mobs.lines[2].glow         = 100;
         for (LineDesign& line : mobs.lines)
             line.glowOffInCombat = true;
         mobs.ornament.place        = OrnamentPlace::BelowMiddle;

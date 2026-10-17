@@ -919,6 +919,9 @@ namespace headsup
             mobLevel.show = condition();
             if (!mobIcons.text.empty()) mobIcons.show = mobLevel.show;
 
+            for (KindSettings& k : s.kinds) // such a file glowed the mobs' names alone
+                for (LineDesign& line : k.lines)
+                    line.glow = 0;
             mobName.glow     = o.nameGlow ? o.glowStrength : 0;
             mobName.glowSize = o.glowSize;
             if (o.ownGlowColor) mobName.glowColor = ColorPick{ColorSource::Custom, o.glowColor};

@@ -161,7 +161,7 @@ namespace headsup
         ColorPick color;
         int shadow = 100;
         ColorPick shadowColor{ColorSource::Custom, ColorFromRgb(0x000000)};
-        int glow     = 0;
+        int glow     = 100;
         int glowSize = 100;
         ColorPick glowColor{ColorSource::Aggression};
         bool glowOffInCombat = false; // no glow while you fight: on for a mob's lines
