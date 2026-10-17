@@ -416,6 +416,16 @@ TEST(the_pages_of_the_kinds_with_status_icons_set_how_many_a_nameplate_shows)
     }
 }
 
+TEST(a_lines_padding_slides_below_zero_to_sink_it_into_the_line_under_it)
+{
+    Window w;
+    w.state.page = Page::Mobs;
+    CHECK(w.Pass({{"mobs-line-style-padding-mobs0", kChangeEvent, "-5"}}).changed);
+    CHECK_EQ(w.settings.Kind(PlateKind::Mobs).lines[0].padding, -5);
+    w.Pass({{"mobs-line-style-padding-mobs0", kChangeEvent, "-8"}});
+    CHECK_EQ(w.settings.Kind(PlateKind::Mobs).lines[0].padding, kMinLinePadding);
+}
+
 TEST(a_lines_glow_can_be_switched_off_for_combat_once_it_has_a_glow)
 {
     Window w;

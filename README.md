@@ -163,7 +163,7 @@ line has these settings:
 - **Font and Font Style:** a line's own font, or the Default Font from the Entities page, in bold, italics, underline
   or any of them together
 - **Text Size and Icon Size:** a percent of the Base Font Size and the Base Icon Size set on the Entities page
-- **Padding:** up to 10 pixels of room under the line (over it, for the bottom line)
+- **Padding:** from -5 to 10 pixels of room under the line (over it, for the bottom line); below 0 the lines close up
 - **Text Color:** a color of your own, the game's, or from a palette
 - **Shadow Strength and Shadow Color:** the soft dark shadow behind the letters
 - **Glow Strength, Glow Size and Glow Color:** a colored halo, such as a monster's name glowing in its outline color.

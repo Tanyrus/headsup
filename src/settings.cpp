@@ -1052,7 +1052,7 @@ namespace headsup
             line.show.when &= conditions;
             line.textSize  = std::clamp(Stepped(line.textSize, kPercentStep), kMinSizePercent, kMaxSizePercent);
             line.iconSize  = std::clamp(Stepped(line.iconSize, kPercentStep), kMinSizePercent, kMaxSizePercent);
-            line.padding   = std::clamp(line.padding, 0, kMaxLinePadding);
+            line.padding   = std::clamp(line.padding, kMinLinePadding, kMaxLinePadding);
             line.shadow    = std::clamp(Stepped(line.shadow, kPercentStep), kMinShadow, kMaxShadow);
             line.glow      = std::clamp(Stepped(line.glow, kPercentStep), kMinGlow, kMaxGlow);
             line.glowSize  = std::clamp(Stepped(line.glowSize, kPercentStep), kMinGlowSize, kMaxGlowSize);

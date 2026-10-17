@@ -2353,12 +2353,14 @@ TEST(a_kinds_lines_and_ornament_are_bounded_and_a_condition_its_page_does_not_of
     pets.padding       = kMaxLinePadding + 5;
     pets.show.when     = ConditionBit(ShowCondition::OwnerIsYou) | ConditionBit(ShowCondition::TooWeak);
     LineDesign& mobs   = s.Kind(PlateKind::Mobs).lines[0];
-    mobs.padding       = -4;
+    mobs.padding       = -9;
     mobs.show.when     = ConditionBit(ShowCondition::OwnerIsYou) | ConditionBit(ShowCondition::TooWeak);
     s.Kind(PlateKind::Npcs).ornament.place = static_cast<OrnamentPlace>(42);
     const Settings bounded = Clamp(s);
     CHECK_EQ(bounded.Kind(PlateKind::Pets).lines[0].padding, kMaxLinePadding);
-    CHECK_EQ(bounded.Kind(PlateKind::Mobs).lines[0].padding, 0);
+    CHECK_EQ(bounded.Kind(PlateKind::Mobs).lines[0].padding, kMinLinePadding);
+    s.Kind(PlateKind::Mobs).lines[0].padding = -3; // a line may sink into the one under it
+    CHECK_EQ(Clamp(s).Kind(PlateKind::Mobs).lines[0].padding, -3);
     // A pet's page asks whose it is and a mob's whether it is too weak, and neither asks the other's.
     CHECK_EQ(bounded.Kind(PlateKind::Pets).lines[0].show.when, ConditionBit(ShowCondition::OwnerIsYou));
     CHECK_EQ(bounded.Kind(PlateKind::Mobs).lines[0].show.when, ConditionBit(ShowCondition::TooWeak));

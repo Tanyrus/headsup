@@ -116,7 +116,7 @@ namespace headsup
     constexpr int kMinGlowSize = 25, kMaxGlowSize = 200;
     constexpr int kMinShadow = 0, kMaxShadow = 200;
     constexpr float kShadowUnit = 1.5f; // a shadow strength of 100 percent, in the mockup's shadows
-    constexpr int kMaxLinePadding = 10; // pixels
+    constexpr int kMinLinePadding = -5, kMaxLinePadding = 10; // pixels
     constexpr int kMinOrnamentWidth = 20, kMaxOrnamentWidth = 300;       // pixels
     constexpr int kMinOrnamentThickness = 3, kMaxOrnamentThickness = 24; // pixels
     constexpr size_t kMaxTemplate = 255;                                 // bytes of a line's text
