@@ -296,6 +296,25 @@ TEST(a_row_mixing_plain_and_badged_icons_steps_past_each_by_its_own_width)
     CHECK(Near(IconOffset(2, 0, 24.0f) + 24.0f, IconRunWidth(3, 0, 24.0f)));
 }
 
+TEST(a_broken_lines_padding_is_under_its_last_row_and_the_bottom_lines_over_its_first)
+{
+    const std::vector<ItemSize> texts{{60.0f, 17.0f}};
+    const auto pads = [&](int source, int row, bool lastRow) {
+        ComposedLine line   = Line({TextItem("Lv 20")}, 13.0f, 16.0f);
+        line.source         = source;
+        line.row            = row;
+        line.lastRow        = lastRow;
+        line.look.padding   = 4.0f;
+        LineInput in;
+        MeasureLine(line, texts, 1.0f, in);
+        return std::pair{in.padBelow, in.padAbove};
+    };
+    CHECK((pads(kTopLine, 0, false) == std::pair{0.0f, 0.0f}));
+    CHECK((pads(kTopLine, 1, true) == std::pair{4.0f, 0.0f}));
+    CHECK((pads(kBottomLine, 0, false) == std::pair{0.0f, 4.0f}));
+    CHECK((pads(kBottomLine, 1, true) == std::pair{0.0f, 0.0f}));
+}
+
 TEST(a_measured_text_line_takes_its_texts_boxes_and_its_alignment)
 {
     const ComposedLine line = Line({TextItem("Lv 20"), TextItem("[006]")}, 13.0f, 16.0f, Align::Right);

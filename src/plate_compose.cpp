@@ -332,9 +332,25 @@ namespace headsup
         {
             const LineDesign& style = StyleLine(kind, i);
             if (!LineShows(style.show, st, player.inCombat)) continue;
+            LineLook look = LookOf(style, st, s, gameArgb);
+            if (deadMob || (player.inCombat && style.glowOffInCombat)) look.glow = 0.0f;
+            if (dead) look.color = kDeadTextArgb;
+            // A break ends a row: each row with something in it is a line of the plate in the design line's look.
+            const size_t firstRow = plate.lines.size();
             LineBuilder builder;
+            const auto endRow = [&] {
+                builder.Finish();
+                if (!builder.items.empty())
+                    plate.lines.push_back(ComposedLine{i, std::move(builder.items), look, static_cast<int>(plate.lines.size() - firstRow)});
+                builder = LineBuilder{};
+            };
             for (const Atom& atom : ParseTemplate(kind.lines[i].text))
             {
+                if (!atom.slot.empty() && atom.slot.front() == Tag::Break)
+                {
+                    endRow();
+                    continue;
+                }
                 if (atom.slot.empty())
                 {
                     if (!deadMob) builder.Literal(marked(atom.text));
@@ -361,11 +377,9 @@ namespace headsup
                 }
                 if (!drawn && !deadMob) builder.Empty();
             }
-            builder.Finish();
-            if (builder.items.empty()) continue;
-            plate.lines.push_back(ComposedLine{i, std::move(builder.items), LookOf(style, st, s, gameArgb)});
-            if (deadMob || (player.inCombat && style.glowOffInCombat)) plate.lines.back().look.glow = 0.0f;
-            if (dead) plate.lines.back().look.color = kDeadTextArgb;
+            endRow();
+            for (size_t row = firstRow; row + 1 < plate.lines.size(); ++row)
+                plate.lines[row].lastRow = false;
         }
         plate.ornament      = kind.ornament.place;
         plate.ornamentColor = ResolveColor(kind.ornament.color, st, s.palette, gameArgb);

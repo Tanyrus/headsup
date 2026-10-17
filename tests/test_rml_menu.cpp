@@ -599,6 +599,32 @@ TEST(a_line_box_keeps_what_is_typed_once_it_is_left)
     CHECK_EQ(window.settings.Kind(PlateKind::Players).lines[2].text, was + " hi");
 }
 
+TEST(enter_in_a_design_line_breaks_it_onto_a_row_of_its_own_and_typing_goes_on_there)
+{
+    Window window;
+    window.Page("players");
+    const std::string box = "players-nameplate-design-design-players-1";
+    std::string& text     = window.settings.Kind(PlateKind::Players).lines[1].text;
+    text                  = "ab";
+    window.Frames(2);
+    window.Click(box + "-t-0");
+    window.Key(Rml::Input::KI_END);
+    window.Key(Rml::Input::KI_RETURN);
+    CHECK_EQ(text, "ab$break");
+    CHECK(window.Shows(box + "-c-0") && window.Find(box + "-c-0")->IsClassSet("break"));
+    const auto top = [&](const std::string& id) { return window.Find(id)->GetAbsoluteOffset(Rml::BoxArea::Border).y; };
+    CHECK(top(box + "-t-1") > top(box + "-t-0"));
+    window.Type("x");
+    window.Click("page-title");
+    CHECK_EQ(text, "ab${break}x");
+    window.Click(box + "-t-1");
+    window.Key(Rml::Input::KI_HOME);
+    window.Key(Rml::Input::KI_BACK);
+    window.Click("page-title");
+    CHECK_EQ(text, "abx");
+    CHECK_EQ(window.Said(), "");
+}
+
 TEST(a_tag_dropped_inside_a_stretch_goes_in_between_the_letters_under_the_pointer)
 {
     Window window;

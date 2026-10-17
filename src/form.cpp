@@ -723,7 +723,8 @@ namespace headsup
         {
             const auto tips = layout.OptionsOf(WindowList::Tags);
             if (slot.size() == 1)
-                return TagMarkup(layout, id, slot.front(), "btn accent chip in drag", tips[static_cast<size_t>(slot.front())].tip);
+                return TagMarkup(layout, id, slot.front(), slot.front() == Tag::Break ? "btn accent chip in drag break" : "btn accent chip in drag",
+                    tips[static_cast<size_t>(slot.front())].tip);
             const char* shared = layout.WordOf(WindowWord::SlotTip).tip;
             std::string parts;
             for (size_t tag = 0; tag < slot.size(); ++tag)
@@ -775,6 +776,20 @@ namespace headsup
             {
                 text     = WithRun(text, run, typed->value);
                 reshaped = RunsOf(text).slots != had.slots;
+            }
+            else if (const FormEvent* enter = Took(input, kBreakEvent))
+            {
+                // The stretch as it stands typed, then a break where the caret was, and the keyboard on the row
+                // after it; typing that made or unmade a tag, or a line with no room for one more, keeps the typing.
+                text     = WithRun(text, run, enter->value);
+                reshaped = true;
+                RunCaret at{run, enter->at};
+                if (std::string broken = text; RunsOf(text).slots == had.slots && PutTag(broken, at, {Tag::Break}))
+                {
+                    text        = std::move(broken);
+                    draft.caret = at;
+                    focus       = FormFocus{runId(at.run), at.at};
+                }
             }
         }
         // Where a chip can be let go in the box: on the box, a stretch, a chip, or one tag of a chip of several.

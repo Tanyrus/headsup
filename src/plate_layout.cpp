@@ -222,10 +222,11 @@ namespace headsup
         into.align          = line.look.align;
         into.textHeight     = 0.0f;
         into.hasIcons       = false;
-        // The bottom design line stays on the game's name, so its padding is the space over it.
+        // The bottom design line stays on the game's name, so its padding is the space over it. A line broken into
+        // rows has it under its last row, or over the first.
         const bool bottom   = line.source == kBottomLine;
-        into.padBelow       = bottom ? 0.0f : line.look.padding * scale;
-        into.padAbove       = bottom ? line.look.padding * scale : 0.0f;
+        into.padBelow       = !bottom && line.lastRow ? line.look.padding * scale : 0.0f;
+        into.padAbove       = bottom && line.row == 0 ? line.look.padding * scale : 0.0f;
         into.ornamentWidth  = 0.0f;
         into.ornamentHeight = 0.0f;
         into.ornamentUnder  = false;

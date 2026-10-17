@@ -47,6 +47,7 @@ namespace headsup
             {Tag::Status, "$status", kMobKinds},
             {Tag::Immune, "$immune", kMobKinds},
             {Tag::Owner, "$owner", kPetKinds},
+            {Tag::Break, "$break", 0}, // Enter in a line's box makes it, and no page offers it as a chip
         };
         static_assert(std::size(kTags) == kTagCount);
 
@@ -236,6 +237,8 @@ namespace headsup
         TemplateRuns runs = RunsOf(text);
         if (slot < 0 || slot >= static_cast<int>(runs.slots.size())) return false;
         TagSlot& into    = runs.slots[static_cast<size_t>(slot)];
+        const auto breaks = [](const TagSlot& tags) { return std::ranges::find(tags, Tag::Break) != tags.end(); };
+        if (breaks(into) || breaks(more)) return false; // a break is a place of its own
         const size_t had = into.size();
         for (const Tag tag : more)
             if (std::ranges::find(into, tag) == into.end()) into.push_back(tag);

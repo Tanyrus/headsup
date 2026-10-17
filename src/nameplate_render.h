@@ -42,7 +42,7 @@ namespace headsup
             float nameX, nameY;
             int nameHeight;
             uint32_t nameColor;
-            ShownLine lines[kPlateLines];
+            std::vector<ShownLine> lines; // the plate's lines, a design line's rows each
             int lineCount;
         };
 
@@ -181,8 +181,10 @@ namespace headsup
         PlateTexture m_LoneCursor;
         PlateTexture m_LoneCursorUnder; // the target's own, while it is also the candidate being picked
         // Kept from plate to plate so measuring one allocates nothing: its lines as the layout takes them, the text
-        // boxes of the line being measured, a badge for each of its icons (null without one) and which texts are left out.
-        std::array<LineInput, kPlateLines> m_Inputs;
+        // boxes of the line being measured, a badge for each of its icons (null without one), which texts are left out
+        // and where each line's texts start among its design line's.
+        std::vector<LineInput> m_Inputs;
+        std::vector<size_t> m_TextStart;
         std::vector<ItemSize> m_TextSizes;
         std::vector<const PlateTexture*> m_IconBadges;
         std::vector<uint8_t> m_LeftOut;

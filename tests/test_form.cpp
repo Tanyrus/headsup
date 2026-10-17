@@ -628,6 +628,28 @@ TEST(a_tag_chip_dropped_in_a_line_box_goes_after_what_it_is_dropped_on)
     CHECK(card.chip && card.text == "Lv $con$level end");
 }
 
+TEST(enter_in_a_stretch_breaks_the_line_there_and_typing_goes_on_after_the_break)
+{
+    BoxCard card;
+    card.text = "Lv $level end";
+    FormEvent enter{"p-c-line-t-0", kBreakEvent, "Lv ", {}, 2};
+    const Form broken = card.Pass({enter});
+    CHECK_EQ(card.text, "Lv$break $level end");
+    CHECK(broken.changed && card.edited);
+    CHECK((broken.focus == FormFocus{"p-c-line-t-1", 0}));
+    CHECK((card.draft.caret == RunCaret{1, 0}));
+    CHECK(Has(broken.blocks[0].rml, "class=\"btn accent chip in drag break\" id=\"p-c-line-c-0\""));
+    // Nothing joins a break, and Backspace at the start of the row after it takes it out.
+    card.Pass({Drop("p-c-line-c-0", kConChip, "$con")});
+    CHECK_EQ(card.text, "Lv$break $level end");
+    card.Pass({{"p-c-line-t-1", kKillEvent, std::string(1, kKillBack) + " "}});
+    CHECK_EQ(card.text, "Lv $level end");
+    // A line too long for one more tag keeps what was typed and breaks nowhere.
+    card.text = std::string(kMaxTemplate - 5, 'a');
+    card.Pass({{"p-c-line-t-0", kBreakEvent, card.text + "b", {}, 1}});
+    CHECK_EQ(card.text, std::string(kMaxTemplate - 5, 'a') + "b");
+}
+
 TEST(a_tag_dropped_on_a_chip_shares_its_slot)
 {
     BoxCard card;

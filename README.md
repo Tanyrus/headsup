@@ -112,6 +112,8 @@ the level. Click a tag under the lines to put it where you last typed, or drag i
 between the letters you let it go on. A tag stands in its line
 as the same button, with text to type before and after it, and Backspace or Delete beside a tag takes the whole tag
 out. A tag in a line can be dragged too: to another place in a line, or out of the lines altogether, which removes it.
+Enter breaks a line where you are typing: what follows goes on a row of its own under the rest, in the line's own
+style, and Backspace at the start of that row joins the two again.
 Typed by hand a tag is a dollar sign and its word, such as `$name`, and `$$` is one dollar sign.
 
 Tags can share one place. Drop a tag onto a tag that is already in a line and the two become one button, such as

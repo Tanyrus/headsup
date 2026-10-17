@@ -363,13 +363,19 @@ namespace headsup
     }
 
     // A key in a stretch that is not the stretch's own: Backspace at its start and Delete at its end are for the tag
-    // beside it, and the arrows step past it. True when the keyboard moved: the stretch left must not get the key.
+    // beside it, the arrows step past it and Enter breaks the line at the caret. True when the stretch must not get
+    // the key: the keyboard moved, or the line takes it.
     bool RmlMenu::RunKey(Rml::ElementFormControlInput* input, const std::string& id, Rml::Input::KeyIdentifier key)
     {
         const std::string value = input->GetValue();
         int start = 0, end = 0;
         input->GetSelection(&start, &end, nullptr);
         const bool atStart = start == 0 && end == 0, atEnd = start == end && ByteOf(value, start) == value.size();
+        if (key == Rml::Input::KI_RETURN || key == Rml::Input::KI_NUMPADENTER)
+        {
+            m_Events.push_back(FormEvent{id, kBreakEvent, value, {}, ByteOf(value, start)});
+            return true;
+        }
         if (key == Rml::Input::KI_BACK && atStart)
             m_Events.push_back(FormEvent{id, kKillEvent, kKillBack + value});
         else if (key == Rml::Input::KI_DELETE && atEnd)
@@ -470,11 +476,11 @@ namespace headsup
                     if (const auto was = m_FocusValue.find(id); was != m_FocusValue.end()) input->SetValue(was->second);
                     input->Blur();
                 }
-                else if (key == Rml::Input::KI_RETURN || key == Rml::Input::KI_NUMPADENTER)
-                    input->Blur();
                 // RmlUi's text box shows its caret for every arrow it is given, with or without the keyboard.
                 else if (target->IsClassSet(kRunClass) && RunKey(input, id, key))
                     event.StopPropagation();
+                else if (key == Rml::Input::KI_RETURN || key == Rml::Input::KI_NUMPADENTER)
+                    input->Blur();
             }
             break;
         case Rml::EventId::Dragdrop:

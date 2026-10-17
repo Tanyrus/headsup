@@ -419,6 +419,35 @@ TEST(player_tags_render_jobs_and_levels_when_known)
     CHECK_EQ(Rendered(ComposePlate(LinkshellPlayer(), kPlayer, s, kGame).lines[0]), "Chadmage");
 }
 
+TEST(a_break_in_a_design_line_makes_rows_that_share_its_look)
+{
+    Settings s;
+    std::string& bottom = s.Kind(PlateKind::Players).lines[kBottomLine].text;
+    ActorInfo player    = LinkshellPlayer();
+    player.jobs         = PlayerJobs{1, 75, 2, 37};
+    bottom              = "$name$break $job";
+    ComposedPlate plate = ComposePlate(player, kPlayer, s, kGame);
+    CHECK_EQ(plate.lines.size(), size_t{2});
+    CHECK(Rendered(plate.lines[0]) == "Chadmage" && Rendered(plate.lines[1]) == "WAR/MNK");
+    CHECK(plate.lines[0].source == kBottomLine && plate.lines[1].source == kBottomLine);
+    CHECK(plate.lines[0].look == plate.lines[1].look);
+    CHECK(plate.lines[0].row == 0 && plate.lines[1].row == 1);
+    CHECK(!plate.lines[0].lastRow && plate.lines[1].lastRow);
+    // Rows with nothing are no rows, and a slot a break starts is a break.
+    bottom = "$break$name$break";
+    plate  = ComposePlate(player, kPlayer, s, kGame);
+    CHECK(plate.lines.size() == 1 && plate.lines[0].row == 0 && plate.lines[0].lastRow);
+    bottom = "$name${break|level}$job";
+    CHECK_EQ(ComposePlate(player, kPlayer, s, kGame).lines.size(), size_t{2});
+    // An ornament between the middle line and a broken bottom line goes over the bottom line's first row.
+    s.Kind(PlateKind::Players).lines[kMiddleLine].text = "$job";
+    s.Kind(PlateKind::Players).ornament.place          = OrnamentPlace::BelowMiddle;
+    bottom = "$name$break$name";
+    plate  = ComposePlate(player, kPlayer, s, kGame);
+    CHECK_EQ(plate.lines.size(), size_t{3});
+    CHECK_EQ(OrnamentLineOf(plate).line, 1);
+}
+
 TEST(the_job_and_level_tag_shows_what_is_known_of_the_two)
 {
     Settings s;

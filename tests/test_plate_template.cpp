@@ -321,13 +321,27 @@ TEST(every_tag_is_offered_and_each_kind_lists_its_chips_in_order)
             const std::vector<Tag> tags = TagsFor(static_cast<PlateKind>(k));
             offered = offered || std::ranges::find(tags, static_cast<Tag>(t)) != tags.end();
         }
-        CHECK(offered);
+        CHECK(offered || static_cast<Tag>(t) == Tag::Break); // Enter makes a break, and no chip
     }
     CHECK((TagsFor(PlateKind::Mobs) == std::vector<Tag>{Tag::Name, Tag::Level, Tag::Con, Tag::Id, Tag::ServerId, Tag::Ph,
                                            Tag::Detect, Tag::Weak, Tag::Resist, Tag::Status, Tag::Immune}));
     CHECK((TagsFor(PlateKind::Players) == std::vector<Tag>{Tag::Name, Tag::Gm, Tag::Mentor, Tag::New, Tag::Sync, Tag::Away,
                                               Tag::Linkshell, Tag::Bazaar, Tag::Seeking, Tag::Job, Tag::Level, Tag::JobLevel,
                                               Tag::Title}));
+}
+
+TEST(a_line_break_is_a_tag_that_shares_no_slot)
+{
+    CHECK((RunsOf("ab$break cd") == TemplateRuns{{"ab", " cd"}, {{Tag::Break}}}));
+    CHECK_EQ(JoinRuns(TemplateRuns{{"ab", "cd"}, {{Tag::Break}}}), "ab${break}cd");
+    std::string text = "ab";
+    RunCaret at{0, 1};
+    CHECK(PutTag(text, at, {Tag::Break}));
+    CHECK_EQ(text, "a${break}b");
+    // A break shares no slot, either way.
+    std::string level = "$level", broken = "$break";
+    CHECK(!JoinSlot(level, 0, {Tag::Break}) && !JoinSlot(broken, 0, {Tag::Con}));
+    CHECK(level == "$level" && broken == "$break");
 }
 
 TEST(a_tag_name_runs_to_the_last_letter_and_text_around_unknown_tags_stays_whole)

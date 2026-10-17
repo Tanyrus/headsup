@@ -400,7 +400,8 @@ namespace headsup
 
                 bool lineUsed[kPlateLines] = {};
                 m_LeftOut.clear();
-                // Each line's text textures. False once GDI or Direct3D refused one.
+                // Each design line's text textures, its rows' one after another. False once GDI or Direct3D refused one.
+                size_t textsUsed[kPlateLines] = {};
                 auto prepareTexts = [&]() {
                     for (const ComposedLine& line : composed.lines)
                     {
@@ -414,7 +415,7 @@ namespace headsup
                             look.glowStrength = line.look.glow;
                             look.glowSize     = line.look.glowSize;
                         }
-                        size_t texts = 0;
+                        size_t& texts = textsUsed[line.source];
                         for (const PlateItem& item : line.items)
                         {
                             if (item.kind != ItemKind::Text) continue;
@@ -423,9 +424,13 @@ namespace headsup
                             if (!Prepare(text, item.text.c_str(), look, lt.raster)) return false;
                             m_LeftOut.push_back(text.unfit);
                         }
-                        for (size_t extra = texts; extra < lt.texts.size(); ++extra)
+                    }
+                    for (int source = 0; source < kPlateLines; ++source)
+                    {
+                        LineTextures& lt = p.lines[source];
+                        for (size_t extra = textsUsed[source]; extra < lt.texts.size(); ++extra)
                             ReleaseTexture(lt.texts[extra].texture);
-                        lt.texts.resize(texts);
+                        lt.texts.resize(textsUsed[source]);
                     }
                     return true;
                 };
@@ -442,13 +447,17 @@ namespace headsup
                 };
                 bool anyBadge = false;
                 m_IconBadges.clear();
+                if (m_Inputs.size() < lineCount) m_Inputs.resize(lineCount);
+                m_TextStart.resize(lineCount);
+                size_t textAt[kPlateLines] = {};
                 // Each line's sizes for the layout, with its badges and the ornament over it. False as above.
                 auto measureLines = [&]() {
                     for (size_t i = 0; i < lineCount; ++i)
                     {
                         const ComposedLine& line = composed.lines[i];
                         LineTextures& lt         = p.lines[line.source];
-                        size_t text              = 0;
+                        m_TextStart[i]           = textAt[line.source];
+                        size_t& text             = textAt[line.source];
                         m_TextSizes.clear();
                         for (size_t j = 0; j < line.items.size(); ++j)
                         {
@@ -531,7 +540,7 @@ namespace headsup
                     const ComposedLine& line = composed.lines[i];
                     const LineTextures& lt   = p.lines[line.source];
                     const LinePlace& place   = layout.lines[i];
-                    size_t text              = 0;
+                    size_t text              = m_TextStart[i];
                     for (size_t j = 0; j < line.items.size(); ++j)
                         if (line.items[j].kind == ItemKind::Text)
                             addText(nextText(lt, text), place.items[j].x, place.items[j].y, textShown(line));
@@ -545,6 +554,7 @@ namespace headsup
                 shown.nameHeight = 0;
                 shown.nameColor  = kWhite;
                 shown.lineCount  = static_cast<int>(lineCount);
+                shown.lines.resize(lineCount);
                 bool named       = false;
                 // Icons after every text, over the shadows beside them, in the order their badges were prepared in.
                 size_t firstBadge = 0;

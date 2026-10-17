@@ -56,6 +56,8 @@ namespace headsup
         int source = 0; // the design line, 0 to 2
         std::vector<PlateItem> items;
         LineLook look;
+        int row      = 0;    // of its design line's rows that show, which a break in its text starts
+        bool lastRow = true;
     };
     // ornament: where the kind's ornament goes, while the plate's lines allow it.
     struct ComposedPlate

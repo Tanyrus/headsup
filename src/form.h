@@ -54,6 +54,8 @@ namespace headsup
     // A tag beside a stretch of a line box is to go: Backspace at the stretch's start, or Delete at its end. Its
     // value is which (kKillBack or kKillForward) and then the stretch as it is typed.
     constexpr const char* kKillEvent   = "kill";
+    // Enter in a stretch of a line box: value is the stretch as it is typed and at the caret's byte in it.
+    constexpr const char* kBreakEvent  = "break";
     constexpr char kKillBack = 'b', kKillForward = 'f';
     // The ids of a line box's parts, after the box's own: a stretch of text and a tag, each with its number.
     // Classes the kit writes, the window sets and the stylesheet draws: one name each for the three.

@@ -261,6 +261,8 @@ namespace headsup
         css += ".linebox input.run:last-child{flex:1 1 auto;}";
         css += ".linebox .chip{flex:0 0 auto;height:" + Em(kFrame - kRunInset) + ";" + line(kFrame - kRunInset, kPillEdge) +
                "padding:0px 0.5em;margin:0.1em 0.1em;}";
+        // A line break takes a row of the box to itself, so what follows it starts the next, as on the nameplate.
+        css += ".linebox .chip.break{flex:1 0 100%;margin:0.1em 0px;text-align:center;}";
         css += "input.hex{width:6em;}";
         // A dropdown's closed control; its list is the popup.
         css += ".dd{position:relative;box-sizing:border-box;height:" + frame + ";" + framed + "padding:0px " +
