@@ -188,8 +188,7 @@ The Nameplates card, on the Entities page, sets what every nameplate shares:
   shows none
 - **Replace Dashes (-):** draws each dash typed in a nameplate's design as a dot, a square or a diamond. The dashes
   HeadsUp writes itself, as in a level range such as 20-23, and a name's own dash stay
-- **Scale with Distance:** names grow and shrink with distance between a Min Size and a Max Size; with Scale Your Own
-  Name off, your own nameplate stays one size
+- **Scale with Distance:** names grow and shrink with distance between a Min Size and a Max Size, your own too
 - **Vertical Offset and Stack Names:** how far over the game's own spot names sit, and whether names that would cover
   each other rise one over another, while your target's keeps its place
 

@@ -373,7 +373,7 @@ namespace headsup
                                         : NameScale(gameName.depth, gameName.box.Height(), screenHeight, minScale, maxScale);
                 p.scale                 = EaseScale(p.scale, sized, now - p.scaleTime);
                 p.scaleTime             = now;
-                const bool scales       = ScalesWithDistance(settings, self);
+                const bool scales       = settings.scaleWithDistance;
                 const float scale       = scales ? p.scale : 1.0f;
                 const float timerShown  = timerLook.textSize * scale * toY;
                 const float cursorScale = settings.scaleCursor ? p.scale : 1.0f;

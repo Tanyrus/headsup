@@ -881,15 +881,10 @@ namespace headsup
                 break;
             case SettingPiece::MinSize:
             case SettingPiece::MaxSize:
-            case SettingPiece::ScaleYourOwnName:
                 form.Fade(!plates || !s.scaleWithDistance);
                 form.Indent(true);
-                if (e.piece == SettingPiece::MinSize)
-                    form.SliderPercent(label.c_str(), s.scaleMin, kMinSizePercent, kMaxSizePercent, tip);
-                else if (e.piece == SettingPiece::MaxSize)
-                    form.SliderPercent(label.c_str(), s.scaleMax, kMinSizePercent, kMaxSizePercent, tip);
-                else
-                    form.Switch(label.c_str(), s.scaleOwnName, tip);
+                form.SliderPercent(label.c_str(), e.piece == SettingPiece::MinSize ? s.scaleMin : s.scaleMax,
+                    kMinSizePercent, kMaxSizePercent, tip);
                 form.Indent(false);
                 break;
             case SettingPiece::VerticalOffset:
