@@ -1,5 +1,6 @@
 #pragma once
 
+#include "function_ref.h"
 #include "screen_vertex.h"
 
 #include <RmlUi/Core/Input.h>
@@ -8,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string_view>
 #include <vector>
 
 namespace headsup
@@ -33,6 +35,10 @@ namespace headsup
     // The two triangles over a width by height target, the layer's picture its share (shareU, shareV) of the padded
     // texture it is drawn into.
     std::array<ScreenVertex, 6> LayerQuad(int width, int height, float shareU, float shareV, uint32_t tint);
+
+    // The boundary between a text's characters nearest x, in bytes, x being measured from the text's start and widthOf
+    // giving the width of a start of it: what is under the pointer when something is let go on it.
+    size_t ByteUnder(std::string_view text, float x, FunctionRef<float(std::string_view)> widthOf);
 
     // A point as a transform moves it: the matrix is RmlUi's, sixteen floats column by column, and the point is
     // divided by the depth it comes out at, as a perspective needs.

@@ -36,6 +36,7 @@ namespace headsup
         std::string type;
         std::string value; // a change's or commit's new value, a drop's dragged control, a caret's place in bytes
         std::string carried = {}; // a drop's: what the dragged control carries (kCarriesAttribute), a tag chip's slot
+        size_t at = std::string::npos; // a drop's on a stretch of text: the byte the pointer was nearest, none for its end
     };
     constexpr const char* kClickEvent  = "click";
     constexpr const char* kChangeEvent = "change"; // a slider moved, a text box typed in

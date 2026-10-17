@@ -612,6 +612,14 @@ TEST(a_tag_chip_dropped_in_a_line_box_goes_after_what_it_is_dropped_on)
     const Form onStretch = card.Pass({Drop("p-c-line-t-0", kConChip, "$con")}); // on a stretch: after it
     CHECK_EQ(card.text, "Lv $con$level end");
     CHECK(onStretch.changed && card.edited);
+    // Let go inside a stretch, between the letters the pointer was nearest.
+    card.text       = "Lv $level end";
+    FormEvent split = Drop("p-c-line-t-0", kConChip, "$con");
+    split.at        = 1;
+    card.Pass({split});
+    CHECK_EQ(card.text, "L${con}v $level end");
+    CHECK((card.draft.caret == RunCaret{1, 0}));
+    card.text = "Lv $con$level end";
     // Anything else dropped is nothing, and a click on the chip under the box is the page's to place.
     card.Pass({{"p-c-line", kDropEvent, "page-title"}});
     card.Pass({Drop("p-c-line", "page-title", "no tag")});

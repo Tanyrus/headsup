@@ -799,8 +799,8 @@ namespace headsup
             }
         }
         RunCaret nowhere;
-        // A tag dropped on a stretch goes after it, on a chip into that chip's slot, on another tag of its own chip
-        // into that tag's place, and anywhere else in the box at its end.
+        // A tag dropped on a stretch goes in at the pointer, on a chip into that chip's slot, on another tag of its own
+        // chip into that tag's place, and anywhere else in the box at its end.
         for (const Place& place : places)
         {
             if (reshaped) break;
@@ -818,7 +818,7 @@ namespace headsup
                     text = WithoutTag(text, taken->slot, taken->tag, nowhere);
                 continue;
             }
-            RunCaret at = place.run < 0 ? RunCaret{} : RunCaret{place.run, std::string::npos};
+            RunCaret at = place.run < 0 ? RunCaret{} : RunCaret{place.run, drop->at};
             if (!PutTag(text, at, dropped)) continue;
             // The slot went in before the stretch the caret is in: one of the line's own then leaves the place it
             // had, which is a slot further on when the new one stands before it.

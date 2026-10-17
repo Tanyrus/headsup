@@ -108,7 +108,8 @@ row's outline to Show Outline to outline those mobs too.
 
 The Nameplate Design card holds three lines: Top Line, Middle Line and Bottom Line, which sits where the game's own
 name does. You type in a line as you would anywhere, and put tags in it: a tag draws something, such as the name or
-the level. Click a tag under the lines to put it where you last typed, or drag it into a line. A tag stands in its line
+the level. Click a tag under the lines to put it where you last typed, or drag it into a line, where it goes in
+between the letters you let it go on. A tag stands in its line
 as the same button, with text to type before and after it, and Backspace or Delete beside a tag takes the whole tag
 out. A tag in a line can be dragged too: to another place in a line, or out of the lines altogether, which removes it.
 Typed by hand a tag is a dollar sign and its word, such as `$name`, and `$$` is one dollar sign.

@@ -599,6 +599,27 @@ TEST(a_line_box_keeps_what_is_typed_once_it_is_left)
     CHECK_EQ(window.settings.Kind(PlateKind::Players).lines[2].text, was + " hi");
 }
 
+TEST(a_tag_dropped_inside_a_stretch_goes_in_between_the_letters_under_the_pointer)
+{
+    Window window;
+    window.Page("players");
+    const std::string run = "players-nameplate-design-design-players-1-t-0";
+    std::string& text     = window.settings.Kind(PlateKind::Players).lines[1].text;
+    const auto dropAt     = [&](const char* before) {
+        text = "abcd";
+        window.Frames(2);
+        Rml::Element* input = window.Find(run);
+        const float x = input->GetAbsoluteOffset(Rml::BoxArea::Content).x +
+                        static_cast<float>(Rml::ElementUtilities::GetStringWidth(input, Rml::String(before))) + 1.0f;
+        window.Drag("tag-0", Rml::Vector2f(x, window.Center(run).y) - window.Center("tag-0"));
+        return text;
+    };
+    CHECK_EQ(dropAt(""), "${name}abcd");
+    CHECK_EQ(dropAt("ab"), "ab${name}cd");
+    CHECK_EQ(dropAt("abcd"), "abcd$name");
+    CHECK_EQ(window.Said(), "");
+}
+
 TEST(a_tag_chip_goes_in_at_the_caret_by_click_and_after_what_it_is_dropped_on_by_drag)
 {
     Window window;

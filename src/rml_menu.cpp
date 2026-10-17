@@ -480,8 +480,17 @@ namespace headsup
         case Rml::EventId::Dragdrop:
             if (auto* dragged = static_cast<Rml::Element*>(event.GetParameter<void*>("drag_element", nullptr));
                 dragged != nullptr && !LetGoOn(dragged, event))
-                m_Events.push_back(FormEvent{id, kDropEvent, dragged->GetId(),
-                    dragged->GetAttribute<Rml::String>(kCarriesAttribute, "")});
+            {
+                FormEvent drop{id, kDropEvent, dragged->GetId(), dragged->GetAttribute<Rml::String>(kCarriesAttribute, "")};
+                // A stretch is as wide as its letters from its content's left: the pointer says between which.
+                if (Rml::ElementFormControlInput* run = named != nullptr && named->IsClassSet(kRunClass) ? AsInput(named) : nullptr)
+                    drop.at = ByteUnder(run->GetValue(),
+                        static_cast<float>(event.GetParameter<int>("mouse_x", 0)) - run->GetAbsoluteOffset(Rml::BoxArea::Content).x,
+                        [&](std::string_view start) {
+                            return static_cast<float>(Rml::ElementUtilities::GetStringWidth(run, Rml::String(start)));
+                        });
+                m_Events.push_back(std::move(drop));
+            }
             break;
         case Rml::EventId::Dragend:
             if (!LetGoOn(target, event)) m_Events.push_back(FormEvent{id, kDragEndEvent, {}, {}});

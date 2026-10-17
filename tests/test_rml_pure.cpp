@@ -8,6 +8,24 @@
 using namespace headsup;
 using Rml::Input::KeyIdentifier;
 
+TEST(the_byte_under_a_point_of_a_text_is_the_nearest_boundary_between_its_characters)
+{
+    // Every character 7 px wide: boundaries at 0, 7, 14, ...
+    const auto wide = [](std::string_view text) {
+        return 7.0f * static_cast<float>(std::ranges::count_if(text, [](char c) { return (c & 0xC0) != 0x80; }));
+    };
+    CHECK_EQ(ByteUnder("abcd", -3.0f, wide), size_t{0});
+    CHECK_EQ(ByteUnder("abcd", 3.0f, wide), size_t{0});
+    CHECK_EQ(ByteUnder("abcd", 10.0f, wide), size_t{1});
+    CHECK_EQ(ByteUnder("abcd", 11.0f, wide), size_t{2});
+    CHECK_EQ(ByteUnder("abcd", 1000.0f, wide), size_t{4});
+    CHECK_EQ(ByteUnder("", 5.0f, wide), size_t{0});
+    // A letter of two bytes is never split.
+    const std::string accented = "a\xC3\xA9";
+    CHECK_EQ(ByteUnder(accented, 10.0f, wide), size_t{1});
+    CHECK_EQ(ByteUnder(accented, 12.0f, wide), size_t{3});
+}
+
 TEST(a_vertex_is_moved_to_the_pixel_center_with_its_texture_share)
 {
     // A 2x4 image padded into an 4x16 texture takes half its width and a quarter of its height.
