@@ -89,6 +89,9 @@ namespace headsup
     // A plate's rise seconds later, on its way to where it should be: most of the way in a fraction of a second, and
     // there once within half a pixel.
     float EaseRise(float shown, float target, double seconds);
+    // The line from a risen plate's bottom down to where it stood, width wide around the plate's center: none for a
+    // plate that rose less than a pixel.
+    std::optional<PlateBox> StackLeader(float centerX, float bottom, float rise, float width);
 
     float CursorBob(double seconds, float height, bool floating);
 

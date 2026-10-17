@@ -195,7 +195,8 @@ The Nameplates card, on the Entities page, sets what every nameplate shares:
   HeadsUp writes itself, as in a level range such as 20-23, and a name's own dash stay
 - **Scale with Distance:** names grow and shrink with distance between a Min Size and a Max Size, your own too
 - **Vertical Offset and Stack Names:** how far over the game's own spot names sit, and whether names that would cover
-  each other rise one over another, while your target's keeps its place
+  each other rise one over another, while your target's keeps its place. Show Line to Entity, under Stack Names, draws a
+  line in the name's color from a risen nameplate down to where it would have stood
 
 ![A player's nameplate with their icons and the feather cursor](resources/player_nameplate.png)
 

@@ -36,7 +36,7 @@ namespace headsup
             {"hideHelpBar", &Settings::hideHelpBar}, {"hideNetstat", &Settings::hideNetstat},
             {"screenshotHidesGame", &Settings::screenshotHidesGame},
             {"clockSeconds", &Settings::clockSeconds},
-            {"stackNames", &Settings::stackNames}, {"hideInEvent", &Settings::hideInEvent},
+            {"stackNames", &Settings::stackNames}, {"stackLine", &Settings::stackLine}, {"hideInEvent", &Settings::hideInEvent},
             {"debugMode", &Settings::debugMode},
             {"nameplates", &Settings::nameplates}, {"outlines", &Settings::outlines},
             {"outlineFadeIn", &Settings::outlineFadeIn}, {"cursorFloat", &Settings::cursorFloat},

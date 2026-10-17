@@ -146,6 +146,7 @@ namespace headsup
         int cursorRaise        = 5;     // pixels over its place
         int nameRaise          = 6;     // pixels the names HeadsUp draws sit above the game's, with all above them
         bool stackNames        = false; // names HeadsUp draws that would cover each other rise over one another
+        bool stackLine         = true;  // and a risen one has a line down to where it stood
         bool hideInEvent       = false; // no nameplate, HeadsUp's or the game's, while you are in a conversation
         bool debugMode         = false; // the HeadsUp Config page shows its readings and reports
         Color weakBadgeColor   = {{0.40f, 1.00f, 0.40f}};

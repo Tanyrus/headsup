@@ -1281,6 +1281,17 @@ TEST(a_new_install_looks_as_the_release_did_for_one_but_for_five_changes)
     CHECK(fresh.scaleMin == release.scaleMin && fresh.scaleMax == release.scaleMax);
 }
 
+TEST(show_line_to_entity_starts_on_and_keeps_what_was_saved)
+{
+    MapStore file = ReleaseFile();
+    CHECK(LoadSettings(file).stackLine);
+    Settings off;
+    off.stackLine = false;
+    MapStore saved;
+    SaveSettings(off, saved);
+    CHECK(!LoadSettings(saved).stackLine);
+}
+
 TEST(an_entity_types_color_is_saved_under_its_own_name)
 {
     // The menu lists the types in another order than their keys: a saved file's keys are by name.

@@ -288,6 +288,19 @@ TEST(only_the_lines_above_the_bottom_one_have_an_alignment)
     }
 }
 
+TEST(show_line_to_entity_shows_under_stack_names_only_while_that_is_on)
+{
+    Window w;
+    const char* row = "entities-nameplates-stack-line-to-entity-label-row";
+    CHECK(ClassOn(w.Pass(), row, "off")); // Stack Names starts off
+    w.settings.stackNames = true;
+    const Form on         = w.Pass();
+    CHECK(!ClassOn(on, row, "off"));
+    CHECK(Has(Block(on, "entities-nameplates")->rml, (std::string("class=\"row indent\" id=\"") + row + "\"").c_str()));
+    CHECK(w.Pass({{"entities-nameplates-stack-line-to-entity", kClickEvent, ""}}).changed);
+    CHECK(!w.settings.stackLine);
+}
+
 TEST(badge_text_goes_with_the_nameplates)
 {
     Window w;

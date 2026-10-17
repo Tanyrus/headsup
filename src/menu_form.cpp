@@ -896,6 +896,10 @@ namespace headsup
                 form.Fade(!plates);
                 form.Switch(label.c_str(), s.stackNames, tip);
                 break;
+            case SettingPiece::StackLineToEntity:
+                form.Fade(!plates || !s.stackNames);
+                form.Switch(label.c_str(), s.stackLine, tip);
+                break;
             case SettingPiece::HideDuringConversation:
                 form.Fade(!plates);
                 form.Switch(label.c_str(), s.hideInEvent, tip);

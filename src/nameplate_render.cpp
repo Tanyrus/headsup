@@ -18,6 +18,7 @@ namespace headsup
     {
         constexpr float kOutlinePerHeight = 0.1f; // a badge's outline width, per pixel of its height
         constexpr float kStackGap         = 2.0f; // screen pixels between plates stacked over one another
+        constexpr float kStackLineWidth   = 1.0f; // screen pixels: the line from a risen plate to where it stood
         constexpr const char* kLineSample = "H"; // any letter: GDI gives a line's height with it
         // From the mockup's CSS: a 22 px name's shadows blur 2 and 3 px, 1 px lower, and its glow 14 px.
         constexpr float kShadowDropPerHeight = 0.05f;
@@ -348,6 +349,9 @@ namespace headsup
             float depth;
             uint16_t index;
             size_t quads, quadsEnd, cursors, cursorsEnd, shown;
+            float centerX;     // where its line down to where it stood goes
+            uint32_t color;    // its bottom line's text color, the line's
+            uint32_t alpha;    // and its opacity
         };
         std::vector<Stacked> stacked;
         if (NameplatesOn(settings) && !m_NamesFailed && m_Device != nullptr)
@@ -635,7 +639,8 @@ namespace headsup
                 // Only a name HeadsUp draws can move: the game's own stays where the game puts it.
                 if (settings.stackNames && lineCount > 0)
                     stacked.push_back(Stacked{&p, BoxOf(layout), rank, depth, info->index, firstQuad,
-                        m_Quads.size(), firstCursor, cursorQuads.size(), shownCount - 1});
+                        m_Quads.size(), firstCursor, cursorQuads.size(), shownCount - 1, layout.centerX,
+                        composed.lines.back().look.color, opaque});
                 else
                     p.rise = 0.0f;
             }
@@ -651,6 +656,11 @@ namespace headsup
         for (const Stacked& s : stacked)
             boxes.push_back(s.box);
         const std::vector<float> rises = StackRises(boxes, kStackGap);
+        if (settings.stackLine && !stacked.empty() && m_Solid == nullptr && !m_SolidRefused)
+        {
+            m_Solid        = CreateTexture(m_Device, &kWhite, 1, 1, m_SolidU, m_SolidV);
+            m_SolidRefused = m_Solid == nullptr;
+        }
         for (size_t i = 0; i < stacked.size(); ++i)
         {
             const Stacked& s = stacked[i];
@@ -666,6 +676,15 @@ namespace headsup
                 GpuQuad& cursor = cursorQuads[q].gpu;
                 cursor.y = KeepOnScreen(CursorSpot{cursor.x, cursor.y - up}, cursor.width, cursor.height, screenWidth * toX,
                     screenHeight * toY, m_CoveredTop * toY).y;
+            }
+            // Drawn after the plate it belongs to, in the plate's rank and at its depth.
+            if (const std::optional<PlateBox> line = StackLeader(s.centerX, s.box.bottom, p.rise, kStackLineWidth);
+                line && settings.stackLine && m_Solid != nullptr)
+            {
+                rank   = s.rank;
+                opaque = s.alpha;
+                addQuad(m_Quads, m_Solid, line->left, line->top, std::max(1.0f, std::round((line->right - line->left) * toX)),
+                    (line->bottom - line->top) * toY, m_SolidU, m_SolidV, s.depth, s.color);
             }
             Shown& shown = m_Shown[s.shown];
             if (shown.nameHeight > 0) shown.nameY -= p.rise;
@@ -772,6 +791,8 @@ namespace headsup
         ReleaseTexture(m_LoneCursorUnder.texture);
         for (PlateTexture& badge : m_Badges.TakeAll())
             ReleaseTexture(badge.texture);
+        ReleaseTexture(m_Solid);
+        m_SolidRefused = false;
         m_Gdi.Release();
     }
 

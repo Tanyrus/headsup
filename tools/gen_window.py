@@ -117,7 +117,7 @@ PIECES = Pieces(
         # Entities
         'base-font-size': Setting(), 'default-font': Setting(), 'base-icon-size': Setting(), 'auto-check': Setting(),
         'replace-dashes': Setting(options=4, nameless=frozenset({1, 2, 3})), 'scale-with-distance': Setting(),
-        'min-size': Setting(), 'max-size': Setting(), 'vertical-offset': Setting(),
+        'min-size': Setting(), 'max-size': Setting(), 'stack-line-to-entity': Setting(), 'vertical-offset': Setting(),
         'stack-names': Setting(), 'hide-during-conversation': Setting(),
         'thickness': Setting(), 'opacity': Setting(), 'smoothness': Setting(), 'outline-range': Setting(),
         'outline-fade-in': Setting(), 'stencil-note': Setting(),

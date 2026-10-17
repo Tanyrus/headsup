@@ -480,6 +480,18 @@ TEST(plates_stack_one_above_another_and_a_rise_onto_a_third_goes_over_it_too)
     CHECK(StackRises(boxes, kStackGap) == (std::vector<float>{0.0f, 0.0f, 77.0f}));
 }
 
+TEST(a_risen_plates_line_runs_from_its_bottom_down_to_where_it_stood)
+{
+    // A plate centered on 150 whose bottom stood at 230, risen 42: a line 1 px wide from 188 down to 230.
+    const std::optional<PlateBox> line = StackLeader(150.0f, 230.0f, 42.0f, 1.0f);
+    CHECK(line.has_value());
+    CHECK(line->left == 149.5f && line->right == 150.5f && line->top == 188.0f && line->bottom == 230.0f);
+    const std::optional<PlateBox> wide = StackLeader(150.0f, 230.0f, 42.0f, 3.0f);
+    CHECK(wide->left == 148.5f && wide->right == 151.5f);
+    // Not risen, or by less than a pixel, it has none.
+    CHECK(!StackLeader(150.0f, 230.0f, 0.0f, 1.0f) && !StackLeader(150.0f, 230.0f, 0.5f, 1.0f));
+}
+
 TEST(a_plates_rise_eases_to_where_it_should_be_and_settles_there)
 {
     CHECK(EaseRise(0.0f, 40.0f, 0.0) == 0.0f);

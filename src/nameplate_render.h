@@ -174,6 +174,11 @@ namespace headsup
         std::unordered_map<uint16_t, Plate> m_Plates;
         FrameCache<BadgeKey, PlateTexture> m_Badges;
         IconTextures m_Icons;
+        // A white pixel, stretched and tinted into the lines from risen plates to where they stood; none once Direct3D
+        // refused it, and then no lines.
+        IDirect3DTexture8* m_Solid = nullptr;
+        float m_SolidU = 0.0f, m_SolidV = 0.0f;
+        bool m_SolidRefused = false;
         std::vector<Quad> m_Quads;
         std::vector<Shown> m_Shown;
         std::vector<CursorName> m_CursorNames;
