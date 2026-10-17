@@ -29,6 +29,7 @@ namespace headsup
         float textHeight     = 0.0f;
         bool hasIcons        = false;
         float padBelow = 0.0f, padAbove = 0.0f;
+        int firstText = -1, lastText = -1; // its first and last text item; icons outside them hang past the text
         float ornamentWidth  = 0.0f;
         float ornamentHeight = 0.0f;
         bool ornamentUnder   = false;

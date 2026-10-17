@@ -159,7 +159,8 @@ After the design come a Line Style card, with a tab for each line, and an Orname
   You, When Claimed by Others, When Engaged in Combat, When Too Weak, When Aggressive, When Passive, When Party Member,
   When Friend, When Linkshell Member or When Owner is You (the ones that fit the kind)
 - **Alignment:** left, center or right against the bottom line, which itself stays on the game's name. A line wider
-  than the name hangs out past it on the side it is set to
+  than the name hangs out past it on the side it is set to. Only a line's text is aligned: icons before or after it
+  stand outside, so a name with the linkshell icon before it stays centered on the game's name
 - **Font and Font Style:** a line's own font, or the Default Font from the Entities page, in bold, italics, underline
   or any of them together
 - **Text Size and Icon Size:** a percent of the Base Font Size and the Base Icon Size set on the Entities page

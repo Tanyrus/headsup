@@ -28,6 +28,15 @@ namespace
         line.hasIcons = true;
         return line;
     }
+    // A line whose text runs from its first to its last item of these places; what is outside them is icons.
+    LineInput Hung(std::initializer_list<ItemSize> items, int firstText, int lastText, Align align = Align::Center)
+    {
+        LineInput line  = Text(items, align);
+        line.firstText  = firstText;
+        line.lastText   = lastText;
+        line.hasIcons   = true;
+        return line;
+    }
     PlateItem TextItem(const char* text)
     {
         PlateItem item;
@@ -123,6 +132,46 @@ TEST(lines_align_against_the_bottom_line)
     const PlateLayout w = LayoutPlate(Anchor(), wide, 0.0f, 0.0f, 0.5f, 0, 0.0f);
     CHECK_EQ(w.lines[0].left, 130.0f - 100.0f);
     CHECK_EQ(w.lines[1].left, 70.0f);
+}
+
+TEST(icons_at_a_lines_ends_hang_outside_its_text_which_centers_alone)
+{
+    // Centered on the name at 100: a 60 px text, from 70 to 130, with a 16 px icon before it, after it or both.
+    const auto laid = [](LineInput line) { return LayoutPlate(Anchor(), std::vector<LineInput>{line}, 0.0f, 0.0f, 0.5f, 0, 0.0f).lines[0]; };
+    const LinePlace before = laid(Hung({{16.0f, 16.0f}, {60.0f, 15.0f}}, 1, 1));
+    CHECK_EQ(before.items[1].x, 70.0f);
+    CHECK_EQ(before.items[0].x, 70.0f - kItemGap - 16.0f);
+    CHECK_EQ(before.left, before.items[0].x);
+    CHECK_EQ(before.width, 16.0f + kItemGap + 60.0f); // the line's box holds its icons
+    const LinePlace after = laid(Hung({{60.0f, 15.0f}, {16.0f, 16.0f}}, 0, 0));
+    CHECK_EQ(after.items[0].x, 70.0f);
+    CHECK_EQ(after.items[1].x, 130.0f + kItemGap);
+    const LinePlace both = laid(Hung({{16.0f, 16.0f}, {60.0f, 15.0f}, {16.0f, 16.0f}}, 1, 1));
+    CHECK(both.items[0].x == 52.0f && both.items[1].x == 70.0f && both.items[2].x == 132.0f);
+    // A space typed between an icon and the text hangs with the icon.
+    const LinePlace spaced = laid(Hung({{16.0f, 16.0f}, {4.5f, 0.0f}, {60.0f, 15.0f}}, 2, 2));
+    CHECK_EQ(spaced.items[2].x, 70.0f);
+    CHECK_EQ(spaced.items[0].x, 70.0f - kItemGap - 4.5f - kItemGap - 16.0f);
+    // Icons between two texts are part of the text's run, and a line of icons alone centers whole.
+    const LinePlace inside = laid(Hung({{30.0f, 15.0f}, {16.0f, 16.0f}, {30.0f, 15.0f}}, 0, 2));
+    CHECK_EQ(inside.left, 100.0f - (30.0f + kItemGap + 16.0f + kItemGap + 30.0f) / 2.0f);
+    CHECK_EQ(laid(Icons({{40.0f, 16.0f}})).left, 80.0f);
+}
+
+TEST(a_lines_text_aligns_against_the_bottom_lines_text_and_its_icons_hang_out_past_it)
+{
+    // The bottom line's text runs from 70 to 130 with an icon hanging left of it; the lines above set against that.
+    const LineInput bottom = Hung({{16.0f, 16.0f}, {60.0f, 15.0f}}, 1, 1);
+    const std::vector<LineInput> lines{Hung({{16.0f, 16.0f}, {40.0f, 15.0f}}, 1, 1, Align::Left),
+        Hung({{40.0f, 15.0f}, {16.0f, 16.0f}}, 0, 0, Align::Right), Hung({{16.0f, 16.0f}, {80.0f, 15.0f}}, 1, 1, Align::Left),
+        Hung({{80.0f, 15.0f}, {16.0f, 16.0f}}, 0, 0, Align::Right), bottom};
+    const PlateLayout l = LayoutPlate(Anchor(), lines, 0.0f, 0.0f, 0.5f, 0, 0.0f);
+    CHECK_EQ(l.lines[4].items[1].x, 70.0f);
+    CHECK(l.lines[0].items[1].x == 70.0f && l.lines[0].items[0].x == 52.0f);
+    CHECK(l.lines[1].items[0].x == 90.0f && l.lines[1].items[1].x == 132.0f);
+    // Wider than the bottom line's text, a line's text hangs out on the side it is set to, its icons past that.
+    CHECK(l.lines[2].items[1].x == 50.0f && l.lines[2].items[0].x == 32.0f);
+    CHECK(l.lines[3].items[0].x == 70.0f && l.lines[3].items[1].x == 152.0f);
 }
 
 TEST(a_lines_padding_opens_the_gap_under_it_and_the_bottom_lines_the_gap_over_it)
@@ -274,6 +323,13 @@ TEST(a_measured_text_line_takes_its_texts_boxes_and_its_alignment)
     const std::vector<ItemSize> tallFirst{{60.0f, 19.0f}, {30.0f, 17.0f}};
     MeasureLine(line, tallFirst, 2.0f, in);
     CHECK_EQ(in.textHeight, 19.0f);
+    CHECK(in.firstText == 0 && in.lastText == 1);
+    // Where its text starts and ends among its items: past icons and the spaces beside them, and nowhere on a line
+    // of icons.
+    MeasureLine(Line({IconItem(2, 0), SpaceItem(1), TextItem("Chadmage"), IconItem(1, 0)}, 14.0f, 14.0f), texts, 1.0f, in);
+    CHECK(in.firstText == 2 && in.lastText == 2);
+    MeasureLine(Line({IconItem(2, 0)}, 14.0f, 14.0f), {}, 1.0f, in);
+    CHECK(in.firstText == -1 && in.lastText == -1);
 }
 
 TEST(icon_runs_on_a_line_without_text_share_a_height_with_room_for_a_badge)
@@ -417,19 +473,19 @@ TEST(a_wrapped_badge_group_stands_a_gap_and_a_hang_over_the_level_line_with_the_
     CHECK(Near(box.left, -29.4f));
 }
 
-TEST(a_players_icons_and_name_center_together_a_gap_apart_and_the_cursor_sinks_into_the_name)
+TEST(a_players_name_centers_on_the_games_name_with_its_icons_left_of_it_and_the_cursor_sinks_into_it)
 {
-    // Three 14 px icons left of a 92 by 21 name: the two centered together on the game's name (100, 210), the name
-    // 2 px right of the icons, the icons centered on its height, the cursor 3 px into the name.
+    // Three 14 px icons left of a 92 by 21 name: the name centered on the game's name (100, 210), the icons (46 px)
+    // 2 px left of it and centered on its height, the cursor 3 px into the name.
     const ComposedLine line = Line({IconItem(3, 0), TextItem("Chadmage")}, 14.0f, 14.0f);
     const std::vector<ItemSize> texts{{92.0f, 21.0f}};
     std::vector<LineInput> lines(1);
     MeasureLine(line, texts, 1.0f, lines[0]);
     const PlateLayout l = LayoutPlate(Anchor(), lines, 14.0f, 20.0f, 0.5f, 0, 0.0f);
-    CHECK_EQ(l.lines[0].items[0].x, 30.0f);
-    CHECK_EQ(l.lines[0].items[0].x + IconOffset(2, 0, 14.0f), 62.0f);
+    CHECK_EQ(l.lines[0].items[1].x, 54.0f);
+    CHECK_EQ(l.lines[0].items[0].x, 6.0f);
+    CHECK_EQ(l.lines[0].items[0].x + IconOffset(2, 0, 14.0f), 38.0f);
     CHECK_EQ(l.lines[0].items[0].y, 203.0f);
-    CHECK_EQ(l.lines[0].items[1].x, 78.0f);
     CHECK_EQ(l.lines[0].items[1].y, 199.5f);
     CHECK_EQ(l.cursor.y, 182.5f);
 }
