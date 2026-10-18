@@ -4,6 +4,7 @@
 #include "bar_content.h"
 #include "bar_fps.h"
 #include "bar_job.h"
+#include "bar_memory.h"
 #include "bar_party.h"
 #include "bar_signet.h"
 #include "bar_types.h"
@@ -65,6 +66,9 @@ namespace headsup
         std::optional<ConnectionReport> connection;
         Party party{}; // empty slots for no one
         std::optional<SignetState> signet; // nullopt while neither is on
+        std::optional<MemoryReport> memory; // nullopt before the first whole walk of the space
+        std::optional<double> cpuPercent;   // of one core; nullopt before two samples
+        LinuxXIState linuxxi;
     };
 
     // The parts of BarState that the shown widgets and the open popup read, for the plugin to gather only those; it
@@ -82,6 +86,9 @@ namespace headsup
         bool connection = false;
         bool party      = false;
         bool signet     = false; // read with the clock, which its timer counts from
+        bool memory     = false;
+        bool cpu        = false;
+        bool linuxxi    = false;
         int containers = 0; // bags from 0 up to this
     };
     BarNeeds NeedsOf(const Settings& settings, std::optional<BarWidget> open);

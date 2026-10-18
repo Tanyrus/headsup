@@ -800,6 +800,14 @@ namespace
             state.connection = SteadyLink();
             state.party      = FourMembers();
             state.signet     = SignetState{Influence::Signet, 6130.0};
+            state.memory     = MemoryReport{1532, 2563, 4095};
+            state.cpuPercent = 18.0;
+            LinuxXIReport report;
+            report.flags      = kPoolHooked | kPoolOn | kGraceActive | kGraceOn;
+            report.copiesHeld = 588;
+            report.addonCount = 1;
+            report.lua[0]     = LinuxXIAddon{"xiui", 41250};
+            state.linuxxi.report = report;
         }
     };
 
@@ -840,6 +848,9 @@ namespace
         if (needs.connection) s.connection = full.connection;
         if (needs.party) s.party = full.party;
         if (needs.signet) s.signet = full.signet;
+        if (needs.memory) s.memory = full.memory;
+        if (needs.cpu) s.cpuPercent = full.cpuPercent;
+        if (needs.linuxxi) s.linuxxi = full.linuxxi;
         return s;
     }
 
@@ -850,7 +861,7 @@ namespace
         for (bool BarNeeds::*part :
             {&BarNeeds::unixTime, &BarNeeds::localTime, &BarNeeds::zone, &BarNeeds::target, &BarNeeds::gil,
             &BarNeeds::strip, &BarNeeds::frames, &BarNeeds::job, &BarNeeds::connection,
-            &BarNeeds::party, &BarNeeds::signet})
+            &BarNeeds::party, &BarNeeds::signet, &BarNeeds::memory, &BarNeeds::cpu, &BarNeeds::linuxxi})
             if (needs.*part)
             {
                 less.push_back(needs);

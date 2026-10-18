@@ -188,7 +188,7 @@ namespace headsup
         constexpr const char* kBarSeparatorsKey                    = "barSeparators";
         const char* const kBarSeparatorsNames[kBarSeparatorsCount] = {"theme", "diamonds", "none"};
         const char* const kBarWidgetKeys[] = {"barZone", "barWeather", "barVanaTime", "barTarget", "barGil", "barBags",
-            "barEarthTime", "barGameHelp", "barFps", "barJob", "barConnection", "barParty", "barSignet", "barDistance"};
+            "barEarthTime", "barGameHelp", "barFps", "barJob", "barConnection", "barParty", "barSignet", "barDistance", "barMemory"};
         static_assert(std::size(kBarWidgetKeys) == kBarWidgetCount);
         const char* const kBarSectionKeys[] = {"barLeft", "barCenter", "barRight"};
         static_assert(std::size(kBarSectionKeys) == kBarSectionCount);

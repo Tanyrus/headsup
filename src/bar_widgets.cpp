@@ -733,11 +733,15 @@ namespace headsup
         needs.target     = shown(BarWidget::Target) || shown(BarWidget::Distance);
         needs.gil        = shown(BarWidget::Gil);
         needs.strip      = shown(BarWidget::GameHelp);
-        needs.frames     = shown(BarWidget::Fps);
+        const bool memoryPopup = shown(BarWidget::Memory) && open == BarWidget::Memory;
+        needs.frames     = shown(BarWidget::Fps) || memoryPopup;
         needs.job        = shown(BarWidget::Job);
         needs.connection = shown(BarWidget::Connection);
         needs.party      = shown(BarWidget::Party);
         needs.signet     = shown(BarWidget::Signet);
+        needs.memory     = shown(BarWidget::Memory);
+        needs.cpu        = memoryPopup;
+        needs.linuxxi    = memoryPopup;
         // Ashita counts a container's items by walking its slots, so the others wait for the popup that lists them.
         if (shown(BarWidget::Bags)) needs.containers = open == BarWidget::Bags ? kContainerCount : 1;
         return needs;
@@ -901,6 +905,8 @@ namespace headsup
             w.title   = ListOf(Text(Printed("%.1f", *state.targetDistance)), Text(" yalms", Tone::Dim));
             w.figures = true;
             break;
+        case BarWidget::Memory:
+            return MemoryWidget(state.memory);
         }
         return w;
     }
@@ -1046,6 +1052,8 @@ namespace headsup
         case BarWidget::Signet:
             return SignetPopup(state.signet, state.zone);
         case BarWidget::Distance: break;
+        case BarWidget::Memory:
+            return MemoryPopup(state.memory, state.cpuPercent, state.frames, state.linuxxi);
         }
         return popup;
     }

@@ -2,11 +2,12 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 OUT="$ROOT/build"
+DLL="HeadsUp" # the file's name, capitals and all, as the release ships it
 PLUGINS_DIR="${HEADSUP_PLUGINS_DIR:-$HOME/Games/PhoenixXI/plugins}"
 # RmlUi and FreeType as tools/rmlui/build.sh builds them: static, for the plugin and for the unit tests.
 RMLUI_DIR="${HEADSUP_RMLUI_DIR:-$HOME/.cache/headsup-rmlui}"
 RMLUI_LIBS=(-lrmlui_debugger -lrmlui -lfreetype)
-PURE_SOURCES=(game_font.cpp window_layout.cpp json_text.cpp window_file.cpp friend_list.cpp auto_check.cpp dash_mark.cpp cursor_picture.cpp rml_pure.cpp markup.cpp bar_document.cpp form.cpp menu_form.cpp menu_document.cpp rml_menu.cpp con.cpp cursor_file.cpp fonts.cpp pointer_keys.cpp utf16.cpp mobdata.cpp npcdata.cpp magic_chance.cpp ph_timers.cpp settings.cpp tracker.cpp outline_math.cpp labels.cpp look.cpp check.cpp nameplate.cpp icons.cpp plate_image.cpp player_status.cpp pose.cpp commands.cpp game_glyphs.cpp game_cursor.cpp native_locate.cpp window_views.cpp strip_text.cpp code_patch.cpp name_frame.cpp copy_state.cpp zones.cpp vanadiel.cpp bar_theme.cpp bar_look.cpp bar_content.cpp bar_server_time.cpp bar_fps.cpp bar_job.cpp bar_connection.cpp bar_party.cpp bar_signet.cpp bar_game_help.cpp bar_widgets.cpp bar_placement.cpp bar_layout.cpp popup_layout.cpp weather.cpp game_packets.cpp game_state.cpp titles.cpp currencies.cpp menu_state.cpp plate_settings.cpp entity_state.cpp plate_template.cpp plate_compose.cpp plate_layout.cpp ini_text.cpp)
+PURE_SOURCES=(bar_memory.cpp address_space.cpp linuxxi_report.cpp game_font.cpp window_layout.cpp json_text.cpp window_file.cpp friend_list.cpp auto_check.cpp dash_mark.cpp cursor_picture.cpp rml_pure.cpp markup.cpp bar_document.cpp form.cpp menu_form.cpp menu_document.cpp rml_menu.cpp con.cpp cursor_file.cpp fonts.cpp pointer_keys.cpp utf16.cpp mobdata.cpp npcdata.cpp magic_chance.cpp ph_timers.cpp settings.cpp tracker.cpp outline_math.cpp labels.cpp look.cpp check.cpp nameplate.cpp icons.cpp plate_image.cpp player_status.cpp pose.cpp commands.cpp game_glyphs.cpp game_cursor.cpp native_locate.cpp window_views.cpp strip_text.cpp code_patch.cpp name_frame.cpp copy_state.cpp zones.cpp vanadiel.cpp bar_theme.cpp bar_look.cpp bar_content.cpp bar_server_time.cpp bar_fps.cpp bar_job.cpp bar_connection.cpp bar_party.cpp bar_signet.cpp bar_game_help.cpp bar_widgets.cpp bar_placement.cpp bar_layout.cpp popup_layout.cpp weather.cpp game_packets.cpp game_state.cpp titles.cpp currencies.cpp menu_state.cpp plate_settings.cpp entity_state.cpp plate_template.cpp plate_compose.cpp plate_layout.cpp ini_text.cpp)
 PLUGIN_SOURCES=("${PURE_SOURCES[@]}" rml_system.cpp rml_render.cpp rml_host.cpp rml_bar.cpp d3d_util.cpp game_names.cpp outline.cpp pointer_swap.cpp gpu.cpp nameplate_render.cpp installed_fonts.cpp debug_report.cpp plugin.cpp native_hook.cpp)
 # A developer's tools, kept beside the repository and out of it: when they are there, they are built in and plugin.cpp's
 # HEADSUP_DEV hooks call them.
@@ -83,20 +84,20 @@ plugin() {
         -DRMLUI_STATIC_LIB -I"$ROOT/src" "${DEV_FLAGS[@]}" \
         -Wall -Wextra -Werror -fpermissive -- "${PLUGIN_SOURCES[@]/#/$ROOT/src/}" "${DEV_SOURCES[@]}"
     i686-w64-mingw32-g++ -shared -static -static-libgcc -static-libstdc++ -Wl,--kill-at \
-        -o "$OUT/headsup.dll" "${OBJECTS[@]}" -L"$RMLUI_DIR/mingw/lib" "${RMLUI_LIBS[@]}" -lpsapi -lgdi32
+        -o "$OUT/$DLL.dll" "${OBJECTS[@]}" -L"$RMLUI_DIR/mingw/lib" "${RMLUI_LIBS[@]}" -lpsapi -lgdi32
     # The static libstdc++ brings 11 MB of debug sections, which the game would map too. The DLL ships without them and
-    # headsup.debug beside it keeps them and the symbols, for reading a crash's addresses.
-    i686-w64-mingw32-objcopy --only-keep-debug "$OUT/headsup.dll" "$OUT/headsup.debug"
-    i686-w64-mingw32-strip --strip-all "$OUT/headsup.dll"
-    i686-w64-mingw32-objcopy --add-gnu-debuglink="$OUT/headsup.debug" "$OUT/headsup.dll"
-    echo "built $OUT/headsup.dll"
+    # HeadsUp.debug beside it keeps them and the symbols, for reading a crash's addresses.
+    i686-w64-mingw32-objcopy --only-keep-debug "$OUT/$DLL.dll" "$OUT/$DLL.debug"
+    i686-w64-mingw32-strip --strip-all "$OUT/$DLL.dll"
+    i686-w64-mingw32-objcopy --add-gnu-debuglink="$OUT/$DLL.debug" "$OUT/$DLL.dll"
+    echo "built $OUT/$DLL.dll"
 }
 
 install_plugin() {
     # Write a new file and rename it over the old one: overwriting in place would corrupt a copy Wine has mapped.
-    cp "$OUT/headsup.dll" "$PLUGINS_DIR/headsup.dll.tmp"
-    mv -f "$PLUGINS_DIR/headsup.dll.tmp" "$PLUGINS_DIR/headsup.dll"
-    echo "installed $PLUGINS_DIR/headsup.dll"
+    cp "$OUT/$DLL.dll" "$PLUGINS_DIR/$DLL.dll.tmp"
+    mv -f "$PLUGINS_DIR/$DLL.dll.tmp" "$PLUGINS_DIR/$DLL.dll"
+    echo "installed $PLUGINS_DIR/$DLL.dll"
 }
 
 for target in linux mingw; do

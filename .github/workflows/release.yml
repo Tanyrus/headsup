@@ -63,7 +63,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: headsup
-          path: build/headsup.dll
+          path: build/HeadsUp.dll
           if-no-files-found: error
 
   release:
@@ -79,4 +79,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.find.outputs.tag }}
-        run: gh release create "$TAG" headsup.dll --repo "$GITHUB_REPOSITORY" --verify-tag --title "HeadsUp $TAG" --generate-notes
+        run: gh release create "$TAG" HeadsUp.dll --repo "$GITHUB_REPOSITORY" --verify-tag --title "HeadsUp $TAG" --generate-notes
