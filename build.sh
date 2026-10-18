@@ -2,6 +2,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 OUT="$ROOT/build"
+DLL="HeadsUp" # the file's name, capitals and all, as the release ships it
 PLUGINS_DIR="${HEADSUP_PLUGINS_DIR:-$HOME/Games/PhoenixXI/plugins}"
 # RmlUi and FreeType as tools/rmlui/build.sh builds them: static, for the plugin and for the unit tests.
 RMLUI_DIR="${HEADSUP_RMLUI_DIR:-$HOME/.cache/headsup-rmlui}"
@@ -83,20 +84,20 @@ plugin() {
         -DRMLUI_STATIC_LIB -I"$ROOT/src" "${DEV_FLAGS[@]}" \
         -Wall -Wextra -Werror -fpermissive -- "${PLUGIN_SOURCES[@]/#/$ROOT/src/}" "${DEV_SOURCES[@]}"
     i686-w64-mingw32-g++ -shared -static -static-libgcc -static-libstdc++ -Wl,--kill-at \
-        -o "$OUT/headsup.dll" "${OBJECTS[@]}" -L"$RMLUI_DIR/mingw/lib" "${RMLUI_LIBS[@]}" -lpsapi -lgdi32
+        -o "$OUT/$DLL.dll" "${OBJECTS[@]}" -L"$RMLUI_DIR/mingw/lib" "${RMLUI_LIBS[@]}" -lpsapi -lgdi32
     # The static libstdc++ brings 11 MB of debug sections, which the game would map too. The DLL ships without them and
-    # headsup.debug beside it keeps them and the symbols, for reading a crash's addresses.
-    i686-w64-mingw32-objcopy --only-keep-debug "$OUT/headsup.dll" "$OUT/headsup.debug"
-    i686-w64-mingw32-strip --strip-all "$OUT/headsup.dll"
-    i686-w64-mingw32-objcopy --add-gnu-debuglink="$OUT/headsup.debug" "$OUT/headsup.dll"
-    echo "built $OUT/headsup.dll"
+    # HeadsUp.debug beside it keeps them and the symbols, for reading a crash's addresses.
+    i686-w64-mingw32-objcopy --only-keep-debug "$OUT/$DLL.dll" "$OUT/$DLL.debug"
+    i686-w64-mingw32-strip --strip-all "$OUT/$DLL.dll"
+    i686-w64-mingw32-objcopy --add-gnu-debuglink="$OUT/$DLL.debug" "$OUT/$DLL.dll"
+    echo "built $OUT/$DLL.dll"
 }
 
 install_plugin() {
     # Write a new file and rename it over the old one: overwriting in place would corrupt a copy Wine has mapped.
-    cp "$OUT/headsup.dll" "$PLUGINS_DIR/headsup.dll.tmp"
-    mv -f "$PLUGINS_DIR/headsup.dll.tmp" "$PLUGINS_DIR/headsup.dll"
-    echo "installed $PLUGINS_DIR/headsup.dll"
+    cp "$OUT/$DLL.dll" "$PLUGINS_DIR/$DLL.dll.tmp"
+    mv -f "$PLUGINS_DIR/$DLL.dll.tmp" "$PLUGINS_DIR/$DLL.dll"
+    echo "installed $PLUGINS_DIR/$DLL.dll"
 }
 
 for target in linux mingw; do

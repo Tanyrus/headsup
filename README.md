@@ -9,8 +9,8 @@ Currencies menu, while the Gil widget is on ([Top panel](#top-panel) says when).
 it checks a monster itself only with Auto-Check switched on, which is off unless you turn it on: it then sends the same
 request `/check` does, for monsters alone and never for a player.
 
-Download `headsup.dll` from the latest release on the [Releases](https://github.com/Tanyrus/headsup/releases) page and
-put it in Ashita's `plugins` folder. Load it with `/load headsup`; `/hu` opens its settings, and `/hu menu <page>`
+Download `HeadsUp.dll` from the latest release on the [Releases](https://github.com/Tanyrus/headsup/releases) page and
+put it in Ashita's `plugins` folder, in place of any `headsup.dll` from before. Load it with `/load HeadsUp`; `/hu` opens its settings, and `/hu menu <page>`
 opens them at a page, such as `/hu menu entities`, `/hu menu mobs` or `/hu menu toppanel`.
 
 > **About the data:** HeadsUp's monster data (levels, aggression, links and detection) is built from Phoenix's own

@@ -68,7 +68,7 @@ namespace
 {
     bool KeyDown(uint8_t vk) { return (GetAsyncKeyState(vk) & headsup::kKeyDownBit) != 0; }
 
-    constexpr const char* kName              = "headsup";
+    constexpr const char* kName              = "HeadsUp"; // as Ashita lists it and the chat names it
     // Ashita takes a plugin's version as one number, so it holds the release tag's major.minor; the release workflow
     // checks the two agree.
     constexpr double kVersion                = 0.7;
