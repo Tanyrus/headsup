@@ -5,6 +5,7 @@
 #include "bar_document.h"
 #include "bar_fps.h"
 #include "bar_job.h"
+#include "bar_memory.h"
 #include "check.h"
 #include "commands.h"
 #include "copy_state.h"
@@ -33,6 +34,7 @@
 #include "shot_watch.h"
 #include "tracker.h"
 #include "window_file.h"
+#include "xilinux_report.h"
 #ifdef HEADSUP_DEV
 #include "codedump.h"
 #include "drawdump.h"
@@ -60,6 +62,8 @@
 #include <utility>
 #include <vector>
 
+#include <winternl.h>
+
 namespace
 {
     bool KeyDown(uint8_t vk) { return (GetAsyncKeyState(vk) & headsup::kKeyDownBit) != 0; }
@@ -73,6 +77,12 @@ namespace
     constexpr const char* kWindowFile        = "settings_window.json"; // a developer's build reads one in its config folder
     constexpr const char* kLogsFolder        = "logs";
     constexpr const char* kFolder            = "headsup"; // inside Ashita's config and logs folders
+    constexpr int kQueriesPerFrame           = 128;      // VirtualQuery calls a frame while the Memory widget shows
+    constexpr uint64_t kSpaceEnd             = uint64_t{1} << 32;
+    constexpr double kXiLinuxStaleSeconds    = 3.0;      // xilinux reports once a second; three missed and it is gone
+    // Proton hides ntdll's wine_get_version from the game; every Wine prefix has this key.
+    constexpr const char* kWineKey           = "Software\\Wine";
+    constexpr ULONG kProcessVmCounters       = 3;        // NtQueryInformationProcess's class for VM_COUNTERS
     constexpr const char* kCursorsFolder     = "cursors"; // inside HeadsUp's config folder: the player's cursor files
     constexpr const char* kSettingsFile      = "settings.ini";
     constexpr const char* kNewFileSuffix     = ".new";          // after the process id: the file while it is written
@@ -263,6 +273,13 @@ class HeadsUp final : public IPlugin
     std::optional<headsup::NetCounters> m_Counters; // the last read, kept between samples
     std::optional<double> m_CountersReadAt;
     headsup::ConnectionMeter m_Connection;
+    headsup::FreeSpaceWalk m_SpaceWalk;
+    headsup::CpuMeter m_Cpu;
+    std::optional<uint64_t> m_Mapped; // the process's VirtualSize, read with the processor time
+    bool m_UnderWine = false;
+    std::mutex m_XiLinuxLock;
+    headsup::XiLinuxState m_XiLinux;
+    std::optional<double> m_XiLinuxAt; // when it came
     bool m_HooksTried = false;
     bool m_PointerFailed = false; // said once; tried again when the setting changes or the folder is read again
     std::pair<headsup::PointerIcon, std::string> m_PointerFor; // the icon and file the pointer was started for
@@ -356,7 +373,24 @@ public:
     uint32_t GetFlags(void) const override
     {
         return static_cast<uint32_t>(Ashita::PluginFlags::UseCommands | Ashita::PluginFlags::UseText |
-                                     Ashita::PluginFlags::UsePackets | Ashita::PluginFlags::UseDirect3D);
+                                     Ashita::PluginFlags::UsePackets | Ashita::PluginFlags::UseDirect3D |
+                                     Ashita::PluginFlags::UsePluginEvents);
+    }
+
+    // xilinux's report, raised in its own Present: kept for the Memory widget, and nothing of the bar touched here.
+    void HandleEvent(const char* eventName, const void* eventData, const uint32_t eventSize) override
+    {
+        try
+        {
+            if (eventName == nullptr || std::strcmp(eventName, headsup::kXiLinuxReportEvent) != 0) return;
+            const headsup::XiLinuxState state{headsup::ReadXiLinuxReport(eventData, eventSize), headsup::OtherXiLinuxVersion(eventData, eventSize)};
+            const std::lock_guard lock(m_XiLinuxLock);
+            m_XiLinux   = state;
+            m_XiLinuxAt = Now();
+        }
+        catch (...)
+        {
+        }
     }
 
     bool Initialize(IAshitaCore* core, ILogManager* logger, const uint32_t id) override
@@ -367,6 +401,7 @@ public:
         g_Plugin     = this;
         g_Resources  = core->GetResourceManager();
         QueryPerformanceFrequency(&m_QpcFrequency);
+        m_UnderWine = UnderWine();
         IConfigurationManager* config = core->GetConfigurationManager();
         m_Store.config                = config;
         m_MenuWidth                   = config->GetFloat(kBootConfig, kRegistry, kMenuWidth, 0.0f);
@@ -1808,6 +1843,61 @@ private:
         m_Pointer.Animate();
     }
 
+    static bool UnderWine()
+    {
+        HKEY key       = nullptr;
+        const bool wine = RegOpenKeyExA(HKEY_CURRENT_USER, kWineKey, 0, KEY_READ, &key) == ERROR_SUCCESS;
+        if (key != nullptr) RegCloseKey(key);
+        return wine;
+    }
+
+    // The process's VirtualSize, which Wine takes from Linux's own count of what is mapped; nothing when ntdll will not say.
+    static std::optional<uint64_t> VirtualSizeNow()
+    {
+        using QueryFn     = LONG(WINAPI*)(HANDLE, ULONG, PVOID, ULONG, PULONG);
+        static const auto query = reinterpret_cast<QueryFn>(reinterpret_cast<void*>(GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtQueryInformationProcess")));
+        VM_COUNTERS counters{};
+        if (query == nullptr || query(GetCurrentProcess(), kProcessVmCounters, &counters, sizeof counters, nullptr) != 0) return std::nullopt;
+        return counters.VirtualSize;
+    }
+
+    static double Seconds(const FILETIME& time)
+    {
+        constexpr double kTicksPerSecond = 1e7; // FILETIME counts 100 ns
+        return static_cast<double>((static_cast<uint64_t>(time.dwHighDateTime) << 32) | time.dwLowDateTime) / kTicksPerSecond;
+    }
+
+    // The space walked a few regions a frame, and the process's size and processor time read once a second, while the
+    // Memory widget shows; the meter is fed with its popup shut too, so it has a figure when the popup opens.
+    void GatherMemory(double now, headsup::BarState& s, bool cpu)
+    {
+        m_SpaceWalk.Step(
+            now,
+            [](uint64_t at) -> std::optional<headsup::Region> {
+                MEMORY_BASIC_INFORMATION info{};
+                if (at >= kSpaceEnd || VirtualQuery(reinterpret_cast<void*>(static_cast<uintptr_t>(at)), &info, sizeof info) == 0)
+                    return std::nullopt;
+                return headsup::Region{reinterpret_cast<uintptr_t>(info.BaseAddress), info.RegionSize, info.State == MEM_FREE};
+            },
+            kQueriesPerFrame);
+        if (m_Cpu.Wants(now))
+        {
+            FILETIME created{}, exited{}, kernel{}, user{};
+            if (GetProcessTimes(GetCurrentProcess(), &created, &exited, &kernel, &user)) m_Cpu.Add(now, Seconds(kernel) + Seconds(user));
+            m_Mapped = VirtualSizeNow();
+        }
+        if (const std::optional<headsup::FreeSpace> space = m_SpaceWalk.Last(); space && m_Mapped)
+            s.memory = headsup::MemoryOf(*space, *m_Mapped, m_UnderWine);
+        if (cpu) s.cpuPercent = m_Cpu.Percent();
+    }
+
+    headsup::XiLinuxState XiLinuxNow(double now)
+    {
+        const std::lock_guard lock(m_XiLinuxLock);
+        if (!m_XiLinuxAt || now - *m_XiLinuxAt >= kXiLinuxStaleSeconds) return {};
+        return m_XiLinux;
+    }
+
     headsup::BarState BarStateNow(double now)
     {
         const headsup::BarNeeds needs = headsup::NeedsOf(m_Settings, m_BarInput.Open());
@@ -1870,6 +1960,8 @@ private:
                     party->GetMemberMPPercent(m), zone, zone == m_Zone};
             }
         }
+        if (needs.memory) GatherMemory(now, s, needs.cpu);
+        if (needs.xilinux) s.xilinux = XiLinuxNow(now);
         if (needs.signet)
         {
             IPlayer* player = m_AshitaCore->GetMemoryManager()->GetPlayer();
