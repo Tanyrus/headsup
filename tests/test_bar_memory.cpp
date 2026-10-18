@@ -35,9 +35,9 @@ namespace
         return colors;
     }
 
-    XiLinuxReport TwoAddons()
+    LinuxXIReport TwoAddons()
     {
-        XiLinuxReport r;
+        LinuxXIReport r;
         r.flags      = kPoolHooked | kPoolOn | kGraceActive | kGraceOn;
         r.copiesHeld = 588, r.copiesPeak = 1348, r.chunks = 3, r.chunksPeak = 4, r.chunkMb = 4;
         r.releasesHeldBack = 2055, r.releasesWaiting = 1, r.addonsStepped = 25, r.addonsNotLoaded = 3;
@@ -117,18 +117,18 @@ TEST(the_widget_turns_amber_then_red_as_the_space_left_runs_low)
 
 TEST(the_popup_has_the_space_the_processor_and_the_frames)
 {
-    const PopupContent popup = MemoryPopup(MemoryReport{1532, 2563, 4095}, 18.0, FrameReport{1000.0 / 30.0, 120.0}, XiLinuxState{});
+    const PopupContent popup = MemoryPopup(MemoryReport{1532, 2563, 4095}, 18.0, FrameReport{1000.0 / 30.0, 120.0}, LinuxXIState{});
     const std::vector<std::string> cells = Cells(popup);
     CHECK(Has(cells, "1,532") && Has(cells, "2,563") && Has(cells, "4,095"));
     CHECK(Has(cells, "18%") && Has(cells, "30 fps") && Has(cells, "33.3 ms") && Has(cells, "120.0 ms"));
     CHECK(!Has(cells, "xiui"));
-    const std::vector<std::string> unread = Cells(MemoryPopup(MemoryReport{1532, 2563, 4095}, std::nullopt, std::nullopt, XiLinuxState{}));
+    const std::vector<std::string> unread = Cells(MemoryPopup(MemoryReport{1532, 2563, 4095}, std::nullopt, std::nullopt, LinuxXIState{}));
     CHECK(!Has(unread, "%") && !Has(unread, "fps"));
 }
 
-TEST(the_popup_lists_what_xilinux_reports_with_each_addon_largest_first)
+TEST(the_popup_lists_what_linuxxi_reports_with_each_addon_largest_first)
 {
-    const PopupContent popup = MemoryPopup(MemoryReport{1532, 2563, 4095}, 18.0, std::nullopt, XiLinuxState{TwoAddons(), std::nullopt});
+    const PopupContent popup = MemoryPopup(MemoryReport{1532, 2563, 4095}, 18.0, std::nullopt, LinuxXIState{TwoAddons(), std::nullopt});
     const std::vector<std::string> cells = Cells(popup);
     CHECK(Has(cells, "588") && Has(cells, "1,348") && Has(cells, "12 MB") && Has(cells, "2,055"));
     std::vector<std::string> addons;
@@ -138,12 +138,12 @@ TEST(the_popup_lists_what_xilinux_reports_with_each_addon_largest_first)
     CHECK(Has(cells, "41.2 MB")); // the two together
 }
 
-TEST(a_fix_xilinux_has_switched_off_or_not_started_says_so_in_amber)
+TEST(a_fix_linuxxi_has_switched_off_or_not_started_says_so_in_amber)
 {
-    XiLinuxReport off = TwoAddons();
+    LinuxXIReport off = TwoAddons();
     off.flags         = kPoolHooked | kGraceActive; // both switched off
     std::vector<uint32_t> amber;
-    for (const PopupSection& section : MemoryPopup(std::nullopt, std::nullopt, std::nullopt, XiLinuxState{off, std::nullopt}).sections)
+    for (const PopupSection& section : MemoryPopup(std::nullopt, std::nullopt, std::nullopt, LinuxXIState{off, std::nullopt}).sections)
         for (const PopupRow& row : section.rows)
             for (const PopupCell& cell : row.cells)
                 for (const Span& span : cell.text)
@@ -154,6 +154,6 @@ TEST(a_fix_xilinux_has_switched_off_or_not_started_says_so_in_amber)
 TEST(a_report_of_another_version_names_the_version)
 {
     const std::vector<std::string> cells =
-        Cells(MemoryPopup(MemoryReport{1532, 2563, 4095}, std::nullopt, std::nullopt, XiLinuxState{std::nullopt, 7}));
+        Cells(MemoryPopup(MemoryReport{1532, 2563, 4095}, std::nullopt, std::nullopt, LinuxXIState{std::nullopt, 7}));
     CHECK(Has(cells, "7"));
 }

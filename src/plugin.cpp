@@ -34,7 +34,7 @@
 #include "shot_watch.h"
 #include "tracker.h"
 #include "window_file.h"
-#include "xilinux_report.h"
+#include "linuxxi_report.h"
 #ifdef HEADSUP_DEV
 #include "codedump.h"
 #include "drawdump.h"
@@ -79,7 +79,7 @@ namespace
     constexpr const char* kFolder            = "headsup"; // inside Ashita's config and logs folders
     constexpr int kQueriesPerFrame           = 128;      // VirtualQuery calls a frame while the Memory widget shows
     constexpr uint64_t kSpaceEnd             = uint64_t{1} << 32;
-    constexpr double kXiLinuxStaleSeconds    = 3.0;      // xilinux reports once a second; three missed and it is gone
+    constexpr double kLinuxXIStaleSeconds    = 3.0;      // LinuxXI reports once a second; three missed and it is gone
     // Proton hides ntdll's wine_get_version from the game; every Wine prefix has this key.
     constexpr const char* kWineKey           = "Software\\Wine";
     constexpr ULONG kProcessVmCounters       = 3;        // NtQueryInformationProcess's class for VM_COUNTERS
@@ -277,9 +277,9 @@ class HeadsUp final : public IPlugin
     headsup::CpuMeter m_Cpu;
     std::optional<uint64_t> m_Mapped; // the process's VirtualSize, read with the processor time
     bool m_UnderWine = false;
-    std::mutex m_XiLinuxLock;
-    headsup::XiLinuxState m_XiLinux;
-    std::optional<double> m_XiLinuxAt; // when it came
+    std::mutex m_LinuxXILock;
+    headsup::LinuxXIState m_LinuxXI;
+    std::optional<double> m_LinuxXIAt; // when it came
     bool m_HooksTried = false;
     bool m_PointerFailed = false; // said once; tried again when the setting changes or the folder is read again
     std::pair<headsup::PointerIcon, std::string> m_PointerFor; // the icon and file the pointer was started for
@@ -377,16 +377,16 @@ public:
                                      Ashita::PluginFlags::UsePluginEvents);
     }
 
-    // xilinux's report, raised in its own Present: kept for the Memory widget, and nothing of the bar touched here.
+    // LinuxXI's report, raised in its own Present: kept for the Memory widget, and nothing of the bar touched here.
     void HandleEvent(const char* eventName, const void* eventData, const uint32_t eventSize) override
     {
         try
         {
-            if (eventName == nullptr || std::strcmp(eventName, headsup::kXiLinuxReportEvent) != 0) return;
-            const headsup::XiLinuxState state{headsup::ReadXiLinuxReport(eventData, eventSize), headsup::OtherXiLinuxVersion(eventData, eventSize)};
-            const std::lock_guard lock(m_XiLinuxLock);
-            m_XiLinux   = state;
-            m_XiLinuxAt = Now();
+            if (eventName == nullptr || std::strcmp(eventName, headsup::kLinuxXIReportEvent) != 0) return;
+            const headsup::LinuxXIState state{headsup::ReadLinuxXIReport(eventData, eventSize), headsup::OtherLinuxXIVersion(eventData, eventSize)};
+            const std::lock_guard lock(m_LinuxXILock);
+            m_LinuxXI   = state;
+            m_LinuxXIAt = Now();
         }
         catch (...)
         {
@@ -1891,11 +1891,11 @@ private:
         if (cpu) s.cpuPercent = m_Cpu.Percent();
     }
 
-    headsup::XiLinuxState XiLinuxNow(double now)
+    headsup::LinuxXIState LinuxXINow(double now)
     {
-        const std::lock_guard lock(m_XiLinuxLock);
-        if (!m_XiLinuxAt || now - *m_XiLinuxAt >= kXiLinuxStaleSeconds) return {};
-        return m_XiLinux;
+        const std::lock_guard lock(m_LinuxXILock);
+        if (!m_LinuxXIAt || now - *m_LinuxXIAt >= kLinuxXIStaleSeconds) return {};
+        return m_LinuxXI;
     }
 
     headsup::BarState BarStateNow(double now)
@@ -1961,7 +1961,7 @@ private:
             }
         }
         if (needs.memory) GatherMemory(now, s, needs.cpu);
-        if (needs.xilinux) s.xilinux = XiLinuxNow(now);
+        if (needs.linuxxi) s.linuxxi = LinuxXINow(now);
         if (needs.signet)
         {
             IPlayer* player = m_AshitaCore->GetMemoryManager()->GetPlayer();

@@ -68,7 +68,7 @@ namespace headsup
         std::optional<SignetState> signet; // nullopt while neither is on
         std::optional<MemoryReport> memory; // nullopt before the first whole walk of the space
         std::optional<double> cpuPercent;   // of one core; nullopt before two samples
-        XiLinuxState xilinux;
+        LinuxXIState linuxxi;
     };
 
     // The parts of BarState that the shown widgets and the open popup read, for the plugin to gather only those; it
@@ -88,7 +88,7 @@ namespace headsup
         bool signet     = false; // read with the clock, which its timer counts from
         bool memory     = false;
         bool cpu        = false;
-        bool xilinux    = false;
+        bool linuxxi    = false;
         int containers = 0; // bags from 0 up to this
     };
     BarNeeds NeedsOf(const Settings& settings, std::optional<BarWidget> open);

@@ -741,7 +741,7 @@ namespace headsup
         needs.signet     = shown(BarWidget::Signet);
         needs.memory     = shown(BarWidget::Memory);
         needs.cpu        = memoryPopup;
-        needs.xilinux    = memoryPopup;
+        needs.linuxxi    = memoryPopup;
         // Ashita counts a container's items by walking its slots, so the others wait for the popup that lists them.
         if (shown(BarWidget::Bags)) needs.containers = open == BarWidget::Bags ? kContainerCount : 1;
         return needs;
@@ -1053,7 +1053,7 @@ namespace headsup
             return SignetPopup(state.signet, state.zone);
         case BarWidget::Distance: break;
         case BarWidget::Memory:
-            return MemoryPopup(state.memory, state.cpuPercent, state.frames, state.xilinux);
+            return MemoryPopup(state.memory, state.cpuPercent, state.frames, state.linuxxi);
         }
         return popup;
     }

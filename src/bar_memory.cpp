@@ -39,9 +39,9 @@ namespace headsup
             return Text(std::move(figures));
         }
 
-        void AddXiLinux(std::vector<PopupSection>& sections, const XiLinuxReport& r)
+        void AddLinuxXI(std::vector<PopupSection>& sections, const LinuxXIReport& r)
         {
-            PopupSection fixes{"xilinux", {}};
+            PopupSection fixes{"LinuxXI", {}};
             fixes.rows.push_back(Labeled("Packet copies",
                 FixSpan(r.flags, kPoolHooked, kPoolOn, Grouped(r.copiesHeld) + " (" + Grouped(r.copiesPeak) + " at most)")));
             if ((r.flags & kPoolHooked) != 0)
@@ -104,7 +104,7 @@ namespace headsup
     }
 
     PopupContent MemoryPopup(const std::optional<MemoryReport>& memory, std::optional<double> cpuPercent,
-        const std::optional<FrameReport>& frames, const XiLinuxState& xilinux)
+        const std::optional<FrameReport>& frames, const LinuxXIState& linuxxi)
     {
         PopupContent popup;
         popup.title = ListOf(Text("Memory"));
@@ -127,11 +127,11 @@ namespace headsup
             processor.rows.push_back(Labeled("Slowest frame", Text(Printed("%.1f ms", frames->slowestMs))));
         }
         if (!processor.rows.empty()) popup.sections.push_back(std::move(processor));
-        if (xilinux.report)
-            AddXiLinux(popup.sections, *xilinux.report);
-        else if (xilinux.otherVersion)
-            popup.sections.push_back(PopupSection{"xilinux", ListOf(LineOf("It sends report version " + std::to_string(*xilinux.otherVersion) +
-                                                                     "; this HeadsUp reads " + std::to_string(kXiLinuxReportVersion) + ".", Tone::Dim))});
+        if (linuxxi.report)
+            AddLinuxXI(popup.sections, *linuxxi.report);
+        else if (linuxxi.otherVersion)
+            popup.sections.push_back(PopupSection{"LinuxXI", ListOf(LineOf("It sends report version " + std::to_string(*linuxxi.otherVersion) +
+                                                                     "; this HeadsUp reads " + std::to_string(kLinuxXIReportVersion) + ".", Tone::Dim))});
         return popup;
     }
 }

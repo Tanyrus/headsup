@@ -3,7 +3,7 @@
 #include "address_space.h"
 #include "bar_content.h"
 #include "bar_fps.h"
-#include "xilinux_report.h"
+#include "linuxxi_report.h"
 
 #include <optional>
 
@@ -34,15 +34,15 @@ namespace headsup
     };
     Headroom HeadroomOf(const MemoryReport& memory);
 
-    // What xilinux last reported, while it still reports, or the version it sends when this HeadsUp cannot read it.
-    struct XiLinuxState
+    // What LinuxXI last reported, while it still reports, or the version it sends when this HeadsUp cannot read it.
+    struct LinuxXIState
     {
-        std::optional<XiLinuxReport> report;
+        std::optional<LinuxXIReport> report;
         std::optional<uint32_t> otherVersion;
-        bool operator==(const XiLinuxState&) const = default;
+        bool operator==(const LinuxXIState&) const = default;
     };
 
     WidgetContent MemoryWidget(const std::optional<MemoryReport>& memory);
     PopupContent MemoryPopup(const std::optional<MemoryReport>& memory, std::optional<double> cpuPercent,
-        const std::optional<FrameReport>& frames, const XiLinuxState& xilinux);
+        const std::optional<FrameReport>& frames, const LinuxXIState& linuxxi);
 }
