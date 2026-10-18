@@ -19,6 +19,8 @@ namespace headsup
         kPoolOn       = 2,
         kGraceActive  = 4, // Direct3D's releases are held back
         kGraceOn      = 8,
+        kLocaleActive = 16, // sandbox's registry compares keep to the C locale
+        kLocaleOn     = 32,
     };
 
     struct LinuxXIAddon

@@ -151,6 +151,25 @@ TEST(a_fix_linuxxi_has_switched_off_or_not_started_says_so_in_amber)
     CHECK(amber.size() == 2);
 }
 
+TEST(the_locale_fix_is_amber_only_while_switched_off)
+{
+    const auto amberOf = [](uint32_t flags) {
+        LinuxXIReport r = TwoAddons();
+        r.flags         = flags;
+        size_t amber    = 0;
+        for (const PopupSection& section : MemoryPopup(std::nullopt, std::nullopt, std::nullopt, LinuxXIState{r, std::nullopt}).sections)
+            for (const PopupRow& row : section.rows)
+                for (const PopupCell& cell : row.cells)
+                    for (const Span& span : cell.text)
+                        if (span.tone == Tone::Own && span.argb == kWarningColor) ++amber;
+        return amber;
+    };
+    const uint32_t others = kPoolHooked | kPoolOn | kGraceActive | kGraceOn;
+    CHECK(amberOf(others | kLocaleActive) == 1);
+    CHECK(amberOf(others | kLocaleActive | kLocaleOn) == 0);
+    CHECK(amberOf(others) == 0); // not in use: sandbox is not in the game
+}
+
 TEST(a_report_of_another_version_names_the_version)
 {
     const std::vector<std::string> cells =

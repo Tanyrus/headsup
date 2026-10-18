@@ -49,6 +49,7 @@ namespace headsup
             fixes.rows.push_back(Labeled("Releases held back",
                 FixSpan(r.flags, kGraceActive, kGraceOn, Grouped(r.releasesHeldBack) + " (" + Grouped(r.releasesWaiting) + " waiting)")));
             fixes.rows.push_back(Labeled("Addons stepped", Text(Grouped(r.addonsStepped) + " (" + Grouped(r.addonsNotLoaded) + " not loaded)")));
+            fixes.rows.push_back(Labeled("Registry compares", FixSpan(r.flags, kLocaleActive, kLocaleOn, "C locale")));
             sections.push_back(std::move(fixes));
             if (r.addonCount == 0) return;
             PopupSection lua{"Lua memory", {}};
