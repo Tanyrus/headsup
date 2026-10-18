@@ -755,7 +755,8 @@
         {"name": "Connection", "tip": "Bytes sent and received each second; amber or red when data stops. Hover for latency."},
         {"name": "Party", "tip": "Party size and the lowest HP and MP. Hover for each member."},
         {"name": "Signet", "tip": "Time left on Signet or Sanction, while one is on."},
-        {"name": "Distance", "tip": "How far your target is, in yalms."}
+        {"name": "Distance", "tip": "How far your target is, in yalms."},
+        {"name": "Memory", "tip": "The game's memory used, over what is left before it runs out at 4 GB; amber, then red, as it runs low. Hover for the processor, the frames and the xilinux plugin's figures."}
       ]
     },
     {

@@ -10,13 +10,13 @@ namespace headsup
     namespace
     {
         const char* const kWidgetNames[] = {"zone", "weather", "vanaTime", "target", "gil", "bags", "earthTime", "gameHelp",
-            "fps", "job", "connection", "party", "signet", "distance"};
+            "fps", "job", "connection", "party", "signet", "distance", "memory"};
         static_assert(std::size(kWidgetNames) == kBarWidgetCount); // by BarWidget
         constexpr BarWidget kDefaultLeft[]   = {BarWidget::Zone, BarWidget::Weather, BarWidget::VanaTime, BarWidget::Job,
             BarWidget::Party, BarWidget::Signet, BarWidget::Distance};
         constexpr BarWidget kDefaultCenter[] = {BarWidget::Target};
-        constexpr BarWidget kDefaultRight[]  = {BarWidget::Gil, BarWidget::Bags, BarWidget::Connection, BarWidget::Fps,
-            BarWidget::EarthTime};
+        constexpr BarWidget kDefaultRight[]  = {BarWidget::Gil, BarWidget::Bags, BarWidget::Connection, BarWidget::Memory,
+            BarWidget::Fps, BarWidget::EarthTime};
         static_assert(std::size(kDefaultLeft) + std::size(kDefaultCenter) + std::size(kDefaultRight) ==
                       kPlacedWidgetCount);
 
