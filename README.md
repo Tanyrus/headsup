@@ -19,8 +19,6 @@ opens them at a page, such as `/hu menu entities`, `/hu menu mobs` or `/hu menu 
 > Phoenix version it was built from, so a monster changed on the live server since then can show the wrong color,
 > level or icons, a changed zone the wrong name, region or forecast, and a changed title the wrong title.
 
-> **About its development:** HeadsUp is developed with the assistance of AI.
-
 ![Settings window](resources/settings.png)
 
 ## Settings
@@ -377,3 +375,7 @@ it and leaves every other window in place.
 The weakness, resistance, status and immunity badges appear only if a line of a mob's nameplate holds their tags. The
 target popup shows the same data. On the Mobs page, the Detection, Badges, Weaknesses and Statuses cards set what those
 tags show.
+
+## Development
+
+HeadsUp is developed with the assistance of AI.
