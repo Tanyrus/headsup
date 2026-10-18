@@ -5,10 +5,11 @@
 
 namespace headsup
 {
-    // What the LinuxXI plugin sends every plugin once a second through Ashita's plugin events, for the Memory widget.
+    // What the LinuxXI plugin sends every plugin through Ashita's plugin events, for the Memory widget.
     // Fixed-width fields alone, so its 32-bit build and the tests' 64-bit one agree; a field added goes before lua
     // with the version raised, and a reader of the old version then refuses it by its size.
     constexpr const char* kLinuxXIReportEvent = "linuxxi_report";
+    constexpr double kLinuxXIReportSeconds    = 1.0; // how often it is raised
     constexpr uint32_t kLinuxXIReportVersion  = 1;
     constexpr uint32_t kLinuxXIAddons         = 64;
     constexpr uint32_t kLinuxXINameChars      = 32; // with its terminator

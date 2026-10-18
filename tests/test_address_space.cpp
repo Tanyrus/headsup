@@ -44,6 +44,13 @@ TEST(a_walk_sums_the_free_regions_and_ends_where_the_space_does)
     CHECK((walk.Last() == FreeSpace{100 * kMb, 200 * kMb}));
 }
 
+TEST(a_whole_walk_in_one_call_gives_what_a_walk_in_steps_does)
+{
+    FakeSpace space = Space({{1, true}, {1, false}, {1, true}, {1, false}, {1, true}, {1, false}, {1, true}});
+    CHECK((WholeFreeSpace(space) == FreeSpace{4 * kMb, 7 * kMb}));
+    CHECK_EQ(space.asked, 8); // each region once, and the space's end
+}
+
 TEST(a_walk_takes_as_many_calls_as_its_budget_needs_and_reports_only_once_whole)
 {
     FakeSpace space = Space({{1, true}, {1, false}, {1, true}, {1, false}, {1, true}, {1, false}, {1, true}});

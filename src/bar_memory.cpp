@@ -6,17 +6,13 @@ namespace headsup
 {
     namespace
     {
-        constexpr uint32_t kKbPerMb = 1024, kMbPerGb = 1024;
+        constexpr uint32_t kMbPerGb = 1024;
         constexpr int kLuaColumns  = 4; // two addons a row, each a name and its size
 
         std::string MbText(uint32_t mb) { return Grouped(mb) + " MB"; }
         std::string LeftText(uint32_t mb)
         {
             return mb >= kMbPerGb ? Printed("%.1f GB", static_cast<double>(mb) / kMbPerGb) : MbText(mb);
-        }
-        std::string KbText(uint64_t kb)
-        {
-            return kb >= kKbPerMb ? Printed("%.1f MB", static_cast<double>(kb) / kKbPerMb) : Grouped(static_cast<uint32_t>(kb)) + " KB";
         }
 
         // The space left, in the color of how little it is.

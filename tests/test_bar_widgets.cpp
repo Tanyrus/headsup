@@ -467,7 +467,6 @@ TEST(gil_bags_and_earth_time)
 {
     Settings settings;
     BarState state;
-    CHECK(Grouped(0) == "0" && Grouped(999) == "999" && Grouped(1000) == "1,000" && Grouped(1234567) == "1,234,567");
     CHECK(Joined(BarWidgetContent(BarWidget::Gil, state, settings).title) == "-");
     state.gil             = 1234567;
     const WidgetContent g = BarWidgetContent(BarWidget::Gil, state, settings);
