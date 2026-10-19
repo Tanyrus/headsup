@@ -224,6 +224,11 @@ namespace headsup
 
     void Form::CheckAt(const char* id, bool& on, const char* tip) { Check(id, on, tip); }
 
+    void Form::ToggleAt(const char* id, bool& on, const char* offWord, const char* onWord)
+    {
+        Check(id, on, nullptr, kWordedCheck, offWord, onWord);
+    }
+
     void Form::Switch(const char* label, bool& on, const char* tip, const char* offWord, const char* onWord)
     {
         Row(label, tip);

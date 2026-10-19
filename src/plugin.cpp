@@ -131,6 +131,8 @@ namespace
     bool g_BarHidden                = false;
     float g_BarScaleX               = 1.0f; // back-buffer pixels per client pixel
     float g_BarScaleY               = 1.0f;
+    float g_MenuScaleX              = 1.0f; // the game's menu pixels per client pixel
+    float g_MenuScaleY              = 1.0f;
     IResourceManager* g_Resources   = nullptr; // for the target popup's drops, from Initialize to Release
     headsup::RmlHost* g_Rml         = nullptr; // for OnMouse and OnKeyboard, from Initialize to Release
 
@@ -199,6 +201,13 @@ namespace
             g_BarClicks->Take(message, static_cast<uint32_t>(wParam), x, y, g_BarOn && !g_BarHidden, overGui, blocked))
             return TRUE;
         if (overRml) return TRUE;
+        // A window the player hides takes no click, which the game would act on unseen; an Ashita window over it does.
+        if (!blocked &&
+            headsup::SwallowsClick(message, static_cast<int>(static_cast<float>(static_cast<int16_t>(LOWORD(lParam))) * g_MenuScaleX),
+                static_cast<int>(static_cast<float>(static_cast<int16_t>(HIWORD(lParam))) * g_MenuScaleY),
+                headsup::WindowHook::HiddenRects()) &&
+            !(g_Gui != nullptr && g_Gui->GetIO().WantCaptureMouse))
+            return TRUE;
         if (!g_SyncClicks) return FALSE;
         // The game takes a click where its pointer last was, which is somewhere else after the mouse moved over another
         // window: a mouse move to the click's place goes first.
@@ -336,6 +345,7 @@ class HeadsUp final : public IPlugin
     float m_MenuWidth   = 0.0f;
     // The windows the hook moves, as last given it (none until the first frame), and those it has seen.
     std::vector<headsup::ViewShift> m_PlacedShifts;      // what the window hook was last given
+    std::vector<std::string> m_HiddenWindows;  // the windows the hook was last told to hide
     std::vector<headsup::WindowOffset> m_PlacedOffsets;
     std::optional<std::string> m_WindowLog;   // /hu windowlog's file, while it runs
     std::vector<std::string> m_LastOpen;      // the open windows it wrote last // what the window hook has: the settings' windows and groups
@@ -746,6 +756,12 @@ public:
                 static_cast<uint32_t>(second.size()), second.data());
             m_GameState.CurrencyRequested(now);
         }
+        if (RECT client{}; g_GameWindow != nullptr && GetClientRect(g_GameWindow, &client) && client.right > 0 &&
+                           client.bottom > 0 && m_MenuWidth > 0.0f && m_MenuHeight > 0.0f)
+        {
+            g_MenuScaleX = m_MenuWidth / static_cast<float>(client.right);
+            g_MenuScaleY = m_MenuHeight / static_cast<float>(client.bottom);
+        }
         if (RECT client{}; g_BarOn && g_GameWindow != nullptr && GetClientRect(g_GameWindow, &client) &&
                            client.right > 0 && client.bottom > 0)
         {
@@ -773,7 +789,8 @@ public:
         const std::optional<headsup::HelpBand> band = HelpBandNow();
         const auto mode         = static_cast<size_t>(headsup::WindowHelpMode(m_Settings));
         const bool movesWindows = (band && band->bottom != 0 && m_Settings.shiftVanillaUi) ||
-                                  !m_Settings.windowOffsets.empty() || m_Settings.moveGameHelp;
+                                  !m_Settings.windowOffsets.empty() || m_Settings.moveGameHelp ||
+                                  !m_Settings.hiddenWindows.empty();
         if ((hidden.Any() || movesWindows) && !std::exchange(m_WindowHookTried, true))
         {
             if (const std::string failure = m_WindowHook.Start(); !failure.empty())
@@ -792,6 +809,11 @@ public:
                                       .shift        = m_Settings.shiftVanillaUi,
                                       .moveGameHelp = m_Settings.moveGameHelp && !m_Settings.hideHelpBar})
                                 : std::nullopt);
+        if (m_Settings.hiddenWindows != m_HiddenWindows)
+        {
+            m_HiddenWindows = m_Settings.hiddenWindows;
+            m_WindowHook.HideWindows(m_HiddenWindows);
+        }
         if (m_Settings.viewShifts[mode] != m_PlacedShifts)
         {
             m_PlacedShifts = m_Settings.viewShifts[mode];
@@ -928,6 +950,7 @@ public:
         UNREFERENCED_PARAMETER(startVertex);
         if (Ours()) return false;
         RecordDraw('P', type, primCount, nullptr, 0u, 0u, 0u);
+        if (InSilentDraw()) return true;
         DrawNameplatesBeforeSceneCopy();
         return false;
     }
@@ -936,6 +959,7 @@ public:
     {
         if (Ours()) return false;
         RecordDraw('I', type, primCount, nullptr, 0u, 0u, 0u);
+        if (InSilentDraw()) return true;
         DrawNameplatesBeforeSceneCopy();
         const bool outlines = m_Settings.enabled && m_Tracker.OutlinedCount() > 0;
         const bool bodies   = headsup::NameplatesOn(m_Settings) && !m_Tracker.Actors().empty(); // labels wait for a drawn body
@@ -954,6 +978,7 @@ public:
     {
         if (Ours()) return false;
         RecordDraw('U', type, primCount, vertices, stride, 0u, headsup::VertexCount(type, primCount));
+        if (InSilentDraw()) return true;
         DrawNameplatesBeforeSceneCopy();
         m_Names.OnDrawUP(m_Tracker, m_Settings);
         if (!InterfaceCopy(type, primCount, vertices, stride)) return false;
@@ -970,6 +995,7 @@ public:
         UNREFERENCED_PARAMETER(indexFormat);
         if (Ours()) return false;
         RecordDraw('X', type, primCount, vertices, stride, minIndex, numVertices);
+        if (InSilentDraw()) return true;
         DrawNameplatesBeforeSceneCopy();
         return false;
     }
@@ -1010,6 +1036,14 @@ private:
         m_DrawDump.Record(m_Device, m_Tracker, hook, type, count, vertices, stride, firstVertex, vertexCount);
 #endif
     }
+    // A draw call inside a window the player hides: dropped, and marked in a draw dump.
+    bool InSilentDraw()
+    {
+        if (!headsup::WindowHook::Silent()) return false;
+        MarkHidden();
+        return true;
+    }
+
     void MarkHidden()
     {
 #ifdef HEADSUP_DEV

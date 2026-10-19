@@ -744,7 +744,7 @@ TEST(auto_adjust_places_the_views_under_the_line_the_windows_last_went_under)
 {
     Window w;
     w.state.page = Page::UserInterface;
-    const char* button = "userinterface-game-windows-auto-adjust";
+    const char* button = "userinterface-base-game-ui-auto-adjust";
     const Settings before = w.settings;
     w.Pass({{button, kClickEvent, ""}}); // no frame of windows placed yet
     CHECK(w.settings == before);
@@ -768,11 +768,29 @@ TEST(shift_vanilla_ui_is_the_top_panels_one_switch_and_off_leaves_auto_adjust_no
     w.readings.windowsBand = 80;
     w.readings.barBand     = 50;
     const Settings before  = w.settings;
-    w.Pass({{"userinterface-game-windows-auto-adjust", kClickEvent, ""}});
+    w.Pass({{"userinterface-base-game-ui-auto-adjust", kClickEvent, ""}});
     CHECK(w.settings == before);
     const Form page = w.Pass();
-    CHECK(At(Block(page, "userinterface-game-windows"), "userinterface-game-windows-move-windows") == std::string::npos);
-    CHECK(At(Block(page, "userinterface-game-windows"), "userinterface-game-windows-keep-clear") == std::string::npos);
+    CHECK(At(Block(page, "userinterface-base-game-ui"), "userinterface-base-game-ui-move-windows") == std::string::npos);
+    CHECK(At(Block(page, "userinterface-base-game-ui"), "userinterface-base-game-ui-keep-clear") == std::string::npos);
+}
+
+TEST(a_window_set_to_hide_goes_on_the_hidden_list_and_shows_no_place_until_kept_again)
+{
+    Window w;
+    w.state.page     = Page::UserInterface;
+    const char* keep = "userinterface-base-game-ui-keep-statcom";
+    const auto place = [](const Form& form) {
+        return At(Block(form, "userinterface-base-game-ui"), "userinterface-base-game-ui-x-statcom") != std::string::npos;
+    };
+    const Form kept = w.Pass();
+    CHECK(ClassOn(kept, keep, "on") && place(kept));
+    CHECK(w.Pass({{keep, kClickEvent, ""}}).changed);
+    CHECK((w.settings.hiddenWindows == std::vector<std::string>{"statcom"}));
+    const Form hidden = w.Pass();
+    CHECK(!ClassOn(hidden, keep, "on") && !place(hidden));
+    w.Pass({{keep, kClickEvent, ""}});
+    CHECK(w.settings.hiddenWindows.empty() && place(w.Pass()));
 }
 
 TEST(the_nameplate_fonts_lead_with_the_games_font_and_the_top_panels_leave_it_out)

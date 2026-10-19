@@ -684,6 +684,28 @@ namespace headsup
         return text;
     }
 
+    std::vector<std::string> HiddenWindowsFrom(std::string_view text)
+    {
+        std::vector<std::string> names;
+        while (!text.empty() && names.size() < kMaxWindowKeys)
+        {
+            const size_t end = std::min(text.find(' '), text.size());
+            const std::string_view name = text.substr(0, end);
+            text.remove_prefix(std::min(end + 1, text.size()));
+            const std::optional<WindowKey> key = KeyFromShortName(name);
+            if (key && MovableWindow(*key) && std::ranges::find(names, name) == names.end()) names.emplace_back(name);
+        }
+        return names;
+    }
+
+    std::string HiddenWindowsText(const std::vector<std::string>& names)
+    {
+        std::string text;
+        for (const std::string& name : names)
+            text += (text.empty() ? "" : " ") + name;
+        return text;
+    }
+
     const std::vector<std::string>& AllWindows()
     {
         // Those HeadsUp names first, in its order, then the rest by their names.

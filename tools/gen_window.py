@@ -109,7 +109,7 @@ PIECES = Pieces(
         'visibility': Card(), 'outline-design': Card(), 'nameplate-design': Card(), 'line-style': Card(),
         'ornament': Card(), 'nameplate-opacity': Card(), 'detection-icons': Card(), 'badges': Card(),
         'weaknesses': Card(), 'statuses': Card(), 'placeholder-timers': Card(),
-        'screenshot-mode': Card(), 'window-groups': Card(), 'game-windows': Card(),
+        'screenshot-mode': Card(), 'window-groups': Card(), 'base-game-ui': Card(),
         'top-panel': Card(switch=True), 'help-bar': Card(switch=True), 'widgets': Card(), 'layout': Card(),
         'mouse-pointer': Card(), 'settings-window': Card(), 'reset': Card(), 'debug-mode': Card(switch=True),
     },
@@ -169,7 +169,7 @@ PIECES = Pieces(
         'window-defaults': Setting(unnamed=True, words={'headsup-defaults': True, 'headsup-help': True,
                                                         'game-defaults': True}),
         'window-list': Setting(unnamed=True, words={'note': True, 'find': True, 'name-hint': True, 'all-windows': False,
-                                                    'row-tip': False}),
+                                                    'hide': True, 'keep': True, 'row-tip': False}),
         # Top Panel and Widgets
         'theme': Setting(), 'separators': Setting(options=3), 'title-font': Setting(), 'text-font': Setting(),
         'height': Setting(), 'text-size': Setting(), 'one-line': Setting(options=3), 'popup-size': Setting(),

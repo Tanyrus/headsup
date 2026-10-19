@@ -79,6 +79,9 @@ namespace headsup
         // to the top row, so it lines up with them.
         int For(int windowLeft, int windowRight, int screenRight) const;
     };
+    // A mouse button's message at a point of the menu, in the game's menu pixels, over one of the windows hidden this
+    // frame: kept from the game, which would act on a window no one sees. Moves and the wheel pass.
+    bool SwallowsClick(uint32_t message, int x, int y, std::span<const WindowRect> hidden);
     // What places a frame: the player's shift for its view and where the view's windows start, neither for a frame no
     // view holds.
     struct FramePlan

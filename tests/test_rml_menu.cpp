@@ -782,7 +782,7 @@ TEST(a_box_typed_in_keeps_the_keyboard_when_what_it_filters_is_listed_anew)
 {
     Window window;
     window.Page("userinterface");
-    const std::string find = "userinterface-game-windows-find-window";
+    const std::string find = "userinterface-base-game-ui-find-window";
     window.Click(find);
     for (const char* letter : {"e", "q", "u"})
         window.Type(letter); // a frame after each: the list under the box changes with every letter
@@ -836,7 +836,7 @@ TEST(escape_gives_a_box_back_what_it_held_and_a_click_beside_a_lines_stretches_t
 TEST(every_switch_of_every_page_flips_a_setting_of_its_own_and_flips_it_back)
 {
     // Not settings: what the window itself is showing.
-    const std::vector<std::string> windowsOwn{"userinterface-game-windows-all-windows"};
+    const std::vector<std::string> windowsOwn{"userinterface-base-game-ui-all-windows"};
     for (const LayoutPage& info : kWindowLayout.pages)
     {
         Window window;
@@ -907,7 +907,7 @@ TEST(every_dropdown_slider_row_of_choices_and_number_of_every_page_and_tab_sets_
         for (int pass = 0; pass < 3; ++pass)
             for (Rml::Element* element : window.OfClass("check"))
                 if (!element->GetId().empty() && !element->IsClassSet("on") && window.Shows(element->GetId()) &&
-                    element->GetId() != "userinterface-game-windows-all-windows")
+                    element->GetId() != "userinterface-base-game-ui-all-windows")
                     window.Click(element->GetId());
         const Settings fresh = window.settings;
         const std::map<std::string, std::string> saved = Saved(fresh);

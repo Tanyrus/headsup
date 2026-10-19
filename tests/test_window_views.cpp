@@ -1,4 +1,5 @@
 #include "fake_memory.h"
+#include "mouse_messages.h"
 #include "native_locate.h"
 #include "test.h"
 #include "window_views.h"
@@ -239,6 +240,17 @@ TEST(wide_scan_s_label_under_the_strip_s_title_moves_with_the_frame_s_windows_an
     rect = {16, 38, 128, 68}; // the strip moved, the windows left where the game put them: the label stays too
     LabelPlace(rect, 0, 22);
     CHECK(rect == title);
+}
+
+TEST(a_click_over_a_hidden_window_is_swallowed_and_a_move_or_one_elsewhere_is_not)
+{
+    const std::vector<WindowRect> hidden = {{16, 64, 198, 254}};
+    for (const uint32_t button : {kLeftDown, kLeftUp, kLeftDouble, kRightDown, kRightUp, kMiddleDown, kMiddleUp})
+        CHECK(SwallowsClick(button, 100, 100, hidden));
+    CHECK(!SwallowsClick(kMouseMove, 100, 100, hidden));
+    CHECK(!SwallowsClick(kLeftDown, 10, 10, hidden) && !SwallowsClick(kLeftDown, 198, 100, hidden));
+    CHECK(SwallowsClick(kLeftDown, 16, 64, hidden) && !SwallowsClick(kLeftDown, 100, 254, hidden));
+    CHECK(!SwallowsClick(kLeftDown, 100, 100, {}));
 }
 
 TEST(a_frame_no_view_holds_goes_right_under_the_band_and_a_view_s_to_where_its_windows_start)

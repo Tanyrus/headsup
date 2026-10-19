@@ -214,9 +214,10 @@ namespace headsup
                color(c.muted) + ";transition:left" + kSlide + ",background-color" + kSlide + ";}";
         css += ".check.on .mark{background-color:" + color(c.accent) + ";}";
         for (const auto& [track, width] : {std::pair{".check", kToggleWidth}, std::pair{".check.wide", kControlWidth},
-                 std::pair{".check.card-on", kCardToggleWidth}})
+                 std::pair{".check.card-on", kCardToggleWidth}, std::pair{".check.worded", kCardToggleWidth}})
             css += std::string(track) + ".on .mark{left:" + Em(width - kTogglePeg - kToggleInset) + ";}";
         css += ".check.wide{width:" + control + ";}";
+        css += ".check.worded{width:" + Em(kCardToggleWidth) + ";}";
         // Joined choices. These, tabs, buttons and lists ease between their looks, and the picked one is the gradient.
         css += std::string(".seg,.tab,.btn,.dd,.opt,.wchip{transition:background-color") + kEase + ",border-color" + kEase +
                ",color" + kEase + ";}";

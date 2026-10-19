@@ -30,6 +30,7 @@ extern "C"
     uintptr_t g_HeadsUpWindowDraw = 0;
     void HeadsUpWindowGate();
     __attribute__((used)) uint32_t HeadsUpOnWindowDraw(uint32_t mcd);
+    __attribute__((used)) void HeadsUpAfterWindowDraw();
     BOOL __stdcall HeadsUpWindowRect(HWND window, RECT* rect);
     int __stdcall HeadsUpSystemMetric(int index);
 }
@@ -102,7 +103,8 @@ _HeadsUpArrowGate:
 )");
 
 // Called in place of the menu window draw, a thiscall with ecx the window's MCD and no stack arguments. On 0 it jumps
-// on to the window draw with ecx as it was; otherwise it returns without drawing, and with no arguments to pop.
+// on to the window draw with ecx as it was; on 1 it returns without drawing, with no arguments to pop; on 2 it calls
+// the window draw and tells HeadsUp when it is back, which drops the draw calls made in between (kWindowSilent).
 asm(R"(
     .text
     .p2align 4
@@ -114,9 +116,13 @@ _HeadsUpWindowGate:
     call _HeadsUpOnWindowDraw
     add esp, 4
     pop ecx
-    test eax, eax
-    jnz .LHeadsUpWindowSkip
+    cmp eax, 1
+    je .LHeadsUpWindowSkip
+    ja .LHeadsUpWindowSilent
     jmp dword ptr [_g_HeadsUpWindowDraw]
+.LHeadsUpWindowSilent:
+    call dword ptr [_g_HeadsUpWindowDraw]
+    call _HeadsUpAfterWindowDraw
 .LHeadsUpWindowSkip:
     ret
     .att_syntax prefix
@@ -148,6 +154,14 @@ namespace headsup
         uint32_t g_PickedReturn = 0; // where the candidate's arrow call returns to
         bool g_HideArrows       = false;
         HiddenWindows g_HiddenWindows;
+        // The gate's answers. A silenced window's draw runs, as it also counts down a closing window and marks its
+        // greyed buttons, and the Direct3D calls made inside it are dropped.
+        constexpr uint32_t kWindowDrawn = 0, kWindowSkipped = 1, kWindowSilent = 2;
+        bool g_SilentDraw = false;  // inside a silenced window's draw
+        WindowKeyList g_HiddenKeys; // the windows the player hides
+        // The rectangles of those that drew, in menu pixels: this frame's as they come, and the last whole frame's.
+        std::array<WindowRect, kMaxWindowKeys> g_HiddenRects{}, g_ShownHiddenRects{};
+        size_t g_HiddenRectCount = 0, g_ShownHiddenRectCount = 0;
         std::optional<WindowPlacing> g_Placing; // windows are placed while it is set
         uint32_t g_TitleText = 0;           // the strip title's text object in its owner; 0 when it was not found
         PlacedText g_TitlePlace;
@@ -503,6 +517,7 @@ namespace headsup
         g_TitlePlace         = {};
         const CodePatch call = std::exchange(m_Call, {});
         g_HiddenWindows      = {};
+        g_SilentDraw         = false;
         g_Placing.reset();
         g_PlannedFrame = 0;
         g_PlannedKeys.Clear();
@@ -519,8 +534,21 @@ namespace headsup
 
     void WindowHook::Hide(HiddenWindows hidden) { g_HiddenWindows = hidden; }
 
+    void WindowHook::HideWindows(const std::vector<std::string>& names)
+    {
+        g_HiddenKeys.Clear();
+        for (const std::string& name : names)
+            if (const std::optional<WindowKey> key = KeyFromShortName(name)) g_HiddenKeys.Add(*key);
+    }
+
+    bool WindowHook::Silent() { return g_SilentDraw; }
+
+    std::span<const WindowRect> WindowHook::HiddenRects() { return {g_ShownHiddenRects.data(), g_ShownHiddenRectCount}; }
+
     void WindowHook::NewFrame()
     {
+        g_ShownHiddenRects     = g_HiddenRects;
+        g_ShownHiddenRectCount = std::exchange(g_HiddenRectCount, 0);
         g_Placements.SetFrame(++g_WindowFrame);
         if (g_Placing && g_WindowMoveTo != 0) PlaceFrame(true);
     }
@@ -998,14 +1026,23 @@ namespace headsup
 extern "C" uint32_t HeadsUpOnWindowDraw(uint32_t mcd)
 {
     using namespace headsup;
-    if ((!g_HiddenWindows.Any() && !g_Placing) || mcd == 0) return 0;
+    if ((!g_HiddenWindows.Any() && !g_Placing && g_HiddenKeys.Size() == 0) || mcd == 0) return kWindowDrawn;
     const uint32_t descriptor = *reinterpret_cast<const uint32_t*>(mcd + kWindowDescriptor);
-    if (descriptor == 0) return 0;
+    if (descriptor == 0) return kWindowDrawn;
     const auto* name = reinterpret_cast<const char*>(descriptor + kDescriptorName);
     if (g_Placing && g_WindowMoveTo != 0 && std::exchange(g_PlannedFrame, g_WindowFrame) != g_WindowFrame)
         PlaceFrame(false);
-    return SkipsWindow(name, g_HiddenWindows) ? 1 : 0;
+    if (SkipsWindow(name, g_HiddenWindows)) return kWindowSkipped;
+    if (g_HiddenKeys.Size() == 0) return kWindowDrawn;
+    const std::optional<WindowKey> key = WindowKeyOf(name);
+    if (!key || !g_HiddenKeys.Has(*key)) return kWindowDrawn;
+    if (g_HiddenRectCount < g_HiddenRects.size())
+        std::memcpy(g_HiddenRects[g_HiddenRectCount++].data(), reinterpret_cast<const void*>(mcd + kMcdRect), kWindowRectBytes);
+    g_SilentDraw = true;
+    return kWindowSilent;
 }
+
+extern "C" void HeadsUpAfterWindowDraw() { headsup::g_SilentDraw = false; }
 
 // On the game's stack, inside its name routine: nothing here may allocate, throw or call Ashita.
 extern "C" uint32_t HeadsUpOnName(uint32_t frame)

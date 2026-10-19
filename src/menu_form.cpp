@@ -291,6 +291,7 @@ namespace headsup
                 const char* label = WindowLabel(name);
                 if (!(list.all || label != nullptr ||
                         std::ranges::any_of(s.windowOffsets, [&](const WindowOffset& o) { return o.name == name; }) ||
+                        has(s.hiddenWindows, name) ||
                         (c.readings.seenWindows != nullptr && has(*c.readings.seenWindows, name))))
                     continue;
                 if (Matches(name, list.text.c_str()) || (label != nullptr && Matches(label, list.text.c_str())))
@@ -301,6 +302,17 @@ namespace headsup
                 const char* label      = WindowLabel(window);
                 const std::string name = TitleCaseText(label != nullptr ? std::string(label) : window); // the game's own
                 form.Row((name + "##" + name + " window " + window).c_str(), WordTip(c, WindowWord::WindowListRowTip));
+                const auto hidden = std::ranges::find(s.hiddenWindows, window);
+                bool kept         = hidden == s.hiddenWindows.end();
+                form.ToggleAt(("keep " + window).c_str(), kept, Word(c, WindowWord::WindowListHide),
+                    Word(c, WindowWord::WindowListKeep));
+                if (kept && hidden != s.hiddenWindows.end()) s.hiddenWindows.erase(hidden);
+                if (!kept)
+                {
+                    if (hidden == s.hiddenWindows.end()) s.hiddenWindows.push_back(window);
+                    form.EndRow();
+                    continue;
+                }
                 auto offset = std::ranges::find(s.windowOffsets, window, &WindowOffset::name);
                 int dx = offset != s.windowOffsets.end() ? offset->x : 0, dy = offset != s.windowOffsets.end() ? offset->y : 0;
                 const int oldX = dx, oldY = dy;
@@ -1285,7 +1297,7 @@ namespace headsup
             case CardPiece::Plain:
             case CardPiece::ScreenshotMode:
             case CardPiece::WindowGroups:
-            case CardPiece::GameWindows:
+            case CardPiece::BaseGameUi:
             case CardPiece::SettingsWindow: return {};
             case CardPiece::Reset: return {.bare = true};
             case CardPiece::Nameplates: return {false, !on, &s.nameplates};

@@ -258,6 +258,10 @@ namespace headsup
     // offset of nothing and any past kMaxWindowKeys go; offsets are clamped to kMaxWindowOffset either way.
     std::vector<WindowOffset> WindowOffsetsFrom(std::string_view text);
     std::string WindowOffsetText(const std::vector<WindowOffset>& offsets);
+    // The windows the player hides, by short name, from the settings file's "statcom inventor": a name no window
+    // could have, a strip window, a repeat and any past kMaxWindowKeys go.
+    std::vector<std::string> HiddenWindowsFrom(std::string_view text);
+    std::string HiddenWindowsText(const std::vector<std::string>& names);
 
     // Every window HeadsUp can move, by short name: those it has a name for first, then the rest of the client's.
     const std::vector<std::string>& AllWindows();

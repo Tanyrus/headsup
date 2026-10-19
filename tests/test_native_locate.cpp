@@ -828,6 +828,14 @@ TEST(window_offsets_read_back_what_they_wrote_and_drop_what_no_window_could_take
     CHECK(WindowOffsetsFrom("").empty() && WindowOffsetText({}).empty());
 }
 
+TEST(hidden_windows_read_back_what_they_wrote_and_drop_what_no_window_could_take)
+{
+    const std::vector<std::string> hidden = HiddenWindowsFrom("statcom inventor helpwind equipment statcom");
+    CHECK((hidden == std::vector<std::string>{"statcom", "inventor"}));
+    CHECK(HiddenWindowsFrom(HiddenWindowsText(hidden)) == hidden);
+    CHECK(HiddenWindowsFrom("").empty() && HiddenWindowsText({}).empty());
+}
+
 TEST(the_weather_is_found_once_by_its_effects_range_check)
 {
     // From the client: mov ax,[03945FE0]; cmp ax,4; jb +7E; cmp ax,20.

@@ -1,6 +1,7 @@
 #include "window_views.h"
 
 #include "bytes.h"
+#include "mouse_messages.h"
 
 #include <algorithm>
 #include <array>
@@ -91,6 +92,14 @@ namespace headsup
         for (const FrameWindow& w : frame)
             if (HangsInView(w, screenBottom)) top = std::min(top.value_or(w.top), w.top);
         return top;
+    }
+
+    bool SwallowsClick(uint32_t message, int x, int y, std::span<const WindowRect> hidden)
+    {
+        constexpr uint32_t kButtons[] = {kLeftDown, kLeftUp, kLeftDouble, kRightDown, kRightUp, kRightDouble, kMiddleDown,
+            kMiddleUp, kMiddleDouble, kXButtonDown, kXButtonUp, kXButtonDouble};
+        return std::ranges::find(kButtons, message) != std::end(kButtons) &&
+               std::ranges::any_of(hidden, [&](const WindowRect& r) { return x >= r[0] && x < r[2] && y >= r[1] && y < r[3]; });
     }
 
     FramePlan PlanOf(std::span<const WindowView> views, std::span<const FrameWindow> frame,

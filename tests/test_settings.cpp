@@ -948,6 +948,7 @@ TEST(the_window_placement_saves_and_loads_back_its_switches_places_and_each_mode
     Settings s;
     s.shiftVanillaUi = false;
     s.placedUnder    = {30, 70};
+    s.hiddenWindows  = {"statcom", "inventor"};
     s.viewShifts[static_cast<int>(HelpMode::On)]  = {ViewShift{std::string(first), 20}};
     s.viewShifts[static_cast<int>(HelpMode::Off)] = {
         ViewShift{std::string(second), -6}, ViewShift{std::string(first), 3}};
@@ -1023,7 +1024,7 @@ TEST(a_new_install_places_the_windows_under_the_panel_at_its_reference_band_and_
 {
     MapStore fresh;
     const Settings s = LoadSettings(fresh);
-    CHECK(s.shiftVanillaUi);
+    CHECK(s.shiftVanillaUi && s.hiddenWindows.empty());
     CHECK_EQ(s.placedUnder[static_cast<int>(HelpMode::On)], ReferenceBand(HelpMode::On));
     CHECK_EQ(s.placedUnder[static_cast<int>(HelpMode::Off)], ReferenceBand(HelpMode::Off));
     CHECK(s.viewShifts[0].empty() && s.viewShifts[1].empty());

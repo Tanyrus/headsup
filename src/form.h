@@ -63,6 +63,7 @@ namespace headsup
     constexpr const char* kCompactCheck = "check";       // a toggle among other controls
     constexpr const char* kWideCheck    = "check wide";  // a row's toggle, as wide as a slider
     constexpr const char* kCardCheck    = "check card-on"; // a card title's switch
+    constexpr const char* kWordedCheck  = "check worded";  // a toggle among a row's controls that says its state
     constexpr const char* kPickedClass  = "picked";  // the chosen one of a row of choices
     constexpr const char* kLineBoxClass = "linebox"; // a design line's box
     constexpr const char* kRunClass     = "run";     // a stretch of text in it
@@ -247,6 +248,8 @@ namespace headsup
 
         // Controls for inside a row or a line. Each id is the control's own within its card.
         void CheckAt(const char* id, bool& on, const char* tip = nullptr);
+        // A toggle among a row's controls that says its state in its middle.
+        void ToggleAt(const char* id, bool& on, const char* offWord, const char* onWord);
         void SegmentsAt(const char* id, int& value, const char* const* options, int count, float segment = 0.0f);
         // A dropdown whose list is a popup of rows, the picked one marked. True when another row was chosen. The
         // closed control's tip is tip, or what option says of the row picked; markup rows are RML, not text.

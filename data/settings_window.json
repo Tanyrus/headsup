@@ -197,8 +197,8 @@
           ]
         },
         {
-          "key": "game-windows",
-          "name": "Game Windows",
+          "key": "base-game-ui",
+          "name": "Base Game UI",
           "settings": [
             {"key": "game-help", "name": "Game Help", "tip": "The game's own help bar goes under the top panel, and the windows under it. Off while it is hidden."},
             {"key": "auto-adjust", "name": "Auto Adjust Windows", "tip": "Places every menu's windows right under the top panel as it is now, for the game help on and off. Your own shifts go."},
@@ -217,7 +217,9 @@
                 {"key": "find", "name": "Find"},
                 {"key": "name-hint", "name": "Name"},
                 {"key": "all-windows", "tip": "Every window the game has, not only the named ones and yours."},
-                {"key": "row-tip", "tip": "Its X and Y offset."}
+                {"key": "hide", "name": "Hide"},
+                {"key": "keep", "name": "Keep"},
+                {"key": "row-tip", "tip": "Keep draws it as the game does, moved by its X and Y offset; Hide draws nothing of it and lets no click through to it. Its keys still work, so Escape closes a hidden menu."}
               ]
             }
           ]

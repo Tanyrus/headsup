@@ -124,6 +124,12 @@ namespace headsup
         bool Running() const { return m_Call.at != nullptr; }
         // Which of the game's windows are skipped from now on.
         void Hide(HiddenWindows hidden);
+        // The windows, by short name, whose draws are dropped from now on (Base Game UI's Hide).
+        void HideWindows(const std::vector<std::string>& names);
+        // While the game draws one of those, every draw call it makes is one to drop.
+        static bool Silent();
+        // Where those drawn in the last whole frame are, in the game's menu pixels: clicks there are kept from it.
+        static std::span<const WindowRect> HiddenRects();
         // Once a frame, before the game draws its windows: Stop puts back those that drew in the last two.
         void NewFrame();
         // While placing is set, the game's windows are placed as they draw: at the first, the frame's windows are read

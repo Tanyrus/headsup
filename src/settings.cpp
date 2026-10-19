@@ -130,6 +130,7 @@ namespace headsup
         constexpr const char* kScaleCursorKey = "scaleCursor";
         constexpr const char* kKeepPointerKey = "keepPointerKeys"; // hex virtual-key codes, a space apart
         constexpr const char* kWindowOffsetsKey = "windowOffsets"; // "equip:10,-20 statcom:0,40"
+        constexpr const char* kHiddenWindowsKey = "hiddenWindows"; // "statcom inventor"
         constexpr const char* kShiftVanillaUiKey = "shiftVanillaUi";
         constexpr const char* kOldMoveWindowsKey = "moveWindows";
         // By HelpMode. movedWindows, windowGroups and allUnderBar, the picks before views, are never read again.
@@ -1329,6 +1330,7 @@ namespace headsup
             sections[i] = store.GetString(kBarSectionKeys[i], "");
         s.barSections = PlacementFrom(sections);
         s.windowOffsets = WindowOffsetsFrom(store.GetString(kWindowOffsetsKey, ""));
+        s.hiddenWindows = HiddenWindowsFrom(store.GetString(kHiddenWindowsKey, ""));
         s.shiftVanillaUi =
             HeldSwitch(store, kShiftVanillaUiKey).value_or(HeldSwitch(store, kOldMoveWindowsKey).value_or(s.shiftVanillaUi));
         for (size_t m = 0; m < kHelpModes; ++m)
@@ -1424,6 +1426,7 @@ namespace headsup
         for (int i = 0; i < kBarSectionCount; ++i)
             store.Set(kBarSectionKeys[i], PlacementNames(s.barSections[i]).c_str());
         store.Set(kWindowOffsetsKey, WindowOffsetText(s.windowOffsets).c_str());
+        store.Set(kHiddenWindowsKey, HiddenWindowsText(s.hiddenWindows).c_str());
         setBool(kShiftVanillaUiKey, s.shiftVanillaUi);
         for (size_t m = 0; m < kHelpModes; ++m)
         {
