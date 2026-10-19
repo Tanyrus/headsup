@@ -772,7 +772,7 @@ public:
             .netstat = m_Settings.enabled && m_Settings.hideNetstat};
         const std::optional<headsup::HelpBand> band = HelpBandNow();
         const auto mode         = static_cast<size_t>(headsup::WindowHelpMode(m_Settings));
-        const bool movesWindows = (band && band->bottom != 0 && m_Settings.moveWindows) ||
+        const bool movesWindows = (band && band->bottom != 0 && m_Settings.shiftVanillaUi) ||
                                   !m_Settings.windowOffsets.empty() || m_Settings.moveGameHelp;
         if ((hidden.Any() || movesWindows) && !std::exchange(m_WindowHookTried, true))
         {
@@ -789,8 +789,7 @@ public:
         m_WindowHook.Place(band ? std::optional<headsup::WindowPlacing>(headsup::WindowPlacing{
                                       .band         = *band,
                                       .placedUnder  = m_Settings.placedUnder[mode],
-                                      .moveWindows  = m_Settings.moveWindows,
-                                      .keepClear    = m_Settings.keepClear,
+                                      .shift        = m_Settings.shiftVanillaUi,
                                       .moveGameHelp = m_Settings.moveGameHelp && !m_Settings.hideHelpBar})
                                 : std::nullopt);
         if (m_Settings.viewShifts[mode] != m_PlacedShifts)
@@ -1568,7 +1567,7 @@ private:
         {
             // A bar setting by number, saved as a change in the window is.
             const int value = static_cast<int>(number(3));
-            if (what == "moves") m_Settings.moveWindows = value != 0;
+            if (what == "moves") m_Settings.shiftVanillaUi = value != 0;
             if (what == "theme") m_Settings.barTheme = static_cast<headsup::BarTheme>(value);
             if (what == "height") m_Settings.barHeight = value;
             if (what == "seps") m_Settings.barSeparators = static_cast<headsup::BarSeparators>(value);

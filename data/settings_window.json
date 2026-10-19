@@ -200,8 +200,6 @@
           "key": "game-windows",
           "name": "Game Windows",
           "settings": [
-            {"key": "move-windows", "name": "Move Game Windows", "tip": "The game's windows that open under the top panel go below it, each menu's together."},
-            {"key": "keep-clear", "name": "Don't Allow Overlap", "tip": "No window is left under the top panel, whatever a shift says: a taller panel takes them further down."},
             {"key": "game-help", "name": "Game Help", "tip": "The game's own help bar goes under the top panel, and the windows under it. Off while it is hidden."},
             {"key": "auto-adjust", "name": "Auto Adjust Windows", "tip": "Places every menu's windows right under the top panel as it is now, for the game help on and off. Your own shifts go."},
             {
@@ -277,7 +275,8 @@
               ]
             },
             {"key": "popup-size", "name": "Popup Size", "tip": "Auto follows the height."},
-            {"key": "hide-readout", "name": "Hide Readout", "tip": "The game's S, R and % numbers at the top right."}
+            {"key": "hide-readout", "name": "Hide Readout", "tip": "The game's S, R and % numbers at the top right."},
+            {"key": "shift-vanilla-ui", "name": "Shift Vanilla UI", "tip": "Shifts base game UI elements downward that would otherwise be partially hidden by the top bar. NOTE: UI elements that are manually positioned or hidden in the User Interface tab will be ignored."}
           ]
         },
         {

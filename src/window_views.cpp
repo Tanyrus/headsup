@@ -102,7 +102,7 @@ namespace headsup
     }
 
     FrameShifts ShiftsOf(std::span<const FrameWindow> frame, std::optional<int> chosen, std::optional<int> placedUnder,
-        int band, bool keepClear, int screenRight, int screenBottom)
+        int band, int screenRight, int screenBottom)
     {
         std::vector<FrameWindow> left, right;
         for (const FrameWindow& w : frame)
@@ -110,10 +110,10 @@ namespace headsup
         const std::optional<int> leftTop = FrameTop(left, screenBottom), rightTop = FrameTop(right, screenBottom);
         const std::optional<int> top = FrameTop(frame, screenBottom);
         if (!top) return {};
-        const int viewShift = FrameShift(*top, chosen, placedUnder.value_or(band), band, keepClear);
+        const int viewShift = FrameShift(*top, chosen, placedUnder.value_or(band), band);
         const auto own = [&](std::optional<int> sideTop) {
             if (!sideTop || *sideTop == *top) return viewShift;
-            return FrameShift(*sideTop, std::nullopt, placedUnder.value_or(band), band, keepClear);
+            return FrameShift(*sideTop, std::nullopt, placedUnder.value_or(band), band);
         };
         const auto side = [&](std::span<const FrameWindow> windows, std::optional<int> sideTop) {
             SideShift shift{own(sideTop), std::nullopt};
@@ -133,10 +133,9 @@ namespace headsup
         return beside ? side.shift - (kGameUnderStripRow - kGameTopRow) : side.shift;
     }
 
-    int FrameShift(int frameTop, std::optional<int> chosen, int placedUnder, int band, bool keepClear)
+    int FrameShift(int frameTop, std::optional<int> chosen, int placedUnder, int band)
     {
-        const int shift = chosen.value_or(placedUnder - frameTop);
-        return keepClear ? std::max(shift, band - frameTop) : shift;
+        return std::max(chosen.value_or(placedUnder - frameTop), band - frameTop);
     }
 
     HelpMode ModeOf(bool panelHelp, bool hideGameHelp)

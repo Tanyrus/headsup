@@ -109,8 +109,7 @@ namespace headsup
     {
         HelpBand band;
         int placedUnder   = 0;
-        bool moveWindows  = false;
-        bool keepClear    = false;
+        bool shift        = false; // Shift Vanilla UI
         bool moveGameHelp = false; // the game's strip goes right under the panel, and the windows under it
     };
 

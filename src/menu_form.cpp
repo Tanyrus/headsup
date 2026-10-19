@@ -187,7 +187,7 @@ namespace headsup
         {
             Form& form  = c.form;
             Settings& s = c.s;
-            form.Fade(!s.moveWindows);
+            form.Fade(!s.shiftVanillaUi);
             form.Note(Word(c, WindowWord::GroupsNote));
             const HelpMode mode = c.state.shiftsFor.value_or(WindowHelpMode(s));
             form.Line();
@@ -1080,16 +1080,8 @@ namespace headsup
                 form.Switch(label.c_str(), s.screenshotHidesGame, tip);
                 break;
             case SettingPiece::Groups: WindowGroups(c); break;
-            case SettingPiece::MoveWindows:
-                form.Fade(false);
-                form.Switch(label.c_str(), s.moveWindows, tip);
-                break;
-            case SettingPiece::KeepClear:
-                form.Fade(!s.moveWindows);
-                form.Switch(label.c_str(), s.keepClear, tip);
-                break;
             case SettingPiece::AutoAdjust:
-                form.Fade(!s.moveWindows || r.windowsBand == 0);
+                form.Fade(!s.shiftVanillaUi || r.windowsBand == 0);
                 if (form.Action(label.c_str(), tip))
                 {
                     AutoAdjustWindows(s, r.windowsBand, r.barBand);
@@ -1152,6 +1144,10 @@ namespace headsup
             case SettingPiece::HideReadout:
                 form.Fade(!on);
                 form.Switch(label.c_str(), s.hideNetstat, tip);
+                break;
+            case SettingPiece::ShiftVanillaUi:
+                form.Fade(!on);
+                form.Switch(label.c_str(), s.shiftVanillaUi, tip);
                 break;
             case SettingPiece::HideGameHelp:
                 form.Fade(!on);

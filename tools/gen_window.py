@@ -165,7 +165,7 @@ PIECES = Pieces(
         'key': Setting(), 'hide-game-windows': Setting(),
         'groups': Setting(unnamed=True, words={'note': True, 'help-on': True, 'help-off': True, 'starts-at': True,
                                                'row-tip': False}),
-        'move-windows': Setting(), 'keep-clear': Setting(), 'game-help': Setting(), 'auto-adjust': Setting(),
+        'game-help': Setting(), 'auto-adjust': Setting(),
         'window-defaults': Setting(unnamed=True, words={'headsup-defaults': True, 'headsup-help': True,
                                                         'game-defaults': True}),
         'window-list': Setting(unnamed=True, words={'note': True, 'find': True, 'name-hint': True, 'all-windows': False,
@@ -173,7 +173,7 @@ PIECES = Pieces(
         # Top Panel and Widgets
         'theme': Setting(), 'separators': Setting(options=3), 'title-font': Setting(), 'text-font': Setting(),
         'height': Setting(), 'text-size': Setting(), 'one-line': Setting(options=3), 'popup-size': Setting(),
-        'hide-readout': Setting(),
+        'hide-readout': Setting(), 'shift-vanilla-ui': Setting(),
         'hide-game-help': Setting(), 'position': Setting(), 'background': Setting(),
         'widget-tabs': Setting(unnamed=True, rows=rows(
             'enabled', 'section', 'second-line', 'icons', 'details', 'currency', 'time-zone', 'server-time', '24-hour',

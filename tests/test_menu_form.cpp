@@ -757,6 +757,24 @@ TEST(auto_adjust_places_the_views_under_the_line_the_windows_last_went_under)
     CHECK_EQ(ValueOn(w.Pass(), kStatusShift), std::to_string(80 - kPortraitTop));
 }
 
+TEST(shift_vanilla_ui_is_the_top_panels_one_switch_and_off_leaves_auto_adjust_nothing_to_do)
+{
+    Window w;
+    w.state.page = Page::TopPanel;
+    CHECK(At(Block(w.Pass(), "toppanel-top-panel"), "toppanel-top-panel-shift-vanilla-ui") != std::string::npos);
+    CHECK(w.Pass({{"toppanel-top-panel-shift-vanilla-ui", kClickEvent, ""}}).changed);
+    CHECK(!w.settings.shiftVanillaUi);
+    w.state.page           = Page::UserInterface;
+    w.readings.windowsBand = 80;
+    w.readings.barBand     = 50;
+    const Settings before  = w.settings;
+    w.Pass({{"userinterface-game-windows-auto-adjust", kClickEvent, ""}});
+    CHECK(w.settings == before);
+    const Form page = w.Pass();
+    CHECK(At(Block(page, "userinterface-game-windows"), "userinterface-game-windows-move-windows") == std::string::npos);
+    CHECK(At(Block(page, "userinterface-game-windows"), "userinterface-game-windows-keep-clear") == std::string::npos);
+}
+
 TEST(the_nameplate_fonts_lead_with_the_games_font_and_the_top_panels_leave_it_out)
 {
     Window w;

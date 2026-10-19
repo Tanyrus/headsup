@@ -130,8 +130,8 @@ namespace headsup
         constexpr const char* kScaleCursorKey = "scaleCursor";
         constexpr const char* kKeepPointerKey = "keepPointerKeys"; // hex virtual-key codes, a space apart
         constexpr const char* kWindowOffsetsKey = "windowOffsets"; // "equip:10,-20 statcom:0,40"
-        constexpr const char* kMoveWindowsKey   = "moveWindows";
-        constexpr const char* kKeepClearKey     = "keepClear";
+        constexpr const char* kShiftVanillaUiKey = "shiftVanillaUi";
+        constexpr const char* kOldMoveWindowsKey = "moveWindows";
         // By HelpMode. movedWindows, windowGroups and allUnderBar, the picks before views, are never read again.
         constexpr const char* kPlacedUnderKeys[kHelpModes] = {"placedUnderHelpOff", "placedUnderHelpOn"};
         constexpr const char* kViewShiftsKeys[kHelpModes]  = {"viewShiftsHelpOff", "viewShiftsHelpOn"}; // "status:20"
@@ -957,8 +957,7 @@ namespace headsup
     void UseHeadsUpWindowDefaults(Settings& s)
     {
         const Settings d;
-        s.moveWindows   = true;
-        s.keepClear     = d.keepClear;
+        s.shiftVanillaUi = true;
         s.placedUnder   = d.placedUnder;
         s.viewShifts    = d.viewShifts;
         s.windowOffsets = {};
@@ -966,7 +965,7 @@ namespace headsup
 
     void UseGameWindowDefaults(Settings& s)
     {
-        s.moveWindows   = false;
+        s.shiftVanillaUi = false;
         s.moveGameHelp  = false;
         s.windowOffsets = {};
     }
@@ -1330,8 +1329,8 @@ namespace headsup
             sections[i] = store.GetString(kBarSectionKeys[i], "");
         s.barSections = PlacementFrom(sections);
         s.windowOffsets = WindowOffsetsFrom(store.GetString(kWindowOffsetsKey, ""));
-        s.moveWindows   = store.GetBool(kMoveWindowsKey, s.moveWindows);
-        s.keepClear     = store.GetBool(kKeepClearKey, s.keepClear);
+        s.shiftVanillaUi =
+            HeldSwitch(store, kShiftVanillaUiKey).value_or(HeldSwitch(store, kOldMoveWindowsKey).value_or(s.shiftVanillaUi));
         for (size_t m = 0; m < kHelpModes; ++m)
         {
             s.placedUnder[m] = LoadInt(store, kPlacedUnderKeys[m], s.placedUnder[m]);
@@ -1425,8 +1424,7 @@ namespace headsup
         for (int i = 0; i < kBarSectionCount; ++i)
             store.Set(kBarSectionKeys[i], PlacementNames(s.barSections[i]).c_str());
         store.Set(kWindowOffsetsKey, WindowOffsetText(s.windowOffsets).c_str());
-        setBool(kMoveWindowsKey, s.moveWindows);
-        setBool(kKeepClearKey, s.keepClear);
+        setBool(kShiftVanillaUiKey, s.shiftVanillaUi);
         for (size_t m = 0; m < kHelpModes; ++m)
         {
             setFloat(kPlacedUnderKeys[m], static_cast<float>(s.placedUnder[m]));

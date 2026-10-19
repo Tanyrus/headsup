@@ -99,8 +99,7 @@ namespace headsup
         int barCurrency = kGilCurrency; // the Gil widget's, by kCurrencyTable
         std::optional<ClockZone> clockZone;           // the Clock widget's; none for the computer's own
         std::vector<WindowOffset> windowOffsets; // each game window's move from where the game puts it
-        bool moveWindows  = true;  // the game's windows that hang from the top go under the panel, a view at a time
-        bool keepClear    = true;  // and none is left under it, whatever a view's shift says
+        bool shiftVanillaUi = true; // the game's windows that hang from the top go under the panel, a view at a time
         // By HelpMode: where a view's highest window goes, in the game's menu pixels, and the player's own shifts.
         std::array<int, kHelpModes> placedUnder = {ReferenceBand(HelpMode::Off), ReferenceBand(HelpMode::On)};
         std::array<std::vector<ViewShift>, kHelpModes> viewShifts;

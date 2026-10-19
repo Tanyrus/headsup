@@ -923,11 +923,11 @@ namespace headsup
                 g_WindowsBand = placed.band;
                 const std::span<const FrameWindow> frame(g_FrameWindows.data(), count);
                 const std::optional<int> top = FrameTop(frame, placing.band.screenBottom);
-                if (placing.moveWindows && placed.band != 0 && top)
+                if (placing.shift && placed.band != 0 && top)
                 {
                     const FramePlan plan = PlanOf(WindowViews(), frame, g_ViewShifts, placing.placedUnder);
-                    g_FrameShifts = ShiftsOf(frame, plan.chosen, plan.placedUnder, placed.band, placing.keepClear,
-                        placing.band.screenRight, placing.band.screenBottom);
+                    g_FrameShifts = ShiftsOf(frame, plan.chosen, plan.placedUnder, placed.band, placing.band.screenRight,
+                        placing.band.screenBottom);
                 }
             }
             if (present)

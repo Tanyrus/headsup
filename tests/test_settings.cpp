@@ -946,9 +946,8 @@ TEST(the_window_placement_saves_and_loads_back_its_switches_places_and_each_mode
 {
     const std::string_view first = WindowViews()[0].id, second = WindowViews()[1].id;
     Settings s;
-    s.moveWindows = false;
-    s.keepClear   = false;
-    s.placedUnder = {30, 70};
+    s.shiftVanillaUi = false;
+    s.placedUnder    = {30, 70};
     s.viewShifts[static_cast<int>(HelpMode::On)]  = {ViewShift{std::string(first), 20}};
     s.viewShifts[static_cast<int>(HelpMode::Off)] = {
         ViewShift{std::string(second), -6}, ViewShift{std::string(first), 3}};
@@ -961,6 +960,30 @@ TEST(the_window_placement_saves_and_loads_back_its_switches_places_and_each_mode
     const std::vector<ViewShift> clamped = {{std::string(first), kMaxWindowOffset}};
     CHECK(read.viewShifts[static_cast<int>(HelpMode::On)] == clamped);
     CHECK_EQ(read.placedUnder[static_cast<int>(HelpMode::Off)], kMaxWindowOffset);
+}
+
+TEST(shift_vanilla_ui_reads_the_old_move_windows_switch_and_writes_only_its_own)
+{
+    MapStore old;
+    old.addsDefaults        = true; // a typed read of the new key would add it on and win over the old one
+    old.values["moveWindows"] = "false";
+    old.values["keepClear"]   = "true";
+    const Settings read = LoadSettings(old);
+    CHECK(!read.shiftVanillaUi);
+    MapStore ashita;
+    ashita.values["moveWindows"] = "0";
+    CHECK(!LoadSettings(ashita).shiftVanillaUi);
+    MapStore both;
+    both.values["shiftVanillaUi"] = "true";
+    both.values["moveWindows"]    = "false";
+    CHECK(LoadSettings(both).shiftVanillaUi);
+    MapStore fresh;
+    fresh.addsDefaults = true;
+    CHECK(LoadSettings(fresh).shiftVanillaUi);
+    MapStore saved;
+    SaveSettings(read, saved);
+    CHECK(saved.values["shiftVanillaUi"] == "false");
+    CHECK(!saved.values.contains("moveWindows") && !saved.values.contains("keepClear"));
 }
 
 TEST(the_windows_help_mode_follows_the_panels_help_line_and_the_games_own_strip)
@@ -1000,7 +1023,7 @@ TEST(a_new_install_places_the_windows_under_the_panel_at_its_reference_band_and_
 {
     MapStore fresh;
     const Settings s = LoadSettings(fresh);
-    CHECK(s.moveWindows && s.keepClear);
+    CHECK(s.shiftVanillaUi);
     CHECK_EQ(s.placedUnder[static_cast<int>(HelpMode::On)], ReferenceBand(HelpMode::On));
     CHECK_EQ(s.placedUnder[static_cast<int>(HelpMode::Off)], ReferenceBand(HelpMode::Off));
     CHECK(s.viewShifts[0].empty() && s.viewShifts[1].empty());
@@ -1224,20 +1247,19 @@ TEST(the_window_defaults_place_every_view_by_headsups_defaults_or_leave_them_all
     Settings s;
     s.windowOffsets = {WindowOffset{"equip", 10, -20}};
     s.viewShifts[static_cast<int>(HelpMode::On)] = {ViewShift{std::string(WindowViews()[0].id), 20}};
-    s.placedUnder = {1, 2};
-    s.keepClear   = false;
-    s.moveWindows = false;
+    s.placedUnder    = {1, 2};
+    s.shiftVanillaUi = false;
     UseHeadsUpWindowDefaults(s);
-    CHECK(s.moveWindows && s.keepClear && s.windowOffsets.empty() && s.viewShifts == Settings{}.viewShifts);
+    CHECK(s.shiftVanillaUi && s.windowOffsets.empty() && s.viewShifts == Settings{}.viewShifts);
     CHECK(s.placedUnder == Settings{}.placedUnder);
     s.windowOffsets = {WindowOffset{"equip", 10, -20}};
     s.moveGameHelp  = true;
     UseGameWindowDefaults(s);
-    CHECK(!s.moveWindows && !s.moveGameHelp && s.windowOffsets.empty());
+    CHECK(!s.shiftVanillaUi && !s.moveGameHelp && s.windowOffsets.empty());
     s.hideHelpBar = false;
     s.barWidgets[static_cast<int>(BarWidget::GameHelp)] = false;
     UseHelpTextDefaults(s);
-    CHECK(s.moveWindows && !s.moveGameHelp && s.hideHelpBar && s.barWidgets[static_cast<int>(BarWidget::GameHelp)]);
+    CHECK(s.shiftVanillaUi && !s.moveGameHelp && s.hideHelpBar && s.barWidgets[static_cast<int>(BarWidget::GameHelp)]);
 }
 
 TEST(a_new_install_looks_as_the_release_did_for_one_but_for_five_changes)
