@@ -38,6 +38,9 @@ namespace headsup
         std::optional<FreeSpace> m_Last;
     };
 
+    // The whole space's free bytes in one call, for a caller that is not drawing frames.
+    std::optional<FreeSpace> WholeFreeSpace(FunctionRef<std::optional<Region>(uint64_t at)> query);
+
     struct MemoryReport
     {
         uint32_t usedMb = 0, leftMb = 0, ceilingMb = 0;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "bar_types.h"
+#include "figures.h"
 #include "function_ref.h"
 #include "icons.h"
 
@@ -143,8 +144,6 @@ namespace headsup
     // The same with the label in its own tone or color.
     PopupRow Labeled(Span label, Span value);
     PopupRow Grid(int columns, size_t cells);
-    // 1,234,567
-    std::string Grouped(uint32_t value);
     // text with each of its digits replaced by digit. A line's room is measured from this, with its font's widest
     // digit, so figures that tick never change the room it takes.
     std::string SteadyFigures(std::string_view text, char digit);

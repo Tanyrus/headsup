@@ -36,17 +36,6 @@ namespace headsup
         return row;
     }
 
-    std::string Grouped(uint32_t value)
-    {
-        std::string digits = std::to_string(value), out;
-        for (size_t i = 0; i < digits.size(); ++i)
-        {
-            if (i > 0 && (digits.size() - i) % 3 == 0) out += ',';
-            out += digits[i];
-        }
-        return out;
-    }
-
     std::string SteadyFigures(std::string_view text, char digit)
     {
         std::string steady(text);

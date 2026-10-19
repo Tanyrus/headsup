@@ -35,6 +35,7 @@
 #include "tracker.h"
 #include "window_file.h"
 #include "linuxxi_report.h"
+#include "memory_query.h"
 #ifdef HEADSUP_DEV
 #include "codedump.h"
 #include "drawdump.h"
@@ -62,8 +63,6 @@
 #include <utility>
 #include <vector>
 
-#include <winternl.h>
-
 namespace
 {
     bool KeyDown(uint8_t vk) { return (GetAsyncKeyState(vk) & headsup::kKeyDownBit) != 0; }
@@ -78,11 +77,7 @@ namespace
     constexpr const char* kLogsFolder        = "logs";
     constexpr const char* kFolder            = "headsup"; // inside Ashita's config and logs folders
     constexpr int kQueriesPerFrame           = 128;      // VirtualQuery calls a frame while the Memory widget shows
-    constexpr uint64_t kSpaceEnd             = uint64_t{1} << 32;
-    constexpr double kLinuxXIStaleSeconds    = 3.0;      // LinuxXI reports once a second; three missed and it is gone
-    // Proton hides ntdll's wine_get_version from the game; every Wine prefix has this key.
-    constexpr const char* kWineKey           = "Software\\Wine";
-    constexpr ULONG kProcessVmCounters       = 3;        // NtQueryInformationProcess's class for VM_COUNTERS
+    constexpr double kLinuxXIStaleSeconds    = 3 * headsup::kLinuxXIReportSeconds; // three reports missed and it is gone
     constexpr const char* kCursorsFolder     = "cursors"; // inside HeadsUp's config folder: the player's cursor files
     constexpr const char* kSettingsFile      = "settings.ini";
     constexpr const char* kNewFileSuffix     = ".new";          // after the process id: the file while it is written
@@ -401,7 +396,7 @@ public:
         g_Plugin     = this;
         g_Resources  = core->GetResourceManager();
         QueryPerformanceFrequency(&m_QpcFrequency);
-        m_UnderWine = UnderWine();
+        m_UnderWine = headsup::UnderWine();
         IConfigurationManager* config = core->GetConfigurationManager();
         m_Store.config                = config;
         m_MenuWidth                   = config->GetFloat(kBootConfig, kRegistry, kMenuWidth, 0.0f);
@@ -1843,24 +1838,6 @@ private:
         m_Pointer.Animate();
     }
 
-    static bool UnderWine()
-    {
-        HKEY key       = nullptr;
-        const bool wine = RegOpenKeyExA(HKEY_CURRENT_USER, kWineKey, 0, KEY_READ, &key) == ERROR_SUCCESS;
-        if (key != nullptr) RegCloseKey(key);
-        return wine;
-    }
-
-    // The process's VirtualSize, which Wine takes from Linux's own count of what is mapped; nothing when ntdll will not say.
-    static std::optional<uint64_t> VirtualSizeNow()
-    {
-        using QueryFn     = LONG(WINAPI*)(HANDLE, ULONG, PVOID, ULONG, PULONG);
-        static const auto query = reinterpret_cast<QueryFn>(reinterpret_cast<void*>(GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtQueryInformationProcess")));
-        VM_COUNTERS counters{};
-        if (query == nullptr || query(GetCurrentProcess(), kProcessVmCounters, &counters, sizeof counters, nullptr) != 0) return std::nullopt;
-        return counters.VirtualSize;
-    }
-
     static double Seconds(const FILETIME& time)
     {
         constexpr double kTicksPerSecond = 1e7; // FILETIME counts 100 ns
@@ -1871,20 +1848,12 @@ private:
     // Memory widget shows; the meter is fed with its popup shut too, so it has a figure when the popup opens.
     void GatherMemory(double now, headsup::BarState& s, bool cpu)
     {
-        m_SpaceWalk.Step(
-            now,
-            [](uint64_t at) -> std::optional<headsup::Region> {
-                MEMORY_BASIC_INFORMATION info{};
-                if (at >= kSpaceEnd || VirtualQuery(reinterpret_cast<void*>(static_cast<uintptr_t>(at)), &info, sizeof info) == 0)
-                    return std::nullopt;
-                return headsup::Region{reinterpret_cast<uintptr_t>(info.BaseAddress), info.RegionSize, info.State == MEM_FREE};
-            },
-            kQueriesPerFrame);
+        m_SpaceWalk.Step(now, headsup::RegionAt, kQueriesPerFrame);
         if (m_Cpu.Wants(now))
         {
             FILETIME created{}, exited{}, kernel{}, user{};
             if (GetProcessTimes(GetCurrentProcess(), &created, &exited, &kernel, &user)) m_Cpu.Add(now, Seconds(kernel) + Seconds(user));
-            m_Mapped = VirtualSizeNow();
+            m_Mapped = headsup::VirtualSizeNow();
         }
         if (const std::optional<headsup::FreeSpace> space = m_SpaceWalk.Last(); space && m_Mapped)
             s.memory = headsup::MemoryOf(*space, *m_Mapped, m_UnderWine);
