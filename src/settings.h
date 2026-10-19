@@ -3,6 +3,7 @@
 #include "argb.h"
 #include "bar_placement.h"
 #include "bar_server_time.h"
+#include "bar_theme.h"
 #include "bar_types.h"
 #include "color.h"
 #include "currencies.h"
@@ -89,6 +90,7 @@ namespace headsup
         std::string badgeFontName; // badges' numbers; empty for the default font
         bool showBar       = true;
         BarTheme barTheme  = BarTheme::PhoenixGold;
+        BarPalette customPalette = PaletteOf(BarTheme::PhoenixGold); // the Custom theme's, kept while another is picked
         BarSeparators barSeparators = BarSeparators::Theme;
         int barHeight      = 45; // pixels: the least at which titles are 13 px over 11 px detail lines
         int barTextSize    = kAutoBarTextSize; // the bar's title size, or Auto

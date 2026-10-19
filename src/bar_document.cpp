@@ -29,8 +29,9 @@ namespace headsup
         constexpr uint32_t kGlassTop = 0xF21B2740, kGlassFoot = 0xF20C1220; // a popup's panel, down its height
         constexpr uint32_t kGlassFrame    = 0x40;       // the accent's alpha in a popup's frame
         constexpr char kSeparator      = '/';
-        // A strip's name: its kind, top, middle, bottom, last row, the row under and what fades below, then its rows.
-        constexpr size_t kStripColors = 6, kStripParts = 1 + kStripColors + 2;
+        // A strip's name: its kind, top, middle, bottom, last row, the row under and what fades below, then its border
+        // and its rows.
+        constexpr size_t kStripColors = 6, kStripParts = 1 + kStripColors + 3;
         constexpr int kHexBase         = 16;
         constexpr float kPercentWhole  = 100.0f;
         constexpr float kBoxBorder     = 1.0f; // a pill's or frame's, inside its edge
@@ -158,10 +159,12 @@ namespace headsup
     std::string StripSource(const BarPalette& palette, int rows, int belowRows)
     {
         std::string name = std::string(kHostSource) + std::string(kStripKind);
-        for (const uint32_t color : {palette.stripTop, palette.stripMiddle, palette.stripBottom, palette.bottomLine,
-                 palette.underLine, palette.below})
+        const uint32_t top = palette.stripTop, middle = palette.gradient ? palette.stripMiddle : top,
+                       bottom = palette.gradient ? palette.stripBottom : top;
+        for (const uint32_t color : {top, middle, bottom, palette.bottomLine, palette.underLine, palette.below})
             name += kSeparator + Hex(color);
-        return name + kSeparator + std::to_string(rows) + kSeparator + std::to_string(belowRows);
+        return name + kSeparator + std::to_string(palette.border) + kSeparator + std::to_string(rows) + kSeparator +
+               std::to_string(belowRows);
     }
 
     std::string DiamondSource(uint32_t argb, int pixels)
@@ -212,10 +215,11 @@ namespace headsup
                     colors[i] = *color;
                 else
                     return std::nullopt;
-            const std::optional<uint32_t> rows = number(1 + kStripColors), below = number(2 + kStripColors);
-            if (!rows || !below) return std::nullopt;
+            const std::optional<uint32_t> border = number(1 + kStripColors), rows = number(2 + kStripColors),
+                                          below = number(3 + kStripColors);
+            if (!border || !rows || !below || *border > static_cast<uint32_t>(kMaxStripBorder)) return std::nullopt;
             return StripColumn(static_cast<int>(*rows), static_cast<int>(*below), colors[0], colors[1], colors[2], colors[3],
-                colors[4], colors[5]);
+                colors[4], colors[5], static_cast<int>(*border));
         }
         if ((kind == kDiamondKind || kind == kResetKind) && parts.size() == 3)
         {

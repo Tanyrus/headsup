@@ -987,6 +987,29 @@ TEST(shift_vanilla_ui_reads_the_old_move_windows_switch_and_writes_only_its_own)
     CHECK(!saved.values.contains("moveWindows") && !saved.values.contains("keepClear"));
 }
 
+TEST(the_custom_theme_saves_and_loads_back_every_part_and_a_file_without_it_has_phoenix_gold)
+{
+    Settings s;
+    s.barTheme = BarTheme::Custom;
+    for (size_t i = 0; i < std::size(kPaletteColors); ++i)
+        s.customPalette.*kPaletteColors[i].field = 0x10203000u + static_cast<uint32_t>(i);
+    s.customPalette.shape    = BarShape::Glass;
+    s.customPalette.border   = 5;
+    s.customPalette.gradient = false;
+    MapStore file;
+    SaveSettings(s, file);
+    CHECK(file.values["customThemeStripTop"] == "10203000" && file.values["customThemeShape"] == "glass");
+    CHECK(LoadSettings(file) == s);
+    MapStore fresh;
+    fresh.addsDefaults = true;
+    CHECK(LoadSettings(fresh).customPalette == PaletteOf(BarTheme::PhoenixGold));
+    MapStore garbled;
+    garbled.values["customThemeAccent"] = "not a color";
+    garbled.values["customThemeBorder"] = "99";
+    const Settings read = LoadSettings(garbled);
+    CHECK(read.customPalette.accent == PaletteOf(BarTheme::PhoenixGold).accent && read.customPalette.border == kMaxStripBorder);
+}
+
 TEST(the_windows_help_mode_follows_the_panels_help_line_and_the_games_own_strip)
 {
     Settings s;
@@ -1051,7 +1074,8 @@ TEST(each_theme_and_bar_widget_has_its_own_key)
     };
     for (const Named& t : {Named{"phoenixGold", BarTheme::PhoenixGold}, Named{"umbraDark", BarTheme::UmbraDark},
              Named{"phoenixRedOrnate", BarTheme::PhoenixRedOrnate},
-             Named{"phoenixRedPills", BarTheme::PhoenixRedPills}, Named{"aurora", BarTheme::Aurora}})
+             Named{"phoenixRedPills", BarTheme::PhoenixRedPills}, Named{"aurora", BarTheme::Aurora},
+             Named{"custom", BarTheme::Custom}})
     {
         MapStore store;
         store.values["barTheme"] = t.name;

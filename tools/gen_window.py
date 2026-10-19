@@ -110,7 +110,7 @@ PIECES = Pieces(
         'ornament': Card(), 'nameplate-opacity': Card(), 'detection-icons': Card(), 'badges': Card(),
         'weaknesses': Card(), 'statuses': Card(), 'placeholder-timers': Card(),
         'screenshot-mode': Card(), 'window-groups': Card(), 'base-game-ui': Card(),
-        'top-panel': Card(switch=True), 'help-bar': Card(switch=True), 'widgets': Card(), 'layout': Card(),
+        'top-panel': Card(switch=True), 'theme-colors': Card(), 'help-bar': Card(switch=True), 'widgets': Card(), 'layout': Card(),
         'mouse-pointer': Card(), 'settings-window': Card(), 'reset': Card(), 'debug-mode': Card(switch=True),
     },
     settings={
@@ -174,6 +174,13 @@ PIECES = Pieces(
         'theme': Setting(), 'separators': Setting(options=3), 'title-font': Setting(), 'text-font': Setting(),
         'height': Setting(), 'text-size': Setting(), 'one-line': Setting(options=3), 'popup-size': Setting(),
         'hide-readout': Setting(), 'shift-vanilla-ui': Setting(),
+        'theme-shape': Setting(options=3), 'theme-background': Setting(), 'theme-gradient': Setting(),
+        'theme-top': Setting(), 'theme-bottom': Setting(), 'theme-border-color': Setting(),
+        'theme-border-thickness': Setting(),
+        'theme-palette': Setting(unnamed=True, rows=rows(
+            'under-line', 'glow-below', 'accent', 'accent-end', 'pill', 'pill-border', 'title', 'subtitle', 'divider',
+            'panel-top', 'panel-bottom', 'panel-border', 'panel-outer', 'text', 'heading', 'tag-fill', 'tag-border',
+            'tag-text', 'highlight')),
         'hide-game-help': Setting(), 'position': Setting(), 'background': Setting(),
         'widget-tabs': Setting(unnamed=True, rows=rows(
             'enabled', 'section', 'second-line', 'icons', 'details', 'currency', 'time-zone', 'server-time', '24-hour',
@@ -192,7 +199,7 @@ PIECES = Pieces(
     lists={
         'plate-mode': List(4), 'outline-mode': List(4, extra={3: 'tipOnClaimRows'}), 'color-source': List(7),
         'show-condition': List(13), 'ornament-place': List(5), 'align': List(3), 'font-style': List(3),
-        'smoothness': List(4), 'bar-theme': List(5), 'menu-theme': List(2), 'bar-sections': List(3),
+        'smoothness': List(4), 'bar-theme': List(6), 'menu-theme': List(2), 'bar-sections': List(3),
         'bar-widgets': List(15), 'plate-lines': List(3), 'job-layout': List(3), 'exp-bar': List(3), 'tags': List(24),
     },
     words={'switched-off': True, 'switch-off': True, 'switch-on': True, 'switched-off-top-panel': True,

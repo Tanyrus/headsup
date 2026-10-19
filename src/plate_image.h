@@ -103,10 +103,10 @@ namespace headsup
     Image Ornament(int width, int height, float shadowBlur, float shadowStrength, uint32_t color, uint32_t shadowColor);
 
     // The bar's background as one column of pixels, stretched across the screen: a vertical gradient through top,
-    // middle (55% down) and bottom over height rows, whose last row is bottomLine; then one row of underLine (none when
-    // 0), then below fading to clear over belowRows rows.
+    // middle (55% down) and bottom over height rows, whose last border rows are bottomLine; then one row of underLine
+    // (none when 0), then below fading to clear over belowRows rows.
     Image StripColumn(int height, int belowRows, uint32_t top, uint32_t middle, uint32_t bottom, uint32_t bottomLine,
-        uint32_t underLine, uint32_t below);
+        uint32_t underLine, uint32_t below, int border);
 
     struct BoxStyle
     {

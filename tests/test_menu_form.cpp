@@ -810,6 +810,52 @@ TEST(a_window_set_to_hide_goes_on_the_hidden_list_and_shows_no_place_until_kept_
     CHECK(w.settings.hiddenWindows.empty() && place(w.Pass()));
 }
 
+TEST(an_edit_of_a_theme_color_makes_the_theme_custom_which_keeps_it)
+{
+    Window w;
+    w.state.page        = Page::TopPanel;
+    w.settings.barTheme = BarTheme::UmbraDark;
+    const std::string accent = "toppanel-theme-colors-accent-theme-palette";
+    w.Pass({{accent, kClickEvent, ""}});
+    CHECK(w.Pass({{accent + "-p-r", kChangeEvent, "1"}}).changed);
+    BarPalette edited = PaletteOf(BarTheme::PhoenixGold); // Custom starts from the first theme, whichever is shown
+    edited.accent     = (edited.accent & 0xFF00FFFFu) | 0x00010000u;
+    CHECK(w.settings.barTheme == BarTheme::Custom && w.settings.customPalette == edited);
+    // Another theme picked leaves Custom's colors for when it is picked again.
+    w.Pass({{"toppanel-top-panel-theme", kClickEvent, ""}});
+    w.Pass({{"toppanel-top-panel-theme-o-4", kClickEvent, ""}});
+    CHECK(w.settings.barTheme == BarTheme::Aurora && w.settings.customPalette == edited);
+    w.Pass({{"toppanel-top-panel-theme", kClickEvent, ""}});
+    w.Pass({{"toppanel-top-panel-theme-o-5", kClickEvent, ""}});
+    CHECK(w.settings.barTheme == BarTheme::Custom && PaletteFor(w.settings) == edited);
+}
+
+TEST(the_theme_colors_card_sets_the_shape_the_border_and_one_color_or_a_gradient)
+{
+    Window w;
+    w.state.page = Page::TopPanel;
+    const auto shows = [&](const char* key) {
+        return !ClassOn(w.Pass(), (std::string("toppanel-theme-colors-") + key + "-label-row").c_str(), "off");
+    };
+    BarPalette& p          = w.settings.customPalette;
+    const BarPalette& gold = PaletteOf(BarTheme::PhoenixGold);
+    // Phoenix Gold's strip is a gradient: its top and bottom show, and no one background.
+    CHECK(shows("theme-top") && shows("theme-bottom") && !shows("theme-background"));
+    CHECK(w.Pass({{"toppanel-theme-colors-theme-gradient", kClickEvent, ""}}).changed);
+    CHECK(!p.gradient && w.settings.barTheme == BarTheme::Custom);
+    CHECK(!shows("theme-top") && !shows("theme-bottom") && shows("theme-background"));
+    // Its stops are kept for the gradient's return; edited, the middle stays halfway between the two.
+    w.Pass({{"toppanel-theme-colors-theme-gradient", kClickEvent, ""}});
+    CHECK(p.gradient && p.stripBottom == gold.stripBottom && shows("theme-top"));
+    w.Pass({{"toppanel-theme-colors-theme-top", kClickEvent, ""}});
+    w.Pass({{"toppanel-theme-colors-theme-top-p-a", kChangeEvent, "0"}});
+    CHECK(p.stripTop == (gold.stripTop & 0x00FFFFFFu) && p.stripMiddle == 0x7F1A1510u);
+    w.Pass({{"toppanel-theme-colors-theme-border-thickness", kChangeEvent, "4"}});
+    CHECK_EQ(p.border, 4);
+    w.Pass({{"toppanel-theme-colors-theme-shape-s-2", kClickEvent, ""}});
+    CHECK(p.shape == BarShape::Glass);
+}
+
 TEST(the_nameplate_fonts_lead_with_the_games_font_and_the_top_panels_leave_it_out)
 {
     Window w;

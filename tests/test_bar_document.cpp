@@ -42,7 +42,7 @@ TEST(image_names_round_trip_to_their_images)
 {
     CHECK_EQ(IconSource(Icon::Link), "hu:icon/4");
     const BarPalette& umbra = PaletteOf(BarTheme::UmbraDark);
-    const std::string umbraStrip = "hu:strip/ff2b2b30/ff212125/ff17171a/ff000000/00000000/80000000/45/13";
+    const std::string umbraStrip = "hu:strip/ff2b2b30/ff212125/ff17171a/ff000000/00000000/80000000/1/45/13";
     CHECK_EQ(StripSource(umbra, 45, 13), umbraStrip);
     CHECK_EQ(DiamondSource(0xFFC9A24Au, 10), "hu:diamond/ffc9a24a/10");
     CHECK_EQ(CoinSource(17), "hu:coin/17");
@@ -51,14 +51,22 @@ TEST(image_names_round_trip_to_their_images)
     const std::optional<Image> strip = HostImage(umbraStrip);
     CHECK(strip && strip->width == 1 && strip->height == 45 + 13);
     CHECK(strip->argb == StripColumn(45, 13, umbra.stripTop, umbra.stripMiddle, umbra.stripBottom, umbra.bottomLine,
-                             umbra.underLine, umbra.below).argb);
+                             umbra.underLine, umbra.below, umbra.border).argb);
+    BarPalette flat = umbra, one = umbra; // no gradient: its top all the way down, the other stops kept
+    flat.gradient   = false;
+    one.stripMiddle = one.stripBottom = umbra.stripTop;
+    CHECK(StripSource(flat, 45, 13) == StripSource(one, 45, 13) && flat.stripBottom == umbra.stripBottom);
+    BarPalette thick = umbra;
+    thick.border     = 4;
+    const std::optional<Image> bordered = HostImage(StripSource(thick, 45, 13));
+    CHECK(bordered && bordered->argb[41] == umbra.bottomLine && bordered->argb[40] != umbra.bottomLine);
     const std::optional<Image> diamond = HostImage("hu:diamond/ffc9a24a/10");
     CHECK(diamond && diamond->width == 10 && diamond->height == 10);
     CHECK(diamond->argb[5 * 10 + 5] == 0xFFC9A24Au); // its middle pixel is solid in its color
     const std::optional<Image> coin = HostImage("hu:coin/17");
     CHECK(coin && coin->width == 17);
     CHECK(!HostImage("hu:icon/999") && !HostImage("hu:nothing") && !HostImage("icon.png") && !HostImage("hu:strip/9/45/13"));
-    CHECK(!HostImage("hu:strip/ff2b2b30/ff212125/zz17171a/ff000000/00000000/80000000/45/13"));
+    CHECK(!HostImage("hu:strip/ff2b2b30/ff212125/zz17171a/ff000000/00000000/80000000/1/45/13"));
     // The reset arrow, in the color asked for: the bottom of its ring is that color.
     const std::optional<Image> reset = HostImage(ResetSource(0xFF8C7270u, 32));
     CHECK(reset && reset->width == 32 && reset->height == 32);

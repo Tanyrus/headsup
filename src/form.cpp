@@ -8,6 +8,7 @@
 #include "settings.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
@@ -29,8 +30,11 @@ namespace headsup
         constexpr int kHexBase            = 16;
         constexpr const char* kNoteName      = "note";     // a note's id, as its card's controls are named
         constexpr const char* kCaptionSuffix = " caption"; // a caption's, after its text
-        constexpr const char* kChannels[] = {"r", "g", "b"};
-        constexpr const char* kChannelNames[] = {"R", "G", "B"};
+        constexpr const char* kChannels[] = {"r", "g", "b", "a"};
+        constexpr const char* kChannelNames[] = {"R", "G", "B", "A"};
+        constexpr size_t kRgbChannels   = 3;
+        constexpr uint32_t kRgbMoved    = 0b111; // the hex box sets the three
+        constexpr int kChannelBits      = 8;
         constexpr const char* kTagIdStart = "tag-"; // a tag chip's id, the same on every page
 
         // An id's characters: letters and figures in lower case, anything else a hyphen, never two in a row.
@@ -453,6 +457,55 @@ namespace headsup
         EndRow();
     }
 
+    uint32_t Form::Picker(const std::string& swatch, std::span<int> levels)
+    {
+        uint32_t moved = 0;
+        for (size_t channel = 0; channel < levels.size(); ++channel)
+        {
+            // A slider says its value as it is made and each time it is set: only a level other than the color's own
+            // is the player's, or opening the picker would round the color to it.
+            const FormEvent* event = Took(swatch + "-p-" + kChannels[channel], kChangeEvent);
+            if (event == nullptr) continue;
+            const int to = static_cast<int>(std::lround(std::clamp(std::strtof(event->value.c_str(), nullptr), 0.0f, kColorFull)));
+            if (to == levels[channel]) continue;
+            levels[channel] = to;
+            moved |= 1u << channel;
+        }
+        const std::string hex = swatch + "-p-hex";
+        if (const FormEvent* typed = Took(hex, kCommitEvent))
+        {
+            const char* text = typed->value.c_str() + (typed->value.starts_with("#") ? 1 : 0);
+            char* end        = nullptr;
+            const unsigned long rgb = std::strtoul(text, &end, kHexBase);
+            if (end == text + kHexDigits && *end == '\0')
+            {
+                for (size_t channel = 0; channel < kRgbChannels; ++channel)
+                    levels[channel] = static_cast<int>((rgb >> (kChannelBits * (kRgbChannels - 1 - channel))) & 0xFF);
+                moved |= kRgbMoved;
+            }
+        }
+        // Its channels as sliders, and the color as it is written, to type.
+        std::string rml = "<div class=\"picker\">";
+        uint32_t rgb    = 0;
+        for (size_t channel = 0; channel < levels.size(); ++channel)
+        {
+            const std::string slider = swatch + "-p-" + kChannels[channel];
+            rml += std::string("<div class=\"pick-row\"><div class=\"pick-name\">") + kChannelNames[channel] +
+                   "</div><input type=\"range\" id=\"" + slider + "\" min=\"0\" max=\"" + Formatted("%.0f", kColorFull) + "\" step=\"1\"/>" +
+                   "<div class=\"val\" id=\"" + slider + "-val\"></div></div>";
+            Set(slider, FormValueKind::Value, {}, std::to_string(levels[channel]));
+            Set(slider + "-val", FormValueKind::Text, {}, std::to_string(levels[channel]));
+            if (channel < kRgbChannels) rgb = rgb << kChannelBits | static_cast<uint32_t>(levels[channel]);
+        }
+        rml += "<div class=\"pick-row\"><div class=\"pick-name\">#</div><input type=\"text\" class=\"hex\" id=\"" + hex +
+               "\" maxlength=\"" + std::to_string(kHexDigits + 1) + "\"/></div></div>"; // the digits after a #
+        char written[16];
+        std::snprintf(written, sizeof(written), "%0*X", kHexDigits, static_cast<unsigned>(rgb));
+        Set(hex, FormValueKind::Value, {}, written);
+        popup = FormPopup{swatch, std::move(rml)};
+        return moved;
+    }
+
     void Form::SwatchAt(const char* id, Color& color)
     {
         const std::string swatch = Id(id);
@@ -460,48 +513,48 @@ namespace headsup
         Out() += "<div class=\"swatch\" id=\"" + swatch + "\"></div>";
         if (m_State.popup == swatch)
         {
-            // Its three channels as sliders, and the color as it is written, to type.
-            std::string rml = "<div class=\"picker\">";
-            for (int channel = 0; channel < static_cast<int>(std::size(kChannels)); ++channel)
-            {
-                const std::string slider = swatch + "-p-" + kChannels[channel];
-                // A slider says its value as it is made and each time it is set: only a level other than the color's
-                // own is the player's, or opening the picker would round the color to it.
-                const FormEvent* moved = Took(slider, kChangeEvent);
-                const float to         = moved != nullptr ? std::clamp(std::strtof(moved->value.c_str(), nullptr), 0.0f, kColorFull) : 0.0f;
-                if (moved != nullptr && std::lround(to) != std::lround(color.v[channel] * kColorFull))
-                {
-                    color.v[channel] = to / kColorFull;
-                    changed          = true;
-                }
-                const int level = static_cast<int>(std::lround(color.v[channel] * kColorFull));
-                rml += std::string("<div class=\"pick-row\"><div class=\"pick-name\">") + kChannelNames[channel] +
-                       "</div><input type=\"range\" id=\"" + slider + "\" min=\"0\" max=\"" + Formatted("%.0f", kColorFull) + "\" step=\"1\"/>" +
-                       "<div class=\"val\" id=\"" + slider + "-val\"></div></div>";
-                Set(slider, FormValueKind::Value, {}, std::to_string(level));
-                Set(slider + "-val", FormValueKind::Text, {}, std::to_string(level));
-            }
-            const std::string hex = swatch + "-p-hex";
-            if (const FormEvent* typed = Took(hex, kCommitEvent))
-            {
-                const char* text = typed->value.c_str() + (typed->value.starts_with("#") ? 1 : 0);
-                char* end        = nullptr;
-                const unsigned long rgb = std::strtoul(text, &end, kHexBase);
-                if (end == text + kHexDigits && *end == '\0')
-                {
-                    color   = ColorFromRgb(static_cast<uint32_t>(rgb));
-                    changed = true;
-                }
-            }
-            rml += "<div class=\"pick-row\"><div class=\"pick-name\">#</div><input type=\"text\" class=\"hex\" id=\"" + hex +
-                   "\" maxlength=\"" + std::to_string(kHexDigits + 1) + "\"/></div></div>"; // the digits after a #
-            char written[16];
-            std::snprintf(written, sizeof(written), "%0*X", kHexDigits, static_cast<unsigned>(RgbOf(color)));
-            Set(hex, FormValueKind::Value, {}, written);
-            popup = FormPopup{swatch, std::move(rml)};
+            std::array<int, kRgbChannels> levels{};
+            for (size_t channel = 0; channel < kRgbChannels; ++channel)
+                levels[channel] = static_cast<int>(std::lround(color.v[channel] * kColorFull));
+            // Only the channels moved are set, so a color between two levels keeps the others as they were.
+            const uint32_t moved = Picker(swatch, levels);
+            for (size_t channel = 0; channel < kRgbChannels; ++channel)
+                if ((moved >> channel & 1u) != 0) color.v[channel] = static_cast<float>(levels[channel]) / kColorFull;
+            changed |= moved != 0;
         }
         Set(swatch, FormValueKind::Property, "background-color", RcssColor(Opaque(RgbOf(color))));
         Set(swatch, FormValueKind::Class, kOffClass, {}, m_Off);
+    }
+
+    void Form::ArgbSwatchAt(const char* id, uint32_t& argb)
+    {
+        const std::string swatch = Id(id);
+        TogglePopup(swatch);
+        Out() += "<div class=\"swatch\" id=\"" + swatch + "\"></div>";
+        if (m_State.popup == swatch)
+        {
+            // In the picker's order, red, green, blue and alpha: the color's bytes from its second, then its first.
+            constexpr int kShifts[] = {16, 8, 0, 24};
+            std::array<int, std::size(kShifts)> levels{};
+            for (size_t channel = 0; channel < levels.size(); ++channel)
+                levels[channel] = static_cast<int>(argb >> kShifts[channel] & 0xFF);
+            if (Picker(swatch, levels) != 0)
+            {
+                argb = 0;
+                for (size_t channel = 0; channel < levels.size(); ++channel)
+                    argb |= static_cast<uint32_t>(levels[channel]) << kShifts[channel];
+                changed = true;
+            }
+        }
+        Set(swatch, FormValueKind::Property, "background-color", RcssColor(argb));
+        Set(swatch, FormValueKind::Class, kOffClass, {}, m_Off);
+    }
+
+    void Form::ArgbSwatch(const char* label, uint32_t& argb, const char* tip)
+    {
+        Row(label, tip);
+        ArgbSwatchAt(label, argb);
+        EndRow();
     }
 
     void Form::Swatch(const char* label, Color& color, const char* tip, const Color* original)

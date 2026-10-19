@@ -282,6 +282,53 @@
           ]
         },
         {
+          "key": "theme-colors",
+          "name": "Theme Colors",
+          "description": "Every part of the Custom theme, which starts as Phoenix Gold. Changing one picks the Custom theme, and it keeps your changes while you pick another.",
+          "settings": [
+            {
+              "key": "theme-shape",
+              "name": "Shape",
+              "tip": "How the widgets sit on the strip.",
+              "options": [
+                {"name": "Ornate", "tip": "Diamonds between the widgets and a framed target, as Phoenix Gold has."},
+                {"name": "Pills", "tip": "Each widget in a rounded pill, as Umbra Dark has."},
+                {"name": "Glass", "tip": "Pills that show only when lit, a line of light under the strip and glass popups, as Aurora has."}
+              ]
+            },
+            {"key": "theme-background", "name": "Background", "tip": "The strip's one color, with its opacity: lower it to see the game through the strip."},
+            {"key": "theme-gradient", "name": "Gradient", "tip": "The strip runs from a top color to a bottom color."},
+            {"key": "theme-top", "name": "Top Color", "indent": true, "tip": "The strip's color at its top, with its opacity."},
+            {"key": "theme-bottom", "name": "Bottom Color", "indent": true, "tip": "The strip's color at its foot, with its opacity."},
+            {"key": "theme-border-color", "name": "Border Color", "tip": "The line along the strip's foot."},
+            {"key": "theme-border-thickness", "name": "Border Thickness", "tip": "How many pixels tall the line along the strip's foot is; 0 for none."},
+            {
+              "key": "theme-palette",
+              "rows": [
+                {"key": "under-line", "name": "Under Line", "tip": "A row just under the border; clear for none."},
+                {"key": "glow-below", "name": "Glow Below", "tip": "What fades out under the strip."},
+                {"key": "accent", "name": "Accent", "tip": "Diamonds, frames, the pin mark and a lit widget."},
+                {"key": "accent-end", "name": "Accent End", "tip": "What the accent runs into where it is a gradient."},
+                {"key": "pill", "name": "Pill", "tip": "A widget's pill."},
+                {"key": "pill-border", "name": "Pill Border"},
+                {"key": "title", "name": "Title", "tip": "A widget's title on the strip."},
+                {"key": "subtitle", "name": "Subtitle", "tip": "A widget's second line, and dim text in popups."},
+                {"key": "divider", "name": "Divider", "tip": "The diamonds between widgets on an ornate strip."},
+                {"key": "panel-top", "name": "Popup Top", "tip": "A popup's color at its top."},
+                {"key": "panel-bottom", "name": "Popup Bottom", "tip": "A popup's color at its foot."},
+                {"key": "panel-border", "name": "Popup Border"},
+                {"key": "panel-outer", "name": "Popup Outer Border", "tip": "A ring around an ornate popup's border; clear for none."},
+                {"key": "text", "name": "Popup Text"},
+                {"key": "heading", "name": "Popup Heading"},
+                {"key": "tag-fill", "name": "Tag Fill", "tip": "The small labels in popups."},
+                {"key": "tag-border", "name": "Tag Border"},
+                {"key": "tag-text", "name": "Tag Text"},
+                {"key": "highlight", "name": "Highlight", "tip": "Over a widget under the pointer."}
+              ]
+            }
+          ]
+        },
+        {
           "key": "help-bar",
           "name": "Help Bar",
           "description": "The game's help text, in a bar of its own under the top panel.",
@@ -722,7 +769,8 @@
         {"name": "Umbra Dark", "tip": "Each widget in a grey pill, lit in blue."},
         {"name": "Phoenix Red, Ornate", "tip": "The ornate strip in Phoenix's dark red."},
         {"name": "Phoenix Red, Pills", "tip": "Each widget in a pill, in Phoenix's dark red."},
-        {"name": "Aurora", "tip": "Slate glass, lit from cyan into violet."}
+        {"name": "Aurora", "tip": "Slate glass, lit from cyan into violet."},
+        {"name": "Custom", "tip": "Your own colors and shape, from the Theme Colors card."}
       ]
     },
     {

@@ -9,11 +9,11 @@
 #include "plate_template.h"
 #include "window_layout.h"
 
-#include <span>
 #include <cstdint>
 #include <cstdio>
 #include <functional>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -230,6 +230,8 @@ namespace headsup
             float segment = 0.0f);
         // original: the color's default. While the color is another, an arrow before the swatch puts it back.
         void Swatch(const char* label, Color& color, const char* tip, const Color* original = nullptr);
+        // A color with its opacity (ARGB): its popup has an alpha slider too, and its hex box keeps the alpha.
+        void ArgbSwatch(const char* label, uint32_t& argb, const char* tip);
         // A color pick: the dropdown of its source, then the swatch of a custom color.
         void ColorPickRow(const char* label, ColorPick& pick, const std::vector<ColorSource>& sources, const char* tip);
         // When a line shows, as a dropdown of checks: Always, under which every condition reads checked, then each
@@ -287,6 +289,7 @@ namespace headsup
         // live: the number is what is so now and no setting yet, shown muted.
         void NumberAt(const char* name, const char* id, int& value, int limit, bool live = false);
         void SwatchAt(const char* id, Color& color);
+        void ArgbSwatchAt(const char* id, uint32_t& argb);
         // The arrow that puts a value back to its default, hidden while it is the default. True when it was clicked.
         bool ResetAt(const char* id, bool differs);
         // A pill. classes: kRaisedPill and the like, and any more for the page's own looks. True when clicked.
@@ -327,6 +330,9 @@ namespace headsup
             const std::function<void(int)>& press, const std::function<bool(int)>& picked);
         // A click on the control opens its popup, or closes it when it is the one open.
         void TogglePopup(const std::string& control);
+        // An open swatch's popup: a slider for each of levels (red, green, blue and maybe alpha, 0 to 255) and the
+        // first three as hex, to type. Moves the levels as the player does, and says which moved, a bit each.
+        uint32_t Picker(const std::string& swatch, std::span<int> levels);
         bool ListControl(const std::string& control, const std::string& shown, float width, const std::string& tip = {},
             bool markup = false);
         std::string ListRow(const std::string& control, int index, const std::string& name, bool picked,

@@ -14,6 +14,9 @@ namespace headsup
         Glass,  // pills of glass that show only when lit, a line of light under the strip, and glass popups
     };
 
+    constexpr int kBarShapeCount = static_cast<int>(BarShape::Glass) + 1;
+    constexpr int kMaxStripBorder = 6; // rows of the strip's line at its foot
+
     // D3DCOLORs (ARGB); 0 is none.
     struct BarPalette
     {
@@ -27,8 +30,29 @@ namespace headsup
         uint32_t panelTop, panelBottom, panelBorder, panelOuter;
         uint32_t text, heading, tagFill, tagBorder, tagText;
         uint32_t highlight; // over a hovered widget
+        int border = 1;     // how many of the strip's last rows are bottomLine
+        bool gradient = true; // the strip runs through its three stops; one color, its top, when not
+        bool operator==(const BarPalette&) const = default;
     };
 
+    // Every color of a palette, by the name its keys carry in the settings and in a theme's file.
+    struct PaletteColor
+    {
+        const char* name;
+        uint32_t BarPalette::*field;
+    };
+    inline constexpr PaletteColor kPaletteColors[] = {{"StripTop", &BarPalette::stripTop},
+        {"StripMiddle", &BarPalette::stripMiddle}, {"StripBottom", &BarPalette::stripBottom},
+        {"BottomLine", &BarPalette::bottomLine}, {"UnderLine", &BarPalette::underLine}, {"Below", &BarPalette::below},
+        {"Accent", &BarPalette::accent}, {"AccentEnd", &BarPalette::accentEnd}, {"Pill", &BarPalette::pill},
+        {"PillBorder", &BarPalette::pillBorder}, {"Title", &BarPalette::title}, {"Subtitle", &BarPalette::subtitle},
+        {"Divider", &BarPalette::divider}, {"PanelTop", &BarPalette::panelTop}, {"PanelBottom", &BarPalette::panelBottom},
+        {"PanelBorder", &BarPalette::panelBorder}, {"PanelOuter", &BarPalette::panelOuter}, {"Text", &BarPalette::text},
+        {"Heading", &BarPalette::heading}, {"TagFill", &BarPalette::tagFill}, {"TagBorder", &BarPalette::tagBorder},
+        {"TagText", &BarPalette::tagText}, {"Highlight", &BarPalette::highlight}};
+    inline constexpr const char* kBarShapeNames[kBarShapeCount] = {"ornate", "pills", "glass"};
+
+    // A fixed theme's palette; Custom's is the settings' own (PaletteFor in bar_look.h).
     const BarPalette& PaletteOf(BarTheme theme);
     // The menu's name for a theme.
 

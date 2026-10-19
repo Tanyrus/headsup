@@ -5,6 +5,7 @@
 #include <RmlUi/Core.h>
 
 #include <string>
+#include <vector>
 
 using namespace headsup;
 
@@ -12,9 +13,8 @@ namespace
 {
     constexpr int kBarHeight = 45;
 
-    BarLook LookOf(BarTheme theme, const Settings& settings)
+    BarLook LookOf(const BarPalette& p, const Settings& settings)
     {
-        const BarPalette& p = PaletteOf(theme);
         const BarMetrics m  = MetricsFor(kBarHeight, p.shape);
         return BarLook{p, settings, m, PillRow(m), TextRow{13, 11, true, 10.0f, 24.0f, 12.0f},
             BarTitleFont(settings, p.shape), p.shape == BarShape::Ornate, BarTextFont(settings)};
@@ -28,10 +28,19 @@ TEST(rmlui_reads_every_themes_bar_and_popups_without_a_complaint)
     const PopupFaces faces = {PopupFace{"Barlow Condensed", 24, 29, 0}, PopupFace{"Barlow Condensed", 18, 22, 0},
         PopupFace{"Barlow Condensed", 15, 18, 2}, PopupFace{"Barlow Condensed", 15, 18, 0}};
     Settings settings;
-    for (int t = 0; t < kBarThemeCount; ++t)
+    std::vector<BarPalette> palettes;
+    for (int t = 0; t < kFixedThemeCount; ++t)
+        palettes.push_back(PaletteOf(static_cast<BarTheme>(t)));
+    for (const BarShape shape : {BarShape::Ornate, BarShape::Pills, BarShape::Glass})
     {
-        const BarTheme theme = static_cast<BarTheme>(t);
-        const BarLook look   = LookOf(theme, settings);
+        BarPalette custom = settings.customPalette;
+        custom.shape      = shape;
+        custom.border     = 3;
+        palettes.push_back(custom);
+    }
+    for (const BarPalette& palette : palettes)
+    {
+        const BarLook look = LookOf(palette, settings);
         test::RmlSession rml;
         Rml::ElementDocument* bar = rml.context->LoadDocumentFromMemory(BarDocument(look, place), "bar");
         Rml::ElementDocument* popups = rml.context->LoadDocumentFromMemory(PopupDocument(look, faces), "popups");

@@ -465,19 +465,20 @@ namespace headsup
     }
 
     Image StripColumn(int height, int belowRows, uint32_t top, uint32_t middle, uint32_t bottom, uint32_t bottomLine,
-        uint32_t underLine, uint32_t below)
+        uint32_t underLine, uint32_t below, int border)
     {
         const int h = std::max(1, height), under = underLine != 0 ? 1 : 0;
         const int fade = below != 0 ? std::max(0, belowRows) : 0;
+        const int line = std::clamp(border, 0, h), gradient = h - line;
         Image image{1, h + under + fade, {}};
         image.argb.reserve(static_cast<size_t>(image.height));
-        for (int y = 0; y < h - 1; ++y)
+        for (int y = 0; y < gradient; ++y)
         {
-            const float t = h > 2 ? static_cast<float>(y) / static_cast<float>(h - 2) : 0.0f;
+            const float t = gradient > 1 ? static_cast<float>(y) / static_cast<float>(gradient - 1) : 0.0f;
             image.argb.push_back(t < kStripMiddle ? Mix(top, middle, t / kStripMiddle)
                                                   : Mix(middle, bottom, (t - kStripMiddle) / (1.0f - kStripMiddle)));
         }
-        image.argb.push_back(bottomLine);
+        image.argb.insert(image.argb.end(), static_cast<size_t>(line), bottomLine);
         if (under != 0) image.argb.push_back(underLine);
         for (int y = 0; y < fade; ++y)
             image.argb.push_back(WithAlpha(below, 1.0f - static_cast<float>(y) / static_cast<float>(fade)));

@@ -23,6 +23,18 @@ namespace
     bool Family(const TextFace& face, const char* family) { return std::string(face.family) == family; }
 }
 
+TEST(the_custom_theme_takes_the_settings_palette_and_starts_as_phoenix_gold)
+{
+    Settings s;
+    CHECK(PaletteFor(s) == PaletteOf(BarTheme::PhoenixGold) && s.customPalette == PaletteOf(BarTheme::PhoenixGold));
+    s.customPalette.accent = 0xFF00FF00;
+    CHECK(PaletteFor(s) == PaletteOf(BarTheme::PhoenixGold)); // kept for when Custom is picked
+    s.barTheme = BarTheme::Custom;
+    CHECK(PaletteFor(s).accent == 0xFF00FF00u && PaletteFor(s).stripTop == PaletteOf(BarTheme::PhoenixGold).stripTop);
+    s.barTheme = BarTheme::UmbraDark;
+    CHECK(PaletteFor(s) == PaletteOf(BarTheme::UmbraDark));
+}
+
 TEST(each_tone_takes_its_color_on_the_bar_and_in_a_popup)
 {
     // Spec, Palettes: the bar's title and subtitle text, the popups' text, headings and tag text by theme; values take
@@ -31,7 +43,7 @@ TEST(each_tone_takes_its_color_on_the_bar_and_in_a_popup)
     settings.weakBadgeColor   = ColorFromRgb(0x112233);
     settings.resistBadgeColor = ColorFromRgb(0x445566);
     settings.immuneBadgeColor = ColorFromRgb(0x778899);
-    for (int theme = 0; theme < kBarThemeCount; ++theme)
+    for (int theme = 0; theme < kFixedThemeCount; ++theme)
     {
         const BarLook look  = LookOf(static_cast<BarTheme>(theme), settings);
         const BarPalette& p = look.palette;
@@ -142,7 +154,7 @@ TEST(a_widget_of_figures_draws_its_title_in_the_detail_font_in_every_theme)
     Settings settings;
     WidgetContent figures, words;
     figures.figures = true;
-    for (int theme = 0; theme < kBarThemeCount; ++theme)
+    for (int theme = 0; theme < kFixedThemeCount; ++theme)
     {
         const BarLook look = LookOf(static_cast<BarTheme>(theme), settings, TextRow{14, 11, true});
         CHECK(Family(look.TitleFace(figures), "Barlow Condensed") && look.TitleFace(figures).size == 14.0f);

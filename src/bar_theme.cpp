@@ -9,7 +9,7 @@ namespace headsup
         constexpr float kTitleShare = 0.40f, kDetailShare = 0.33f, kPopupTextShare = 0.39f; // of H
 
         // Alpha is the first byte: 0x1A is 10%, 0x33 20%, 0x59 35%, 0x80 50% and 0xF7 97%.
-        constexpr BarPalette kPalettes[kBarThemeCount] = {
+        constexpr BarPalette kPalettes[kFixedThemeCount] = {
             {.shape = BarShape::Ornate, .stripTop = 0xFF2A2219, .stripMiddle = 0xFF15110C, .stripBottom = 0xFF0B0907,
                 .bottomLine = 0xFFC9A24A, .underLine = 0xFF3D2F14, .below = 0x59C9A24A, .accent = 0xFFC9A24A, .accentEnd = 0xFFEFE3C6,
                 .pill = 0, .pillBorder = 0, .title = 0xFFEFE3C6, .subtitle = 0xFFA8936D, .divider = 0xFF8A6D2C,
@@ -45,7 +45,7 @@ namespace headsup
 
     const BarPalette& PaletteOf(BarTheme theme)
     {
-        return kPalettes[std::clamp(static_cast<int>(theme), 0, kBarThemeCount - 1)];
+        return kPalettes[std::clamp(static_cast<int>(theme), 0, kFixedThemeCount - 1)];
     }
 
     BarMetrics MetricsFor(int barHeight, BarShape shape, int barText, int popupText)

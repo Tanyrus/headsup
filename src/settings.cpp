@@ -157,7 +157,12 @@ namespace headsup
         constexpr const char* kDesignsSavedKey = "nameplateDesigns";
         constexpr const char* kBarThemeKey = "barTheme";
         const char* const kBarThemeNames[kBarThemeCount] = {"phoenixGold", "umbraDark", "phoenixRedOrnate",
-            "phoenixRedPills", "aurora"};
+            "phoenixRedPills", "aurora", "custom"};
+        // The Custom theme: this before each of kPaletteColors' names, and its shape and border.
+        constexpr const char* kCustomThemeKey = "customTheme";
+        constexpr const char* kShapeSuffix = "Shape";
+        constexpr const char* kBorderSuffix = "Border";
+        constexpr const char* kGradientSuffix = "Gradient";
         constexpr const char* kBarCurrencyKey = "barCurrency";
         constexpr const char* kClockServerTimeKey = "clockServerTime";
         // Server time was a widget of its own, with this switch.
@@ -1192,6 +1197,8 @@ namespace headsup
         ClampPick(s.cursorColor, d.cursorColor, CursorSources());
         ClampPick(s.cursorEdgeColor, d.cursorEdgeColor, CursorSources());
         if (static_cast<int>(s.barTheme) >= kBarThemeCount) s.barTheme = d.barTheme;
+        if (static_cast<int>(s.customPalette.shape) >= kBarShapeCount) s.customPalette.shape = d.customPalette.shape;
+        s.customPalette.border = std::clamp(s.customPalette.border, 0, kMaxStripBorder);
         if (s.barCurrency < 0 || s.barCurrency >= kCurrencyCount) s.barCurrency = d.barCurrency;
         if (s.clockZone && static_cast<int>(*s.clockZone) >= kClockZoneCount) s.clockZone = d.clockZone;
         if (static_cast<int>(s.expBar) >= kExpBarPlaceCount) s.expBar = d.expBar;
@@ -1280,6 +1287,13 @@ namespace headsup
         const std::string theme = store.GetString(kBarThemeKey, "");
         for (int t = 0; t < kBarThemeCount; ++t)
             if (theme == kBarThemeNames[t]) s.barTheme = static_cast<BarTheme>(t);
+        const std::string custom = kCustomThemeKey;
+        for (const PaletteColor& color : kPaletteColors)
+            s.customPalette.*color.field = LoadHex(store, custom + color.name, s.customPalette.*color.field);
+        s.customPalette.shape = static_cast<BarShape>(NameIndex(kBarShapeNames, kBarShapeCount,
+            store.GetString((custom + kShapeSuffix).c_str(), ""), static_cast<int>(s.customPalette.shape)));
+        s.customPalette.border = LoadInt(store, (custom + kBorderSuffix).c_str(), s.customPalette.border);
+        s.customPalette.gradient = store.GetBool((custom + kGradientSuffix).c_str(), s.customPalette.gradient);
         if (const std::optional<int> currency = CurrencyOfKey(store.GetString(kBarCurrencyKey, "")))
             s.barCurrency = *currency;
         s.barTargetDetails = store.GetBool(kTargetDetailsKey, s.barTargetDetails);
@@ -1399,6 +1413,11 @@ namespace headsup
             setFloat(base + kResistRankSuffix, static_cast<float>(s.statusBadges[i].resistRank));
         }
         store.Set(kBarThemeKey, kBarThemeNames[static_cast<int>(s.barTheme)]);
+        for (const PaletteColor& color : kPaletteColors)
+            StoreHex(store, kCustomThemeKey + std::string(color.name), s.customPalette.*color.field);
+        store.Set((kCustomThemeKey + std::string(kShapeSuffix)).c_str(), kBarShapeNames[static_cast<int>(s.customPalette.shape)]);
+        setFloat(kCustomThemeKey + std::string(kBorderSuffix), static_cast<float>(s.customPalette.border));
+        setBool(kCustomThemeKey + std::string(kGradientSuffix), s.customPalette.gradient);
         store.Set(kBarSeparatorsKey, kBarSeparatorsNames[static_cast<int>(s.barSeparators)]);
         store.Set(kBarCurrencyKey, kCurrencyTable[s.barCurrency].key);
         store.Set(kClockZoneKey, s.clockZone ? kClockZoneNames[static_cast<int>(*s.clockZone)] : kLocalZone);

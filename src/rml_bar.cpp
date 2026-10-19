@@ -162,10 +162,16 @@ namespace headsup
         });
     }
 
-    bool RmlBar::Document(RmlHost& host, const BarLook& look, BarTheme theme, const BarTextPlace& place)
+    bool RmlBar::Document(RmlHost& host, const BarLook& look, const BarTextPlace& place)
     {
-        DocumentKey key{theme, look.metrics, look.row, look.lines, place, look.titleFont, look.detailFont};
+        DocumentKey key{look.palette, look.metrics, look.row, look.lines, place, look.titleFont, look.detailFont};
         if (m_Document != nullptr && key == m_DocumentKey) return true;
+        // A strip of other colors or rows is another image: the one before is let go, or every step of a color's
+        // slider would keep its own.
+        const auto strip = [](const DocumentKey& k) {
+            return StripSource(k.palette, WholePixels(k.metrics.height), WholePixels(k.metrics.below));
+        };
+        if (m_Document != nullptr && strip(m_DocumentKey) != strip(key)) Rml::ReleaseTexture(strip(m_DocumentKey));
         Close();
         m_Document = host.Bar()->LoadDocumentFromMemory(BarDocument(look, place), kDocumentName);
         if (m_Document == nullptr) return false;
@@ -316,9 +322,9 @@ namespace headsup
         return parts.row.box;
     }
 
-    bool RmlBar::PopupDocumentFor(RmlHost& host, const BarLook& look, BarTheme theme)
+    bool RmlBar::PopupDocumentFor(RmlHost& host, const BarLook& look)
     {
-        PopupDocumentKey key{theme, look.metrics, look.titleFont, look.detailFont};
+        PopupDocumentKey key{look.palette, look.metrics, look.titleFont, look.detailFont};
         if (m_PopupDocument != nullptr && key == m_PopupDocumentKey) return true;
         ClosePopup();
         for (int f = 0; f < kPopupFontCount; ++f)
@@ -337,7 +343,7 @@ namespace headsup
         return m_Popup != nullptr;
     }
 
-    BarRect RmlBar::ShowPopup(RmlHost& host, const BarLook& look, BarTheme theme, const BarState& state,
+    BarRect RmlBar::ShowPopup(RmlHost& host, const BarLook& look, const BarState& state,
         const BarLayout& layout, float screenWidth, float screenHeight, const BarInput& input, bool hidden)
     {
         const std::optional<BarWidget> open = input.Open();
@@ -351,7 +357,7 @@ namespace headsup
             }
             return BarRect{};
         }
-        if (!PopupDocumentFor(host, look, theme)) return BarRect{};
+        if (!PopupDocumentFor(host, look)) return BarRect{};
         const BarPalette& p = look.palette;
         const BarMetrics& m = look.metrics;
         auto measure = [&](const Span& s, PopupFont f) {
@@ -401,7 +407,7 @@ namespace headsup
             input.SetPopup(BarRect{});
             return;
         }
-        const BarPalette& p = PaletteOf(settings.barTheme);
+        const BarPalette& p = PaletteFor(settings);
         const BarMetrics m  = MetricsFor(settings.barHeight, p.shape, settings.barTextSize, settings.popupTextSize);
         // The player's fonts where RmlUi can read them, the theme's where it cannot.
         const char* titleFont = BarTitleFont(settings, p.shape);
@@ -412,7 +418,7 @@ namespace headsup
         const BarLook look{p, settings, m, PillRow(m), rows.lines, titleFont, p.shape == BarShape::Ornate, detailFont};
         m_TitlePixels = look.lines.title;
         m_BarBottom   = BarBottom(p, m);
-        if (!Document(host, look, settings.barTheme, rows.place))
+        if (!Document(host, look, rows.place))
         {
             input.Frame(BarLayout{}, {});
             input.SetPopup(BarRect{});
@@ -436,7 +442,7 @@ namespace headsup
             m_HelpReach = BarRect{HelpBarLeft(m) + helpX, helpTop, HelpBarWidth(screenWidth), rows.helpBarHeight};
         input.Frame(layout, widgets.hasPopup);
         input.SetPopup(
-            ShowPopup(host, look, settings.barTheme, state, layout, screenWidth, screenHeight, input, hidden));
+            ShowPopup(host, look, state, layout, screenWidth, screenHeight, input, hidden));
         if (m_Visible == hidden)
         {
             m_Visible = !hidden;

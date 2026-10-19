@@ -339,6 +339,50 @@ namespace headsup
             }
         }
 
+        // The Custom theme's palette, edited: any change is the Custom theme's and picks it.
+        void EditTheme(Context& c, const BarPalette& edited)
+        {
+            if (edited == c.s.customPalette) return;
+            c.s.customPalette = edited;
+            c.s.barTheme      = BarTheme::Custom;
+        }
+
+        // Halfway between two colors, a byte at a time.
+        uint32_t Halfway(uint32_t a, uint32_t b)
+        {
+            uint32_t mixed = 0;
+            for (int shift = 0; shift < 32; shift += 8)
+                mixed |= (((a >> shift & 0xFF) + (b >> shift & 0xFF)) / 2) << shift;
+            return mixed;
+        }
+
+        // The rest of the palette, by ThemePaletteRow.
+        constexpr uint32_t BarPalette::*kThemeRowFields[] = {&BarPalette::underLine, &BarPalette::below,
+            &BarPalette::accent, &BarPalette::accentEnd, &BarPalette::pill, &BarPalette::pillBorder, &BarPalette::title,
+            &BarPalette::subtitle, &BarPalette::divider, &BarPalette::panelTop, &BarPalette::panelBottom,
+            &BarPalette::panelBorder, &BarPalette::panelOuter, &BarPalette::text, &BarPalette::heading,
+            &BarPalette::tagFill, &BarPalette::tagBorder, &BarPalette::tagText, &BarPalette::highlight};
+        static_assert(std::size(kThemeRowFields) == static_cast<size_t>(ThemePaletteRow::Highlight) + 1);
+
+        void ThemePalette(Context& c, const LayoutSetting& e)
+        {
+            Form& form = c.form;
+            form.Fade(!BarOn(c.s));
+            BarPalette edited = c.s.customPalette;
+            const auto rows   = c.layout.RowsOf(e);
+            const size_t first = (rows.size() + 1) / 2;
+            form.Raw("<div class=\"columns\"><div class=\"column\">");
+            for (size_t i = 0; i < rows.size(); ++i)
+            {
+                if (i == first) form.Raw("</div><div class=\"column second\">");
+                const LayoutRow& row = rows[i];
+                form.ArgbSwatch(Labeled(row.name, row.key, std::string(" ") + e.key).c_str(), edited.*kThemeRowFields[row.row],
+                    row.tip);
+            }
+            form.Raw("</div></div>");
+            EditTheme(c, edited);
+        }
+
         // One widget's options: its switch, its section, what it shows and its own settings, as the layout orders
         // them; a row the widget has nothing for is left out.
         void WidgetOptions(Context& c, const LayoutSetting& e, BarWidget widget)
@@ -1169,6 +1213,60 @@ namespace headsup
                 form.Fade(!on);
                 form.Switch(label.c_str(), s.shiftVanillaUi, tip);
                 break;
+            // The Custom theme's colors, shown and edited as they are kept, whatever theme is picked.
+            case SettingPiece::ThemeShape:
+            {
+                form.Fade(!BarOn(s));
+                BarPalette edited = s.customPalette;
+                const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(e));
+                form.Segments(label.c_str(), edited.shape, names.data(), kBarShapeCount, tip, kWideSegmentWidth);
+                EditTheme(c, edited);
+                break;
+            }
+            case SettingPiece::ThemeBackground:
+            {
+                form.Fade(!BarOn(s) || s.customPalette.gradient);
+                BarPalette edited = s.customPalette;
+                form.ArgbSwatch(label.c_str(), edited.stripTop, tip);
+                EditTheme(c, edited);
+                break;
+            }
+            case SettingPiece::ThemeGradient:
+            {
+                form.Fade(!BarOn(s));
+                BarPalette edited = s.customPalette;
+                form.Switch(label.c_str(), edited.gradient, tip);
+                EditTheme(c, edited);
+                break;
+            }
+            case SettingPiece::ThemeTop:
+            case SettingPiece::ThemeBottom:
+            {
+                form.Fade(!BarOn(s) || !s.customPalette.gradient);
+                BarPalette edited = s.customPalette;
+                form.ArgbSwatch(label.c_str(), e.piece == SettingPiece::ThemeTop ? edited.stripTop : edited.stripBottom, tip);
+                if (edited == s.customPalette) break;
+                edited.stripMiddle = Halfway(edited.stripTop, edited.stripBottom);
+                EditTheme(c, edited);
+                break;
+            }
+            case SettingPiece::ThemeBorderColor:
+            {
+                form.Fade(!BarOn(s));
+                BarPalette edited = s.customPalette;
+                form.ArgbSwatch(label.c_str(), edited.bottomLine, tip);
+                EditTheme(c, edited);
+                break;
+            }
+            case SettingPiece::ThemeBorderThickness:
+            {
+                form.Fade(!BarOn(s));
+                BarPalette edited = s.customPalette;
+                form.SliderInt(label.c_str(), edited.border, 0, kMaxStripBorder, "%d px", tip);
+                EditTheme(c, edited);
+                break;
+            }
+            case SettingPiece::ThemePalette: ThemePalette(c, e); break;
             case SettingPiece::HideGameHelp:
                 form.Fade(!on);
                 form.Switch(label.c_str(), s.hideHelpBar, tip);
@@ -1306,6 +1404,7 @@ namespace headsup
             case CardPiece::ScreenshotMode:
             case CardPiece::WindowGroups:
             case CardPiece::BaseGameUi:
+            case CardPiece::ThemeColors:
             case CardPiece::SettingsWindow: return {};
             case CardPiece::Reset: return {.bare = true};
             case CardPiece::Nameplates: return {false, !on, &s.nameplates};

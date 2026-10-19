@@ -466,6 +466,34 @@ TEST(a_swatch_opens_three_sliders_and_the_color_as_written)
     CHECK(nudged.changed && color.v[1] == 39.0f / 255.0f && color.v[2] == 0.15f);
 }
 
+TEST(a_color_with_alpha_opens_four_sliders_and_its_hex_keeps_the_alpha)
+{
+    FormState state;
+    uint32_t argb   = 0x80336699;
+    const auto pass = [&](const std::vector<FormEvent>& events) {
+        Form form(events, state);
+        form.pageKey = "p";
+        form.BeginCard("C");
+        form.ArgbSwatch("Fill", argb, nullptr);
+        form.EndCard();
+        return form;
+    };
+    const Form closed      = pass({});
+    const FormValue* shown = ValueOf(closed, "p-c-fill", FormValueKind::Property, "background-color");
+    CHECK(shown != nullptr && shown->text == "#33669980");
+    const Form open = pass({{"p-c-fill", kClickEvent, ""}});
+    CHECK(open.popup && ValueText(open, "p-c-fill-p-a") == "128" && ValueText(open, "p-c-fill-p-hex") == "336699");
+    const Form opaque = pass({{"p-c-fill-p-a", kChangeEvent, "255"}});
+    CHECK(opaque.changed && argb == 0xFF336699u);
+    const Form green = pass({{"p-c-fill-p-g", kChangeEvent, "0"}});
+    CHECK(green.changed && argb == 0xFF330099u);
+    pass({{"p-c-fill-p-a", kChangeEvent, "64"}});
+    pass({{"p-c-fill-p-hex", kCommitEvent, "#102030"}});
+    CHECK_EQ(argb, 0x40102030u);
+    const Form echoed = pass({{"p-c-fill-p-r", kChangeEvent, "16"}}); // said back as it stands
+    CHECK(!echoed.changed);
+}
+
 TEST(a_list_of_checks_stays_open_and_a_condition_unchecked_under_always_turns_always_off)
 {
     FormState state;

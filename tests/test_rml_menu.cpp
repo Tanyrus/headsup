@@ -841,7 +841,9 @@ TEST(every_switch_of_every_page_flips_a_setting_of_its_own_and_flips_it_back)
     {
         Window window;
         window.Page(info.key);
-        const Settings fresh = window.settings;
+        // An edit of the Custom theme's colors picks it, so its switches flip back from Custom alone.
+        window.settings.barTheme = BarTheme::Custom;
+        const Settings fresh     = window.settings;
         std::vector<std::string> switches;
         for (Rml::Element* element : window.OfClass("check"))
             if (!element->GetId().empty()) switches.push_back(element->GetId());

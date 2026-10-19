@@ -48,6 +48,9 @@ namespace headsup
         std::optional<BoxStyle> BoxOf(BarWidget widget, bool lit) const;
     };
 
+    // The palette the bar is drawn with: the picked theme's, or the player's own for Custom.
+    const BarPalette& PaletteFor(const Settings& settings);
+
     // The bar's fonts: the player's, or the theme's when they set none. Each name lasts as long as the process, for the
     // caches that keep it by reference.
     const char* BarTitleFont(const Settings& settings, BarShape shape);
