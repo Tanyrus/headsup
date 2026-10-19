@@ -702,7 +702,7 @@ TEST(wide_scans_grid_label_takes_the_title_windows_place_from_one_call_to_get_re
 {
     Image image;
     PutScanLabel(image, kScanLabelRva, kGetRectRva);
-    const ScanLabelSite found = LocateScanLabel(image.Text(), kGetRectRva);
+    const TitleRectSite found = LocateScanLabel(image.Text(), kGetRectRva);
     CHECK(found.problem == LocateProblem::None);
     CHECK_EQ(found.call, kScanLabelCall);
     CHECK(LocateScanLabel(image.Text(), 0).problem == LocateProblem::NoScanLabel); // GetRect itself not found
@@ -712,6 +712,40 @@ TEST(wide_scans_grid_label_takes_the_title_windows_place_from_one_call_to_get_re
     CHECK(LocateScanLabel(elsewhere.Text(), kGetRectRva).problem == LocateProblem::ScanLabelChanged);
     PutScanLabel(image, 0x100000, kGetRectRva);
     CHECK(LocateScanLabel(image.Text(), kGetRectRva).problem == LocateProblem::AmbiguousScanLabel);
+}
+
+namespace
+{
+    // Where an item list draws its count at the strip title's corner (RVA 0x1CB590 in the client of 2026-10-19, which
+    // five lists call): the title's owner from a global, its window's rectangle by MCD::GetRect, then the slash and
+    // the two numbers from that rectangle.
+    constexpr uint32_t kStripCountRva  = 0x1CB590;
+    constexpr uint32_t kStripCountCall = kStripCountRva + 58;
+    void PutStripCount(Image& image, uint32_t at, uint32_t calls)
+    {
+        image.Put(at, {0xA1, 0x7C, 0x84, 0xA3, 0x03, 0x83, 0xEC, 0x2C, 0x53, 0x33, 0xDB, 0x56, 0x3B, 0xC3, 0x57, 0x0F,
+                          0x84, 0x87, 0x01, 0x00, 0x00, 0x39, 0x58, 0x08, 0x0F, 0x84, 0x7E, 0x01, 0x00, 0x00, 0x8D, 0x4C,
+                          0x24, 0x0C, 0x66, 0x89, 0x5C, 0x24, 0x0C, 0x66, 0x89, 0x5C, 0x24, 0x0E, 0x66, 0x89, 0x5C, 0x24,
+                          0x10, 0x66, 0x89, 0x5C, 0x24, 0x12, 0x51, 0x8B, 0x48, 0x08, 0xE8, 0x00, 0x00, 0x00, 0x00, 0x8B,
+                          0x7C, 0x24, 0x3C});
+        image.Put32(at + 59, calls - (at + 58 + kBranchLength));
+    }
+}
+
+TEST(an_item_lists_count_takes_the_title_windows_place_from_one_call_to_get_rect)
+{
+    Image image;
+    PutStripCount(image, kStripCountRva, kGetRectRva);
+    const TitleRectSite found = LocateStripCount(image.Text(), kGetRectRva);
+    CHECK(found.problem == LocateProblem::None);
+    CHECK_EQ(found.call, kStripCountCall);
+    CHECK(LocateStripCount(image.Text(), 0).problem == LocateProblem::NoStripCount);
+    CHECK(LocateStripCount(Image{}.Text(), kGetRectRva).problem == LocateProblem::NoStripCount);
+    Image elsewhere;
+    PutStripCount(elsewhere, kStripCountRva, kGetRectRva + 0x40);
+    CHECK(LocateStripCount(elsewhere.Text(), kGetRectRva).problem == LocateProblem::StripCountChanged);
+    PutStripCount(image, 0x100000, kGetRectRva);
+    CHECK(LocateStripCount(image.Text(), kGetRectRva).problem == LocateProblem::AmbiguousStripCount);
 }
 
 TEST(only_a_countdown_above_zero_is_a_move_under_way)

@@ -470,6 +470,7 @@ namespace headsup
     namespace
     {
         __attribute__((thiscall)) void ScanLabelRect(uintptr_t mcd, int16_t* place);
+        __attribute__((thiscall)) void StripCountRect(uintptr_t mcd, int16_t* place);
     }
 
     std::string WindowHook::Start()
@@ -496,11 +497,18 @@ namespace headsup
         g_WindowMoveTo            = move.problem == LocateProblem::None ? Address(base) + move.moveTo : 0;
         g_WindowGetRect           = move.getRect != 0 ? Address(base) + move.getRect : 0;
         // Without it Wide Scan's grid label stays under the strip's title where the game put it.
-        if (const ScanLabelSite label = LocateScanLabel(text, move.getRect); label.problem == LocateProblem::None)
+        if (const TitleRectSite label = LocateScanLabel(text, move.getRect); label.problem == LocateProblem::None)
         {
             uint8_t* at         = base + label.call;
             CodePatch labelCall = Retarget(at, Address(at), Address(&ScanLabelRect));
             if (PutIn({&labelCall, 1}).empty()) m_LabelCall = labelCall;
+        }
+        // Without it an item list's count stays at the hidden strip's corner, under the panel.
+        if (const TitleRectSite count = LocateStripCount(text, move.getRect); count.problem == LocateProblem::None)
+        {
+            uint8_t* at         = base + count.call;
+            CodePatch countCall = Retarget(at, Address(at), Address(&StripCountRect));
+            if (PutIn({&countCall, 1}).empty()) m_CountCall = countCall;
         }
         m_MoveProblem             = move.problem != LocateProblem::None ? Describe(move.problem)
                                     : g_WindowList == 0 ? "the game's list of open windows was not found" : "";
@@ -530,6 +538,10 @@ namespace headsup
         g_PlannedFrame = 0;
         g_PlannedKeys.Clear();
         g_WindowsBand  = 0;
+        const CodePatch count       = std::exchange(m_CountCall, {});
+        const std::string countBack = count.at == nullptr ? "" : KeptLoaded(PutBack({&count, 1},
+            "the item lists' count was changed again after HeadsUp hooked it, so it was left as it is",
+            "the item lists' count could not be put back"));
         const CodePatch label       = std::exchange(m_LabelCall, {});
         const std::string labelBack = label.at == nullptr ? "" : KeptLoaded(PutBack({&label, 1},
             "Wide Scan's grid label was changed again after HeadsUp hooked it, so it was left as it is",
@@ -537,7 +549,7 @@ namespace headsup
         const std::string drawBack = KeptLoaded(PutBack({&call, 1},
             "the game's window draw was changed again after HeadsUp hooked it, so it was left as it is",
             "the game's window draw could not be put back"));
-        return drawBack.empty() ? labelBack : drawBack;
+        return !drawBack.empty() ? drawBack : !labelBack.empty() ? labelBack : countBack;
     }
 
     void WindowHook::Hide(HiddenWindows hidden) { g_HiddenWindows = hidden; }
@@ -880,6 +892,16 @@ namespace headsup
             const WindowSpot now{rect[0], rect[1]};
             LabelPlace(std::span<int16_t, 4>(place, 4), g_FrameShifts.left.shift,
                 now.top - g_Placements.OriginOf(mcd, *key, now).top);
+        }
+
+        // In place of the call through which an item list's count asks for the strip title's rectangle: while the strip
+        // is hidden the count goes with it, off the screen, as the panel's help line says it.
+        __attribute__((thiscall)) void StripCountRect(uintptr_t mcd, int16_t* place)
+        {
+            reinterpret_cast<WindowGetRectFn>(g_WindowGetRect)(mcd, place);
+            if (!g_HiddenWindows.helpBar) return;
+            constexpr int16_t kOffScreen = -0x4000; // far above the screen, with room under the int16's floor
+            place[1] = place[3] = kOffScreen;
         }
 
         // HeadsUp's own move of a window. One whose owner puts it back each frame keeps the spot its owner last asked

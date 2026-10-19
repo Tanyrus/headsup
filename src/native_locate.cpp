@@ -93,6 +93,11 @@ namespace headsup
             0x8B, 0x4A, 0x08, 0xE8, -1, -1, -1, -1, 0x8B, 0x4C, 0x24, 0x0A, 0x8B, 0x54, 0x24, 0x04, 0x8D, 0x44, 0x24, 0x10,
             0x68, 0x80, 0x80, 0x80, 0x80, 0x83, 0xC1, 0x03};
         constexpr uint32_t kScanLabelCall = 17;
+        constexpr int16_t kStripCount[] = {0xA1, -1, -1, -1, -1, 0x83, 0xEC, 0x2C, 0x53, 0x33, 0xDB, 0x56, 0x3B, 0xC3, 0x57,
+            0x0F, 0x84, -1, -1, -1, -1, 0x39, 0x58, 0x08, 0x0F, 0x84, -1, -1, -1, -1, 0x8D, 0x4C, 0x24, 0x0C, 0x66, 0x89,
+            0x5C, 0x24, 0x0C, 0x66, 0x89, 0x5C, 0x24, 0x0E, 0x66, 0x89, 0x5C, 0x24, 0x10, 0x66, 0x89, 0x5C, 0x24, 0x12, 0x51,
+            0x8B, 0x48, 0x08, 0xE8, -1, -1, -1, -1, 0x8B, 0x7C, 0x24, 0x3C};
+        constexpr uint32_t kStripCountCall = 58;
         constexpr int16_t kWindowGetRect[] = {0x83, 0xEC, 0x0C, 0x56, 0x8B, 0xF1, 0x8A, 0x86, 0x99, 0x00, 0x00, 0x00,
             0x84, 0xC0, 0x0F, 0x84};
         constexpr char kMenuPrefix[] = "menu    ";
@@ -328,6 +333,9 @@ namespace headsup
         case LocateProblem::NoScanLabel: return "where Wide Scan places its grid label was not found";
         case LocateProblem::AmbiguousScanLabel: return "where Wide Scan places its grid label was found more than once";
         case LocateProblem::ScanLabelChanged: return "Wide Scan's grid label is placed through an unexpected function";
+        case LocateProblem::NoStripCount: return "where the item lists draw their count was not found";
+        case LocateProblem::AmbiguousStripCount: return "where the item lists draw their count was found more than once";
+        case LocateProblem::StripCountChanged: return "the item lists' count is placed through an unexpected function";
         case LocateProblem::NoStripText: return "the game's help bar text was not found";
         case LocateProblem::AmbiguousStripText: return "the game's help bar text was found in more places than one";
         case LocateProblem::StripTextChanged: return "the game's help bar text is not laid out as HeadsUp expects";
@@ -594,14 +602,24 @@ namespace headsup
         return WindowRect{by(copy[kLeft], dx), by(copy[kTop], dy), by(copy[kRight], dx), by(copy[kBottom], dy)};
     }
 
-    ScanLabelSite LocateScanLabel(const ImageSection& text, uint32_t getRect)
+    TitleRectSite LocateScanLabel(const ImageSection& text, uint32_t getRect)
     {
         const std::vector<uint32_t> found = FindAll(kScanLabel, text);
-        if (getRect == 0 || found.empty()) return ScanLabelSite{LocateProblem::NoScanLabel};
-        if (found.size() > 1) return ScanLabelSite{LocateProblem::AmbiguousScanLabel};
+        if (getRect == 0 || found.empty()) return TitleRectSite{LocateProblem::NoScanLabel};
+        if (found.size() > 1) return TitleRectSite{LocateProblem::AmbiguousScanLabel};
         const uint32_t call = text.rva + found.front() + kScanLabelCall;
-        if (CallTarget(call, text) != getRect) return ScanLabelSite{LocateProblem::ScanLabelChanged};
-        return ScanLabelSite{LocateProblem::None, call};
+        if (CallTarget(call, text) != getRect) return TitleRectSite{LocateProblem::ScanLabelChanged};
+        return TitleRectSite{LocateProblem::None, call};
+    }
+
+    TitleRectSite LocateStripCount(const ImageSection& text, uint32_t getRect)
+    {
+        const std::vector<uint32_t> found = FindAll(kStripCount, text);
+        if (getRect == 0 || found.empty()) return TitleRectSite{LocateProblem::NoStripCount};
+        if (found.size() > 1) return TitleRectSite{LocateProblem::AmbiguousStripCount};
+        const uint32_t call = text.rva + found.front() + kStripCountCall;
+        if (CallTarget(call, text) != getRect) return TitleRectSite{LocateProblem::StripCountChanged};
+        return TitleRectSite{LocateProblem::None, call};
     }
 
     std::optional<WindowKey> WindowKeyOf(const char* name)
