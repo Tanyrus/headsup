@@ -1,11 +1,30 @@
 #include "bar_theme.h"
 
+#include "ini_text.h"
+
 #include <algorithm>
+#include <charconv>
+#include <cstdio>
+#include <vector>
 
 namespace headsup
 {
     namespace
     {
+        constexpr const char* kThemeSection = "theme";
+        constexpr const char* kShapeKey = "Shape", *kBorderKey = "Border", *kGradientKey = "Gradient";
+        constexpr const char* kTrueText = "true", *kFalseText = "false";
+        constexpr int kHex = 16;
+
+        std::optional<int> NumberIn(const std::optional<std::string>& text, int base)
+        {
+            int value = 0;
+            if (!text || text->empty()) return std::nullopt;
+            const char* end = text->data() + text->size();
+            const auto [at, problem] = std::from_chars(text->data(), end, value, base);
+            return problem == std::errc{} && at == end ? std::optional<int>(value) : std::nullopt;
+        }
+
         constexpr float kTitleShare = 0.40f, kDetailShare = 0.33f, kPopupTextShare = 0.39f; // of H
 
         // Alpha is the first byte: 0x1A is 10%, 0x33 20%, 0x59 35%, 0x80 50% and 0xF7 97%.
@@ -65,4 +84,43 @@ namespace headsup
     }
 
     const char* TitleFont(BarShape shape) { return shape == BarShape::Ornate ? kMarcellusSC : kDetailFont; }
+
+    std::string ThemeFileText(const BarPalette& palette)
+    {
+        std::vector<KeyText> values;
+        for (const PaletteColor& color : kPaletteColors)
+        {
+            char hex[16];
+            std::snprintf(hex, sizeof(hex), "%08x", palette.*color.field);
+            values.push_back({color.name, hex});
+        }
+        values.push_back({kShapeKey, kBarShapeNames[static_cast<int>(palette.shape)]});
+        values.push_back({kBorderKey, std::to_string(palette.border)});
+        values.push_back({kGradientKey, palette.gradient ? kTrueText : kFalseText});
+        return WithIniValues("", kThemeSection, values);
+    }
+
+    std::optional<BarPalette> PaletteFromThemeFile(std::string_view file)
+    {
+        BarPalette palette = PaletteOf(BarTheme::PhoenixGold);
+        bool any           = false;
+        for (const PaletteColor& color : kPaletteColors)
+            if (const std::optional<std::string> text = IniValue(file, kThemeSection, color.name))
+            {
+                uint32_t value = 0;
+                const char* end = text->data() + text->size();
+                const auto [at, problem] = std::from_chars(text->data(), end, value, kHex);
+                if (problem != std::errc{} || at != end || text->empty()) continue;
+                palette.*color.field = value;
+                any                  = true;
+            }
+        const std::optional<std::string> shape = IniValue(file, kThemeSection, kShapeKey);
+        for (int i = 0; shape && i < kBarShapeCount; ++i)
+            if (*shape == kBarShapeNames[i]) palette.shape = static_cast<BarShape>(i);
+        if (const std::optional<int> border = NumberIn(IniValue(file, kThemeSection, kBorderKey), 10))
+            palette.border = std::clamp(*border, 0, kMaxStripBorder);
+        if (const std::optional<std::string> gradient = IniValue(file, kThemeSection, kGradientKey))
+            palette.gradient = *gradient != kFalseText;
+        return any ? std::optional<BarPalette>(palette) : std::nullopt;
+    }
 }

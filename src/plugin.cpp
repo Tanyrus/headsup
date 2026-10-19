@@ -79,6 +79,7 @@ namespace
     constexpr int kQueriesPerFrame           = 128;      // VirtualQuery calls a frame while the Memory widget shows
     constexpr double kLinuxXIStaleSeconds    = 3 * headsup::kLinuxXIReportSeconds; // three reports missed and it is gone
     constexpr const char* kCursorsFolder     = "cursors"; // inside HeadsUp's config folder: the player's cursor files
+    constexpr const char* kThemesFolder      = "themes";  // and their saved top panel themes
     constexpr const char* kSettingsFile      = "settings.ini";
     constexpr const char* kNewFileSuffix     = ".new";          // after the process id: the file while it is written
     constexpr long kMaxSettingsBytes         = 4 * 1024 * 1024; // past this the file is not HeadsUp's to rewrite
@@ -352,6 +353,7 @@ class HeadsUp final : public IPlugin
     std::vector<std::string> m_LastOpen;      // the open windows it wrote last // what the window hook has: the settings' windows and groups
     std::vector<std::string> m_SeenWindows;
     std::vector<std::string> m_CursorFiles;      // the cursors folder's, as the Target Cursor and Cursor Icon lists offer them
+    std::vector<std::string> m_ThemeFiles;       // the themes folder's, as Theme Colors' Load offers them
     std::optional<std::string> m_CursorFileRead; // the File cursor read last, whether or not it was one
     std::string m_GameFontFailure;                // why the game's font could not be read; empty when it was
     bool m_GameFontWarned = false;
@@ -424,6 +426,7 @@ public:
         }
         LoadSettings();
         ScanCursors();
+        ScanThemes();
 #ifdef HEADSUP_DEV
         ReadWindowFile(false);
 #endif
@@ -866,6 +869,7 @@ public:
                 .seenWindows      = &m_SeenWindows,
                 .windowPlaces     = &m_WindowPlaces,
                 .cursorFiles      = &m_CursorFiles,
+                .themeFiles       = &m_ThemeFiles,
 #ifdef HEADSUP_DEV
                 .watching         = m_DrawDump.Watching(),
 #else
@@ -898,6 +902,10 @@ public:
             if (m_RmlMenu.TakeExportRequest()) ExportWindowFile();
 #endif
             if (m_RmlMenu.TakeCursorsRequest()) ScanCursors();
+            if (m_RmlMenu.TakeThemesRequest()) ScanThemes();
+            if (const std::optional<std::string> name = m_RmlMenu.TakeThemeSave()) SaveTheme(*name);
+            if (const std::optional<std::string> name = m_RmlMenu.TakeThemeLoad(); name && LoadTheme(*name))
+                m_SettingsChangedAt = now;
         }
         if (headsup::SaveDue(m_SettingsChangedAt, now, m_RmlMenu.open)) SaveSettings();
         UpdatePointer();
@@ -1662,10 +1670,11 @@ private:
     }
 
     std::string CursorsFolder() { return OwnFolder(kConfigFolder) + "\\" + kCursorsFolder + "\\"; }
+    std::string ThemesFolder() { return OwnFolder(kConfigFolder) + "\\" + kThemesFolder + "\\"; }
 
-    void ScanCursors()
+    // The names of the files in one of HeadsUp's own folders, which is made if it is not there.
+    static std::vector<std::string> FolderEntries(const std::string& folder)
     {
-        const std::string folder = CursorsFolder();
         CreateDirectoryA(folder.c_str(), nullptr);
         std::vector<std::string> entries;
         WIN32_FIND_DATAA found{};
@@ -1677,7 +1686,42 @@ private:
             while (FindNextFileA(search, &found) != 0);
             FindClose(search);
         }
-        m_CursorFiles = headsup::CursorFileNames(entries);
+        return entries;
+    }
+
+    void ScanThemes() { m_ThemeFiles = headsup::FolderFileNames(FolderEntries(ThemesFolder()), headsup::kThemeExtensions); }
+
+    void SaveTheme(const std::string& name)
+    {
+        const std::string path = ThemesFolder() + name + headsup::kThemeExtensions[0];
+        std::ofstream out(path, std::ios::binary | std::ios::trunc);
+        const std::string text = headsup::ThemeFileText(m_Settings.customPalette);
+        out.write(text.data(), static_cast<std::streamsize>(text.size()));
+        Print(out.good() ? "saved the Custom theme as " + name + "." : "could not save the theme " + path + ".");
+        ScanThemes();
+    }
+
+    // Makes a saved theme the Custom theme and picks it; false when the file gave no theme.
+    bool LoadTheme(const std::string& name)
+    {
+        const std::string path = ThemesFolder() + name + headsup::kThemeExtensions[0];
+        std::ifstream in(path, std::ios::binary);
+        const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        const std::optional<headsup::BarPalette> palette = headsup::PaletteFromThemeFile(text);
+        if (!palette)
+        {
+            Print("could not read a theme from " + path + ".");
+            return false;
+        }
+        m_Settings.customPalette = *palette;
+        m_Settings.barTheme      = headsup::BarTheme::Custom;
+        return true;
+    }
+
+    void ScanCursors()
+    {
+        const std::vector<std::string> entries = FolderEntries(CursorsFolder());
+        m_CursorFiles = headsup::FolderFileNames(entries, headsup::kCursorExtensions);
         m_CursorFileRead.reset(); // a file that could not be read may have been put right since
         m_PointerFailed = false;
     }

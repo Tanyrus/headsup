@@ -52,10 +52,10 @@ namespace headsup
     const char* CursorStyleName(CursorStyle style); // as the settings file has it
     // A picture keeps its own colors; a shape is filled with the cursor's.
     constexpr bool CursorIsPicture(CursorStyle style) { return style == CursorStyle::Chocobo || style == CursorStyle::File; }
-    // A cursor file is kept by its name, which goes into a path under the cursors folder: not empty, not over
-    // this long, and with nothing in it that would lead out of the folder.
-    constexpr size_t kMaxCursorFileName = 64;
-    bool IsCursorFileName(std::string_view name);
+    // A cursor or theme file is kept by its name, which goes into a path under its folder: not empty, not over this
+    // long, and with nothing in it that would lead out of the folder.
+    constexpr size_t kMaxFileName = 64;
+    bool IsFolderFileName(std::string_view name);
     // The mouse pointer: the game's own, PlayOnline's chocobo, or a cursor file of the player's.
     enum class PointerIcon : uint8_t { Vanilla, Chocobo, File };
     constexpr int kPointerIconCount = 3;

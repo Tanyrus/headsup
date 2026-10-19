@@ -2330,7 +2330,7 @@ TEST(a_cursor_file_is_a_name_and_never_a_path)
     named.cursorFile  = "My Cursor 2";
     CHECK(Clamp(named) == named);
     // The longest name a file may have is kept, and one letter more is no name.
-    named.cursorFile = std::string(kMaxCursorFileName, 'n');
+    named.cursorFile = std::string(kMaxFileName, 'n');
     CHECK(Clamp(named) == named);
     named.cursorFile += 'n';
     CHECK(Clamp(named).cursorStyle == CursorStyle::Feather);

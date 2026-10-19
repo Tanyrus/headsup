@@ -856,6 +856,28 @@ TEST(the_theme_colors_card_sets_the_shape_the_border_and_one_color_or_a_gradient
     CHECK(p.shape == BarShape::Glass);
 }
 
+TEST(a_theme_is_saved_under_a_name_it_can_have_and_loaded_from_the_list)
+{
+    Window w;
+    w.state.page          = Page::TopPanel;
+    const Settings before = w.settings;
+    const char* name = "toppanel-theme-colors-theme-name";
+    const char* save = "toppanel-theme-colors-save-theme";
+    w.Pass({{save, kClickEvent, ""}});
+    CHECK(!w.state.themeSave);
+    w.Pass({{name, kChangeEvent, "a/b"}, {save, kClickEvent, ""}});
+    CHECK(!w.state.themeSave);
+    w.Pass({{name, kChangeEvent, "Dusk"}, {save, kClickEvent, ""}});
+    CHECK(w.state.themeSave == "Dusk");
+    const std::vector<std::string> files = {"Dawn", "Dusk"};
+    w.readings.themeFiles = &files;
+    w.Pass({{"toppanel-theme-colors-theme-file", kClickEvent, ""}});
+    CHECK(w.state.themesRequested); // opened, the folder is read again
+    w.Pass({{"toppanel-theme-colors-theme-file-o-1", kClickEvent, ""}});
+    w.Pass({{"toppanel-theme-colors-load-theme", kClickEvent, ""}});
+    CHECK(w.state.themeLoad == "Dusk" && w.settings == before); // the plugin reads it in
+}
+
 TEST(the_nameplate_fonts_lead_with_the_games_font_and_the_top_panels_leave_it_out)
 {
     Window w;

@@ -4,6 +4,9 @@
 #include "fonts.h"
 
 #include <cstdint>
+#include <optional>
+#include <string>
+#include <string_view>
 
 namespace headsup
 {
@@ -51,6 +54,13 @@ namespace headsup
         {"Heading", &BarPalette::heading}, {"TagFill", &BarPalette::tagFill}, {"TagBorder", &BarPalette::tagBorder},
         {"TagText", &BarPalette::tagText}, {"Highlight", &BarPalette::highlight}};
     inline constexpr const char* kBarShapeNames[kBarShapeCount] = {"ornate", "pills", "glass"};
+
+    // A saved theme's file, in the themes folder: a [theme] section of its palette's parts by kPaletteColors' names,
+    // Shape, Border and Gradient. Read back, a part it lacks or that cannot be read is Phoenix Gold's, and a file of
+    // none of them is no theme.
+    constexpr const char* kThemeExtensions[] = {".ini"};
+    std::string ThemeFileText(const BarPalette& palette);
+    std::optional<BarPalette> PaletteFromThemeFile(std::string_view file);
 
     // A fixed theme's palette; Custom's is the settings' own (PaletteFor in bar_look.h).
     const BarPalette& PaletteOf(BarTheme theme);

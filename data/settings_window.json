@@ -325,6 +325,15 @@
                 {"key": "tag-text", "name": "Tag Text"},
                 {"key": "highlight", "name": "Highlight", "tip": "Over a widget under the pointer."}
               ]
+            },
+            {
+              "key": "theme-files",
+              "words": [
+                {"key": "save-as", "name": "Save As", "tip": "Saves the Custom theme under this name, in config/headsup/themes, over one of the same name."},
+                {"key": "name-hint", "name": "Name"},
+                {"key": "save", "name": "Save"},
+                {"key": "load", "name": "Load", "tip": "Makes a saved theme the Custom theme, and picks it."}
+              ]
             }
           ]
         },

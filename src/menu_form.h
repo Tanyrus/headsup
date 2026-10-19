@@ -32,6 +32,7 @@ namespace headsup
         const std::vector<std::string>* seenWindows = nullptr; // the game's windows seen under Game help's bar
         const std::vector<WindowPlace>* windowPlaces = nullptr; // where each window seen last stood
         const std::vector<std::string>* cursorFiles = nullptr; // the cursors folder's files, without their extensions
+        const std::vector<std::string>* themeFiles  = nullptr; // the themes folder's, the same way
         std::optional<bool> watching;            // whether the debug watch runs; none in a build without one
         const std::string* lastReport = nullptr; // the file the last report went to, empty before one
         bool exportable = false; // a developer's build, which can write its built-in layout out as a file
@@ -55,6 +56,10 @@ namespace headsup
         bool watchRequested = false; // the debug watch is to start, or stop
         bool exportRequested = false;
         bool cursorsRequested = false; // a list of pictures was opened: the cursors folder is to be read again
+        bool themesRequested  = false; // the list of saved themes was opened: the themes folder is to be read again
+        std::string themeName;   // typed to save the Custom theme under
+        std::string themePicked; // the saved theme picked to load
+        std::optional<std::string> themeSave, themeLoad; // what the plugin is to write or read in, once
         KeyCapture keyCapture;      // the Mouse Cursor page's
         KeyCapture shotKeyCapture;  // screenshot mode's
         WindowFilter windows;

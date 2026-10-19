@@ -181,6 +181,7 @@ PIECES = Pieces(
             'under-line', 'glow-below', 'accent', 'accent-end', 'pill', 'pill-border', 'title', 'subtitle', 'divider',
             'panel-top', 'panel-bottom', 'panel-border', 'panel-outer', 'text', 'heading', 'tag-fill', 'tag-border',
             'tag-text', 'highlight')),
+        'theme-files': Setting(unnamed=True, words={'save-as': True, 'name-hint': True, 'save': True, 'load': True}),
         'hide-game-help': Setting(), 'position': Setting(), 'background': Setting(),
         'widget-tabs': Setting(unnamed=True, rows=rows(
             'enabled', 'section', 'second-line', 'icons', 'details', 'currency', 'time-zone', 'server-time', '24-hour',

@@ -383,6 +383,32 @@ namespace headsup
             EditTheme(c, edited);
         }
 
+        // Save the Custom theme under a name, or load one saved: the plugin reads and writes the files.
+        void ThemeFiles(Context& c)
+        {
+            Form& form = c.form;
+            form.Fade(!BarOn(c.s));
+            form.Row(Labeled(Word(c, WindowWord::ThemeFilesSaveAs), "save as").c_str(), WordTip(c, WindowWord::ThemeFilesSaveAs));
+            form.TextAt("theme name", c.state.themeName, Word(c, WindowWord::ThemeFilesNameHint), kFilterWidth, true, kMaxFileName);
+            if (form.Button(Word(c, WindowWord::ThemeFilesSave), "save theme") && IsFolderFileName(c.state.themeName))
+                c.state.themeSave = c.state.themeName;
+            form.EndRow();
+            static const std::vector<std::string> kNoThemes;
+            const std::vector<std::string>& files = c.readings.themeFiles != nullptr ? *c.readings.themeFiles : kNoThemes;
+            form.Row(Labeled(Word(c, WindowWord::ThemeFilesLoad), "load").c_str(), WordTip(c, WindowWord::ThemeFilesLoad));
+            if (!files.empty())
+            {
+                const auto known = std::ranges::find(files, c.state.themePicked);
+                int picked       = known != files.end() ? static_cast<int>(known - files.begin()) : 0;
+                form.DropdownAt("theme file", picked, 0, static_cast<int>(files.size()) - 1,
+                    [&](int i) { return files[static_cast<size_t>(i)]; }, kFilterWidth);
+                c.state.themePicked = files[static_cast<size_t>(picked)];
+                if (form.Button(Word(c, WindowWord::ThemeFilesLoad), "load theme")) c.state.themeLoad = c.state.themePicked;
+            }
+            if (form.Opened("theme file")) c.state.themesRequested = true;
+            form.EndRow();
+        }
+
         // One widget's options: its switch, its section, what it shows and its own settings, as the layout orders
         // them; a row the widget has nothing for is left out.
         void WidgetOptions(Context& c, const LayoutSetting& e, BarWidget widget)
@@ -1267,6 +1293,7 @@ namespace headsup
                 break;
             }
             case SettingPiece::ThemePalette: ThemePalette(c, e); break;
+            case SettingPiece::ThemeFiles: ThemeFiles(c); break;
             case SettingPiece::HideGameHelp:
                 form.Fade(!on);
                 form.Switch(label.c_str(), s.hideHelpBar, tip);

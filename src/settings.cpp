@@ -1149,9 +1149,9 @@ namespace headsup
 
     const char* CursorStyleName(CursorStyle style) { return kCursorStyleNames[static_cast<int>(style)]; }
 
-    bool IsCursorFileName(std::string_view name)
+    bool IsFolderFileName(std::string_view name)
     {
-        return !name.empty() && name.size() <= kMaxCursorFileName && name.find_first_of(kPathCharacters) == std::string_view::npos;
+        return !name.empty() && name.size() <= kMaxFileName && name.find_first_of(kPathCharacters) == std::string_view::npos;
     }
 
     Settings Clamp(Settings s)
@@ -1185,11 +1185,11 @@ namespace headsup
         s.helpBarY        = std::clamp(s.helpBarY, -kMaxHelpBarOffset, kMaxHelpBarOffset);
         for (const ColorKey& c : kColors)
             s.*c.field = ClampColor(s.*c.field, d.*c.field);
-        const bool named = IsCursorFileName(s.cursorFile);
+        const bool named = IsFolderFileName(s.cursorFile);
         if (!named) s.cursorFile.clear();
         if (static_cast<int>(s.cursorStyle) >= kCursorStyleCount || (s.cursorStyle == CursorStyle::File && !named))
             s.cursorStyle = d.cursorStyle;
-        const bool pointerNamed = IsCursorFileName(s.pointerFile);
+        const bool pointerNamed = IsFolderFileName(s.pointerFile);
         if (!pointerNamed) s.pointerFile.clear();
         if (static_cast<int>(s.pointerIcon) >= kPointerIconCount || (s.pointerIcon == PointerIcon::File && !pointerNamed))
             s.pointerIcon = d.pointerIcon;
