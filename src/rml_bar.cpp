@@ -167,7 +167,7 @@ namespace headsup
         DocumentKey key{theme, look.metrics, look.row, look.lines, place, look.titleFont, look.detailFont};
         if (m_Document != nullptr && key == m_DocumentKey) return true;
         Close();
-        m_Document = host.Bar()->LoadDocumentFromMemory(BarDocument(look, theme, place), kDocumentName);
+        m_Document = host.Bar()->LoadDocumentFromMemory(BarDocument(look, place), kDocumentName);
         if (m_Document == nullptr) return false;
         m_DocumentKey = std::move(key);
         for (int w = 0; w < kBarWidgetCount; ++w)
@@ -329,7 +329,7 @@ namespace headsup
             m_PopupFaces[f]      = PopupFace{face.family, pixels, line.rmlHeight, face.tracking, line.drop};
         }
         m_PopupDocument =
-            host.Overlay()->LoadDocumentFromMemory(PopupDocument(look, m_PopupFaces, theme), kPopupDocumentName);
+            host.Overlay()->LoadDocumentFromMemory(PopupDocument(look, m_PopupFaces), kPopupDocumentName);
         if (m_PopupDocument == nullptr) return false;
         m_PopupDocumentKey = std::move(key);
         m_Popup            = m_PopupDocument->GetElementById(kPopupId);

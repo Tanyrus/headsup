@@ -24,7 +24,7 @@ TEST(each_theme_has_the_mockups_colors_and_shape)
     CHECK_EQ(PaletteOf(BarTheme::PhoenixRedPills).pillBorder, 0x33D2ABABu); // #d2abab at 20%
     // Aurora is laid out as pills are, in its own slate and cyan.
     const BarPalette& aurora = PaletteOf(BarTheme::Aurora);
-    CHECK(aurora.shape == BarShape::Pills && aurora.accent == 0xFF5EE6FFu && aurora.title == 0xFFEAF2FFu);
+    CHECK(aurora.shape == BarShape::Glass && aurora.accent == 0xFF5EE6FFu && aurora.title == 0xFFEAF2FFu);
 }
 
 TEST(sizes_follow_the_bar_height)

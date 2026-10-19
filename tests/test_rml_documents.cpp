@@ -33,8 +33,8 @@ TEST(rmlui_reads_every_themes_bar_and_popups_without_a_complaint)
         const BarTheme theme = static_cast<BarTheme>(t);
         const BarLook look   = LookOf(theme, settings);
         test::RmlSession rml;
-        Rml::ElementDocument* bar = rml.context->LoadDocumentFromMemory(BarDocument(look, theme, place), "bar");
-        Rml::ElementDocument* popups = rml.context->LoadDocumentFromMemory(PopupDocument(look, faces, theme), "popups");
+        Rml::ElementDocument* bar = rml.context->LoadDocumentFromMemory(BarDocument(look, place), "bar");
+        Rml::ElementDocument* popups = rml.context->LoadDocumentFromMemory(PopupDocument(look, faces), "popups");
         CHECK(bar != nullptr && popups != nullptr);
         bar->Show();
         popups->Show();

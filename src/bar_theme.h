@@ -11,6 +11,7 @@ namespace headsup
     {
         Ornate, // a strip with an edge line and glow, diamond caps and dividers, a framed target
         Pills,  // a strip with each widget in a rounded pill
+        Glass,  // pills of glass that show only when lit, a line of light under the strip, and glass popups
     };
 
     // D3DCOLORs (ARGB); 0 is none.

@@ -7,13 +7,13 @@ using namespace headsup;
 
 namespace
 {
-    BarLook LookOf(BarTheme theme, const Settings& settings)
+    BarLook LookOf(const BarPalette& p, const Settings& settings)
     {
-        const BarPalette& p = PaletteOf(theme);
         const BarMetrics m  = MetricsFor(45, p.shape);
         return BarLook{p, settings, m, PillRow(m), TextRow{13, 11, true, 10.0f, 24.0f, 12.0f},
             BarTitleFont(settings, p.shape), p.shape == BarShape::Ornate, BarTextFont(settings)};
     }
+    BarLook LookOf(BarTheme theme, const Settings& settings) { return LookOf(PaletteOf(theme), settings); }
 
     // Line boxes 16 and 14 px tall, the title's top at row 9 over a detail at row 23, or alone at row 14.
     BarTextPlace Place()
@@ -41,19 +41,24 @@ TEST(colors_are_written_with_their_alpha_last)
 TEST(image_names_round_trip_to_their_images)
 {
     CHECK_EQ(IconSource(Icon::Link), "hu:icon/4");
-    CHECK_EQ(StripSource(BarTheme::UmbraDark, 45, 13), "hu:strip/1/45/13");
+    const BarPalette& umbra = PaletteOf(BarTheme::UmbraDark);
+    const std::string umbraStrip = "hu:strip/ff2b2b30/ff212125/ff17171a/ff000000/00000000/80000000/45/13";
+    CHECK_EQ(StripSource(umbra, 45, 13), umbraStrip);
     CHECK_EQ(DiamondSource(0xFFC9A24Au, 10), "hu:diamond/ffc9a24a/10");
     CHECK_EQ(CoinSource(17), "hu:coin/17");
     const std::optional<Image> icon = HostImage("hu:icon/4");
     CHECK(icon && icon->width == static_cast<int>(IconImage(Icon::Link).width));
-    const std::optional<Image> strip = HostImage("hu:strip/1/45/13");
+    const std::optional<Image> strip = HostImage(umbraStrip);
     CHECK(strip && strip->width == 1 && strip->height == 45 + 13);
+    CHECK(strip->argb == StripColumn(45, 13, umbra.stripTop, umbra.stripMiddle, umbra.stripBottom, umbra.bottomLine,
+                             umbra.underLine, umbra.below).argb);
     const std::optional<Image> diamond = HostImage("hu:diamond/ffc9a24a/10");
     CHECK(diamond && diamond->width == 10 && diamond->height == 10);
     CHECK(diamond->argb[5 * 10 + 5] == 0xFFC9A24Au); // its middle pixel is solid in its color
     const std::optional<Image> coin = HostImage("hu:coin/17");
     CHECK(coin && coin->width == 17);
     CHECK(!HostImage("hu:icon/999") && !HostImage("hu:nothing") && !HostImage("icon.png") && !HostImage("hu:strip/9/45/13"));
+    CHECK(!HostImage("hu:strip/ff2b2b30/ff212125/zz17171a/ff000000/00000000/80000000/45/13"));
     // The reset arrow, in the color asked for: the bottom of its ring is that color.
     const std::optional<Image> reset = HostImage(ResetSource(0xFF8C7270u, 32));
     CHECK(reset && reset->width == 32 && reset->height == 32);
@@ -64,9 +69,9 @@ TEST(image_names_round_trip_to_their_images)
 TEST(the_document_holds_the_strip_the_caps_the_dividers_and_every_placed_widget)
 {
     Settings settings;
-    const std::string rml = BarDocument(LookOf(BarTheme::PhoenixGold, settings), BarTheme::PhoenixGold, Place());
+    const std::string rml = BarDocument(LookOf(BarTheme::PhoenixGold, settings), Place());
     CHECK(Has(rml, "<rml>") && Has(rml, "</rml>") && Has(rml, "<body class=\"ornate\">"));
-    CHECK(Has(rml, "hu:strip/0/45/13")); // 45 rows and 0.28 H below
+    CHECK(Has(rml, StripSource(PaletteOf(BarTheme::PhoenixGold), 45, 13).c_str())); // 45 rows and 0.28 H below
     CHECK(Has(rml, "height:59px")); // those, and the gold theme's line under the strip
     CHECK(Has(rml, "id=\"w-zone\"") && Has(rml, "id=\"w-target\"") && Has(rml, "id=\"w-earthTime\""));
     CHECK(!Has(rml, "id=\"w-gameHelp\"")); // never on the bar
@@ -92,7 +97,7 @@ TEST(the_document_holds_the_strip_the_caps_the_dividers_and_every_placed_widget)
 TEST(a_pill_theme_frames_each_widget_and_has_no_caps)
 {
     Settings settings;
-    const std::string rml = BarDocument(LookOf(BarTheme::UmbraDark, settings), BarTheme::UmbraDark, Place());
+    const std::string rml = BarDocument(LookOf(BarTheme::UmbraDark, settings), Place());
     CHECK(Has(rml, "<body class=\"pills\">") && !Has(rml, "cap-right\" src"));
     // 0.17 H corners, the pill's fill and edge.
     CHECK(Has(rml, ".pills .widget{background-color:#222226ff;border-color:#3a3a42ff;border-radius:7.65px;}"));
@@ -152,7 +157,7 @@ TEST(a_widget_of_figures_takes_the_detail_font_for_its_title)
 TEST(the_bars_text_carries_its_shadow)
 {
     Settings settings;
-    const std::string rml = BarDocument(LookOf(BarTheme::PhoenixGold, settings), BarTheme::PhoenixGold, Place());
+    const std::string rml = BarDocument(LookOf(BarTheme::PhoenixGold, settings), Place());
     // A 13 px title's shadow blurs 0.12 of its height: a Gaussian of 0.78 px, which RmlUi makes from a width of 2.
     // Once in place and once a pixel down, at 60%.
     CHECK(Has(rml, "font-effect:glow(0px 2px 0px 1px #00000099),glow(0px 2px 0px 0px #00000099);"));
@@ -178,7 +183,7 @@ TEST(the_help_bar_is_its_box_and_its_three_texts_centered_on_the_row)
     CHECK(!Has(HelpBarRml(parts, look, Place()), "help-box"));
     parts.row = HelpBarRow{};
     CHECK(HelpBarRml(parts, look, Place()).empty());
-    const std::string document = BarDocument(look, BarTheme::PhoenixGold, Place());
+    const std::string document = BarDocument(look, Place());
     CHECK(Has(document, "id=\"help\"") && Has(document, ".help-box{"));
     CHECK(Has(document, "decorator:vertical-gradient(#1c160ff7 #0c0a08f7)"));
 }
@@ -235,7 +240,7 @@ TEST(the_popup_document_styles_its_faces_and_boxes_from_the_look)
     const BarLook look = LookOf(BarTheme::PhoenixRedPills, settings);
     const PopupFaces faces = {PopupFace{"Barlow Condensed", 24, 29, 0}, PopupFace{"Barlow Condensed", 18, 22, 0},
         PopupFace{"Barlow Condensed", 15, 18, 2}, PopupFace{"Barlow Condensed", 15, 18, 0}};
-    const std::string rml = PopupDocument(look, faces, BarTheme::PhoenixRedPills);
+    const std::string rml = PopupDocument(look, faces);
     CHECK(Has(rml, "pointer-events:none") && Has(rml, "<div id=\"popup\" class=\"hidden\"></div>"));
     CHECK(Has(rml, ".f0{font-family:\"Barlow Condensed\";font-size:24px;line-height:29px;letter-spacing:0px;"));
     CHECK(Has(rml, ".f2{font-family:\"Barlow Condensed\";font-size:15px;line-height:18px;letter-spacing:2px;"));
@@ -275,7 +280,7 @@ TEST(every_theme_eases_breathes_and_pulses_in_its_own_colors)
              Lit{BarTheme::Aurora, "from{border-color:#5ee6ff59;}to{border-color:#b48cffcc;}", "#5ee6ffff #b48cffff"}})
     {
         const BarLook look    = LookOf(lit.theme, settings);
-        const std::string rml = BarDocument(look, lit.theme, Place());
+        const std::string rml = BarDocument(look, Place());
         // Widgets ease into their lit look, the target's frame breathes until it is lit, and progress is a
         // gradient that pulses.
         CHECK(Has(rml, "transition:background-color 0.2s cubic-out,border-color 0.2s cubic-out;"));
@@ -286,7 +291,7 @@ TEST(every_theme_eases_breathes_and_pulses_in_its_own_colors)
                            ");animation:1.8s sine-in-out infinite alternate pulse;}").c_str()));
         CHECK(Has(rml, "@keyframes pulse{from{opacity:0.65;}to{opacity:1;}}"));
         // A popup drops in from its widget.
-        const std::string popup = PopupDocument(look, faces, lit.theme);
+        const std::string popup = PopupDocument(look, faces);
         CHECK(Has(popup, "#popup{position:absolute;transform-origin:50% 0%;}"));
         CHECK(Has(popup, "#popup.open{animation:0.2s cubic-out drop-in;}"));
         CHECK(Has(popup, "@keyframes drop-in{from{opacity:0;transform:translateY(-10px) scale(0.96);}to{opacity:1;"
@@ -294,11 +299,11 @@ TEST(every_theme_eases_breathes_and_pulses_in_its_own_colors)
     }
 }
 
-TEST(the_line_of_light_and_the_glass_are_auroras_alone)
+TEST(the_line_of_light_and_the_glass_are_the_glass_shapes_alone)
 {
     Settings settings;
     const BarLook aurora  = LookOf(BarTheme::Aurora, settings);
-    const std::string rml = BarDocument(aurora, BarTheme::Aurora, Place());
+    const std::string rml = BarDocument(aurora, Place());
     // The strip's foot: a line of light, cyan to violet, fading out to both sides.
     CHECK(Has(rml, "<div class=\"glint a\"></div><div class=\"glint b\"></div><div class=\"glint c\"></div>"));
     CHECK(Has(rml, ".glint.a{left:0%;width:30%;decorator:horizontal-gradient(#5ee6ff00 #5ee6ffff);}"));
@@ -306,11 +311,19 @@ TEST(the_line_of_light_and_the_glass_are_auroras_alone)
     const PopupFaces faces = {PopupFace{"Barlow Condensed", 24, 29, 0}, PopupFace{"Barlow Condensed", 18, 22, 0},
         PopupFace{"Barlow Condensed", 15, 18, 2}, PopupFace{"Barlow Condensed", 15, 18, 0}};
     // The panel is glass, lighter at its top, in a frame of the accent at a quarter.
-    CHECK(Has(PopupDocument(aurora, faces, BarTheme::Aurora),
+    CHECK(Has(PopupDocument(aurora, faces),
         "#panel{background-color:transparent;decorator:vertical-gradient(#1b2740f2 #0c1220f2);border-color:#5ee6ff40;}"));
     // The others keep their strips and panels.
     const BarLook gold = LookOf(BarTheme::PhoenixGold, settings);
-    CHECK(!Has(BarDocument(gold, BarTheme::PhoenixGold, Place()), "glint"));
-    CHECK(!Has(PopupDocument(gold, faces, BarTheme::PhoenixGold), "background-color:transparent;decorator:vertical-gradient(#1b2740f2"));
-    CHECK(Has(PopupDocument(gold, faces, BarTheme::PhoenixGold), "decorator:vertical-gradient(#1c160ff7 #0c0a08f7);"));
+    CHECK(!Has(BarDocument(gold, Place()), "glint"));
+    CHECK(!Has(PopupDocument(gold, faces), "background-color:transparent;decorator:vertical-gradient(#1b2740f2"));
+    CHECK(Has(PopupDocument(gold, faces), "decorator:vertical-gradient(#1c160ff7 #0c0a08f7);"));
+    // It is the shape's, whatever the colors: Phoenix Gold's as glass has them, Aurora's as pills has neither.
+    BarPalette glassGold = PaletteOf(BarTheme::PhoenixGold), pillAurora = PaletteOf(BarTheme::Aurora);
+    glassGold.shape      = BarShape::Glass;
+    pillAurora.shape     = BarShape::Pills;
+    CHECK(Has(BarDocument(LookOf(glassGold, settings), Place()), "glint"));
+    CHECK(Has(PopupDocument(LookOf(glassGold, settings), faces), "#panel{background-color:transparent;"));
+    CHECK(!Has(BarDocument(LookOf(pillAurora, settings), Place()), "glint"));
+    CHECK(!Has(PopupDocument(LookOf(pillAurora, settings), faces), "#panel{background-color:transparent;"));
 }
