@@ -241,6 +241,22 @@ TEST(wide_scan_s_label_under_the_strip_s_title_moves_with_the_frame_s_windows_an
     CHECK(rect == title);
 }
 
+TEST(a_frame_no_view_holds_goes_right_under_the_band_and_a_view_s_to_where_its_windows_start)
+{
+    // A player's check: the inspect window at the game's 48, under a band of 60 and with windows starting at 64.
+    const std::vector<FrameWindow> check = {{Key("inspect"), 16, 48, 198, false}};
+    std::vector<std::optional<int>> shifts(WindowViews().size());
+    const FramePlan unheld = PlanOf(WindowViews(), check, shifts, 64);
+    CHECK(!unheld.chosen && !unheld.placedUnder);
+    CHECK_EQ(ShiftsOf(check, unheld.chosen, unheld.placedUnder, 60, true, kScreenRight, kScreenBottom).For(16, 198, kScreenRight), 12);
+    // Status is a view: it goes where windows start, or by the player's own shift for it.
+    const FramePlan status = PlanOf(WindowViews(), StatusFrame(), shifts, 64);
+    CHECK(!status.chosen && status.placedUnder == 64);
+    shifts[*ViewOf(WindowViews(), StatusFrame())] = 30;
+    CHECK(PlanOf(WindowViews(), StatusFrame(), shifts, 64).chosen == 30);
+    CHECK(!PlanOf(WindowViews(), check, shifts, 64).chosen);
+}
+
 TEST(the_side_holding_the_view_s_highest_window_takes_its_shift_and_the_other_hangs_under_the_band_by_its_own)
 {
     // Status: the status column at 16 on the left, and its menu at 48 on the right, where the Commands menu was.

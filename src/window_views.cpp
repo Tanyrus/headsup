@@ -93,8 +93,16 @@ namespace headsup
         return top;
     }
 
-    FrameShifts ShiftsOf(std::span<const FrameWindow> frame, std::optional<int> chosen, int placedUnder, int band,
-        bool keepClear, int screenRight, int screenBottom)
+    FramePlan PlanOf(std::span<const WindowView> views, std::span<const FrameWindow> frame,
+        std::span<const std::optional<int>> viewShifts, int placedUnder)
+    {
+        const std::optional<size_t> view = ViewOf(views, frame);
+        if (!view) return {};
+        return FramePlan{*view < viewShifts.size() ? viewShifts[*view] : std::nullopt, placedUnder};
+    }
+
+    FrameShifts ShiftsOf(std::span<const FrameWindow> frame, std::optional<int> chosen, std::optional<int> placedUnder,
+        int band, bool keepClear, int screenRight, int screenBottom)
     {
         std::vector<FrameWindow> left, right;
         for (const FrameWindow& w : frame)
@@ -102,10 +110,10 @@ namespace headsup
         const std::optional<int> leftTop = FrameTop(left, screenBottom), rightTop = FrameTop(right, screenBottom);
         const std::optional<int> top = FrameTop(frame, screenBottom);
         if (!top) return {};
-        const int viewShift = FrameShift(*top, chosen, placedUnder, band, keepClear);
+        const int viewShift = FrameShift(*top, chosen, placedUnder.value_or(band), band, keepClear);
         const auto own = [&](std::optional<int> sideTop) {
             if (!sideTop || *sideTop == *top) return viewShift;
-            return FrameShift(*sideTop, std::nullopt, placedUnder, band, keepClear);
+            return FrameShift(*sideTop, std::nullopt, placedUnder.value_or(band), band, keepClear);
         };
         const auto side = [&](std::span<const FrameWindow> windows, std::optional<int> sideTop) {
             SideShift shift{own(sideTop), std::nullopt};

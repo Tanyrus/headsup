@@ -925,10 +925,8 @@ namespace headsup
                 const std::optional<int> top = FrameTop(frame, placing.band.screenBottom);
                 if (placing.moveWindows && placed.band != 0 && top)
                 {
-                    const std::optional<size_t> view = ViewOf(WindowViews(), frame);
-                    const std::optional<int> chosen =
-                        view && *view < g_ViewShifts.size() ? g_ViewShifts[*view] : std::nullopt;
-                    g_FrameShifts = ShiftsOf(frame, chosen, placing.placedUnder, placed.band, placing.keepClear,
+                    const FramePlan plan = PlanOf(WindowViews(), frame, g_ViewShifts, placing.placedUnder);
+                    g_FrameShifts = ShiftsOf(frame, plan.chosen, plan.placedUnder, placed.band, placing.keepClear,
                         placing.band.screenRight, placing.band.screenBottom);
                 }
             }
