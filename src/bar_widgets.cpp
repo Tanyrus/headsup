@@ -25,6 +25,14 @@ namespace headsup
             "Mog Locker", "Mog Satchel", "Mog Sack", "Mog Case", "Mog Wardrobe", "Mog Safe 2", "Mog Wardrobe 2",
             "Mog Wardrobe 3", "Mog Wardrobe 4", "Mog Wardrobe 5", "Mog Wardrobe 6", "Mog Wardrobe 7", "Mog Wardrobe 8"};
         constexpr const char* kItemsMenu = "Items";
+        // The Mog House's own short captions for some of them, as the game's strip titles their lists.
+        struct ShortCaption
+        {
+            const char* caption;
+            int container;
+        };
+        constexpr ShortCaption kShortCaptions[] = {{"Locker", 4}, {"M.Ward.", 8}, {"M.Ward. 2", 10}, {"M.Ward. 3", 11},
+            {"M.Ward. 4", 12}, {"M.Ward. 5", 13}, {"M.Ward. 6", 14}, {"M.Ward. 7", 15}, {"M.Ward. 8", 16}};
         constexpr uint32_t kElementColors[kElementCount] = {0xFFFF8A3C, 0xFF8FD8FF, kBarGreen, 0xFFD8B25A, 0xFFC58CFF,
             0xFF5B9DFF, 0xFFFFFFFF, 0xFF9A8AA8};
         constexpr int kDamageColumns = 4, kElementColumns = 4, kStatusColumns = 5, kStatColumns = 4, kBagColumns = 2;
@@ -714,6 +722,8 @@ namespace headsup
             if (caption == kContainerNames[c]) return c;
         // The Items menu opens on the inventory under its own name.
         if (caption == kItemsMenu) return static_cast<int>(kInventory);
+        for (const ShortCaption& shortened : kShortCaptions)
+            if (caption == shortened.caption) return shortened.container;
         return std::nullopt;
     }
 
