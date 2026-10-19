@@ -14,6 +14,7 @@ namespace headsup
     constexpr float kIconGap     = 2.0f; // pixels between a run's icons
     constexpr float kNameOverlap = 3.0f; // pixels: a font's own empty space above its letters
     constexpr float kSpaceShare  = 0.3f; // a space's width, of its line's text size
+    constexpr float kHangShare   = 0.25f; // the gap between a line's text and icons hanging beside it, of its text size
 
     // A text item also has its capitals' rows from its box's top: their top and the baseline, 0 and 0 for none.
     struct ItemSize
@@ -30,6 +31,7 @@ namespace headsup
         Align align          = Align::Center;
         float textHeight     = 0.0f;
         float inkTop = 0.0f, inkBottom = 0.0f; // its tallest text's capitals, which an icon beside it centers on
+        float textSize = 0.0f;                 // its letters' size
         bool hasIcons        = false;
         float padBelow = 0.0f, padAbove = 0.0f;
         int firstText = -1, lastText = -1; // its first and last text item; icons outside them hang past the text
