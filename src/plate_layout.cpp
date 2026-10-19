@@ -141,12 +141,18 @@ namespace headsup
 
         for (size_t i = 0; i < lines.size(); ++i)
         {
-            LinePlace& place = layout.lines[i];
-            float x          = place.left;
-            place.items.reserve(lines[i].items.size());
-            for (const ItemSize& item : lines[i].items)
+            LinePlace& place    = layout.lines[i];
+            const LineInput& in = lines[i];
+            // A font's capitals sit low in its box, under the room it keeps for accents: what is not text centers on them.
+            const bool inked     = in.inkBottom > 0.0f;
+            const float capitals = TextTop(place, in) + (in.inkTop + in.inkBottom) / 2.0f;
+            float x              = place.left;
+            place.items.reserve(in.items.size());
+            for (const ItemSize& item : in.items)
             {
-                place.items.push_back({x, place.top + (place.height - item.height) / 2.0f});
+                const bool text = item.inkBottom > 0.0f;
+                const float y   = inked && !text ? capitals - item.height / 2.0f : place.top + (place.height - item.height) / 2.0f;
+                place.items.push_back({x, y});
                 x += item.width + kItemGap;
             }
         }
@@ -221,6 +227,8 @@ namespace headsup
         into.items.clear();
         into.align          = line.look.align;
         into.textHeight     = 0.0f;
+        into.inkTop         = 0.0f;
+        into.inkBottom      = 0.0f;
         into.hasIcons       = false;
         // The bottom design line stays on the game's name, so its padding is the space over it. A line broken into
         // rows has it under its last row, or over the first.
@@ -240,8 +248,13 @@ namespace headsup
             {
             case ItemKind::Text:
                 if (into.firstText < 0) into.firstText = static_cast<int>(i);
-                into.lastText   = static_cast<int>(i);
-                into.textHeight = std::max(into.textHeight, texts[text].height);
+                into.lastText = static_cast<int>(i);
+                if (texts[text].height > into.textHeight)
+                {
+                    into.textHeight = texts[text].height;
+                    into.inkTop     = texts[text].inkTop;
+                    into.inkBottom  = texts[text].inkBottom;
+                }
                 into.items.push_back(texts[text++]);
                 break;
             case ItemKind::Icons:

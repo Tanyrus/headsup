@@ -19,7 +19,7 @@ namespace headsup
         constexpr float kOutlinePerHeight = 0.1f; // a badge's outline width, per pixel of its height
         constexpr float kStackGap         = 2.0f; // screen pixels between plates stacked over one another
         constexpr float kStackLineWidth   = 1.0f; // screen pixels: the line from a risen plate to where it stood
-        constexpr const char* kLineSample = "H"; // any letter: GDI gives a line's height with it
+        constexpr const char* kLineSample = "H"; // GDI gives a line's height with it, and a capital's top and baseline
         // From the mockup's CSS: a 22 px name's shadows blur 2 and 3 px, 1 px lower, and its glow 14 px.
         constexpr float kShadowDropPerHeight = 0.05f;
         constexpr float kGlowPerHeight       = 0.64f; // the glow's blur radius, per pixel of name height
@@ -206,8 +206,11 @@ namespace headsup
         Image image =
             look.line.outline ? Outlined(coverage, style.edge, look.color, look.line.shadowColor) : Styled(coverage, layers);
         if (!Upload(t, std::move(image), std::move(key))) return false;
-        t.halo   = static_cast<float>(style.margin);
-        t.raster = *height;
+        const LineInk ink = m_Gdi.FontInk(font, *height, kLineSample);
+        t.halo            = static_cast<float>(style.margin);
+        t.raster          = *height;
+        t.inkTop          = ink.top;
+        t.inkBottom       = ink.baseline;
         return true;
     }
 
@@ -324,8 +327,9 @@ namespace headsup
         };
         // A texture shown at this height as the layout places it: on screen, without its halo.
         auto boxOf = [&](const PlateTexture& t, float shown) {
-            const float fit = FitOf(shown, t.raster);
-            return ItemSize{(t.width - 2.0f * t.halo) * fit / toY, (t.height - 2.0f * t.halo) * fit / toY};
+            const float scale = FitOf(shown, t.raster) / toY;
+            return ItemSize{(t.width - 2.0f * t.halo) * scale, (t.height - 2.0f * t.halo) * scale, t.inkTop * scale,
+                t.inkBottom * scale};
         };
         // Every plate but yours is sized by how far its owner is from you, with the camera's own distance behind you
         // added: unlike the game's name size, that changes smoothly as you walk and not at all as the camera turns.

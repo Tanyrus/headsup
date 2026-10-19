@@ -15,9 +15,11 @@ namespace headsup
     constexpr float kNameOverlap = 3.0f; // pixels: a font's own empty space above its letters
     constexpr float kSpaceShare  = 0.3f; // a space's width, of its line's text size
 
+    // A text item also has its capitals' rows from its box's top: their top and the baseline, 0 and 0 for none.
     struct ItemSize
     {
         float width = 0.0f, height = 0.0f;
+        float inkTop = 0.0f, inkBottom = 0.0f;
     };
 
     // A composed line as the renderer measured it, in screen pixels: its items' boxes, its tallest text's height (0
@@ -27,6 +29,7 @@ namespace headsup
         std::vector<ItemSize> items;
         Align align          = Align::Center;
         float textHeight     = 0.0f;
+        float inkTop = 0.0f, inkBottom = 0.0f; // its tallest text's capitals, which an icon beside it centers on
         bool hasIcons        = false;
         float padBelow = 0.0f, padAbove = 0.0f;
         int firstText = -1, lastText = -1; // its first and last text item; icons outside them hang past the text

@@ -158,6 +158,25 @@ TEST(icons_at_a_lines_ends_hang_outside_its_text_which_centers_alone)
     CHECK_EQ(laid(Icons({{40.0f, 16.0f}})).left, 80.0f);
 }
 
+TEST(an_icon_beside_text_centers_on_the_texts_capitals_not_its_box)
+{
+    // A 15 px text whose capitals run from its row 5 to its baseline at 14, beside a 16 px icon: the text's box is
+    // centered, half a pixel down, and the icon on the capitals' middle, 10 px down, so 2 px under the line's top.
+    const auto laid = [](LineInput line) { return LayoutPlate(Anchor(), std::vector<LineInput>{line}, 0.0f, 0.0f, 0.5f, 0, 0.0f).lines[0]; };
+    LineInput inked  = Hung({{16.0f, 16.0f}, {60.0f, 15.0f, 5.0f, 14.0f}}, 1, 1);
+    inked.textHeight = 15.0f;
+    inked.inkTop     = 5.0f;
+    inked.inkBottom  = 14.0f;
+    const LinePlace place = laid(inked);
+    CHECK_EQ(place.items[1].y, place.top + 0.5f);
+    CHECK_EQ(place.items[0].y, place.top + 2.0f);
+    // Without ink the text's whole box stands in, and a line of icons alone is as it was.
+    const LinePlace plain = laid(Hung({{16.0f, 16.0f}, {60.0f, 15.0f}}, 1, 1));
+    CHECK_EQ(plain.items[0].y, plain.top);
+    const LinePlace icons = laid(Icons({{40.0f, 16.0f}, {20.0f, 10.0f}}));
+    CHECK_EQ(icons.items[1].y, icons.top + 3.0f);
+}
+
 TEST(a_lines_text_aligns_against_the_bottom_lines_text_and_its_icons_hang_out_past_it)
 {
     // The bottom line's text runs from 70 to 130 with an icon hanging left of it; the lines above set against that.
@@ -339,9 +358,14 @@ TEST(a_measured_text_line_takes_its_texts_boxes_and_its_alignment)
     CHECK_EQ(in.ornamentHeight, 0.0f);
     CHECK(!in.ornamentUnder);
     // The line's text height is its tallest text's, wherever that stands.
-    const std::vector<ItemSize> tallFirst{{60.0f, 19.0f}, {30.0f, 17.0f}};
+    const std::vector<ItemSize> tallFirst{{60.0f, 19.0f, 4.0f, 15.0f}, {30.0f, 17.0f, 3.0f, 13.0f}};
     MeasureLine(line, tallFirst, 2.0f, in);
     CHECK_EQ(in.textHeight, 19.0f);
+    // And its capitals are that text's.
+    CHECK(in.inkTop == 4.0f && in.inkBottom == 15.0f);
+    const std::vector<ItemSize> tallLast{{60.0f, 17.0f, 3.0f, 13.0f}, {30.0f, 19.0f, 4.0f, 15.0f}};
+    MeasureLine(line, tallLast, 2.0f, in);
+    CHECK(in.inkTop == 4.0f && in.inkBottom == 15.0f);
     CHECK(in.firstText == 0 && in.lastText == 1);
     // Where its text starts and ends among its items: past icons and the spaces beside them, and nowhere on a line
     // of icons.

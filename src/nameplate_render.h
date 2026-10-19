@@ -108,6 +108,7 @@ namespace headsup
             float tip = 0.5f;
             float halo = 0.0f; // the shadow's or glow's margin, in texture pixels: it hangs outside the box the layout places
             int raster = 0;     // the height it is drawn at: its key's, or less when that image fits no texture
+            float inkTop = 0.0f, inkBottom = 0.0f; // a text's capitals, in rows of its raster under the halo
             bool unfit = false; // it fits none at the smallest height either: no texture, and the key says for what
         };
 
