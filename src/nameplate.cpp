@@ -43,26 +43,27 @@ namespace headsup
         return placed;
     }
 
-    bool CursorShown(uint16_t index, const Settings& settings, const CursorTargets& targets)
+    bool CursorShown(uint16_t index, const Settings& settings, const PlayerState& player, const CursorTargets& targets)
     {
-        return settings.cursorStyle != CursorStyle::Vanilla && !targets.gameArrowsShown && Targeted(TargetStateOf(index, targets));
+        return settings.cursorStyle != CursorStyle::Vanilla && !targets.gameArrowsShown && !HiddenInEvent(settings, player) &&
+               Targeted(TargetStateOf(index, targets));
     }
 
-    std::vector<LoneCursor> LoneCursors(const CursorTargets& targets, const Settings& settings,
+    std::vector<LoneCursor> LoneCursors(const CursorTargets& targets, const Settings& settings, const PlayerState& player,
         const std::vector<uint16_t>& withNameplateCursor)
     {
         std::vector<LoneCursor> lone;
         if (!targets.anchored) return lone;
         auto add = [&](uint16_t index, float x, float y) {
             const bool onNameplate = std::ranges::find(withNameplateCursor, index) != withNameplateCursor.end();
-            if (CursorShown(index, settings, targets) && !onNameplate)
+            if (CursorShown(index, settings, player, targets) && !onNameplate)
                 lone.push_back(LoneCursor{index, TargetStateOf(index, targets), x, y});
         };
         // Drawn in this order: on one entity the target's own cursor goes under the candidate's.
         if (const TargetState under = TargetUnderPick(targets.target, targets); under != TargetState::None)
         {
             const bool onNameplate = std::ranges::find(withNameplateCursor, targets.target) != withNameplateCursor.end();
-            if (CursorShown(targets.target, settings, targets) && !onNameplate)
+            if (CursorShown(targets.target, settings, player, targets) && !onNameplate)
                 lone.push_back(LoneCursor{targets.target, under, targets.anchorX, targets.anchorY, true});
         }
         add(targets.subTarget, targets.subAnchorX, targets.subAnchorY);

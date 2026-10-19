@@ -298,7 +298,7 @@ namespace headsup
     {
         if (screenshot) return HookAction::Hide;
         if (!s.enabled || !s.nameplates) return HookAction::Keep;
-        if (player.inEvent && s.hideInEvent) return HookAction::Hide;
+        if (HiddenInEvent(s, player)) return HookAction::Hide;
         const HookAction drawn = namesFailed ? HookAction::Keep : HookAction::Replace;
         switch (s.Kind(PlateKindOf(state)).rows[RowOf(state)].plate)
         {
@@ -313,7 +313,7 @@ namespace headsup
     {
         ComposedPlate plate;
         const EntityState& st = info.state;
-        if (!s.enabled || !s.nameplates || (player.inEvent && s.hideInEvent)) return plate;
+        if (!s.enabled || !s.nameplates || HiddenInEvent(s, player)) return plate;
         const KindSettings& kind = s.Kind(PlateKindOf(st));
         const PlateMode mode     = kind.rows[RowOf(st)].plate;
         if (!DrawsPlate(mode)) return plate;

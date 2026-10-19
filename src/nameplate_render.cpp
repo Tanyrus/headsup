@@ -375,9 +375,10 @@ namespace headsup
                 ComposedPlate composed = ComposePlate(*info, tracker.Player(), settings, gameName.color);
                 if (m_Icons.Failed()) DropIcons(composed);
                 const TargetState target = TargetStateOf(info->index, targets);
-                const bool showCursor    = CursorShown(info->index, settings, targets);
+                const bool showCursor    = CursorShown(info->index, settings, tracker.Player(), targets);
                 const TargetState under  = showCursor ? TargetUnderPick(info->index, targets) : TargetState::None;
-                const bool timersHere    = info->index == selfIndex && !selfTimers.empty();
+                const bool timersHere =
+                    info->index == selfIndex && !selfTimers.empty() && !HiddenInEvent(settings, tracker.Player());
                 if (composed.lines.empty() && !showCursor && !timersHere) continue;
                 Plate& p = m_Plates[info->index];
                 rank     = PlateRank(info->index, targets);
@@ -716,14 +717,14 @@ namespace headsup
         m_Gdi.Sweep();
     }
 
-    std::vector<LoneCursor> NameplateRenderer::LoneCursorsDue(const Settings& settings, const CursorTargets& targets,
-        float screenWidth, float screenHeight) const
+    std::vector<LoneCursor> NameplateRenderer::LoneCursorsDue(const Settings& settings, const PlayerState& player,
+        const CursorTargets& targets, float screenWidth, float screenHeight) const
     {
         if (!NameplatesOn(settings) || m_NamesFailed || m_Device == nullptr) return {};
         std::vector<uint16_t> withNameplateCursor;
         for (size_t i = 0; i < m_PlateCursors; ++i)
             withNameplateCursor.push_back(m_CursorNames[i].index);
-        std::vector<LoneCursor> lone = LoneCursors(targets, settings, withNameplateCursor);
+        std::vector<LoneCursor> lone = LoneCursors(targets, settings, player, withNameplateCursor);
         std::erase_if(lone, [&](const LoneCursor& c) { return !AnchorOnScreen(c.x, c.y, screenWidth, screenHeight); });
         return lone;
     }

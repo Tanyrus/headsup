@@ -31,7 +31,7 @@
             {"key": "auto-check", "name": "Auto-Check", "tip": "Automatically checks all nearby enemies to get their exact level and difficulty. Players are never checked: their level is read from what the server already sends, unless they are anonymous."},
             {"key": "stack-names", "name": "Stack Names", "tip": "If enabled, when nameplates would overlap, they instead stack on top of each other. NOTE: Your target's nameplate will be prioritized and stay in place."},
             {"key": "stack-line-to-entity", "name": "Show Line to Entity", "indent": true, "tip": "When a name is stacked upward, draw a line from the bottom of the nameplate down to it's original position to indicate the player it is attached to."},
-            {"key": "hide-during-conversation", "name": "Hide During Conversation", "tip": "Hides all nameplates if you are in a conversation with an NPC."}
+            {"key": "hide-during-conversation", "name": "Hide During Conversation", "tip": "Hides all nameplates, outlines and target cursors while you are in a conversation with an NPC or a cutscene."}
           ]
         },
         {

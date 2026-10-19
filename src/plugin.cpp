@@ -2018,7 +2018,8 @@ private:
         if (std::exchange(m_LoneCursorsDrawn, true) || Unseen() || m_Device == nullptr) return;
         PlaceCursorAnchors();
         const float width = m_Names.BackBufferWidth(), height = m_Names.BackBufferHeight();
-        const std::vector<headsup::LoneCursor> lone = m_Nameplates.LoneCursorsDue(m_Settings, m_CursorTargets, width, height);
+        const std::vector<headsup::LoneCursor> lone =
+            m_Nameplates.LoneCursorsDue(m_Settings, m_Player, m_CursorTargets, width, height);
         if (lone.empty()) return;
         if (!WithSavedState([&] { m_Nameplates.DrawLoneCursors(lone, m_Settings, Now(), width, height); })) PlatesNotDrawn();
     }

@@ -27,6 +27,9 @@ namespace headsup
         std::optional<Caster> caster = std::nullopt; // your magic accuracy, for the rank badges' chances
     };
 
+    // Hide During Conversation while a cutscene or an NPC's dialog runs: nothing of HeadsUp's shows over the scene.
+    bool HiddenInEvent(const Settings& settings, const PlayerState& player);
+
     // Phoenix's CZoneEntities::tapMobAggro with its mob data. checkedLevel is the level a /check reported for this
     // spawn, which includes its level mod, or 0 without one.
     Category Classify(const MobRecord* mob, int checkedLevel, const PlayerState& player);

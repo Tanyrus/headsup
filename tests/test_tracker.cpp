@@ -291,6 +291,21 @@ TEST(mobs_beyond_max_distance_are_not_outlined)
     CHECK(!t.Find(0x3000)->outline);
 }
 
+TEST(in_a_conversation_hide_during_conversation_takes_the_outlines_too)
+{
+    Tracker t;
+    Settings s;
+    const PlayerState talking{20, false, true};
+    t.Update({BountyHunter(0x2000)}, talking, s, CursorTargets{});
+    CHECK(t.Find(0x2000)->outline);
+    s.hideInEvent = true;
+    t.Update({BountyHunter(0x2000)}, talking, s, CursorTargets{});
+    CHECK(!t.Find(0x2000)->outline);
+    CHECK_EQ(t.OutlinedCount(), 0u);
+    t.Update({BountyHunter(0x2000)}, kLevel20, s, CursorTargets{});
+    CHECK(t.Find(0x2000)->outline);
+}
+
 TEST(a_mob_that_cannot_be_targeted_is_not_outlined)
 {
     Tracker t;

@@ -56,8 +56,8 @@ namespace headsup
         void Draw(bool depthTest);
         // The cursors of targets whose nameplate carries none, at the target window's anchors, as far as those are on
         // screen. Read the anchors when these are drawn: the game moves them only after it has copied its scene.
-        std::vector<LoneCursor> LoneCursorsDue(const Settings& settings, const CursorTargets& targets, float screenWidth,
-            float screenHeight) const;
+        std::vector<LoneCursor> LoneCursorsDue(const Settings& settings, const PlayerState& player, const CursorTargets& targets,
+            float screenWidth, float screenHeight) const;
         // In the back buffer's own pixels, at exactly the cursor's size and on top: there is no name to scale by or to
         // sit behind walls with. Changes render states.
         void DrawLoneCursors(const std::vector<LoneCursor>& lone, const Settings& settings, double now, float screenWidth,
