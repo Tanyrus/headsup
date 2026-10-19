@@ -263,9 +263,9 @@
               ]
             },
             {"key": "title-font", "name": "Title Font"},
-            {"key": "text-font", "name": "Text Font"},
+            {"key": "text-font", "name": "Default Font"},
             {"key": "height", "name": "Height"},
-            {"key": "text-size", "name": "Text Size", "tip": "Auto follows the height. Too large for two lines, the second line goes as One Line says."},
+            {"key": "text-size", "name": "Base Font Size", "tip": "Auto follows the height. Too large for two lines, the second line goes as One Line says."},
             {
               "key": "one-line",
               "name": "One Line",
