@@ -346,7 +346,8 @@ class HeadsUp final : public IPlugin
     // The windows the hook moves, as last given it (none until the first frame), and those it has seen.
     std::vector<headsup::ViewShift> m_PlacedShifts;      // what the window hook was last given
     std::vector<std::string> m_HiddenWindows;  // the windows the hook was last told to hide
-    std::vector<headsup::WindowOffset> m_PlacedOffsets;
+    std::vector<headsup::WindowPlace> m_PlacedPins;
+    std::vector<headsup::WindowPlace> m_WindowPlaces; // for the settings window, while it is open
     std::optional<std::string> m_WindowLog;   // /hu windowlog's file, while it runs
     std::vector<std::string> m_LastOpen;      // the open windows it wrote last // what the window hook has: the settings' windows and groups
     std::vector<std::string> m_SeenWindows;
@@ -789,7 +790,7 @@ public:
         const std::optional<headsup::HelpBand> band = HelpBandNow();
         const auto mode         = static_cast<size_t>(headsup::WindowHelpMode(m_Settings));
         const bool movesWindows = (band && band->bottom != 0 && m_Settings.shiftVanillaUi) ||
-                                  !m_Settings.windowOffsets.empty() || m_Settings.moveGameHelp ||
+                                  !m_Settings.pinnedWindows.empty() || m_Settings.moveGameHelp ||
                                   !m_Settings.hiddenWindows.empty();
         if ((hidden.Any() || movesWindows) && !std::exchange(m_WindowHookTried, true))
         {
@@ -819,10 +820,10 @@ public:
             m_PlacedShifts = m_Settings.viewShifts[mode];
             m_WindowHook.Shift(m_PlacedShifts);
         }
-        if (m_Settings.windowOffsets != m_PlacedOffsets)
+        if (m_Settings.pinnedWindows != m_PlacedPins)
         {
-            m_PlacedOffsets = m_Settings.windowOffsets;
-            m_WindowHook.Offset(m_PlacedOffsets);
+            m_PlacedPins = m_Settings.pinnedWindows;
+            m_WindowHook.Pin(m_PlacedPins);
         }
         if (m_WindowHook.SeenCount() != m_SeenWindows.size()) m_SeenWindows = m_WindowHook.SeenWindows();
         if (std::vector<std::string> open = m_WindowHook.TakeOpen(); m_WindowLog && open != m_LastOpen)
@@ -843,6 +844,7 @@ public:
         if (m_Rml.Running())
         {
             const headsup::NameStats names = m_NameHook.Stats();
+            if (m_RmlMenu.open) m_WindowPlaces = m_WindowHook.Places();
             const headsup::MenuReadings readings{
                 .outlinedMobs     = m_Tracker.OutlinedCount(),
                 .meshes           = m_Outline.MeshesLastFrame(),
@@ -862,6 +864,7 @@ public:
                 .windowsBand      = m_WindowHook.WindowsBand(),
                 .barBand          = HelpBandNow().value_or(headsup::HelpBand{}).topBar,
                 .seenWindows      = &m_SeenWindows,
+                .windowPlaces     = &m_WindowPlaces,
                 .cursorFiles      = &m_CursorFiles,
 #ifdef HEADSUP_DEV
                 .watching         = m_DrawDump.Watching(),

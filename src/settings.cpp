@@ -129,7 +129,7 @@ namespace headsup
         // Saved files from before the cursor scaled on its own, when it scaled with the names, take the names'.
         constexpr const char* kScaleCursorKey = "scaleCursor";
         constexpr const char* kKeepPointerKey = "keepPointerKeys"; // hex virtual-key codes, a space apart
-        constexpr const char* kWindowOffsetsKey = "windowOffsets"; // "equip:10,-20 statcom:0,40"
+        constexpr const char* kPinnedWindowsKey = "pinnedWindows"; // "equip:100,200 statcom:0,40"
         constexpr const char* kHiddenWindowsKey = "hiddenWindows"; // "statcom inventor"
         constexpr const char* kShiftVanillaUiKey = "shiftVanillaUi";
         constexpr const char* kOldMoveWindowsKey = "moveWindows";
@@ -961,14 +961,14 @@ namespace headsup
         s.shiftVanillaUi = true;
         s.placedUnder   = d.placedUnder;
         s.viewShifts    = d.viewShifts;
-        s.windowOffsets = {};
+        s.pinnedWindows = {};
     }
 
     void UseGameWindowDefaults(Settings& s)
     {
         s.shiftVanillaUi = false;
         s.moveGameHelp  = false;
-        s.windowOffsets = {};
+        s.pinnedWindows = {};
     }
 
     void UseHelpTextDefaults(Settings& s)
@@ -1170,7 +1170,7 @@ namespace headsup
         }
         s.keepPointerKeys = std::move(keys);
         s.screenshotKey   = BindableKey(s.screenshotKey);
-        s.windowOffsets   = WindowOffsetsFrom(WindowOffsetText(s.windowOffsets));
+        s.pinnedWindows   = WindowPlacesFrom(WindowPlaceText(s.pinnedWindows));
         for (size_t m = 0; m < kHelpModes; ++m)
         {
             s.placedUnder[m] = std::clamp(s.placedUnder[m], 0, kMaxWindowOffset);
@@ -1329,7 +1329,7 @@ namespace headsup
         for (int i = 0; i < kBarSectionCount; ++i)
             sections[i] = store.GetString(kBarSectionKeys[i], "");
         s.barSections = PlacementFrom(sections);
-        s.windowOffsets = WindowOffsetsFrom(store.GetString(kWindowOffsetsKey, ""));
+        s.pinnedWindows = WindowPlacesFrom(store.GetString(kPinnedWindowsKey, ""));
         s.hiddenWindows = HiddenWindowsFrom(store.GetString(kHiddenWindowsKey, ""));
         s.shiftVanillaUi =
             HeldSwitch(store, kShiftVanillaUiKey).value_or(HeldSwitch(store, kOldMoveWindowsKey).value_or(s.shiftVanillaUi));
@@ -1425,7 +1425,7 @@ namespace headsup
         setBool(kLatencyKey, s.barLatency);
         for (int i = 0; i < kBarSectionCount; ++i)
             store.Set(kBarSectionKeys[i], PlacementNames(s.barSections[i]).c_str());
-        store.Set(kWindowOffsetsKey, WindowOffsetText(s.windowOffsets).c_str());
+        store.Set(kPinnedWindowsKey, WindowPlaceText(s.pinnedWindows).c_str());
         store.Set(kHiddenWindowsKey, HiddenWindowsText(s.hiddenWindows).c_str());
         setBool(kShiftVanillaUiKey, s.shiftVanillaUi);
         for (size_t m = 0; m < kHelpModes; ++m)

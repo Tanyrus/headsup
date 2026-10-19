@@ -246,18 +246,18 @@ namespace headsup
         std::array<WindowKey, kMaxWindowKeys> m_Keys{};
         size_t m_Count = 0;
     };
-    // How far the player moves a window from where the game puts it, in the game's menu resolution.
-    struct WindowOffset
+    // Where a window stands, its top left in the game's menu resolution.
+    struct WindowPlace
     {
         std::string name; // its short name
         int x = 0, y = 0;
-        bool operator==(const WindowOffset&) const = default;
+        bool operator==(const WindowPlace&) const = default;
     };
     constexpr int kMaxWindowOffset = 2000;
-    // From the settings file, "equip:10,-20 statcom:0,40": a name no window could have, a strip window, a repeat, an
-    // offset of nothing and any past kMaxWindowKeys go; offsets are clamped to kMaxWindowOffset either way.
-    std::vector<WindowOffset> WindowOffsetsFrom(std::string_view text);
-    std::string WindowOffsetText(const std::vector<WindowOffset>& offsets);
+    // The places the player puts windows at, from the settings file's "equip:100,200 statcom:0,40": a name no window
+    // could have, a strip window, a repeat and any past kMaxWindowKeys go; places are held to 0 to kMaxWindowOffset.
+    std::vector<WindowPlace> WindowPlacesFrom(std::string_view text);
+    std::string WindowPlaceText(const std::vector<WindowPlace>& places);
     // The windows the player hides, by short name, from the settings file's "statcom inventor": a name no window
     // could have, a strip window, a repeat and any past kMaxWindowKeys go.
     std::vector<std::string> HiddenWindowsFrom(std::string_view text);

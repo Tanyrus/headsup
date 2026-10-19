@@ -290,7 +290,7 @@ namespace headsup
             {
                 const char* label = WindowLabel(name);
                 if (!(list.all || label != nullptr ||
-                        std::ranges::any_of(s.windowOffsets, [&](const WindowOffset& o) { return o.name == name; }) ||
+                        std::ranges::any_of(s.pinnedWindows, [&](const WindowPlace& p) { return p.name == name; }) ||
                         has(s.hiddenWindows, name) ||
                         (c.readings.seenWindows != nullptr && has(*c.readings.seenWindows, name))))
                     continue;
@@ -313,21 +313,29 @@ namespace headsup
                     form.EndRow();
                     continue;
                 }
-                auto offset = std::ranges::find(s.windowOffsets, window, &WindowOffset::name);
-                int dx = offset != s.windowOffsets.end() ? offset->x : 0, dy = offset != s.windowOffsets.end() ? offset->y : 0;
-                const int oldX = dx, oldY = dy;
-                form.NumberAt("X", ("x " + window).c_str(), dx, kMaxWindowOffset);
-                form.NumberAt("Y", ("y " + window).c_str(), dy, kMaxWindowOffset);
+                // The player's place for it, else where it stands now, muted: typing either number puts it there.
+                const auto pin = std::ranges::find(s.pinnedWindows, window, &WindowPlace::name);
+                const bool pinned = pin != s.pinnedWindows.end();
+                WindowPlace at    = pinned ? *pin : WindowPlace{window};
+                if (const auto* now = c.readings.windowPlaces; !pinned && now != nullptr)
+                    if (const auto seen = std::ranges::find(*now, window, &WindowPlace::name); seen != now->end()) at = *seen;
+                const WindowPlace was = at;
+                form.NumberAt("X", ("x " + window).c_str(), at.x, kMaxWindowOffset, !pinned);
+                form.NumberAt("Y", ("y " + window).c_str(), at.y, kMaxWindowOffset, !pinned);
+                const bool unpin = form.ResetAt(("place " + window).c_str(), pinned);
                 form.EndRow();
-                if (dx == oldX && dy == oldY) continue;
-                offset = std::ranges::find(s.windowOffsets, window, &WindowOffset::name);
-                if (offset == s.windowOffsets.end())
-                    s.windowOffsets.push_back(WindowOffset{window, dx, dy});
-                else
+                if (unpin)
                 {
-                    offset->x = dx;
-                    offset->y = dy;
+                    s.pinnedWindows.erase(pin);
+                    form.changed = true;
                 }
+                if (unpin || at == was) continue;
+                at.x = std::max(at.x, 0);
+                at.y = std::max(at.y, 0);
+                if (pinned)
+                    *pin = at;
+                else
+                    s.pinnedWindows.push_back(at);
             }
         }
 

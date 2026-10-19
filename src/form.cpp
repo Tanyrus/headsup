@@ -584,7 +584,7 @@ namespace headsup
         EndRow();
     }
 
-    void Form::NumberAt(const char* name, const char* id, int& value, int limit)
+    void Form::NumberAt(const char* name, const char* id, int& value, int limit, bool live)
     {
         const std::string number = Id(id);
         if (const FormEvent* typed = Took(number, kCommitEvent); typed != nullptr && !m_Off)
@@ -603,6 +603,7 @@ namespace headsup
         Set(number + "-name", FormValueKind::Class, kOffClass, {}, m_Off);
         Set(number, FormValueKind::Value, {}, std::to_string(value));
         Set(number, FormValueKind::Class, kOffClass, {}, m_Off);
+        Set(number, FormValueKind::Class, kLiveClass, {}, live);
     }
 
     void Form::Offset(const char* label, int& x, int& y, int limit, const char* tip)

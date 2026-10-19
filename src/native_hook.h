@@ -138,8 +138,10 @@ namespace headsup
         void Place(std::optional<WindowPlacing> placing);
         // The player's shifts for the views of the help's mode now.
         void Shift(const std::vector<ViewShift>& shifts);
-        // Each window's offset from where the game puts it.
-        void Offset(const std::vector<WindowOffset>& offsets);
+        // The places the player put windows at: such a window goes there, and no view's shift moves it.
+        void Pin(const std::vector<WindowPlace>& places);
+        // Where each window seen since HeadsUp loaded last stood, by short name.
+        std::vector<WindowPlace> Places() const;
         // The line the windows went under in the last frame placed, in the game's menu pixels; 0 before one.
         int WindowsBand() const;
         // The windows that drew since the last call, by short name, sorted: those open now.

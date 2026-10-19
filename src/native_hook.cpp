@@ -167,13 +167,21 @@ namespace headsup
         PlacedText g_TitlePlace;
         WindowKeyList g_SeenWindows;        // those that opened since HeadsUp loaded
         std::vector<std::optional<int>> g_ViewShifts; // the player's, by view of WindowViews()
-        struct KeyOffset
+        struct KeyPlace
         {
             WindowKey key;
             int x, y;
         };
-        std::array<KeyOffset, kMaxWindowKeys> g_Offsets{}; // the player's, by window
-        size_t g_OffsetCount = 0;
+        std::array<KeyPlace, kMaxWindowKeys> g_Pins{}; // the player's places, by window
+        size_t g_PinCount = 0;
+        std::array<KeyPlace, kMaxWindowKeys> g_LastPlaces{}; // where each window seen last stood
+        size_t g_LastPlaceCount = 0;
+
+        KeyPlace* PlaceIn(std::span<KeyPlace> places, const WindowKey& key)
+        {
+            const auto at = std::ranges::find(places, key, &KeyPlace::key);
+            return at != places.end() ? &*at : nullptr;
+        }
         WindowKeyList g_DrawnWindows; // those that drew since TakeOpen last ran
         WindowPlacements g_Placements;      // where each moved window came from and went
         uint32_t g_WindowFrame = 0;         // counts WindowHook::NewFrame
@@ -566,12 +574,20 @@ namespace headsup
 
     int WindowHook::WindowsBand() const { return g_WindowsBand; }
 
-    void WindowHook::Offset(const std::vector<WindowOffset>& offsets)
+    void WindowHook::Pin(const std::vector<WindowPlace>& places)
     {
-        g_OffsetCount = 0;
-        for (const WindowOffset& o : offsets)
-            if (const std::optional<WindowKey> key = KeyFromShortName(o.name); key && g_OffsetCount < g_Offsets.size())
-                g_Offsets[g_OffsetCount++] = KeyOffset{*key, o.x, o.y};
+        g_PinCount = 0;
+        for (const WindowPlace& p : places)
+            if (const std::optional<WindowKey> key = KeyFromShortName(p.name); key && g_PinCount < g_Pins.size())
+                g_Pins[g_PinCount++] = KeyPlace{*key, p.x, p.y};
+    }
+
+    std::vector<WindowPlace> WindowHook::Places() const
+    {
+        std::vector<WindowPlace> places;
+        for (size_t i = 0; i < g_LastPlaceCount; ++i)
+            places.push_back(WindowPlace{ShortName(g_LastPlaces[i].key), g_LastPlaces[i].x, g_LastPlaces[i].y});
+        return places;
     }
 
     std::vector<std::string> WindowHook::SeenWindows() const
@@ -994,20 +1010,25 @@ namespace headsup
             }
             g_SeenWindows.Add(key);
             g_DrawnWindows.Add(key);
-            const KeyOffset* offset = nullptr;
-            for (size_t i = 0; i < g_OffsetCount; ++i)
-                if (g_Offsets[i].key == key) offset = &g_Offsets[i];
-            const int shift = HangsFromTop(origin.top, band.screenBottom)
+            // A window the player put somewhere goes there, and the view's shift leaves it be.
+            const KeyPlace* pin = PlaceIn({g_Pins.data(), g_PinCount}, key);
+            const int shift = pin == nullptr && HangsFromTop(origin.top, band.screenBottom)
                                   ? g_FrameShifts.For(origin.left, origin.left + (right - left), band.screenRight)
                                   : 0;
+            WindowSpot at = now;
             if (const std::optional<WindowSpot> to = g_Placements.PlaceFor(mcd, key, now, right - left, bottom - top,
-                    offset != nullptr ? offset->x : 0, shift + (offset != nullptr ? offset->y : 0), band.screenRight,
-                    band.screenBottom))
+                    pin != nullptr ? pin->x - origin.left : 0, pin != nullptr ? pin->y - origin.top : shift,
+                    band.screenRight, band.screenBottom))
             {
                 MoveWindow(mcd, key, *to);
                 if (key == g_EquipKey) MoveEquipNumbers(ReadAt<uint32_t>(field(kMcdOwner), 0), now, right - left,
                                            bottom - top, *to);
+                at = *to;
             }
+            if (KeyPlace* last = PlaceIn({g_LastPlaces.data(), g_LastPlaceCount}, key))
+                *last = KeyPlace{key, at.left, at.top};
+            else if (g_LastPlaceCount < g_LastPlaces.size())
+                g_LastPlaces[g_LastPlaceCount++] = KeyPlace{key, at.left, at.top};
         }
     }
 

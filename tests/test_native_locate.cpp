@@ -816,16 +816,16 @@ TEST(an_offset_moves_a_window_either_way_from_where_the_game_puts_it_and_keeps_i
     CHECK(place(0x4000, {100, 60}, 5000, 5000) == (WindowSpot{kScreenRight - kWidth, kScreenBottom - 300}));
 }
 
-TEST(window_offsets_read_back_what_they_wrote_and_drop_what_no_window_could_take)
+TEST(window_places_read_back_what_they_wrote_and_keep_a_place_at_the_origin)
 {
-    const std::vector<WindowOffset> offsets = WindowOffsetsFrom("equip:10,-20 statcom:0,40");
-    CHECK(offsets == (std::vector<WindowOffset>{{"equip", 10, -20}, {"statcom", 0, 40}}));
-    CHECK(WindowOffsetsFrom(WindowOffsetText(offsets)) == offsets);
-    // A strip window, a name no window has, a repeat, nothing moved, garbled numbers: all dropped.
-    CHECK(WindowOffsetsFrom("helpwind:5,5 equipment:5,5 equip:1,1 equip:2,2 money:0,0 inventor:x,3 itemctrl:4").size() ==
-          1);
-    CHECK(WindowOffsetsFrom("equip:99999,-99999") == (std::vector<WindowOffset>{{"equip", kMaxWindowOffset, -kMaxWindowOffset}}));
-    CHECK(WindowOffsetsFrom("").empty() && WindowOffsetText({}).empty());
+    const std::vector<WindowPlace> places = WindowPlacesFrom("equip:100,200 statcom:0,0");
+    CHECK(places == (std::vector<WindowPlace>{{"equip", 100, 200}, {"statcom", 0, 0}}));
+    CHECK(WindowPlacesFrom(WindowPlaceText(places)) == places);
+    // A strip window, a name no window has, a repeat, garbled numbers: all dropped.
+    CHECK(WindowPlacesFrom("helpwind:5,5 equipment:5,5 equip:1,1 equip:2,2 inventor:x,3 itemctrl:4").size() == 1);
+    // Off the screen's top left or far past it, a place is held to the screen's corner and to the limit.
+    CHECK(WindowPlacesFrom("equip:99999,-40") == (std::vector<WindowPlace>{{"equip", kMaxWindowOffset, 0}}));
+    CHECK(WindowPlacesFrom("").empty() && WindowPlaceText({}).empty());
 }
 
 TEST(hidden_windows_read_back_what_they_wrote_and_drop_what_no_window_could_take)

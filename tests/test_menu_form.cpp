@@ -757,6 +757,23 @@ TEST(auto_adjust_places_the_views_under_the_line_the_windows_last_went_under)
     CHECK_EQ(ValueOn(w.Pass(), kStatusShift), std::to_string(80 - kPortraitTop));
 }
 
+TEST(a_typed_x_puts_a_window_where_it_stands_but_for_that_and_its_arrow_lets_it_go)
+{
+    Window w;
+    w.state.page = Page::UserInterface;
+    const std::vector<WindowPlace> now = {{"statcom", 16, 64}};
+    w.readings.windowPlaces = &now;
+    const std::string x = "userinterface-base-game-ui-x-statcom", arrow = "userinterface-base-game-ui-place-statcom";
+    const Form shown = w.Pass();
+    CHECK(ValueOn(shown, x) == "16" && ClassOn(shown, x.c_str(), "live") && ClassOn(shown, arrow.c_str(), "hidden"));
+    CHECK(w.Pass({{x, kCommitEvent, "300"}}).changed);
+    CHECK((w.settings.pinnedWindows == std::vector<WindowPlace>{{"statcom", 300, 64}}));
+    const Form placed = w.Pass();
+    CHECK(!ClassOn(placed, x.c_str(), "live") && !ClassOn(placed, arrow.c_str(), "hidden"));
+    CHECK(w.Pass({{arrow, kClickEvent, ""}}).changed);
+    CHECK(w.settings.pinnedWindows.empty());
+}
+
 TEST(shift_vanilla_ui_is_the_top_panels_one_switch_and_off_leaves_auto_adjust_nothing_to_do)
 {
     Window w;

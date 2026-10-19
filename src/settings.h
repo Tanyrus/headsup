@@ -98,7 +98,7 @@ namespace headsup
         std::array<bool, kBarWidgetCount> barWidgets = kBarWidgetDefaults; // by BarWidget
         int barCurrency = kGilCurrency; // the Gil widget's, by kCurrencyTable
         std::optional<ClockZone> clockZone;           // the Clock widget's; none for the computer's own
-        std::vector<WindowOffset> windowOffsets; // each game window's move from where the game puts it
+        std::vector<WindowPlace> pinnedWindows;  // game windows the player put at places of their own, never shifted
         std::vector<std::string> hiddenWindows;  // game windows drawn as nothing, by short name
         bool shiftVanillaUi = true; // the game's windows that hang from the top go under the panel, a view at a time
         // By HelpMode: where a view's highest window goes, in the game's menu pixels, and the player's own shifts.

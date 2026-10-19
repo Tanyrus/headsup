@@ -649,10 +649,10 @@ namespace headsup
         return true;
     }
 
-    std::vector<WindowOffset> WindowOffsetsFrom(std::string_view text)
+    std::vector<WindowPlace> WindowPlacesFrom(std::string_view text)
     {
-        std::vector<WindowOffset> offsets;
-        while (!text.empty() && offsets.size() < kMaxWindowKeys)
+        std::vector<WindowPlace> places;
+        while (!text.empty() && places.size() < kMaxWindowKeys)
         {
             const size_t end = std::min(text.find(' '), text.size());
             const std::string_view entry = text.substr(0, end);
@@ -667,20 +667,18 @@ namespace headsup
                 return problem == std::errc{} && end == digits.data() + digits.size();
             };
             if (!key || !MovableWindow(*key) || !number(entry.substr(colon + 1, comma - colon - 1), x) ||
-                !number(entry.substr(comma + 1), y) || (x == 0 && y == 0) ||
-                std::ranges::any_of(offsets, [&](const WindowOffset& o) { return o.name == name; }))
+                !number(entry.substr(comma + 1), y) || std::ranges::any_of(places, [&](const WindowPlace& p) { return p.name == name; }))
                 continue;
-            offsets.push_back(WindowOffset{std::string(name), std::clamp(x, -kMaxWindowOffset, kMaxWindowOffset),
-                std::clamp(y, -kMaxWindowOffset, kMaxWindowOffset)});
+            places.push_back(WindowPlace{std::string(name), std::clamp(x, 0, kMaxWindowOffset), std::clamp(y, 0, kMaxWindowOffset)});
         }
-        return offsets;
+        return places;
     }
 
-    std::string WindowOffsetText(const std::vector<WindowOffset>& offsets)
+    std::string WindowPlaceText(const std::vector<WindowPlace>& places)
     {
         std::string text;
-        for (const WindowOffset& o : offsets)
-            text += (text.empty() ? "" : " ") + o.name + ":" + std::to_string(o.x) + "," + std::to_string(o.y);
+        for (const WindowPlace& p : places)
+            text += (text.empty() ? "" : " ") + p.name + ":" + std::to_string(p.x) + "," + std::to_string(p.y);
         return text;
     }
 

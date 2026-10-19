@@ -384,7 +384,6 @@ helpBarY=8.0000
         s.barTargetDetails = true;
         s.menuFont         = "Tahoma";
         s.menuFontSize     = 21; // 125 percent of Ashita's 18 pixels, in Tahoma, which was drawn at 0.95 of its size
-        s.windowOffsets    = {WindowOffset{"equip", 10, -20}};
         s.moveGameHelp     = true;
         s.helpBarBackground = false;
         s.helpBarX         = 12;
@@ -426,7 +425,7 @@ helpBarY=8.0000
 
     // The keys of kSavedFile that only an older build's file carries: a migration reads them, or nothing does, and
     // nothing writes them.
-    const char* const kOldKeys[] = {"showRanks", "scaleOwnName", "movedWindows", "windowGroups", "allUnderBar", "menuScale", "chocoboPointer", "untargetedOpacity", "glowOffWhenFighting", "thickness", "cursorSize", "cursorOutline", "replaceCursor", "cursorFeather", "barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
+    const char* const kOldKeys[] = {"showRanks", "scaleOwnName", "movedWindows", "windowOffsets", "windowGroups", "allUnderBar", "menuScale", "chocoboPointer", "untargetedOpacity", "glowOffWhenFighting", "thickness", "cursorSize", "cursorOutline", "replaceCursor", "cursorFeather", "barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
         "serverClockZone", "showLabels", "replaceMobNames", "showIcons", "hideInCombat", "hideClaimed", "hideTooWeak",
         "hideWhileEngaged", "markPlaceholders", "fontBold", "nameGlow", "scalePlayerNames",
         "labelFontBold", "showOrnament", "ownGlowColor", "ownOrnamentColor", "labelFontName", "glowSize",
@@ -949,6 +948,7 @@ TEST(the_window_placement_saves_and_loads_back_its_switches_places_and_each_mode
     s.shiftVanillaUi = false;
     s.placedUnder    = {30, 70};
     s.hiddenWindows  = {"statcom", "inventor"};
+    s.pinnedWindows  = {WindowPlace{"equip", 100, 200}};
     s.viewShifts[static_cast<int>(HelpMode::On)]  = {ViewShift{std::string(first), 20}};
     s.viewShifts[static_cast<int>(HelpMode::Off)] = {
         ViewShift{std::string(second), -6}, ViewShift{std::string(first), 3}};
@@ -1246,17 +1246,17 @@ TEST(the_windows_font_size_is_pixels_and_an_old_percent_becomes_the_pixels_it_dr
 TEST(the_window_defaults_place_every_view_by_headsups_defaults_or_leave_them_all_to_the_game)
 {
     Settings s;
-    s.windowOffsets = {WindowOffset{"equip", 10, -20}};
+    s.pinnedWindows = {WindowPlace{"equip", 100, 200}};
     s.viewShifts[static_cast<int>(HelpMode::On)] = {ViewShift{std::string(WindowViews()[0].id), 20}};
     s.placedUnder    = {1, 2};
     s.shiftVanillaUi = false;
     UseHeadsUpWindowDefaults(s);
-    CHECK(s.shiftVanillaUi && s.windowOffsets.empty() && s.viewShifts == Settings{}.viewShifts);
+    CHECK(s.shiftVanillaUi && s.pinnedWindows.empty() && s.viewShifts == Settings{}.viewShifts);
     CHECK(s.placedUnder == Settings{}.placedUnder);
-    s.windowOffsets = {WindowOffset{"equip", 10, -20}};
+    s.pinnedWindows = {WindowPlace{"equip", 100, 200}};
     s.moveGameHelp  = true;
     UseGameWindowDefaults(s);
-    CHECK(!s.shiftVanillaUi && !s.moveGameHelp && s.windowOffsets.empty());
+    CHECK(!s.shiftVanillaUi && !s.moveGameHelp && s.pinnedWindows.empty());
     s.hideHelpBar = false;
     s.barWidgets[static_cast<int>(BarWidget::GameHelp)] = false;
     UseHelpTextDefaults(s);

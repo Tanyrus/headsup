@@ -60,6 +60,7 @@ namespace headsup
     // The ids of a line box's parts, after the box's own: a stretch of text and a tag, each with its number.
     // Classes the kit writes, the window sets and the stylesheet draws: one name each for the three.
     constexpr const char* kOffClass     = "off";     // a setting of something switched off: not shown
+    constexpr const char* kLiveClass    = "live";    // a number box showing what is so now, no setting
     constexpr const char* kCompactCheck = "check";       // a toggle among other controls
     constexpr const char* kWideCheck    = "check wide";  // a row's toggle, as wide as a slider
     constexpr const char* kCardCheck    = "check card-on"; // a card title's switch
@@ -283,7 +284,8 @@ namespace headsup
             }
         }
         // A whole number to type, with its name before it: "X [ 12 ]".
-        void NumberAt(const char* name, const char* id, int& value, int limit);
+        // live: the number is what is so now and no setting yet, shown muted.
+        void NumberAt(const char* name, const char* id, int& value, int limit, bool live = false);
         void SwatchAt(const char* id, Color& color);
         // The arrow that puts a value back to its default, hidden while it is the default. True when it was clicked.
         bool ResetAt(const char* id, bool differs);

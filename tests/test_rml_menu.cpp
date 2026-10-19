@@ -992,7 +992,7 @@ TEST(every_dropdown_slider_row_of_choices_and_number_of_every_page_and_tab_sets_
     }
     // Keys that hold many settings in one value, each window's offsets, each view's shift or each section's widgets:
     // two controls of these are the same setting only when they write the same value.
-    const std::vector<std::string> lists{"windowOffsets", "viewShiftsHelpOn", "viewShiftsHelpOff", "barLeft", "barCenter",
+    const std::vector<std::string> lists{"pinnedWindows", "viewShiftsHelpOn", "viewShiftsHelpOff", "barLeft", "barCenter",
         "barRight"};
     const auto same = [&](const std::map<std::string, std::string>& a, const std::map<std::string, std::string>& b) {
         if (!std::ranges::equal(a, b, {}, &std::pair<const std::string, std::string>::first,

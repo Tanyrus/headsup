@@ -30,6 +30,7 @@ namespace headsup
         // reach without its help line; 0 while the panel is off.
         int windowsBand = 0, barBand = 0;
         const std::vector<std::string>* seenWindows = nullptr; // the game's windows seen under Game help's bar
+        const std::vector<WindowPlace>* windowPlaces = nullptr; // where each window seen last stood
         const std::vector<std::string>* cursorFiles = nullptr; // the cursors folder's files, without their extensions
         std::optional<bool> watching;            // whether the debug watch runs; none in a build without one
         const std::string* lastReport = nullptr; // the file the last report went to, empty before one
