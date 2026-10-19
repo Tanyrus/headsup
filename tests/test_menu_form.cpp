@@ -237,7 +237,8 @@ TEST(a_build_that_exports_its_layout_has_an_export_button_after_the_report_and_t
     CHECK(!Has(Block(w.Pass(), "configmenu-debug-mode")->rml, exporting)); // a release build
     w.readings.watching   = false;
     w.readings.exportable = true;
-    const FormBlock* card = Block(w.Pass(), "configmenu-debug-mode");
+    const Form exportable = w.Pass();
+    const FormBlock* card = Block(exportable, "configmenu-debug-mode");
     CHECK(At(card, "configmenu-debug-mode-debug-report") < At(card, "configmenu-debug-mode-watch"));
     CHECK(At(card, "configmenu-debug-mode-watch") < At(card, exporting));
     w.Pass({{exporting, kClickEvent, ""}});
