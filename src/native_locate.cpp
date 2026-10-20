@@ -100,6 +100,8 @@ namespace headsup
         constexpr uint32_t kStripCountCall = 58;
         constexpr int16_t kWindowGetRect[] = {0x83, 0xEC, 0x0C, 0x56, 0x8B, 0xF1, 0x8A, 0x86, 0x99, 0x00, 0x00, 0x00,
             0x84, 0xC0, 0x0F, 0x84};
+        constexpr int16_t kWindowEntryRect[] = {0x8B, 0x44, 0x24, 0x08, 0x56, 0x50, 0x8B, 0xF1, 0xE8, -1, -1, -1, -1, 0x85,
+            0xC0, 0x74, -1, 0x0F, 0xBF, 0x48, 0x2A, 0x0F, 0xBF, 0x50, 0x2C};
         constexpr char kMenuPrefix[] = "menu    ";
         constexpr size_t kMenuPrefixLength = sizeof(kMenuPrefix) - 1;
         static_assert(kMenuPrefixLength + kWindowKeyLength == kWindowNameLength);
@@ -520,18 +522,46 @@ namespace headsup
         const std::vector<uint32_t> found = FindAll(kWindowMoveTo, text);
         if (found.empty()) return WindowMoveSite{LocateProblem::NoWindowMove};
         if (found.size() > 1) return WindowMoveSite{LocateProblem::AmbiguousWindowMove};
-        const std::vector<uint32_t> getRect = FindAll(kWindowGetRect, text);
+        const std::vector<uint32_t> getRect = FindAll(kWindowGetRect, text), entryRect = FindAll(kWindowEntryRect, text);
         return WindowMoveSite{LocateProblem::None, text.rva + found.front(),
-            getRect.size() == 1 ? text.rva + getRect.front() : 0};
+            getRect.size() == 1 ? text.rva + getRect.front() : 0, entryRect.size() == 1 ? text.rva + entryRect.front() : 0};
     }
 
     bool MoveUnderWay(int32_t move) { return move > 0; }
 
+    namespace
+    {
+        // A layout ends at a ret padded to the next 16-byte boundary, where the compiler starts the next function; a
+        // ret with code after it is an early return. Read no further: that code is another class's.
+        std::span<const uint8_t> LayoutBody(std::span<const uint8_t> layout, uintptr_t at)
+        {
+            constexpr uint8_t kRet = 0xC3, kNop = 0x90, kInt3 = 0xCC;
+            constexpr uintptr_t kFunctionAlign = 16;
+            for (size_t i = 0; i + 1 < layout.size(); ++i)
+            {
+                if (layout[i] != kRet || (layout[i + 1] != kNop && layout[i + 1] != kInt3)) continue;
+                size_t pad = i + 1;
+                while (pad < layout.size() && (at + pad) % kFunctionAlign != 0 && (layout[pad] == kNop || layout[pad] == kInt3))
+                    ++pad;
+                if ((at + pad) % kFunctionAlign == 0) return layout.first(i + 1);
+            }
+            return layout;
+        }
+
+        constexpr uint8_t kCallOp = 0xE8;
+        constexpr size_t kCallLength = 5;
+        bool CallsAt(std::span<const uint8_t> code, size_t i, uintptr_t at, uintptr_t target)
+        {
+            return code[i] == kCallOp && i + kCallLength <= code.size() &&
+                   at + i + kCallLength + static_cast<uintptr_t>(ReadAt<int32_t>(code.data(), i + 1)) == target;
+        }
+    }
+
     std::optional<uint32_t> PlaceCopyOffset(std::span<const uint8_t> layout, uintptr_t at, uintptr_t getRect)
     {
-        constexpr uint8_t kCall = 0xE8, kLea = 0x8D, kMov = 0x8B, kPush = 0x50, kRegisters = 8;
+        constexpr uint8_t kLea = 0x8D, kMov = 0x8B, kPush = 0x50, kRegisters = 8;
         constexpr uint8_t kModDisp8 = 1, kRmSib = 4, kEcx = 1, kMcdField = 0x08;
-        constexpr size_t kCallBytes = 5, kOperandBytes = 3; // lea and mov, each with a ModRM and a disp8
+        constexpr size_t kOperandBytes = 3; // lea and mov, each with a ModRM and a disp8
         constexpr size_t kPushReach = 16;                   // bytes from the push to the call at most
         const auto mod = [](uint8_t modrm) { return modrm >> 6; };
         const auto reg = [](uint8_t modrm) { return (modrm >> 3) & 7; };
@@ -566,30 +596,59 @@ namespace headsup
                 return leaAt(mov, pushed);
             return std::nullopt;
         };
-        // The layout ends at a ret padded to the next 16-byte boundary, where the compiler starts the next function;
-        // a ret with code after it is an early return. Read no further: that code is another class's.
-        constexpr uint8_t kRet = 0xC3, kNop = 0x90, kInt3 = 0xCC;
-        constexpr uintptr_t kFunctionAlign = 16;
-        size_t end = layout.size();
-        for (size_t i = 0; i + 1 < layout.size() && end == layout.size(); ++i)
+        layout = LayoutBody(layout, at);
+        for (size_t i = 1; i < layout.size(); ++i)
         {
-            if (layout[i] != kRet || (layout[i + 1] != kNop && layout[i + 1] != kInt3)) continue;
-            size_t pad = i + 1;
-            while (pad < layout.size() && (at + pad) % kFunctionAlign != 0 && (layout[pad] == kNop || layout[pad] == kInt3))
-                ++pad;
-            if ((at + pad) % kFunctionAlign == 0) end = i + 1;
-        }
-        layout = layout.first(end);
-        for (size_t i = 1; i + kCallBytes <= layout.size(); ++i)
-        {
-            if (layout[i] != kCall ||
-                at + i + kCallBytes + static_cast<uintptr_t>(ReadAt<int32_t>(layout.data(), i + 1)) != getRect)
-                continue;
+            if (!CallsAt(layout, i, at, getRect)) continue;
             // The push may have an instruction or two after it before the call (Trade sets a flag there).
             for (size_t back = 1; back <= kPushReach && back <= i; ++back)
                 if (const std::optional<uint32_t> offset = argumentAt(i - back)) return offset;
         }
         return std::nullopt;
+    }
+
+    std::optional<uint32_t> EntryPlaceOffset(std::span<const uint8_t> layout, uintptr_t at, uintptr_t entryRect)
+    {
+        // mov word [base + disp8], r16: 66 89, a ModRM of mod 1 whose base is no SIB, then the displacement.
+        constexpr uint8_t kOperandSize = 0x66, kStore = 0x89, kModDisp8 = 1, kRmSib = 4;
+        constexpr size_t kStoreBytes = 4, kStoreReach = 0x20; // bytes past the call that its corner is kept in
+        struct Store
+        {
+            int base;
+            uint8_t disp;
+        };
+        const auto storeAt = [&](std::span<const uint8_t> code, size_t i) -> std::optional<Store> {
+            if (i + kStoreBytes > code.size() || code[i] != kOperandSize || code[i + 1] != kStore) return std::nullopt;
+            const uint8_t modrm = code[i + 2];
+            if (modrm >> 6 != kModDisp8 || (modrm & 7) == kRmSib) return std::nullopt;
+            return Store{modrm & 7, code[i + 3]};
+        };
+        layout = LayoutBody(layout, at);
+        for (size_t i = 0; i < layout.size(); ++i)
+        {
+            if (!CallsAt(layout, i, at, entryRect)) continue;
+            const std::span<const uint8_t> after = layout.subspan(i + kCallLength).first(
+                std::min(kStoreReach, layout.size() - i - kCallLength));
+            for (size_t first = 0; first < after.size(); ++first)
+            {
+                const std::optional<Store> left = storeAt(after, first);
+                if (!left) continue;
+                for (size_t second = first + kStoreBytes; second < after.size(); ++second)
+                    if (const std::optional<Store> top = storeAt(after, second);
+                        top && top->base == left->base && top->disp == left->disp + sizeof(int16_t))
+                        return left->disp;
+                break;
+            }
+        }
+        return std::nullopt;
+    }
+
+    std::optional<WindowSpot> MovedEntryPlace(WindowSpot point, const WindowRect& window, int dx, int dy)
+    {
+        enum Edge { kLeft, kTop, kRight, kBottom };
+        if (point.left < window[kLeft] || point.left >= window[kRight] || point.top < window[kTop] || point.top >= window[kBottom])
+            return std::nullopt;
+        return WindowSpot{point.left + dx, point.top + dy};
     }
 
     std::optional<WindowRect> MovedPlaceCopy(const WindowRect& copy, const WindowRect& window, int dx, int dy, PlaceMatch match)

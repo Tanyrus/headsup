@@ -669,6 +669,27 @@ namespace
     }
 }
 
+namespace
+{
+    // MCD::GetEntryRect(int16* out, index, lit, pressed), at RVA 0x118900 in the client of 2026-10-19.
+    constexpr uint32_t kEntryRectRva = 0x118900;
+    void PutEntryRect(Image& image, uint32_t at)
+    {
+        image.Put(at, {0x8B, 0x44, 0x24, 0x08, 0x56, 0x50, 0x8B, 0xF1, 0xE8, 0xC3, 0xF8, 0xFF, 0xFF, 0x85, 0xC0, 0x74, 0x67,
+                          0x0F, 0xBF, 0x48, 0x2A, 0x0F, 0xBF, 0x50, 0x2C});
+    }
+}
+
+TEST(the_windows_entry_rectangle_is_found_beside_its_move)
+{
+    Image image;
+    PutMoveTo(image, kMoveToRva);
+    PutEntryRect(image, kEntryRectRva);
+    CHECK(LocateWindowMove(image.Text()).entryRect == kEntryRectRva);
+    PutEntryRect(image, kEntryRectRva + 0x2000);
+    CHECK(LocateWindowMove(image.Text()).entryRect == 0); // two: neither is taken
+}
+
 TEST(the_windows_rectangle_copy_is_found_beside_its_move)
 {
     Image image;
@@ -1029,6 +1050,35 @@ TEST(an_owners_copy_of_its_windows_place_moves_with_the_window)
     // Where the class's layout says nothing, only a copy that is the window's rectangle exactly is taken for one.
     CHECK((MovedPlaceCopy(Place{16, 48, 382, 104}, Place{16, 48, 382, 104}, 0, 16, PlaceMatch::Exact) == Place{16, 64, 382, 120}));
     CHECK(!MovedPlaceCopy(Place{130, 48, 382, 184}, Place{130, 48, 382, 140}, 0, 48, PlaceMatch::Exact));
+}
+
+TEST(an_owners_copy_of_an_entrys_corner_moves_with_the_window_while_it_is_inside_it)
+{
+    // The Linkshell item's window (link2): the owner keeps its middle button's corner, the window at 1792, 48.
+    const WindowRect window{1792, 48, 1904, 106};
+    CHECK((MovedEntryPlace(WindowSpot{1808, 70}, window, 0, 16) == WindowSpot{1808, 86}));
+    CHECK((MovedEntryPlace(WindowSpot{1792, 48}, window, -4, 16) == WindowSpot{1788, 64}));
+    // A point outside the window is no place in it: left alone.
+    CHECK(!MovedEntryPlace(WindowSpot{1808, 106}, window, 0, 16) && !MovedEntryPlace(WindowSpot{0, 0}, window, 0, 16));
+}
+
+TEST(an_owners_copy_of_an_entrys_corner_is_found_after_its_layouts_call_for_the_entrys_rectangle)
+{
+    // The Linkshell item's owner (the client's 0x1E5F90 of 2026-10-19): the call at 0x1E5FDE, then
+    // mov cx,[esp+0Ch]; mov ax,[esi+14h]; mov dx,[esp+0Eh]; mov [esi+18h],cx; mov ecx,[esi+8]; push 1; push eax;
+    // mov [esi+1Ah],dx.
+    constexpr uintptr_t entryRect = 0x118900, at = 0x1E5FDE;
+    const std::vector<uint8_t> corner{0xE8, 0x1D, 0x29, 0xF3, 0xFF, 0x66, 0x8B, 0x4C, 0x24, 0x0C, 0x66, 0x8B, 0x46, 0x14,
+        0x66, 0x8B, 0x54, 0x24, 0x0E, 0x66, 0x89, 0x4E, 0x18, 0x8B, 0x4E, 0x08, 0x6A, 0x01, 0x50, 0x66, 0x89, 0x56, 0x1A};
+    CHECK(EntryPlaceOffset(corner, at, entryRect) == std::optional<uint32_t>(0x18));
+    CHECK(!EntryPlaceOffset(corner, at, entryRect + 0x10)); // a call to another routine
+    // Only its left kept, or the two halves in two objects: no corner.
+    std::vector<uint8_t> left = corner;
+    left.resize(left.size() - 4);
+    CHECK(!EntryPlaceOffset(left, at, entryRect));
+    std::vector<uint8_t> apart = corner;
+    apart[apart.size() - 2] = 0x57; // mov [edi+1Ah],dx
+    CHECK(!EntryPlaceOffset(apart, at, entryRect));
 }
 
 TEST(an_owners_place_copy_is_found_in_its_layouts_call_for_the_windows_rectangle)

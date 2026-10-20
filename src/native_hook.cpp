@@ -197,6 +197,7 @@ namespace headsup
         using WindowMoveToFn     = void(__attribute__((thiscall))*)(uintptr_t mcd, int x, int y);
         using WindowGetRectFn    = void(__attribute__((thiscall))*)(uintptr_t mcd, int16_t* place);
         uintptr_t g_WindowGetRect = 0;     // MCD::GetRect, or 0 when it was not found
+        uintptr_t g_WindowEntryRect = 0;   // MCD::GetEntryRect, or 0 when it was not found
         uint32_t g_PickedColor  = 0;
         uintptr_t g_RangeColor  = 0; // the window's thiscall that picks the candidate arrow's color
         using RangeColorFn      = uint32_t(__attribute__((thiscall))*)(const void* window, uintptr_t you, uintptr_t candidate,
@@ -496,6 +497,7 @@ namespace headsup
         const WindowMoveSite move = LocateWindowMove(text);
         g_WindowMoveTo            = move.problem == LocateProblem::None ? Address(base) + move.moveTo : 0;
         g_WindowGetRect           = move.getRect != 0 ? Address(base) + move.getRect : 0;
+        g_WindowEntryRect         = move.entryRect != 0 ? Address(base) + move.entryRect : 0;
         // Without it Wide Scan's grid label stays under the strip's title where the game put it.
         if (const TitleRectSite label = LocateScanLabel(text, move.getRect); label.problem == LocateProblem::None)
         {
@@ -846,16 +848,31 @@ namespace headsup
 
         // Where an owner keeps its copy of its window's place, read off its class's layout: none for a class that keeps
         // none, or when the code cannot be read.
-        std::optional<uint32_t> PlaceCopyAt(uint32_t owner)
+        // An owner's class's layout code, kLayoutScanBytes of it, and where it starts; none when it cannot be read.
+        std::optional<std::pair<std::span<const uint8_t>, uint32_t>> OwnerLayout(uint32_t owner)
         {
             const auto* object = reinterpret_cast<const uint8_t*>(owner);
-            if (g_WindowGetRect == 0 || owner == 0 || !Readable(object, sizeof(uint32_t))) return std::nullopt;
+            if (owner == 0 || !Readable(object, sizeof(uint32_t))) return std::nullopt;
             const auto* slot = reinterpret_cast<const uint8_t*>(ReadAt<uint32_t>(object, 0) + kOwnerLayoutSlot * sizeof(uint32_t));
             if (!Readable(slot, sizeof(uint32_t))) return std::nullopt;
             const uint32_t layout = ReadAt<uint32_t>(slot, 0);
             const auto* code      = reinterpret_cast<const uint8_t*>(layout);
             if (layout == 0 || !Readable(code, kLayoutScanBytes)) return std::nullopt;
-            return PlaceCopyOffset({code, kLayoutScanBytes}, layout, g_WindowGetRect);
+            return std::pair{std::span<const uint8_t>(code, kLayoutScanBytes), layout};
+        }
+
+        std::optional<uint32_t> PlaceCopyAt(uint32_t owner)
+        {
+            const auto layout = g_WindowGetRect != 0 ? OwnerLayout(owner) : std::nullopt;
+            return layout ? PlaceCopyOffset(layout->first, layout->second, g_WindowGetRect) : std::nullopt;
+        }
+
+        // Where an owner keeps an entry's top left corner, read off its class's layout as PlaceCopyAt reads the
+        // window's place: none for a class that keeps none.
+        std::optional<uint32_t> EntryPlaceAt(uint32_t owner)
+        {
+            const auto layout = g_WindowEntryRect != 0 ? OwnerLayout(owner) : std::nullopt;
+            return layout ? EntryPlaceOffset(layout->first, layout->second, g_WindowEntryRect) : std::nullopt;
         }
 
         // The game's own move. An owner that keeps a copy of its window's place draws from it, and the move leaves it
@@ -873,6 +890,16 @@ namespace headsup
             WindowRect kept{};
             if (readable) std::memcpy(kept.data(), copy, kWindowRectBytes);
             reinterpret_cast<WindowMoveToFn>(g_WindowMoveTo)(mcd, to.left, to.top);
+            // An entry's corner the owner draws a picture at stays where it was: it moves too, while inside the window.
+            if (const std::optional<uint32_t> entry = EntryPlaceAt(owner))
+                if (auto* corner = reinterpret_cast<int16_t*>(owner + *entry);
+                    Readable(reinterpret_cast<const uint8_t*>(corner), 2 * sizeof(int16_t)))
+                    if (const std::optional<WindowSpot> moved = MovedEntryPlace(WindowSpot{corner[0], corner[1]}, window,
+                            to.left - window[0], to.top - window[1]))
+                    {
+                        corner[0] = static_cast<int16_t>(moved->left);
+                        corner[1] = static_cast<int16_t>(moved->top);
+                    }
             if (!readable) return;
             if (const std::optional<WindowRect> moved = MovedPlaceCopy(kept, window, to.left - window[0], to.top - window[1], match))
                 std::memcpy(copy, moved->data(), kWindowRectBytes);

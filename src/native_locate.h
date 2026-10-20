@@ -157,6 +157,7 @@ namespace headsup
         LocateProblem problem = LocateProblem::None;
         uint32_t moveTo  = 0; // RVA
         uint32_t getRect = 0; // RVA of MCD::GetRect, 0 when it was not found once
+        uint32_t entryRect = 0; // RVA of MCD::GetEntryRect, the same way
     };
     struct TitleRectSite
     {
@@ -213,6 +214,11 @@ namespace headsup
     constexpr uint32_t kOwnerLayoutSlot = 1;
     constexpr size_t kLayoutScanBytes   = 0x200;
     std::optional<uint32_t> PlaceCopyOffset(std::span<const uint8_t> layout, uintptr_t at, uintptr_t getRect);
+    // MCD::GetEntryRect(int16* out, index, lit, pressed) (RVA 0x118900 in the client of 2026-10-19) writes an entry's
+    // rectangle. Some owners keep an entry's top left corner from it and draw a picture there (the Linkshell item's
+    // middle button, at +0x18): where, from a call to it in the class's layout at at and, after it, an int16 kept at
+    // [base + disp8] and the next at the same base 2 further. None for a class that keeps none.
+    std::optional<uint32_t> EntryPlaceOffset(std::span<const uint8_t> layout, uintptr_t at, uintptr_t entryRect);
     // An MCD's rectangle in the game's menu resolution: int16 left, top, right and bottom from +0x3A. +0x94 is a move's
     // countdown (MoveUnderWay); +0x99 is set for windows kept in a 640 x 480 space instead; +0x10 is
     // kWindowOpening while the window has no owner to lay out yet.
@@ -289,6 +295,8 @@ namespace headsup
         int left = 0, top = 0;
         bool operator==(const WindowSpot&) const = default;
     };
+    // Such a corner moved with its window by dx, dy: only one inside the window, as an entry's is.
+    std::optional<WindowSpot> MovedEntryPlace(WindowSpot point, const WindowRect& window, int dx, int dy);
     // A text the game places once, where its window then was, kept with a window HeadsUp moves: the strip's title,
     // whose text object holds where it is drawn (kStripTextX) and is not told when its window moves.
     class PlacedText
