@@ -3,6 +3,7 @@
 #include "test.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <iterator>
 #include <string>
@@ -502,62 +503,114 @@ namespace
     const auto kFlatGrey = [](int, int, uint8_t* pixel) { Put(pixel, 120, 120, 120, 255); };
 }
 
+namespace
+{
+    // A solid disc of the shape, all or nothing as XIUI's edge is, its middle at the shape's.
+    PearlShape Disc(float radius)
+    {
+        return ShapeOf([radius](int x, int y, uint8_t* pixel) {
+            const float dx = static_cast<float>(x) + 0.5f - kShapeSide / 2.0f, dy = static_cast<float>(y) + 0.5f - kShapeSide / 2.0f;
+            Put(pixel, 120, 120, 120, dx * dx + dy * dy <= radius * radius ? 255 : 0);
+        });
+    }
+    const auto kSolidGrey = [](int, int, uint8_t* pixel) { Put(pixel, 120, 120, 120, 119); };
+    // The pixels of the middle row from the left edge to the middle: how many are seen and darker than half the body.
+    int DarkFromLeft(const std::vector<unsigned char>& lit)
+    {
+        const int body = At(lit, kShapeSide / 2, kShapeSide / 2)[1];
+        int dark       = 0;
+        for (int x = 0; x < kShapeSide / 2; ++x)
+            dark += At(lit, x, kShapeSide / 2)[3] >= 128 && At(lit, x, kShapeSide / 2)[1] * 2 < body;
+        return dark;
+    }
+}
+
 TEST(the_game_lit_pearl_lays_the_games_visible_square_over_the_shapes)
 {
-    // A 16 x 16 opaque square from (8, 8), its top left quarter one color and the rest another, on a flat shape: four
-    // shape pixels a texel, so shape (8, 8) is texel (10, 10) and (56, 56) texel (22, 22), six texels from where they meet.
+    // A 16 x 16 opaque square from (8, 8), its top left quarter one color and the rest another, on a shape lit 100 above
+    // and 200 below: four shape pixels a texel, so shape (12, 12) is texel (11, 11) and (52, 52) texel (21, 21), five
+    // texels from where they meet. The shape gives no light of its own.
     const ColorPicture game = GamePicture([](int x, int y, uint8_t* pixel) {
         if (x < 8 || y < 8 || x >= 24 || y >= 24) return;
         if (x < 16 && y < 16) Put(pixel, 40, 80, 120, 119);
         else Put(pixel, 90, 60, 30, 119);
     });
-    const PearlShape shape                    = ShapeOf(kFlatGrey);
-    const std::vector<unsigned char> lit = GameLitPearl(game, shape.Bitmap());
-    CHECK_EQ(lit.size(), shape.bgra.size());
-    CHECK(Near(At(lit, 8, 8), 40, 80, 120, 1));
-    CHECK(Near(At(lit, 56, 56), 90, 60, 30, 1));
-    CHECK(GameLitPearl(GamePicture([](int, int, uint8_t*) {}), shape.Bitmap()).empty());
-}
-
-TEST(the_game_lit_pearl_has_the_shapes_alpha_and_the_games_color_out_to_its_edge)
-{
-    // The game's disc of radius 10 in clear black, under a shape whose disc reaches further: every pixel the shape
-    // shows has the game's color, never the black of its clear pixels, and the shape's own alpha.
-    const ColorPicture game = GamePicture([](int x, int y, uint8_t* pixel) {
-        const float dx = static_cast<float>(x) + 0.5f - 16.0f, dy = static_cast<float>(y) + 0.5f - 16.0f;
-        if (dx * dx + dy * dy <= 100.0f) Put(pixel, 200, 150, 100, 119);
-    });
-    const PearlShape shape = ShapeOf([](int x, int y, uint8_t* pixel) {
-        const float dx = static_cast<float>(x) + 0.5f - 32.0f, dy = static_cast<float>(y) + 0.5f - 32.0f;
-        Put(pixel, 120, 120, 120, dx * dx + dy * dy <= 31.0f * 31.0f ? 255 : dx * dx + dy * dy <= 32.0f * 32.0f ? 128 : 0);
-    });
-    const std::vector<unsigned char> lit = GameLitPearl(game, shape.Bitmap());
-    bool alphas = true, colored = true;
-    for (int y = 0; y < kShapeSide; ++y)
-        for (int x = 0; x < kShapeSide; ++x)
-        {
-            alphas = alphas && At(lit, x, y)[3] == At(shape.bgra, x, y)[3];
-            if (At(lit, x, y)[3] > 0) colored = colored && Near(At(lit, x, y), 200, 150, 100, 2);
-        }
-    CHECK(alphas);
-    CHECK(colored);
-}
-
-TEST(the_game_lit_pearl_keeps_the_shapes_outline_but_not_its_broad_light)
-{
-    // The shape: grey 100 over its top half, 200 under it (XIUI's bright bottom), inside a dark ring two pixels wide.
-    // The ring stays dark, at 20 over its neighborhood's 50 or so; the halves come out alike, as the game's flat color
-    // has them.
-    const ColorPicture game = GamePicture([](int, int, uint8_t* pixel) { Put(pixel, 120, 120, 120, 119); });
-    const PearlShape shape       = ShapeOf([](int x, int y, uint8_t* pixel) {
-        const bool ring = x < 2 || y < 2 || x >= kShapeSide - 2 || y >= kShapeSide - 2;
-        const uint8_t v = ring ? 20 : y < kShapeSide / 2 ? 100 : 200;
+    const PearlShape shape = ShapeOf([](int, int y, uint8_t* pixel) {
+        const uint8_t v = y < kShapeSide / 2 ? 100 : 200;
         Put(pixel, v, v, v, 255);
     });
-    const std::vector<unsigned char> lit = GameLitPearl(game, shape.Bitmap());
-    const int top = At(lit, 32, 12)[1], bottom = At(lit, 32, 52)[1], ring = At(lit, 32, 0)[1];
-    CHECK(std::abs(top - bottom) <= 6);
-    CHECK(ring * 2 < top);
+    const std::vector<unsigned char> lit = GameLitPearl(game, shape.Bitmap(), 100);
+    CHECK_EQ(lit.size(), shape.bgra.size());
+    CHECK(Near(At(lit, 12, 12), 40, 80, 120, 1));
+    CHECK(Near(At(lit, 52, 52), 90, 60, 30, 1));
+    CHECK(GameLitPearl(GamePicture([](int, int, uint8_t*) {}), shape.Bitmap(), 100).empty());
+}
+
+TEST(the_game_lit_pearls_edge_is_the_shapes_traced_smooth)
+{
+    // The shape under a line falling one pixel in three, all or nothing as XIUI's edge is, so it steps: its pixels
+    // whose middles lie on the line come out half seen, those a pixel and a half either side of it whole or clear.
+    const PearlShape shape = ShapeOf([](int x, int y, uint8_t* pixel) {
+        Put(pixel, 120, 120, 120, static_cast<float>(y) + 0.5f > 20.0f + (static_cast<float>(x) + 0.5f) / 3.0f ? 255 : 0);
+    });
+    const std::vector<unsigned char> lit = GameLitPearl(GamePicture(kSolidGrey), shape.Bitmap(), 100);
+    int onLine = 0;
+    bool smooth = true, whole = true;
+    for (int y = 8; y < kShapeSide - 8; ++y)
+        for (int x = 8; x < kShapeSide - 8; ++x)
+        {
+            // Its distance from the line, under it positive: (y - x / 3 - 20) over the length of (1, -1/3).
+            const float d = (static_cast<float>(y) + 0.5f - (static_cast<float>(x) + 0.5f) / 3.0f - 20.0f) / std::sqrt(1.0f + 1.0f / 9.0f);
+            const int alpha = At(lit, x, y)[3];
+            if (std::abs(d) <= 0.15f) smooth = smooth && alpha >= 64 && alpha <= 191, ++onLine;
+            if (d >= 1.5f) whole = whole && alpha == 255;
+            if (d <= -1.5f) whole = whole && alpha == 0;
+        }
+    CHECK(onLine > 0);
+    CHECK(smooth);
+    CHECK(whole);
+}
+
+TEST(the_game_lit_pearls_outline_is_as_thick_as_asked)
+{
+    // XIUI's outline is about 1.7 of its pixels; twice that is a pixel or two more, none is none.
+    const PearlShape shape = Disc(26.0f);
+    const int one = DarkFromLeft(GameLitPearl(GamePicture(kSolidGrey), shape.Bitmap(), 100));
+    const int two = DarkFromLeft(GameLitPearl(GamePicture(kSolidGrey), shape.Bitmap(), 200));
+    CHECK(one >= 1 && one <= 3);
+    CHECK(two > one && two <= 5);
+    CHECK_EQ(DarkFromLeft(GameLitPearl(GamePicture(kSolidGrey), shape.Bitmap(), 0)), 0);
+}
+
+TEST(the_clear_pixels_around_the_pearl_take_its_edges_color)
+{
+    // Drawn smaller, a clear pixel's color mixes into the edge beside it: next to the outline it must be as dark.
+    const PearlShape shape = Disc(26.0f);
+    const auto firstClear  = [](const std::vector<unsigned char>& lit) {
+        int x = kShapeSide / 2;
+        while (x > 0 && At(lit, x, kShapeSide / 2)[3] > 0)
+            --x;
+        return At(lit, x, kShapeSide / 2);
+    };
+    const std::vector<unsigned char> outlined = GameLitPearl(GamePicture(kSolidGrey), shape.Bitmap(), 100);
+    CHECK(firstClear(outlined)[1] * 2 < At(outlined, kShapeSide / 2, kShapeSide / 2)[1]);
+    const std::vector<unsigned char> plain = GameLitPearl(GamePicture(kSolidGrey), shape.Bitmap(), 0);
+    CHECK(Near(firstClear(plain), 120, 120, 120, 3));
+}
+
+TEST(the_game_lit_pearl_takes_its_colors_from_the_games_solid_pixels)
+{
+    // The game's pearl solid to radius 8 and partly clear and dark from 8 to 11, as its clasp and rim are: the shape,
+    // a disc filling its square, shows the solid color out to its outline.
+    const ColorPicture game = GamePicture([](int x, int y, uint8_t* pixel) {
+        const float dx = static_cast<float>(x) + 0.5f - 16.0f, dy = static_cast<float>(y) + 0.5f - 16.0f;
+        const float r2 = dx * dx + dy * dy;
+        if (r2 <= 64.0f) Put(pixel, 200, 160, 120, 119);
+        else if (r2 <= 121.0f) Put(pixel, 20, 20, 20, 80);
+    });
+    const std::vector<unsigned char> lit = GameLitPearl(game, Disc(31.0f).Bitmap(), 100);
+    CHECK(Near(At(lit, kShapeSide / 2 - 26, kShapeSide / 2), 200, 160, 120, 2));
+    CHECK(Near(At(lit, kShapeSide / 2, kShapeSide / 2 + 26), 200, 160, 120, 2));
 }
 
 TEST(the_game_lit_pearl_smooths_the_games_block_noise)
@@ -567,11 +620,10 @@ TEST(the_game_lit_pearl_smooths_the_games_block_noise)
         const uint8_t v = (x + y) % 2 == 0 ? 100 : 150;
         Put(pixel, v, v, v, 119);
     });
-    const PearlShape shape                    = ShapeOf(kFlatGrey);
-    const std::vector<unsigned char> lit = GameLitPearl(game, shape.Bitmap());
+    const std::vector<unsigned char> lit = GameLitPearl(game, ShapeOf(kFlatGrey).Bitmap(), 100);
     bool even = true;
-    for (int y = 4; y < kShapeSide - 4; ++y)
-        for (int x = 4; x < kShapeSide - 4; ++x)
+    for (int y = 8; y < kShapeSide - 8; ++y)
+        for (int x = 8; x < kShapeSide - 8; ++x)
             even = even && Near(At(lit, x, y), 125, 125, 125, 3);
     CHECK(even);
 }

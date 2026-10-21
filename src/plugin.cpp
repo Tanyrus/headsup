@@ -357,6 +357,8 @@ class HeadsUp final : public IPlugin
     std::optional<std::string> m_CursorFileRead; // the File cursor read last, whether or not it was one
     std::string m_GameFontFailure;                // why the game's font could not be read; empty when it was
     std::string m_GamePearlFailure;               // why the game's pearl could not be read; empty when it was
+    std::optional<headsup::ColorPicture> m_GamePearl;
+    std::optional<int> m_PearlOutlineDrawn;       // the outline the pearl was last drawn with
     bool m_GameFontWarned = false;
     float m_MenuHeight  = 0.0f;
     int m_CaptureLeft   = 0;
@@ -787,6 +789,7 @@ public:
         m_BarDrawn = false;
         m_ArrowHook.Hide(m_Settings.enabled && m_Settings.cursorStyle != headsup::CursorStyle::Vanilla);
         LoadCursorFile();
+        LightGamePearl();
         // The game's help bar is the only help left while an event hides HeadsUp's bar; a screenshot wants neither.
         const bool helpGone = m_Settings.hideHelpBar && (m_Screenshot || !m_Player.inEvent);
         const headsup::HiddenWindows hidden{.helpBar = m_Settings.enabled && helpGone,
@@ -1297,10 +1300,8 @@ private:
                 return;
             }
             headsup::Read<headsup::ColorPicture> pearl = headsup::ReadGamePearl(bytes);
-            std::vector<unsigned char> lit = pearl.value ? headsup::GameLitPearl(*pearl.value, headsup::IconImage(headsup::Icon::Linkshell))
-                                                         : std::vector<unsigned char>();
-            if (!lit.empty()) m_Nameplates.SetGamePearl(std::move(lit));
-            else m_GamePearlFailure = path + ": " + (pearl.value ? "its pearl shows nothing" : pearl.failure);
+            if (pearl.value) m_GamePearl = std::move(pearl.value);
+            else m_GamePearlFailure = path + ": " + pearl.failure;
             headsup::Read<headsup::GameFontFace> font = headsup::ReadGameFont(bytes);
             if (!font.value)
             {
@@ -1313,6 +1314,15 @@ private:
         }
         m_GameFontFailure  = "the game's ROM\\119\\51.DAT was not found under " + gameFolder;
         m_GamePearlFailure = m_GameFontFailure;
+    }
+
+    // The linkshell's pearl in the game's light and colors, drawn again when the settings ask for another outline.
+    void LightGamePearl()
+    {
+        if (!m_GamePearl || m_PearlOutlineDrawn == m_Settings.pearlOutline) return;
+        m_PearlOutlineDrawn = m_Settings.pearlOutline;
+        m_Nameplates.SetGamePearl(
+            headsup::GameLitPearl(*m_GamePearl, headsup::IconImage(headsup::Icon::Linkshell), m_Settings.pearlOutline));
     }
 
     // Once, when a nameplate is set in the game's font and it could not be read.

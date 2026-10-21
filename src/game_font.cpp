@@ -435,6 +435,10 @@ namespace headsup
                               static_cast<std::ptrdiff_t>((static_cast<size_t>(kPearlV + y) * static_cast<size_t>(sheet.value->width) + kPearlU) * kBgraBytes);
             pearl.bgra.insert(pearl.bgra.end(), from, from + static_cast<std::ptrdiff_t>(row));
         }
+        bool seen = false;
+        for (size_t p = kBgraBytes - 1; p < pearl.bgra.size(); p += kBgraBytes)
+            seen = seen || pearl.bgra[p] != 0;
+        if (!seen) return {std::nullopt, "its pearl shows nothing"};
         return {std::move(pearl), {}};
     }
 

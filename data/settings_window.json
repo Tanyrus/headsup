@@ -13,6 +13,7 @@
             {"key": "default-font", "name": "Default Font", "tip": "The default used by most other nameplate font settings."},
             {"key": "base-font-size", "name": "Base Font Size", "tip": "The base font size for nameplate elements."},
             {"key": "base-icon-size", "name": "Base Icon Size", "tip": "The base icon size for nameplate elements."},
+            {"key": "linkpearl-outline", "name": "Linkpearl Outline", "tip": "How thick the dark outline around a linkshell's pearl is: 100% is XIUI's, 0% none."},
             {
               "key": "replace-dashes",
               "name": "Replace Dashes",

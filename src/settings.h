@@ -33,6 +33,7 @@ namespace headsup
     constexpr int kMinSmoothness = SmoothnessCopies(SmoothnessLevel::Low), kMaxSmoothness = SmoothnessCopies(SmoothnessLevel::Ultra);
     constexpr int kMinTextSize = 8, kMaxTextSize = 48;   // pixels: the base font and base icon sizes
     constexpr int kDefaultIconSize = 16;                 // pixels: the base icon size
+    constexpr int kMaxPearlOutline = 300;                // percent of XIUI's: the linkpearl's outline
     constexpr int kMinNameRaise = 0, kMaxNameRaise = 40; // pixels
     constexpr const char* kDefaultFont = kMontserratSemiBold;
     constexpr const char* kBadgeFont   = kBarlowCondensed; // what badges were set in before they took the default font
@@ -159,6 +160,7 @@ namespace headsup
         bool outlines   = true;
         int baseSize    = 15; // pixels: a line's text at 100 percent
         int baseIconSize = kDefaultIconSize; // and its icons
+        int pearlOutline = 100;              // the linkpearl's outline, percent of XIUI's; 0 for none
         DashMark dashMark = DashMark::Diamond; // what a dash typed in a design is drawn as
         bool autoCheck    = false; // every mob that comes near is checked by HeadsUp, for its exact level
         std::string defaultFont = kDefaultFont;

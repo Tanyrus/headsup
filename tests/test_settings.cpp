@@ -718,6 +718,7 @@ TEST(percents_load_and_clamp_onto_steps_of_five)
     s.outlineOpacity         = 12;
     s.menuOpacity            = 33;
     s.cursorOutlineThickness = 52;
+    s.pearlOutline           = 113;
     LineDesign& line = s.Kind(PlateKind::Players).lines[0];
     line.textSize    = 87;
     line.iconSize    = 112;
@@ -731,14 +732,20 @@ TEST(percents_load_and_clamp_onto_steps_of_five)
     const Settings c = Clamp(s);
     CHECK(c.timerPercent == 85 && c.scaleMin == 90 && c.outlineOpacity == 10 && c.menuOpacity == 35);
     CHECK_EQ(c.cursorOutlineThickness, 50);
+    CHECK_EQ(c.pearlOutline, 115);
+    s.pearlOutline = 400;
+    CHECK_EQ(Clamp(s).pearlOutline, kMaxPearlOutline);
+    s.pearlOutline = -20;
+    CHECK_EQ(Clamp(s).pearlOutline, 0);
     const LineDesign& l = c.Kind(PlateKind::Players).lines[0];
     CHECK(l.textSize == 85 && l.iconSize == 110 && l.shadow == 5 && l.glow == 300 && l.glowSize == 25);
     const OpacitySettings& co = c.opacity;
     CHECK(co.noTarget == 85 && co.notTargeted == 40 && co.targeted == 100);
     CHECK(Clamp(Settings{}) == Settings{}); // every default is on the steps already
-    MapStore file = ReleaseFile({{"timerPercent", "87.0000"}, {"mobsLine2TextSize", "87.0000"}});
+    MapStore file = ReleaseFile({{"timerPercent", "87.0000"}, {"mobsLine2TextSize", "87.0000"}, {"pearlOutline", "142"}});
     const Settings loaded = LoadSettings(file);
     CHECK(loaded.timerPercent == 85 && loaded.Kind(PlateKind::Mobs).lines[1].textSize == 85);
+    CHECK_EQ(loaded.pearlOutline, 140);
 }
 
 TEST(non_finite_values_fall_back_to_defaults)

@@ -954,6 +954,10 @@ namespace headsup
                 form.Fade(!plates);
                 form.SliderInt(label.c_str(), s.baseIconSize, kMinTextSize, kMaxTextSize, "%d px", tip);
                 break;
+            case SettingPiece::LinkpearlOutline:
+                form.Fade(!plates);
+                form.SliderPercent(label.c_str(), s.pearlOutline, 0, kMaxPearlOutline, tip);
+                break;
             case SettingPiece::AutoCheck:
                 form.Fade(!plates);
                 form.Switch(label.c_str(), s.autoCheck, tip);

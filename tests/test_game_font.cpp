@@ -257,6 +257,17 @@ TEST(the_games_pearl_is_the_square_at_0_64_of_its_status_icons_picture)
     CHECK(!ReadGamePearl(small).value && !ReadGamePearl(small).failure.empty());
     const Bytes renamed = Chunk("usta", 0x20, PictureBody(256, 256, "DXT1", blocks, 0xA1, "menu    ustatsxx"));
     CHECK(!ReadGamePearl(renamed).value);
+    // DXT1's fourth pick after a smaller first color is clear: a pearl's square all of it shows nothing.
+    Bytes clear;
+    for (int by = 0; by < 64; ++by)
+        for (int bx = 0; bx < 64; ++bx)
+        {
+            std::array<uint8_t, 16> picks{};
+            if (bx < 8 && by >= 16 && by < 24) picks.fill(3);
+            clear = clear + ColorBlock(0, 0x07E0, picks);
+        }
+    const Read<ColorPicture> nothing = ReadGamePearl(Chunk("usta", 0x20, PictureBody(256, 256, "DXT1", clear, 0xA1, "menu    ustatshd")));
+    CHECK(!nothing.value && !nothing.failure.empty());
 }
 
 TEST(a_record_that_is_no_picture_is_refused_with_why)
