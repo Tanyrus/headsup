@@ -591,12 +591,12 @@ namespace headsup
                         for (size_t k = 0; k < item.icons.size(); ++k)
                         {
                             const IconDraw& draw    = item.icons[k];
-                            const IconTexture* icon = m_Icons.For(m_Device, draw.icon);
+                            const IconTexture* icon = m_Icons.For(m_Device, draw.icon, draw.dye);
                             if (icon == nullptr) break;
                             const IconSpot in = IconInRun(run, item, k);
                             const IconSpot spot{at.x + in.x, at.y + in.y};
                             addQuad(m_Quads, icon->texture, spot.x, spot.y, run.iconSize * toX, run.iconSize * toY, icon->u, icon->v, depth,
-                                draw.tint);
+                                kWhite);
                             ++drawn;
                             const PlateTexture* badge = m_IconBadges[firstBadge + k];
                             if (badge == nullptr) continue;

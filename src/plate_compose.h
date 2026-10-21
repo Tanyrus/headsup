@@ -16,7 +16,7 @@ namespace headsup
     struct IconDraw
     {
         Icon icon          = Icon::AggroNQ;
-        uint32_t tint      = kWhite;
+        uint32_t dye       = kWhite; // the game's dye the icon is painted in, the linkshell's; white as it is drawn
         std::string badge;
         uint32_t badgeColor = 0;
         bool operator==(const IconDraw&) const = default;

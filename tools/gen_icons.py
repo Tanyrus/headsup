@@ -32,10 +32,6 @@ ICONS = [(name, f'mobdb-icons/{name}.png', '') for name in
 ] + [(name, f'mobdb-icons/Immune{name}.png', '') for name in
      ['LightSleep', 'DarkSleep', 'Gravity', 'Bind', 'Stun', 'Silence', 'Paralyze', 'Blind', 'Slow', 'Poison', 'Elegy',
       'Requiem', 'Petrify']]
-# The icons the renderer tints with a color of the game's, the linkshell's: XIUI's pearl is a grey shaded sphere, which
-# the color multiplies, so the pearl would show at half the color the game shows. Its shading is halved toward white.
-TINTED = {'Linkshell'}
-TINT_SHADE = 0.5  # what is left of a tinted icon's shading
 # An icon is drawn at about a quarter of its pixels with linear filtering and no smaller copies, which mixes the clear
 # pixels two out from its edge into it: those take the colors beside them, so the edge keeps its own.
 BLEED_RINGS = 2
@@ -177,15 +173,6 @@ def bled(width: int, height: int, bgra: bytes) -> bytes:
     return bytes(out)
 
 
-def lifted(bgra: bytes) -> bytes:
-    """The pixels with each color channel's shading, what it lacks of white, cut to TINT_SHADE; alpha kept."""
-    out = bytearray(bgra)
-    for i in range(len(out)):
-        if i % BYTES_PER_PIXEL != BYTES_PER_PIXEL - 1:
-            out[i] = int(255 - (255 - out[i]) * TINT_SHADE + 0.5)
-    return bytes(out)
-
-
 def c_bytes(name: str, data: bytes) -> str:
     lines = [f'const unsigned char {name}[] = {{']
     for start in range(0, len(data), BYTES_PER_LINE):
@@ -208,7 +195,7 @@ def generate(third_party: pathlib.Path) -> str:
         try:
             width, height, bgra = trim_square(*decode_bgra(path.read_bytes()))
             bgra = bled(width, height, bgra)
-            parts.append(c_bitmap(name, width, height, lifted(bgra) if name in TINTED else bgra))
+            parts.append(c_bitmap(name, width, height, bgra))
         except IconError as error:
             raise IconError(f'{path}: {error}') from None
     parts.append('const IconBitmap kIcons[] = {' + ', '.join(f'kIcon{name}' for name, _, _ in ICONS) + '};')

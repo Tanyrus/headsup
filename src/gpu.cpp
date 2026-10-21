@@ -191,14 +191,15 @@ namespace headsup
             if (font != nullptr) DeleteObject(font);
     }
 
-    const IconTexture* IconTextures::For(IDirect3DDevice8* device, Icon icon)
+    const IconTexture* IconTextures::For(IDirect3DDevice8* device, Icon icon, uint32_t dye)
     {
-        IconTexture& t = m_Textures[static_cast<size_t>(icon)];
+        IconTexture& t = dye == kWhite ? m_Textures[static_cast<size_t>(icon)] : m_Painted[{icon, dye}];
         if (t.texture != nullptr) return &t;
         if (m_Failed) return nullptr;
         const IconBitmap& bitmap = IconImage(icon);
         const auto width = static_cast<int>(bitmap.width), height = static_cast<int>(bitmap.height);
-        t.texture = CreateTexture(device, bitmap.bgra, width, height, t.u, t.v);
+        const std::vector<unsigned char> painted = dye == kWhite ? std::vector<unsigned char>() : PaintedIcon(bitmap, dye);
+        t.texture = CreateTexture(device, painted.empty() ? bitmap.bgra : painted.data(), width, height, t.u, t.v);
         if (t.texture == nullptr)
         {
             m_Failed  = true;
@@ -217,6 +218,9 @@ namespace headsup
     {
         for (IconTexture& t : m_Textures)
             ReleaseTexture(t.texture);
+        for (auto& [key, t] : m_Painted)
+            ReleaseTexture(t.texture);
+        m_Painted.clear();
     }
 
     void SetQuadStates(IDirect3DDevice8* device, bool depthTest)

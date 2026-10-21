@@ -47,7 +47,7 @@ namespace
         PlayerStatus status;
         status.linkshell     = true;
         status.seekingParty  = true;
-        status.linkshellArgb = 0xFF0000FF;
+        status.linkshellArgb = 0xFF4F2F0F; // 4-2-0 as the server sends it
         info.status          = status;
         info.linkshellArgb   = status.linkshellArgb;
         return info;
@@ -84,7 +84,7 @@ TEST(the_default_player_design_puts_the_icons_before_the_name)
     CHECK_EQ(plate.lines[0].items.size(), size_t{2});
     const PlateItem& icons = plate.lines[0].items[0];
     CHECK(icons.icons[0].icon == Icon::Linkshell);
-    CHECK_EQ(icons.icons[0].tint, 0xFF0000FFu);
+    CHECK_EQ(icons.icons[0].dye, 0xFF442200u); // the game's dye of it
     CHECK(icons.icons[1].icon == Icon::Invite);
     CHECK(plate.lines[0].items[1].name);
     CHECK(!icons.name);
@@ -624,7 +624,7 @@ TEST(each_player_icon_tag_draws_its_own_icon_only_when_its_flag_is_set)
         CHECK_EQ(on.lines[0].items[0].icons.size(), size_t{1});
         const IconDraw& draw = on.lines[0].items[0].icons[0];
         CHECK(draw.icon == c.icon);
-        CHECK_EQ(draw.tint, c.icon == Icon::Linkshell ? 0xFF0000FFu : kWhite);
+        CHECK_EQ(draw.dye, c.icon == Icon::Linkshell ? 0xFF442200u : kWhite);
         CHECK(Compose(PlayerWith(PlayerStatus{}), s).lines.empty());
         CHECK(Compose(PlainPlayer(), s).lines.empty());
     }

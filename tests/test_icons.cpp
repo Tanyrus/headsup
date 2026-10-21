@@ -443,3 +443,29 @@ TEST(each_icon_a_mobs_row_holds_belongs_to_its_own_filter_kind)
         CHECK(!holds(kAllDetection & ~DetectionBit(p.kind)));
     }
 }
+
+TEST(a_linkshells_color_is_the_games_dye_of_its_four_bits_a_channel)
+{
+    // The server sends each channel as its step shifted up a nibble with the low one full: 4-2-0 is 79, 47, 15. The
+    // game's dye is the step times 17, 4-2-0 #442200, whichever of the two a byte holds.
+    CHECK_EQ(LinkshellDye(0xFF4F2F0Fu), 0xFF442200u);
+    CHECK_EQ(LinkshellDye(0xFF442200u), 0xFF442200u);
+    CHECK_EQ(LinkshellDye(0xFFFFFFFFu), 0xFFFFFFFFu);
+    CHECK_EQ(LinkshellDye(0x000F0F0Fu), 0xFF000000u);
+}
+
+TEST(a_grey_icon_is_painted_as_the_game_paints_its_pearl)
+{
+    // Three greys, 50, 100 and 200, the middle one the pearl's body, and a clear pixel of 100. Dyed #442200 (4-2-0), each
+    // channel plus 8 times the pixel's light over the body's: (76, 42, 8) at the body, half that in the shadow, twice
+    // in the highlight, as ferrisxitools' linkpearl page draws it.
+    const unsigned char greys[] = {50, 50, 50, 255, 100, 100, 100, 255, 200, 200, 200, 255, 100, 100, 100, 0};
+    const IconBitmap icon{greys, 2, 2};
+    const std::vector<unsigned char> painted = PaintedIcon(icon, 0xFF442200u);
+    const std::vector<unsigned char> expected = {4, 21, 38, 255, 8, 42, 76, 255, 16, 84, 152, 255, 8, 42, 76, 0};
+    CHECK(painted == expected);
+    // A channel past full is held at it.
+    const std::vector<unsigned char> bright = PaintedIcon(icon, 0xFFFFFFFFu);
+    CHECK(bright[8] == 255 && bright[9] == 255 && bright[10] == 255 && bright[4] == 255 && bright[0] == 132);
+}
+
