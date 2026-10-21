@@ -127,11 +127,9 @@ namespace headsup
 
     const IconBitmap& IconImage(Icon icon);
 
-    // A linkshell's color as the game dyes its pearl: each channel's four bits times 17. The server sends a channel as
-    // its four bits shifted up with the low ones full (4-2-0 as 79, 47, 15); either form reads back the same.
-    uint32_t LinkshellDye(uint32_t color);
-    // A grey icon painted in a dye as the game paints its linkpearl: each channel plus kShellLight, times the pixel's
-    // light over the icon's middle light, held to 255; alpha as it was. BGRA, as IconBitmap holds it. As ferrisxitools'
-    // linkpearl page draws the game's pearl.
-    std::vector<unsigned char> PaintedIcon(const IconBitmap& icon, uint32_t dye);
+    // A grey icon painted in a linkshell's color as the game paints the pearl before a name: the game's colors stand at
+    // half strength (0x80 the texture as it is), so each channel is the pixel's times twice the color's, held to 255;
+    // alpha as it was. The color is as the server sends it, each channel's four bits shifted up with the low ones full
+    // (4-2-0 as 79, 47, 15). BGRA, as IconBitmap holds it.
+    std::vector<unsigned char> PaintedIcon(const IconBitmap& icon, uint32_t color);
 }

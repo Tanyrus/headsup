@@ -266,38 +266,21 @@ namespace headsup
         return kIcons[static_cast<size_t>(icon)];
     }
 
-    uint32_t LinkshellDye(uint32_t color)
+    std::vector<unsigned char> PaintedIcon(const IconBitmap& icon, uint32_t color)
     {
-        constexpr uint32_t kStepByte = 17; // a four-bit step's byte: 15 is 255
-        uint32_t dye = 0xFF000000u;
-        for (const int shift : {0, 8, 16})
-            dye |= ((color >> shift & 0xFF) >> 4) * kStepByte << shift;
-        return dye;
-    }
-
-    std::vector<unsigned char> PaintedIcon(const IconBitmap& icon, uint32_t dye)
-    {
-        constexpr double kShellLight = 8.0; // added to each channel, so a channel at 0 still shows the shell
-        constexpr double kRed = 0.299, kGreen = 0.587, kBlue = 0.114;
-        constexpr size_t kBytes = 4, kAlpha = 3;
+        constexpr double kHalfStrength = 255.0 / 2.0; // a color channel at this leaves the texture as it is
+        constexpr size_t kBytes = 4, kChannels = 3;
         const size_t pixels = static_cast<size_t>(icon.width) * icon.height;
-        // Each pixel's light, in the page's order of terms so a light half of the body's halves the dye exactly.
-        std::vector<double> light(pixels), seen;
-        for (size_t p = 0; p < pixels; ++p)
-        {
-            const unsigned char* bgra = icon.bgra + p * kBytes;
-            light[p] = bgra[2] * kRed + bgra[1] * kGreen + bgra[0] * kBlue;
-            if (bgra[kAlpha] != 0) seen.push_back(light[p]);
-        }
-        std::ranges::sort(seen);
-        const double body = seen.empty() || seen[(seen.size() - 1) / 2] == 0.0 ? 1.0 : seen[(seen.size() - 1) / 2];
-        const double channel[3] = {static_cast<double>(dye & 0xFF), static_cast<double>(dye >> 8 & 0xFF),
-            static_cast<double>(dye >> 16 & 0xFF)};
         std::vector<unsigned char> out(icon.bgra, icon.bgra + pixels * kBytes);
-        for (size_t p = 0; p < pixels; ++p)
-            for (size_t c = 0; c < 3; ++c)
-                out[p * kBytes + c] = static_cast<unsigned char>(
-                    std::min<long>(255, std::lround((channel[c] + kShellLight) * (light[p] / body))));
+        for (size_t c = 0; c < kChannels; ++c)
+        {
+            const double gain = static_cast<double>(color >> (8 * c) & 0xFF) / kHalfStrength;
+            for (size_t p = 0; p < pixels; ++p)
+            {
+                unsigned char& channel = out[p * kBytes + c];
+                channel = static_cast<unsigned char>(std::min<long>(255, std::lround(channel * gain)));
+            }
+        }
         return out;
     }
 }

@@ -83,9 +83,9 @@ namespace headsup
     class IconTextures
     {
     public:
-        // Null once Direct3D could not make one. An icon painted in a dye other than white (the linkshell's pearl) has
-        // a texture of its own for each dye.
-        const IconTexture* For(IDirect3DDevice8* device, Icon icon, uint32_t dye);
+        // Null once Direct3D could not make one. An icon painted in a color (the linkshell's pearl) has a texture of its
+        // own for each color.
+        const IconTexture* For(IDirect3DDevice8* device, Icon icon, std::optional<uint32_t> paint);
         bool Failed() const { return m_Failed; }
         // Which icon Direct3D could not make, once.
         std::string TakeFailure();
@@ -93,7 +93,7 @@ namespace headsup
 
     private:
         std::array<IconTexture, kIconCount> m_Textures{};
-        std::map<std::pair<Icon, uint32_t>, IconTexture> m_Painted;
+        std::map<std::pair<Icon, uint32_t>, IconTexture> m_Painted; // by icon and color, alpha left out
         bool m_Failed = false;
         std::string m_Failure;
     };

@@ -78,11 +78,11 @@ namespace headsup
             item.kind = kind;
             return item;
         }
-        IconDraw DrawOf(Icon icon, uint32_t dye = kWhite)
+        IconDraw DrawOf(Icon icon, std::optional<uint32_t> paint = std::nullopt)
         {
             IconDraw draw;
-            draw.icon = icon;
-            draw.dye  = dye;
+            draw.icon  = icon;
+            draw.paint = paint;
             return draw;
         }
 
@@ -210,7 +210,7 @@ namespace headsup
             }
             const std::optional<Icon> icon = TagIcon(tag);
             if (!icon || info.state.kind != EntityKind::Player || !info.status || !PlayerHas(tag, *info.status)) return out;
-            out.push_back(DrawOf(*icon, tag == Tag::Linkshell ? LinkshellDye(info.linkshellArgb) : kWhite));
+            out.push_back(DrawOf(*icon, tag == Tag::Linkshell ? std::optional(info.linkshellArgb) : std::nullopt));
             return out;
         }
 

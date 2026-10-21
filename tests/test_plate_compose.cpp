@@ -2,6 +2,7 @@
 #include "look.h"
 #include "test.h"
 
+#include <optional>
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
@@ -84,8 +85,13 @@ TEST(the_default_player_design_puts_the_icons_before_the_name)
     CHECK_EQ(plate.lines[0].items.size(), size_t{2});
     const PlateItem& icons = plate.lines[0].items[0];
     CHECK(icons.icons[0].icon == Icon::Linkshell);
-    CHECK_EQ(icons.icons[0].dye, 0xFF442200u); // the game's dye of it
+    CHECK(icons.icons[0].paint == std::optional<uint32_t>(0xFF4F2F0Fu)); // painted in it as the game paints
+    CHECK(!icons.icons[1].paint);
     CHECK(icons.icons[1].icon == Icon::Invite);
+    ActorInfo white                = LinkshellPlayer();
+    white.linkshellArgb            = 0xFFFFFFFF; // a white shell is painted too: the game doubles its pearl's light
+    const ComposedPlate whitePlate = ComposePlate(white, kPlayer, s, kGame);
+    CHECK(whitePlate.lines[0].items[0].icons[0].paint == std::optional<uint32_t>(0xFFFFFFFFu));
     CHECK(plate.lines[0].items[1].name);
     CHECK(!icons.name);
     CHECK_EQ(plate.lines[0].look.glow, 1.0f);
@@ -624,7 +630,7 @@ TEST(each_player_icon_tag_draws_its_own_icon_only_when_its_flag_is_set)
         CHECK_EQ(on.lines[0].items[0].icons.size(), size_t{1});
         const IconDraw& draw = on.lines[0].items[0].icons[0];
         CHECK(draw.icon == c.icon);
-        CHECK_EQ(draw.dye, c.icon == Icon::Linkshell ? 0xFF442200u : kWhite);
+        CHECK(draw.paint == (c.icon == Icon::Linkshell ? std::optional<uint32_t>(0xFF4F2F0Fu) : std::nullopt));
         CHECK(Compose(PlayerWith(PlayerStatus{}), s).lines.empty());
         CHECK(Compose(PlainPlayer(), s).lines.empty());
     }

@@ -591,7 +591,7 @@ namespace headsup
                         for (size_t k = 0; k < item.icons.size(); ++k)
                         {
                             const IconDraw& draw    = item.icons[k];
-                            const IconTexture* icon = m_Icons.For(m_Device, draw.icon, draw.dye);
+                            const IconTexture* icon = m_Icons.For(m_Device, draw.icon, draw.paint);
                             if (icon == nullptr) break;
                             const IconSpot in = IconInRun(run, item, k);
                             const IconSpot spot{at.x + in.x, at.y + in.y};

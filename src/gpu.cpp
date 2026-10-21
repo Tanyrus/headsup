@@ -191,14 +191,15 @@ namespace headsup
             if (font != nullptr) DeleteObject(font);
     }
 
-    const IconTexture* IconTextures::For(IDirect3DDevice8* device, Icon icon, uint32_t dye)
+    const IconTexture* IconTextures::For(IDirect3DDevice8* device, Icon icon, std::optional<uint32_t> paint)
     {
-        IconTexture& t = dye == kWhite ? m_Textures[static_cast<size_t>(icon)] : m_Painted[{icon, dye}];
+        constexpr uint32_t kRgb = 0x00FFFFFF;
+        IconTexture& t = !paint ? m_Textures[static_cast<size_t>(icon)] : m_Painted[{icon, *paint & kRgb}];
         if (t.texture != nullptr) return &t;
         if (m_Failed) return nullptr;
         const IconBitmap& bitmap = IconImage(icon);
         const auto width = static_cast<int>(bitmap.width), height = static_cast<int>(bitmap.height);
-        const std::vector<unsigned char> painted = dye == kWhite ? std::vector<unsigned char>() : PaintedIcon(bitmap, dye);
+        const std::vector<unsigned char> painted = paint ? PaintedIcon(bitmap, *paint) : std::vector<unsigned char>();
         t.texture = CreateTexture(device, painted.empty() ? bitmap.bgra : painted.data(), width, height, t.u, t.v);
         if (t.texture == nullptr)
         {
