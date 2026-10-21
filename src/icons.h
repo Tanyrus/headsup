@@ -134,9 +134,9 @@ namespace headsup
     std::vector<unsigned char> PaintedIcon(const IconBitmap& icon, uint32_t color);
 
     struct ColorPicture;
-    constexpr int kPearlSide = 64; // as large as the largest built-in icon
-    // The game's pearl (ReadGamePearl) drawn anew as a kPearlSide square: cut to its visible square as the built-in
-    // icons are, its alpha doubled to full, its colors smoothed of the game's block noise and kept at the game's half
-    // for PaintedIcon, its edge a pixel wide. Empty when nothing of it is visible.
-    std::vector<unsigned char> HighPearl(const ColorPicture& pearl);
+    // XIUI's pearl (shape: its outline, clasp and fine detail) in the game's light and colors (ReadGamePearl): the
+    // game's colors, bled past its edge and smoothed of its block noise, laid over shape's square and times shape's
+    // detail finer than kPearlDetailRadius, so XIUI's own shading stays out. shape's size and alpha, the colors at the
+    // game's half for PaintedIcon. Empty when nothing of the game's is visible.
+    std::vector<unsigned char> GameLitPearl(const ColorPicture& game, const IconBitmap& shape);
 }

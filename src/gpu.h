@@ -87,7 +87,8 @@ namespace headsup
         // own for each color.
         const IconTexture* For(IDirect3DDevice8* device, Icon icon, std::optional<uint32_t> paint);
         bool Failed() const { return m_Failed; }
-        // The pearl drawn for the linkshell in place of the built-in one (HighPearl's), its painted textures let go.
+        // The pearl drawn for the linkshell in place of the built-in one, at its size (GameLitPearl's), its painted
+        // textures let go.
         void SetPearl(std::vector<unsigned char> bgra);
         // Which icon Direct3D could not make, once.
         std::string TakeFailure();
@@ -96,7 +97,7 @@ namespace headsup
     private:
         std::array<IconTexture, kIconCount> m_Textures{};
         std::map<std::pair<Icon, uint32_t>, IconTexture> m_Painted; // by icon and color, alpha left out
-        std::vector<unsigned char> m_Pearl;                          // kPearlSide square, or empty for the built-in
+        std::vector<unsigned char> m_Pearl;                          // or empty for the built-in
         bool m_Failed = false;
         std::string m_Failure;
     };

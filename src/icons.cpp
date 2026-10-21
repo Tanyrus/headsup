@@ -273,8 +273,11 @@ namespace headsup
     {
         constexpr size_t kBytes = 4, kChannels = 3, kAlpha = 3;
         constexpr float kFullByte = 255.0f;
-        constexpr float kVisibleShare = 0.5f;   // a pixel at least this covered is part of the pearl's square
-        constexpr float kLeastColorShare = 1e-3f; // under this coverage a pixel's color is no one's
+        constexpr float kVisibleShare = 0.5f; // a pixel at least this covered is part of the pearl, and its color its own
+        constexpr float kPearlDetailRadius = 2.0f; // XIUI's rim and clasp are finer than this, its shading broader
+        constexpr float kMaxDetail         = 2.0f;
+        constexpr float kLeastWeight       = 1e-3f;
+        constexpr float kRed = 0.299f, kGreen = 0.587f, kBlue = 0.114f;
 
         // A plane of floats over a picture, read clamped to its edge.
         struct Plane
@@ -301,6 +304,72 @@ namespace headsup
                     out.values[static_cast<size_t>(y * plane.width + x)] =
                         (across.At(x, y - 1) + 2.0f * across.At(x, y) + across.At(x, y + 1)) / 4.0f;
             return out;
+        }
+
+        // The plane blurred by a Gaussian of this radius across and down, nothing past its edges.
+        Plane Blurred(const Plane& plane, float radius)
+        {
+            const auto at = [](const Plane& p, int x, int y) { return x < 0 || y < 0 || x >= p.width || y >= p.height ? 0.0f : p.At(x, y); };
+            const int reach = static_cast<int>(std::ceil(3.0f * radius));
+            std::vector<float> weights;
+            float total = 0.0f;
+            for (int d = -reach; d <= reach; ++d)
+            {
+                weights.push_back(std::exp(-static_cast<float>(d * d) / (2.0f * radius * radius)));
+                total += weights.back();
+            }
+            Plane across = plane, out = plane;
+            for (int y = 0; y < plane.height; ++y)
+                for (int x = 0; x < plane.width; ++x)
+                {
+                    float sum = 0.0f;
+                    for (int d = -reach; d <= reach; ++d)
+                        sum += weights[static_cast<size_t>(d + reach)] * at(plane, x + d, y);
+                    across.values[static_cast<size_t>(y * plane.width + x)] = sum / total;
+                }
+            for (int y = 0; y < plane.height; ++y)
+                for (int x = 0; x < plane.width; ++x)
+                {
+                    float sum = 0.0f;
+                    for (int d = -reach; d <= reach; ++d)
+                        sum += weights[static_cast<size_t>(d + reach)] * at(across, x, y + d);
+                    out.values[static_cast<size_t>(y * plane.width + x)] = sum / total;
+                }
+            return out;
+        }
+
+        // The planes with each pixel not known given the mean of its known neighbors, a ring at a time, so a clear
+        // pixel's color, which is no one's, never reaches the pearl.
+        void Bleed(std::array<Plane, kChannels>& planes, std::vector<bool> known)
+        {
+            const int width = planes[0].width, height = planes[0].height;
+            for (bool grew = true; grew;)
+            {
+                grew = false;
+                std::vector<bool> next = known;
+                for (int y = 0; y < height; ++y)
+                    for (int x = 0; x < width; ++x)
+                    {
+                        const size_t at = static_cast<size_t>(y * width + x);
+                        if (known[at]) continue;
+                        std::array<float, kChannels> sum{};
+                        int count = 0;
+                        for (int ny = std::max(0, y - 1); ny <= std::min(height - 1, y + 1); ++ny)
+                            for (int nx = std::max(0, x - 1); nx <= std::min(width - 1, x + 1); ++nx)
+                            {
+                                const size_t n = static_cast<size_t>(ny * width + nx);
+                                if (!known[n]) continue;
+                                for (size_t c = 0; c < kChannels; ++c)
+                                    sum[c] += planes[c].values[n];
+                                ++count;
+                            }
+                        if (count == 0) continue;
+                        for (size_t c = 0; c < kChannels; ++c)
+                            planes[c].values[at] = sum[c] / static_cast<float>(count);
+                        next[at] = grew = true;
+                    }
+                known = std::move(next);
+            }
         }
 
         // Catmull-Rom's weights for the four pixels around a point t of the way past the second.
@@ -342,46 +411,60 @@ namespace headsup
         return out;
     }
 
-    std::vector<unsigned char> HighPearl(const ColorPicture& pearl)
+    std::vector<unsigned char> GameLitPearl(const ColorPicture& game, const IconBitmap& shape)
     {
-        const size_t pixels = static_cast<size_t>(pearl.width) * static_cast<size_t>(pearl.height);
-        if (pearl.width <= 0 || pearl.height <= 0 || pearl.bgra.size() != pixels * kBytes) return {};
+        const size_t pixels = static_cast<size_t>(game.width) * static_cast<size_t>(game.height);
+        if (game.width <= 0 || game.height <= 0 || game.bgra.size() != pixels * kBytes || shape.width == 0 || shape.height == 0)
+            return {};
         // The game's alpha stands at half: twice it is the pearl's coverage.
-        Plane coverage{pearl.width, pearl.height, std::vector<float>(pixels)};
-        std::array<Plane, kChannels> covered;
-        covered.fill(coverage);
-        int left = pearl.width, top = pearl.height, right = 0, bottom = 0;
+        std::array<Plane, kChannels> colors;
+        colors.fill(Plane{game.width, game.height, std::vector<float>(pixels)});
+        std::vector<bool> known(pixels);
+        int left = game.width, top = game.height, right = 0, bottom = 0;
         for (size_t p = 0; p < pixels; ++p)
         {
-            const float share = std::min(1.0f, 2.0f * static_cast<float>(pearl.bgra[p * kBytes + kAlpha]) / kFullByte);
-            coverage.values[p] = share;
             for (size_t c = 0; c < kChannels; ++c)
-                covered[c].values[p] = static_cast<float>(pearl.bgra[p * kBytes + c]) * share;
-            if (share < kVisibleShare) continue;
-            const int x = static_cast<int>(p % static_cast<size_t>(pearl.width)), y = static_cast<int>(p / static_cast<size_t>(pearl.width));
+                colors[c].values[p] = static_cast<float>(game.bgra[p * kBytes + c]);
+            known[p] = 2.0f * static_cast<float>(game.bgra[p * kBytes + kAlpha]) / kFullByte >= kVisibleShare;
+            if (!known[p]) continue;
+            const int x = static_cast<int>(p % static_cast<size_t>(game.width)), y = static_cast<int>(p / static_cast<size_t>(game.width));
             left = std::min(left, x), top = std::min(top, y), right = std::max(right, x + 1), bottom = std::max(bottom, y + 1);
         }
         if (right <= left) return {};
-        // Colors weighed by their coverage, so a clear pixel's color, which is no one's, never reaches the edge.
-        const Plane share = Smoothed(coverage);
-        for (Plane& plane : covered)
+        Bleed(colors, known);
+        for (Plane& plane : colors)
             plane = Smoothed(plane);
-        const int side            = std::max(right - left, bottom - top);
-        const float magnification = static_cast<float>(kPearlSide) / static_cast<float>(side);
-        const float originX = static_cast<float>(left) - static_cast<float>(side - (right - left)) / 2.0f;
-        const float originY = static_cast<float>(top) - static_cast<float>(side - (bottom - top)) / 2.0f;
-        std::vector<unsigned char> out(static_cast<size_t>(kPearlSide) * kPearlSide * kBytes, 0);
-        for (int y = 0; y < kPearlSide; ++y)
-            for (int x = 0; x < kPearlSide; ++x)
+
+        // The shape's detail: its light over its light blurred, weighed by its alpha so the clear around it counts for nothing.
+        const int width = static_cast<int>(shape.width), height = static_cast<int>(shape.height);
+        const size_t count = static_cast<size_t>(width) * static_cast<size_t>(height);
+        Plane alpha{width, height, std::vector<float>(count)}, light = alpha, lit = alpha;
+        for (size_t p = 0; p < count; ++p)
+        {
+            const unsigned char* px = shape.bgra + p * kBytes;
+            alpha.values[p]         = static_cast<float>(px[kAlpha]) / kFullByte;
+            light.values[p]         = kBlue * px[0] + kGreen * px[1] + kRed * px[2];
+            lit.values[p]           = light.values[p] * alpha.values[p];
+        }
+        const Plane broadLit = Blurred(lit, kPearlDetailRadius), broadAlpha = Blurred(alpha, kPearlDetailRadius);
+
+        const int side         = std::max(right - left, bottom - top);
+        const float scaleX     = static_cast<float>(side) / static_cast<float>(width);
+        const float scaleY     = static_cast<float>(side) / static_cast<float>(height);
+        const float originX    = static_cast<float>(left) - static_cast<float>(side - (right - left)) / 2.0f;
+        const float originY    = static_cast<float>(top) - static_cast<float>(side - (bottom - top)) / 2.0f;
+        std::vector<unsigned char> out(count * kBytes);
+        for (int y = 0; y < height; ++y)
+            for (int x = 0; x < width; ++x)
             {
-                const float sx = originX + (static_cast<float>(x) + 0.5f) / magnification;
-                const float sy = originY + (static_cast<float>(y) + 0.5f) / magnification;
-                unsigned char* pixel = out.data() + (static_cast<size_t>(y) * kPearlSide + static_cast<size_t>(x)) * kBytes;
-                pixel[kAlpha]        = Sharpened(std::clamp(Cubic(coverage, sx, sy), 0.0f, 1.0f), magnification);
-                const float weight   = Cubic(share, sx, sy);
-                if (weight < kLeastColorShare) continue;
+                const size_t p     = static_cast<size_t>(y * width + x);
+                const float broad  = broadAlpha.values[p] > kLeastWeight ? broadLit.values[p] / broadAlpha.values[p] : 0.0f;
+                const float detail = broad > kLeastWeight ? std::clamp(light.values[p] / broad, 0.0f, kMaxDetail) : 1.0f;
+                const float sx = originX + (static_cast<float>(x) + 0.5f) * scaleX, sy = originY + (static_cast<float>(y) + 0.5f) * scaleY;
+                unsigned char* pixel = out.data() + p * kBytes;
                 for (size_t c = 0; c < kChannels; ++c)
-                    pixel[c] = static_cast<unsigned char>(std::lround(std::clamp(Cubic(covered[c], sx, sy) / weight, 0.0f, kFullByte)));
+                    pixel[c] = static_cast<unsigned char>(std::lround(std::clamp(Cubic(colors[c], sx, sy) * detail, 0.0f, kFullByte)));
+                pixel[kAlpha] = shape.bgra[p * kBytes + kAlpha];
             }
         return out;
     }

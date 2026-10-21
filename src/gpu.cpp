@@ -197,8 +197,8 @@ namespace headsup
         IconTexture& t = !paint ? m_Textures[static_cast<size_t>(icon)] : m_Painted[{icon, *paint & kRgb}];
         if (t.texture != nullptr) return &t;
         if (m_Failed) return nullptr;
-        const IconBitmap bitmap = icon == Icon::Linkshell && !m_Pearl.empty() ? IconBitmap{m_Pearl.data(), kPearlSide, kPearlSide}
-                                                                              : IconImage(icon);
+        IconBitmap bitmap = IconImage(icon);
+        if (icon == Icon::Linkshell && !m_Pearl.empty()) bitmap.bgra = m_Pearl.data();
         const auto width = static_cast<int>(bitmap.width), height = static_cast<int>(bitmap.height);
         const std::vector<unsigned char> painted = paint ? PaintedIcon(bitmap, *paint) : std::vector<unsigned char>();
         t.texture = CreateTexture(device, painted.empty() ? bitmap.bgra : painted.data(), width, height, t.u, t.v);

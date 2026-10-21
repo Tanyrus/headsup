@@ -1297,8 +1297,9 @@ private:
                 return;
             }
             headsup::Read<headsup::ColorPicture> pearl = headsup::ReadGamePearl(bytes);
-            std::vector<unsigned char> high            = pearl.value ? headsup::HighPearl(*pearl.value) : std::vector<unsigned char>();
-            if (!high.empty()) m_Nameplates.SetGamePearl(std::move(high));
+            std::vector<unsigned char> lit = pearl.value ? headsup::GameLitPearl(*pearl.value, headsup::IconImage(headsup::Icon::Linkshell))
+                                                         : std::vector<unsigned char>();
+            if (!lit.empty()) m_Nameplates.SetGamePearl(std::move(lit));
             else m_GamePearlFailure = path + ": " + (pearl.value ? "its pearl shows nothing" : pearl.failure);
             headsup::Read<headsup::GameFontFace> font = headsup::ReadGameFont(bytes);
             if (!font.value)

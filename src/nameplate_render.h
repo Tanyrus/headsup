@@ -71,7 +71,7 @@ namespace headsup
         void SetCursorFile(std::optional<Image> picture);
         // The game's own font, for the text set in it; every plate is drawn again with it.
         void SetGameFont(std::optional<GameFontFace> face);
-        // The game's own pearl drawn anew (HighPearl), for the linkshell's icon.
+        // The built-in pearl in the game's light and colors (GameLitPearl), for the linkshell's icon.
         void SetGamePearl(std::vector<unsigned char> bgra) { m_Icons.SetPearl(std::move(bgra)); }
         // The game's cursor is blocked over these.
         const std::vector<CursorName>& CursorNames() const { return m_CursorNames; }
