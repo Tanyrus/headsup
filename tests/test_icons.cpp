@@ -1,7 +1,9 @@
+#include "game_font.h"
 #include "icons.h"
 #include "test.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <iterator>
 #include <string>
 #include <vector>
@@ -457,4 +459,84 @@ TEST(a_grey_icon_is_painted_as_the_game_paints_a_names_pearl)
     const std::vector<unsigned char> white = PaintedIcon(icon, 0x00FFFFFFu);
     const std::vector<unsigned char> doubled = {100, 100, 100, 255, 200, 200, 200, 255, 255, 255, 255, 255, 200, 200, 200, 0};
     CHECK(white == doubled);
+}
+
+namespace
+{
+    // A 32 x 32 picture as ReadGamePearl gives one: clear black, with what paint puts at each pixel. The game's alpha
+    // stands at half, so 128 is opaque.
+    template <typename Paint>
+    ColorPicture GamePicture(Paint paint)
+    {
+        ColorPicture picture{"menu    ustatshd", 32, 32, std::vector<uint8_t>(32 * 32 * 4, 0)};
+        for (int y = 0; y < 32; ++y)
+            for (int x = 0; x < 32; ++x)
+                paint(x, y, picture.bgra.data() + (y * 32 + x) * 4);
+        return picture;
+    }
+    void Put(uint8_t* pixel, uint8_t b, uint8_t g, uint8_t r, uint8_t a)
+    {
+        pixel[0] = b, pixel[1] = g, pixel[2] = r, pixel[3] = a;
+    }
+    const uint8_t* At(const std::vector<unsigned char>& bgra, int x, int y) { return bgra.data() + (y * kPearlSide + x) * 4; }
+    bool Near(const uint8_t* pixel, int b, int g, int r, int a, int slack)
+    {
+        return std::abs(pixel[0] - b) <= slack && std::abs(pixel[1] - g) <= slack && std::abs(pixel[2] - r) <= slack &&
+               std::abs(pixel[3] - a) <= slack;
+    }
+}
+
+TEST(the_high_pearl_is_the_games_visible_square_filling_its_own_at_full_alpha)
+{
+    // A 16 x 16 opaque square from (8, 8), its top left quarter one color and the rest another: four of our pixels a
+    // texel, so our (8, 8) is texel (10, 10) and our (56, 56) texel (22, 22), each six texels from where they meet.
+    const ColorPicture picture = GamePicture([](int x, int y, uint8_t* pixel) {
+        if (x < 8 || y < 8 || x >= 24 || y >= 24) return;
+        if (x < 16 && y < 16) Put(pixel, 40, 80, 120, 128);
+        else Put(pixel, 90, 60, 30, 128);
+    });
+    const std::vector<unsigned char> pearl = HighPearl(picture);
+    CHECK_EQ(pearl.size(), size_t{kPearlSide * kPearlSide * 4});
+    CHECK(Near(At(pearl, 8, 8), 40, 80, 120, 255, 1));
+    CHECK(Near(At(pearl, 56, 56), 90, 60, 30, 255, 1));
+    bool opaque = true;
+    for (int y = 2; y < kPearlSide - 2; ++y)
+        for (int x = 2; x < kPearlSide - 2; ++x)
+            opaque = opaque && At(pearl, x, y)[3] == 255;
+    CHECK(opaque);
+    CHECK(HighPearl(GamePicture([](int, int, uint8_t*) {})).empty());
+}
+
+TEST(the_high_pearls_edge_is_a_pixel_wide_and_the_clear_pixels_never_darken_it)
+{
+    // A disc of radius 12 in a clear black picture: a row a quarter down crosses its edge twice.
+    const ColorPicture picture = GamePicture([](int x, int y, uint8_t* pixel) {
+        const float dx = static_cast<float>(x) + 0.5f - 16.0f, dy = static_cast<float>(y) + 0.5f - 16.0f;
+        if (dx * dx + dy * dy <= 144.0f) Put(pixel, 200, 200, 200, 128);
+    });
+    const std::vector<unsigned char> pearl = HighPearl(picture);
+    int partial = 0;
+    for (int x = 0; x < kPearlSide; ++x)
+        partial += At(pearl, x, kPearlSide / 4)[3] > 0 && At(pearl, x, kPearlSide / 4)[3] < 255;
+    CHECK(partial > 0 && partial <= 4);
+    bool bright = true;
+    for (int y = 0; y < kPearlSide; ++y)
+        for (int x = 0; x < kPearlSide; ++x)
+            if (At(pearl, x, y)[3] > 0) bright = bright && Near(At(pearl, x, y), 200, 200, 200, At(pearl, x, y)[3], 2);
+    CHECK(bright);
+}
+
+TEST(the_high_pearl_smooths_the_games_block_noise)
+{
+    // Texels alternating 100 and 150, as DXT's four colors a block leave the game's sheen, come out their mean.
+    const ColorPicture picture = GamePicture([](int x, int y, uint8_t* pixel) {
+        const uint8_t v = (x + y) % 2 == 0 ? 100 : 150;
+        Put(pixel, v, v, v, 128);
+    });
+    const std::vector<unsigned char> pearl = HighPearl(picture);
+    bool even = true;
+    for (int y = 4; y < kPearlSide - 4; ++y)
+        for (int x = 4; x < kPearlSide - 4; ++x)
+            even = even && Near(At(pearl, x, y), 125, 125, 125, 255, 3);
+    CHECK(even);
 }

@@ -197,7 +197,8 @@ namespace headsup
         IconTexture& t = !paint ? m_Textures[static_cast<size_t>(icon)] : m_Painted[{icon, *paint & kRgb}];
         if (t.texture != nullptr) return &t;
         if (m_Failed) return nullptr;
-        const IconBitmap& bitmap = IconImage(icon);
+        const IconBitmap bitmap = icon == Icon::Linkshell && !m_Pearl.empty() ? IconBitmap{m_Pearl.data(), kPearlSide, kPearlSide}
+                                                                              : IconImage(icon);
         const auto width = static_cast<int>(bitmap.width), height = static_cast<int>(bitmap.height);
         const std::vector<unsigned char> painted = paint ? PaintedIcon(bitmap, *paint) : std::vector<unsigned char>();
         t.texture = CreateTexture(device, painted.empty() ? bitmap.bgra : painted.data(), width, height, t.u, t.v);
@@ -211,6 +212,22 @@ namespace headsup
         t.width  = static_cast<float>(width);
         t.height = static_cast<float>(height);
         return &t;
+    }
+
+    void IconTextures::SetPearl(std::vector<unsigned char> bgra)
+    {
+        ReleaseTexture(m_Textures[static_cast<size_t>(Icon::Linkshell)].texture);
+        for (auto it = m_Painted.begin(); it != m_Painted.end();)
+        {
+            if (it->first.first != Icon::Linkshell)
+            {
+                ++it;
+                continue;
+            }
+            ReleaseTexture(it->second.texture);
+            it = m_Painted.erase(it);
+        }
+        m_Pearl = std::move(bgra);
     }
 
     std::string IconTextures::TakeFailure() { return std::exchange(m_Failure, std::string()); }

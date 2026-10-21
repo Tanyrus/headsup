@@ -92,6 +92,17 @@ namespace headsup
     };
     // A picture chunk's DXT3 or DXT1 picture.
     Read<FontPicture> ReadFontPicture(std::span<const uint8_t> body);
+    struct ColorPicture
+    {
+        std::string name; // its 16-byte name
+        int width = 0, height = 0;
+        std::vector<uint8_t> bgra; // four bytes a pixel, rows top to bottom
+    };
+    // A picture chunk's DXT3 or DXT1 picture in its colors.
+    Read<ColorPicture> ReadColorPicture(std::span<const uint8_t> body);
+    // The pearl the game draws before a name, out of a whole 51.DAT: a square of its status icons' picture, its colors
+    // and alpha at half, as the game keeps them.
+    Read<ColorPicture> ReadGamePearl(std::span<const uint8_t> dat);
     // The glyphs of a shapes chunk, each drawn from the picture of that name, which is width by height.
     Read<std::array<GlyphShape, kGlyphCount>> ReadGlyphShapes(std::span<const uint8_t> body, std::string_view picture, int width,
         int height);

@@ -356,6 +356,7 @@ class HeadsUp final : public IPlugin
     std::vector<std::string> m_ThemeFiles;       // the themes folder's, as Theme Colors' Load offers them
     std::optional<std::string> m_CursorFileRead; // the File cursor read last, whether or not it was one
     std::string m_GameFontFailure;                // why the game's font could not be read; empty when it was
+    std::string m_GamePearlFailure;               // why the game's pearl could not be read; empty when it was
     bool m_GameFontWarned = false;
     float m_MenuHeight  = 0.0f;
     int m_CaptureLeft   = 0;
@@ -1259,10 +1260,12 @@ private:
             Print("could not fix the game's mouse pointer: " + failure + ".");
         ReadGameFont();
         SayGameFontFailure();
+        if (!m_GamePearlFailure.empty())
+            Print("the game's linkpearl could not be read (" + m_GamePearlFailure + "): the linkshell's is drawn as XIUI's.");
     }
 
-    // The font the game writes its names in, from the file it reads it from: while XIPivot is loaded, the first of
-    // its overlays that holds the file.
+    // The font the game writes its names in and the pearl it draws before them, from the file it reads them from:
+    // while XIPivot is loaded, the first of its overlays that holds the file.
     void ReadGameFont()
     {
         std::string pivotIni;
@@ -1282,6 +1285,7 @@ private:
             if (static_cast<uint64_t>(size) > kMaxFontFileBytes)
             {
                 m_GameFontFailure += "it is too large";
+                m_GamePearlFailure = m_GameFontFailure;
                 return;
             }
             std::vector<uint8_t> bytes(static_cast<size_t>(size));
@@ -1289,8 +1293,13 @@ private:
             if (!in.read(reinterpret_cast<char*>(bytes.data()), size))
             {
                 m_GameFontFailure += "it could not be read";
+                m_GamePearlFailure = m_GameFontFailure;
                 return;
             }
+            headsup::Read<headsup::ColorPicture> pearl = headsup::ReadGamePearl(bytes);
+            std::vector<unsigned char> high            = pearl.value ? headsup::HighPearl(*pearl.value) : std::vector<unsigned char>();
+            if (!high.empty()) m_Nameplates.SetGamePearl(std::move(high));
+            else m_GamePearlFailure = path + ": " + (pearl.value ? "its pearl shows nothing" : pearl.failure);
             headsup::Read<headsup::GameFontFace> font = headsup::ReadGameFont(bytes);
             if (!font.value)
             {
@@ -1301,7 +1310,8 @@ private:
             m_Nameplates.SetGameFont(std::move(font.value));
             return;
         }
-        m_GameFontFailure = "the game's ROM\\119\\51.DAT was not found under " + gameFolder;
+        m_GameFontFailure  = "the game's ROM\\119\\51.DAT was not found under " + gameFolder;
+        m_GamePearlFailure = m_GameFontFailure;
     }
 
     // Once, when a nameplate is set in the game's font and it could not be read.

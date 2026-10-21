@@ -132,4 +132,11 @@ namespace headsup
     // alpha as it was. The color is as the server sends it, each channel's four bits shifted up with the low ones full
     // (4-2-0 as 79, 47, 15). BGRA, as IconBitmap holds it.
     std::vector<unsigned char> PaintedIcon(const IconBitmap& icon, uint32_t color);
+
+    struct ColorPicture;
+    constexpr int kPearlSide = 64; // as large as the largest built-in icon
+    // The game's pearl (ReadGamePearl) drawn anew as a kPearlSide square: cut to its visible square as the built-in
+    // icons are, its alpha doubled to full, its colors smoothed of the game's block noise and kept at the game's half
+    // for PaintedIcon, its edge a pixel wide. Empty when nothing of it is visible.
+    std::vector<unsigned char> HighPearl(const ColorPicture& pearl);
 }
