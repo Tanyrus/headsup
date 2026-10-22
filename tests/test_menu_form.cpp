@@ -228,6 +228,28 @@ TEST(a_build_that_watches_has_a_watch_button_and_the_card_says_where_the_last_re
     CHECK(Has(saved, "debug-20261015-101500.txt") && !Has(saved, "PhoenixXI"));
 }
 
+TEST(logging_is_a_switch_of_the_debug_mode_card_that_names_its_file)
+{
+    Window w;
+    w.state.page       = Page::ConfigMenu;
+    const char* toggle = "configmenu-debug-mode-logging";
+    CHECK(ClassOn(w.Pass(), "configmenu-debug-mode-logging-label-row", kOffClass));
+    w.Pass({{toggle, kClickEvent, ""}});
+    CHECK(!w.settings.logging); // the card is its title alone
+    w.settings.debugMode = true;
+    const Form on        = w.Pass({{toggle, kClickEvent, ""}});
+    CHECK(w.settings.logging && on.changed);
+    const FormBlock* card = Block(on, "configmenu-debug-mode");
+    CHECK(At(card, "configmenu-debug-mode-debug-report") < At(card, toggle));
+    CHECK(At(card, toggle) < At(card, "configmenu-debug-mode-mobs-outlined"));
+    // No file until a note opens one, then its name.
+    CHECK(!Has(card->rml, "headsup-20261022"));
+    const std::string file = "C:\\PhoenixXI\\logs\\headsup\\headsup-20261022-101500.txt";
+    w.readings.logFile     = &file;
+    const std::string named = Block(w.Pass(), "configmenu-debug-mode")->rml;
+    CHECK(Has(named, "headsup-20261022-101500.txt") && !Has(named, "PhoenixXI"));
+}
+
 TEST(a_build_that_exports_its_layout_has_an_export_button_after_the_report_and_the_watch)
 {
     Window w;

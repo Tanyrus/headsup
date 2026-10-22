@@ -22,6 +22,7 @@
 #include "mobdata.h"
 #include "nameplate_render.h"
 #include "native_hook.h"
+#include "note_log.h"
 #include "outline.h"
 #include "ph_timers.h"
 #include "player_status.h"
@@ -79,6 +80,7 @@ namespace
     constexpr int kQueriesPerFrame           = 128;      // VirtualQuery calls a frame while the Memory widget shows
     constexpr double kLinuxXIStaleSeconds    = 3 * headsup::kLinuxXIReportSeconds; // three reports missed and it is gone
     constexpr const char* kCursorsFolder     = "cursors"; // inside HeadsUp's config folder: the player's cursor files
+    constexpr const char* kNoteLog           = "headsup";  // the log's name in HeadsUp's logs folder, before its time
     constexpr const char* kThemesFolder      = "themes";  // and their saved top panel themes
     constexpr const char* kSettingsFile      = "settings.ini";
     constexpr const char* kNewFileSuffix     = ".new";          // after the process id: the file while it is written
@@ -335,10 +337,11 @@ class HeadsUp final : public IPlugin
 #endif
     bool m_Drawing      = false; // drawing nameplates: our own draws come back through the hooks
     bool m_DrewInScene  = false; // this frame
-    // Said once each: Direct3D could not save the game's render states, so nameplates or the bar were not drawn.
-    bool m_PlatesUnsaved = false;
-    bool m_BarUnsaved    = false;
-    bool m_RestoreWarned = false; // said once that Direct3D did not put the game's states back
+    // What HeadsUp works around: written to a log while Debug Mode's Logging is on, and never to chat.
+    headsup::NoteLog m_Notes;
+    std::FILE* m_NoteFile = nullptr;
+    std::string m_NoteFileName; // the last one opened, for the Debug Mode card
+    bool m_NoteFileRefused = false; // could not be made; tried again when Logging is turned on again
     std::optional<DWORD> m_QuadStates; // the bar's (RecordQuadStates), freed at unload
     bool m_QuadStatesTried = false;
     IDirect3DDevice8* m_Device = nullptr;
@@ -472,6 +475,7 @@ public:
         if (m_QuadStates) m_Device->DeleteStateBlock(*m_QuadStates);
         g_BarClicks = nullptr;
         g_BarOn     = false;
+        CloseNotes();
         // Ashita would keep the settings' values loaded after this, for the next load to find even with the file gone.
         m_AshitaCore->GetConfigurationManager()->Delete(kConfigAlias);
     }
@@ -787,6 +791,7 @@ public:
         if (g_PresentSlot != nullptr)
             g_AfterGui = [] { if (g_Plugin != nullptr) g_Plugin->DrawOverGui(); };
         m_BarDrawn = false;
+        if (!Logging()) CloseNotes();
         m_ArrowHook.Hide(m_Settings.enabled && m_Settings.cursorStyle != headsup::CursorStyle::Vanilla);
         LoadCursorFile();
         LightGamePearl();
@@ -804,7 +809,7 @@ public:
             if (const std::string failure = m_WindowHook.Start(); !failure.empty())
                 Print("could not hide or move the game's windows: " + failure + ".");
             if (const std::string failure = m_WindowHook.TakeMoveProblem(); !failure.empty())
-                Print("the game's windows stay under the help bar: " + failure + ".");
+                Note("the game's windows stay under the help bar: " + failure + ".");
         }
         m_Shot.EndFrame();
         m_SceneCopied      = false;
@@ -880,6 +885,7 @@ public:
                 .watching         = std::nullopt,
 #endif
                 .lastReport       = &m_LastReport,
+                .logFile          = &m_NoteFileName,
 #ifdef HEADSUP_DEV
                 .exportable       = true,
 #endif
@@ -1080,8 +1086,7 @@ private:
         m_Drawing = false;
         restore(texture);
         if (const std::string lost = headsup::StatesNotRestored(before, headsup::ReadCopyState(m_Device)); !lost.empty())
-            if (!std::exchange(m_RestoreWarned, true))
-                Print("Direct3D did not put back the game's " + lost + " after HeadsUp drew; HeadsUp puts them back itself.");
+            Note("Direct3D did not put back the game's " + lost + " after HeadsUp drew; HeadsUp puts them back itself.");
         headsup::RestoreCopyState(m_Device, before, texture);
         if (texture != nullptr) texture->Release();
     }
@@ -1128,13 +1133,9 @@ private:
         return true;
     }
 
-    void NotDrawn(const char* what, bool& said)
-    {
-        if (!std::exchange(said, true))
-            Print(std::string(what) + " not drawn: Direct3D could not save the game's render states.");
-    }
-    void PlatesNotDrawn() { NotDrawn("nameplates are", m_PlatesUnsaved); }
-    void BarNotDrawn() { NotDrawn("the top panel is", m_BarUnsaved); }
+    void NotDrawn(const char* what) { Note(std::string(what) + " not drawn: Direct3D could not save the game's render states."); }
+    void PlatesNotDrawn() { NotDrawn("nameplates are"); }
+    void BarNotDrawn() { NotDrawn("the top panel is"); }
 
     // Ashita's screenshot plugin, asked to hide, takes its fonts away for the frame it captures (shot_watch.h): that
     // frame is drawn as screenshot mode draws. HeadsUp's own hiding of the fonts is not a screenshot.
@@ -1260,11 +1261,11 @@ private:
         if (const std::string failure = m_ArrowHook.Start(); !failure.empty())
             Print("could not hook the game's target arrows, so it draws its own and HeadsUp none: " + failure + ".");
         if (const std::string failure = m_PointerFix.Start(); !failure.empty())
-            Print("could not fix the game's mouse pointer: " + failure + ".");
+            Note("could not fix the game's mouse pointer: " + failure + ".");
         ReadGameFont();
         SayGameFontFailure();
         if (!m_GamePearlFailure.empty())
-            Print("the game's linkpearl could not be read (" + m_GamePearlFailure + "): the linkshell's is drawn as XIUI's.");
+            Note("the game's linkpearl could not be read (" + m_GamePearlFailure + "): the linkshell's is drawn as XIUI's.");
     }
 
     // The font the game writes its names in and the pearl it draws before them, from the file it reads them from:
@@ -1329,7 +1330,7 @@ private:
     void SayGameFontFailure()
     {
         if (m_GameFontFailure.empty() || !headsup::UsesGameFont(m_Settings) || std::exchange(m_GameFontWarned, true)) return;
-        Print("the game's font could not be read (" + m_GameFontFailure + "): nameplates set in it are drawn in " +
+        Note("the game's font could not be read (" + m_GameFontFailure + "): nameplates set in it are drawn in " +
               headsup::kDefaultFont + " until HeadsUp is reloaded.");
     }
 
@@ -1378,6 +1379,41 @@ private:
         m_AshitaCore->GetChatManager()->Write(kChatMode, false, line.c_str());
     }
 
+    bool Logging() const { return m_Settings.debugMode && m_Settings.logging; }
+
+    // What HeadsUp works around and carries on from: to the log while Logging is on, else nowhere.
+    void Note(const std::string& message)
+    {
+        if (!Logging() || m_NoteFileRefused) return;
+        if (m_NoteFile == nullptr && (m_NoteFile = OpenLog(kNoteLog, m_NoteFileName)) == nullptr)
+        {
+            m_NoteFileRefused = true;
+            return;
+        }
+        char stamp[16];
+        const std::time_t now = std::time(nullptr);
+        std::strftime(stamp, sizeof(stamp), "%H:%M:%S", std::localtime(&now));
+        if (const std::optional<std::string> line = m_Notes.Line(message, stamp))
+        {
+            std::fprintf(m_NoteFile, "%s\n", line->c_str());
+            std::fflush(m_NoteFile);
+        }
+    }
+
+    // Ends the log with how often each note came again, once Logging is off or HeadsUp unloads.
+    void CloseNotes()
+    {
+        if (m_NoteFile != nullptr)
+        {
+            for (const std::string& repeat : m_Notes.Repeats())
+                std::fprintf(m_NoteFile, "%s\n", repeat.c_str());
+            std::fclose(m_NoteFile);
+            m_NoteFile = nullptr;
+        }
+        m_Notes           = {};
+        m_NoteFileRefused = false;
+    }
+
     // It scans the client's image, so once; the bar's widget and the dev dump share it.
     void FindStripText()
     {
@@ -1389,7 +1425,7 @@ private:
     {
         if (!std::exchange(m_WeatherTried, true))
             if (const std::string failure = m_WeatherReader.Find(); !failure.empty())
-                Print("the weather widget goes by the last weather change: " + failure + ".");
+                Note("the weather widget goes by the last weather change: " + failure + ".");
         if (m_Zone != 0)
             if (const std::optional<headsup::Weather> weather = m_WeatherReader.Read()) return weather;
         return m_GameState.ZoneWeather();
@@ -1399,7 +1435,7 @@ private:
     {
         if (!std::exchange(m_NetStatsTried, true))
             if (const std::string failure = m_NetStats.Find(); !failure.empty())
-                Print("the connection widget shows no S and R: " + failure + ".");
+                Note("the connection widget shows no S and R: " + failure + ".");
         return m_NetStats.Read();
     }
 
@@ -1449,7 +1485,7 @@ private:
         g_RealPresent = reinterpret_cast<PresentFn>(*slot);
         if (!WriteSlot(slot, reinterpret_cast<void*>(&HookedPresent)))
         {
-            Print("the top panel's popups draw under other addons' windows: Present could not be hooked.");
+            Note("the top panel's popups draw under other addons' windows: Present could not be hooked.");
             return;
         }
         g_PresentSlot = slot;
@@ -1464,7 +1500,7 @@ private:
         if (!WriteSlot(slot, reinterpret_cast<void*>(&HookedReset)))
         {
             m_Rml.RefuseLayers();
-            Print("the settings window is drawn opaque: Reset could not be hooked.");
+            Note("the settings window is drawn opaque: Reset could not be hooked.");
             return;
         }
         g_ResetSlot   = slot;
@@ -1670,12 +1706,12 @@ private:
         if (m_Rml.Running())
         {
             m_Rml.Resize(width, height);
-            if (const std::string failure = m_Rml.TakeFailure(); !failure.empty()) Print("RmlUi: " + failure + ".");
+            if (const std::string failure = m_Rml.TakeFailure(); !failure.empty()) Note("RmlUi: " + failure + ".");
             return;
         }
         if (std::exchange(m_RmlTried, true)) return;
         const bool started = m_Rml.Start(m_Device, width, height,
-            [this](const std::string& line) { Print("RmlUi: " + line); },
+            [this](const std::string& line) { Note("RmlUi: " + line); },
             [](const std::string& name) { return headsup::HostImage(name); });
         if (!started) Print("RmlUi did not start: the top panel and the settings window are off until HeadsUp reloads.");
     }
@@ -1772,7 +1808,7 @@ private:
         if (!wanted || m_CursorFileRead == m_Settings.cursorFile) return;
         m_CursorFileRead = m_Settings.cursorFile;
         std::optional<headsup::Image> picture = headsup::CursorFilePicture(CursorFileFrames(m_Settings.cursorFile));
-        if (!picture) Print("could not read the cursor " + m_Settings.cursorFile + " in " + CursorsFolder() + "; the feather stands in for it");
+        if (!picture) Note("could not read the cursor " + m_Settings.cursorFile + " in " + CursorsFolder() + "; the feather stands in for it");
         m_Nameplates.SetCursorFile(std::move(picture));
     }
 
@@ -1933,7 +1969,7 @@ private:
             const std::string failure = m_Pointer.Start(chocobo ? headsup::ChocoboPointer() : CursorFileFrames(m_Settings.pointerFile));
             m_PointerFailed           = !failure.empty();
             if (m_PointerFailed)
-                Print("the mouse pointer is the game's, as " + (chocobo ? std::string("the chocobo") : m_Settings.pointerFile + " in " + CursorsFolder()) +
+                Note("the mouse pointer is the game's, as " + (chocobo ? std::string("the chocobo") : m_Settings.pointerFile + " in " + CursorsFolder()) +
                       " could not be shown: " + failure + ".");
         }
         m_Pointer.Animate();

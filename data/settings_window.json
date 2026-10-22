@@ -446,6 +446,14 @@
                 {"key": "saved", "name": "Report saved to: {file}"}
               ]
             },
+            {
+              "key": "logging",
+              "name": "Logging",
+              "tip": "Writes what HeadsUp works around to logs/headsup, where chat only gets what stops working.",
+              "words": [
+                {"key": "file", "name": "Logging to: {file}"}
+              ]
+            },
             {"key": "mobs-outlined", "name": "Mobs Outlined"},
             {"key": "meshes-outlined", "name": "Meshes Outlined"},
             {"key": "stencil-buffer", "name": "Stencil Buffer"},

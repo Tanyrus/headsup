@@ -38,6 +38,7 @@ namespace headsup
             {"clockSeconds", &Settings::clockSeconds},
             {"stackNames", &Settings::stackNames}, {"stackLine", &Settings::stackLine}, {"hideInEvent", &Settings::hideInEvent},
             {"debugMode", &Settings::debugMode},
+            {"logging", &Settings::logging},
             {"nameplates", &Settings::nameplates}, {"outlines", &Settings::outlines},
             {"outlineFadeIn", &Settings::outlineFadeIn}, {"cursorFloat", &Settings::cursorFloat},
             {"autoCheck", &Settings::autoCheck}};

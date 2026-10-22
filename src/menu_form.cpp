@@ -1373,6 +1373,12 @@ namespace headsup
                 if (r.lastReport != nullptr && !r.lastReport->empty())
                     form.Note(Filled(Word(c, WindowWord::DebugReportSaved), kFileMark, FileName(*r.lastReport)).c_str());
                 break;
+            case SettingPiece::Logging:
+                form.Fade(!s.debugMode);
+                form.Switch(label.c_str(), s.logging, tip);
+                if (r.logFile != nullptr && !r.logFile->empty())
+                    form.Note(Filled(Word(c, WindowWord::LoggingFile), kFileMark, FileName(*r.logFile)).c_str());
+                break;
             case SettingPiece::MobsOutlined:
                 form.Fade(!s.debugMode);
                 form.Reading(label.c_str(), std::to_string(r.outlinedMobs));

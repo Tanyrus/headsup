@@ -194,6 +194,7 @@ PIECES = Pieces(
         'window-opacity': Setting(),
         'reset-all-settings': Setting(words={'note': True, 'reset-everything': True, 'keep-them': True}),
         'debug-report': Setting(words={'watch': True, 'stop': True, 'saved': True}),
+        'logging': Setting(words={'file': True}),
         'mobs-outlined': Setting(), 'meshes-outlined': Setting(), 'stencil-buffer': Setting(), 'nameplates': Setting(),
         'drawn': Setting(), 'game-s-names': Setting(), 'frame-time': Setting(), 'last-save': Setting(),
         'your-level': Setting(),
