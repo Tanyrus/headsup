@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <charconv>
+#include <cstdlib>
 
 namespace headsup
 {
@@ -98,6 +99,45 @@ namespace headsup
     {
         constexpr std::string_view kMapWindow = "mapframe";
         return std::ranges::find(open, kMapWindow) != open.end();
+    }
+
+    std::optional<std::array<int16_t, 4>> PlaceKept(const ButtonSpot& button, int windowLeft, int windowTop)
+    {
+        constexpr int kCursorNudge = 1; // the game draws the button under the cursor a pixel to the left
+        const int dx = button.x - (windowLeft + button.place[0]), dy = button.y - (windowTop + button.place[1]);
+        const int keptX = std::abs(dx) > kCursorNudge ? dx : 0, keptY = std::abs(dy) > kCursorNudge ? dy : 0;
+        if (keptX == 0 && keptY == 0) return std::nullopt;
+        const auto by = [](int16_t edge, int move) { return static_cast<int16_t>(edge + move); };
+        return std::array<int16_t, 4>{by(button.place[0], keptX), by(button.place[1], keptY), by(button.place[2], keptX),
+            by(button.place[3], keptY)};
+    }
+
+    std::vector<ButtonSpot> ButtonSpots(uint32_t mcd, const ProcessMemory& memory)
+    {
+        constexpr uint32_t kMcdList = 0x14, kNodeX = 0x2A, kNodeY = 0x2C;
+        constexpr uint32_t kNodeBytes = kNodePlace + 4 * sizeof(int16_t);
+        constexpr uint16_t kButtonKind = 1; // a node's first word
+        std::vector<ButtonSpot> buttons;
+        uint32_t link = 0;
+        if (!Copy(memory, mcd + kMcdList, &link, sizeof(link))) return buttons;
+        for (size_t links = 0; link != 0 && links < kMaxListLinks; ++links)
+        {
+            std::array<uint8_t, kLinkBytes> raw;
+            if (!Copy(memory, link, raw.data(), raw.size())) break;
+            const uint32_t node = ReadAt<uint32_t>(raw.data(), kLinkWindow);
+            std::array<uint8_t, kNodeBytes> entry;
+            if (raw[kLinkSkip] == 0 && node != 0 && Copy(memory, node, entry.data(), entry.size()) &&
+                ReadAt<uint16_t>(entry.data(), 0) == kButtonKind)
+            {
+                if (std::ranges::find(buttons, node, &ButtonSpot::node) != buttons.end()) break;
+                ButtonSpot& button = buttons.emplace_back(
+                    ButtonSpot{node, ReadAt<int16_t>(entry.data(), kNodeX), ReadAt<int16_t>(entry.data(), kNodeY)});
+                for (size_t edge = 0; edge < button.place.size(); ++edge)
+                    button.place[edge] = ReadAt<int16_t>(entry.data(), kNodePlace + edge * sizeof(int16_t));
+            }
+            link = ReadAt<uint32_t>(raw.data(), kLinkNext);
+        }
+        return buttons;
     }
 
     bool SwallowsClick(uint32_t message, int x, int y, std::span<const WindowRect> hidden)

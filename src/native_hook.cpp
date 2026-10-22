@@ -889,6 +889,10 @@ namespace headsup
             const bool readable             = copy != nullptr && Readable(copy, kWindowRectBytes);
             WindowRect kept{};
             if (readable) std::memcpy(kept.data(), copy, kWindowRectBytes);
+            for (const ButtonSpot& button : ButtonSpots(mcd, kProcessMemory))
+                if (const auto place = PlaceKept(button, window[0], window[1]);
+                    place && Readable(Pointer(button.node + kNodePlace), sizeof(*place)))
+                    std::memcpy(reinterpret_cast<void*>(button.node + kNodePlace), place->data(), sizeof(*place));
             reinterpret_cast<WindowMoveToFn>(g_WindowMoveTo)(mcd, to.left, to.top);
             // An entry's corner the owner draws a picture at stays where it was: it moves too, while inside the window.
             if (const std::optional<uint32_t> entry = EntryPlaceAt(owner))
