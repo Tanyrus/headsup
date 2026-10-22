@@ -56,3 +56,31 @@ TEST(rmlui_reads_every_themes_bar_and_popups_without_a_complaint)
         CHECK_EQ(rml.Said(), "");
     }
 }
+
+TEST(the_target_widget_goes_back_to_breathing_after_its_popup_without_a_complaint)
+{
+    const BarTextPlace place{BarLinePlace{16, 9.0f, 14.0f, 2.0f}, BarLinePlace{17, 8.0f, 13.0f, 1.0f},
+        BarLinePlace{14, 23.0f, 0.0f, 3.0f}};
+    Settings settings;
+    for (int t = 0; t < kFixedThemeCount; ++t)
+    {
+        test::RmlSession rml;
+        Rml::ElementDocument* bar =
+            rml.context->LoadDocumentFromMemory(BarDocument(LookOf(PaletteOf(static_cast<BarTheme>(t)), settings), place), "bar");
+        bar->Show();
+        Rml::Element* target = bar->GetElementById(WidgetId(BarWidget::Target));
+        CHECK(target != nullptr);
+        // The pointer comes onto the widget (its popup opens), then leaves it (the popup closes).
+        for (const bool lit : {true, false})
+        {
+            target->SetClass(kLitClass, lit);
+            for (int frame = 0; frame < 10; ++frame)
+            {
+                rml.complaints.seconds += 0.05;
+                rml.context->Update();
+                rml.context->Render();
+            }
+        }
+        CHECK_EQ(rml.Said(), "");
+    }
+}

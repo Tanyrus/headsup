@@ -289,10 +289,11 @@ TEST(every_theme_eases_breathes_and_pulses_in_its_own_colors)
     {
         const BarLook look    = LookOf(lit.theme, settings);
         const std::string rml = BarDocument(look, Place());
-        // Widgets ease into their lit look, the target's frame breathes until it is lit, and progress is a
-        // gradient that pulses.
+        // Widgets ease into their lit look, the target's frame breathes until it is lit (its border eases no other
+        // way), and progress is a gradient that pulses.
         CHECK(Has(rml, "transition:background-color 0.2s cubic-out,border-color 0.2s cubic-out;"));
-        CHECK(Has(rml, ".widget.target{animation:2.4s sine-in-out infinite alternate breathe;}"));
+        CHECK(Has(rml, ".widget.target{animation:2.4s sine-in-out infinite alternate breathe;"
+                       "transition:background-color 0.2s cubic-out;}"));
         CHECK(Has(rml, (std::string("@keyframes breathe{") + lit.breathe + "}").c_str()));
         CHECK(Has(rml, ".widget.lit{animation:none;}"));
         CHECK(Has(rml, (std::string("decorator:horizontal-gradient(") + lit.fill +

@@ -25,6 +25,8 @@ namespace headsup
         constexpr int kShadowDrop          = 1; // pixels down
         // The accent's alpha in the target's frame as it breathes, from and to, and in a lit title's glow.
         constexpr uint32_t kBreatheLow = 0x59, kBreatheHigh = 0xCC, kLitGlow = 0x80;
+        // How a widget eases into its lit look.
+        const std::string kEaseBackground = "background-color 0.2s cubic-out", kEaseBorder = "border-color 0.2s cubic-out";
         constexpr float kGlint             = 2.0f;       // the line of light at the foot of a glass strip, in pixels
         constexpr uint32_t kGlassTop = 0xF21B2740, kGlassFoot = 0xF20C1220; // a popup's panel, down its height
         constexpr uint32_t kGlassFrame    = 0x40;       // the accent's alpha in a popup's frame
@@ -302,7 +304,7 @@ namespace headsup
         css += ".widget{position:absolute;top:" + Px(row.y) + ";height:" + Px(row.height) +
                ";box-sizing:border-box;white-space:nowrap;border-width:" + Px(kBoxBorder) + ";padding:0px " +
                Px(m.padding - kBoxBorder) + ";" + BoxRules(std::nullopt) +
-               "transition:background-color 0.2s cubic-out,border-color 0.2s cubic-out;}";
+               "transition:" + kEaseBackground + "," + kEaseBorder + ";}";
         if (look.ornate)
         {
             css += ".ornate .widget{border-width:0px;margin:0px " + Px(clear) + ";padding:" + Px(kContentInset) + " " +
@@ -321,7 +323,8 @@ namespace headsup
         }
         // A widget eases into its lit look (above) and its title glows there; the target's frame breathes from the
         // accent into what it runs into until it is lit.
-        css += ".widget.target{animation:2.4s sine-in-out infinite alternate breathe;}";
+        // RmlUi refuses a transition on a property an animation drives, once a border side, as the breathing comes back.
+        css += ".widget.target{animation:2.4s sine-in-out infinite alternate breathe;transition:" + kEaseBackground + ";}";
         css += "@keyframes breathe{from{border-color:" + RcssColor(Faded(p.accent, kBreatheLow)) + ";}to{border-color:" +
                RcssColor(Faded(p.accentEnd, kBreatheHigh)) + ";}}";
         css += std::string(".widget.") + kLitClass + "{animation:none;}";
