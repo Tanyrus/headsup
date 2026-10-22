@@ -371,3 +371,14 @@ TEST(two_cursors_match_by_hotspot_shape_and_visible_colors)
     moved.hotX = 6;
     CHECK(!SameCursor(chocobo, moved));
 }
+
+TEST(a_pointer_at_a_size_is_its_picture_scaled)
+{
+    // The game's pointers are 32 by 32 (mousenor.ani's frames).
+    CursorImage pointer;
+    pointer.width = pointer.height = 32;
+    CHECK(SizedPointer(pointer, 100).width == 32);
+    const PointerSize doubled = SizedPointer(pointer, 200);
+    CHECK(doubled.width == 64 && doubled.height == 64);
+    CHECK(SizedPointer(pointer, 105).width == 34); // 33.6 to the nearest pixel
+}

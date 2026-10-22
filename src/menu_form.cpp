@@ -1329,6 +1329,10 @@ namespace headsup
                 s.pointerFile = choice.file;
                 break;
             }
+            case SettingPiece::PointerSize:
+                form.Fade(!on);
+                form.SliderPercent(label.c_str(), s.pointerSize, kMinPointerSize, kMaxPointerSize, tip);
+                break;
             case SettingPiece::PointerFix:
                 form.Fade(!on);
                 form.Switch(label.c_str(), s.fixPointer, tip);

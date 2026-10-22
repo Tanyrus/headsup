@@ -54,6 +54,7 @@ namespace headsup
             {"outlineThickness", &Settings::outlineThickness, kMinOutlineThickness, kMaxOutlineThickness, kPercentStep},
             {"outlineOpacity", &Settings::outlineOpacity, kMinOpacity, kMaxOpacity, kPercentStep},
             {"menuOpacity", &Settings::menuOpacity, kMinMenuOpacity, kMaxOpacity, kPercentStep},
+            {"pointerSize", &Settings::pointerSize, kMinPointerSize, kMaxPointerSize, kPercentStep},
             {"cursorRaise", &Settings::cursorRaise, -kMaxCursorRaise, kMaxCursorRaise},
             {"nameRaise", &Settings::nameRaise, kMinNameRaise, kMaxNameRaise},
             {"elementWeakRank", &Settings::elementWeakRank, kNoWeakRank, kMaxWeakRank},
@@ -1517,5 +1518,10 @@ namespace headsup
     {
         auto byte = [](float f) { return static_cast<uint8_t>(std::lround(f * 255.0f)); };
         return Opaque(byte(c.v[0]), byte(c.v[1]), byte(c.v[2]));
+    }
+
+    bool PointerSwapped(const Settings& s)
+    {
+        return s.enabled && (s.pointerIcon != PointerIcon::Vanilla || s.pointerSize != kMinPointerSize);
     }
 }

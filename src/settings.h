@@ -68,6 +68,7 @@ namespace headsup
     constexpr int kMinOpacity = 10, kMaxOpacity = 100; // percent
 
     constexpr int kMinMenuFontSize = 10, kMaxMenuFontSize = 40, kDefaultMenuFontSize = 18; // pixels
+    constexpr int kMinPointerSize = 100, kMaxPointerSize = 300; // percent of the pointer's own size
     constexpr int kMinMenuOpacity = 30; // percent: fainter, the window could not be found to set it back
     constexpr int kMaxMenuSide  = 16384; // pixels: more than any screen is across
 
@@ -141,6 +142,7 @@ namespace headsup
         std::string cursorFile; // a File cursor's name in the cursors folder, without its extension
         PointerIcon pointerIcon = PointerIcon::Vanilla;
         std::string pointerFile; // a File pointer's name in the cursors folder, without its extension
+        int pointerSize = kMinPointerSize; // percent, the game's own pointer included
         bool fixPointer        = true;  // the game reads the mouse in its true client area and syncs its pointer before clicks
         int cursorWidth        = DefaultCursorWidth(); // pixels
         int cursorHeight       = kDefaultCursorHeight;
@@ -219,6 +221,8 @@ namespace headsup
 
     // Out-of-range values become the nearest limit; NaN and infinities become the default.
     Settings Clamp(Settings s);
+    // Whether HeadsUp shows a pointer of its own in place of the game's: another icon, or the game's at another size.
+    bool PointerSwapped(const Settings& s);
     Settings LoadSettings(SettingsStore& store);
     void SaveSettings(const Settings& s, SettingsStore& store);
 

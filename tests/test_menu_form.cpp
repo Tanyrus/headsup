@@ -915,3 +915,11 @@ TEST(the_nameplate_fonts_lead_with_the_games_font_and_the_top_panels_leave_it_ou
     const Form open = w.Pass({{"toppanel-top-panel-title-font", kClickEvent, ""}});
     CHECK(open.popup && Has(open.popup->rml, "Arial") && !Has(open.popup->rml, kGameFontName));
 }
+
+TEST(the_cursor_size_slider_sets_the_pointers_size)
+{
+    Window w;
+    w.state.page = Page::MouseCursor;
+    CHECK(w.Pass({{"mousecursor-mouse-pointer-pointer-size", kChangeEvent, "150"}}).changed);
+    CHECK_EQ(w.settings.pointerSize, 150);
+}

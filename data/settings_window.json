@@ -411,6 +411,7 @@
                 {"tip": "Replaces the mouse cursor with this file from the config/headsup/cursors folder."}
               ]
             },
+            {"key": "pointer-size", "name": "Cursor Size", "tip": "How large the mouse cursor is, the game's own included."},
             {"key": "pointer-fix", "name": "Pointer Fix", "tip": "Keeps the game's pointer under yours after a resize, and clicks where you click. It also shows the pointer again over Ashita's windows."},
             {"key": "keep-pointer", "name": "Keep Pointer", "tip": "The game hides its pointer when a key runs a command. While only these keys are held, it stays."}
           ]

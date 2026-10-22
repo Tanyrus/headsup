@@ -2653,3 +2653,27 @@ TEST(the_nameplate_fonts_are_the_games_two_then_the_font_list_which_never_holds_
         "Cormorant SC", "Barlow Condensed", "Arial"};
     CHECK(choices == expected);
 }
+
+TEST(the_pointer_size_is_held_to_its_range_in_five_percent_steps)
+{
+    Settings s;
+    s.pointerSize = 999;
+    CHECK_EQ(Clamp(s).pointerSize, kMaxPointerSize);
+    s.pointerSize = 0;
+    CHECK_EQ(Clamp(s).pointerSize, kMinPointerSize);
+    s.pointerSize = 123;
+    CHECK_EQ(Clamp(s).pointerSize, 125);
+}
+
+TEST(the_game_pointer_is_swapped_for_another_icon_or_another_size)
+{
+    Settings s;
+    CHECK(!PointerSwapped(s)); // the vanilla pointer at its own size
+    s.pointerSize = 150;
+    CHECK(PointerSwapped(s));
+    s.pointerSize = 100;
+    s.pointerIcon = PointerIcon::Chocobo;
+    CHECK(PointerSwapped(s));
+    s.enabled = false;
+    CHECK(!PointerSwapped(s));
+}

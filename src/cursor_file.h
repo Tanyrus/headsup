@@ -25,6 +25,13 @@ namespace headsup
     // 4, 8 or 24 bits per pixel, as the game's pointers and the chocobo are, or 32 with alpha, as most others.
     std::vector<CursorFrame> ReadCursorFile(const uint8_t* data, size_t size);
 
+    struct PointerSize
+    {
+        uint32_t width = 0, height = 0;
+    };
+    // A pointer's picture drawn at a percent of its own size, to the nearest pixel.
+    PointerSize SizedPointer(const CursorImage& image, int percent);
+
     // The frame shown `seconds` after the animation started; it loops.
     size_t FrameAt(const std::vector<CursorFrame>& frames, double seconds);
 

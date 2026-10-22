@@ -61,6 +61,7 @@
 #include <optional>
 #include <string>
 #include <unordered_set>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -289,7 +290,7 @@ class HeadsUp final : public IPlugin
     std::optional<double> m_LinuxXIAt; // when it came
     bool m_HooksTried = false;
     bool m_PointerFailed = false; // said once; tried again when the setting changes or the folder is read again
-    std::pair<headsup::PointerIcon, std::string> m_PointerFor; // the icon and file the pointer was started for
+    std::tuple<headsup::PointerIcon, std::string, int> m_PointerFor; // the icon, file and size the pointer was started for
     headsup::InstalledFonts m_Fonts;
     headsup::PlayerState m_Player;
     headsup::CheckResults m_Checks;
@@ -1959,8 +1960,8 @@ private:
 
     void UpdatePointer()
     {
-        const bool wanted = m_Settings.enabled && m_Settings.pointerIcon != headsup::PointerIcon::Vanilla;
-        const std::pair<headsup::PointerIcon, std::string> pick{m_Settings.pointerIcon, m_Settings.pointerFile};
+        const bool wanted = headsup::PointerSwapped(m_Settings);
+        const std::tuple<headsup::PointerIcon, std::string, int> pick{m_Settings.pointerIcon, m_Settings.pointerFile, m_Settings.pointerSize};
         if (!wanted || pick != m_PointerFor)
         {
             m_PointerFailed = false;
@@ -1970,12 +1971,19 @@ private:
         if (!wanted) return;
         if (!m_Pointer.Running() && !m_PointerFailed)
         {
-            const bool chocobo        = m_Settings.pointerIcon == headsup::PointerIcon::Chocobo;
-            const std::string failure = m_Pointer.Start(chocobo ? headsup::ChocoboPointer() : CursorFileFrames(m_Settings.pointerFile));
-            m_PointerFailed           = !failure.empty();
+            const headsup::PointerIcon icon = m_Settings.pointerIcon;
+            const std::string failure = m_Pointer.Start(
+                icon == headsup::PointerIcon::Vanilla ? std::nullopt
+                : icon == headsup::PointerIcon::Chocobo ? std::optional(headsup::ChocoboPointer())
+                                                        : std::optional(CursorFileFrames(m_Settings.pointerFile)),
+                m_Settings.pointerSize);
+            m_PointerFailed = !failure.empty();
             if (m_PointerFailed)
-                Note("the mouse pointer is the game's, as " + (chocobo ? std::string("the chocobo") : m_Settings.pointerFile + " in " + CursorsFolder()) +
-                      " could not be shown: " + failure + ".");
+                Note("the mouse pointer is the game's, as " +
+                     (icon == headsup::PointerIcon::Vanilla   ? std::string("its own at another size")
+                      : icon == headsup::PointerIcon::Chocobo ? std::string("the chocobo")
+                                                              : m_Settings.pointerFile + " in " + CursorsFolder()) +
+                     " could not be shown: " + failure + ".");
         }
         m_Pointer.Animate();
     }
