@@ -5,6 +5,7 @@
 #include "bar_placement.h"
 #include "markup.h"
 
+#include <array>
 #include <charconv>
 #include <cmath>
 #include <cstdio>
@@ -24,10 +25,13 @@ namespace headsup
         constexpr int kShadowDrop          = 1; // pixels down
         // The accent's alpha in the target's frame as it breathes, from and to, and in a lit title's glow.
         constexpr uint32_t kBreatheLow = 0x59, kBreatheHigh = 0xCC, kLitGlow = 0x80;
-        constexpr float kGlint             = 2.0f;       // the line of light at the foot of Aurora's strip, in pixels
-        constexpr uint32_t kAuroraGlassTop = 0xF21B2740, kAuroraGlassFoot = 0xF20C1220; // a popup's panel, down its height
-        constexpr uint32_t kAuroraFrame    = 0x40;       // the accent's alpha in a popup's frame
+        constexpr float kGlint             = 2.0f;       // the line of light at the foot of a glass strip, in pixels
+        constexpr uint32_t kGlassTop = 0xF21B2740, kGlassFoot = 0xF20C1220; // a popup's panel, down its height
+        constexpr uint32_t kGlassFrame    = 0x40;       // the accent's alpha in a popup's frame
         constexpr char kSeparator      = '/';
+        // A strip's name: its kind, top, middle, bottom, last row, the row under and what fades below, then its border
+        // and its rows.
+        constexpr size_t kStripColors = 6, kStripParts = 1 + kStripColors + 3;
         constexpr int kHexBase         = 16;
         constexpr float kPercentWhole  = 100.0f;
         constexpr float kBoxBorder     = 1.0f; // a pill's or frame's, inside its edge
@@ -152,10 +156,15 @@ namespace headsup
         return std::string(kHostSource) + std::string(kIconKind) + kSeparator + std::to_string(static_cast<int>(icon));
     }
 
-    std::string StripSource(BarTheme theme, int rows, int belowRows)
+    std::string StripSource(const BarPalette& palette, int rows, int belowRows)
     {
-        return std::string(kHostSource) + std::string(kStripKind) + kSeparator + std::to_string(static_cast<int>(theme)) +
-               kSeparator + std::to_string(rows) + kSeparator + std::to_string(belowRows);
+        std::string name = std::string(kHostSource) + std::string(kStripKind);
+        const uint32_t top = palette.stripTop, middle = palette.gradient ? palette.stripMiddle : top,
+                       bottom = palette.gradient ? palette.stripBottom : top;
+        for (const uint32_t color : {top, middle, bottom, palette.bottomLine, palette.underLine, palette.below})
+            name += kSeparator + Hex(color);
+        return name + kSeparator + std::to_string(palette.border) + kSeparator + std::to_string(rows) + kSeparator +
+               std::to_string(belowRows);
     }
 
     std::string DiamondSource(uint32_t argb, int pixels)
@@ -198,13 +207,19 @@ namespace headsup
             std::memcpy(image.argb.data(), bitmap.bgra, image.argb.size() * sizeof(uint32_t));
             return image;
         }
-        if (kind == kStripKind && parts.size() == 4)
+        if (kind == kStripKind && parts.size() == kStripParts)
         {
-            const std::optional<uint32_t> theme = number(1), rows = number(2), below = number(3);
-            if (!theme || !rows || !below || *theme >= static_cast<uint32_t>(kBarThemeCount)) return std::nullopt;
-            const BarPalette& p = PaletteOf(static_cast<BarTheme>(*theme));
-            return StripColumn(static_cast<int>(*rows), static_cast<int>(*below), p.stripTop, p.stripMiddle, p.stripBottom,
-                p.bottomLine, p.underLine, p.below);
+            std::array<uint32_t, kStripColors> colors{};
+            for (size_t i = 0; i < kStripColors; ++i)
+                if (const std::optional<uint32_t> color = number(1 + i, kHexBase))
+                    colors[i] = *color;
+                else
+                    return std::nullopt;
+            const std::optional<uint32_t> border = number(1 + kStripColors), rows = number(2 + kStripColors),
+                                          below = number(3 + kStripColors);
+            if (!border || !rows || !below || *border > static_cast<uint32_t>(kMaxStripBorder)) return std::nullopt;
+            return StripColumn(static_cast<int>(*rows), static_cast<int>(*below), colors[0], colors[1], colors[2], colors[3],
+                colors[4], colors[5], static_cast<int>(*border));
         }
         if ((kind == kDiamondKind || kind == kResetKind) && parts.size() == 3)
         {
@@ -229,8 +244,8 @@ namespace headsup
         // A color with another alpha.
         uint32_t Faded(uint32_t argb, uint32_t alpha) { return (argb & ~kAlphaMask) | alpha << kAlphaShift; }
 
-        // What is Aurora's alone: a line of light under the strip, and widgets that show no pill until they are lit.
-        std::string AuroraBarRules(const BarLook& look)
+        // The glass shape's own: a line of light under the strip, and widgets that show no pill until they are lit.
+        std::string GlassBarRules(const BarLook& look)
         {
             const uint32_t cyan = look.palette.accent, violet = look.palette.accentEnd;
             const std::string c = RcssColor(cyan), v = RcssColor(violet);
@@ -249,7 +264,7 @@ namespace headsup
         }
     }
 
-    std::string BarDocument(const BarLook& look, BarTheme theme, const BarTextPlace& place)
+    std::string BarDocument(const BarLook& look, const BarTextPlace& place)
     {
         const BarPalette& p  = look.palette;
         const BarMetrics& m  = look.metrics;
@@ -276,7 +291,7 @@ namespace headsup
         css += "div{display:block;}";
         css += std::string(".") + kHiddenClass + "{display:none;}";
         css += std::string("#") + kStripId + "{position:absolute;left:0px;top:0px;width:100%;height:" + Px(stripHeight) +
-               ";decorator:image(\"" + StripSource(theme, stripRows, belowRows) + "\");}";
+               ";decorator:image(\"" + StripSource(p, stripRows, belowRows) + "\");}";
         css += ".cap{position:absolute;top:" + centered(static_cast<float>(cap)) + ";" + square(static_cast<float>(cap)) + "}";
         css += "#cap-left{left:" + Px(std::round(m.cap / 2.0f - static_cast<float>(cap) / 2.0f)) + ";}";
         css += ".divider{position:absolute;top:" + centered(static_cast<float>(divider)) + ";" +
@@ -353,11 +368,12 @@ namespace headsup
         css += ".help-box{position:absolute;" + PanelRules(HelpBarPanel(look)) + "}";
         css += ".hc{" + FaceRules(look.titleFont, lines.title, place.title.height) + ShadowEffect(lines.title) + "}";
         css += ".hh{" + FaceRules(look.detailFont, lines.title, place.figures.height) + ShadowEffect(lines.title) + "}";
-        if (theme == BarTheme::Aurora) css += AuroraBarRules(look);
+        const bool glass = look.palette.shape == BarShape::Glass;
+        if (glass) css += GlassBarRules(look);
 
         std::string rml = "<rml><head><style>" + css + "</style></head><body class=\"" + shape.substr(1) + "\">";
         rml += std::string("<div id=\"") + kStripId + "\"></div>";
-        if (theme == BarTheme::Aurora) rml += "<div class=\"glint a\"></div><div class=\"glint b\"></div><div class=\"glint c\"></div>";
+        if (glass) rml += "<div class=\"glint a\"></div><div class=\"glint b\"></div><div class=\"glint c\"></div>";
         if (look.ornate)
             rml += "<img class=\"cap\" id=\"cap-left\" src=\"" + capSource + "\"/><img class=\"cap\" id=\"" + kRightCapId +
                    "\" src=\"" + capSource + "\"/>";
@@ -392,7 +408,7 @@ namespace headsup
         return rml;
     }
 
-    std::string PopupDocument(const BarLook& look, const PopupFaces& faces, BarTheme theme)
+    std::string PopupDocument(const BarLook& look, const PopupFaces& faces)
     {
         const BoxStyle panel = PopupPanel(look);
         std::string css = "body{display:block;width:100%;height:100%;pointer-events:none;z-index:10;}";
@@ -416,13 +432,13 @@ namespace headsup
         css += ".rule{height:1px;decorator:horizontal-gradient(" + RcssColor(look.palette.divider) + " " +
                RcssColor(look.palette.divider & ~kAlphaMask) + ");}";
         css += ".mark{text-align:center;}";
-        if (theme == BarTheme::Aurora)
+        if (look.palette.shape == BarShape::Glass)
         {
             // Its panel and cards are glass.
             css += ".card{decorator:vertical-gradient(#ffffff17 #ffffff08);background-color:transparent;border-color:" +
                    RcssColor(Faded(look.palette.accent, 0x33)) + ";}";
-            css += "#panel{background-color:transparent;decorator:vertical-gradient(" + RcssColor(kAuroraGlassTop) + " " +
-                   RcssColor(kAuroraGlassFoot) + ");border-color:" + RcssColor(Faded(look.palette.accent, kAuroraFrame)) + ";}";
+            css += "#panel{background-color:transparent;decorator:vertical-gradient(" + RcssColor(kGlassTop) + " " +
+                   RcssColor(kGlassFoot) + ");border-color:" + RcssColor(Faded(look.palette.accent, kGlassFrame)) + ";}";
         }
         return "<rml><head><style>" + css + "</style></head><body><div id=\"" + kPopupId + "\" class=\"" + kHiddenClass +
                "\"></div></body></rml>";

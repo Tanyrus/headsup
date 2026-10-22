@@ -57,7 +57,7 @@ namespace headsup
         // What the document was built from: a change builds it again.
         struct DocumentKey
         {
-            BarTheme theme = BarTheme::PhoenixGold;
+            BarPalette palette{};
             BarMetrics metrics{};
             BarRow row{};
             TextRow lines{};
@@ -130,7 +130,7 @@ namespace headsup
         };
         struct PopupDocumentKey
         {
-            BarTheme theme = BarTheme::PhoenixGold;
+            BarPalette palette{};
             BarMetrics metrics{};
             const char* titleFont  = nullptr;
             const char* detailFont = nullptr;
@@ -152,7 +152,7 @@ namespace headsup
             const char* detailFont);
         BarLinePlace PlaceLine(RmlHost& host, const char* family, int pixels, const char* glyphs, float top, float aloneTop);
         // Builds the document again when what it is made from changed. False when RmlUi refused it.
-        bool Document(RmlHost& host, const BarLook& look, BarTheme theme, const BarTextPlace& place);
+        bool Document(RmlHost& host, const BarLook& look, const BarTextPlace& place);
         BarLayout PlaceWidgets(RmlHost& host, const BarLook& look, const BarState& state, float screenWidth,
             Widgets& widgets);
         void ShowWidgets(const BarLook& look, const BarLayout& layout, const Widgets& widgets, const BarInput& input,
@@ -162,9 +162,9 @@ namespace headsup
         BarRect ShowHelpBar(RmlHost& host, const BarLook& look, const Rows& rows, const BarState& state, float top,
             float offsetX, float screenWidth, bool& cut);
         // The open popup in the host's overlay, and where it went (an empty rectangle for none).
-        BarRect ShowPopup(RmlHost& host, const BarLook& look, BarTheme theme, const BarState& state,
+        BarRect ShowPopup(RmlHost& host, const BarLook& look, const BarState& state,
             const BarLayout& layout, float screenWidth, float screenHeight, const BarInput& input, bool hidden);
-        bool PopupDocumentFor(RmlHost& host, const BarLook& look, BarTheme theme);
+        bool PopupDocumentFor(RmlHost& host, const BarLook& look);
         void ClosePopup();
         const FaceLine& FaceLineOf(RmlHost& host, const char* family, int pixels);
 

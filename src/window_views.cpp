@@ -1,6 +1,7 @@
 #include "window_views.h"
 
 #include "bytes.h"
+#include "mouse_messages.h"
 
 #include <algorithm>
 #include <array>
@@ -93,8 +94,24 @@ namespace headsup
         return top;
     }
 
-    FrameShifts ShiftsOf(std::span<const FrameWindow> frame, std::optional<int> chosen, int placedUnder, int band,
-        bool keepClear, int screenRight, int screenBottom)
+    bool SwallowsClick(uint32_t message, int x, int y, std::span<const WindowRect> hidden)
+    {
+        constexpr uint32_t kButtons[] = {kLeftDown, kLeftUp, kLeftDouble, kRightDown, kRightUp, kRightDouble, kMiddleDown,
+            kMiddleUp, kMiddleDouble, kXButtonDown, kXButtonUp, kXButtonDouble};
+        return std::ranges::find(kButtons, message) != std::end(kButtons) &&
+               std::ranges::any_of(hidden, [&](const WindowRect& r) { return x >= r[0] && x < r[2] && y >= r[1] && y < r[3]; });
+    }
+
+    FramePlan PlanOf(std::span<const WindowView> views, std::span<const FrameWindow> frame,
+        std::span<const std::optional<int>> viewShifts, int placedUnder)
+    {
+        const std::optional<size_t> view = ViewOf(views, frame);
+        if (!view) return {};
+        return FramePlan{*view < viewShifts.size() ? viewShifts[*view] : std::nullopt, placedUnder};
+    }
+
+    FrameShifts ShiftsOf(std::span<const FrameWindow> frame, std::optional<int> chosen, std::optional<int> placedUnder,
+        int band, int screenRight, int screenBottom)
     {
         std::vector<FrameWindow> left, right;
         for (const FrameWindow& w : frame)
@@ -102,10 +119,10 @@ namespace headsup
         const std::optional<int> leftTop = FrameTop(left, screenBottom), rightTop = FrameTop(right, screenBottom);
         const std::optional<int> top = FrameTop(frame, screenBottom);
         if (!top) return {};
-        const int viewShift = FrameShift(*top, chosen, placedUnder, band, keepClear);
+        const int viewShift = FrameShift(*top, chosen, placedUnder.value_or(band), band);
         const auto own = [&](std::optional<int> sideTop) {
             if (!sideTop || *sideTop == *top) return viewShift;
-            return FrameShift(*sideTop, std::nullopt, placedUnder, band, keepClear);
+            return FrameShift(*sideTop, std::nullopt, placedUnder.value_or(band), band);
         };
         const auto side = [&](std::span<const FrameWindow> windows, std::optional<int> sideTop) {
             SideShift shift{own(sideTop), std::nullopt};
@@ -125,10 +142,9 @@ namespace headsup
         return beside ? side.shift - (kGameUnderStripRow - kGameTopRow) : side.shift;
     }
 
-    int FrameShift(int frameTop, std::optional<int> chosen, int placedUnder, int band, bool keepClear)
+    int FrameShift(int frameTop, std::optional<int> chosen, int placedUnder, int band)
     {
-        const int shift = chosen.value_or(placedUnder - frameTop);
-        return keepClear ? std::max(shift, band - frameTop) : shift;
+        return std::max(chosen.value_or(placedUnder - frameTop), band - frameTop);
     }
 
     HelpMode ModeOf(bool panelHelp, bool hideGameHelp)

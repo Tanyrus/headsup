@@ -56,8 +56,8 @@ namespace headsup
         void Draw(bool depthTest);
         // The cursors of targets whose nameplate carries none, at the target window's anchors, as far as those are on
         // screen. Read the anchors when these are drawn: the game moves them only after it has copied its scene.
-        std::vector<LoneCursor> LoneCursorsDue(const Settings& settings, const CursorTargets& targets, float screenWidth,
-            float screenHeight) const;
+        std::vector<LoneCursor> LoneCursorsDue(const Settings& settings, const PlayerState& player, const CursorTargets& targets,
+            float screenWidth, float screenHeight) const;
         // In the back buffer's own pixels, at exactly the cursor's size and on top: there is no name to scale by or to
         // sit behind walls with. Changes render states.
         void DrawLoneCursors(const std::vector<LoneCursor>& lone, const Settings& settings, double now, float screenWidth,
@@ -71,6 +71,8 @@ namespace headsup
         void SetCursorFile(std::optional<Image> picture);
         // The game's own font, for the text set in it; every plate is drawn again with it.
         void SetGameFont(std::optional<GameFontFace> face);
+        // The built-in pearl in the game's light and colors (GameLitPearl), for the linkshell's icon.
+        void SetGamePearl(std::vector<unsigned char> bgra) { m_Icons.SetPearl(std::move(bgra)); }
         // The game's cursor is blocked over these.
         const std::vector<CursorName>& CursorNames() const { return m_CursorNames; }
         bool NamesFailed() const { return m_NamesFailed; }
@@ -108,6 +110,7 @@ namespace headsup
             float tip = 0.5f;
             float halo = 0.0f; // the shadow's or glow's margin, in texture pixels: it hangs outside the box the layout places
             int raster = 0;     // the height it is drawn at: its key's, or less when that image fits no texture
+            float inkTop = 0.0f, inkBottom = 0.0f; // a text's capitals, in rows of its raster under the halo
             bool unfit = false; // it fits none at the smallest height either: no texture, and the key says for what
         };
 

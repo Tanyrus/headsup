@@ -187,7 +187,7 @@ namespace headsup
         {
             Form& form  = c.form;
             Settings& s = c.s;
-            form.Fade(!s.moveWindows);
+            form.Fade(!s.shiftVanillaUi);
             form.Note(Word(c, WindowWord::GroupsNote));
             const HelpMode mode = c.state.shiftsFor.value_or(WindowHelpMode(s));
             form.Line();
@@ -290,7 +290,8 @@ namespace headsup
             {
                 const char* label = WindowLabel(name);
                 if (!(list.all || label != nullptr ||
-                        std::ranges::any_of(s.windowOffsets, [&](const WindowOffset& o) { return o.name == name; }) ||
+                        std::ranges::any_of(s.pinnedWindows, [&](const WindowPlace& p) { return p.name == name; }) ||
+                        has(s.hiddenWindows, name) ||
                         (c.readings.seenWindows != nullptr && has(*c.readings.seenWindows, name))))
                     continue;
                 if (Matches(name, list.text.c_str()) || (label != nullptr && Matches(label, list.text.c_str())))
@@ -301,22 +302,111 @@ namespace headsup
                 const char* label      = WindowLabel(window);
                 const std::string name = TitleCaseText(label != nullptr ? std::string(label) : window); // the game's own
                 form.Row((name + "##" + name + " window " + window).c_str(), WordTip(c, WindowWord::WindowListRowTip));
-                auto offset = std::ranges::find(s.windowOffsets, window, &WindowOffset::name);
-                int dx = offset != s.windowOffsets.end() ? offset->x : 0, dy = offset != s.windowOffsets.end() ? offset->y : 0;
-                const int oldX = dx, oldY = dy;
-                form.NumberAt("X", ("x " + window).c_str(), dx, kMaxWindowOffset);
-                form.NumberAt("Y", ("y " + window).c_str(), dy, kMaxWindowOffset);
-                form.EndRow();
-                if (dx == oldX && dy == oldY) continue;
-                offset = std::ranges::find(s.windowOffsets, window, &WindowOffset::name);
-                if (offset == s.windowOffsets.end())
-                    s.windowOffsets.push_back(WindowOffset{window, dx, dy});
-                else
+                const auto hidden = std::ranges::find(s.hiddenWindows, window);
+                bool kept         = hidden == s.hiddenWindows.end();
+                form.ToggleAt(("keep " + window).c_str(), kept, Word(c, WindowWord::WindowListHide),
+                    Word(c, WindowWord::WindowListKeep));
+                if (kept && hidden != s.hiddenWindows.end()) s.hiddenWindows.erase(hidden);
+                if (!kept)
                 {
-                    offset->x = dx;
-                    offset->y = dy;
+                    if (hidden == s.hiddenWindows.end()) s.hiddenWindows.push_back(window);
+                    form.EndRow();
+                    continue;
                 }
+                // The player's place for it, else where it stands now, muted: typing either number puts it there.
+                const auto pin = std::ranges::find(s.pinnedWindows, window, &WindowPlace::name);
+                const bool pinned = pin != s.pinnedWindows.end();
+                WindowPlace at    = pinned ? *pin : WindowPlace{window};
+                if (const auto* now = c.readings.windowPlaces; !pinned && now != nullptr)
+                    if (const auto seen = std::ranges::find(*now, window, &WindowPlace::name); seen != now->end()) at = *seen;
+                const WindowPlace was = at;
+                form.NumberAt("X", ("x " + window).c_str(), at.x, kMaxWindowOffset, !pinned);
+                form.NumberAt("Y", ("y " + window).c_str(), at.y, kMaxWindowOffset, !pinned);
+                const bool unpin = form.ResetAt(("place " + window).c_str(), pinned);
+                form.EndRow();
+                if (unpin)
+                {
+                    s.pinnedWindows.erase(pin);
+                    form.changed = true;
+                }
+                if (unpin || at == was) continue;
+                at.x = std::max(at.x, 0);
+                at.y = std::max(at.y, 0);
+                if (pinned)
+                    *pin = at;
+                else
+                    s.pinnedWindows.push_back(at);
             }
+        }
+
+        // The Custom theme's palette, edited: any change is the Custom theme's and picks it.
+        void EditTheme(Context& c, const BarPalette& edited)
+        {
+            if (edited == c.s.customPalette) return;
+            c.s.customPalette = edited;
+            c.s.barTheme      = BarTheme::Custom;
+        }
+
+        // Halfway between two colors, a byte at a time.
+        uint32_t Halfway(uint32_t a, uint32_t b)
+        {
+            uint32_t mixed = 0;
+            for (int shift = 0; shift < 32; shift += 8)
+                mixed |= (((a >> shift & 0xFF) + (b >> shift & 0xFF)) / 2) << shift;
+            return mixed;
+        }
+
+        // The rest of the palette, by ThemePaletteRow.
+        constexpr uint32_t BarPalette::*kThemeRowFields[] = {&BarPalette::underLine, &BarPalette::below,
+            &BarPalette::accent, &BarPalette::accentEnd, &BarPalette::pill, &BarPalette::pillBorder, &BarPalette::title,
+            &BarPalette::subtitle, &BarPalette::divider, &BarPalette::panelTop, &BarPalette::panelBottom,
+            &BarPalette::panelBorder, &BarPalette::panelOuter, &BarPalette::text, &BarPalette::heading,
+            &BarPalette::tagFill, &BarPalette::tagBorder, &BarPalette::tagText, &BarPalette::highlight};
+        static_assert(std::size(kThemeRowFields) == static_cast<size_t>(ThemePaletteRow::Highlight) + 1);
+
+        void ThemePalette(Context& c, const LayoutSetting& e)
+        {
+            Form& form = c.form;
+            form.Fade(!BarOn(c.s));
+            BarPalette edited = c.s.customPalette;
+            const auto rows   = c.layout.RowsOf(e);
+            const size_t first = (rows.size() + 1) / 2;
+            form.Raw("<div class=\"columns\"><div class=\"column\">");
+            for (size_t i = 0; i < rows.size(); ++i)
+            {
+                if (i == first) form.Raw("</div><div class=\"column second\">");
+                const LayoutRow& row = rows[i];
+                form.ArgbSwatch(Labeled(row.name, row.key, std::string(" ") + e.key).c_str(), edited.*kThemeRowFields[row.row],
+                    row.tip);
+            }
+            form.Raw("</div></div>");
+            EditTheme(c, edited);
+        }
+
+        // Save the Custom theme under a name, or load one saved: the plugin reads and writes the files.
+        void ThemeFiles(Context& c)
+        {
+            Form& form = c.form;
+            form.Fade(!BarOn(c.s));
+            form.Row(Labeled(Word(c, WindowWord::ThemeFilesSaveAs), "save as").c_str(), WordTip(c, WindowWord::ThemeFilesSaveAs));
+            form.TextAt("theme name", c.state.themeName, Word(c, WindowWord::ThemeFilesNameHint), kFilterWidth, true, kMaxFileName);
+            if (form.Button(Word(c, WindowWord::ThemeFilesSave), "save theme") && IsFolderFileName(c.state.themeName))
+                c.state.themeSave = c.state.themeName;
+            form.EndRow();
+            static const std::vector<std::string> kNoThemes;
+            const std::vector<std::string>& files = c.readings.themeFiles != nullptr ? *c.readings.themeFiles : kNoThemes;
+            form.Row(Labeled(Word(c, WindowWord::ThemeFilesLoad), "load").c_str(), WordTip(c, WindowWord::ThemeFilesLoad));
+            if (!files.empty())
+            {
+                const auto known = std::ranges::find(files, c.state.themePicked);
+                int picked       = known != files.end() ? static_cast<int>(known - files.begin()) : 0;
+                form.DropdownAt("theme file", picked, 0, static_cast<int>(files.size()) - 1,
+                    [&](int i) { return files[static_cast<size_t>(i)]; }, kFilterWidth);
+                c.state.themePicked = files[static_cast<size_t>(picked)];
+                if (form.Button(Word(c, WindowWord::ThemeFilesLoad), "load theme")) c.state.themeLoad = c.state.themePicked;
+            }
+            if (form.Opened("theme file")) c.state.themesRequested = true;
+            form.EndRow();
         }
 
         // One widget's options: its switch, its section, what it shows and its own settings, as the layout orders
@@ -864,6 +954,10 @@ namespace headsup
                 form.Fade(!plates);
                 form.SliderInt(label.c_str(), s.baseIconSize, kMinTextSize, kMaxTextSize, "%d px", tip);
                 break;
+            case SettingPiece::LinkpearlOutline:
+                form.Fade(!plates);
+                form.SliderPercent(label.c_str(), s.pearlOutline, 0, kMaxPearlOutline, tip);
+                break;
             case SettingPiece::AutoCheck:
                 form.Fade(!plates);
                 form.Switch(label.c_str(), s.autoCheck, tip);
@@ -1080,16 +1174,8 @@ namespace headsup
                 form.Switch(label.c_str(), s.screenshotHidesGame, tip);
                 break;
             case SettingPiece::Groups: WindowGroups(c); break;
-            case SettingPiece::MoveWindows:
-                form.Fade(false);
-                form.Switch(label.c_str(), s.moveWindows, tip);
-                break;
-            case SettingPiece::KeepClear:
-                form.Fade(!s.moveWindows);
-                form.Switch(label.c_str(), s.keepClear, tip);
-                break;
             case SettingPiece::AutoAdjust:
-                form.Fade(!s.moveWindows || r.windowsBand == 0);
+                form.Fade(!s.shiftVanillaUi || r.windowsBand == 0);
                 if (form.Action(label.c_str(), tip))
                 {
                     AutoAdjustWindows(s, r.windowsBand, r.barBand);
@@ -1153,6 +1239,65 @@ namespace headsup
                 form.Fade(!on);
                 form.Switch(label.c_str(), s.hideNetstat, tip);
                 break;
+            case SettingPiece::ShiftVanillaUi:
+                form.Fade(!on);
+                form.Switch(label.c_str(), s.shiftVanillaUi, tip);
+                break;
+            // The Custom theme's colors, shown and edited as they are kept, whatever theme is picked.
+            case SettingPiece::ThemeShape:
+            {
+                form.Fade(!BarOn(s));
+                BarPalette edited = s.customPalette;
+                const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(e));
+                form.Segments(label.c_str(), edited.shape, names.data(), kBarShapeCount, tip, kWideSegmentWidth);
+                EditTheme(c, edited);
+                break;
+            }
+            case SettingPiece::ThemeBackground:
+            {
+                form.Fade(!BarOn(s) || s.customPalette.gradient);
+                BarPalette edited = s.customPalette;
+                form.ArgbSwatch(label.c_str(), edited.stripTop, tip);
+                EditTheme(c, edited);
+                break;
+            }
+            case SettingPiece::ThemeGradient:
+            {
+                form.Fade(!BarOn(s));
+                BarPalette edited = s.customPalette;
+                form.Switch(label.c_str(), edited.gradient, tip);
+                EditTheme(c, edited);
+                break;
+            }
+            case SettingPiece::ThemeTop:
+            case SettingPiece::ThemeBottom:
+            {
+                form.Fade(!BarOn(s) || !s.customPalette.gradient);
+                BarPalette edited = s.customPalette;
+                form.ArgbSwatch(label.c_str(), e.piece == SettingPiece::ThemeTop ? edited.stripTop : edited.stripBottom, tip);
+                if (edited == s.customPalette) break;
+                edited.stripMiddle = Halfway(edited.stripTop, edited.stripBottom);
+                EditTheme(c, edited);
+                break;
+            }
+            case SettingPiece::ThemeBorderColor:
+            {
+                form.Fade(!BarOn(s));
+                BarPalette edited = s.customPalette;
+                form.ArgbSwatch(label.c_str(), edited.bottomLine, tip);
+                EditTheme(c, edited);
+                break;
+            }
+            case SettingPiece::ThemeBorderThickness:
+            {
+                form.Fade(!BarOn(s));
+                BarPalette edited = s.customPalette;
+                form.SliderInt(label.c_str(), edited.border, 0, kMaxStripBorder, "%d px", tip);
+                EditTheme(c, edited);
+                break;
+            }
+            case SettingPiece::ThemePalette: ThemePalette(c, e); break;
+            case SettingPiece::ThemeFiles: ThemeFiles(c); break;
             case SettingPiece::HideGameHelp:
                 form.Fade(!on);
                 form.Switch(label.c_str(), s.hideHelpBar, tip);
@@ -1289,7 +1434,8 @@ namespace headsup
             case CardPiece::Plain:
             case CardPiece::ScreenshotMode:
             case CardPiece::WindowGroups:
-            case CardPiece::GameWindows:
+            case CardPiece::BaseGameUi:
+            case CardPiece::ThemeColors:
             case CardPiece::SettingsWindow: return {};
             case CardPiece::Reset: return {.bare = true};
             case CardPiece::Nameplates: return {false, !on, &s.nameplates};

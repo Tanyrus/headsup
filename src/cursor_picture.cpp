@@ -30,7 +30,7 @@ namespace headsup
         return frames.empty() ? std::nullopt : std::optional<Image>(PictureOf(frames.front().image));
     }
 
-    std::vector<std::string> CursorFileNames(const std::vector<std::string>& entries)
+    std::vector<std::string> FolderFileNames(const std::vector<std::string>& entries, std::span<const char* const> extensions)
     {
         const auto lower    = [](char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); };
         const auto lowered  = [&](std::string text) {
@@ -40,13 +40,13 @@ namespace headsup
         std::vector<std::string> names;
         for (const std::string& entry : entries)
         {
-            for (const char* extension : kCursorExtensions)
+            for (const char* extension : extensions)
             {
                 const std::string_view ending(extension);
                 if (entry.size() <= ending.size() || lowered(entry.substr(entry.size() - ending.size())) != ending) continue;
                 std::string name = entry.substr(0, entry.size() - ending.size());
                 // One the settings would not keep is not offered: picking it would only put the feather back.
-                if (IsCursorFileName(name)) names.push_back(std::move(name));
+                if (IsFolderFileName(name)) names.push_back(std::move(name));
             }
         }
         // Windows opens a file whatever the case of its name: two that differ only by that are one name.

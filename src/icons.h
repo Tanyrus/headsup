@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace headsup
 {
@@ -125,4 +126,17 @@ namespace headsup
     };
 
     const IconBitmap& IconImage(Icon icon);
+
+    // A grey icon painted in a linkshell's color as the game paints the pearl before a name: the game's colors stand at
+    // half strength (0x80 the texture as it is), so each channel is the pixel's times twice the color's, held to 255;
+    // alpha as it was. The color is as the server sends it, each channel's four bits shifted up with the low ones full
+    // (4-2-0 as 79, 47, 15). BGRA, as IconBitmap holds it.
+    std::vector<unsigned char> PaintedIcon(const IconBitmap& icon, uint32_t color);
+
+    struct ColorPicture;
+    // XIUI's pearl (shape) traced smooth, in the game's light and colors (ReadGamePearl): the game's colors from its
+    // solid pixels, bled past them and smoothed of its block noise, laid over shape's square, inside an outline
+    // outlinePercent of XIUI's thick (0 for none). shape's size, the colors at the game's half for PaintedIcon.
+    // Empty when nothing of the game's is solid.
+    std::vector<unsigned char> GameLitPearl(const ColorPicture& game, const IconBitmap& shape, int outlinePercent);
 }

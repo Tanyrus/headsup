@@ -194,17 +194,66 @@ namespace headsup
                 Channel8(color & kFiveBits, kFiveBits)});
         }
 
-        // Each pixel of a block: its brightness times its alpha.
-        std::array<uint8_t, kBlockPixels> BlockFill(const uint8_t* block, bool dxt3)
+        // The pearl before a name is the square the font's shapes draw the linkshell icon from, in the status
+        // icons' picture.
+        constexpr std::string_view kStatusChunk   = "usta";
+        constexpr std::string_view kStatusPicture = "menu    ustatshd";
+        constexpr int kPearlU = 0, kPearlV = 64, kPearlSourceSide = 32;
+        constexpr size_t kBgraBytes = 4;
+
+        // What a picture chunk's header says, or why it is no picture.
+        struct PictureHeader
+        {
+            std::string name;
+            int width = 0, height = 0;
+            bool dxt3 = false;
+            size_t blocksWide = 0, blocksTall = 0, blockBytes = 0;
+        };
+        Read<PictureHeader> ReadPictureHeader(std::span<const uint8_t> body)
+        {
+            if (body.size() < kBlocksAt || body[0] != kPictureFlag || ReadAt<uint32_t>(body.data(), kInfoHeaderAt) != kInfoHeaderBytes)
+                return {std::nullopt, "its picture is not one"};
+            const std::string_view code(reinterpret_cast<const char*>(body.data() + kCodeAt), kDxt3Code.size());
+            if (code != kDxt3Code && code != kDxt1Code) return {std::nullopt, "its picture is not DXT1 or DXT3"};
+            PictureHeader header;
+            header.dxt3   = code == kDxt3Code;
+            header.width  = ReadAt<int32_t>(body.data(), kWidthAt);
+            header.height = ReadAt<int32_t>(body.data(), kHeightAt);
+            if (header.width <= 0 || header.height <= 0 || header.width > kMaxPictureSide || header.height > kMaxPictureSide ||
+                header.width % kBlockSide != 0 || header.height % kBlockSide != 0)
+                return {std::nullopt, "its picture is " + std::to_string(header.width) + " x " + std::to_string(header.height)};
+            header.blocksWide = static_cast<size_t>(header.width / kBlockSide);
+            header.blocksTall = static_cast<size_t>(header.height / kBlockSide);
+            header.blockBytes = header.dxt3 ? kDxt3BlockBytes : kDxt1BlockBytes;
+            if (body.size() - kBlocksAt < header.blocksWide * header.blocksTall * header.blockBytes)
+                return {std::nullopt, "its picture ends early"};
+            header.name.assign(reinterpret_cast<const char*>(body.data() + kNameAt), kNameBytes);
+            return {std::move(header), {}};
+        }
+
+        // Where a block's pixel k goes in a picture width pixels wide.
+        size_t PixelOf(const PictureHeader& header, size_t bx, size_t by, int k)
+        {
+            return (by * kBlockSide + static_cast<size_t>(k / kBlockSide)) * static_cast<size_t>(header.width) + bx * kBlockSide +
+                   static_cast<size_t>(k % kBlockSide);
+        }
+
+        // A block's alphas: DXT3's four bits each, DXT1's full.
+        std::array<uint32_t, kBlockPixels> BlockAlphas(const uint8_t* block, bool dxt3)
         {
             std::array<uint32_t, kBlockPixels> alpha{};
             alpha.fill(kFull);
             if (dxt3)
-            {
                 for (int k = 0; k < kBlockPixels; ++k)
                     alpha[static_cast<size_t>(k)] = (block[k / 2] >> (k % 2 * kAlphaBits) & kAlphaMask) * kAlphaScale;
-                block += kAlphaBytes;
-            }
+            return alpha;
+        }
+
+        // Each pixel of a block: its brightness times its alpha.
+        std::array<uint8_t, kBlockPixels> BlockFill(const uint8_t* block, bool dxt3)
+        {
+            std::array<uint32_t, kBlockPixels> alpha = BlockAlphas(block, dxt3);
+            if (dxt3) block += kAlphaBytes;
             const auto c0 = ReadAt<uint16_t>(block, 0), c1 = ReadAt<uint16_t>(block, kSecondColorAt);
             const uint32_t b0 = Brightness(c0), b1 = Brightness(c1);
             const bool fourColors = dxt3 || c0 > c1;
@@ -218,6 +267,36 @@ namespace headsup
                 fill[static_cast<size_t>(k)] = static_cast<uint8_t>(colors[pick] * alpha[static_cast<size_t>(k)] / kFull);
             }
             return fill;
+        }
+
+        // Each pixel of a block in its colors, blue, green, red and alpha; DXT1's clear pick is clear black.
+        std::array<std::array<uint8_t, kBgraBytes>, kBlockPixels> BlockColors(const uint8_t* block, bool dxt3)
+        {
+            const std::array<uint32_t, kBlockPixels> alpha = BlockAlphas(block, dxt3);
+            if (dxt3) block += kAlphaBytes;
+            const auto c0 = ReadAt<uint16_t>(block, 0), c1 = ReadAt<uint16_t>(block, kSecondColorAt);
+            const auto bgr = [](uint16_t c) {
+                return std::array<uint32_t, 3>{Channel8(c & kFiveBits, kFiveBits), Channel8(c >> kGreenShift & kSixBits, kSixBits),
+                    Channel8(c >> kRedShift & kFiveBits, kFiveBits)};
+            };
+            const std::array<uint32_t, 3> a = bgr(c0), b = bgr(c1);
+            const bool fourColors = dxt3 || c0 > c1;
+            std::array<std::array<uint32_t, 3>, 4> colors{a, b, a, b};
+            for (size_t c = 0; c < 3; ++c)
+            {
+                colors[2][c] = fourColors ? (2 * a[c] + b[c]) / 3 : (a[c] + b[c]) / 2;
+                colors[3][c] = fourColors ? (a[c] + 2 * b[c]) / 3 : 0;
+            }
+            const auto picks = ReadAt<uint32_t>(block, kPicksAt);
+            std::array<std::array<uint8_t, kBgraBytes>, kBlockPixels> out{};
+            for (int k = 0; k < kBlockPixels; ++k)
+            {
+                const uint32_t pick = picks >> (k * kPickBits) & kPickMask;
+                const auto& color   = colors[pick];
+                out[static_cast<size_t>(k)] = {static_cast<uint8_t>(color[0]), static_cast<uint8_t>(color[1]), static_cast<uint8_t>(color[2]),
+                    static_cast<uint8_t>(!fourColors && pick == kClearPick ? 0 : alpha[static_cast<size_t>(k)])};
+            }
+            return out;
         }
 
         // A file under a folder, which may end with its separator already.
@@ -306,33 +385,61 @@ namespace headsup
 
     Read<FontPicture> ReadFontPicture(std::span<const uint8_t> body)
     {
-        if (body.size() < kBlocksAt || body[0] != kPictureFlag || ReadAt<uint32_t>(body.data(), kInfoHeaderAt) != kInfoHeaderBytes)
-            return {std::nullopt, "its picture is not one"};
-        const std::string_view code(reinterpret_cast<const char*>(body.data() + kCodeAt), kDxt3Code.size());
-        if (code != kDxt3Code && code != kDxt1Code) return {std::nullopt, "its picture is not DXT1 or DXT3"};
-        const bool dxt3   = code == kDxt3Code;
-        const auto width  = ReadAt<int32_t>(body.data(), kWidthAt);
-        const auto height = ReadAt<int32_t>(body.data(), kHeightAt);
-        if (width <= 0 || height <= 0 || width > kMaxPictureSide || height > kMaxPictureSide || width % kBlockSide != 0 ||
-            height % kBlockSide != 0)
-            return {std::nullopt, "its picture is " + std::to_string(width) + " x " + std::to_string(height)};
-        const size_t blocksWide = static_cast<size_t>(width / kBlockSide), blocksTall = static_cast<size_t>(height / kBlockSide);
-        const size_t blockBytes = dxt3 ? kDxt3BlockBytes : kDxt1BlockBytes;
-        if (body.size() - kBlocksAt < blocksWide * blocksTall * blockBytes) return {std::nullopt, "its picture ends early"};
-        FontPicture picture;
-        picture.name.assign(reinterpret_cast<const char*>(body.data() + kNameAt), kNameBytes);
-        picture.width  = width;
-        picture.height = height;
-        picture.fill.resize(static_cast<size_t>(width) * static_cast<size_t>(height));
-        for (size_t by = 0; by < blocksTall; ++by)
-            for (size_t bx = 0; bx < blocksWide; ++bx)
+        Read<PictureHeader> header = ReadPictureHeader(body);
+        if (!header.value) return {std::nullopt, std::move(header.failure)};
+        const PictureHeader& h = *header.value;
+        FontPicture picture{h.name, h.width, h.height, std::vector<uint8_t>(static_cast<size_t>(h.width) * static_cast<size_t>(h.height))};
+        for (size_t by = 0; by < h.blocksTall; ++by)
+            for (size_t bx = 0; bx < h.blocksWide; ++bx)
             {
-                const auto fill = BlockFill(body.data() + kBlocksAt + (by * blocksWide + bx) * blockBytes, dxt3);
+                const auto fill = BlockFill(body.data() + kBlocksAt + (by * h.blocksWide + bx) * h.blockBytes, h.dxt3);
                 for (int k = 0; k < kBlockPixels; ++k)
-                    picture.fill[(by * kBlockSide + static_cast<size_t>(k / kBlockSide)) * static_cast<size_t>(width) + bx * kBlockSide +
-                                 static_cast<size_t>(k % kBlockSide)] = fill[static_cast<size_t>(k)];
+                    picture.fill[PixelOf(h, bx, by, k)] = fill[static_cast<size_t>(k)];
             }
         return {std::move(picture), {}};
+    }
+
+    Read<ColorPicture> ReadColorPicture(std::span<const uint8_t> body)
+    {
+        Read<PictureHeader> header = ReadPictureHeader(body);
+        if (!header.value) return {std::nullopt, std::move(header.failure)};
+        const PictureHeader& h = *header.value;
+        ColorPicture picture{h.name, h.width, h.height,
+            std::vector<uint8_t>(static_cast<size_t>(h.width) * static_cast<size_t>(h.height) * kBgraBytes)};
+        for (size_t by = 0; by < h.blocksTall; ++by)
+            for (size_t bx = 0; bx < h.blocksWide; ++bx)
+            {
+                const auto colors = BlockColors(body.data() + kBlocksAt + (by * h.blocksWide + bx) * h.blockBytes, h.dxt3);
+                for (int k = 0; k < kBlockPixels; ++k)
+                    std::copy(colors[static_cast<size_t>(k)].begin(), colors[static_cast<size_t>(k)].end(),
+                        picture.bgra.begin() + static_cast<std::ptrdiff_t>(PixelOf(h, bx, by, k) * kBgraBytes));
+            }
+        return {std::move(picture), {}};
+    }
+
+    Read<ColorPicture> ReadGamePearl(std::span<const uint8_t> dat)
+    {
+        const auto chunk = FindChunk(dat, kStatusChunk, kPictureChunkType);
+        if (!chunk) return {std::nullopt, "it holds no status icons"};
+        Read<ColorPicture> sheet = ReadColorPicture(*chunk);
+        if (!sheet.value) return sheet;
+        if (sheet.value->name != kStatusPicture) return {std::nullopt, "its status icons are named " + sheet.value->name};
+        if (sheet.value->width < kPearlU + kPearlSourceSide || sheet.value->height < kPearlV + kPearlSourceSide)
+            return {std::nullopt, "its status icons are too small to hold the pearl"};
+        const size_t row = static_cast<size_t>(kPearlSourceSide) * kBgraBytes;
+        ColorPicture pearl{sheet.value->name, kPearlSourceSide, kPearlSourceSide, {}};
+        pearl.bgra.reserve(row * kPearlSourceSide);
+        for (int y = 0; y < kPearlSourceSide; ++y)
+        {
+            const auto from = sheet.value->bgra.begin() +
+                              static_cast<std::ptrdiff_t>((static_cast<size_t>(kPearlV + y) * static_cast<size_t>(sheet.value->width) + kPearlU) * kBgraBytes);
+            pearl.bgra.insert(pearl.bgra.end(), from, from + static_cast<std::ptrdiff_t>(row));
+        }
+        bool seen = false;
+        for (size_t p = kBgraBytes - 1; p < pearl.bgra.size(); p += kBgraBytes)
+            seen = seen || pearl.bgra[p] != 0;
+        if (!seen) return {std::nullopt, "its pearl shows nothing"};
+        return {std::move(pearl), {}};
     }
 
     Read<std::array<GlyphShape, kGlyphCount>> ReadGlyphShapes(std::span<const uint8_t> body, std::string_view picture, int width,

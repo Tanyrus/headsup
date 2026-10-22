@@ -3,6 +3,7 @@
 #include "argb.h"
 #include "bar_placement.h"
 #include "bar_server_time.h"
+#include "bar_theme.h"
 #include "bar_types.h"
 #include "color.h"
 #include "currencies.h"
@@ -32,6 +33,7 @@ namespace headsup
     constexpr int kMinSmoothness = SmoothnessCopies(SmoothnessLevel::Low), kMaxSmoothness = SmoothnessCopies(SmoothnessLevel::Ultra);
     constexpr int kMinTextSize = 8, kMaxTextSize = 48;   // pixels: the base font and base icon sizes
     constexpr int kDefaultIconSize = 16;                 // pixels: the base icon size
+    constexpr int kMaxPearlOutline = 300;                // percent of XIUI's: the linkpearl's outline
     constexpr int kMinNameRaise = 0, kMaxNameRaise = 40; // pixels
     constexpr const char* kDefaultFont = kMontserratSemiBold;
     constexpr const char* kBadgeFont   = kBarlowCondensed; // what badges were set in before they took the default font
@@ -51,10 +53,10 @@ namespace headsup
     const char* CursorStyleName(CursorStyle style); // as the settings file has it
     // A picture keeps its own colors; a shape is filled with the cursor's.
     constexpr bool CursorIsPicture(CursorStyle style) { return style == CursorStyle::Chocobo || style == CursorStyle::File; }
-    // A cursor file is kept by its name, which goes into a path under the cursors folder: not empty, not over
-    // this long, and with nothing in it that would lead out of the folder.
-    constexpr size_t kMaxCursorFileName = 64;
-    bool IsCursorFileName(std::string_view name);
+    // A cursor or theme file is kept by its name, which goes into a path under its folder: not empty, not over this
+    // long, and with nothing in it that would lead out of the folder.
+    constexpr size_t kMaxFileName = 64;
+    bool IsFolderFileName(std::string_view name);
     // The mouse pointer: the game's own, PlayOnline's chocobo, or a cursor file of the player's.
     enum class PointerIcon : uint8_t { Vanilla, Chocobo, File };
     constexpr int kPointerIconCount = 3;
@@ -89,6 +91,7 @@ namespace headsup
         std::string badgeFontName; // badges' numbers; empty for the default font
         bool showBar       = true;
         BarTheme barTheme  = BarTheme::PhoenixGold;
+        BarPalette customPalette = PaletteOf(BarTheme::PhoenixGold); // the Custom theme's, kept while another is picked
         BarSeparators barSeparators = BarSeparators::Theme;
         int barHeight      = 45; // pixels: the least at which titles are 13 px over 11 px detail lines
         int barTextSize    = kAutoBarTextSize; // the bar's title size, or Auto
@@ -98,9 +101,9 @@ namespace headsup
         std::array<bool, kBarWidgetCount> barWidgets = kBarWidgetDefaults; // by BarWidget
         int barCurrency = kGilCurrency; // the Gil widget's, by kCurrencyTable
         std::optional<ClockZone> clockZone;           // the Clock widget's; none for the computer's own
-        std::vector<WindowOffset> windowOffsets; // each game window's move from where the game puts it
-        bool moveWindows  = true;  // the game's windows that hang from the top go under the panel, a view at a time
-        bool keepClear    = true;  // and none is left under it, whatever a view's shift says
+        std::vector<WindowPlace> pinnedWindows;  // game windows the player put at places of their own, never shifted
+        std::vector<std::string> hiddenWindows;  // game windows drawn as nothing, by short name
+        bool shiftVanillaUi = true; // the game's windows that hang from the top go under the panel, a view at a time
         // By HelpMode: where a view's highest window goes, in the game's menu pixels, and the player's own shifts.
         std::array<int, kHelpModes> placedUnder = {ReferenceBand(HelpMode::Off), ReferenceBand(HelpMode::On)};
         std::array<std::vector<ViewShift>, kHelpModes> viewShifts;
@@ -157,6 +160,7 @@ namespace headsup
         bool outlines   = true;
         int baseSize    = 15; // pixels: a line's text at 100 percent
         int baseIconSize = kDefaultIconSize; // and its icons
+        int pearlOutline = 100;              // the linkpearl's outline, percent of XIUI's; 0 for none
         DashMark dashMark = DashMark::Diamond; // what a dash typed in a design is drawn as
         bool autoCheck    = false; // every mob that comes near is checked by HeadsUp, for its exact level
         std::string defaultFont = kDefaultFont;

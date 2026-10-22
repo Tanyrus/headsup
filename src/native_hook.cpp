@@ -30,6 +30,7 @@ extern "C"
     uintptr_t g_HeadsUpWindowDraw = 0;
     void HeadsUpWindowGate();
     __attribute__((used)) uint32_t HeadsUpOnWindowDraw(uint32_t mcd);
+    __attribute__((used)) void HeadsUpAfterWindowDraw();
     BOOL __stdcall HeadsUpWindowRect(HWND window, RECT* rect);
     int __stdcall HeadsUpSystemMetric(int index);
 }
@@ -102,7 +103,8 @@ _HeadsUpArrowGate:
 )");
 
 // Called in place of the menu window draw, a thiscall with ecx the window's MCD and no stack arguments. On 0 it jumps
-// on to the window draw with ecx as it was; otherwise it returns without drawing, and with no arguments to pop.
+// on to the window draw with ecx as it was; on 1 it returns without drawing, with no arguments to pop; on 2 it calls
+// the window draw and tells HeadsUp when it is back, which drops the draw calls made in between (kWindowSilent).
 asm(R"(
     .text
     .p2align 4
@@ -114,9 +116,13 @@ _HeadsUpWindowGate:
     call _HeadsUpOnWindowDraw
     add esp, 4
     pop ecx
-    test eax, eax
-    jnz .LHeadsUpWindowSkip
+    cmp eax, 1
+    je .LHeadsUpWindowSkip
+    ja .LHeadsUpWindowSilent
     jmp dword ptr [_g_HeadsUpWindowDraw]
+.LHeadsUpWindowSilent:
+    call dword ptr [_g_HeadsUpWindowDraw]
+    call _HeadsUpAfterWindowDraw
 .LHeadsUpWindowSkip:
     ret
     .att_syntax prefix
@@ -148,18 +154,34 @@ namespace headsup
         uint32_t g_PickedReturn = 0; // where the candidate's arrow call returns to
         bool g_HideArrows       = false;
         HiddenWindows g_HiddenWindows;
+        // The gate's answers. A silenced window's draw runs, as it also counts down a closing window and marks its
+        // greyed buttons, and the Direct3D calls made inside it are dropped.
+        constexpr uint32_t kWindowDrawn = 0, kWindowSkipped = 1, kWindowSilent = 2;
+        bool g_SilentDraw = false;  // inside a silenced window's draw
+        WindowKeyList g_HiddenKeys; // the windows the player hides
+        // The rectangles of those that drew, in menu pixels: this frame's as they come, and the last whole frame's.
+        std::array<WindowRect, kMaxWindowKeys> g_HiddenRects{}, g_ShownHiddenRects{};
+        size_t g_HiddenRectCount = 0, g_ShownHiddenRectCount = 0;
         std::optional<WindowPlacing> g_Placing; // windows are placed while it is set
         uint32_t g_TitleText = 0;           // the strip title's text object in its owner; 0 when it was not found
         PlacedText g_TitlePlace;
         WindowKeyList g_SeenWindows;        // those that opened since HeadsUp loaded
         std::vector<std::optional<int>> g_ViewShifts; // the player's, by view of WindowViews()
-        struct KeyOffset
+        struct KeyPlace
         {
             WindowKey key;
             int x, y;
         };
-        std::array<KeyOffset, kMaxWindowKeys> g_Offsets{}; // the player's, by window
-        size_t g_OffsetCount = 0;
+        std::array<KeyPlace, kMaxWindowKeys> g_Pins{}; // the player's places, by window
+        size_t g_PinCount = 0;
+        std::array<KeyPlace, kMaxWindowKeys> g_LastPlaces{}; // where each window seen last stood
+        size_t g_LastPlaceCount = 0;
+
+        KeyPlace* PlaceIn(std::span<KeyPlace> places, const WindowKey& key)
+        {
+            const auto at = std::ranges::find(places, key, &KeyPlace::key);
+            return at != places.end() ? &*at : nullptr;
+        }
         WindowKeyList g_DrawnWindows; // those that drew since TakeOpen last ran
         WindowPlacements g_Placements;      // where each moved window came from and went
         uint32_t g_WindowFrame = 0;         // counts WindowHook::NewFrame
@@ -175,6 +197,7 @@ namespace headsup
         using WindowMoveToFn     = void(__attribute__((thiscall))*)(uintptr_t mcd, int x, int y);
         using WindowGetRectFn    = void(__attribute__((thiscall))*)(uintptr_t mcd, int16_t* place);
         uintptr_t g_WindowGetRect = 0;     // MCD::GetRect, or 0 when it was not found
+        uintptr_t g_WindowEntryRect = 0;   // MCD::GetEntryRect, or 0 when it was not found
         uint32_t g_PickedColor  = 0;
         uintptr_t g_RangeColor  = 0; // the window's thiscall that picks the candidate arrow's color
         using RangeColorFn      = uint32_t(__attribute__((thiscall))*)(const void* window, uintptr_t you, uintptr_t candidate,
@@ -448,6 +471,7 @@ namespace headsup
     namespace
     {
         __attribute__((thiscall)) void ScanLabelRect(uintptr_t mcd, int16_t* place);
+        __attribute__((thiscall)) void StripCountRect(uintptr_t mcd, int16_t* place);
     }
 
     std::string WindowHook::Start()
@@ -473,12 +497,20 @@ namespace headsup
         const WindowMoveSite move = LocateWindowMove(text);
         g_WindowMoveTo            = move.problem == LocateProblem::None ? Address(base) + move.moveTo : 0;
         g_WindowGetRect           = move.getRect != 0 ? Address(base) + move.getRect : 0;
+        g_WindowEntryRect         = move.entryRect != 0 ? Address(base) + move.entryRect : 0;
         // Without it Wide Scan's grid label stays under the strip's title where the game put it.
-        if (const ScanLabelSite label = LocateScanLabel(text, move.getRect); label.problem == LocateProblem::None)
+        if (const TitleRectSite label = LocateScanLabel(text, move.getRect); label.problem == LocateProblem::None)
         {
             uint8_t* at         = base + label.call;
             CodePatch labelCall = Retarget(at, Address(at), Address(&ScanLabelRect));
             if (PutIn({&labelCall, 1}).empty()) m_LabelCall = labelCall;
+        }
+        // Without it an item list's count stays at the hidden strip's corner, under the panel.
+        if (const TitleRectSite count = LocateStripCount(text, move.getRect); count.problem == LocateProblem::None)
+        {
+            uint8_t* at         = base + count.call;
+            CodePatch countCall = Retarget(at, Address(at), Address(&StripCountRect));
+            if (PutIn({&countCall, 1}).empty()) m_CountCall = countCall;
         }
         m_MoveProblem             = move.problem != LocateProblem::None ? Describe(move.problem)
                                     : g_WindowList == 0 ? "the game's list of open windows was not found" : "";
@@ -503,10 +535,15 @@ namespace headsup
         g_TitlePlace         = {};
         const CodePatch call = std::exchange(m_Call, {});
         g_HiddenWindows      = {};
+        g_SilentDraw         = false;
         g_Placing.reset();
         g_PlannedFrame = 0;
         g_PlannedKeys.Clear();
         g_WindowsBand  = 0;
+        const CodePatch count       = std::exchange(m_CountCall, {});
+        const std::string countBack = count.at == nullptr ? "" : KeptLoaded(PutBack({&count, 1},
+            "the item lists' count was changed again after HeadsUp hooked it, so it was left as it is",
+            "the item lists' count could not be put back"));
         const CodePatch label       = std::exchange(m_LabelCall, {});
         const std::string labelBack = label.at == nullptr ? "" : KeptLoaded(PutBack({&label, 1},
             "Wide Scan's grid label was changed again after HeadsUp hooked it, so it was left as it is",
@@ -514,13 +551,26 @@ namespace headsup
         const std::string drawBack = KeptLoaded(PutBack({&call, 1},
             "the game's window draw was changed again after HeadsUp hooked it, so it was left as it is",
             "the game's window draw could not be put back"));
-        return drawBack.empty() ? labelBack : drawBack;
+        return !drawBack.empty() ? drawBack : !labelBack.empty() ? labelBack : countBack;
     }
 
     void WindowHook::Hide(HiddenWindows hidden) { g_HiddenWindows = hidden; }
 
+    void WindowHook::HideWindows(const std::vector<std::string>& names)
+    {
+        g_HiddenKeys.Clear();
+        for (const std::string& name : names)
+            if (const std::optional<WindowKey> key = KeyFromShortName(name)) g_HiddenKeys.Add(*key);
+    }
+
+    bool WindowHook::Silent() { return g_SilentDraw; }
+
+    std::span<const WindowRect> WindowHook::HiddenRects() { return {g_ShownHiddenRects.data(), g_ShownHiddenRectCount}; }
+
     void WindowHook::NewFrame()
     {
+        g_ShownHiddenRects     = g_HiddenRects;
+        g_ShownHiddenRectCount = std::exchange(g_HiddenRectCount, 0);
         g_Placements.SetFrame(++g_WindowFrame);
         if (g_Placing && g_WindowMoveTo != 0) PlaceFrame(true);
     }
@@ -538,12 +588,20 @@ namespace headsup
 
     int WindowHook::WindowsBand() const { return g_WindowsBand; }
 
-    void WindowHook::Offset(const std::vector<WindowOffset>& offsets)
+    void WindowHook::Pin(const std::vector<WindowPlace>& places)
     {
-        g_OffsetCount = 0;
-        for (const WindowOffset& o : offsets)
-            if (const std::optional<WindowKey> key = KeyFromShortName(o.name); key && g_OffsetCount < g_Offsets.size())
-                g_Offsets[g_OffsetCount++] = KeyOffset{*key, o.x, o.y};
+        g_PinCount = 0;
+        for (const WindowPlace& p : places)
+            if (const std::optional<WindowKey> key = KeyFromShortName(p.name); key && g_PinCount < g_Pins.size())
+                g_Pins[g_PinCount++] = KeyPlace{*key, p.x, p.y};
+    }
+
+    std::vector<WindowPlace> WindowHook::Places() const
+    {
+        std::vector<WindowPlace> places;
+        for (size_t i = 0; i < g_LastPlaceCount; ++i)
+            places.push_back(WindowPlace{ShortName(g_LastPlaces[i].key), g_LastPlaces[i].x, g_LastPlaces[i].y});
+        return places;
     }
 
     std::vector<std::string> WindowHook::SeenWindows() const
@@ -790,16 +848,31 @@ namespace headsup
 
         // Where an owner keeps its copy of its window's place, read off its class's layout: none for a class that keeps
         // none, or when the code cannot be read.
-        std::optional<uint32_t> PlaceCopyAt(uint32_t owner)
+        // An owner's class's layout code, kLayoutScanBytes of it, and where it starts; none when it cannot be read.
+        std::optional<std::pair<std::span<const uint8_t>, uint32_t>> OwnerLayout(uint32_t owner)
         {
             const auto* object = reinterpret_cast<const uint8_t*>(owner);
-            if (g_WindowGetRect == 0 || owner == 0 || !Readable(object, sizeof(uint32_t))) return std::nullopt;
+            if (owner == 0 || !Readable(object, sizeof(uint32_t))) return std::nullopt;
             const auto* slot = reinterpret_cast<const uint8_t*>(ReadAt<uint32_t>(object, 0) + kOwnerLayoutSlot * sizeof(uint32_t));
             if (!Readable(slot, sizeof(uint32_t))) return std::nullopt;
             const uint32_t layout = ReadAt<uint32_t>(slot, 0);
             const auto* code      = reinterpret_cast<const uint8_t*>(layout);
             if (layout == 0 || !Readable(code, kLayoutScanBytes)) return std::nullopt;
-            return PlaceCopyOffset({code, kLayoutScanBytes}, layout, g_WindowGetRect);
+            return std::pair{std::span<const uint8_t>(code, kLayoutScanBytes), layout};
+        }
+
+        std::optional<uint32_t> PlaceCopyAt(uint32_t owner)
+        {
+            const auto layout = g_WindowGetRect != 0 ? OwnerLayout(owner) : std::nullopt;
+            return layout ? PlaceCopyOffset(layout->first, layout->second, g_WindowGetRect) : std::nullopt;
+        }
+
+        // Where an owner keeps an entry's top left corner, read off its class's layout as PlaceCopyAt reads the
+        // window's place: none for a class that keeps none.
+        std::optional<uint32_t> EntryPlaceAt(uint32_t owner)
+        {
+            const auto layout = g_WindowEntryRect != 0 ? OwnerLayout(owner) : std::nullopt;
+            return layout ? EntryPlaceOffset(layout->first, layout->second, g_WindowEntryRect) : std::nullopt;
         }
 
         // The game's own move. An owner that keeps a copy of its window's place draws from it, and the move leaves it
@@ -817,6 +890,16 @@ namespace headsup
             WindowRect kept{};
             if (readable) std::memcpy(kept.data(), copy, kWindowRectBytes);
             reinterpret_cast<WindowMoveToFn>(g_WindowMoveTo)(mcd, to.left, to.top);
+            // An entry's corner the owner draws a picture at stays where it was: it moves too, while inside the window.
+            if (const std::optional<uint32_t> entry = EntryPlaceAt(owner))
+                if (auto* corner = reinterpret_cast<int16_t*>(owner + *entry);
+                    Readable(reinterpret_cast<const uint8_t*>(corner), 2 * sizeof(int16_t)))
+                    if (const std::optional<WindowSpot> moved = MovedEntryPlace(WindowSpot{corner[0], corner[1]}, window,
+                            to.left - window[0], to.top - window[1]))
+                    {
+                        corner[0] = static_cast<int16_t>(moved->left);
+                        corner[1] = static_cast<int16_t>(moved->top);
+                    }
             if (!readable) return;
             if (const std::optional<WindowRect> moved = MovedPlaceCopy(kept, window, to.left - window[0], to.top - window[1], match))
                 std::memcpy(copy, moved->data(), kWindowRectBytes);
@@ -836,6 +919,16 @@ namespace headsup
             const WindowSpot now{rect[0], rect[1]};
             LabelPlace(std::span<int16_t, 4>(place, 4), g_FrameShifts.left.shift,
                 now.top - g_Placements.OriginOf(mcd, *key, now).top);
+        }
+
+        // In place of the call through which an item list's count asks for the strip title's rectangle: while the strip
+        // is hidden the count goes with it, off the screen, as the panel's help line says it.
+        __attribute__((thiscall)) void StripCountRect(uintptr_t mcd, int16_t* place)
+        {
+            reinterpret_cast<WindowGetRectFn>(g_WindowGetRect)(mcd, place);
+            if (!g_HiddenWindows.helpBar) return;
+            constexpr int16_t kOffScreen = -0x4000; // far above the screen, with room under the int16's floor
+            place[1] = place[3] = kOffScreen;
         }
 
         // HeadsUp's own move of a window. One whose owner puts it back each frame keeps the spot its owner last asked
@@ -923,13 +1016,11 @@ namespace headsup
                 g_WindowsBand = placed.band;
                 const std::span<const FrameWindow> frame(g_FrameWindows.data(), count);
                 const std::optional<int> top = FrameTop(frame, placing.band.screenBottom);
-                if (placing.moveWindows && placed.band != 0 && top)
+                if (placing.shift && placed.band != 0 && top)
                 {
-                    const std::optional<size_t> view = ViewOf(WindowViews(), frame);
-                    const std::optional<int> chosen =
-                        view && *view < g_ViewShifts.size() ? g_ViewShifts[*view] : std::nullopt;
-                    g_FrameShifts = ShiftsOf(frame, chosen, placing.placedUnder, placed.band, placing.keepClear,
-                        placing.band.screenRight, placing.band.screenBottom);
+                    const FramePlan plan = PlanOf(WindowViews(), frame, g_ViewShifts, placing.placedUnder);
+                    g_FrameShifts = ShiftsOf(frame, plan.chosen, plan.placedUnder, placed.band, placing.band.screenRight,
+                        placing.band.screenBottom);
                 }
             }
             if (present)
@@ -968,20 +1059,25 @@ namespace headsup
             }
             g_SeenWindows.Add(key);
             g_DrawnWindows.Add(key);
-            const KeyOffset* offset = nullptr;
-            for (size_t i = 0; i < g_OffsetCount; ++i)
-                if (g_Offsets[i].key == key) offset = &g_Offsets[i];
-            const int shift = HangsFromTop(origin.top, band.screenBottom)
+            // A window the player put somewhere goes there, and the view's shift leaves it be.
+            const KeyPlace* pin = PlaceIn({g_Pins.data(), g_PinCount}, key);
+            const int shift = pin == nullptr && HangsFromTop(origin.top, band.screenBottom)
                                   ? g_FrameShifts.For(origin.left, origin.left + (right - left), band.screenRight)
                                   : 0;
+            WindowSpot at = now;
             if (const std::optional<WindowSpot> to = g_Placements.PlaceFor(mcd, key, now, right - left, bottom - top,
-                    offset != nullptr ? offset->x : 0, shift + (offset != nullptr ? offset->y : 0), band.screenRight,
-                    band.screenBottom))
+                    pin != nullptr ? pin->x - origin.left : 0, pin != nullptr ? pin->y - origin.top : shift,
+                    band.screenRight, band.screenBottom))
             {
                 MoveWindow(mcd, key, *to);
                 if (key == g_EquipKey) MoveEquipNumbers(ReadAt<uint32_t>(field(kMcdOwner), 0), now, right - left,
                                            bottom - top, *to);
+                at = *to;
             }
+            if (KeyPlace* last = PlaceIn({g_LastPlaces.data(), g_LastPlaceCount}, key))
+                *last = KeyPlace{key, at.left, at.top};
+            else if (g_LastPlaceCount < g_LastPlaces.size())
+                g_LastPlaces[g_LastPlaceCount++] = KeyPlace{key, at.left, at.top};
         }
     }
 
@@ -1000,14 +1096,23 @@ namespace headsup
 extern "C" uint32_t HeadsUpOnWindowDraw(uint32_t mcd)
 {
     using namespace headsup;
-    if ((!g_HiddenWindows.Any() && !g_Placing) || mcd == 0) return 0;
+    if ((!g_HiddenWindows.Any() && !g_Placing && g_HiddenKeys.Size() == 0) || mcd == 0) return kWindowDrawn;
     const uint32_t descriptor = *reinterpret_cast<const uint32_t*>(mcd + kWindowDescriptor);
-    if (descriptor == 0) return 0;
+    if (descriptor == 0) return kWindowDrawn;
     const auto* name = reinterpret_cast<const char*>(descriptor + kDescriptorName);
     if (g_Placing && g_WindowMoveTo != 0 && std::exchange(g_PlannedFrame, g_WindowFrame) != g_WindowFrame)
         PlaceFrame(false);
-    return SkipsWindow(name, g_HiddenWindows) ? 1 : 0;
+    if (SkipsWindow(name, g_HiddenWindows)) return kWindowSkipped;
+    if (g_HiddenKeys.Size() == 0) return kWindowDrawn;
+    const std::optional<WindowKey> key = WindowKeyOf(name);
+    if (!key || !g_HiddenKeys.Has(*key)) return kWindowDrawn;
+    if (g_HiddenRectCount < g_HiddenRects.size())
+        std::memcpy(g_HiddenRects[g_HiddenRectCount++].data(), reinterpret_cast<const void*>(mcd + kMcdRect), kWindowRectBytes);
+    g_SilentDraw = true;
+    return kWindowSilent;
 }
+
+extern "C" void HeadsUpAfterWindowDraw() { headsup::g_SilentDraw = false; }
 
 // On the game's stack, inside its name routine: nothing here may allocate, throw or call Ashita.
 extern "C" uint32_t HeadsUpOnName(uint32_t frame)

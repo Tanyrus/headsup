@@ -23,6 +23,8 @@ TEST(a_name_shows_whenever_some_of_it_is_on_screen)
 
 namespace
 {
+    const PlayerState kIdle;
+
     // The game's arrow anchors on screen: from a capture targeting a Telepoint, which has no name, its anchor sat one
     // unit above it at (1400, 608).
     CursorTargets Anchored(uint16_t target, uint16_t subTarget)
@@ -38,17 +40,17 @@ namespace
 TEST(a_target_without_a_name_gets_a_cursor_at_the_games_arrow)
 {
     const Settings s;
-    const auto lone = LoneCursors(Anchored(554, 0), s, {});
+    const auto lone = LoneCursors(Anchored(554, 0), s, kIdle, {});
     CHECK_EQ(lone.size(), 1u);
     CHECK(lone[0].index == 554 && lone[0].target == TargetState::Targeted && lone[0].x == 1400.0f && lone[0].y == 608.0f);
-    CHECK(LoneCursors(Anchored(554, 0), s, {554}).empty()); // its nameplate already has one
-    CHECK(LoneCursors(Anchored(0, 0), s, {}).empty());
+    CHECK(LoneCursors(Anchored(554, 0), s, kIdle, {554}).empty()); // its nameplate already has one
+    CHECK(LoneCursors(Anchored(0, 0), s, kIdle, {}).empty());
     CursorTargets unknown = Anchored(554, 0);
     unknown.anchored      = false; // the menu's size was not known
-    CHECK(LoneCursors(unknown, s, {}).empty());
+    CHECK(LoneCursors(unknown, s, kIdle, {}).empty());
     Settings off = s;
     off.cursorStyle = CursorStyle::Vanilla;
-    CHECK(LoneCursors(Anchored(554, 0), off, {}).empty());
+    CHECK(LoneCursors(Anchored(554, 0), off, kIdle, {}).empty());
 }
 
 // The Mog House's door on the test client (2026-10-12): the window's anchor at (1706,418) of a 1920x1080 menu, which
@@ -62,17 +64,17 @@ TEST(a_targeted_door_gets_the_cursor_at_the_games_anchor)
     const uint16_t empty = SlotTarget(0, false, false, kEntities);
     CursorTargets door   = TargetsFromSlots(false, SlotTarget(0, true, true, kEntities), empty, false);
     PlaceAnchors(door, CursorWindow{1706.0f, 418.0f, 0.0f, 0.0f}, 1920.0f, 1080.0f, 2560.0f, 1440.0f);
-    const auto lone = LoneCursors(door, s, {1024}); // your own nameplate is the only one
+    const auto lone = LoneCursors(door, s, kIdle, {1024}); // your own nameplate is the only one
     CHECK_EQ(lone.size(), 1u);
     if (lone.empty()) return;
     CHECK(lone[0].target == TargetState::Targeted && Near(lone[0].x, 2274.7f, kReportRounding) &&
           Near(lone[0].y, 557.3f, kReportRounding));
     door.locked = true;
-    CHECK(LoneCursors(door, s, {})[0].target == TargetState::Locked);
+    CHECK(LoneCursors(door, s, kIdle, {})[0].target == TargetState::Locked);
     // Untargeted, the window keeps its last anchor and the slot is not active: nothing is drawn there.
     CursorTargets none = TargetsFromSlots(false, empty, empty, false);
     PlaceAnchors(none, CursorWindow{1706.0f, 418.0f, 0.0f, 0.0f}, 1920.0f, 1080.0f, 2560.0f, 1440.0f);
-    CHECK(LoneCursors(none, s, {}).empty());
+    CHECK(LoneCursors(none, s, kIdle, {}).empty());
 }
 
 // The same door's anchor on the 2560 by 1440 back buffer, from debug reports on the test client: in view, off the
@@ -94,12 +96,12 @@ TEST(while_picking_the_candidate_takes_the_sub_anchor_and_the_target_the_main_on
     const Settings s;
     CursorTargets t = Anchored(1105, 554);
     t.outOfRange    = true;
-    const auto lone = LoneCursors(t, s, {});
+    const auto lone = LoneCursors(t, s, kIdle, {});
     CHECK_EQ(lone.size(), 2u);
     CHECK(lone[0].index == 554 && lone[0].target == TargetState::OutOfRange && lone[0].x == 900.0f && lone[0].y == 300.0f);
     CHECK(lone[1].index == 1105 && lone[1].target == TargetState::Targeted && lone[1].x == 1400.0f);
     // Picking the target itself: its own cursor at the main anchor, under the candidate's, as the game draws two arrows.
-    const auto same = LoneCursors(Anchored(554, 554), s, {});
+    const auto same = LoneCursors(Anchored(554, 554), s, kIdle, {});
     CHECK_EQ(same.size(), 2u);
     CHECK(same[0].index == 554 && same[0].under && same[0].target == TargetState::Targeted && same[0].x == 1400.0f &&
           same[0].y == 608.0f);
@@ -112,18 +114,18 @@ TEST(a_cursor_is_drawn_for_your_target_and_the_one_you_are_picking_alone)
 {
     const Settings s;
     const CursorTargets picking = Anchored(1105, 554);
-    CHECK(CursorShown(1105, s, picking) && CursorShown(554, s, picking));
-    CHECK(!CursorShown(700, s, picking));
-    CHECK(!CursorShown(0, s, picking) && !CursorShown(0, s, CursorTargets{})); // index 0 is no entity, target or not
+    CHECK(CursorShown(1105, s, kIdle, picking) && CursorShown(554, s, kIdle, picking));
+    CHECK(!CursorShown(700, s, kIdle, picking));
+    CHECK(!CursorShown(0, s, kIdle, picking) && !CursorShown(0, s, kIdle, CursorTargets{})); // index 0 is no entity, target or not
     Settings off;
     off.cursorStyle = CursorStyle::Vanilla;
-    CHECK(!CursorShown(1105, off, picking));
+    CHECK(!CursorShown(1105, off, kIdle, picking));
     CursorTargets unhooked   = picking;
     unhooked.gameArrowsShown = true; // the game draws its own arrows
-    CHECK(!CursorShown(1105, s, unhooked) && !CursorShown(554, s, unhooked));
+    CHECK(!CursorShown(1105, s, kIdle, unhooked) && !CursorShown(554, s, kIdle, unhooked));
     CursorTargets unanchored = picking;
     unanchored.anchored      = false; // a cursor on a nameplate hangs on the name, not the game's anchor
-    CHECK(CursorShown(1105, s, unanchored));
+    CHECK(CursorShown(1105, s, kIdle, unanchored));
 }
 
 TEST(a_lone_cursor_points_at_its_anchor)
@@ -381,13 +383,25 @@ TEST(a_frame_redraws_textures_until_its_budget_is_spent_but_always_draws_a_first
     CHECK(RedrawNow(false, kRedrawBudgetMs * 10.0)); // a plate with nothing to show yet never waits
 }
 
+TEST(in_a_conversation_hide_during_conversation_takes_every_cursor)
+{
+    Settings s;
+    const PlayerState talking{20, false, true};
+    const CursorTargets picking = Anchored(1105, 554);
+    CHECK(CursorShown(1105, s, talking, picking) && !LoneCursors(picking, s, talking, {}).empty());
+    s.hideInEvent = true;
+    CHECK(!CursorShown(1105, s, talking, picking) && !CursorShown(554, s, talking, picking));
+    CHECK(LoneCursors(picking, s, talking, {}).empty());
+    CHECK(CursorShown(1105, s, kIdle, picking));
+}
+
 TEST(no_cursor_is_drawn_over_arrows_the_game_could_not_be_kept_from_drawing)
 {
     const Settings s;
     CursorTargets targets{1105, 0, false};
     targets.gameArrowsShown = true;
     targets.anchored        = true;
-    CHECK(LoneCursors(targets, s, {}).empty());
+    CHECK(LoneCursors(targets, s, kIdle, {}).empty());
 }
 
 TEST(a_badge_hangs_past_its_icons_bottom_right_corner)

@@ -12,8 +12,10 @@ namespace headsup
         PhoenixRedOrnate,
         PhoenixRedPills,
         Aurora, // glass, and a line of light under the strip
+        Custom, // the player's own palette, Settings::customPalette
     };
-    constexpr int kBarThemeCount = static_cast<int>(BarTheme::Aurora) + 1;
+    constexpr int kBarThemeCount   = static_cast<int>(BarTheme::Custom) + 1;
+    constexpr int kFixedThemeCount = static_cast<int>(BarTheme::Custom); // those with a palette of their own
 
     // What divides neighbouring widgets: the theme's own (ornate diamonds, pills none), or the player's pick.
     enum class BarSeparators : uint8_t

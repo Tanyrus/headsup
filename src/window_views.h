@@ -58,8 +58,8 @@ namespace headsup
     // strip and what sits above its row left out; none without such a window.
     std::optional<int> FrameTop(std::span<const FrameWindow> frame, int screenBottom);
     // How far every window of the frame moves down (up when negative): the player's shift for its view, else what
-    // brings its top to placedUnder; keepClear then pushes it down to clear band, and never up.
-    int FrameShift(int frameTop, std::optional<int> chosen, int placedUnder, int band, bool keepClear);
+    // brings its top to placedUnder, then down to clear band, and never up.
+    int FrameShift(int frameTop, std::optional<int> chosen, int placedUnder, int band);
     // The game anchors a window starting past the middle of its menu to the right: the command menus are there.
     constexpr bool OnLeftSide(int windowLeft, int screenRight) { return windowLeft < screenRight / 2; }
     // Where a side's windows in the game's top row stand, from their leftmost left to their rightmost right.
@@ -79,10 +79,22 @@ namespace headsup
         // to the top row, so it lines up with them.
         int For(int windowLeft, int windowRight, int screenRight) const;
     };
+    // A mouse button's message at a point of the menu, in the game's menu pixels, over one of the windows hidden this
+    // frame: kept from the game, which would act on a window no one sees. Moves and the wheel pass.
+    bool SwallowsClick(uint32_t message, int x, int y, std::span<const WindowRect> hidden);
+    // What places a frame: the player's shift for its view and where the view's windows start, neither for a frame no
+    // view holds.
+    struct FramePlan
+    {
+        std::optional<int> chosen, placedUnder;
+    };
+    FramePlan PlanOf(std::span<const WindowView> views, std::span<const FrameWindow> frame,
+        std::span<const std::optional<int>> viewShifts, int placedUnder);
     // FrameShift for each side of the screen: the side holding the frame's highest window takes the view's shift, the
-    // other what brings its own top to placedUnder, so the command menus on the right stay put when Status opens.
-    FrameShifts ShiftsOf(std::span<const FrameWindow> frame, std::optional<int> chosen, int placedUnder, int band,
-        bool keepClear, int screenRight, int screenBottom);
+    // other what brings its own top to placedUnder, so the command menus on the right stay put when Status opens. A
+    // frame of no view has no placedUnder and goes right under the band.
+    FrameShifts ShiftsOf(std::span<const FrameWindow> frame, std::optional<int> chosen, std::optional<int> placedUnder,
+        int band, int screenRight, int screenBottom);
 
     // Whether the game's help shows under the panel: the panel's help line, or the game's own strip, moved under it
     // or where the game put it. Each has its own place for the windows and its own shifts.

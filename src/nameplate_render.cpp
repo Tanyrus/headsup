@@ -19,7 +19,7 @@ namespace headsup
         constexpr float kOutlinePerHeight = 0.1f; // a badge's outline width, per pixel of its height
         constexpr float kStackGap         = 2.0f; // screen pixels between plates stacked over one another
         constexpr float kStackLineWidth   = 1.0f; // screen pixels: the line from a risen plate to where it stood
-        constexpr const char* kLineSample = "H"; // any letter: GDI gives a line's height with it
+        constexpr const char* kLineSample = "H"; // GDI gives a line's height with it, and a capital's top and baseline
         // From the mockup's CSS: a 22 px name's shadows blur 2 and 3 px, 1 px lower, and its glow 14 px.
         constexpr float kShadowDropPerHeight = 0.05f;
         constexpr float kGlowPerHeight       = 0.64f; // the glow's blur radius, per pixel of name height
@@ -206,8 +206,11 @@ namespace headsup
         Image image =
             look.line.outline ? Outlined(coverage, style.edge, look.color, look.line.shadowColor) : Styled(coverage, layers);
         if (!Upload(t, std::move(image), std::move(key))) return false;
-        t.halo   = static_cast<float>(style.margin);
-        t.raster = *height;
+        const LineInk ink = m_Gdi.FontInk(font, *height, kLineSample);
+        t.halo            = static_cast<float>(style.margin);
+        t.raster          = *height;
+        t.inkTop          = ink.top;
+        t.inkBottom       = ink.baseline;
         return true;
     }
 
@@ -324,8 +327,9 @@ namespace headsup
         };
         // A texture shown at this height as the layout places it: on screen, without its halo.
         auto boxOf = [&](const PlateTexture& t, float shown) {
-            const float fit = FitOf(shown, t.raster);
-            return ItemSize{(t.width - 2.0f * t.halo) * fit / toY, (t.height - 2.0f * t.halo) * fit / toY};
+            const float scale = FitOf(shown, t.raster) / toY;
+            return ItemSize{(t.width - 2.0f * t.halo) * scale, (t.height - 2.0f * t.halo) * scale, t.inkTop * scale,
+                t.inkBottom * scale};
         };
         // Every plate but yours is sized by how far its owner is from you, with the camera's own distance behind you
         // added: unlike the game's name size, that changes smoothly as you walk and not at all as the camera turns.
@@ -371,9 +375,10 @@ namespace headsup
                 ComposedPlate composed = ComposePlate(*info, tracker.Player(), settings, gameName.color);
                 if (m_Icons.Failed()) DropIcons(composed);
                 const TargetState target = TargetStateOf(info->index, targets);
-                const bool showCursor    = CursorShown(info->index, settings, targets);
+                const bool showCursor    = CursorShown(info->index, settings, tracker.Player(), targets);
                 const TargetState under  = showCursor ? TargetUnderPick(info->index, targets) : TargetState::None;
-                const bool timersHere    = info->index == selfIndex && !selfTimers.empty();
+                const bool timersHere =
+                    info->index == selfIndex && !selfTimers.empty() && !HiddenInEvent(settings, tracker.Player());
                 if (composed.lines.empty() && !showCursor && !timersHere) continue;
                 Plate& p = m_Plates[info->index];
                 rank     = PlateRank(info->index, targets);
@@ -586,12 +591,12 @@ namespace headsup
                         for (size_t k = 0; k < item.icons.size(); ++k)
                         {
                             const IconDraw& draw    = item.icons[k];
-                            const IconTexture* icon = m_Icons.For(m_Device, draw.icon);
+                            const IconTexture* icon = m_Icons.For(m_Device, draw.icon, draw.paint);
                             if (icon == nullptr) break;
                             const IconSpot in = IconInRun(run, item, k);
                             const IconSpot spot{at.x + in.x, at.y + in.y};
                             addQuad(m_Quads, icon->texture, spot.x, spot.y, run.iconSize * toX, run.iconSize * toY, icon->u, icon->v, depth,
-                                draw.tint);
+                                kWhite);
                             ++drawn;
                             const PlateTexture* badge = m_IconBadges[firstBadge + k];
                             if (badge == nullptr) continue;
@@ -712,14 +717,14 @@ namespace headsup
         m_Gdi.Sweep();
     }
 
-    std::vector<LoneCursor> NameplateRenderer::LoneCursorsDue(const Settings& settings, const CursorTargets& targets,
-        float screenWidth, float screenHeight) const
+    std::vector<LoneCursor> NameplateRenderer::LoneCursorsDue(const Settings& settings, const PlayerState& player,
+        const CursorTargets& targets, float screenWidth, float screenHeight) const
     {
         if (!NameplatesOn(settings) || m_NamesFailed || m_Device == nullptr) return {};
         std::vector<uint16_t> withNameplateCursor;
         for (size_t i = 0; i < m_PlateCursors; ++i)
             withNameplateCursor.push_back(m_CursorNames[i].index);
-        std::vector<LoneCursor> lone = LoneCursors(targets, settings, withNameplateCursor);
+        std::vector<LoneCursor> lone = LoneCursors(targets, settings, player, withNameplateCursor);
         std::erase_if(lone, [&](const LoneCursor& c) { return !AnchorOnScreen(c.x, c.y, screenWidth, screenHeight); });
         return lone;
     }

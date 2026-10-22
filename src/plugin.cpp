@@ -79,6 +79,7 @@ namespace
     constexpr int kQueriesPerFrame           = 128;      // VirtualQuery calls a frame while the Memory widget shows
     constexpr double kLinuxXIStaleSeconds    = 3 * headsup::kLinuxXIReportSeconds; // three reports missed and it is gone
     constexpr const char* kCursorsFolder     = "cursors"; // inside HeadsUp's config folder: the player's cursor files
+    constexpr const char* kThemesFolder      = "themes";  // and their saved top panel themes
     constexpr const char* kSettingsFile      = "settings.ini";
     constexpr const char* kNewFileSuffix     = ".new";          // after the process id: the file while it is written
     constexpr long kMaxSettingsBytes         = 4 * 1024 * 1024; // past this the file is not HeadsUp's to rewrite
@@ -131,6 +132,8 @@ namespace
     bool g_BarHidden                = false;
     float g_BarScaleX               = 1.0f; // back-buffer pixels per client pixel
     float g_BarScaleY               = 1.0f;
+    float g_MenuScaleX              = 1.0f; // the game's menu pixels per client pixel
+    float g_MenuScaleY              = 1.0f;
     IResourceManager* g_Resources   = nullptr; // for the target popup's drops, from Initialize to Release
     headsup::RmlHost* g_Rml         = nullptr; // for OnMouse and OnKeyboard, from Initialize to Release
 
@@ -199,6 +202,13 @@ namespace
             g_BarClicks->Take(message, static_cast<uint32_t>(wParam), x, y, g_BarOn && !g_BarHidden, overGui, blocked))
             return TRUE;
         if (overRml) return TRUE;
+        // A window the player hides takes no click, which the game would act on unseen; an Ashita window over it does.
+        if (!blocked &&
+            headsup::SwallowsClick(message, static_cast<int>(static_cast<float>(static_cast<int16_t>(LOWORD(lParam))) * g_MenuScaleX),
+                static_cast<int>(static_cast<float>(static_cast<int16_t>(HIWORD(lParam))) * g_MenuScaleY),
+                headsup::WindowHook::HiddenRects()) &&
+            !(g_Gui != nullptr && g_Gui->GetIO().WantCaptureMouse))
+            return TRUE;
         if (!g_SyncClicks) return FALSE;
         // The game takes a click where its pointer last was, which is somewhere else after the mouse moved over another
         // window: a mouse move to the click's place goes first.
@@ -336,13 +346,19 @@ class HeadsUp final : public IPlugin
     float m_MenuWidth   = 0.0f;
     // The windows the hook moves, as last given it (none until the first frame), and those it has seen.
     std::vector<headsup::ViewShift> m_PlacedShifts;      // what the window hook was last given
-    std::vector<headsup::WindowOffset> m_PlacedOffsets;
+    std::vector<std::string> m_HiddenWindows;  // the windows the hook was last told to hide
+    std::vector<headsup::WindowPlace> m_PlacedPins;
+    std::vector<headsup::WindowPlace> m_WindowPlaces; // for the settings window, while it is open
     std::optional<std::string> m_WindowLog;   // /hu windowlog's file, while it runs
     std::vector<std::string> m_LastOpen;      // the open windows it wrote last // what the window hook has: the settings' windows and groups
     std::vector<std::string> m_SeenWindows;
     std::vector<std::string> m_CursorFiles;      // the cursors folder's, as the Target Cursor and Cursor Icon lists offer them
+    std::vector<std::string> m_ThemeFiles;       // the themes folder's, as Theme Colors' Load offers them
     std::optional<std::string> m_CursorFileRead; // the File cursor read last, whether or not it was one
     std::string m_GameFontFailure;                // why the game's font could not be read; empty when it was
+    std::string m_GamePearlFailure;               // why the game's pearl could not be read; empty when it was
+    std::optional<headsup::ColorPicture> m_GamePearl;
+    std::optional<int> m_PearlOutlineDrawn;       // the outline the pearl was last drawn with
     bool m_GameFontWarned = false;
     float m_MenuHeight  = 0.0f;
     int m_CaptureLeft   = 0;
@@ -413,6 +429,7 @@ public:
         }
         LoadSettings();
         ScanCursors();
+        ScanThemes();
 #ifdef HEADSUP_DEV
         ReadWindowFile(false);
 #endif
@@ -746,6 +763,12 @@ public:
                 static_cast<uint32_t>(second.size()), second.data());
             m_GameState.CurrencyRequested(now);
         }
+        if (RECT client{}; g_GameWindow != nullptr && GetClientRect(g_GameWindow, &client) && client.right > 0 &&
+                           client.bottom > 0 && m_MenuWidth > 0.0f && m_MenuHeight > 0.0f)
+        {
+            g_MenuScaleX = m_MenuWidth / static_cast<float>(client.right);
+            g_MenuScaleY = m_MenuHeight / static_cast<float>(client.bottom);
+        }
         if (RECT client{}; g_BarOn && g_GameWindow != nullptr && GetClientRect(g_GameWindow, &client) &&
                            client.right > 0 && client.bottom > 0)
         {
@@ -766,14 +789,16 @@ public:
         m_BarDrawn = false;
         m_ArrowHook.Hide(m_Settings.enabled && m_Settings.cursorStyle != headsup::CursorStyle::Vanilla);
         LoadCursorFile();
+        LightGamePearl();
         // The game's help bar is the only help left while an event hides HeadsUp's bar; a screenshot wants neither.
         const bool helpGone = m_Settings.hideHelpBar && (m_Screenshot || !m_Player.inEvent);
         const headsup::HiddenWindows hidden{.helpBar = m_Settings.enabled && helpGone,
             .netstat = m_Settings.enabled && m_Settings.hideNetstat};
         const std::optional<headsup::HelpBand> band = HelpBandNow();
         const auto mode         = static_cast<size_t>(headsup::WindowHelpMode(m_Settings));
-        const bool movesWindows = (band && band->bottom != 0 && m_Settings.moveWindows) ||
-                                  !m_Settings.windowOffsets.empty() || m_Settings.moveGameHelp;
+        const bool movesWindows = (band && band->bottom != 0 && m_Settings.shiftVanillaUi) ||
+                                  !m_Settings.pinnedWindows.empty() || m_Settings.moveGameHelp ||
+                                  !m_Settings.hiddenWindows.empty();
         if ((hidden.Any() || movesWindows) && !std::exchange(m_WindowHookTried, true))
         {
             if (const std::string failure = m_WindowHook.Start(); !failure.empty())
@@ -789,19 +814,23 @@ public:
         m_WindowHook.Place(band ? std::optional<headsup::WindowPlacing>(headsup::WindowPlacing{
                                       .band         = *band,
                                       .placedUnder  = m_Settings.placedUnder[mode],
-                                      .moveWindows  = m_Settings.moveWindows,
-                                      .keepClear    = m_Settings.keepClear,
+                                      .shift        = m_Settings.shiftVanillaUi,
                                       .moveGameHelp = m_Settings.moveGameHelp && !m_Settings.hideHelpBar})
                                 : std::nullopt);
+        if (m_Settings.hiddenWindows != m_HiddenWindows)
+        {
+            m_HiddenWindows = m_Settings.hiddenWindows;
+            m_WindowHook.HideWindows(m_HiddenWindows);
+        }
         if (m_Settings.viewShifts[mode] != m_PlacedShifts)
         {
             m_PlacedShifts = m_Settings.viewShifts[mode];
             m_WindowHook.Shift(m_PlacedShifts);
         }
-        if (m_Settings.windowOffsets != m_PlacedOffsets)
+        if (m_Settings.pinnedWindows != m_PlacedPins)
         {
-            m_PlacedOffsets = m_Settings.windowOffsets;
-            m_WindowHook.Offset(m_PlacedOffsets);
+            m_PlacedPins = m_Settings.pinnedWindows;
+            m_WindowHook.Pin(m_PlacedPins);
         }
         if (m_WindowHook.SeenCount() != m_SeenWindows.size()) m_SeenWindows = m_WindowHook.SeenWindows();
         if (std::vector<std::string> open = m_WindowHook.TakeOpen(); m_WindowLog && open != m_LastOpen)
@@ -822,6 +851,7 @@ public:
         if (m_Rml.Running())
         {
             const headsup::NameStats names = m_NameHook.Stats();
+            if (m_RmlMenu.open) m_WindowPlaces = m_WindowHook.Places();
             const headsup::MenuReadings readings{
                 .outlinedMobs     = m_Tracker.OutlinedCount(),
                 .meshes           = m_Outline.MeshesLastFrame(),
@@ -841,7 +871,9 @@ public:
                 .windowsBand      = m_WindowHook.WindowsBand(),
                 .barBand          = HelpBandNow().value_or(headsup::HelpBand{}).topBar,
                 .seenWindows      = &m_SeenWindows,
+                .windowPlaces     = &m_WindowPlaces,
                 .cursorFiles      = &m_CursorFiles,
+                .themeFiles       = &m_ThemeFiles,
 #ifdef HEADSUP_DEV
                 .watching         = m_DrawDump.Watching(),
 #else
@@ -874,6 +906,10 @@ public:
             if (m_RmlMenu.TakeExportRequest()) ExportWindowFile();
 #endif
             if (m_RmlMenu.TakeCursorsRequest()) ScanCursors();
+            if (m_RmlMenu.TakeThemesRequest()) ScanThemes();
+            if (const std::optional<std::string> name = m_RmlMenu.TakeThemeSave()) SaveTheme(*name);
+            if (const std::optional<std::string> name = m_RmlMenu.TakeThemeLoad(); name && LoadTheme(*name))
+                m_SettingsChangedAt = now;
         }
         if (headsup::SaveDue(m_SettingsChangedAt, now, m_RmlMenu.open)) SaveSettings();
         UpdatePointer();
@@ -929,6 +965,7 @@ public:
         UNREFERENCED_PARAMETER(startVertex);
         if (Ours()) return false;
         RecordDraw('P', type, primCount, nullptr, 0u, 0u, 0u);
+        if (InSilentDraw()) return true;
         DrawNameplatesBeforeSceneCopy();
         return false;
     }
@@ -937,6 +974,7 @@ public:
     {
         if (Ours()) return false;
         RecordDraw('I', type, primCount, nullptr, 0u, 0u, 0u);
+        if (InSilentDraw()) return true;
         DrawNameplatesBeforeSceneCopy();
         const bool outlines = m_Settings.enabled && m_Tracker.OutlinedCount() > 0;
         const bool bodies   = headsup::NameplatesOn(m_Settings) && !m_Tracker.Actors().empty(); // labels wait for a drawn body
@@ -955,6 +993,7 @@ public:
     {
         if (Ours()) return false;
         RecordDraw('U', type, primCount, vertices, stride, 0u, headsup::VertexCount(type, primCount));
+        if (InSilentDraw()) return true;
         DrawNameplatesBeforeSceneCopy();
         m_Names.OnDrawUP(m_Tracker, m_Settings);
         if (!InterfaceCopy(type, primCount, vertices, stride)) return false;
@@ -971,6 +1010,7 @@ public:
         UNREFERENCED_PARAMETER(indexFormat);
         if (Ours()) return false;
         RecordDraw('X', type, primCount, vertices, stride, minIndex, numVertices);
+        if (InSilentDraw()) return true;
         DrawNameplatesBeforeSceneCopy();
         return false;
     }
@@ -1011,6 +1051,14 @@ private:
         m_DrawDump.Record(m_Device, m_Tracker, hook, type, count, vertices, stride, firstVertex, vertexCount);
 #endif
     }
+    // A draw call inside a window the player hides: dropped, and marked in a draw dump.
+    bool InSilentDraw()
+    {
+        if (!headsup::WindowHook::Silent()) return false;
+        MarkHidden();
+        return true;
+    }
+
     void MarkHidden()
     {
 #ifdef HEADSUP_DEV
@@ -1215,10 +1263,12 @@ private:
             Print("could not fix the game's mouse pointer: " + failure + ".");
         ReadGameFont();
         SayGameFontFailure();
+        if (!m_GamePearlFailure.empty())
+            Print("the game's linkpearl could not be read (" + m_GamePearlFailure + "): the linkshell's is drawn as XIUI's.");
     }
 
-    // The font the game writes its names in, from the file it reads it from: while XIPivot is loaded, the first of
-    // its overlays that holds the file.
+    // The font the game writes its names in and the pearl it draws before them, from the file it reads them from:
+    // while XIPivot is loaded, the first of its overlays that holds the file.
     void ReadGameFont()
     {
         std::string pivotIni;
@@ -1238,6 +1288,7 @@ private:
             if (static_cast<uint64_t>(size) > kMaxFontFileBytes)
             {
                 m_GameFontFailure += "it is too large";
+                m_GamePearlFailure = m_GameFontFailure;
                 return;
             }
             std::vector<uint8_t> bytes(static_cast<size_t>(size));
@@ -1245,8 +1296,12 @@ private:
             if (!in.read(reinterpret_cast<char*>(bytes.data()), size))
             {
                 m_GameFontFailure += "it could not be read";
+                m_GamePearlFailure = m_GameFontFailure;
                 return;
             }
+            headsup::Read<headsup::ColorPicture> pearl = headsup::ReadGamePearl(bytes);
+            if (pearl.value) m_GamePearl = std::move(pearl.value);
+            else m_GamePearlFailure = path + ": " + pearl.failure;
             headsup::Read<headsup::GameFontFace> font = headsup::ReadGameFont(bytes);
             if (!font.value)
             {
@@ -1257,7 +1312,17 @@ private:
             m_Nameplates.SetGameFont(std::move(font.value));
             return;
         }
-        m_GameFontFailure = "the game's ROM\\119\\51.DAT was not found under " + gameFolder;
+        m_GameFontFailure  = "the game's ROM\\119\\51.DAT was not found under " + gameFolder;
+        m_GamePearlFailure = m_GameFontFailure;
+    }
+
+    // The linkshell's pearl in the game's light and colors, drawn again when the settings ask for another outline.
+    void LightGamePearl()
+    {
+        if (!m_GamePearl || m_PearlOutlineDrawn == m_Settings.pearlOutline) return;
+        m_PearlOutlineDrawn = m_Settings.pearlOutline;
+        m_Nameplates.SetGamePearl(
+            headsup::GameLitPearl(*m_GamePearl, headsup::IconImage(headsup::Icon::Linkshell), m_Settings.pearlOutline));
     }
 
     // Once, when a nameplate is set in the game's font and it could not be read.
@@ -1568,7 +1633,7 @@ private:
         {
             // A bar setting by number, saved as a change in the window is.
             const int value = static_cast<int>(number(3));
-            if (what == "moves") m_Settings.moveWindows = value != 0;
+            if (what == "moves") m_Settings.shiftVanillaUi = value != 0;
             if (what == "theme") m_Settings.barTheme = static_cast<headsup::BarTheme>(value);
             if (what == "height") m_Settings.barHeight = value;
             if (what == "seps") m_Settings.barSeparators = static_cast<headsup::BarSeparators>(value);
@@ -1626,10 +1691,11 @@ private:
     }
 
     std::string CursorsFolder() { return OwnFolder(kConfigFolder) + "\\" + kCursorsFolder + "\\"; }
+    std::string ThemesFolder() { return OwnFolder(kConfigFolder) + "\\" + kThemesFolder + "\\"; }
 
-    void ScanCursors()
+    // The names of the files in one of HeadsUp's own folders, which is made if it is not there.
+    static std::vector<std::string> FolderEntries(const std::string& folder)
     {
-        const std::string folder = CursorsFolder();
         CreateDirectoryA(folder.c_str(), nullptr);
         std::vector<std::string> entries;
         WIN32_FIND_DATAA found{};
@@ -1641,7 +1707,42 @@ private:
             while (FindNextFileA(search, &found) != 0);
             FindClose(search);
         }
-        m_CursorFiles = headsup::CursorFileNames(entries);
+        return entries;
+    }
+
+    void ScanThemes() { m_ThemeFiles = headsup::FolderFileNames(FolderEntries(ThemesFolder()), headsup::kThemeExtensions); }
+
+    void SaveTheme(const std::string& name)
+    {
+        const std::string path = ThemesFolder() + name + headsup::kThemeExtensions[0];
+        std::ofstream out(path, std::ios::binary | std::ios::trunc);
+        const std::string text = headsup::ThemeFileText(m_Settings.customPalette);
+        out.write(text.data(), static_cast<std::streamsize>(text.size()));
+        Print(out.good() ? "saved the Custom theme as " + name + "." : "could not save the theme " + path + ".");
+        ScanThemes();
+    }
+
+    // Makes a saved theme the Custom theme and picks it; false when the file gave no theme.
+    bool LoadTheme(const std::string& name)
+    {
+        const std::string path = ThemesFolder() + name + headsup::kThemeExtensions[0];
+        std::ifstream in(path, std::ios::binary);
+        const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        const std::optional<headsup::BarPalette> palette = headsup::PaletteFromThemeFile(text);
+        if (!palette)
+        {
+            Print("could not read a theme from " + path + ".");
+            return false;
+        }
+        m_Settings.customPalette = *palette;
+        m_Settings.barTheme      = headsup::BarTheme::Custom;
+        return true;
+    }
+
+    void ScanCursors()
+    {
+        const std::vector<std::string> entries = FolderEntries(CursorsFolder());
+        m_CursorFiles = headsup::FolderFileNames(entries, headsup::kCursorExtensions);
         m_CursorFileRead.reset(); // a file that could not be read may have been put right since
         m_PointerFailed = false;
     }
@@ -2018,7 +2119,8 @@ private:
         if (std::exchange(m_LoneCursorsDrawn, true) || Unseen() || m_Device == nullptr) return;
         PlaceCursorAnchors();
         const float width = m_Names.BackBufferWidth(), height = m_Names.BackBufferHeight();
-        const std::vector<headsup::LoneCursor> lone = m_Nameplates.LoneCursorsDue(m_Settings, m_CursorTargets, width, height);
+        const std::vector<headsup::LoneCursor> lone =
+            m_Nameplates.LoneCursorsDue(m_Settings, m_Player, m_CursorTargets, width, height);
         if (lone.empty()) return;
         if (!WithSavedState([&] { m_Nameplates.DrawLoneCursors(lone, m_Settings, Now(), width, height); })) PlatesNotDrawn();
     }

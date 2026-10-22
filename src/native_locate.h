@@ -63,6 +63,9 @@ namespace headsup
         NoScanLabel,
         AmbiguousScanLabel,
         ScanLabelChanged,
+        NoStripCount,
+        AmbiguousStripCount,
+        StripCountChanged,
         NoWeather,
         AmbiguousWeather,
     };
@@ -154,15 +157,19 @@ namespace headsup
         LocateProblem problem = LocateProblem::None;
         uint32_t moveTo  = 0; // RVA
         uint32_t getRect = 0; // RVA of MCD::GetRect, 0 when it was not found once
+        uint32_t entryRect = 0; // RVA of MCD::GetEntryRect, the same way
     };
-    struct ScanLabelSite
+    struct TitleRectSite
     {
         LocateProblem problem = LocateProblem::None;
         uint32_t call = 0; // RVA of the call to MCD::GetRect for the strip title's rectangle
     };
     // Where Wide Scan's grid label asks for the strip title window's rectangle, which it is drawn under; `getRect` is
     // MCD::GetRect's RVA, and the call must go there.
-    ScanLabelSite LocateScanLabel(const ImageSection& text, uint32_t getRect);
+    TitleRectSite LocateScanLabel(const ImageSection& text, uint32_t getRect);
+    // Where an item list's count (used / most) asks for the strip title's rectangle, at whose corner it is drawn
+    // inside the list's own draw (RVA 0x1CB5CA in the client of 2026-10-19); the call must go to `getRect`.
+    TitleRectSite LocateStripCount(const ImageSection& text, uint32_t getRect);
 
     // A window's MCD holds its descriptor at +0x04, whose 16-byte name is at +0x46, and its owner at +0x0C; the owner
     // holds its MCD at +0x08.
@@ -207,6 +214,11 @@ namespace headsup
     constexpr uint32_t kOwnerLayoutSlot = 1;
     constexpr size_t kLayoutScanBytes   = 0x200;
     std::optional<uint32_t> PlaceCopyOffset(std::span<const uint8_t> layout, uintptr_t at, uintptr_t getRect);
+    // MCD::GetEntryRect(int16* out, index, lit, pressed) (RVA 0x118900 in the client of 2026-10-19) writes an entry's
+    // rectangle. Some owners keep an entry's top left corner from it and draw a picture there (the Linkshell item's
+    // middle button, at +0x18): where, from a call to it in the class's layout at at and, after it, an int16 kept at
+    // [base + disp8] and the next at the same base 2 further. None for a class that keeps none.
+    std::optional<uint32_t> EntryPlaceOffset(std::span<const uint8_t> layout, uintptr_t at, uintptr_t entryRect);
     // An MCD's rectangle in the game's menu resolution: int16 left, top, right and bottom from +0x3A. +0x94 is a move's
     // countdown (MoveUnderWay); +0x99 is set for windows kept in a 640 x 480 space instead; +0x10 is
     // kWindowOpening while the window has no owner to lay out yet.
@@ -246,18 +258,22 @@ namespace headsup
         std::array<WindowKey, kMaxWindowKeys> m_Keys{};
         size_t m_Count = 0;
     };
-    // How far the player moves a window from where the game puts it, in the game's menu resolution.
-    struct WindowOffset
+    // Where a window stands, its top left in the game's menu resolution.
+    struct WindowPlace
     {
         std::string name; // its short name
         int x = 0, y = 0;
-        bool operator==(const WindowOffset&) const = default;
+        bool operator==(const WindowPlace&) const = default;
     };
     constexpr int kMaxWindowOffset = 2000;
-    // From the settings file, "equip:10,-20 statcom:0,40": a name no window could have, a strip window, a repeat, an
-    // offset of nothing and any past kMaxWindowKeys go; offsets are clamped to kMaxWindowOffset either way.
-    std::vector<WindowOffset> WindowOffsetsFrom(std::string_view text);
-    std::string WindowOffsetText(const std::vector<WindowOffset>& offsets);
+    // The places the player puts windows at, from the settings file's "equip:100,200 statcom:0,40": a name no window
+    // could have, a strip window, a repeat and any past kMaxWindowKeys go; places are held to 0 to kMaxWindowOffset.
+    std::vector<WindowPlace> WindowPlacesFrom(std::string_view text);
+    std::string WindowPlaceText(const std::vector<WindowPlace>& places);
+    // The windows the player hides, by short name, from the settings file's "statcom inventor": a name no window
+    // could have, a strip window, a repeat and any past kMaxWindowKeys go.
+    std::vector<std::string> HiddenWindowsFrom(std::string_view text);
+    std::string HiddenWindowsText(const std::vector<std::string>& names);
 
     // Every window HeadsUp can move, by short name: those it has a name for first, then the rest of the client's.
     const std::vector<std::string>& AllWindows();
@@ -279,6 +295,8 @@ namespace headsup
         int left = 0, top = 0;
         bool operator==(const WindowSpot&) const = default;
     };
+    // Such a corner moved with its window by dx, dy: only one inside the window, as an entry's is.
+    std::optional<WindowSpot> MovedEntryPlace(WindowSpot point, const WindowRect& window, int dx, int dy);
     // A text the game places once, where its window then was, kept with a window HeadsUp moves: the strip's title,
     // whose text object holds where it is drawn (kStripTextX) and is not told when its window moves.
     class PlacedText

@@ -316,20 +316,29 @@ namespace
 
 TEST(the_strip_column_runs_its_gradient_then_its_lines_then_fades_below)
 {
-    const Image s = StripColumn(10, 4, 0xFF000000, 0xFF808080, 0xFFFFFFFF, 0xFFFF0000, 0xFF00FF00, 0x80FFFFFF);
+    const Image s = StripColumn(10, 4, 0xFF000000, 0xFF808080, 0xFFFFFFFF, 0xFFFF0000, 0xFF00FF00, 0x80FFFFFF, 1);
     CHECK(s.width == 1 && s.height == 15);
     CHECK_EQ(Pixel(s, 0, 0), 0xFF000000u);
     CHECK(Channel(Pixel(s, 0, 3), kRedShift) > 0x00 && Channel(Pixel(s, 0, 3), kRedShift) < 0x80); // toward the middle
     CHECK_EQ(Pixel(s, 0, 9), 0xFFFF0000u);  // the bottom line
     CHECK_EQ(Pixel(s, 0, 10), 0xFF00FF00u); // the line under it
     CHECK(Alpha(s, 0, 11) > Alpha(s, 0, 14) && Alpha(s, 0, 11) <= 0x80 && Alpha(s, 0, 14) > 0);
-    CHECK_EQ(StripColumn(10, 4, 0xFF000000, 0xFF000000, 0xFF000000, 0xFF000000, 0, 0).height, 10); // nothing under
+    CHECK_EQ(StripColumn(10, 4, 0xFF000000, 0xFF000000, 0xFF000000, 0xFF000000, 0, 0, 1).height, 10); // nothing under
+}
+
+TEST(the_strip_columns_border_is_its_last_rows_in_the_line_color)
+{
+    const Image thick = StripColumn(10, 0, 0xFF000000, 0xFF808080, 0xFFFFFFFF, 0xFFFF0000, 0, 0, 3);
+    CHECK(Pixel(thick, 0, 7) == 0xFFFF0000u && Pixel(thick, 0, 8) == 0xFFFF0000u && Pixel(thick, 0, 9) == 0xFFFF0000u);
+    CHECK_EQ(Pixel(thick, 0, 6), 0xFFFFFFFFu); // the gradient ends on its bottom color just over the border
+    const Image none = StripColumn(10, 0, 0xFF000000, 0xFF808080, 0xFFFFFFFF, 0xFFFF0000, 0, 0, 0);
+    CHECK_EQ(Pixel(none, 0, 9), 0xFFFFFFFFu);
 }
 
 TEST(the_strip_columns_middle_color_is_55_percent_down_its_gradient)
 {
     // The gradient runs over rows 0 to 20 (the last row is the bottom line), so 55% down is row 11.
-    const Image s = StripColumn(22, 0, 0xFF000000, 0xFFFFFFFF, 0xFF000000, 0xFF000000, 0, 0);
+    const Image s = StripColumn(22, 0, 0xFF000000, 0xFFFFFFFF, 0xFF000000, 0xFF000000, 0, 0, 1);
     CHECK_EQ(Pixel(s, 0, 11), 0xFFFFFFFFu);
     CHECK(Channel(Pixel(s, 0, 10), kRedShift) < 0xFF && Channel(Pixel(s, 0, 12), kRedShift) < 0xFF);
 }

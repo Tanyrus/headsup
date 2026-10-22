@@ -1,4 +1,5 @@
 #include "fake_memory.h"
+#include "mouse_messages.h"
 #include "native_locate.h"
 #include "test.h"
 #include "window_views.h"
@@ -173,16 +174,16 @@ TEST(a_frame_s_top_is_its_highest_shown_window_that_hangs_from_the_top_and_is_no
     CHECK(FrameTop(map, kScreenBottom) == std::optional<int>(48));
 }
 
-TEST(a_frame_goes_down_or_up_by_its_view_s_shift_and_no_overlap_pushes_it_down_only)
+TEST(a_frame_goes_down_or_up_by_its_view_s_shift_and_never_under_the_band)
 {
     // The band at the reference settings: 62 with the help bar, 38 without it.
-    CHECK(FrameShift(16, std::nullopt, 62, 62, false) == 46);
-    CHECK(FrameShift(48, std::nullopt, 62, 62, false) == 14);
-    CHECK(FrameShift(48, std::nullopt, 38, 38, false) == -10);
-    CHECK(FrameShift(16, 20, 62, 62, false) == 20);   // the player's own shift for the view
-    CHECK(FrameShift(16, 20, 62, 62, true) == 46);    // pushed clear of the band
-    CHECK(FrameShift(48, std::nullopt, 62, 80, true) == 32); // the bar grew past where the views were placed
-    CHECK(FrameShift(48, std::nullopt, 62, 30, true) == 14); // and a smaller bar leaves them where they are
+    CHECK(FrameShift(16, std::nullopt, 62, 62) == 46);
+    CHECK(FrameShift(48, std::nullopt, 62, 62) == 14);
+    CHECK(FrameShift(48, std::nullopt, 38, 38) == -10);
+    CHECK(FrameShift(16, 20, 62, 30) == 20);          // the player's own shift for the view
+    CHECK(FrameShift(16, 20, 62, 62) == 46);          // pushed clear of the band
+    CHECK(FrameShift(48, std::nullopt, 62, 80) == 32); // the bar grew past where the views were placed
+    CHECK(FrameShift(48, std::nullopt, 62, 30) == 14); // and a smaller bar leaves them where they are
 }
 
 TEST(view_shifts_read_back_what_they_wrote_and_drop_what_no_view_could_take)
@@ -241,25 +242,53 @@ TEST(wide_scan_s_label_under_the_strip_s_title_moves_with_the_frame_s_windows_an
     CHECK(rect == title);
 }
 
+TEST(a_click_over_a_hidden_window_is_swallowed_and_a_move_or_one_elsewhere_is_not)
+{
+    const std::vector<WindowRect> hidden = {{16, 64, 198, 254}};
+    for (const uint32_t button : {kLeftDown, kLeftUp, kLeftDouble, kRightDown, kRightUp, kMiddleDown, kMiddleUp})
+        CHECK(SwallowsClick(button, 100, 100, hidden));
+    CHECK(!SwallowsClick(kMouseMove, 100, 100, hidden));
+    CHECK(!SwallowsClick(kLeftDown, 10, 10, hidden) && !SwallowsClick(kLeftDown, 198, 100, hidden));
+    CHECK(SwallowsClick(kLeftDown, 16, 64, hidden) && !SwallowsClick(kLeftDown, 100, 254, hidden));
+    CHECK(!SwallowsClick(kLeftDown, 100, 100, {}));
+}
+
+TEST(a_frame_no_view_holds_goes_right_under_the_band_and_a_view_s_to_where_its_windows_start)
+{
+    // A player's check: the inspect window at the game's 48, under a band of 60 and with windows starting at 64.
+    const std::vector<FrameWindow> check = {{Key("inspect"), 16, 48, 198, false}};
+    std::vector<std::optional<int>> shifts(WindowViews().size());
+    const FramePlan unheld = PlanOf(WindowViews(), check, shifts, 64);
+    CHECK(!unheld.chosen && !unheld.placedUnder);
+    const FrameShifts shifted = ShiftsOf(check, unheld.chosen, unheld.placedUnder, 60, kScreenRight, kScreenBottom);
+    CHECK_EQ(shifted.For(16, 198, kScreenRight), 12);
+    // Status is a view: it goes where windows start, or by the player's own shift for it.
+    const FramePlan status = PlanOf(WindowViews(), StatusFrame(), shifts, 64);
+    CHECK(!status.chosen && status.placedUnder == 64);
+    shifts[*ViewOf(WindowViews(), StatusFrame())] = 30;
+    CHECK(PlanOf(WindowViews(), StatusFrame(), shifts, 64).chosen == 30);
+    CHECK(!PlanOf(WindowViews(), check, shifts, 64).chosen);
+}
+
 TEST(the_side_holding_the_view_s_highest_window_takes_its_shift_and_the_other_hangs_under_the_band_by_its_own)
 {
     // Status: the status column at 16 on the left, and its menu at 48 on the right, where the Commands menu was.
     const auto column = [](const FrameShifts& s) { return s.For(16, 128, kScreenRight); };
     const auto menu   = [](const FrameShifts& s) { return s.For(1792, 1904, kScreenRight); };
-    const FrameShifts placed = ShiftsOf(StatusFrame(), std::nullopt, 64, 64, true, kScreenRight, kScreenBottom);
+    const FrameShifts placed = ShiftsOf(StatusFrame(), std::nullopt, 64, 64, kScreenRight, kScreenBottom);
     CHECK(column(placed) == 48 && menu(placed) == 16);
-    const FrameShifts chosen = ShiftsOf(StatusFrame(), 30, 64, 64, false, kScreenRight, kScreenBottom);
+    const FrameShifts chosen = ShiftsOf(StatusFrame(), 30, 64, 30, kScreenRight, kScreenBottom); // a smaller panel
     CHECK(column(chosen) == 30 && menu(chosen) == 16);
-    const FrameShifts pushed = ShiftsOf(StatusFrame(), std::nullopt, 64, 80, true, kScreenRight, kScreenBottom);
+    const FrameShifts pushed = ShiftsOf(StatusFrame(), std::nullopt, 64, 80, kScreenRight, kScreenBottom);
     CHECK(column(pushed) == 64 && menu(pushed) == 32);
     // Items: the list on the left and its sort menu on the right start together, so the player's shift moves both.
     const std::vector<FrameWindow> items = {{Key("buff"), 142, 48, 382, false}, {Key("inventor"), 16, 48, 198, false},
         {Key("itmsort2"), 1792, 48, 1904, false}, {Key("iteminfo"), 16, 992, 382, false}};
-    const FrameShifts both = ShiftsOf(items, 20, 64, 64, false, kScreenRight, kScreenBottom);
+    const FrameShifts both = ShiftsOf(items, 20, 64, 64, kScreenRight, kScreenBottom);
     CHECK(both.For(16, 198, kScreenRight) == 20 && both.For(1792, 1904, kScreenRight) == 20);
     // A view on the right alone takes its shift there.
     const std::vector<FrameWindow> conquest = {{Key("conquer1"), 1792, 48, 1904, false}};
-    CHECK(ShiftsOf(conquest, 6, 64, 64, false, kScreenRight, kScreenBottom).For(1792, 1904, kScreenRight) == 6);
+    CHECK(ShiftsOf(conquest, 6, 64, 50, kScreenRight, kScreenBottom).For(1792, 1904, kScreenRight) == 6);
 }
 
 TEST(a_window_the_game_hangs_under_the_strip_beside_the_status_column_rises_to_line_up_with_it)
@@ -270,19 +299,19 @@ TEST(a_window_the_game_hangs_under_the_strip_beside_the_status_column_rises_to_l
     const auto top = [](const FrameShifts& s, int left, int top, int right) {
         return top + s.For(left, right, kScreenRight);
     };
-    const FrameShifts placed = ShiftsOf(magic, std::nullopt, 64, 64, true, kScreenRight, kScreenBottom);
+    const FrameShifts placed = ShiftsOf(magic, std::nullopt, 64, 64, kScreenRight, kScreenBottom);
     CHECK(top(placed, 16, 16, 128) == 64);
     CHECK(top(placed, 130, 48, 382) == 64);
     CHECK(top(placed, 16, 208, 128) == 256);
     CHECK(top(placed, 142, 48, 382) == 64); // the status icons stay where they were before Status opened
     CHECK(top(placed, 1792, 48, 1904) == 64);
-    const FrameShifts chosen = ShiftsOf(magic, 30, 64, 64, false, kScreenRight, kScreenBottom);
+    const FrameShifts chosen = ShiftsOf(magic, 30, 64, 30, kScreenRight, kScreenBottom);
     CHECK(top(chosen, 16, 16, 128) == 46 && top(chosen, 130, 48, 382) == 46);
     // Currencies hides the column under its list: nothing is beside it, and the icons stay too.
     std::vector<FrameWindow> currencies = StatusFrame();
     currencies[6].hidden = true;
     currencies.push_back({Key("evitem"), 16, 48, 382, false});
-    const FrameShifts hidden = ShiftsOf(currencies, std::nullopt, 64, 64, true, kScreenRight, kScreenBottom);
+    const FrameShifts hidden = ShiftsOf(currencies, std::nullopt, 64, 64, kScreenRight, kScreenBottom);
     CHECK(top(hidden, 16, 48, 382) == 64 && top(hidden, 142, 48, 382) == 64);
     CHECK(FrameShifts{}.For(130, 382, kScreenRight) == 0); // windows not moved
 }

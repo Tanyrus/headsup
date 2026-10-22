@@ -65,6 +65,11 @@ namespace headsup
         return palette.text;
     }
 
+    const BarPalette& PaletteFor(const Settings& settings)
+    {
+        return settings.barTheme == BarTheme::Custom ? settings.customPalette : PaletteOf(settings.barTheme);
+    }
+
     const char* BarTitleFont(const Settings& settings, BarShape shape)
     {
         return settings.barTitleFont.empty() ? TitleFont(shape) : Interned(settings.barTitleFont);

@@ -42,10 +42,11 @@ namespace
 
     // A picture chunk's body as 51.DAT has it: 0xA1, a 16-byte name, a BITMAPINFOHEADER, the four-letter code stored
     // backwards, the data's size and a dword, then the blocks.
-    Bytes PictureBody(int32_t width, int32_t height, const char* code, const Bytes& blocks, uint8_t flag = 0xA1)
+    Bytes PictureBody(int32_t width, int32_t height, const char* code, const Bytes& blocks, uint8_t flag = 0xA1,
+        const char* name = kPictureName)
     {
         Bytes out{flag};
-        PutText(out, kPictureName);
+        PutText(out, name);
         Put32(out, 40);
         Put32(out, static_cast<uint32_t>(width));
         Put32(out, static_cast<uint32_t>(height));
@@ -212,6 +213,61 @@ TEST(a_dxt1_picture_is_clear_where_it_picks_its_fourth_color_after_a_smaller_fir
     const std::vector<uint8_t>& fill = read.value->fill;
     CHECK(fill[0] == 0 && fill[1] == 255 && fill[2] == 127 && fill[3] == 0);
     CHECK_EQ(fill[4], 85);
+}
+
+TEST(a_pictures_colors_are_read_blue_green_red_alpha_a_pixel)
+{
+    // Red and blue at full, and DXT3's two thirds of the way each side; its alphas are four bits times 17.
+    const std::array<uint8_t, 16> alphas{15, 8, 0, 4};
+    const Bytes dxt3 = Dxt3Block(alphas, 0xF800, 0x001F, {0, 1, 2, 3}) + Dxt3Block({}, 0xF800, 0x001F, {});
+    const Read<ColorPicture> read = ReadColorPicture(PictureBody(8, 4, "DXT3", dxt3));
+    CHECK(read.value && read.failure.empty());
+    CHECK(read.value->name == kPictureName && read.value->width == 8 && read.value->height == 4);
+    CHECK((std::vector<uint8_t>(read.value->bgra.begin(), read.value->bgra.begin() + 16) ==
+           std::vector<uint8_t>{0, 0, 255, 255, 255, 0, 0, 136, 85, 0, 170, 0, 170, 0, 85, 68}));
+    // DXT1 with the first color not above the second: halfway for the third pick, clear for the fourth.
+    const Bytes dxt1             = ColorBlock(0x001F, 0xF800, {0, 2, 3}) + ColorBlock(0x07E0, 0, {});
+    const Read<ColorPicture> one = ReadColorPicture(PictureBody(8, 4, "DXT1", dxt1));
+    CHECK(one.value);
+    CHECK((std::vector<uint8_t>(one.value->bgra.begin(), one.value->bgra.begin() + 12) ==
+           std::vector<uint8_t>{255, 0, 0, 255, 127, 0, 127, 255, 0, 0, 0, 0}));
+    CHECK((std::vector<uint8_t>(one.value->bgra.begin() + 16, one.value->bgra.begin() + 20) == std::vector<uint8_t>{0, 255, 0, 255}));
+    CHECK(!ReadColorPicture(PictureBody(4, 4, "DXT5", dxt3)).value);
+}
+
+TEST(the_games_pearl_is_the_square_at_0_64_of_its_status_icons_picture)
+{
+    // 256 x 256 in DXT1: green in the 8 x 8 blocks from block (0, 16), red elsewhere.
+    Bytes blocks;
+    for (int by = 0; by < 64; ++by)
+        for (int bx = 0; bx < 64; ++bx)
+            blocks = blocks + ColorBlock(bx < 8 && by >= 16 && by < 24 ? 0x07E0 : 0xF800, 0, {});
+    const Bytes status = Chunk("usta", 0x20, PictureBody(256, 256, "DXT1", blocks, 0xA1, "menu    ustatshd"));
+    const Bytes other  = Chunk("font", 0x20, PictureBody(4, 4, "DXT1", ColorBlock(0xFFFF, 0, {})));
+    const Read<ColorPicture> pearl = ReadGamePearl(other + status);
+    CHECK(pearl.value && pearl.failure.empty());
+    CHECK(pearl.value->width == 32 && pearl.value->height == 32);
+    bool green = pearl.value->bgra.size() == 32 * 32 * 4;
+    for (size_t i = 0; green && i < pearl.value->bgra.size(); i += 4)
+        green = pearl.value->bgra[i] == 0 && pearl.value->bgra[i + 1] == 255 && pearl.value->bgra[i + 2] == 0 &&
+                pearl.value->bgra[i + 3] == 255;
+    CHECK(green);
+    CHECK(!ReadGamePearl(other).value && !ReadGamePearl(other).failure.empty());
+    const Bytes small = Chunk("usta", 0x20, PictureBody(32, 32, "DXT1", Bytes(64 * 8, 0), 0xA1, "menu    ustatshd"));
+    CHECK(!ReadGamePearl(small).value && !ReadGamePearl(small).failure.empty());
+    const Bytes renamed = Chunk("usta", 0x20, PictureBody(256, 256, "DXT1", blocks, 0xA1, "menu    ustatsxx"));
+    CHECK(!ReadGamePearl(renamed).value);
+    // DXT1's fourth pick after a smaller first color is clear: a pearl's square all of it shows nothing.
+    Bytes clear;
+    for (int by = 0; by < 64; ++by)
+        for (int bx = 0; bx < 64; ++bx)
+        {
+            std::array<uint8_t, 16> picks{};
+            if (bx < 8 && by >= 16 && by < 24) picks.fill(3);
+            clear = clear + ColorBlock(0, 0x07E0, picks);
+        }
+    const Read<ColorPicture> nothing = ReadGamePearl(Chunk("usta", 0x20, PictureBody(256, 256, "DXT1", clear, 0xA1, "menu    ustatshd")));
+    CHECK(!nothing.value && !nothing.failure.empty());
 }
 
 TEST(a_record_that_is_no_picture_is_refused_with_why)

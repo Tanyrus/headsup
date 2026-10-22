@@ -97,17 +97,17 @@ TEST(the_cursors_folder_lists_its_cursor_files_by_name)
 {
     // Whatever else is in the folder is left out; a name comes once though it has both kinds of file.
     const std::vector<std::string> names =
-        CursorFileNames({"sword.cur", "Gold Arrow.ANI", "readme.txt", "arrow.png", "sword.ani", ".cur", "backup.cur.bak", "axe.Cur"});
+        FolderFileNames({"sword.cur", "Gold Arrow.ANI", "readme.txt", "arrow.png", "sword.ani", ".cur", "backup.cur.bak", "axe.Cur"}, kCursorExtensions);
     CHECK((names == std::vector<std::string>{"axe", "Gold Arrow", "sword"}));
-    CHECK(CursorFileNames({}).empty());
+    CHECK(FolderFileNames({}, kCursorExtensions).empty());
     // Windows opens Arrow.cur for arrow too: two files whose names differ only by case are one name.
-    CHECK((CursorFileNames({"arrow.ani", "Arrow.cur"}) == std::vector<std::string>{"Arrow"}));
+    CHECK((FolderFileNames({"arrow.ani", "Arrow.cur"}, kCursorExtensions) == std::vector<std::string>{"Arrow"}));
     // A name the settings would not keep is not offered: picking it would only put the feather back.
-    const std::string longest(kMaxCursorFileName, 'a'), tooLong(kMaxCursorFileName + 1, 'b');
-    CHECK((CursorFileNames({tooLong + ".cur", longest + ".cur"}) == std::vector<std::string>{longest}));
-    CHECK(IsCursorFileName(longest) && !IsCursorFileName(tooLong) && !IsCursorFileName(""));
+    const std::string longest(kMaxFileName, 'a'), tooLong(kMaxFileName + 1, 'b');
+    CHECK((FolderFileNames({tooLong + ".cur", longest + ".cur"}, kCursorExtensions) == std::vector<std::string>{longest}));
+    CHECK(IsFolderFileName(longest) && !IsFolderFileName(tooLong) && !IsFolderFileName(""));
     for (const char* path : {"..\\x", "a/b", "c:evil"})
-        CHECK(!IsCursorFileName(path));
+        CHECK(!IsFolderFileName(path));
 }
 
 TEST(a_cursor_files_bytes_are_its_first_frames_picture_or_nothing)

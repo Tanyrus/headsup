@@ -63,6 +63,7 @@ namespace headsup
             {"popupTextSize", &Settings::popupTextSize, kAutoPopupTextSize, kMaxBarTextSize},
             {"baseSize", &Settings::baseSize, kMinTextSize, kMaxTextSize},
             {"baseIconSize", &Settings::baseIconSize, kMinTextSize, kMaxTextSize},
+            {"pearlOutline", &Settings::pearlOutline, 0, kMaxPearlOutline, kPercentStep},
             {"scaleMin", &Settings::scaleMin, kMinSizePercent, kMaxSizePercent, kPercentStep},
             {"scaleMax", &Settings::scaleMax, kMinSizePercent, kMaxSizePercent, kPercentStep},
             {"timerPercent", &Settings::timerPercent, kMinSizePercent, kMaxSizePercent, kPercentStep},
@@ -129,9 +130,10 @@ namespace headsup
         // Saved files from before the cursor scaled on its own, when it scaled with the names, take the names'.
         constexpr const char* kScaleCursorKey = "scaleCursor";
         constexpr const char* kKeepPointerKey = "keepPointerKeys"; // hex virtual-key codes, a space apart
-        constexpr const char* kWindowOffsetsKey = "windowOffsets"; // "equip:10,-20 statcom:0,40"
-        constexpr const char* kMoveWindowsKey   = "moveWindows";
-        constexpr const char* kKeepClearKey     = "keepClear";
+        constexpr const char* kPinnedWindowsKey = "pinnedWindows"; // "equip:100,200 statcom:0,40"
+        constexpr const char* kHiddenWindowsKey = "hiddenWindows"; // "statcom inventor"
+        constexpr const char* kShiftVanillaUiKey = "shiftVanillaUi";
+        constexpr const char* kOldMoveWindowsKey = "moveWindows";
         // By HelpMode. movedWindows, windowGroups and allUnderBar, the picks before views, are never read again.
         constexpr const char* kPlacedUnderKeys[kHelpModes] = {"placedUnderHelpOff", "placedUnderHelpOn"};
         constexpr const char* kViewShiftsKeys[kHelpModes]  = {"viewShiftsHelpOff", "viewShiftsHelpOn"}; // "status:20"
@@ -156,7 +158,12 @@ namespace headsup
         constexpr const char* kDesignsSavedKey = "nameplateDesigns";
         constexpr const char* kBarThemeKey = "barTheme";
         const char* const kBarThemeNames[kBarThemeCount] = {"phoenixGold", "umbraDark", "phoenixRedOrnate",
-            "phoenixRedPills", "aurora"};
+            "phoenixRedPills", "aurora", "custom"};
+        // The Custom theme: this before each of kPaletteColors' names, and its shape and border.
+        constexpr const char* kCustomThemeKey = "customTheme";
+        constexpr const char* kShapeSuffix = "Shape";
+        constexpr const char* kBorderSuffix = "Border";
+        constexpr const char* kGradientSuffix = "Gradient";
         constexpr const char* kBarCurrencyKey = "barCurrency";
         constexpr const char* kClockServerTimeKey = "clockServerTime";
         // Server time was a widget of its own, with this switch.
@@ -957,18 +964,17 @@ namespace headsup
     void UseHeadsUpWindowDefaults(Settings& s)
     {
         const Settings d;
-        s.moveWindows   = true;
-        s.keepClear     = d.keepClear;
+        s.shiftVanillaUi = true;
         s.placedUnder   = d.placedUnder;
         s.viewShifts    = d.viewShifts;
-        s.windowOffsets = {};
+        s.pinnedWindows = {};
     }
 
     void UseGameWindowDefaults(Settings& s)
     {
-        s.moveWindows   = false;
+        s.shiftVanillaUi = false;
         s.moveGameHelp  = false;
-        s.windowOffsets = {};
+        s.pinnedWindows = {};
     }
 
     void UseHelpTextDefaults(Settings& s)
@@ -1144,9 +1150,9 @@ namespace headsup
 
     const char* CursorStyleName(CursorStyle style) { return kCursorStyleNames[static_cast<int>(style)]; }
 
-    bool IsCursorFileName(std::string_view name)
+    bool IsFolderFileName(std::string_view name)
     {
-        return !name.empty() && name.size() <= kMaxCursorFileName && name.find_first_of(kPathCharacters) == std::string_view::npos;
+        return !name.empty() && name.size() <= kMaxFileName && name.find_first_of(kPathCharacters) == std::string_view::npos;
     }
 
     Settings Clamp(Settings s)
@@ -1170,7 +1176,7 @@ namespace headsup
         }
         s.keepPointerKeys = std::move(keys);
         s.screenshotKey   = BindableKey(s.screenshotKey);
-        s.windowOffsets   = WindowOffsetsFrom(WindowOffsetText(s.windowOffsets));
+        s.pinnedWindows   = WindowPlacesFrom(WindowPlaceText(s.pinnedWindows));
         for (size_t m = 0; m < kHelpModes; ++m)
         {
             s.placedUnder[m] = std::clamp(s.placedUnder[m], 0, kMaxWindowOffset);
@@ -1180,11 +1186,11 @@ namespace headsup
         s.helpBarY        = std::clamp(s.helpBarY, -kMaxHelpBarOffset, kMaxHelpBarOffset);
         for (const ColorKey& c : kColors)
             s.*c.field = ClampColor(s.*c.field, d.*c.field);
-        const bool named = IsCursorFileName(s.cursorFile);
+        const bool named = IsFolderFileName(s.cursorFile);
         if (!named) s.cursorFile.clear();
         if (static_cast<int>(s.cursorStyle) >= kCursorStyleCount || (s.cursorStyle == CursorStyle::File && !named))
             s.cursorStyle = d.cursorStyle;
-        const bool pointerNamed = IsCursorFileName(s.pointerFile);
+        const bool pointerNamed = IsFolderFileName(s.pointerFile);
         if (!pointerNamed) s.pointerFile.clear();
         if (static_cast<int>(s.pointerIcon) >= kPointerIconCount || (s.pointerIcon == PointerIcon::File && !pointerNamed))
             s.pointerIcon = d.pointerIcon;
@@ -1192,6 +1198,8 @@ namespace headsup
         ClampPick(s.cursorColor, d.cursorColor, CursorSources());
         ClampPick(s.cursorEdgeColor, d.cursorEdgeColor, CursorSources());
         if (static_cast<int>(s.barTheme) >= kBarThemeCount) s.barTheme = d.barTheme;
+        if (static_cast<int>(s.customPalette.shape) >= kBarShapeCount) s.customPalette.shape = d.customPalette.shape;
+        s.customPalette.border = std::clamp(s.customPalette.border, 0, kMaxStripBorder);
         if (s.barCurrency < 0 || s.barCurrency >= kCurrencyCount) s.barCurrency = d.barCurrency;
         if (s.clockZone && static_cast<int>(*s.clockZone) >= kClockZoneCount) s.clockZone = d.clockZone;
         if (static_cast<int>(s.expBar) >= kExpBarPlaceCount) s.expBar = d.expBar;
@@ -1280,6 +1288,13 @@ namespace headsup
         const std::string theme = store.GetString(kBarThemeKey, "");
         for (int t = 0; t < kBarThemeCount; ++t)
             if (theme == kBarThemeNames[t]) s.barTheme = static_cast<BarTheme>(t);
+        const std::string custom = kCustomThemeKey;
+        for (const PaletteColor& color : kPaletteColors)
+            s.customPalette.*color.field = LoadHex(store, custom + color.name, s.customPalette.*color.field);
+        s.customPalette.shape = static_cast<BarShape>(NameIndex(kBarShapeNames, kBarShapeCount,
+            store.GetString((custom + kShapeSuffix).c_str(), ""), static_cast<int>(s.customPalette.shape)));
+        s.customPalette.border = LoadInt(store, (custom + kBorderSuffix).c_str(), s.customPalette.border);
+        s.customPalette.gradient = store.GetBool((custom + kGradientSuffix).c_str(), s.customPalette.gradient);
         if (const std::optional<int> currency = CurrencyOfKey(store.GetString(kBarCurrencyKey, "")))
             s.barCurrency = *currency;
         s.barTargetDetails = store.GetBool(kTargetDetailsKey, s.barTargetDetails);
@@ -1329,9 +1344,10 @@ namespace headsup
         for (int i = 0; i < kBarSectionCount; ++i)
             sections[i] = store.GetString(kBarSectionKeys[i], "");
         s.barSections = PlacementFrom(sections);
-        s.windowOffsets = WindowOffsetsFrom(store.GetString(kWindowOffsetsKey, ""));
-        s.moveWindows   = store.GetBool(kMoveWindowsKey, s.moveWindows);
-        s.keepClear     = store.GetBool(kKeepClearKey, s.keepClear);
+        s.pinnedWindows = WindowPlacesFrom(store.GetString(kPinnedWindowsKey, ""));
+        s.hiddenWindows = HiddenWindowsFrom(store.GetString(kHiddenWindowsKey, ""));
+        s.shiftVanillaUi =
+            HeldSwitch(store, kShiftVanillaUiKey).value_or(HeldSwitch(store, kOldMoveWindowsKey).value_or(s.shiftVanillaUi));
         for (size_t m = 0; m < kHelpModes; ++m)
         {
             s.placedUnder[m] = LoadInt(store, kPlacedUnderKeys[m], s.placedUnder[m]);
@@ -1398,6 +1414,11 @@ namespace headsup
             setFloat(base + kResistRankSuffix, static_cast<float>(s.statusBadges[i].resistRank));
         }
         store.Set(kBarThemeKey, kBarThemeNames[static_cast<int>(s.barTheme)]);
+        for (const PaletteColor& color : kPaletteColors)
+            StoreHex(store, kCustomThemeKey + std::string(color.name), s.customPalette.*color.field);
+        store.Set((kCustomThemeKey + std::string(kShapeSuffix)).c_str(), kBarShapeNames[static_cast<int>(s.customPalette.shape)]);
+        setFloat(kCustomThemeKey + std::string(kBorderSuffix), static_cast<float>(s.customPalette.border));
+        setBool(kCustomThemeKey + std::string(kGradientSuffix), s.customPalette.gradient);
         store.Set(kBarSeparatorsKey, kBarSeparatorsNames[static_cast<int>(s.barSeparators)]);
         store.Set(kBarCurrencyKey, kCurrencyTable[s.barCurrency].key);
         store.Set(kClockZoneKey, s.clockZone ? kClockZoneNames[static_cast<int>(*s.clockZone)] : kLocalZone);
@@ -1424,9 +1445,9 @@ namespace headsup
         setBool(kLatencyKey, s.barLatency);
         for (int i = 0; i < kBarSectionCount; ++i)
             store.Set(kBarSectionKeys[i], PlacementNames(s.barSections[i]).c_str());
-        store.Set(kWindowOffsetsKey, WindowOffsetText(s.windowOffsets).c_str());
-        setBool(kMoveWindowsKey, s.moveWindows);
-        setBool(kKeepClearKey, s.keepClear);
+        store.Set(kPinnedWindowsKey, WindowPlaceText(s.pinnedWindows).c_str());
+        store.Set(kHiddenWindowsKey, HiddenWindowsText(s.hiddenWindows).c_str());
+        setBool(kShiftVanillaUiKey, s.shiftVanillaUi);
         for (size_t m = 0; m < kHelpModes; ++m)
         {
             setFloat(kPlacedUnderKeys[m], static_cast<float>(s.placedUnder[m]));

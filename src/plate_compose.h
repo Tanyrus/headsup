@@ -7,6 +7,7 @@
 #include "tracker.h"
 
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -16,7 +17,7 @@ namespace headsup
     struct IconDraw
     {
         Icon icon          = Icon::AggroNQ;
-        uint32_t tint      = kWhite;
+        std::optional<uint32_t> paint; // the color the icon is painted in, the linkshell's; none as it is drawn
         std::string badge;
         uint32_t badgeColor = 0;
         bool operator==(const IconDraw&) const = default;

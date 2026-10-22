@@ -93,8 +93,15 @@ namespace headsup
             0x8B, 0x4A, 0x08, 0xE8, -1, -1, -1, -1, 0x8B, 0x4C, 0x24, 0x0A, 0x8B, 0x54, 0x24, 0x04, 0x8D, 0x44, 0x24, 0x10,
             0x68, 0x80, 0x80, 0x80, 0x80, 0x83, 0xC1, 0x03};
         constexpr uint32_t kScanLabelCall = 17;
+        constexpr int16_t kStripCount[] = {0xA1, -1, -1, -1, -1, 0x83, 0xEC, 0x2C, 0x53, 0x33, 0xDB, 0x56, 0x3B, 0xC3, 0x57,
+            0x0F, 0x84, -1, -1, -1, -1, 0x39, 0x58, 0x08, 0x0F, 0x84, -1, -1, -1, -1, 0x8D, 0x4C, 0x24, 0x0C, 0x66, 0x89,
+            0x5C, 0x24, 0x0C, 0x66, 0x89, 0x5C, 0x24, 0x0E, 0x66, 0x89, 0x5C, 0x24, 0x10, 0x66, 0x89, 0x5C, 0x24, 0x12, 0x51,
+            0x8B, 0x48, 0x08, 0xE8, -1, -1, -1, -1, 0x8B, 0x7C, 0x24, 0x3C};
+        constexpr uint32_t kStripCountCall = 58;
         constexpr int16_t kWindowGetRect[] = {0x83, 0xEC, 0x0C, 0x56, 0x8B, 0xF1, 0x8A, 0x86, 0x99, 0x00, 0x00, 0x00,
             0x84, 0xC0, 0x0F, 0x84};
+        constexpr int16_t kWindowEntryRect[] = {0x8B, 0x44, 0x24, 0x08, 0x56, 0x50, 0x8B, 0xF1, 0xE8, -1, -1, -1, -1, 0x85,
+            0xC0, 0x74, -1, 0x0F, 0xBF, 0x48, 0x2A, 0x0F, 0xBF, 0x50, 0x2C};
         constexpr char kMenuPrefix[] = "menu    ";
         constexpr size_t kMenuPrefixLength = sizeof(kMenuPrefix) - 1;
         static_assert(kMenuPrefixLength + kWindowKeyLength == kWindowNameLength);
@@ -328,6 +335,9 @@ namespace headsup
         case LocateProblem::NoScanLabel: return "where Wide Scan places its grid label was not found";
         case LocateProblem::AmbiguousScanLabel: return "where Wide Scan places its grid label was found more than once";
         case LocateProblem::ScanLabelChanged: return "Wide Scan's grid label is placed through an unexpected function";
+        case LocateProblem::NoStripCount: return "where the item lists draw their count was not found";
+        case LocateProblem::AmbiguousStripCount: return "where the item lists draw their count was found more than once";
+        case LocateProblem::StripCountChanged: return "the item lists' count is placed through an unexpected function";
         case LocateProblem::NoStripText: return "the game's help bar text was not found";
         case LocateProblem::AmbiguousStripText: return "the game's help bar text was found in more places than one";
         case LocateProblem::StripTextChanged: return "the game's help bar text is not laid out as HeadsUp expects";
@@ -512,18 +522,46 @@ namespace headsup
         const std::vector<uint32_t> found = FindAll(kWindowMoveTo, text);
         if (found.empty()) return WindowMoveSite{LocateProblem::NoWindowMove};
         if (found.size() > 1) return WindowMoveSite{LocateProblem::AmbiguousWindowMove};
-        const std::vector<uint32_t> getRect = FindAll(kWindowGetRect, text);
+        const std::vector<uint32_t> getRect = FindAll(kWindowGetRect, text), entryRect = FindAll(kWindowEntryRect, text);
         return WindowMoveSite{LocateProblem::None, text.rva + found.front(),
-            getRect.size() == 1 ? text.rva + getRect.front() : 0};
+            getRect.size() == 1 ? text.rva + getRect.front() : 0, entryRect.size() == 1 ? text.rva + entryRect.front() : 0};
     }
 
     bool MoveUnderWay(int32_t move) { return move > 0; }
 
+    namespace
+    {
+        // A layout ends at a ret padded to the next 16-byte boundary, where the compiler starts the next function; a
+        // ret with code after it is an early return. Read no further: that code is another class's.
+        std::span<const uint8_t> LayoutBody(std::span<const uint8_t> layout, uintptr_t at)
+        {
+            constexpr uint8_t kRet = 0xC3, kNop = 0x90, kInt3 = 0xCC;
+            constexpr uintptr_t kFunctionAlign = 16;
+            for (size_t i = 0; i + 1 < layout.size(); ++i)
+            {
+                if (layout[i] != kRet || (layout[i + 1] != kNop && layout[i + 1] != kInt3)) continue;
+                size_t pad = i + 1;
+                while (pad < layout.size() && (at + pad) % kFunctionAlign != 0 && (layout[pad] == kNop || layout[pad] == kInt3))
+                    ++pad;
+                if ((at + pad) % kFunctionAlign == 0) return layout.first(i + 1);
+            }
+            return layout;
+        }
+
+        constexpr uint8_t kCallOp = 0xE8;
+        constexpr size_t kCallLength = 5;
+        bool CallsAt(std::span<const uint8_t> code, size_t i, uintptr_t at, uintptr_t target)
+        {
+            return code[i] == kCallOp && i + kCallLength <= code.size() &&
+                   at + i + kCallLength + static_cast<uintptr_t>(ReadAt<int32_t>(code.data(), i + 1)) == target;
+        }
+    }
+
     std::optional<uint32_t> PlaceCopyOffset(std::span<const uint8_t> layout, uintptr_t at, uintptr_t getRect)
     {
-        constexpr uint8_t kCall = 0xE8, kLea = 0x8D, kMov = 0x8B, kPush = 0x50, kRegisters = 8;
+        constexpr uint8_t kLea = 0x8D, kMov = 0x8B, kPush = 0x50, kRegisters = 8;
         constexpr uint8_t kModDisp8 = 1, kRmSib = 4, kEcx = 1, kMcdField = 0x08;
-        constexpr size_t kCallBytes = 5, kOperandBytes = 3; // lea and mov, each with a ModRM and a disp8
+        constexpr size_t kOperandBytes = 3; // lea and mov, each with a ModRM and a disp8
         constexpr size_t kPushReach = 16;                   // bytes from the push to the call at most
         const auto mod = [](uint8_t modrm) { return modrm >> 6; };
         const auto reg = [](uint8_t modrm) { return (modrm >> 3) & 7; };
@@ -558,30 +596,59 @@ namespace headsup
                 return leaAt(mov, pushed);
             return std::nullopt;
         };
-        // The layout ends at a ret padded to the next 16-byte boundary, where the compiler starts the next function;
-        // a ret with code after it is an early return. Read no further: that code is another class's.
-        constexpr uint8_t kRet = 0xC3, kNop = 0x90, kInt3 = 0xCC;
-        constexpr uintptr_t kFunctionAlign = 16;
-        size_t end = layout.size();
-        for (size_t i = 0; i + 1 < layout.size() && end == layout.size(); ++i)
+        layout = LayoutBody(layout, at);
+        for (size_t i = 1; i < layout.size(); ++i)
         {
-            if (layout[i] != kRet || (layout[i + 1] != kNop && layout[i + 1] != kInt3)) continue;
-            size_t pad = i + 1;
-            while (pad < layout.size() && (at + pad) % kFunctionAlign != 0 && (layout[pad] == kNop || layout[pad] == kInt3))
-                ++pad;
-            if ((at + pad) % kFunctionAlign == 0) end = i + 1;
-        }
-        layout = layout.first(end);
-        for (size_t i = 1; i + kCallBytes <= layout.size(); ++i)
-        {
-            if (layout[i] != kCall ||
-                at + i + kCallBytes + static_cast<uintptr_t>(ReadAt<int32_t>(layout.data(), i + 1)) != getRect)
-                continue;
+            if (!CallsAt(layout, i, at, getRect)) continue;
             // The push may have an instruction or two after it before the call (Trade sets a flag there).
             for (size_t back = 1; back <= kPushReach && back <= i; ++back)
                 if (const std::optional<uint32_t> offset = argumentAt(i - back)) return offset;
         }
         return std::nullopt;
+    }
+
+    std::optional<uint32_t> EntryPlaceOffset(std::span<const uint8_t> layout, uintptr_t at, uintptr_t entryRect)
+    {
+        // mov word [base + disp8], r16: 66 89, a ModRM of mod 1 whose base is no SIB, then the displacement.
+        constexpr uint8_t kOperandSize = 0x66, kStore = 0x89, kModDisp8 = 1, kRmSib = 4;
+        constexpr size_t kStoreBytes = 4, kStoreReach = 0x20; // bytes past the call that its corner is kept in
+        struct Store
+        {
+            int base;
+            uint8_t disp;
+        };
+        const auto storeAt = [&](std::span<const uint8_t> code, size_t i) -> std::optional<Store> {
+            if (i + kStoreBytes > code.size() || code[i] != kOperandSize || code[i + 1] != kStore) return std::nullopt;
+            const uint8_t modrm = code[i + 2];
+            if (modrm >> 6 != kModDisp8 || (modrm & 7) == kRmSib) return std::nullopt;
+            return Store{modrm & 7, code[i + 3]};
+        };
+        layout = LayoutBody(layout, at);
+        for (size_t i = 0; i < layout.size(); ++i)
+        {
+            if (!CallsAt(layout, i, at, entryRect)) continue;
+            const std::span<const uint8_t> after = layout.subspan(i + kCallLength).first(
+                std::min(kStoreReach, layout.size() - i - kCallLength));
+            for (size_t first = 0; first < after.size(); ++first)
+            {
+                const std::optional<Store> left = storeAt(after, first);
+                if (!left) continue;
+                for (size_t second = first + kStoreBytes; second < after.size(); ++second)
+                    if (const std::optional<Store> top = storeAt(after, second);
+                        top && top->base == left->base && top->disp == left->disp + sizeof(int16_t))
+                        return left->disp;
+                break;
+            }
+        }
+        return std::nullopt;
+    }
+
+    std::optional<WindowSpot> MovedEntryPlace(WindowSpot point, const WindowRect& window, int dx, int dy)
+    {
+        enum Edge { kLeft, kTop, kRight, kBottom };
+        if (point.left < window[kLeft] || point.left >= window[kRight] || point.top < window[kTop] || point.top >= window[kBottom])
+            return std::nullopt;
+        return WindowSpot{point.left + dx, point.top + dy};
     }
 
     std::optional<WindowRect> MovedPlaceCopy(const WindowRect& copy, const WindowRect& window, int dx, int dy, PlaceMatch match)
@@ -594,14 +661,24 @@ namespace headsup
         return WindowRect{by(copy[kLeft], dx), by(copy[kTop], dy), by(copy[kRight], dx), by(copy[kBottom], dy)};
     }
 
-    ScanLabelSite LocateScanLabel(const ImageSection& text, uint32_t getRect)
+    TitleRectSite LocateScanLabel(const ImageSection& text, uint32_t getRect)
     {
         const std::vector<uint32_t> found = FindAll(kScanLabel, text);
-        if (getRect == 0 || found.empty()) return ScanLabelSite{LocateProblem::NoScanLabel};
-        if (found.size() > 1) return ScanLabelSite{LocateProblem::AmbiguousScanLabel};
+        if (getRect == 0 || found.empty()) return TitleRectSite{LocateProblem::NoScanLabel};
+        if (found.size() > 1) return TitleRectSite{LocateProblem::AmbiguousScanLabel};
         const uint32_t call = text.rva + found.front() + kScanLabelCall;
-        if (CallTarget(call, text) != getRect) return ScanLabelSite{LocateProblem::ScanLabelChanged};
-        return ScanLabelSite{LocateProblem::None, call};
+        if (CallTarget(call, text) != getRect) return TitleRectSite{LocateProblem::ScanLabelChanged};
+        return TitleRectSite{LocateProblem::None, call};
+    }
+
+    TitleRectSite LocateStripCount(const ImageSection& text, uint32_t getRect)
+    {
+        const std::vector<uint32_t> found = FindAll(kStripCount, text);
+        if (getRect == 0 || found.empty()) return TitleRectSite{LocateProblem::NoStripCount};
+        if (found.size() > 1) return TitleRectSite{LocateProblem::AmbiguousStripCount};
+        const uint32_t call = text.rva + found.front() + kStripCountCall;
+        if (CallTarget(call, text) != getRect) return TitleRectSite{LocateProblem::StripCountChanged};
+        return TitleRectSite{LocateProblem::None, call};
     }
 
     std::optional<WindowKey> WindowKeyOf(const char* name)
@@ -649,10 +726,10 @@ namespace headsup
         return true;
     }
 
-    std::vector<WindowOffset> WindowOffsetsFrom(std::string_view text)
+    std::vector<WindowPlace> WindowPlacesFrom(std::string_view text)
     {
-        std::vector<WindowOffset> offsets;
-        while (!text.empty() && offsets.size() < kMaxWindowKeys)
+        std::vector<WindowPlace> places;
+        while (!text.empty() && places.size() < kMaxWindowKeys)
         {
             const size_t end = std::min(text.find(' '), text.size());
             const std::string_view entry = text.substr(0, end);
@@ -667,20 +744,40 @@ namespace headsup
                 return problem == std::errc{} && end == digits.data() + digits.size();
             };
             if (!key || !MovableWindow(*key) || !number(entry.substr(colon + 1, comma - colon - 1), x) ||
-                !number(entry.substr(comma + 1), y) || (x == 0 && y == 0) ||
-                std::ranges::any_of(offsets, [&](const WindowOffset& o) { return o.name == name; }))
+                !number(entry.substr(comma + 1), y) || std::ranges::any_of(places, [&](const WindowPlace& p) { return p.name == name; }))
                 continue;
-            offsets.push_back(WindowOffset{std::string(name), std::clamp(x, -kMaxWindowOffset, kMaxWindowOffset),
-                std::clamp(y, -kMaxWindowOffset, kMaxWindowOffset)});
+            places.push_back(WindowPlace{std::string(name), std::clamp(x, 0, kMaxWindowOffset), std::clamp(y, 0, kMaxWindowOffset)});
         }
-        return offsets;
+        return places;
     }
 
-    std::string WindowOffsetText(const std::vector<WindowOffset>& offsets)
+    std::string WindowPlaceText(const std::vector<WindowPlace>& places)
     {
         std::string text;
-        for (const WindowOffset& o : offsets)
-            text += (text.empty() ? "" : " ") + o.name + ":" + std::to_string(o.x) + "," + std::to_string(o.y);
+        for (const WindowPlace& p : places)
+            text += (text.empty() ? "" : " ") + p.name + ":" + std::to_string(p.x) + "," + std::to_string(p.y);
+        return text;
+    }
+
+    std::vector<std::string> HiddenWindowsFrom(std::string_view text)
+    {
+        std::vector<std::string> names;
+        while (!text.empty() && names.size() < kMaxWindowKeys)
+        {
+            const size_t end = std::min(text.find(' '), text.size());
+            const std::string_view name = text.substr(0, end);
+            text.remove_prefix(std::min(end + 1, text.size()));
+            const std::optional<WindowKey> key = KeyFromShortName(name);
+            if (key && MovableWindow(*key) && std::ranges::find(names, name) == names.end()) names.emplace_back(name);
+        }
+        return names;
+    }
+
+    std::string HiddenWindowsText(const std::vector<std::string>& names)
+    {
+        std::string text;
+        for (const std::string& name : names)
+            text += (text.empty() ? "" : " ") + name;
         return text;
     }
 

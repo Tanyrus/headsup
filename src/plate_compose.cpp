@@ -78,11 +78,11 @@ namespace headsup
             item.kind = kind;
             return item;
         }
-        IconDraw DrawOf(Icon icon, uint32_t tint = kWhite)
+        IconDraw DrawOf(Icon icon, std::optional<uint32_t> paint = std::nullopt)
         {
             IconDraw draw;
-            draw.icon = icon;
-            draw.tint = tint;
+            draw.icon  = icon;
+            draw.paint = paint;
             return draw;
         }
 
@@ -210,7 +210,7 @@ namespace headsup
             }
             const std::optional<Icon> icon = TagIcon(tag);
             if (!icon || info.state.kind != EntityKind::Player || !info.status || !PlayerHas(tag, *info.status)) return out;
-            out.push_back(DrawOf(*icon, tag == Tag::Linkshell ? info.linkshellArgb : kWhite));
+            out.push_back(DrawOf(*icon, tag == Tag::Linkshell ? std::optional(info.linkshellArgb) : std::nullopt));
             return out;
         }
 
@@ -298,7 +298,7 @@ namespace headsup
     {
         if (screenshot) return HookAction::Hide;
         if (!s.enabled || !s.nameplates) return HookAction::Keep;
-        if (player.inEvent && s.hideInEvent) return HookAction::Hide;
+        if (HiddenInEvent(s, player)) return HookAction::Hide;
         const HookAction drawn = namesFailed ? HookAction::Keep : HookAction::Replace;
         switch (s.Kind(PlateKindOf(state)).rows[RowOf(state)].plate)
         {
@@ -313,7 +313,7 @@ namespace headsup
     {
         ComposedPlate plate;
         const EntityState& st = info.state;
-        if (!s.enabled || !s.nameplates || (player.inEvent && s.hideInEvent)) return plate;
+        if (!s.enabled || !s.nameplates || HiddenInEvent(s, player)) return plate;
         const KindSettings& kind = s.Kind(PlateKindOf(st));
         const PlateMode mode     = kind.rows[RowOf(st)].plate;
         if (!DrawsPlate(mode)) return plate;

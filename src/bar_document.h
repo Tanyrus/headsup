@@ -22,7 +22,7 @@ namespace headsup
     // its number, a theme's strip column (its rows and the rows fading below), a diamond or a coin by its pixels.
     constexpr std::string_view kHostSource = "hu:";
     std::string IconSource(Icon icon);
-    std::string StripSource(BarTheme theme, int rows, int belowRows);
+    std::string StripSource(const BarPalette& palette, int rows, int belowRows);
     std::string DiamondSource(uint32_t argb, int pixels);
     std::string CoinSource(int pixels);
     std::string StarSource(int pixels);
@@ -50,7 +50,7 @@ namespace headsup
     // The bar's markup and style: the strip across the screen, the ornate caps, a divider for each pair of
     // neighbours and every placed widget's element, all sized from the look. The widgets and dividers carry the
     // hidden class and no place: the plugin shows and places them.
-    std::string BarDocument(const BarLook& look, BarTheme theme, const BarTextPlace& place);
+    std::string BarDocument(const BarLook& look, const BarTextPlace& place);
     std::string WidgetId(BarWidget widget);
     std::string DividerId(int divider);
     constexpr int kDividerCount       = kPlacedWidgetCount - 1;
@@ -85,7 +85,7 @@ namespace headsup
     constexpr int kPopupFontCount = static_cast<int>(PopupFont::Pin) + 1;
     using PopupFaces = std::array<PopupFace, kPopupFontCount>;
     // The popups' document: an empty popup over the whole screen that takes no clicks, styled from the look.
-    std::string PopupDocument(const BarLook& look, const PopupFaces& faces, BarTheme theme);
+    std::string PopupDocument(const BarLook& look, const PopupFaces& faces);
     constexpr const char* kOpenClass = "open"; // on a popup while it shows, so what it does as it opens plays each time
     constexpr const char* kPopupId = "popup";
     // A laid out popup's markup, from its top left corner: its panel, then each piece where the layout put it.

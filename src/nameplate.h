@@ -19,9 +19,9 @@ namespace headsup
     // A posed player's name comes down to their head.
     ScreenBox PlaceName(const ScreenBox& name, const Camera* camera, const WorldPoint& feet, Pose pose);
 
-    // Whether HeadsUp draws a cursor for this entity: your target or the one you are picking, with the cursor on and
-    // the game's own arrows hooked away.
-    bool CursorShown(uint16_t index, const Settings& settings, const CursorTargets& targets);
+    // Whether HeadsUp draws a cursor for this entity: your target or the one you are picking, with the cursor on, the
+    // game's own arrows hooked away and nothing hidden for a conversation.
+    bool CursorShown(uint16_t index, const Settings& settings, const PlayerState& player, const CursorTargets& targets);
 
     // A target with no game name to hang a cursor on, such as a Telepoint, gets its cursor at the game's arrow anchor.
     struct LoneCursor
@@ -31,7 +31,7 @@ namespace headsup
         float x, y;
         bool under = false; // the target's own cursor, under the candidate's on the same entity
     };
-    std::vector<LoneCursor> LoneCursors(const CursorTargets& targets, const Settings& settings,
+    std::vector<LoneCursor> LoneCursors(const CursorTargets& targets, const Settings& settings, const PlayerState& player,
         const std::vector<uint16_t>& withNameplateCursor);
 
     struct CursorSpot

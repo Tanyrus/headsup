@@ -669,6 +669,27 @@ namespace
     }
 }
 
+namespace
+{
+    // MCD::GetEntryRect(int16* out, index, lit, pressed), at RVA 0x118900 in the client of 2026-10-19.
+    constexpr uint32_t kEntryRectRva = 0x118900;
+    void PutEntryRect(Image& image, uint32_t at)
+    {
+        image.Put(at, {0x8B, 0x44, 0x24, 0x08, 0x56, 0x50, 0x8B, 0xF1, 0xE8, 0xC3, 0xF8, 0xFF, 0xFF, 0x85, 0xC0, 0x74, 0x67,
+                          0x0F, 0xBF, 0x48, 0x2A, 0x0F, 0xBF, 0x50, 0x2C});
+    }
+}
+
+TEST(the_windows_entry_rectangle_is_found_beside_its_move)
+{
+    Image image;
+    PutMoveTo(image, kMoveToRva);
+    PutEntryRect(image, kEntryRectRva);
+    CHECK(LocateWindowMove(image.Text()).entryRect == kEntryRectRva);
+    PutEntryRect(image, kEntryRectRva + 0x2000);
+    CHECK(LocateWindowMove(image.Text()).entryRect == 0); // two: neither is taken
+}
+
 TEST(the_windows_rectangle_copy_is_found_beside_its_move)
 {
     Image image;
@@ -702,7 +723,7 @@ TEST(wide_scans_grid_label_takes_the_title_windows_place_from_one_call_to_get_re
 {
     Image image;
     PutScanLabel(image, kScanLabelRva, kGetRectRva);
-    const ScanLabelSite found = LocateScanLabel(image.Text(), kGetRectRva);
+    const TitleRectSite found = LocateScanLabel(image.Text(), kGetRectRva);
     CHECK(found.problem == LocateProblem::None);
     CHECK_EQ(found.call, kScanLabelCall);
     CHECK(LocateScanLabel(image.Text(), 0).problem == LocateProblem::NoScanLabel); // GetRect itself not found
@@ -712,6 +733,40 @@ TEST(wide_scans_grid_label_takes_the_title_windows_place_from_one_call_to_get_re
     CHECK(LocateScanLabel(elsewhere.Text(), kGetRectRva).problem == LocateProblem::ScanLabelChanged);
     PutScanLabel(image, 0x100000, kGetRectRva);
     CHECK(LocateScanLabel(image.Text(), kGetRectRva).problem == LocateProblem::AmbiguousScanLabel);
+}
+
+namespace
+{
+    // Where an item list draws its count at the strip title's corner (RVA 0x1CB590 in the client of 2026-10-19, which
+    // five lists call): the title's owner from a global, its window's rectangle by MCD::GetRect, then the slash and
+    // the two numbers from that rectangle.
+    constexpr uint32_t kStripCountRva  = 0x1CB590;
+    constexpr uint32_t kStripCountCall = kStripCountRva + 58;
+    void PutStripCount(Image& image, uint32_t at, uint32_t calls)
+    {
+        image.Put(at, {0xA1, 0x7C, 0x84, 0xA3, 0x03, 0x83, 0xEC, 0x2C, 0x53, 0x33, 0xDB, 0x56, 0x3B, 0xC3, 0x57, 0x0F,
+                          0x84, 0x87, 0x01, 0x00, 0x00, 0x39, 0x58, 0x08, 0x0F, 0x84, 0x7E, 0x01, 0x00, 0x00, 0x8D, 0x4C,
+                          0x24, 0x0C, 0x66, 0x89, 0x5C, 0x24, 0x0C, 0x66, 0x89, 0x5C, 0x24, 0x0E, 0x66, 0x89, 0x5C, 0x24,
+                          0x10, 0x66, 0x89, 0x5C, 0x24, 0x12, 0x51, 0x8B, 0x48, 0x08, 0xE8, 0x00, 0x00, 0x00, 0x00, 0x8B,
+                          0x7C, 0x24, 0x3C});
+        image.Put32(at + 59, calls - (at + 58 + kBranchLength));
+    }
+}
+
+TEST(an_item_lists_count_takes_the_title_windows_place_from_one_call_to_get_rect)
+{
+    Image image;
+    PutStripCount(image, kStripCountRva, kGetRectRva);
+    const TitleRectSite found = LocateStripCount(image.Text(), kGetRectRva);
+    CHECK(found.problem == LocateProblem::None);
+    CHECK_EQ(found.call, kStripCountCall);
+    CHECK(LocateStripCount(image.Text(), 0).problem == LocateProblem::NoStripCount);
+    CHECK(LocateStripCount(Image{}.Text(), kGetRectRva).problem == LocateProblem::NoStripCount);
+    Image elsewhere;
+    PutStripCount(elsewhere, kStripCountRva, kGetRectRva + 0x40);
+    CHECK(LocateStripCount(elsewhere.Text(), kGetRectRva).problem == LocateProblem::StripCountChanged);
+    PutStripCount(image, 0x100000, kGetRectRva);
+    CHECK(LocateStripCount(image.Text(), kGetRectRva).problem == LocateProblem::AmbiguousStripCount);
 }
 
 TEST(only_a_countdown_above_zero_is_a_move_under_way)
@@ -816,16 +871,24 @@ TEST(an_offset_moves_a_window_either_way_from_where_the_game_puts_it_and_keeps_i
     CHECK(place(0x4000, {100, 60}, 5000, 5000) == (WindowSpot{kScreenRight - kWidth, kScreenBottom - 300}));
 }
 
-TEST(window_offsets_read_back_what_they_wrote_and_drop_what_no_window_could_take)
+TEST(window_places_read_back_what_they_wrote_and_keep_a_place_at_the_origin)
 {
-    const std::vector<WindowOffset> offsets = WindowOffsetsFrom("equip:10,-20 statcom:0,40");
-    CHECK(offsets == (std::vector<WindowOffset>{{"equip", 10, -20}, {"statcom", 0, 40}}));
-    CHECK(WindowOffsetsFrom(WindowOffsetText(offsets)) == offsets);
-    // A strip window, a name no window has, a repeat, nothing moved, garbled numbers: all dropped.
-    CHECK(WindowOffsetsFrom("helpwind:5,5 equipment:5,5 equip:1,1 equip:2,2 money:0,0 inventor:x,3 itemctrl:4").size() ==
-          1);
-    CHECK(WindowOffsetsFrom("equip:99999,-99999") == (std::vector<WindowOffset>{{"equip", kMaxWindowOffset, -kMaxWindowOffset}}));
-    CHECK(WindowOffsetsFrom("").empty() && WindowOffsetText({}).empty());
+    const std::vector<WindowPlace> places = WindowPlacesFrom("equip:100,200 statcom:0,0");
+    CHECK(places == (std::vector<WindowPlace>{{"equip", 100, 200}, {"statcom", 0, 0}}));
+    CHECK(WindowPlacesFrom(WindowPlaceText(places)) == places);
+    // A strip window, a name no window has, a repeat, garbled numbers: all dropped.
+    CHECK(WindowPlacesFrom("helpwind:5,5 equipment:5,5 equip:1,1 equip:2,2 inventor:x,3 itemctrl:4").size() == 1);
+    // Off the screen's top left or far past it, a place is held to the screen's corner and to the limit.
+    CHECK(WindowPlacesFrom("equip:99999,-40") == (std::vector<WindowPlace>{{"equip", kMaxWindowOffset, 0}}));
+    CHECK(WindowPlacesFrom("").empty() && WindowPlaceText({}).empty());
+}
+
+TEST(hidden_windows_read_back_what_they_wrote_and_drop_what_no_window_could_take)
+{
+    const std::vector<std::string> hidden = HiddenWindowsFrom("statcom inventor helpwind equipment statcom");
+    CHECK((hidden == std::vector<std::string>{"statcom", "inventor"}));
+    CHECK(HiddenWindowsFrom(HiddenWindowsText(hidden)) == hidden);
+    CHECK(HiddenWindowsFrom("").empty() && HiddenWindowsText({}).empty());
 }
 
 TEST(the_weather_is_found_once_by_its_effects_range_check)
@@ -987,6 +1050,35 @@ TEST(an_owners_copy_of_its_windows_place_moves_with_the_window)
     // Where the class's layout says nothing, only a copy that is the window's rectangle exactly is taken for one.
     CHECK((MovedPlaceCopy(Place{16, 48, 382, 104}, Place{16, 48, 382, 104}, 0, 16, PlaceMatch::Exact) == Place{16, 64, 382, 120}));
     CHECK(!MovedPlaceCopy(Place{130, 48, 382, 184}, Place{130, 48, 382, 140}, 0, 48, PlaceMatch::Exact));
+}
+
+TEST(an_owners_copy_of_an_entrys_corner_moves_with_the_window_while_it_is_inside_it)
+{
+    // The Linkshell item's window (link2): the owner keeps its middle button's corner, the window at 1792, 48.
+    const WindowRect window{1792, 48, 1904, 106};
+    CHECK((MovedEntryPlace(WindowSpot{1808, 70}, window, 0, 16) == WindowSpot{1808, 86}));
+    CHECK((MovedEntryPlace(WindowSpot{1792, 48}, window, -4, 16) == WindowSpot{1788, 64}));
+    // A point outside the window is no place in it: left alone.
+    CHECK(!MovedEntryPlace(WindowSpot{1808, 106}, window, 0, 16) && !MovedEntryPlace(WindowSpot{0, 0}, window, 0, 16));
+}
+
+TEST(an_owners_copy_of_an_entrys_corner_is_found_after_its_layouts_call_for_the_entrys_rectangle)
+{
+    // The Linkshell item's owner (the client's 0x1E5F90 of 2026-10-19): the call at 0x1E5FDE, then
+    // mov cx,[esp+0Ch]; mov ax,[esi+14h]; mov dx,[esp+0Eh]; mov [esi+18h],cx; mov ecx,[esi+8]; push 1; push eax;
+    // mov [esi+1Ah],dx.
+    constexpr uintptr_t entryRect = 0x118900, at = 0x1E5FDE;
+    const std::vector<uint8_t> corner{0xE8, 0x1D, 0x29, 0xF3, 0xFF, 0x66, 0x8B, 0x4C, 0x24, 0x0C, 0x66, 0x8B, 0x46, 0x14,
+        0x66, 0x8B, 0x54, 0x24, 0x0E, 0x66, 0x89, 0x4E, 0x18, 0x8B, 0x4E, 0x08, 0x6A, 0x01, 0x50, 0x66, 0x89, 0x56, 0x1A};
+    CHECK(EntryPlaceOffset(corner, at, entryRect) == std::optional<uint32_t>(0x18));
+    CHECK(!EntryPlaceOffset(corner, at, entryRect + 0x10)); // a call to another routine
+    // Only its left kept, or the two halves in two objects: no corner.
+    std::vector<uint8_t> left = corner;
+    left.resize(left.size() - 4);
+    CHECK(!EntryPlaceOffset(left, at, entryRect));
+    std::vector<uint8_t> apart = corner;
+    apart[apart.size() - 2] = 0x57; // mov [edi+1Ah],dx
+    CHECK(!EntryPlaceOffset(apart, at, entryRect));
 }
 
 TEST(an_owners_place_copy_is_found_in_its_layouts_call_for_the_windows_rectangle)

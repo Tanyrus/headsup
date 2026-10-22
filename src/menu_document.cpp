@@ -214,9 +214,10 @@ namespace headsup
                color(c.muted) + ";transition:left" + kSlide + ",background-color" + kSlide + ";}";
         css += ".check.on .mark{background-color:" + color(c.accent) + ";}";
         for (const auto& [track, width] : {std::pair{".check", kToggleWidth}, std::pair{".check.wide", kControlWidth},
-                 std::pair{".check.card-on", kCardToggleWidth}})
+                 std::pair{".check.card-on", kCardToggleWidth}, std::pair{".check.worded", kCardToggleWidth}})
             css += std::string(track) + ".on .mark{left:" + Em(width - kTogglePeg - kToggleInset) + ";}";
         css += ".check.wide{width:" + control + ";}";
+        css += ".check.worded{width:" + Em(kCardToggleWidth) + ";}";
         // Joined choices. These, tabs, buttons and lists ease between their looks, and the picked one is the gradient.
         css += std::string(".seg,.tab,.btn,.dd,.opt,.wchip{transition:background-color") + kEase + ",border-color" + kEase +
                ",color" + kEase + ";}";
@@ -247,6 +248,7 @@ namespace headsup
         css += "input.text:placeholder-shown{color:" + color(c.muted) + ";}";
         css += "input.text selection{background-color:" + color(c.accentSoft) + ";}";
         css += "input.num{width:" + Em(kNumberWidth) + ";}";
+        css += std::string("input.num.") + kLiveClass + "{color:" + color(c.muted) + ";}";
         css += ".num-name{width:" + Em(kNumberName) + ";text-align:right;color:" + color(c.muted) + ";" + raised + "}";
         // A design line's box looks a text box, and holds stretches of text to type in with tags as chips between
         // them. It wraps, and its last stretch takes what is left of its row, so a click past the text lands in it.

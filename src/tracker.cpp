@@ -23,6 +23,8 @@ namespace headsup
         return player.sitting ? attack : ignore;
     }
 
+    bool HiddenInEvent(const Settings& settings, const PlayerState& player) { return settings.hideInEvent && player.inEvent; }
+
     bool IsClaimed(uint32_t claimStatus) { return claimStatus != 0; }
 
     bool ClaimedByParty(uint32_t claimStatus, const std::vector<uint32_t>& partyServerIds)
@@ -99,7 +101,8 @@ namespace headsup
             // A dead mob's row decides for it; nothing else dead is outlined, and a pet goes by the pets' rows. Nothing
             // the player cannot target is outlined, as a Chigoe until it engages.
             const bool outlinable = (a.alive || PlateKindOf(st) == PlateKind::Mobs) && !a.untargetable;
-            if (settings.enabled && settings.outlines && wanted && outlinable && a.distance <= settings.maxDistance)
+            if (settings.enabled && settings.outlines && wanted && outlinable && a.distance <= settings.maxDistance &&
+                !HiddenInEvent(settings, player))
             {
                 info.outline    = true;
                 info.stencilRef = static_cast<uint8_t>(m_Outlined % kMaxStencilRef + 1);

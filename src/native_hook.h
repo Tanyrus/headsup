@@ -109,8 +109,7 @@ namespace headsup
     {
         HelpBand band;
         int placedUnder   = 0;
-        bool moveWindows  = false;
-        bool keepClear    = false;
+        bool shift        = false; // Shift Vanilla UI
         bool moveGameHelp = false; // the game's strip goes right under the panel, and the windows under it
     };
 
@@ -125,6 +124,12 @@ namespace headsup
         bool Running() const { return m_Call.at != nullptr; }
         // Which of the game's windows are skipped from now on.
         void Hide(HiddenWindows hidden);
+        // The windows, by short name, whose draws are dropped from now on (Base Game UI's Hide).
+        void HideWindows(const std::vector<std::string>& names);
+        // While the game draws one of those, every draw call it makes is one to drop.
+        static bool Silent();
+        // Where those drawn in the last whole frame are, in the game's menu pixels: clicks there are kept from it.
+        static std::span<const WindowRect> HiddenRects();
         // Once a frame, before the game draws its windows: Stop puts back those that drew in the last two.
         void NewFrame();
         // While placing is set, the game's windows are placed as they draw: at the first, the frame's windows are read
@@ -133,8 +138,10 @@ namespace headsup
         void Place(std::optional<WindowPlacing> placing);
         // The player's shifts for the views of the help's mode now.
         void Shift(const std::vector<ViewShift>& shifts);
-        // Each window's offset from where the game puts it.
-        void Offset(const std::vector<WindowOffset>& offsets);
+        // The places the player put windows at: such a window goes there, and no view's shift moves it.
+        void Pin(const std::vector<WindowPlace>& places);
+        // Where each window seen since HeadsUp loaded last stood, by short name.
+        std::vector<WindowPlace> Places() const;
         // The line the windows went under in the last frame placed, in the game's menu pixels; 0 before one.
         int WindowsBand() const;
         // The windows that drew since the last call, by short name, sorted: those open now.
@@ -148,6 +155,7 @@ namespace headsup
     private:
         CodePatch m_Call;
         CodePatch m_LabelCall; // Wide Scan's grid label's ask for the strip title's place, when it was found
+        CodePatch m_CountCall; // an item list's count's ask for it, when it was found
         std::string m_MoveProblem;
     };
 

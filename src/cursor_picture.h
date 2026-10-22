@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -18,9 +19,9 @@ namespace headsup
     std::optional<Image> CursorFilePicture(const std::vector<CursorFrame>& frames);
     // The kinds of file the cursors folder is read for, as their names end.
     constexpr const char* kCursorExtensions[] = {".cur", ".ani"};
-    // The cursors a folder holds, from the names of everything in it: each cursor file's name without its ending,
+    // The files of these kinds a folder holds, from the names of everything in it: each one's name without its ending,
     // once whatever its case, in the alphabet's order. A name the settings would not keep is left out.
-    std::vector<std::string> CursorFileNames(const std::vector<std::string>& entries);
+    std::vector<std::string> FolderFileNames(const std::vector<std::string>& entries, std::span<const char* const> extensions);
     // The most of a cursor file that is read: an animated cursor of many large frames is a few megabytes.
     constexpr size_t kMaxCursorFileBytes = size_t{16} << 20;
 

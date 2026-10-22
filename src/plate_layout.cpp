@@ -35,16 +35,26 @@ namespace headsup
 
     namespace
     {
+        // Between item j and the next: wider where the text meets what hangs beside it.
+        float GapAfter(const LineInput& line, size_t j)
+        {
+            const bool edge = line.firstText >= 0 &&
+                              (j + 1 == static_cast<size_t>(line.firstText) || j == static_cast<size_t>(line.lastText));
+            return edge ? std::max(kItemGap, kHangShare * line.textSize) : kItemGap;
+        }
+
         // What stands before a line's first text item or after its last, with the gap beside each: icons, and the
         // spaces between them and the text, which hang past the text as it aligns. Nothing on a line without text.
         float Hang(const LineInput& line, bool before)
         {
             if (line.firstText < 0) return 0.0f;
-            const size_t from = before ? 0 : static_cast<size_t>(line.lastText) + 1;
-            const size_t to   = before ? static_cast<size_t>(line.firstText) : line.items.size();
-            float hang        = 0.0f;
-            for (size_t j = from; j < to; ++j)
-                hang += line.items[j].width + kItemGap;
+            float hang = 0.0f;
+            if (before)
+                for (size_t j = 0; j < static_cast<size_t>(line.firstText); ++j)
+                    hang += line.items[j].width + GapAfter(line, j);
+            else
+                for (size_t j = static_cast<size_t>(line.lastText) + 1; j < line.items.size(); ++j)
+                    hang += GapAfter(line, j - 1) + line.items[j].width;
             return hang;
         }
 
@@ -67,7 +77,7 @@ namespace headsup
             LinePlace& place = layout.lines[i];
             for (size_t j = 0; j < lines[i].items.size(); ++j)
             {
-                place.width += (j > 0 ? kItemGap : 0.0f) + lines[i].items[j].width;
+                place.width += (j > 0 ? GapAfter(lines[i], j - 1) : 0.0f) + lines[i].items[j].width;
                 place.height = std::max(place.height, lines[i].items[j].height);
             }
         }
@@ -141,13 +151,20 @@ namespace headsup
 
         for (size_t i = 0; i < lines.size(); ++i)
         {
-            LinePlace& place = layout.lines[i];
-            float x          = place.left;
-            place.items.reserve(lines[i].items.size());
-            for (const ItemSize& item : lines[i].items)
+            LinePlace& place    = layout.lines[i];
+            const LineInput& in = lines[i];
+            // A font's capitals sit low in its box, under the room it keeps for accents: what is not text centers on them.
+            const bool inked     = in.inkBottom > 0.0f;
+            const float capitals = TextTop(place, in) + (in.inkTop + in.inkBottom) / 2.0f;
+            float x              = place.left;
+            place.items.reserve(in.items.size());
+            for (size_t j = 0; j < in.items.size(); ++j)
             {
-                place.items.push_back({x, place.top + (place.height - item.height) / 2.0f});
-                x += item.width + kItemGap;
+                const ItemSize& item = in.items[j];
+                const bool text      = item.inkBottom > 0.0f;
+                const float y = inked && !text ? capitals - item.height / 2.0f : place.top + (place.height - item.height) / 2.0f;
+                place.items.push_back({x, y});
+                x += item.width + GapAfter(in, j);
             }
         }
         return layout;
@@ -221,6 +238,9 @@ namespace headsup
         into.items.clear();
         into.align          = line.look.align;
         into.textHeight     = 0.0f;
+        into.inkTop         = 0.0f;
+        into.inkBottom      = 0.0f;
+        into.textSize       = line.look.textSize * scale;
         into.hasIcons       = false;
         // The bottom design line stays on the game's name, so its padding is the space over it. A line broken into
         // rows has it under its last row, or over the first.
@@ -240,8 +260,13 @@ namespace headsup
             {
             case ItemKind::Text:
                 if (into.firstText < 0) into.firstText = static_cast<int>(i);
-                into.lastText   = static_cast<int>(i);
-                into.textHeight = std::max(into.textHeight, texts[text].height);
+                into.lastText = static_cast<int>(i);
+                if (texts[text].height > into.textHeight)
+                {
+                    into.textHeight = texts[text].height;
+                    into.inkTop     = texts[text].inkTop;
+                    into.inkBottom  = texts[text].inkBottom;
+                }
                 into.items.push_back(texts[text++]);
                 break;
             case ItemKind::Icons:
@@ -252,7 +277,7 @@ namespace headsup
                 break;
             }
             case ItemKind::Space:
-                into.items.push_back({static_cast<float>(item.spaces) * kSpaceShare * line.look.textSize * scale, 0.0f});
+                into.items.push_back({static_cast<float>(item.spaces) * kSpaceShare * into.textSize, 0.0f});
                 break;
             }
         }

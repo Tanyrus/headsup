@@ -384,7 +384,6 @@ helpBarY=8.0000
         s.barTargetDetails = true;
         s.menuFont         = "Tahoma";
         s.menuFontSize     = 21; // 125 percent of Ashita's 18 pixels, in Tahoma, which was drawn at 0.95 of its size
-        s.windowOffsets    = {WindowOffset{"equip", 10, -20}};
         s.moveGameHelp     = true;
         s.helpBarBackground = false;
         s.helpBarX         = 12;
@@ -426,7 +425,7 @@ helpBarY=8.0000
 
     // The keys of kSavedFile that only an older build's file carries: a migration reads them, or nothing does, and
     // nothing writes them.
-    const char* const kOldKeys[] = {"showRanks", "scaleOwnName", "movedWindows", "windowGroups", "allUnderBar", "menuScale", "chocoboPointer", "untargetedOpacity", "glowOffWhenFighting", "thickness", "cursorSize", "cursorOutline", "replaceCursor", "cursorFeather", "barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
+    const char* const kOldKeys[] = {"showRanks", "scaleOwnName", "movedWindows", "windowOffsets", "windowGroups", "allUnderBar", "menuScale", "chocoboPointer", "untargetedOpacity", "glowOffWhenFighting", "thickness", "cursorSize", "cursorOutline", "replaceCursor", "cursorFeather", "barServerTime", "barServerTimeLine2", "barServerTimeIcons", "serverSeconds",
         "serverClockZone", "showLabels", "replaceMobNames", "showIcons", "hideInCombat", "hideClaimed", "hideTooWeak",
         "hideWhileEngaged", "markPlaceholders", "fontBold", "nameGlow", "scalePlayerNames",
         "labelFontBold", "showOrnament", "ownGlowColor", "ownOrnamentColor", "labelFontName", "glowSize",
@@ -719,6 +718,7 @@ TEST(percents_load_and_clamp_onto_steps_of_five)
     s.outlineOpacity         = 12;
     s.menuOpacity            = 33;
     s.cursorOutlineThickness = 52;
+    s.pearlOutline           = 113;
     LineDesign& line = s.Kind(PlateKind::Players).lines[0];
     line.textSize    = 87;
     line.iconSize    = 112;
@@ -732,14 +732,20 @@ TEST(percents_load_and_clamp_onto_steps_of_five)
     const Settings c = Clamp(s);
     CHECK(c.timerPercent == 85 && c.scaleMin == 90 && c.outlineOpacity == 10 && c.menuOpacity == 35);
     CHECK_EQ(c.cursorOutlineThickness, 50);
+    CHECK_EQ(c.pearlOutline, 115);
+    s.pearlOutline = 400;
+    CHECK_EQ(Clamp(s).pearlOutline, kMaxPearlOutline);
+    s.pearlOutline = -20;
+    CHECK_EQ(Clamp(s).pearlOutline, 0);
     const LineDesign& l = c.Kind(PlateKind::Players).lines[0];
     CHECK(l.textSize == 85 && l.iconSize == 110 && l.shadow == 5 && l.glow == 300 && l.glowSize == 25);
     const OpacitySettings& co = c.opacity;
     CHECK(co.noTarget == 85 && co.notTargeted == 40 && co.targeted == 100);
     CHECK(Clamp(Settings{}) == Settings{}); // every default is on the steps already
-    MapStore file = ReleaseFile({{"timerPercent", "87.0000"}, {"mobsLine2TextSize", "87.0000"}});
+    MapStore file = ReleaseFile({{"timerPercent", "87.0000"}, {"mobsLine2TextSize", "87.0000"}, {"pearlOutline", "142"}});
     const Settings loaded = LoadSettings(file);
     CHECK(loaded.timerPercent == 85 && loaded.Kind(PlateKind::Mobs).lines[1].textSize == 85);
+    CHECK_EQ(loaded.pearlOutline, 140);
 }
 
 TEST(non_finite_values_fall_back_to_defaults)
@@ -946,9 +952,10 @@ TEST(the_window_placement_saves_and_loads_back_its_switches_places_and_each_mode
 {
     const std::string_view first = WindowViews()[0].id, second = WindowViews()[1].id;
     Settings s;
-    s.moveWindows = false;
-    s.keepClear   = false;
-    s.placedUnder = {30, 70};
+    s.shiftVanillaUi = false;
+    s.placedUnder    = {30, 70};
+    s.hiddenWindows  = {"statcom", "inventor"};
+    s.pinnedWindows  = {WindowPlace{"equip", 100, 200}};
     s.viewShifts[static_cast<int>(HelpMode::On)]  = {ViewShift{std::string(first), 20}};
     s.viewShifts[static_cast<int>(HelpMode::Off)] = {
         ViewShift{std::string(second), -6}, ViewShift{std::string(first), 3}};
@@ -961,6 +968,53 @@ TEST(the_window_placement_saves_and_loads_back_its_switches_places_and_each_mode
     const std::vector<ViewShift> clamped = {{std::string(first), kMaxWindowOffset}};
     CHECK(read.viewShifts[static_cast<int>(HelpMode::On)] == clamped);
     CHECK_EQ(read.placedUnder[static_cast<int>(HelpMode::Off)], kMaxWindowOffset);
+}
+
+TEST(shift_vanilla_ui_reads_the_old_move_windows_switch_and_writes_only_its_own)
+{
+    MapStore old;
+    old.addsDefaults        = true; // a typed read of the new key would add it on and win over the old one
+    old.values["moveWindows"] = "false";
+    old.values["keepClear"]   = "true";
+    const Settings read = LoadSettings(old);
+    CHECK(!read.shiftVanillaUi);
+    MapStore ashita;
+    ashita.values["moveWindows"] = "0";
+    CHECK(!LoadSettings(ashita).shiftVanillaUi);
+    MapStore both;
+    both.values["shiftVanillaUi"] = "true";
+    both.values["moveWindows"]    = "false";
+    CHECK(LoadSettings(both).shiftVanillaUi);
+    MapStore fresh;
+    fresh.addsDefaults = true;
+    CHECK(LoadSettings(fresh).shiftVanillaUi);
+    MapStore saved;
+    SaveSettings(read, saved);
+    CHECK(saved.values["shiftVanillaUi"] == "false");
+    CHECK(!saved.values.contains("moveWindows") && !saved.values.contains("keepClear"));
+}
+
+TEST(the_custom_theme_saves_and_loads_back_every_part_and_a_file_without_it_has_phoenix_gold)
+{
+    Settings s;
+    s.barTheme = BarTheme::Custom;
+    for (size_t i = 0; i < std::size(kPaletteColors); ++i)
+        s.customPalette.*kPaletteColors[i].field = 0x10203000u + static_cast<uint32_t>(i);
+    s.customPalette.shape    = BarShape::Glass;
+    s.customPalette.border   = 5;
+    s.customPalette.gradient = false;
+    MapStore file;
+    SaveSettings(s, file);
+    CHECK(file.values["customThemeStripTop"] == "10203000" && file.values["customThemeShape"] == "glass");
+    CHECK(LoadSettings(file) == s);
+    MapStore fresh;
+    fresh.addsDefaults = true;
+    CHECK(LoadSettings(fresh).customPalette == PaletteOf(BarTheme::PhoenixGold));
+    MapStore garbled;
+    garbled.values["customThemeAccent"] = "not a color";
+    garbled.values["customThemeBorder"] = "99";
+    const Settings read = LoadSettings(garbled);
+    CHECK(read.customPalette.accent == PaletteOf(BarTheme::PhoenixGold).accent && read.customPalette.border == kMaxStripBorder);
 }
 
 TEST(the_windows_help_mode_follows_the_panels_help_line_and_the_games_own_strip)
@@ -1000,7 +1054,7 @@ TEST(a_new_install_places_the_windows_under_the_panel_at_its_reference_band_and_
 {
     MapStore fresh;
     const Settings s = LoadSettings(fresh);
-    CHECK(s.moveWindows && s.keepClear);
+    CHECK(s.shiftVanillaUi && s.hiddenWindows.empty());
     CHECK_EQ(s.placedUnder[static_cast<int>(HelpMode::On)], ReferenceBand(HelpMode::On));
     CHECK_EQ(s.placedUnder[static_cast<int>(HelpMode::Off)], ReferenceBand(HelpMode::Off));
     CHECK(s.viewShifts[0].empty() && s.viewShifts[1].empty());
@@ -1027,7 +1081,8 @@ TEST(each_theme_and_bar_widget_has_its_own_key)
     };
     for (const Named& t : {Named{"phoenixGold", BarTheme::PhoenixGold}, Named{"umbraDark", BarTheme::UmbraDark},
              Named{"phoenixRedOrnate", BarTheme::PhoenixRedOrnate},
-             Named{"phoenixRedPills", BarTheme::PhoenixRedPills}, Named{"aurora", BarTheme::Aurora}})
+             Named{"phoenixRedPills", BarTheme::PhoenixRedPills}, Named{"aurora", BarTheme::Aurora},
+             Named{"custom", BarTheme::Custom}})
     {
         MapStore store;
         store.values["barTheme"] = t.name;
@@ -1222,22 +1277,21 @@ TEST(the_windows_font_size_is_pixels_and_an_old_percent_becomes_the_pixels_it_dr
 TEST(the_window_defaults_place_every_view_by_headsups_defaults_or_leave_them_all_to_the_game)
 {
     Settings s;
-    s.windowOffsets = {WindowOffset{"equip", 10, -20}};
+    s.pinnedWindows = {WindowPlace{"equip", 100, 200}};
     s.viewShifts[static_cast<int>(HelpMode::On)] = {ViewShift{std::string(WindowViews()[0].id), 20}};
-    s.placedUnder = {1, 2};
-    s.keepClear   = false;
-    s.moveWindows = false;
+    s.placedUnder    = {1, 2};
+    s.shiftVanillaUi = false;
     UseHeadsUpWindowDefaults(s);
-    CHECK(s.moveWindows && s.keepClear && s.windowOffsets.empty() && s.viewShifts == Settings{}.viewShifts);
+    CHECK(s.shiftVanillaUi && s.pinnedWindows.empty() && s.viewShifts == Settings{}.viewShifts);
     CHECK(s.placedUnder == Settings{}.placedUnder);
-    s.windowOffsets = {WindowOffset{"equip", 10, -20}};
+    s.pinnedWindows = {WindowPlace{"equip", 100, 200}};
     s.moveGameHelp  = true;
     UseGameWindowDefaults(s);
-    CHECK(!s.moveWindows && !s.moveGameHelp && s.windowOffsets.empty());
+    CHECK(!s.shiftVanillaUi && !s.moveGameHelp && s.pinnedWindows.empty());
     s.hideHelpBar = false;
     s.barWidgets[static_cast<int>(BarWidget::GameHelp)] = false;
     UseHelpTextDefaults(s);
-    CHECK(s.moveWindows && !s.moveGameHelp && s.hideHelpBar && s.barWidgets[static_cast<int>(BarWidget::GameHelp)]);
+    CHECK(s.shiftVanillaUi && !s.moveGameHelp && s.hideHelpBar && s.barWidgets[static_cast<int>(BarWidget::GameHelp)]);
 }
 
 TEST(a_new_install_looks_as_the_release_did_for_one_but_for_five_changes)
@@ -2283,7 +2337,7 @@ TEST(a_cursor_file_is_a_name_and_never_a_path)
     named.cursorFile  = "My Cursor 2";
     CHECK(Clamp(named) == named);
     // The longest name a file may have is kept, and one letter more is no name.
-    named.cursorFile = std::string(kMaxCursorFileName, 'n');
+    named.cursorFile = std::string(kMaxFileName, 'n');
     CHECK(Clamp(named) == named);
     named.cursorFile += 'n';
     CHECK(Clamp(named).cursorStyle == CursorStyle::Feather);
