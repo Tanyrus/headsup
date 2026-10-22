@@ -353,6 +353,7 @@ class HeadsUp final : public IPlugin
     std::vector<headsup::WindowPlace> m_PlacedPins;
     std::vector<headsup::WindowPlace> m_WindowPlaces; // for the settings window, while it is open
     std::optional<std::string> m_WindowLog;   // /hu windowlog's file, while it runs
+    std::vector<std::string> m_OpenWindows;   // the game's windows drawn in the last frame, by short name
     std::vector<std::string> m_LastOpen;      // the open windows it wrote last // what the window hook has: the settings' windows and groups
     std::vector<std::string> m_SeenWindows;
     std::vector<std::string> m_CursorFiles;      // the cursors folder's, as the Target Cursor and Cursor Icon lists offer them
@@ -737,7 +738,8 @@ public:
         const uint8_t loginStatus = m_AshitaCore->GetMemoryManager()->GetPlayer()->GetLoginStatus();
         // A popup left open at logout would come back with the next character.
         if (loginStatus != headsup::kLoginInGame) m_BarInput.Reset();
-        m_UiHidden = m_Screenshot || m_Player.inEvent;
+        const bool mapShown = headsup::MapShown(m_OpenWindows);
+        m_UiHidden          = m_Screenshot || m_Player.inEvent || mapShown;
         StartRml();
         g_BarOn     = headsup::BarRuns(m_Settings, loginStatus) && m_Rml.Running();
         g_BarHidden = m_UiHidden;
@@ -795,8 +797,9 @@ public:
         m_ArrowHook.Hide(m_Settings.enabled && m_Settings.cursorStyle != headsup::CursorStyle::Vanilla);
         LoadCursorFile();
         LightGamePearl();
-        // The game's help bar is the only help left while an event hides HeadsUp's bar; a screenshot wants neither.
-        const bool helpGone = m_Settings.hideHelpBar && (m_Screenshot || !m_Player.inEvent);
+        // The game's help bar is the only help left while an event or the map hides HeadsUp's bar; a screenshot wants
+        // neither.
+        const bool helpGone = m_Settings.hideHelpBar && (m_Screenshot || !(m_Player.inEvent || mapShown));
         const headsup::HiddenWindows hidden{.helpBar = m_Settings.enabled && helpGone,
             .netstat = m_Settings.enabled && m_Settings.hideNetstat};
         const std::optional<headsup::HelpBand> band = HelpBandNow();
@@ -804,7 +807,8 @@ public:
         const bool movesWindows = (band && band->bottom != 0 && m_Settings.shiftVanillaUi) ||
                                   !m_Settings.pinnedWindows.empty() || m_Settings.moveGameHelp ||
                                   !m_Settings.hiddenWindows.empty();
-        if ((hidden.Any() || movesWindows) && !std::exchange(m_WindowHookTried, true))
+        // The panel also needs the hook to know when the game's map covers it.
+        if ((hidden.Any() || movesWindows || g_BarOn) && !std::exchange(m_WindowHookTried, true))
         {
             if (const std::string failure = m_WindowHook.Start(); !failure.empty())
                 Print("could not hide or move the game's windows: " + failure + ".");
@@ -838,7 +842,8 @@ public:
             m_WindowHook.Pin(m_PlacedPins);
         }
         if (m_WindowHook.SeenCount() != m_SeenWindows.size()) m_SeenWindows = m_WindowHook.SeenWindows();
-        if (std::vector<std::string> open = m_WindowHook.TakeOpen(); m_WindowLog && open != m_LastOpen)
+        m_OpenWindows = m_WindowHook.TakeOpen();
+        if (const std::vector<std::string>& open = m_OpenWindows; m_WindowLog && open != m_LastOpen)
         {
             if (FILE* log = std::fopen(m_WindowLog->c_str(), "a"))
             {
@@ -848,7 +853,7 @@ public:
                 std::fputc('\n', log);
                 std::fclose(log);
             }
-            m_LastOpen = std::move(open);
+            m_LastOpen = open;
         }
         m_PointerFix.Enable(m_Settings.enabled && m_Settings.fixPointer);
         m_PointerFix.KeepPointerFor(m_Settings.enabled ? m_Settings.keepPointerKeys : std::vector<uint8_t>{});

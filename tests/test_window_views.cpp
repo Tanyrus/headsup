@@ -315,3 +315,11 @@ TEST(a_window_the_game_hangs_under_the_strip_beside_the_status_column_rises_to_l
     CHECK(top(hidden, 16, 48, 382) == 64 && top(hidden, 142, 48, 382) == 64);
     CHECK(FrameShifts{}.For(130, 382, kScreenRight) == 0); // windows not moved
 }
+
+TEST(the_full_map_covers_the_panel_and_other_windows_do_not)
+{
+    // The windows the test client drew with the map open, and before it in West Ronfaure (/hu windowlog).
+    CHECK(MapShown({"logwindo", "map0", "mapframe", "partywin"}));
+    CHECK(!MapShown({"buff", "logwin2", "logwindo", "partywin"}));
+    CHECK(!MapShown({}));
+}

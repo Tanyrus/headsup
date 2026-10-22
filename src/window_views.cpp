@@ -94,6 +94,12 @@ namespace headsup
         return top;
     }
 
+    bool MapShown(const std::vector<std::string>& open)
+    {
+        constexpr std::string_view kMapWindow = "mapframe";
+        return std::ranges::find(open, kMapWindow) != open.end();
+    }
+
     bool SwallowsClick(uint32_t message, int x, int y, std::span<const WindowRect> hidden)
     {
         constexpr uint32_t kButtons[] = {kLeftDown, kLeftUp, kLeftDouble, kRightDown, kRightUp, kRightDouble, kMiddleDown,

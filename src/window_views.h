@@ -82,6 +82,9 @@ namespace headsup
     // A mouse button's message at a point of the menu, in the game's menu pixels, over one of the windows hidden this
     // frame: kept from the game, which would act on a window no one sees. Moves and the wheel pass.
     bool SwallowsClick(uint32_t message, int x, int y, std::span<const WindowRect> hidden);
+    // Whether the game's full map is among the windows open, by short name: it starts at the screen's top, under the
+    // panel, and is too tall to move down.
+    bool MapShown(const std::vector<std::string>& open);
     // What places a frame: the player's shift for its view and where the view's windows start, neither for a frame no
     // view holds.
     struct FramePlan
