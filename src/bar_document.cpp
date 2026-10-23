@@ -276,7 +276,9 @@ namespace headsup
         const BarRow& row    = look.row;
         const TextRow& lines = look.lines;
         const int stripRows = WholePixels(m.height), belowRows = WholePixels(m.below);
-        const float stripHeight = static_cast<float>(stripRows + belowRows) + (p.underLine != 0 ? 1.0f : 0.0f);
+        // The game's art frames the bar alone: the glow other themes fade out under the strip would hang its frame low.
+        const float stripHeight =
+            static_cast<float>(stripRows + (look.skin ? 0 : belowRows)) + (p.underLine != 0 ? 1.0f : 0.0f);
         const float mid         = row.y + row.height / 2.0f;
         const float rowTop      = row.y + kContentInset; // where a widget's content starts
         const float clear       = DiamondClearance(m);

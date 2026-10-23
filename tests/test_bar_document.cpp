@@ -348,6 +348,10 @@ TEST(the_strip_and_the_popups_are_drawn_with_the_games_art_when_the_shape_is_win
     const std::string bar = BarDocument(look, Place());
     CHECK(bar.find(SkinSource(3, SkinPiece::Back, kSkinTile)) != std::string::npos);
     CHECK(bar.find("hu:strip") == std::string::npos);
+    // The art is the bar's own height, so the widgets centered in the bar are centered in the frame: no room for the
+    // glow other themes fade out under the strip.
+    const std::string strip = bar.substr(bar.find("#strip{"));
+    CHECK(strip.substr(0, strip.find('}')).find("height:" + Px(look.metrics.height) + ";") != std::string::npos);
     const PopupFaces faces{};
     CHECK(PopupDocument(look, faces).find(SkinSource(3, SkinPiece::TopLeft, kFrameCorner)) != std::string::npos);
     // Without the art read, the shape draws its colors.
