@@ -1286,7 +1286,7 @@ private:
             pivotIni.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
         }
         const std::string gameFolder = headsup::ModuleFolder(headsup::kGameModule);
-        for (const std::string& path : headsup::GameFontCandidates(pivotIni, pivotFolder + kPivotDats, gameFolder))
+        for (const std::string& path : headsup::GameFileCandidates(pivotIni, pivotFolder + kPivotDats, gameFolder, headsup::kGameFontFile))
         {
             std::ifstream in(path, std::ios::binary | std::ios::ate);
             const std::streamoff size = in.tellg();

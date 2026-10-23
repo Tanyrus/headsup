@@ -1,3 +1,4 @@
+#include "dat_bytes.h"
 #include "game_font.h"
 #include "plate_image.h"
 #include "plate_settings.h"
@@ -12,67 +13,16 @@ using namespace headsup;
 
 namespace
 {
-    using Bytes = std::vector<uint8_t>;
+    using namespace dat;
 
     constexpr const char* kPictureName = "font    font    ";
 
-    void Put16(Bytes& out, uint16_t v) { out.insert(out.end(), {static_cast<uint8_t>(v), static_cast<uint8_t>(v >> 8)}); }
-    void Put32(Bytes& out, uint32_t v)
-    {
-        for (int i = 0; i < 4; ++i)
-            out.push_back(static_cast<uint8_t>(v >> (8 * i)));
-    }
-    void PutText(Bytes& out, const char* text) { out.insert(out.end(), text, text + std::strlen(text)); }
-    Bytes operator+(Bytes a, const Bytes& b)
-    {
-        a.insert(a.end(), b.begin(), b.end());
-        return a;
-    }
-
-    // A DAT chunk: its name, a word of its type (low 7 bits) and its size in 16-byte units (the next 19), 8 bytes
-    // unused, then the body padded to 16 bytes.
-    Bytes Chunk(const char* name, uint32_t type, Bytes body)
-    {
-        body.resize((body.size() + 15) / 16 * 16);
-        Bytes out(name, name + 4);
-        Put32(out, static_cast<uint32_t>((16 + body.size()) / 16) << 7 | type);
-        out.resize(16);
-        return out + body;
-    }
-
-    // A picture chunk's body as 51.DAT has it: 0xA1, a 16-byte name, a BITMAPINFOHEADER, the four-letter code stored
-    // backwards, the data's size and a dword, then the blocks.
     Bytes PictureBody(int32_t width, int32_t height, const char* code, const Bytes& blocks, uint8_t flag = 0xA1,
         const char* name = kPictureName)
     {
-        Bytes out{flag};
-        PutText(out, name);
-        Put32(out, 40);
-        Put32(out, static_cast<uint32_t>(width));
-        Put32(out, static_cast<uint32_t>(height));
-        Put16(out, 1);
-        Put16(out, 32);
-        out.resize(out.size() + 24);
-        for (int i = 3; i >= 0; --i)
-            out.push_back(static_cast<uint8_t>(code[i]));
-        Put32(out, static_cast<uint32_t>(blocks.size()));
-        Put32(out, 0x400);
-        return out + blocks;
+        return Picture(name, width, height, code, blocks, flag);
     }
 
-    // Direct3D's blocks of 4 x 4 pixels, the first pixel in the lowest bits: DXT3 is 16 alphas of 4 bits, then a DXT1
-    // color block, two 565 colors and a 2-bit pick a pixel.
-    Bytes ColorBlock(uint16_t c0, uint16_t c1, const std::array<uint8_t, 16>& picks)
-    {
-        Bytes out;
-        Put16(out, c0);
-        Put16(out, c1);
-        uint32_t bits = 0;
-        for (int k = 0; k < 16; ++k)
-            bits |= static_cast<uint32_t>(picks[static_cast<size_t>(k)]) << (2 * k);
-        Put32(out, bits);
-        return out;
-    }
     Bytes Dxt3Block(const std::array<uint8_t, 16>& alphas, uint16_t c0, uint16_t c1, const std::array<uint8_t, 16>& picks)
     {
         Bytes out(8, 0);
@@ -344,17 +294,17 @@ TEST(the_font_is_read_where_xipivot_would_read_it_then_from_the_game)
 {
     // XIPivot's overlays, numbered from 0 until one is missing, each under its root; the lowest number wins.
     const std::string game = "C:\\Game\\ROM\\119\\51.DAT";
-    CHECK((GameFontCandidates("[settings]\r\nroot_path=X:\\r\r\n[overlays]\r\n0=A\r\n1=B\r\n3=D\r\n", "D:\\d", "C:\\Game") ==
+    CHECK((GameFileCandidates("[settings]\r\nroot_path=X:\\r\r\n[overlays]\r\n0=A\r\n1=B\r\n3=D\r\n", "D:\\d", "C:\\Game", kGameFontFile) ==
            std::vector<std::string>{"X:\\r\\A\\ROM\\119\\51.DAT", "X:\\r\\B\\ROM\\119\\51.DAT", game}));
-    CHECK((GameFontCandidates("[Overlays]\n0 = A\n[SETTINGS]\nRoot_Path=X:\\r\\\n", "D:\\d", "C:\\Game") ==
+    CHECK((GameFileCandidates("[Overlays]\n0 = A\n[SETTINGS]\nRoot_Path=X:\\r\\\n", "D:\\d", "C:\\Game", kGameFontFile) ==
            std::vector<std::string>{"X:\\r\\A\\ROM\\119\\51.DAT", game}));
-    CHECK((GameFontCandidates("[overlays]\n0=A\n", "D:\\d", "C:\\Game") == std::vector<std::string>{"D:\\d\\A\\ROM\\119\\51.DAT", game}));
-    CHECK((GameFontCandidates("[settings]\nroot_path=X:\\r\n", "D:\\d", "C:\\Game") == std::vector<std::string>{game}));
-    CHECK((GameFontCandidates("", "D:\\d", "C:\\Game") == std::vector<std::string>{game}));
+    CHECK((GameFileCandidates("[overlays]\n0=A\n", "D:\\d", "C:\\Game", kGameFontFile) == std::vector<std::string>{"D:\\d\\A\\ROM\\119\\51.DAT", game}));
+    CHECK((GameFileCandidates("[settings]\nroot_path=X:\\r\n", "D:\\d", "C:\\Game", kGameFontFile) == std::vector<std::string>{game}));
+    CHECK((GameFileCandidates("", "D:\\d", "C:\\Game", kGameFontFile) == std::vector<std::string>{game}));
     // This install's file.
     const char* pivot = "[settings]\nroot_path=X:\\Games\\PhoenixXI\\polplugins\\DATs\ndebug_log=false\nredirect_fopens=true\n"
                         "[overlays]\n0=EraDATs\n1=XICombinedMaps-2048\n2=XiView-Standard\n";
-    const std::vector<std::string> files = GameFontCandidates(pivot, "D:\\d", "C:\\Game");
+    const std::vector<std::string> files = GameFileCandidates(pivot, "D:\\d", "C:\\Game", kGameFontFile);
     CHECK(files.size() == 4u && files[2] == "X:\\Games\\PhoenixXI\\polplugins\\DATs\\XiView-Standard\\ROM\\119\\51.DAT");
 }
 

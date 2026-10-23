@@ -67,7 +67,6 @@ namespace headsup
             kRectV,
         };
 
-        constexpr std::string_view kFontFile      = "ROM\\119\\51.DAT";
         constexpr std::string_view kPivotSettings = "settings", kPivotRoot = "root_path", kPivotOverlays = "overlays";
 
         constexpr char32_t kUnknownGlyph = U'?';
@@ -487,7 +486,8 @@ namespace headsup
         return {GameFontFace{std::move(*picture.value), *shapes.value}, {}};
     }
 
-    std::vector<std::string> GameFontCandidates(std::string_view pivotIni, std::string_view defaultRoot, std::string_view gameFolder)
+    std::vector<std::string> GameFileCandidates(std::string_view pivotIni, std::string_view defaultRoot, std::string_view gameFolder,
+        std::string_view file)
     {
         std::string root = IniValue(pivotIni, kPivotSettings, kPivotRoot).value_or(std::string());
         if (root.empty()) root = defaultRoot;
@@ -496,9 +496,9 @@ namespace headsup
         {
             const std::optional<std::string> overlay = IniValue(pivotIni, kPivotOverlays, std::to_string(number));
             if (!overlay || overlay->empty()) break;
-            files.push_back(Under(Under(root, *overlay), kFontFile));
+            files.push_back(Under(Under(root, *overlay), file));
         }
-        files.push_back(Under(gameFolder, kFontFile));
+        files.push_back(Under(gameFolder, file));
         return files;
     }
 }
