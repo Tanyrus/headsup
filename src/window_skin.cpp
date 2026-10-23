@@ -303,6 +303,12 @@ namespace headsup
                shade(f.shadeBottom) + "),image(" + source(SkinPiece::Back, kSkinTile) + " none repeat);";
     }
 
+    int SkinTypeOf(int windowType, std::optional<int> gameType)
+    {
+        if (windowType > kFollowGameWindow) return std::min(windowType, kWindowTypes) - 1;
+        return std::clamp(gameType.value_or(0), 0, kWindowTypes - 1);
+    }
+
     GameSkinLook SkinLookOf(const WindowSkin& skin, int type, float scale)
     {
         return GameSkinLook{SkinFrame{type, scale, skin.shadeTop, skin.shadeBottom}, SkinPalette(skin), SkinMenuColors(skin)};

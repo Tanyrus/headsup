@@ -212,6 +212,19 @@ namespace headsup
         std::array<StripWindowReader, 2> m_Readers; // by StripWindow
     };
     // The client's connection counters (LocateNetStats), read on the game's thread.
+    // The Window Type the game is set to, by the client's own config getter, found once.
+    class WindowTypeReader
+    {
+    public:
+        // "" when found, else why not.
+        std::string Find();
+        // 0 to 7; nothing before Find succeeded or when the game answers no type.
+        std::optional<int> Read() const;
+
+    private:
+        int32_t(__cdecl* m_Get)(int32_t) = nullptr;
+    };
+
     // The zone's weather as the client keeps it, found once.
     class WeatherReader
     {

@@ -1196,3 +1196,20 @@ TEST(an_owners_place_copy_is_found_in_its_layouts_call_for_the_windows_rectangle
     const std::vector<uint8_t> noDisplacement{0x8D, 0x06, 0x90, 0x50, 0xE8, 0x3A, 0x07, 0xFD, 0xFF};
     CHECK(!PlaceCopyOffset(noDisplacement, 0x14882D, getRect));
 }
+
+TEST(the_config_getter_is_the_first_place_its_bytes_are)
+{
+    // From the client: mov ecx,[config]; test ecx,ecx; jz; mov eax,[esp+4]; push eax; call get; ret; or eax,-1; ret.
+    constexpr uint32_t kGetter = kTextRva + 0x153850;
+    const auto put = [&](Image& image, uint32_t at) {
+        image.Put(at, {0x8B, 0x0D, 0xA8, 0x3C, 0x57, 0x10, 0x85, 0xC9, 0x74, 0x0C, 0x8B, 0x44, 0x24, 0x04, 0x50, 0xE8, 0x10,
+                          0x20, 0x30, 0x00, 0xC3, 0x83, 0xC8, 0xFF, 0xC3});
+    };
+    Image image;
+    CHECK(LocateConfigGet(image.Text()).problem == LocateProblem::NoConfigGet);
+    put(image, kGetter);
+    // The client has a second getter of the same bytes after it, for another table: Ashita's config addon takes the first.
+    put(image, kGetter + 0x20);
+    const ConfigGetSite found = LocateConfigGet(image.Text());
+    CHECK(found.problem == LocateProblem::None && found.entry == kGetter);
+}

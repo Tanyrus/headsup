@@ -65,6 +65,9 @@ namespace headsup
     BarPalette SkinPalette(const WindowSkin& skin);
     MenuColors SkinMenuColors(const WindowSkin& skin);
 
+    // The skin drawn for a Window Type setting: the type it pins, else the type the game is set to (0 to 7), else Type 1.
+    int SkinTypeOf(int windowType, std::optional<int> gameType);
+
     // What the panel and the settings window are drawn with for one skin: its frame and its colors.
     struct GameSkinLook
     {

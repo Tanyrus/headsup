@@ -212,6 +212,9 @@ namespace headsup
         constexpr int16_t kWeatherLoad[]      = {0x66, 0xA1, -1, -1, -1, -1, 0x66, 0x3D, 0x04, 0x00, 0x72, -1, 0x66,
             0x3D, 0x14, 0x00};
         constexpr uint32_t kWeatherLoadGlobal = 2;
+        // mov ecx,[config]; test ecx,ecx; jz; mov eax,[esp+4]; push eax; call get; ret; or eax,-1; ret.
+        constexpr int16_t kConfigGet[] = {0x8B, 0x0D, -1, -1, -1, -1, 0x85, 0xC9, 0x74, -1, 0x8B, 0x44, 0x24, 0x04, 0x50,
+            0xE8, -1, -1, -1, -1, 0xC3, 0x83, 0xC8, 0xFF, 0xC3};
         constexpr size_t kCounterLoads        = 2;
         // The 3-second update: xor eax,eax; push 3000; clear both byte counts; mov edx,[net]; mov eax,[edx+4190h], the
         // milliseconds since the last server data.
@@ -334,6 +337,7 @@ namespace headsup
         case LocateProblem::WindowDrawChanged: return "the game's menu window draw is not as HeadsUp expects";
         case LocateProblem::NoWeather: return "the game's weather was not found";
         case LocateProblem::AmbiguousWeather: return "the game's weather was found more than once";
+        case LocateProblem::NoConfigGet: return "the game's config values were not found";
         case LocateProblem::NoWindowMove: return "the game's window move was not found";
         case LocateProblem::AmbiguousWindowMove: return "the game's window move was found more than once";
         case LocateProblem::NoWindowBuild: return "where the game builds a window was not found";
@@ -507,6 +511,13 @@ namespace headsup
         if (found.empty()) return WeatherSite{LocateProblem::NoWeather};
         if (found.size() > 1) return WeatherSite{LocateProblem::AmbiguousWeather};
         return WeatherSite{LocateProblem::None, ReadAt<uint32_t>(text.bytes, found.front() + kWeatherLoadGlobal)};
+    }
+
+    ConfigGetSite LocateConfigGet(const ImageSection& text)
+    {
+        const std::vector<uint32_t> found = FindAll(kConfigGet, text);
+        if (found.empty()) return ConfigGetSite{LocateProblem::NoConfigGet};
+        return ConfigGetSite{LocateProblem::None, text.rva + found.front()};
     }
 
     std::optional<NetCounters> CountersFrom(int32_t received, int32_t sent, int32_t health)

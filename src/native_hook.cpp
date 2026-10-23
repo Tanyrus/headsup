@@ -6,6 +6,7 @@
 #include "native_locate.h"
 #include "pointer_keys.h"
 #include "tracker.h"
+#include "window_skin.h"
 
 #ifdef HEADSUP_DEV
 #include "namedump.h"
@@ -731,6 +732,26 @@ namespace headsup
         if (!InImage(base, Pointer(found.global), sizeof(uint16_t))) return "the weather is not in the game's image";
         m_Global = found.global;
         return "";
+    }
+
+    std::string WindowTypeReader::Find()
+    {
+        const auto* base = reinterpret_cast<const uint8_t*>(GetModuleHandleA(kGameModule));
+        if (base == nullptr) return std::string(kGameModule) + " is not loaded";
+        ImageSection text{};
+        if (!FindSection(base, kCodeSection, text)) return kCodeNotRead;
+        const ConfigGetSite found = LocateConfigGet(text);
+        if (found.problem != LocateProblem::None) return Describe(found.problem);
+        m_Get = reinterpret_cast<int32_t(__cdecl*)(int32_t)>(const_cast<uint8_t*>(base) + found.entry);
+        return "";
+    }
+
+    std::optional<int> WindowTypeReader::Read() const
+    {
+        if (m_Get == nullptr) return std::nullopt;
+        const int32_t type = m_Get(kWindowTypeConfig);
+        if (type < 0 || type >= kWindowTypes) return std::nullopt;
+        return type;
     }
 
     std::vector<uint32_t> FriendListReader::Read()

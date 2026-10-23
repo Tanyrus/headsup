@@ -331,3 +331,11 @@ TEST(a_skins_look_is_its_frame_its_palette_and_its_menus_colors)
     CHECK((look.frame == SkinFrame{4, 2.0f, 0.25f, 1.0f}));
     CHECK(look.palette == SkinPalette(skin) && look.menu == SkinMenuColors(skin));
 }
+
+TEST(the_skin_drawn_is_the_pinned_type_else_the_games_else_type_1)
+{
+    CHECK_EQ(SkinTypeOf(3, 6), 2);
+    CHECK_EQ(SkinTypeOf(kFollowGameWindow, 6), 6);
+    CHECK_EQ(SkinTypeOf(kFollowGameWindow, std::nullopt), 0);
+    CHECK_EQ(SkinTypeOf(kWindowTypes, std::nullopt), kWindowTypes - 1);
+}

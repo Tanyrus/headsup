@@ -70,6 +70,7 @@ namespace headsup
         StripCountChanged,
         NoWeather,
         AmbiguousWeather,
+        NoConfigGet,
     };
     const char* Describe(LocateProblem problem);
 
@@ -440,6 +441,16 @@ namespace headsup
         uint32_t global       = 0; // the weather's address in the running client, as the code holds it
     };
     WeatherSite LocateWeather(const ImageSection& text);
+
+    // The client's getter of its config values (int32_t __cdecl get(int32_t key), -1 for none), as Ashita's config
+    // addon finds it: the first of the two routines of its bytes. Key 18 is Config > Windows > Shared > Window Type.
+    struct ConfigGetSite
+    {
+        LocateProblem problem = LocateProblem::None;
+        uint32_t entry        = 0; // RVA
+    };
+    ConfigGetSite LocateConfigGet(const ImageSection& text);
+    constexpr int32_t kWindowTypeConfig = 18;
 
     struct NetCounters
     {

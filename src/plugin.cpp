@@ -35,6 +35,7 @@
 #include "shot_watch.h"
 #include "tracker.h"
 #include "window_file.h"
+#include "window_skin.h"
 #include "linuxxi_report.h"
 #include "memory_query.h"
 #ifdef HEADSUP_DEV
@@ -102,7 +103,8 @@ namespace
     constexpr const char* kPivotModule       = "pivot.dll";
     constexpr const char* kPivotConfig       = "config\\pivot\\pivot.ini";
     constexpr const char* kPivotDats         = "\\DATs";
-    constexpr uint64_t kMaxFontFileBytes     = 64u << 20; // the game's own is 4 MB
+    constexpr uint64_t kMaxDatBytes          = 64u << 20; // 51.DAT is 4 MB, the largest of the game files read
+    constexpr double kWindowTypeSeconds      = 1.0;       // how often the game's Window Type is read again
     constexpr uint32_t kPartyIconMembers     = 5;  // the other members of your party, whose buffs the game keeps
     constexpr uint32_t kPartyMembers         = 18; // you, your party and the two other alliance parties
     constexpr uint32_t kEngagedStatus        = 1;  // an entity's status while it fights
@@ -362,6 +364,13 @@ class HeadsUp final : public IPlugin
     std::optional<std::string> m_CursorFileRead; // the File cursor read last, whether or not it was one
     std::string m_GameFontFailure;                // why the game's font could not be read; empty when it was
     std::string m_GamePearlFailure;               // why the game's pearl could not be read; empty when it was
+    headsup::WindowSkins m_WindowSkins;           // the game's window art, by Window Type
+    std::array<std::string, headsup::kWindowTypes> m_SkinFailures; // why a type's art could not be read
+    std::array<bool, headsup::kWindowTypes> m_SkinWarned{};        // whether that was said
+    headsup::WindowTypeReader m_WindowTypeReader;
+    std::optional<int> m_GameWindowType;          // the Window Type the game is set to, 0 to 7, while it can be read
+    double m_WindowTypeReadAt = -kWindowTypeSeconds;
+    std::optional<headsup::GameSkinLook> m_SkinLook; // the art drawn now, while the panel or the window uses it
     std::optional<headsup::ColorPicture> m_GamePearl;
     std::optional<int> m_PearlOutlineDrawn;       // the outline the pearl was last drawn with
     bool m_GameFontWarned = false;
@@ -787,8 +796,9 @@ public:
                 m_BarInput.Leave();
         }
         // Off, the bar is given nothing to show, and releases what it made.
+        UpdateSkin(now);
         if (m_Rml.Running())
-            m_RmlBar.Update(m_Rml, g_BarOn ? BarStateNow(now) : headsup::BarState{}, m_Settings, nullptr,
+            m_RmlBar.Update(m_Rml, g_BarOn ? BarStateNow(now) : headsup::BarState{}, m_Settings, SkinNow(),
                 m_Names.BackBufferWidth(), m_Names.BackBufferHeight(), m_BarInput, m_UiHidden);
         // Over ImGui from Present; with the bar, under ImGui, when Present is not hooked.
         if (g_PresentSlot != nullptr)
@@ -1270,13 +1280,14 @@ private:
             Note("could not fix the game's mouse pointer: " + failure + ".");
         ReadGameFont();
         SayGameFontFailure();
+        ReadWindowSkins();
         if (!m_GamePearlFailure.empty())
             Note("the game's linkpearl could not be read (" + m_GamePearlFailure + "): the linkshell's is drawn as XIUI's.");
     }
 
-    // The font the game writes its names in and the pearl it draws before them, from the file it reads them from:
-    // while XIPivot is loaded, the first of its overlays that holds the file.
-    void ReadGameFont()
+    // A file of the game's install where the game reads it: while XIPivot is loaded, the first of its overlays that
+    // holds the file. Its bytes, or why there are none (failure, which names the file once one was found).
+    std::optional<std::vector<uint8_t>> GameFileBytes(std::string_view file, std::string& failure)
     {
         std::string pivotIni;
         const std::string pivotFolder = headsup::ModuleFolder(kPivotModule);
@@ -1286,42 +1297,92 @@ private:
             pivotIni.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
         }
         const std::string gameFolder = headsup::ModuleFolder(headsup::kGameModule);
-        for (const std::string& path : headsup::GameFileCandidates(pivotIni, pivotFolder + kPivotDats, gameFolder, headsup::kGameFontFile))
+        for (const std::string& path : headsup::GameFileCandidates(pivotIni, pivotFolder + kPivotDats, gameFolder, file))
         {
             std::ifstream in(path, std::ios::binary | std::ios::ate);
             const std::streamoff size = in.tellg();
             if (!in || size <= 0) continue;
-            m_GameFontFailure = path + ": ";
-            if (static_cast<uint64_t>(size) > kMaxFontFileBytes)
+            failure = path + ": ";
+            if (static_cast<uint64_t>(size) > kMaxDatBytes)
             {
-                m_GameFontFailure += "it is too large";
-                m_GamePearlFailure = m_GameFontFailure;
-                return;
+                failure += "it is too large";
+                return std::nullopt;
             }
             std::vector<uint8_t> bytes(static_cast<size_t>(size));
             in.seekg(0);
             if (!in.read(reinterpret_cast<char*>(bytes.data()), size))
             {
-                m_GameFontFailure += "it could not be read";
-                m_GamePearlFailure = m_GameFontFailure;
-                return;
+                failure += "it could not be read";
+                return std::nullopt;
             }
-            headsup::Read<headsup::ColorPicture> pearl = headsup::ReadGamePearl(bytes);
-            if (pearl.value) m_GamePearl = std::move(pearl.value);
-            else m_GamePearlFailure = path + ": " + pearl.failure;
-            headsup::Read<headsup::GameFontFace> font = headsup::ReadGameFont(bytes);
-            if (!font.value)
-            {
-                m_GameFontFailure += font.failure;
-                return;
-            }
-            m_GameFontFailure.clear();
-            m_Nameplates.SetGameFont(std::move(font.value));
+            return bytes;
+        }
+        failure = "the game's " + std::string(file) + " was not found under " + gameFolder;
+        return std::nullopt;
+    }
+
+    // The font the game writes its names in and the pearl it draws before them.
+    void ReadGameFont()
+    {
+        std::string where;
+        const std::optional<std::vector<uint8_t>> bytes = GameFileBytes(headsup::kGameFontFile, where);
+        if (!bytes)
+        {
+            m_GameFontFailure  = where;
+            m_GamePearlFailure = where;
             return;
         }
-        m_GameFontFailure  = "the game's ROM\\119\\51.DAT was not found under " + gameFolder;
-        m_GamePearlFailure = m_GameFontFailure;
+        headsup::Read<headsup::ColorPicture> pearl = headsup::ReadGamePearl(*bytes);
+        if (pearl.value) m_GamePearl = std::move(pearl.value);
+        else m_GamePearlFailure = where + pearl.failure;
+        headsup::Read<headsup::GameFontFace> font = headsup::ReadGameFont(*bytes);
+        if (!font.value)
+        {
+            m_GameFontFailure = where + font.failure;
+            return;
+        }
+        m_GameFontFailure.clear();
+        m_Nameplates.SetGameFont(std::move(font.value));
     }
+
+    // The game's eight window skins, and where it keeps the Window Type it is set to.
+    void ReadWindowSkins()
+    {
+        for (int type = 0; type < headsup::kWindowTypes; ++type)
+        {
+            std::string where;
+            const std::optional<std::vector<uint8_t>> bytes = GameFileBytes(headsup::WindowSkinFile(type), where);
+            headsup::Read<headsup::WindowSkin> skin =
+                bytes ? headsup::ReadWindowSkin(*bytes) : headsup::Read<headsup::WindowSkin>{std::nullopt, ""};
+            if (skin.value) m_WindowSkins[static_cast<size_t>(type)] = std::move(skin.value);
+            else m_SkinFailures[static_cast<size_t>(type)] = where + skin.failure;
+        }
+        if (const std::string failure = m_WindowTypeReader.Find(); !failure.empty())
+            Note("Game Window's Follow Game draws Type 1, as the game's Window Type cannot be read: " + failure + ".");
+    }
+
+    // The game's art the panel and the window are drawn in while they use it: the Window Type's, the game's own read
+    // again once a second, at the menu's scale on the back buffer.
+    void UpdateSkin(double now)
+    {
+        if (!headsup::UsesGameArt(m_Settings)) return;
+        if (now - m_WindowTypeReadAt >= kWindowTypeSeconds)
+        {
+            m_GameWindowType   = m_WindowTypeReader.Read();
+            m_WindowTypeReadAt = now;
+        }
+        const int type    = headsup::SkinTypeOf(m_Settings.windowType, m_GameWindowType);
+        const float scale = m_MenuHeight > 0.0f ? m_Names.BackBufferHeight() / m_MenuHeight : 1.0f;
+        if (m_SkinLook && type == m_SkinLook->frame.type && scale == m_SkinLook->frame.scale) return;
+        const std::optional<headsup::WindowSkin>& skin = m_WindowSkins[static_cast<size_t>(type)];
+        m_SkinLook.reset();
+        if (skin) m_SkinLook = headsup::SkinLookOf(*skin, type, scale);
+        else if (!std::exchange(m_SkinWarned[static_cast<size_t>(type)], true))
+            Print("the game's window art for Type " + std::to_string(type + 1) + " could not be read (" +
+                  m_SkinFailures[static_cast<size_t>(type)] + "): Game Window looks as Phoenix Gold until HeadsUp reloads.");
+    }
+
+    const headsup::GameSkinLook* SkinNow() const { return m_SkinLook ? &*m_SkinLook : nullptr; }
 
     // The linkshell's pearl in the game's light and colors, drawn again when the settings ask for another outline.
     void LightGamePearl()
@@ -1546,6 +1607,7 @@ private:
     headsup::MenuHost MenuHostNow()
     {
         headsup::MenuHost host{m_Rml.Overlay(), headsup::kBarlowCondensed, {}, KeyDown};
+        host.skin = m_SkinLook;
         const headsup::MenuFont* font = headsup::MenuFontNamed(m_Settings.menuFont);
         if (font != nullptr && (font->file == nullptr ? m_Rml.EnsureFont(font->name)
                                                       : m_Rml.EnsureFontFile(font->name, headsup::WindowsFontPath(font->file))))
@@ -1718,7 +1780,10 @@ private:
         if (std::exchange(m_RmlTried, true)) return;
         const bool started = m_Rml.Start(m_Device, width, height,
             [this](const std::string& line) { Note("RmlUi: " + line); },
-            [](const std::string& name) { return headsup::HostImage(name); });
+            [this](const std::string& name) {
+                if (std::optional<headsup::Image> piece = headsup::SkinImage(m_WindowSkins, name)) return piece;
+                return headsup::HostImage(name);
+            });
         if (!started) Print("RmlUi did not start: the top panel and the settings window are off until HeadsUp reloads.");
     }
 
