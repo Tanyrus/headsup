@@ -925,6 +925,7 @@ TEST(a_caption_names_a_bag_only_when_it_is_that_bags_name)
     // The Mog House's own short captions for some of them.
     CHECK(ContainerNamed("Locker") == 4 && ContainerNamed("M.Ward.") == 8 && ContainerNamed("M.Ward. 2") == 10);
     CHECK(ContainerNamed("M.Ward. 8") == 16 && !ContainerNamed("M.Ward. 9").has_value());
+    CHECK(ContainerNamed("Satchel") == 5 && ContainerNamed("Mog Sack") == 6); // as View House's lists title them
     CHECK(!ContainerNamed("Inventory 1/30").has_value()); // the game's own count, if it is there, stays the game's
     CHECK(!ContainerNamed("Commands").has_value() && !ContainerNamed("").has_value());
 }

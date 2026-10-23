@@ -31,7 +31,7 @@ namespace headsup
             const char* caption;
             int container;
         };
-        constexpr ShortCaption kShortCaptions[] = {{"Locker", 4}, {"M.Ward.", 8}, {"M.Ward. 2", 10}, {"M.Ward. 3", 11},
+        constexpr ShortCaption kShortCaptions[] = {{"Locker", 4}, {"Satchel", 5}, {"M.Ward.", 8}, {"M.Ward. 2", 10}, {"M.Ward. 3", 11},
             {"M.Ward. 4", 12}, {"M.Ward. 5", 13}, {"M.Ward. 6", 14}, {"M.Ward. 7", 15}, {"M.Ward. 8", 16}};
         constexpr uint32_t kElementColors[kElementCount] = {0xFFFF8A3C, 0xFF8FD8FF, kBarGreen, 0xFFD8B25A, 0xFFC58CFF,
             0xFF5B9DFF, 0xFFFFFFFF, 0xFF9A8AA8};
