@@ -3,7 +3,10 @@
 #include "test.h"
 #include "window_skin.h"
 
+#include <algorithm>
 #include <array>
+#include <cmath>
+#include <numbers>
 #include <optional>
 #include <string>
 #include <tuple>
@@ -217,4 +220,88 @@ TEST(sizes_are_the_menus_pixels_times_its_scale)
     CHECK_EQ(SkinPixels(24, 4.0f / 3.0f), 32);
     CHECK_EQ(SkinPixels(5, 4.0f / 3.0f), 7);
     CHECK_EQ(SkinPixels(5, 0.01f), 1);
+}
+
+namespace
+{
+    // A skin of one background color and a frame of another, at full shade.
+    WindowSkin Colored(uint32_t back, uint32_t frame)
+    {
+        const auto fill = [](int side, uint32_t argb) {
+            ColorPicture p{"", side, side, {}};
+            for (int i = 0; i < side * side; ++i)
+                p.bgra.insert(p.bgra.end(), {static_cast<uint8_t>(argb), static_cast<uint8_t>(argb >> 8),
+                                                static_cast<uint8_t>(argb >> 16), static_cast<uint8_t>(argb >> 24)});
+            return p;
+        };
+        return WindowSkin{fill(128, back), fill(32, frame), fill(32, frame), fill(32, frame)};
+    }
+
+    double Linear(uint32_t argb, int shift)
+    {
+        const double c = static_cast<double>(argb >> shift & 0xFF) / 255.0;
+        return c <= 0.04045 ? c / 12.92 : std::pow((c + 0.055) / 1.055, 2.4);
+    }
+    // WCAG's relative luminance and contrast ratio.
+    double Luminance(uint32_t argb) { return 0.2126 * Linear(argb, 16) + 0.7152 * Linear(argb, 8) + 0.0722 * Linear(argb, 0); }
+    double Contrast(uint32_t a, uint32_t b)
+    {
+        const double la = Luminance(a), lb = Luminance(b);
+        return (std::max(la, lb) + 0.05) / (std::min(la, lb) + 0.05);
+    }
+    // A color's hue in degrees, and how far from grey it is (its largest channel less its smallest, of 255).
+    double Hue(uint32_t argb)
+    {
+        const double r = argb >> 16 & 0xFF, g = argb >> 8 & 0xFF, b = argb & 0xFF;
+        return std::fmod(std::atan2(std::sqrt(3.0) * (g - b), 2 * r - g - b) * 180.0 / std::numbers::pi + 360.0, 360.0);
+    }
+    int Chroma(uint32_t argb)
+    {
+        const int r = argb >> 16 & 0xFF, g = argb >> 8 & 0xFF, b = argb & 0xFF;
+        return std::max({r, g, b}) - std::min({r, g, b});
+    }
+}
+
+TEST(the_palette_keeps_the_backgrounds_hue)
+{
+    const uint32_t blue = 0xFF1E2A6E;
+    const BarPalette p  = SkinPalette(Colored(blue, 0xFF888888));
+    CHECK(std::abs(Hue(p.accent) - Hue(blue)) < 2.0);
+    CHECK(Luminance(p.accent) > Luminance(blue) && Chroma(p.accent) >= Chroma(blue));
+    const MenuColors m = SkinMenuColors(Colored(blue, 0xFF888888));
+    CHECK(m.accent == p.accent && std::abs(Hue(m.control) - Hue(blue)) < 2.0);
+}
+
+TEST(its_text_stands_out_from_its_background)
+{
+    for (const uint32_t back : {0xFF101018u, 0xFF4F4836u, 0xFFE8E0D0u})
+    {
+        const BarPalette p = SkinPalette(Colored(back, 0xFF888888));
+        const double needed = back == 0xFF4F4836u ? 4.5 : 7.0;
+        CHECK(Contrast(p.text, p.panelTop) >= needed && Contrast(p.title, p.panelTop) >= needed);
+        CHECK(Contrast(SkinMenuColors(Colored(back, 0xFF888888)).text, p.panelTop) >= needed);
+    }
+}
+
+TEST(a_grey_skin_gives_a_grey_accent)
+{
+    const BarPalette p = SkinPalette(Colored(0xFF404040, 0xFF888888));
+    CHECK(Chroma(p.accent) <= 2 && Luminance(p.accent) > Luminance(0xFF404040));
+}
+
+TEST(the_background_is_shaded_as_the_game_shades_it)
+{
+    WindowSkin skin  = Colored(0xFF8080FF, 0xFF888888);
+    skin.shadeTop    = 0.5f;
+    skin.shadeBottom = 1.0f;
+    const BarPalette p = SkinPalette(skin);
+    CHECK_EQ(p.panelTop & 0xFFFFFF, 0x404080u);
+    CHECK_EQ(p.panelBottom & 0xFFFFFF, 0x8080FFu);
+}
+
+TEST(the_palette_is_the_window_shape_with_no_pills_and_no_glow)
+{
+    const BarPalette p = SkinPalette(Colored(0xFF1E2A6E, 0xFF888888));
+    CHECK(p.shape == BarShape::Window && p.pill == 0 && p.pillBorder == 0 && p.below == 0 && p.underLine == 0);
+    CHECK(p.panelBorder == 0xFF888888u);
 }

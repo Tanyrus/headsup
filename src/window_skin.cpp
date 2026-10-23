@@ -1,5 +1,6 @@
 #include "window_skin.h"
 
+#include "argb.h"
 #include "bar_document.h"
 
 #include <algorithm>
@@ -159,6 +160,132 @@ namespace headsup
         case SkinPiece::Right: return Resampled(cut, *pixels, cut.height);
         default: return Resampled(cut, *pixels, *pixels);
         }
+    }
+
+    namespace
+    {
+        constexpr uint8_t kOpaqueEnough = 0x80; // a frame pixel at least this opaque counts toward its color
+        constexpr float kGreyChroma     = 0.05f; // a saturation under which a background reads as grey
+        constexpr float kAccentChroma   = 0.45f; // the least saturation an accent of a hue is drawn with
+        constexpr float kAccentLight = 0.68f, kAccentHoverLight = 0.78f, kSubtitleLight = 0.75f, kDividerLight = 0.35f;
+        constexpr float kSubtitleChroma = 0.5f; // of the accent's
+        constexpr float kTitleTint = 0.08f, kTextTint = 0.15f; // the accent's share in the text's white
+        constexpr float kDarkText  = 0.18f; // a background lighter than this luminance takes dark text
+        constexpr uint32_t kLightText = 0xFFFFFFFF, kDarkTextColor = 0xFF101010;
+        constexpr uint32_t kHighlightAlpha = 0x33, kTagAlpha = 0x26, kPanelAlpha = 0xF7, kSoftAlpha = 0x47;
+        constexpr uint32_t kCardAlpha = 0xB3, kBorderAlpha = 0x40, kRaisedAlpha = 0x66;
+        constexpr float kCardShade = 0.6f, kInsetShade = 0.5f; // a card and a tray, of the background
+        constexpr float kControlLift = 0.10f, kHoverLift = 0.18f; // a control's lightness over the background's
+        constexpr float kControlChroma = 0.6f;                    // of the accent's
+        constexpr float kLabelTint     = 0.2f;                    // the background's share in a label's text color
+
+        struct Rgb
+        {
+            float r = 0, g = 0, b = 0; // 0 to 1
+        };
+        struct Hsl
+        {
+            float h = 0, s = 0, l = 0; // h in turns
+        };
+
+        Rgb RgbOf(uint32_t argb)
+        {
+            return {Channel(argb, kRedShift) / kFullByte, Channel(argb, kGreenShift) / kFullByte, Channel(argb, kBlueShift) / kFullByte};
+        }
+        uint32_t ArgbOf(Rgb c, uint32_t alpha = kOpaqueAlpha)
+        {
+            const auto byte = [](float v) { return static_cast<uint8_t>(std::lround(std::clamp(v, 0.0f, 1.0f) * kFullByte)); };
+            return Argb(static_cast<uint8_t>(alpha), byte(c.r), byte(c.g), byte(c.b));
+        }
+        Rgb Times(Rgb c, float k) { return {c.r * k, c.g * k, c.b * k}; }
+        Rgb Mixed(Rgb a, Rgb b, float share) { return {a.r + (b.r - a.r) * share, a.g + (b.g - a.g) * share, a.b + (b.b - a.b) * share}; }
+
+        Hsl HslOf(Rgb c)
+        {
+            const float hi = std::max({c.r, c.g, c.b}), lo = std::min({c.r, c.g, c.b}), l = (hi + lo) / 2.0f, d = hi - lo;
+            if (d <= 0.0f) return {0.0f, 0.0f, l};
+            const float s = d / (1.0f - std::abs(2.0f * l - 1.0f));
+            float h       = hi == c.r ? std::fmod((c.g - c.b) / d, 6.0f) : hi == c.g ? (c.b - c.r) / d + 2.0f : (c.r - c.g) / d + 4.0f;
+            h             = h / 6.0f;
+            return {h < 0.0f ? h + 1.0f : h, s, l};
+        }
+        Rgb RgbOf(Hsl c)
+        {
+            const auto channel = [&](float n) {
+                const float k = std::fmod(n + c.h * 12.0f, 12.0f), a = c.s * std::min(c.l, 1.0f - c.l);
+                return c.l - a * std::max(-1.0f, std::min({k - 3.0f, 9.0f - k, 1.0f}));
+            };
+            return {channel(0.0f), channel(8.0f), channel(4.0f)};
+        }
+
+        // The mean color of a picture's pixels at least this opaque.
+        Rgb MeanOf(const ColorPicture& p, uint8_t leastAlpha)
+        {
+            double sum[3] = {};
+            size_t count  = 0;
+            for (size_t i = 0; i + kBgraBytes <= p.bgra.size(); i += kBgraBytes)
+            {
+                if (p.bgra[i + 3] < leastAlpha) continue;
+                for (int c = 0; c < 3; ++c)
+                    sum[c] += p.bgra[i + static_cast<size_t>(c)];
+                ++count;
+            }
+            if (count == 0) return {};
+            const auto mean = [&](int c) { return static_cast<float>(sum[c] / static_cast<double>(count)) / kFullByte; };
+            return {mean(2), mean(1), mean(0)};
+        }
+
+        float Linear(float c) { return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f); }
+        float Luminance(Rgb c) { return 0.2126f * Linear(c.r) + 0.7152f * Linear(c.g) + 0.0722f * Linear(c.b); }
+
+        // What every color of a skin is worked out from.
+        struct Tones
+        {
+            Rgb top, middle, bottom, frame; // the background as shaded, and the frame
+            Hsl hue;                        // the accent's hue and saturation
+            Rgb accent, text;
+        };
+        Tones TonesOf(const WindowSkin& skin)
+        {
+            const Rgb back = MeanOf(skin.back, 0);
+            Tones t;
+            t.top    = Times(back, skin.shadeTop);
+            t.bottom = Times(back, skin.shadeBottom);
+            t.middle = Times(back, (skin.shadeTop + skin.shadeBottom) / 2.0f);
+            t.frame  = MeanOf(skin.across, kOpaqueEnough);
+            const Hsl base = HslOf(back);
+            t.hue    = {base.h, base.s < kGreyChroma ? 0.0f : std::max(base.s, kAccentChroma), 0.0f};
+            t.accent = RgbOf(Hsl{t.hue.h, t.hue.s, kAccentLight});
+            t.text   = RgbOf(Luminance(t.middle) < kDarkText ? kLightText : kDarkTextColor);
+            return t;
+        }
+        Rgb Shade(const Tones& t, float chromaShare, float light) { return RgbOf(Hsl{t.hue.h, t.hue.s * chromaShare, light}); }
+    }
+
+    BarPalette SkinPalette(const WindowSkin& skin)
+    {
+        const Tones t = TonesOf(skin);
+        const uint32_t accent = ArgbOf(t.accent), frame = ArgbOf(t.frame), text = ArgbOf(Mixed(t.text, t.accent, kTextTint));
+        return BarPalette{.shape = BarShape::Window, .stripTop = ArgbOf(t.top), .stripMiddle = ArgbOf(t.middle),
+            .stripBottom = ArgbOf(t.bottom), .bottomLine = frame, .underLine = 0, .below = 0, .accent = accent,
+            .accentEnd = Lighter(frame), .pill = 0, .pillBorder = 0, .title = ArgbOf(Mixed(t.text, t.accent, kTitleTint)),
+            .subtitle = ArgbOf(Shade(t, kSubtitleChroma, kSubtitleLight)), .divider = ArgbOf(Shade(t, 1.0f, kDividerLight)),
+            .panelTop = ArgbOf(t.top, kPanelAlpha), .panelBottom = ArgbOf(t.bottom, kPanelAlpha), .panelBorder = frame,
+            .panelOuter = 0, .text = text, .heading = accent, .tagFill = WithAlpha(accent, kTagAlpha), .tagBorder = 0,
+            .tagText = text, .highlight = WithAlpha(accent, kHighlightAlpha), .border = 0, .gradient = true};
+    }
+
+    MenuColors SkinMenuColors(const WindowSkin& skin)
+    {
+        const Tones t       = TonesOf(skin);
+        const float light   = HslOf(t.middle).l;
+        const uint32_t accent = ArgbOf(t.accent), frame = ArgbOf(t.frame);
+        return MenuColors{ArgbOf(t.middle, kPanelAlpha), ArgbOf(Times(t.middle, kCardShade), kCardAlpha),
+            ArgbOf(Shade(t, kControlChroma, light + kControlLift)), ArgbOf(Shade(t, kControlChroma, light + kHoverLift)),
+            ArgbOf(Times(t.middle, kInsetShade)), WithAlpha(frame, kBorderAlpha), WithAlpha(frame, kRaisedAlpha),
+            ArgbOf(Mixed(t.text, t.accent, kTextTint)), ArgbOf(Mixed(t.text, t.accent, kTitleTint)),
+            ArgbOf(Mixed(t.text, t.middle, kLabelTint)), ArgbOf(Shade(t, kSubtitleChroma, kSubtitleLight)), accent,
+            ArgbOf(RgbOf(Hsl{t.hue.h, t.hue.s, kAccentHoverLight})), WithAlpha(accent, kSoftAlpha), Lighter(frame)};
     }
 
     Read<WindowSkin> ReadWindowSkin(std::span<const uint8_t> dat)

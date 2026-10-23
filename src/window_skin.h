@@ -1,6 +1,8 @@
 #pragma once
 
+#include "bar_theme.h"
 #include "game_font.h"
+#include "menu_document.h"
 #include "plate_image.h"
 
 #include <array>
@@ -56,4 +58,9 @@ namespace headsup
     std::string SkinSource(int type, SkinPiece piece, int pixels);
     // The picture a SkinSource name stands for; none for another name, or a skin that was not read.
     std::optional<Image> SkinImage(const WindowSkins& skins, std::string_view name);
+
+    // The colors drawn with a skin: its background's hue, light and vivid, for the accent, text that stands out from
+    // the background as shaded, the background and the frame's own colors for the panels and edges.
+    BarPalette SkinPalette(const WindowSkin& skin);
+    MenuColors SkinMenuColors(const WindowSkin& skin);
 }
