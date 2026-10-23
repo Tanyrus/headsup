@@ -1,5 +1,6 @@
 #include "rml_menu.h"
 
+#include "bar_look.h"
 #include "fonts.h"
 #include "game_font.h"
 #include "layout_edit.h"
@@ -64,9 +65,9 @@ namespace
         RmlMenu menu;
         std::vector<uint8_t> held; // the keys that are down, by their virtual-key codes
 
-        explicit Window(MenuTheme theme = MenuTheme::Phoenix, const char* font = kBarlowCondensed)
+        explicit Window(BarTheme theme = BarTheme::PhoenixGold, const char* font = kBarlowCondensed)
         {
-            settings.menuTheme = theme;
+            settings.barTheme = theme;
             m_Host.context     = m_Rml.context;
             m_Host.textFont    = font;
             m_Host.menuFonts = {kBarlowCondensed};
@@ -334,7 +335,7 @@ TEST(text_in_a_box_stands_in_its_middle_by_its_fonts_capitals)
     };
     for (const Size size : {Size{kBarlowCondensed, 18}, Size{kBarlowCondensed, 24}, Size{kCinzel, 18}})
     {
-        Window window(MenuTheme::Phoenix, size.font);
+        Window window(BarTheme::PhoenixGold, size.font);
         window.settings.menuFontSize = size.pixels;
         window.Frames(2);
         const float cap = CapHeight(size.font, static_cast<float>(size.pixels));
@@ -358,7 +359,7 @@ TEST(a_pages_name_stays_on_one_line_under_the_pointer_and_its_highlight_goes_on_
     // The narrowest and the widest of the fonts the window can be set in.
     for (const char* font : {kBarlowCondensed, kCinzel})
     {
-        Window window(MenuTheme::Phoenix, font);
+        Window window(BarTheme::PhoenixGold, font);
         const float page = left(window.Find("main"));
         for (const LayoutPage& info : kWindowLayout.pages)
         {
@@ -416,7 +417,7 @@ TEST(badge_numbers_is_a_dropdown_whose_closed_control_holds_each_choice_on_one_l
 {
     for (const char* font : {kBarlowCondensed, kCinzel})
     {
-        Window window(MenuTheme::Phoenix, font);
+        Window window(BarTheme::PhoenixGold, font);
         window.Page("mobs");
         std::string control;
         for (Rml::Element* element : window.OfClass("dd"))
@@ -564,7 +565,7 @@ TEST(a_dash_mark_is_shown_as_its_shape_in_the_list_and_in_the_closed_control)
 
 TEST(rmlui_reads_every_page_of_both_themes_without_a_complaint)
 {
-    for (const MenuTheme theme : {MenuTheme::Phoenix, MenuTheme::Aurora})
+    for (const BarTheme theme : {BarTheme::PhoenixGold, BarTheme::Aurora})
     {
         Window window(theme);
         for (const LayoutPage& page : kWindowLayout.pages)
@@ -577,7 +578,7 @@ TEST(rmlui_reads_every_page_of_both_themes_without_a_complaint)
 
 TEST(auroras_window_works_as_phoenixs_does)
 {
-    Window window(MenuTheme::Aurora);
+    Window window(BarTheme::Aurora);
     window.Page("mobs");
     window.Click("mobs-line-style-line-style-t-1");
     window.Click("mobs-line-style-text-color-mobs1");
@@ -1278,10 +1279,10 @@ TEST(a_tip_stays_on_the_screen_and_off_the_pointer)
 
 TEST(every_control_of_every_page_takes_a_click_and_the_window_stands)
 {
-    for (const MenuTheme theme : {MenuTheme::Phoenix, MenuTheme::Aurora, MenuTheme::GameWindow})
+    for (const BarTheme theme : {BarTheme::PhoenixGold, BarTheme::Aurora, BarTheme::GameWindow})
     {
         Window window(theme);
-        if (theme == MenuTheme::GameWindow)
+        if (theme == BarTheme::GameWindow)
             window.Skin(GameSkinLook{SkinFrame{0, 4.0f / 3.0f, 0.5f, 1.0f}, PaletteOf(BarTheme::UmbraDark), kAuroraMenuColors});
         for (const LayoutPage& page : kWindowLayout.pages)
         {
@@ -1305,7 +1306,7 @@ TEST(every_control_of_every_page_takes_a_click_and_the_window_stands)
 
 TEST(a_list_drops_in_in_both_themes)
 {
-    for (const MenuTheme theme : {MenuTheme::Phoenix, MenuTheme::Aurora})
+    for (const BarTheme theme : {BarTheme::PhoenixGold, BarTheme::Aurora})
     {
         Window window(theme);
         window.Page("mobs");
@@ -1328,7 +1329,7 @@ TEST(a_toggle_is_a_sliders_width_and_its_wide_peg_slides_across_its_track_in_bot
     auto middle = [](Rml::Element* element) {
         return element->GetAbsoluteOffset(Rml::BoxArea::Border).x + element->GetBox().GetSize(Rml::BoxArea::Border).x / 2.0f;
     };
-    for (const MenuTheme theme : {MenuTheme::Phoenix, MenuTheme::Aurora})
+    for (const BarTheme theme : {BarTheme::PhoenixGold, BarTheme::Aurora})
     {
         Window window(theme);
         Rml::Element* track = window.Find(box);
@@ -1382,7 +1383,7 @@ TEST(a_toggles_word_says_its_state_in_capitals_inside_its_track_clear_of_the_peg
     };
     const Toggle toggles[] = {{"entities", "entities-nameplates-stack-names", "OFF", "ON"},
         {"entities", "entities-nameplates-on", "OFF", "ON"}, {"mobs", "mobs-detection-icons-links", "HIDDEN", "SHOWN"}};
-    for (const MenuTheme theme : {MenuTheme::Phoenix, MenuTheme::Aurora})
+    for (const BarTheme theme : {BarTheme::PhoenixGold, BarTheme::Aurora})
         for (const char* font : {kBarlowCondensed, kCinzel})
             for (const Toggle& toggle : toggles)
             {
@@ -1399,7 +1400,7 @@ TEST(a_toggles_word_says_its_state_in_capitals_inside_its_track_clear_of_the_peg
                     std::ranges::transform(shown, shown.begin(), [](unsigned char ch) { return static_cast<char>(std::toupper(ch)); });
                     CHECK_EQ(shown, on ? toggle.on : toggle.off);
                     CHECK(word->GetComputedValues().text_transform() == Rml::Style::TextTransform::Uppercase);
-                    CHECK_EQ(argb(word->GetComputedValues().color()), MenuColorsOf(theme).text);
+                    CHECK_EQ(argb(word->GetComputedValues().color()), MenuColorsFor(window.settings, nullptr).text);
                     // Its capitals, centered in the word's box, stand inside the track and clear of the peg.
                     const auto [trackLeft, trackRight] = edges(track);
                     const auto [boxLeft, boxRight]     = edges(word);
@@ -1567,7 +1568,7 @@ TEST(a_setting_of_something_switched_off_is_not_shown)
 
 TEST(the_game_window_theme_draws_the_window_in_the_art_and_its_colors)
 {
-    Window window(MenuTheme::GameWindow);
+    Window window(BarTheme::GameWindow);
     const GameSkinLook look{SkinFrame{5, 1.0f, 0.5f, 1.0f}, PaletteOf(BarTheme::UmbraDark), kAuroraMenuColors};
     const MenuLook menu{MenuTheme::GameWindow, kBarlowCondensed, kMarcellusSC, 16, 0, false, look.menu, look.frame};
     const std::string style = MenuStyle(menu);

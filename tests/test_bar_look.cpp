@@ -2,6 +2,7 @@
 #include "bar_placement.h"
 #include "test.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <string>
@@ -180,7 +181,7 @@ TEST(the_bar_takes_the_players_fonts_or_its_themes)
     CHECK(std::string(look.DetailFace().family) == "Verdana" && std::string(look.TitleFace().family) == "Georgia");
 }
 
-TEST(the_games_art_is_in_use_for_its_theme_a_custom_theme_of_its_shape_or_the_windows_theme)
+TEST(the_games_art_is_in_use_for_its_theme_or_a_custom_theme_of_its_shape)
 {
     Settings s;
     CHECK(!UsesGameArt(s));
@@ -192,8 +193,6 @@ TEST(the_games_art_is_in_use_for_its_theme_a_custom_theme_of_its_shape_or_the_wi
     CHECK(UsesGameArt(s));
     s.barTheme = BarTheme::Aurora;
     CHECK(!UsesGameArt(s));
-    s.menuTheme = MenuTheme::GameWindow;
-    CHECK(UsesGameArt(s));
 }
 
 TEST(game_window_without_the_games_art_is_phoenix_gold)
@@ -201,4 +200,60 @@ TEST(game_window_without_the_games_art_is_phoenix_gold)
     Settings s;
     s.barTheme = BarTheme::GameWindow;
     CHECK(PaletteFor(s) == PaletteOf(BarTheme::PhoenixGold));
+}
+
+namespace
+{
+    double Linear(uint32_t argb, int shift)
+    {
+        const double c = static_cast<double>(argb >> shift & 0xFF) / 255.0;
+        return c <= 0.04045 ? c / 12.92 : std::pow((c + 0.055) / 1.055, 2.4);
+    }
+    // WCAG's contrast ratio of two opaque colors.
+    double Contrast(uint32_t a, uint32_t b)
+    {
+        const auto luminance = [](uint32_t c) { return 0.2126 * Linear(c, 16) + 0.7152 * Linear(c, 8) + 0.0722 * Linear(c, 0); };
+        const double la = luminance(a), lb = luminance(b);
+        return (std::max(la, lb) + 0.05) / (std::min(la, lb) + 0.05);
+    }
+    int Brightness(uint32_t argb) { return static_cast<int>((argb >> 16 & 0xFF) + (argb >> 8 & 0xFF) + (argb & 0xFF)); }
+}
+
+TEST(the_settings_window_takes_the_top_panels_theme)
+{
+    Settings s;
+    // Phoenix Gold, the default, gives a window lit in its gold.
+    CHECK(MenuThemeFor(s, nullptr) == MenuTheme::Phoenix);
+    CHECK_EQ(MenuColorsFor(s, nullptr).accent, PaletteOf(BarTheme::PhoenixGold).accent);
+    // The Phoenix Red themes keep the window drawn from phoenix-xi.com's palette, and Aurora its glass.
+    s.barTheme = BarTheme::PhoenixRedPills;
+    CHECK(MenuColorsFor(s, nullptr) == kPhoenixMenuColors);
+    s.barTheme = BarTheme::Aurora;
+    CHECK(MenuThemeFor(s, nullptr) == MenuTheme::Aurora && MenuColorsFor(s, nullptr) == kAuroraMenuColors);
+    // Custom's own colors.
+    s.barTheme             = BarTheme::Custom;
+    s.customPalette.accent = 0xFF12AB34;
+    CHECK_EQ(MenuColorsFor(s, nullptr).accent, 0xFF12AB34u);
+    // The game's art, once read, for Game Window and a Custom theme of its shape; Phoenix Gold's colors until then.
+    const GameSkinLook skin{SkinFrame{2, 1.0f, 0.5f, 1.0f}, PaletteOf(BarTheme::UmbraDark), kAuroraMenuColors};
+    s.customPalette.shape = BarShape::Window;
+    CHECK(MenuThemeFor(s, &skin) == MenuTheme::GameWindow && MenuColorsFor(s, &skin) == kAuroraMenuColors);
+    s.barTheme = BarTheme::GameWindow;
+    CHECK(MenuThemeFor(s, &skin) == MenuTheme::GameWindow);
+    CHECK(MenuThemeFor(s, nullptr) == MenuTheme::Phoenix);
+    CHECK_EQ(MenuColorsFor(s, nullptr).accent, PaletteOf(BarTheme::PhoenixGold).accent);
+}
+
+TEST(a_window_from_a_panels_colors_reads_well_and_steps_up_from_its_page)
+{
+    for (int t = 0; t < kFixedThemeCount; ++t)
+    {
+        const MenuColors c = MenuColorsFrom(PaletteOf(static_cast<BarTheme>(t)));
+        const uint32_t page = c.background | 0xFF000000u;
+        CHECK(Contrast(c.text, page) >= 7.0 && Contrast(c.heading, page) >= 7.0 && Contrast(c.label, page) >= 4.5);
+        // Cards, controls and a hovered control each a step lighter than the page, and the trays darker.
+        CHECK(Brightness(page) < Brightness(c.card) && Brightness(c.card) < Brightness(c.control) &&
+              Brightness(c.control) < Brightness(c.hover) && Brightness(c.inset) < Brightness(page));
+        CHECK(c.accent == PaletteOf(static_cast<BarTheme>(t)).accent);
+    }
 }

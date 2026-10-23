@@ -1345,10 +1345,6 @@ namespace headsup
                 form.Fade(!on);
                 Keys(c, label, tip, s.keepPointerKeys, kMaxKeptKeys, c.state.keyCapture);
                 break;
-            case SettingPiece::WindowTheme:
-                form.Fade(false);
-                OptionsDropdown(form, label, s.menuTheme, c.layout.OptionsOf(WindowList::MenuTheme), tip);
-                break;
             case SettingPiece::Font:
                 form.Fade(false);
                 form.FontDropdown(label.c_str(), s.menuFont, c.menuFonts, tip);

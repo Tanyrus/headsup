@@ -115,7 +115,6 @@ namespace headsup
         std::string menuFont = kDefaultMenuFont; // the settings window's text, by its kMenuFonts name
         int menuFontSize     = kDefaultMenuFontSize; // pixels: the settings window's text and everything sized by it
         int menuOpacity      = 100;              // percent
-        MenuTheme menuTheme  = MenuTheme::Phoenix;
         int windowType       = kFollowGameWindow; // the game's art drawn: the Window Type the game is set to, or 1 to 8
         // Where the player left the settings window, in pixels; no width for one never moved, which opens in the
         // screen's middle.

@@ -1216,39 +1216,37 @@ TEST(text_sizes_start_at_auto_and_clamp_to_their_range)
 TEST(the_settings_window_keeps_its_theme_and_its_place)
 {
     MapStore store;
-    store.values["menuTheme"]  = "aurora";
+    store.values["menuTheme"]  = "aurora"; // the window's own theme of before it took the top panel's: never read again
     store.values["menuX"]      = "120";
     store.values["menuY"]      = "80";
     store.values["menuWidth"]  = "900";
     store.values["menuHeight"] = "700";
     const Settings s           = LoadSettings(store);
-    CHECK(s.menuTheme == MenuTheme::Aurora && s.menuX == 120 && s.menuY == 80 && s.menuWidth == 900 && s.menuHeight == 700);
+    CHECK(s.menuX == 120 && s.menuY == 80 && s.menuWidth == 900 && s.menuHeight == 700);
     MapStore saved;
     SaveSettings(s, saved);
-    CHECK(saved.values["menuTheme"] == "aurora" && saved.values["menuWidth"] == "900.0000" &&
+    CHECK(!saved.values.contains("menuTheme") && saved.values["menuWidth"] == "900.0000" &&
           saved.values["menuY"] == "80.0000");
-    // A theme the list lacks keeps the default, and a size of nonsense is no place at all.
-    store.values["menuTheme"]  = "neon";
+    // A size of nonsense is no place at all.
     store.values["menuWidth"]  = "-5";
     store.values["menuHeight"] = "1e9";
     const Settings odd         = LoadSettings(store);
-    CHECK(odd.menuTheme == MenuTheme::Phoenix && odd.menuWidth == 0 && odd.menuHeight == kMaxMenuSide);
+    CHECK(odd.menuWidth == 0 && odd.menuHeight == kMaxMenuSide);
     // A new file has neither: the window opens in the screen's middle, in the Phoenix look.
     MapStore empty;
     const Settings fresh = LoadSettings(empty);
-    CHECK(fresh.menuTheme == MenuTheme::Phoenix && fresh.menuWidth == 0 && fresh.menuHeight == 0);
+    CHECK(fresh.menuWidth == 0 && fresh.menuHeight == 0);
 }
 
-TEST(the_game_window_theme_and_its_window_type_are_kept)
+TEST(the_window_type_is_kept)
 {
     MapStore store;
-    store.values["menuTheme"]  = "gameWindow";
     store.values["windowType"] = "5";
     const Settings s           = LoadSettings(store);
-    CHECK(s.menuTheme == MenuTheme::GameWindow && s.windowType == 5);
+    CHECK(s.windowType == 5);
     MapStore saved;
     SaveSettings(s, saved);
-    CHECK(saved.values["menuTheme"] == "gameWindow" && saved.values["windowType"] == "5.0000");
+    CHECK(saved.values["windowType"] == "5.0000");
     // Past Type 8 is Type 8, below Follow Game is Follow Game, as is a new file.
     store.values["windowType"] = "9";
     CHECK_EQ(LoadSettings(store).windowType, kWindowTypes);

@@ -51,8 +51,15 @@ namespace headsup
         std::optional<BoxStyle> BoxOf(BarWidget widget, bool lit) const;
     };
 
-    // Whether the game's window art is drawn: its theme, a Custom theme of its shape, or the settings window's theme.
+    // Whether the game's window art is drawn: its theme, or a Custom theme of its shape.
     bool UsesGameArt(const Settings& settings);
+    // The settings window in the top panel's theme: Aurora's glass for Aurora, the game's art once it is read for the
+    // Window shape, and the Phoenix window else; its colors phoenix-xi.com's for the Phoenix Red themes, Aurora's and
+    // the art's for theirs, and the panel's own for the rest (MenuColorsFrom).
+    MenuTheme MenuThemeFor(const Settings& settings, const GameSkinLook* skin);
+    MenuColors MenuColorsFor(const Settings& settings, const GameSkinLook* skin);
+    // A window in a panel's colors: its page the panel's foot, cards and controls each a step toward its text.
+    MenuColors MenuColorsFrom(const BarPalette& palette);
 
     // What Game Window looks as while the game's art is not read.
     constexpr BarTheme kGameArtFallback = BarTheme::PhoenixGold;

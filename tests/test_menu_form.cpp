@@ -632,7 +632,7 @@ TEST(a_setting_moved_to_another_card_works_there_and_sets_only_its_own_key)
     CHECK_EQ(KeysChanged(before, w.settings).size(), size_t{1});
     // It comes first in its new card, and is gone from its old one.
     const FormBlock* card = Block(form, "configmenu-settings-window");
-    CHECK(At(card, "configmenu-settings-window-pointer-fix") < At(card, "configmenu-settings-window-window-theme"));
+    CHECK(At(card, "configmenu-settings-window-pointer-fix") < At(card, "configmenu-settings-window-font"));
     w.state.page = Page::MouseCursor;
     CHECK(At(Block(w.Pass(), "mousecursor-mouse-pointer"), "mousecursor-mouse-pointer-pointer-fix") == std::string::npos);
 }

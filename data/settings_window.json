@@ -253,7 +253,7 @@
           "name": "Top Panel",
           "description": "Hover a widget for details; click it to keep them open. The Widgets page has each one's options.",
           "settings": [
-            {"key": "theme", "name": "Theme"},
+            {"key": "theme", "name": "Theme", "tip": "The look of the top panel, its popups and this config window."},
             {
               "key": "window-type",
               "name": "Window Type",
@@ -445,7 +445,6 @@
           "name": "Config Window",
           "settings": [
             {"key": "enable-headsup", "name": "Enable HeadsUp", "tip": "If turned off, all HeadsUp features will be disabled."},
-            {"key": "window-theme", "name": "Window Theme", "tip": "The color and style of this config window."},
             {"key": "font", "name": "Font", "tip": "The font used for this config window."},
             {"key": "size", "name": "Font Size", "tip": "The font size used for this config window, in pixels."},
             {"key": "window-opacity", "name": "Window Opacity", "tip": "The opacity of this config window."}
@@ -809,14 +808,6 @@
         {"name": "Aurora", "tip": "Slate glass, lit from cyan into violet."},
         {"name": "Custom", "tip": "Your own colors and shape, from the Theme Colors card."},
         {"name": "Game Window", "tip": "The game's own window art, of the Window Type below, in colors taken from it."}
-      ]
-    },
-    {
-      "key": "menu-theme",
-      "options": [
-        {"name": "Phoenix", "tip": "Phoenix's dark red, lit in its royal red."},
-        {"name": "Aurora", "tip": "Slate glass, lit from cyan into violet."},
-        {"name": "Game Window", "tip": "The game's own window art, of the Top Panel's Window Type, in colors taken from it."}
       ]
     },
     {

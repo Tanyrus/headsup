@@ -66,13 +66,6 @@ namespace headsup
         }
     }
 
-    const MenuColors& MenuColorsOf(MenuTheme theme)
-    {
-        // The game's window art without its art is Phoenix's.
-        static const MenuColors kColors[kMenuThemeCount] = {kPhoenixMenuColors, kAuroraMenuColors, kPhoenixMenuColors};
-        return kColors[std::clamp(static_cast<int>(theme), 0, kMenuThemeCount - 1)];
-    }
-
     int TextLift(float ascent, float descent, int fontPixels)
     {
         return static_cast<int>(std::lround((ascent - descent - kCapHeightShare * static_cast<float>(fontPixels)) / 2.0f));

@@ -59,7 +59,6 @@ namespace headsup
     // How far under the middle of its line a line of capitals stands, from the font's ascent and descent as RmlUi lays
     // the line out: in whole pixels, as RmlUi puts each glyph on a whole pixel.
     int TextLift(float ascent, float descent, int fontPixels);
-    const MenuColors& MenuColorsOf(MenuTheme theme);
 
     // The window's ids, which its owner finds its parts by.
     constexpr const char* kMenuSidebarId   = "sidebar";

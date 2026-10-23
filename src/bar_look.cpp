@@ -12,6 +12,11 @@ namespace headsup
     namespace
     {
         constexpr uint32_t kNeutralColor = 0xFF8D8D8D;
+        // A window in a panel's colors: the page's alpha, each step of a card, a control and a hovered one toward the
+        // text, the trays toward black, a label's and a muted word's share of the way to the subtitle and the page,
+        // and the alphas of the edges and the soft accent, as the Phoenix window has them.
+        constexpr uint32_t kMenuPageAlpha = 0xF7, kMenuEdgeAlpha = 0x24, kMenuRaisedAlpha = 0x3D, kMenuSoftAlpha = 0x47;
+        constexpr float kCardStep = 0.07f, kInsetShade = 0.4f, kLabelShare = 0.3f, kMutedShare = 0.4f;
         constexpr float kTitleScale      = 1.35f; // a popup title, in popupText
         constexpr float kCoinScale       = 0.75f; // gil's coin, in icons
         constexpr float kFrameRadius     = 3.0f;  // the ornate target frame and hover tint
@@ -74,8 +79,43 @@ namespace headsup
     bool UsesGameArt(const Settings& settings)
     {
         return settings.barTheme == BarTheme::GameWindow ||
-               (settings.barTheme == BarTheme::Custom && settings.customPalette.shape == BarShape::Window) ||
-               settings.menuTheme == MenuTheme::GameWindow;
+               (settings.barTheme == BarTheme::Custom && settings.customPalette.shape == BarShape::Window);
+    }
+
+    MenuTheme MenuThemeFor(const Settings& settings, const GameSkinLook* skin)
+    {
+        if (settings.barTheme == BarTheme::Aurora) return MenuTheme::Aurora;
+        if (skin != nullptr && UsesGameArt(settings)) return MenuTheme::GameWindow;
+        return MenuTheme::Phoenix;
+    }
+
+    MenuColors MenuColorsFor(const Settings& settings, const GameSkinLook* skin)
+    {
+        switch (MenuThemeFor(settings, skin))
+        {
+        case MenuTheme::Aurora: return kAuroraMenuColors;
+        case MenuTheme::GameWindow: return skin->menu;
+        case MenuTheme::Phoenix: break;
+        }
+        if (settings.barTheme == BarTheme::PhoenixRedOrnate || settings.barTheme == BarTheme::PhoenixRedPills)
+            return kPhoenixMenuColors;
+        return MenuColorsFrom(PaletteFor(settings, skin));
+    }
+
+    MenuColors MenuColorsFrom(const BarPalette& p)
+    {
+        const uint32_t page = p.panelBottom | kAlphaMask;
+        const auto toward = [](uint32_t from, uint32_t to, float share) {
+            const auto channel = [&](int shift) {
+                const float a = Channel(from, shift), b = Channel(to, shift);
+                return static_cast<uint8_t>(std::lround(a + (b - a) * share));
+            };
+            return Opaque(channel(kRedShift), channel(kGreenShift), channel(kBlueShift));
+        };
+        return MenuColors{WithAlpha(page, kMenuPageAlpha), toward(page, p.text, kCardStep), toward(page, p.text, 2.0f * kCardStep),
+            toward(page, p.text, 3.0f * kCardStep), toward(page, kBlack, kInsetShade), WithAlpha(p.subtitle, kMenuEdgeAlpha),
+            WithAlpha(p.subtitle, kMenuRaisedAlpha), p.text, p.title, toward(p.text, p.subtitle, kLabelShare),
+            toward(p.subtitle, page, kMutedShare), p.accent, p.accentEnd, WithAlpha(p.accent, kMenuSoftAlpha), p.accentEnd};
     }
 
     const char* BarTitleFont(const Settings& settings, BarShape shape)

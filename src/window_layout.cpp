@@ -53,7 +53,6 @@ namespace headsup
     static_assert(ListCount(WindowList::FontStyle) == kFontStyleCount, "settings_window.json: font-style");
     static_assert(ListCount(WindowList::Smoothness) == kSmoothnessLevelCount, "settings_window.json: smoothness");
     static_assert(ListCount(WindowList::BarTheme) == kBarThemeCount, "settings_window.json: bar-theme");
-    static_assert(ListCount(WindowList::MenuTheme) == kMenuThemeCount, "settings_window.json: menu-theme");
     static_assert(ListCount(WindowList::BarSections) == kBarSectionCount, "settings_window.json: bar-sections");
     static_assert(ListCount(WindowList::BarWidgets) == kBarWidgetCount, "settings_window.json: bar-widgets");
     static_assert(ListCount(WindowList::PlateLines) == kPlateLines, "settings_window.json: plate-lines");

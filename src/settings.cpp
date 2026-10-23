@@ -179,8 +179,6 @@ namespace headsup
         const char* const kJobLayoutNames[kJobLayoutCount] = {"jobsFirst", "expFirst", "expOnly"};
         constexpr const char* kTargetDetailsKey = "barTargetDetails";
         constexpr const char* kMenuFontKey      = "menuFont";
-        constexpr const char* kMenuThemeKey     = "menuTheme";
-        const char* const kMenuThemeNames[kMenuThemeCount] = {"phoenix", "aurora", "gameWindow"};
         constexpr const char* kMenuXKey = "menuX", *kMenuYKey = "menuY", *kMenuWidthKey = "menuWidth",
                               *kMenuHeightKey = "menuHeight";
         constexpr const char* kSecondLineSuffix = "Line2";
@@ -1209,7 +1207,6 @@ namespace headsup
         if (static_cast<int>(s.jobLayout) >= kJobLayoutCount) s.jobLayout = d.jobLayout;
         if (static_cast<int>(s.barSubtitle) >= kSubtitlePlaceCount) s.barSubtitle = d.barSubtitle;
         if (MenuFontNamed(s.menuFont) == nullptr) s.menuFont = d.menuFont;
-        if (static_cast<int>(s.menuTheme) >= kMenuThemeCount) s.menuTheme = d.menuTheme;
         for (int* side : {&s.menuX, &s.menuY, &s.menuWidth, &s.menuHeight})
             *side = std::clamp(*side, 0, kMaxMenuSide);
         if (static_cast<int>(s.barSeparators) >= kBarSeparatorsCount) s.barSeparators = d.barSeparators;
@@ -1308,9 +1305,6 @@ namespace headsup
             return kAshitaFontPixels * std::clamp(percent, kOldMinMenuScale, kOldMaxMenuScale) / kPercent *
                    (font != nullptr ? font->oldScale : 1.0f);
         });
-        const std::string menuTheme = store.GetString(kMenuThemeKey, "");
-        for (int t = 0; t < kMenuThemeCount; ++t)
-            if (menuTheme == kMenuThemeNames[t]) s.menuTheme = static_cast<MenuTheme>(t);
         s.menuX      = LoadInt(store, kMenuXKey, s.menuX);
         s.menuY      = LoadInt(store, kMenuYKey, s.menuY);
         s.menuWidth  = LoadInt(store, kMenuWidthKey, s.menuWidth);
@@ -1427,7 +1421,6 @@ namespace headsup
         store.Set(kClockZoneKey, s.clockZone ? kClockZoneNames[static_cast<int>(*s.clockZone)] : kLocalZone);
         setBool(kTargetDetailsKey, s.barTargetDetails);
         store.Set(kMenuFontKey, s.menuFont.c_str());
-        store.Set(kMenuThemeKey, kMenuThemeNames[static_cast<int>(s.menuTheme)]);
         setFloat(kMenuXKey, static_cast<float>(s.menuX));
         setFloat(kMenuYKey, static_cast<float>(s.menuY));
         setFloat(kMenuWidthKey, static_cast<float>(s.menuWidth));

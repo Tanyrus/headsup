@@ -190,7 +190,7 @@ PIECES = Pieces(
         'trays': Setting(unnamed=True), 'reset-layout': Setting(),
         # Mouse Cursor and HeadsUp Config
         'pointer-icon': Setting(options=3, nameless=frozenset({2})), 'pointer-size': Setting(), 'pointer-fix': Setting(), 'keep-pointer': Setting(),
-        'enable-headsup': Setting(), 'window-theme': Setting(), 'font': Setting(), 'size': Setting(),
+        'enable-headsup': Setting(), 'font': Setting(), 'size': Setting(),
         'window-opacity': Setting(),
         'reset-all-settings': Setting(words={'note': True, 'reset-everything': True, 'keep-them': True}),
         'debug-report': Setting(words={'watch': True, 'stop': True, 'saved': True}),
@@ -202,7 +202,7 @@ PIECES = Pieces(
     lists={
         'plate-mode': List(4), 'outline-mode': List(4, extra={3: 'tipOnClaimRows'}), 'color-source': List(7),
         'show-condition': List(13), 'ornament-place': List(5), 'align': List(3), 'font-style': List(3),
-        'smoothness': List(4), 'bar-theme': List(7), 'menu-theme': List(3), 'bar-sections': List(3),
+        'smoothness': List(4), 'bar-theme': List(7), 'bar-sections': List(3),
         'bar-widgets': List(15), 'plate-lines': List(3), 'job-layout': List(3), 'exp-bar': List(3), 'tags': List(24),
     },
     words={'switched-off': True, 'switch-off': True, 'switch-on': True, 'switched-off-top-panel': True,
