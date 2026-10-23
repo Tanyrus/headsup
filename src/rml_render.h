@@ -75,6 +75,7 @@ namespace headsup
         {
             IDirect3DTexture8* texture = nullptr;
             float u = 0.0f, v = 0.0f; // the image's share of the padded texture
+            bool repeats = false;     // unpadded, and drawn wrapping where RmlUi repeats it
         };
 
         struct Layer
@@ -103,6 +104,8 @@ namespace headsup
         bool m_NothingVisible = false; // the scissor and the mask leave no pixel: nothing is drawn
         D3DVIEWPORT8 m_GameViewport{};
         bool m_Textured = true; // the color stage reads the texture; untextured geometry takes its vertex colors
+        bool m_Wrapped  = false; // the texture is sampled wrapping, else clamped as the quad states set it
+        void Wrap(bool wrapped);
         std::optional<Rml::Matrix4f> m_Transform;
         std::vector<ScreenVertex> m_Placed;
         std::vector<uint32_t> m_Pixels;

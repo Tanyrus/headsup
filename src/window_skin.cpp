@@ -5,6 +5,7 @@
 #include "markup.h"
 
 #include <algorithm>
+#include <bit>
 #include <charconv>
 #include <cmath>
 #include <utility>
@@ -159,6 +160,13 @@ namespace headsup
         case SkinPiece::Bottom: return Resampled(cut, cut.width, *pixels);
         case SkinPiece::Left:
         case SkinPiece::Right: return Resampled(cut, *pixels, cut.height);
+        case SkinPiece::Back:
+        {
+            const int side = static_cast<int>(std::bit_ceil(static_cast<unsigned>(*pixels)));
+            Image back     = Resampled(cut, side, side);
+            back.shownWidth = back.shownHeight = *pixels;
+            return back;
+        }
         default: return Resampled(cut, *pixels, *pixels);
         }
     }

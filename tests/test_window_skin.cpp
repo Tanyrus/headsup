@@ -339,3 +339,16 @@ TEST(the_skin_drawn_is_the_pinned_type_else_the_games_else_type_1)
     CHECK_EQ(SkinTypeOf(kFollowGameWindow, std::nullopt), 0);
     CHECK_EQ(SkinTypeOf(kWindowTypes, std::nullopt), kWindowTypes - 1);
 }
+
+TEST(the_background_is_a_power_of_two_of_pixels_shown_at_its_size_so_it_can_repeat)
+{
+    // Direct3D 8 repeats only a texture that is not padded: 171 shown pixels are kept as 256.
+    const std::optional<Image> back = SkinImage(Only(0, PlacedSkin()), SkinSource(0, SkinPiece::Back, 171));
+    CHECK(back && back->width == 256 && back->height == 256 && back->shownWidth == 171 && back->shownHeight == 171);
+    CHECK((Where(*back, 255, 254) == std::pair{127, 127}));
+    const std::optional<Image> exact = SkinImage(Only(0, PlacedSkin()), SkinSource(0, SkinPiece::Back, 128));
+    CHECK(exact && exact->width == 128 && exact->shownWidth == 128);
+    // The other pieces are stretched, never repeated, and are shown at their own size.
+    const std::optional<Image> corner = SkinImage(Only(0, PlacedSkin()), SkinSource(0, SkinPiece::TopLeft, 32));
+    CHECK(corner && corner->shownWidth == 0);
+}
