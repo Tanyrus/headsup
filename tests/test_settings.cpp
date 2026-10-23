@@ -1082,7 +1082,7 @@ TEST(each_theme_and_bar_widget_has_its_own_key)
     for (const Named& t : {Named{"phoenixGold", BarTheme::PhoenixGold}, Named{"umbraDark", BarTheme::UmbraDark},
              Named{"phoenixRedOrnate", BarTheme::PhoenixRedOrnate},
              Named{"phoenixRedPills", BarTheme::PhoenixRedPills}, Named{"aurora", BarTheme::Aurora},
-             Named{"custom", BarTheme::Custom}})
+             Named{"custom", BarTheme::Custom}, Named{"gameWindow", BarTheme::GameWindow}})
     {
         MapStore store;
         store.values["barTheme"] = t.name;
@@ -1237,6 +1237,25 @@ TEST(the_settings_window_keeps_its_theme_and_its_place)
     MapStore empty;
     const Settings fresh = LoadSettings(empty);
     CHECK(fresh.menuTheme == MenuTheme::Phoenix && fresh.menuWidth == 0 && fresh.menuHeight == 0);
+}
+
+TEST(the_game_window_theme_and_its_window_type_are_kept)
+{
+    MapStore store;
+    store.values["menuTheme"]  = "gameWindow";
+    store.values["windowType"] = "5";
+    const Settings s           = LoadSettings(store);
+    CHECK(s.menuTheme == MenuTheme::GameWindow && s.windowType == 5);
+    MapStore saved;
+    SaveSettings(s, saved);
+    CHECK(saved.values["menuTheme"] == "gameWindow" && saved.values["windowType"] == "5.0000");
+    // Past Type 8 is Type 8, below Follow Game is Follow Game, as is a new file.
+    store.values["windowType"] = "9";
+    CHECK_EQ(LoadSettings(store).windowType, kWindowTypes);
+    store.values["windowType"] = "-1";
+    CHECK_EQ(LoadSettings(store).windowType, 0);
+    MapStore empty;
+    CHECK_EQ(LoadSettings(empty).windowType, 0);
 }
 
 TEST(a_menu_font_the_list_lacks_or_a_size_past_its_ends_keeps_the_defaults)

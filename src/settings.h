@@ -17,6 +17,7 @@
 #include "native_locate.h"
 #include "outline_math.h"
 #include "plate_settings.h"
+#include "window_skin.h"
 #include "window_views.h"
 
 #include <array>
@@ -115,6 +116,7 @@ namespace headsup
         int menuFontSize     = kDefaultMenuFontSize; // pixels: the settings window's text and everything sized by it
         int menuOpacity      = 100;              // percent
         MenuTheme menuTheme  = MenuTheme::Phoenix;
+        int windowType       = kFollowGameWindow; // the game's art drawn: the Window Type the game is set to, or 1 to 8
         // Where the player left the settings window, in pixels; no width for one never moved, which opens in the
         // screen's middle.
         int menuX = 0, menuY = 0, menuWidth = 0, menuHeight = 0;

@@ -255,6 +255,23 @@
           "settings": [
             {"key": "theme", "name": "Theme"},
             {
+              "key": "window-type",
+              "name": "Window Type",
+              "indent": true,
+              "tip": "Which of the game's window frames the art is: the one picked in the game's Config, Windows, Shared, or one of the eight.",
+              "options": [
+                {"name": "Follow Game", "tip": "The Window Type the game is set to, followed as you change it."},
+                {"name": "Type 1"},
+                {"name": "Type 2"},
+                {"name": "Type 3"},
+                {"name": "Type 4"},
+                {"name": "Type 5"},
+                {"name": "Type 6"},
+                {"name": "Type 7"},
+                {"name": "Type 8"}
+              ]
+            },
+            {
               "key": "separators",
               "name": "Separators",
               "options": [
@@ -294,7 +311,8 @@
               "options": [
                 {"name": "Ornate", "tip": "Diamonds between the widgets and a framed target, as Phoenix Gold has."},
                 {"name": "Pills", "tip": "Each widget in a rounded pill, as Umbra Dark has."},
-                {"name": "Glass", "tip": "Pills that show only when lit, a line of light under the strip and glass popups, as Aurora has."}
+                {"name": "Glass", "tip": "Pills that show only when lit, a line of light under the strip and glass popups, as Aurora has."},
+                {"name": "Window", "tip": "The game's own window art under the strip and the popups, with pills only when lit, as Game Window has."}
               ]
             },
             {"key": "theme-background", "name": "Background", "tip": "The strip's one color, with its opacity: lower it to see the game through the strip."},
@@ -789,14 +807,16 @@
         {"name": "Phoenix Red, Ornate", "tip": "The ornate strip in Phoenix's dark red."},
         {"name": "Phoenix Red, Pills", "tip": "Each widget in a pill, in Phoenix's dark red."},
         {"name": "Aurora", "tip": "Slate glass, lit from cyan into violet."},
-        {"name": "Custom", "tip": "Your own colors and shape, from the Theme Colors card."}
+        {"name": "Custom", "tip": "Your own colors and shape, from the Theme Colors card."},
+        {"name": "Game Window", "tip": "The game's own window art, of the Window Type below, in colors taken from it."}
       ]
     },
     {
       "key": "menu-theme",
       "options": [
         {"name": "Phoenix", "tip": "Phoenix's dark red, lit in its royal red."},
-        {"name": "Aurora", "tip": "Slate glass, lit from cyan into violet."}
+        {"name": "Aurora", "tip": "Slate glass, lit from cyan into violet."},
+        {"name": "Game Window", "tip": "The game's own window art, of the Top Panel's Window Type, in colors taken from it."}
       ]
     },
     {

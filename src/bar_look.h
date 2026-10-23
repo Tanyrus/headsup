@@ -48,6 +48,11 @@ namespace headsup
         std::optional<BoxStyle> BoxOf(BarWidget widget, bool lit) const;
     };
 
+    // Whether the game's window art is drawn: its theme, a Custom theme of its shape, or the settings window's theme.
+    bool UsesGameArt(const Settings& settings);
+
+    // What Game Window looks as while the game's art is not read.
+    constexpr BarTheme kGameArtFallback = BarTheme::PhoenixGold;
     // The palette the bar is drawn with: the picked theme's, or the player's own for Custom.
     const BarPalette& PaletteFor(const Settings& settings);
 

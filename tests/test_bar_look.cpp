@@ -179,3 +179,26 @@ TEST(the_bar_takes_the_players_fonts_or_its_themes)
     const BarLook look = LookOf(BarTheme::PhoenixGold, settings);
     CHECK(std::string(look.DetailFace().family) == "Verdana" && std::string(look.TitleFace().family) == "Georgia");
 }
+
+TEST(the_games_art_is_in_use_for_its_theme_a_custom_theme_of_its_shape_or_the_windows_theme)
+{
+    Settings s;
+    CHECK(!UsesGameArt(s));
+    s.barTheme = BarTheme::GameWindow;
+    CHECK(UsesGameArt(s));
+    s.barTheme = BarTheme::Custom;
+    CHECK(!UsesGameArt(s));
+    s.customPalette.shape = BarShape::Window;
+    CHECK(UsesGameArt(s));
+    s.barTheme = BarTheme::Aurora;
+    CHECK(!UsesGameArt(s));
+    s.menuTheme = MenuTheme::GameWindow;
+    CHECK(UsesGameArt(s));
+}
+
+TEST(game_window_without_the_games_art_is_phoenix_gold)
+{
+    Settings s;
+    s.barTheme = BarTheme::GameWindow;
+    CHECK(PaletteFor(s) == PaletteOf(BarTheme::PhoenixGold));
+}

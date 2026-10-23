@@ -67,7 +67,15 @@ namespace headsup
 
     const BarPalette& PaletteFor(const Settings& settings)
     {
+        if (settings.barTheme == BarTheme::GameWindow) return PaletteOf(kGameArtFallback);
         return settings.barTheme == BarTheme::Custom ? settings.customPalette : PaletteOf(settings.barTheme);
+    }
+
+    bool UsesGameArt(const Settings& settings)
+    {
+        return settings.barTheme == BarTheme::GameWindow ||
+               (settings.barTheme == BarTheme::Custom && settings.customPalette.shape == BarShape::Window) ||
+               settings.menuTheme == MenuTheme::GameWindow;
     }
 
     const char* BarTitleFont(const Settings& settings, BarShape shape)

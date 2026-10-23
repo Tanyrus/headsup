@@ -853,6 +853,24 @@ TEST(an_edit_of_a_theme_color_makes_the_theme_custom_which_keeps_it)
     CHECK(w.settings.barTheme == BarTheme::Custom && PaletteFor(w.settings) == edited);
 }
 
+TEST(window_type_shows_while_the_games_art_is_in_use_and_picks_a_type_or_follows_the_game)
+{
+    Window w;
+    w.state.page             = Page::TopPanel;
+    const std::string type   = "toppanel-top-panel-window-type";
+    const auto shown = [&] { return !ClassOn(w.Pass(), (type + "-label-row").c_str(), "off"); };
+    CHECK(!shown());
+    w.Pass({{"toppanel-top-panel-theme", kClickEvent, ""}});
+    w.Pass({{"toppanel-top-panel-theme-o-6", kClickEvent, ""}});
+    CHECK(w.settings.barTheme == BarTheme::GameWindow && shown());
+    w.Pass({{type, kClickEvent, ""}});
+    CHECK(w.Pass({{type + "-o-5", kClickEvent, ""}}).changed);
+    CHECK_EQ(w.settings.windowType, 5);
+    w.Pass({{type, kClickEvent, ""}});
+    w.Pass({{type + "-o-0", kClickEvent, ""}});
+    CHECK_EQ(w.settings.windowType, 0);
+}
+
 TEST(the_theme_colors_card_sets_the_shape_the_border_and_one_color_or_a_gradient)
 {
     Window w;

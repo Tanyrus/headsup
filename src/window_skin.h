@@ -15,6 +15,7 @@ namespace headsup
     // The game's eight Window Types (Config > Windows > Shared), each a skin of its own: ROM/0/14.DAT for Type 1 to
     // ROM/0/21.DAT for Type 8.
     constexpr int kWindowTypes = 8;
+    constexpr int kFollowGameWindow = 0; // a Window Type setting's: the type the game is set to, where 1 to 8 pin one
     std::string WindowSkinFile(int type);
 
     // A skin's pictures: the background the game tiles every 128 pixels, the strip its top and bottom edges are cut

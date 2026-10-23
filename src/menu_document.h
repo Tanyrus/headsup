@@ -5,13 +5,15 @@
 
 namespace headsup
 {
-    // The settings window's looks: Phoenix's own, and Aurora's glass and switches. Both move alike.
+    // The settings window's looks: Phoenix's own, Aurora's glass and switches, and the game's window art. All move
+    // alike.
     enum class MenuTheme : uint8_t
     {
         Phoenix,
         Aurora,
+        GameWindow,
     };
-    constexpr int kMenuThemeCount = static_cast<int>(MenuTheme::Aurora) + 1;
+    constexpr int kMenuThemeCount = static_cast<int>(MenuTheme::GameWindow) + 1;
 
     // The settings window's colors (ARGB): a page, the cards on it, the controls on those, each a step lighter, and
     // the trays a step below the page.

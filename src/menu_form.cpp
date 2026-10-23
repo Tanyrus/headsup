@@ -1193,6 +1193,10 @@ namespace headsup
                 form.Fade(!BarOn(s));
                 OptionsDropdown(form, label, s.barTheme, c.layout.OptionsOf(WindowList::BarTheme), tip);
                 break;
+            case SettingPiece::WindowType:
+                form.Fade(!UsesGameArt(s));
+                OptionsDropdown(form, label, s.windowType, c.layout.OptionsOf(e), tip);
+                break;
             case SettingPiece::Separators:
             {
                 form.Fade(!BarOn(s));

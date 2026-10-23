@@ -69,7 +69,8 @@ namespace headsup
             {"scaleMin", &Settings::scaleMin, kMinSizePercent, kMaxSizePercent, kPercentStep},
             {"scaleMax", &Settings::scaleMax, kMinSizePercent, kMaxSizePercent, kPercentStep},
             {"timerPercent", &Settings::timerPercent, kMinSizePercent, kMaxSizePercent, kPercentStep},
-            {"screenshotKey", &Settings::screenshotKey, 0, UINT8_MAX}};
+            {"screenshotKey", &Settings::screenshotKey, 0, UINT8_MAX},
+            {"windowType", &Settings::windowType, kFollowGameWindow, kWindowTypes}};
 
         // Numbers whose meaning changed and whose key changed with it: saved and bounded as the rest, and read through
         // Rebased, since a typed read of the new key would have Ashita's store hold its default before the old is asked.
@@ -160,7 +161,7 @@ namespace headsup
         constexpr const char* kDesignsSavedKey = "nameplateDesigns";
         constexpr const char* kBarThemeKey = "barTheme";
         const char* const kBarThemeNames[kBarThemeCount] = {"phoenixGold", "umbraDark", "phoenixRedOrnate",
-            "phoenixRedPills", "aurora", "custom"};
+            "phoenixRedPills", "aurora", "custom", "gameWindow"};
         // The Custom theme: this before each of kPaletteColors' names, and its shape and border.
         constexpr const char* kCustomThemeKey = "customTheme";
         constexpr const char* kShapeSuffix = "Shape";
@@ -179,7 +180,7 @@ namespace headsup
         constexpr const char* kTargetDetailsKey = "barTargetDetails";
         constexpr const char* kMenuFontKey      = "menuFont";
         constexpr const char* kMenuThemeKey     = "menuTheme";
-        const char* const kMenuThemeNames[kMenuThemeCount] = {"phoenix", "aurora"};
+        const char* const kMenuThemeNames[kMenuThemeCount] = {"phoenix", "aurora", "gameWindow"};
         constexpr const char* kMenuXKey = "menuX", *kMenuYKey = "menuY", *kMenuWidthKey = "menuWidth",
                               *kMenuHeightKey = "menuHeight";
         constexpr const char* kSecondLineSuffix = "Line2";

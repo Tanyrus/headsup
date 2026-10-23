@@ -58,7 +58,8 @@ namespace headsup
 
     const MenuColors& MenuColorsOf(MenuTheme theme)
     {
-        static const MenuColors kColors[kMenuThemeCount] = {kPhoenixMenuColors, kAuroraMenuColors};
+        // The game's window art without its art is Phoenix's.
+        static const MenuColors kColors[kMenuThemeCount] = {kPhoenixMenuColors, kAuroraMenuColors, kPhoenixMenuColors};
         return kColors[std::clamp(static_cast<int>(theme), 0, kMenuThemeCount - 1)];
     }
 

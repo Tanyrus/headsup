@@ -104,3 +104,10 @@ TEST(a_popup_text_size_at_its_auto_position_follows_the_height)
     CHECK(Near(autoSize.popupText, 0.39f * 45.0f) && Near(autoSize.popupPadding, 0.36f * 45.0f));
     CHECK(Near(MetricsFor(45, BarShape::Ornate, kAutoBarTextSize, kAutoPopupTextSize + 1).popupText, 10.0f));
 }
+
+TEST(a_theme_file_keeps_the_window_shape)
+{
+    BarPalette p = PaletteOf(BarTheme::UmbraDark);
+    p.shape      = BarShape::Window;
+    CHECK(PaletteFromThemeFile(ThemeFileText(p)) == p);
+}
