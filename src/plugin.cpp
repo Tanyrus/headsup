@@ -104,7 +104,6 @@ namespace
     constexpr const char* kPivotConfig       = "config\\pivot\\pivot.ini";
     constexpr const char* kPivotDats         = "\\DATs";
     constexpr uint64_t kMaxDatBytes          = 64u << 20; // 51.DAT is 4 MB, the largest of the game files read
-    constexpr double kWindowTypeSeconds      = 1.0;       // how often the game's Window Type is read again
     constexpr uint32_t kPartyIconMembers     = 5;  // the other members of your party, whose buffs the game keeps
     constexpr uint32_t kPartyMembers         = 18; // you, your party and the two other alliance parties
     constexpr uint32_t kEngagedStatus        = 1;  // an entity's status while it fights
@@ -368,8 +367,6 @@ class HeadsUp final : public IPlugin
     std::array<std::string, headsup::kWindowTypes> m_SkinFailures; // why a type's art could not be read
     std::array<bool, headsup::kWindowTypes> m_SkinWarned{};        // whether that was said
     headsup::WindowTypeReader m_WindowTypeReader;
-    std::optional<int> m_GameWindowType;          // the Window Type the game is set to, 0 to 7, while it can be read
-    double m_WindowTypeReadAt = -kWindowTypeSeconds;
     std::optional<headsup::GameSkinLook> m_SkinLook; // the art drawn now, while the panel or the window uses it
     std::optional<headsup::ColorPicture> m_GamePearl;
     std::optional<int> m_PearlOutlineDrawn;       // the outline the pearl was last drawn with
@@ -796,7 +793,7 @@ public:
                 m_BarInput.Leave();
         }
         // Off, the bar is given nothing to show, and releases what it made.
-        UpdateSkin(now);
+        UpdateSkin();
         if (m_Rml.Running())
             m_RmlBar.Update(m_Rml, g_BarOn ? BarStateNow(now) : headsup::BarState{}, m_Settings, SkinNow(),
                 m_Names.BackBufferWidth(), m_Names.BackBufferHeight(), m_BarInput, m_UiHidden);
@@ -1362,16 +1359,11 @@ private:
     }
 
     // The game's art the panel and the window are drawn in while they use it: the Window Type's, the game's own read
-    // again once a second, at the menu's scale on the back buffer.
-    void UpdateSkin(double now)
+    // every frame (one call into its config), at the menu's scale on the back buffer.
+    void UpdateSkin()
     {
         if (!headsup::UsesGameArt(m_Settings)) return;
-        if (now - m_WindowTypeReadAt >= kWindowTypeSeconds)
-        {
-            m_GameWindowType   = m_WindowTypeReader.Read();
-            m_WindowTypeReadAt = now;
-        }
-        const int type    = headsup::SkinTypeOf(m_Settings.windowType, m_GameWindowType);
+        const int type    = headsup::SkinTypeOf(m_Settings.windowType, m_WindowTypeReader.Read());
         const float scale = m_MenuHeight > 0.0f ? m_Names.BackBufferHeight() / m_MenuHeight : 1.0f;
         if (m_SkinLook && type == m_SkinLook->frame.type && scale == m_SkinLook->frame.scale) return;
         const std::optional<headsup::WindowSkin>& skin = m_WindowSkins[static_cast<size_t>(type)];
