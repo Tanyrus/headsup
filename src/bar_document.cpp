@@ -144,6 +144,9 @@ namespace headsup
                    RcssColor(style.bottom) + ");";
         }
 
+        // A box drawn in the game's art, which is its own edge.
+        std::string ArtRules(const SkinFrame& frame) { return "box-sizing:border-box;" + SkinDecorator(frame); }
+
         // A box of one fill, its edge and, when it has them, its corners.
         std::string FlatRules(const BoxStyle& style, bool corners)
         {
@@ -292,8 +295,8 @@ namespace headsup
                RcssColor(p.title) + ";}";
         css += "div{display:block;}";
         css += std::string(".") + kHiddenClass + "{display:none;}";
-        css += std::string("#") + kStripId + "{position:absolute;left:0px;top:0px;width:100%;height:" + Px(stripHeight) +
-               ";decorator:image(\"" + StripSource(p, stripRows, belowRows) + "\");}";
+        css += std::string("#") + kStripId + "{position:absolute;left:0px;top:0px;width:100%;height:" + Px(stripHeight) + ";" +
+               (look.skin ? SkinDecorator(*look.skin) : "decorator:image(\"" + StripSource(p, stripRows, belowRows) + "\");") + "}";
         css += ".cap{position:absolute;top:" + centered(static_cast<float>(cap)) + ";" + square(static_cast<float>(cap)) + "}";
         css += "#cap-left{left:" + Px(std::round(m.cap / 2.0f - static_cast<float>(cap) / 2.0f)) + ";}";
         css += ".divider{position:absolute;top:" + centered(static_cast<float>(divider)) + ";" +
@@ -368,7 +371,7 @@ namespace headsup
         // Game help's bar: its pieces are placed in the screen's own pixels.
         css += std::string("#") + kHelpId + "{position:absolute;left:0px;top:0px;width:0px;height:0px;}";
         css += ".p{position:absolute;white-space:pre;}";
-        css += ".help-box{position:absolute;" + PanelRules(HelpBarPanel(look)) + "}";
+        css += ".help-box{position:absolute;" + (look.skin ? ArtRules(*look.skin) : PanelRules(HelpBarPanel(look))) + "}";
         css += ".hc{" + FaceRules(look.titleFont, lines.title, place.title.height) + ShadowEffect(lines.title) + "}";
         css += ".hh{" + FaceRules(look.detailFont, lines.title, place.figures.height) + ShadowEffect(lines.title) + "}";
         const bool glass = look.palette.shape == BarShape::Glass;
@@ -429,7 +432,7 @@ namespace headsup
         if (panel.outer != 0)
             css += "#outer{position:absolute;box-sizing:border-box;border:1px " + RcssColor(panel.outer) +
                    ";border-radius:" + Px(panel.radius + static_cast<float>(OuterPad(panel))) + ";}";
-        css += "#panel{position:absolute;left:0px;top:0px;" + PanelRules(panel) + "}";
+        css += "#panel{position:absolute;left:0px;top:0px;" + (look.skin ? ArtRules(*look.skin) : PanelRules(panel)) + "}";
         css += ".card{" + FlatRules(PopupCard(look), true) + "}";
         css += ".tag{" + FlatRules(PopupTag(look, 0.0f), false) + "}";
         css += ".rule{height:1px;decorator:horizontal-gradient(" + RcssColor(look.palette.divider) + " " +

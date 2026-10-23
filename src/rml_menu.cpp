@@ -188,7 +188,9 @@ namespace headsup
 
     bool RmlMenu::Document(const MenuHost& host, const Settings& settings)
     {
-        MenuLook look{settings.menuTheme, host.textFont, kMarcellusSC, settings.menuFontSize, m_Look.textLift, host.developer};
+        const bool art = settings.menuTheme == MenuTheme::GameWindow && host.skin;
+        MenuLook look{settings.menuTheme, host.textFont, kMarcellusSC, settings.menuFontSize, m_Look.textLift, host.developer,
+            art ? host.skin->menu : MenuColorsOf(settings.menuTheme), art ? std::optional(host.skin->frame) : std::nullopt};
         if (m_Document != nullptr && look == m_Look) return true;
         look.textLift = LiftOf(host.textFont, settings.menuFontSize);
         if (m_Document != nullptr && look.SameFrame(m_Look))

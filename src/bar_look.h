@@ -6,6 +6,8 @@
 #include "plate_image.h"
 #include "popup_layout.h"
 #include "settings.h"
+#include "skin_frame.h"
+#include "window_skin.h"
 
 #include <cstdint>
 #include <optional>
@@ -31,6 +33,7 @@ namespace headsup
         const char* titleFont;
         bool ornate;
         const char* detailFont = kDetailFont; // details, figures and popup text
+        std::optional<SkinFrame> skin;        // the game's art the strip and the popups are drawn in, for the Window shape
 
         // A span's color on the bar, and in a popup.
         uint32_t BarColor(const Span& span) const;
@@ -53,8 +56,9 @@ namespace headsup
 
     // What Game Window looks as while the game's art is not read.
     constexpr BarTheme kGameArtFallback = BarTheme::PhoenixGold;
-    // The palette the bar is drawn with: the picked theme's, or the player's own for Custom.
-    const BarPalette& PaletteFor(const Settings& settings);
+    // The palette the bar is drawn with: the picked theme's, the player's own for Custom, or the skin's for Game
+    // Window (kGameArtFallback's while none is read).
+    const BarPalette& PaletteFor(const Settings& settings, const GameSkinLook* skin = nullptr);
 
     // The bar's fonts: the player's, or the theme's when they set none. Each name lasts as long as the process, for the
     // caches that keep it by reference.

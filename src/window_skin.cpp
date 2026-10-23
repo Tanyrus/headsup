@@ -2,6 +2,7 @@
 
 #include "argb.h"
 #include "bar_document.h"
+#include "markup.h"
 
 #include <algorithm>
 #include <charconv>
@@ -286,6 +287,25 @@ namespace headsup
             ArgbOf(Mixed(t.text, t.accent, kTextTint)), ArgbOf(Mixed(t.text, t.accent, kTitleTint)),
             ArgbOf(Mixed(t.text, t.middle, kLabelTint)), ArgbOf(Shade(t, kSubtitleChroma, kSubtitleLight)), accent,
             ArgbOf(RgbOf(Hsl{t.hue.h, t.hue.s, kAccentHoverLight})), WithAlpha(accent, kSoftAlpha), Lighter(frame)};
+    }
+
+    std::string SkinDecorator(const SkinFrame& f)
+    {
+        const auto source = [&](SkinPiece piece, int menuPixels) {
+            return "\"" + SkinSource(f.type, piece, SkinPixels(menuPixels, f.scale)) + "\"";
+        };
+        const auto shade = [](float level) { return RcssColor(WithAlpha(kBlack, static_cast<uint32_t>(std::lround((1.0f - std::min(level, 1.0f)) * kFullByte)))); };
+        return "decorator:tiled-box(" + source(SkinPiece::TopLeft, kFrameCorner) + "," + source(SkinPiece::Top, kFrameEdge) + "," +
+               source(SkinPiece::TopRight, kFrameCorner) + "," + source(SkinPiece::Left, kFrameEdge) + "," +
+               source(SkinPiece::Clear, 1) + "," + source(SkinPiece::Right, kFrameEdge) + "," +
+               source(SkinPiece::BottomLeft, kFrameCorner) + "," + source(SkinPiece::Bottom, kFrameEdge) + "," +
+               source(SkinPiece::BottomRight, kFrameCorner) + "),vertical-gradient(" + shade(f.shadeTop) + " " +
+               shade(f.shadeBottom) + "),image(" + source(SkinPiece::Back, kSkinTile) + " none repeat);";
+    }
+
+    GameSkinLook SkinLookOf(const WindowSkin& skin, int type, float scale)
+    {
+        return GameSkinLook{SkinFrame{type, scale, skin.shadeTop, skin.shadeBottom}, SkinPalette(skin), SkinMenuColors(skin)};
     }
 
     Read<WindowSkin> ReadWindowSkin(std::span<const uint8_t> dat)

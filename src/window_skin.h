@@ -4,6 +4,7 @@
 #include "game_font.h"
 #include "menu_document.h"
 #include "plate_image.h"
+#include "skin_frame.h"
 
 #include <array>
 #include <cstdint>
@@ -63,4 +64,13 @@ namespace headsup
     // the background as shaded, the background and the frame's own colors for the panels and edges.
     BarPalette SkinPalette(const WindowSkin& skin);
     MenuColors SkinMenuColors(const WindowSkin& skin);
+
+    // What the panel and the settings window are drawn with for one skin: its frame and its colors.
+    struct GameSkinLook
+    {
+        SkinFrame frame;
+        BarPalette palette;
+        MenuColors menu;
+    };
+    GameSkinLook SkinLookOf(const WindowSkin& skin, int type, float scale);
 }

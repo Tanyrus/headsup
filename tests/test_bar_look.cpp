@@ -17,7 +17,7 @@ namespace
         const BarPalette& p = PaletteOf(theme);
         const BarMetrics m  = MetricsFor(height, p.shape);
         return BarLook{p, settings, m, PillRow(m), lines, BarTitleFont(settings, p.shape), p.shape == BarShape::Ornate,
-            BarTextFont(settings)};
+            BarTextFont(settings), std::nullopt};
     }
 
     bool Family(const TextFace& face, const char* family) { return std::string(face.family) == family; }

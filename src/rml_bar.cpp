@@ -394,8 +394,8 @@ namespace headsup
         return rect;
     }
 
-    void RmlBar::Update(RmlHost& host, const BarState& state, const Settings& settings, float screenWidth,
-        float screenHeight, BarInput& input, bool hidden)
+    void RmlBar::Update(RmlHost& host, const BarState& state, const Settings& settings, const GameSkinLook* skin,
+        float screenWidth, float screenHeight, BarInput& input, bool hidden)
     {
         m_HelpReach.reset();
         m_BarBottom = 0.0f;
@@ -407,7 +407,7 @@ namespace headsup
             input.SetPopup(BarRect{});
             return;
         }
-        const BarPalette& p = PaletteFor(settings);
+        const BarPalette& p = PaletteFor(settings, skin);
         const BarMetrics m  = MetricsFor(settings.barHeight, p.shape, settings.barTextSize, settings.popupTextSize);
         // The player's fonts where RmlUi can read them, the theme's where it cannot.
         const char* titleFont = BarTitleFont(settings, p.shape);
@@ -415,7 +415,9 @@ namespace headsup
         const char* detailFont = BarTextFont(settings);
         if (!host.EnsureFont(detailFont)) detailFont = kDetailFont;
         const Rows& rows = RowsFor(host, m, p.shape, settings.barTextSize, titleFont, detailFont);
-        const BarLook look{p, settings, m, PillRow(m), rows.lines, titleFont, p.shape == BarShape::Ornate, detailFont};
+        BarLook look{p, settings, m, PillRow(m), rows.lines, titleFont, p.shape == BarShape::Ornate, detailFont,
+            std::nullopt};
+        if (p.shape == BarShape::Window && skin != nullptr) look.skin = skin->frame;
         m_TitlePixels = look.lines.title;
         m_BarBottom   = BarBottom(p, m);
         if (!Document(host, look, rows.place))

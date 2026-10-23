@@ -56,6 +56,16 @@ namespace headsup
         }
     }
 
+    namespace
+    {
+        // The game's art in place of the window's fill and edge, and of its lists' and tips'.
+        std::string SkinMenuRules(const SkinFrame& frame)
+        {
+            const std::string art = "background-color:transparent;border-width:0px;border-radius:0px;" + SkinDecorator(frame);
+            return "body{" + art + "}#" + std::string(kMenuPopupId) + ",#" + kMenuTipId + "{" + art + "}";
+        }
+    }
+
     const MenuColors& MenuColorsOf(MenuTheme theme)
     {
         // The game's window art without its art is Phoenix's.
@@ -70,7 +80,7 @@ namespace headsup
 
     std::string MenuStyle(const MenuLook& look)
     {
-        const MenuColors& c = MenuColorsOf(look.theme);
+        const MenuColors& c = look.colors;
         const auto color    = [](uint32_t argb) { return RcssColor(argb); };
         const std::string frame = Em(kFrame), radius = Em(kRadius), control = Em(kControlWidth);
         const float top    = kGutter + kHeadHeight + 0.5f; // where the sidebar and the page start
@@ -363,6 +373,7 @@ namespace headsup
                ";background-color:" + color(Opaque(c.card)) + ";pointer-events:none;}";
 
         if (look.theme == MenuTheme::Aurora) css += AuroraMenuRules(c);
+        if (look.skin) css += SkinMenuRules(*look.skin);
         // The settings of what is switched off are not shown. Last, and with the body before it, so that no rule
         // that lays a row or a control out puts it back.
         css += std::string("body .") + kOffClass + "{display:none;}";

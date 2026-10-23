@@ -65,9 +65,9 @@ namespace headsup
         return palette.text;
     }
 
-    const BarPalette& PaletteFor(const Settings& settings)
+    const BarPalette& PaletteFor(const Settings& settings, const GameSkinLook* skin)
     {
-        if (settings.barTheme == BarTheme::GameWindow) return PaletteOf(kGameArtFallback);
+        if (settings.barTheme == BarTheme::GameWindow) return skin != nullptr ? skin->palette : PaletteOf(kGameArtFallback);
         return settings.barTheme == BarTheme::Custom ? settings.customPalette : PaletteOf(settings.barTheme);
     }
 

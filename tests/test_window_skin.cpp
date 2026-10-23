@@ -305,3 +305,29 @@ TEST(the_palette_is_the_window_shape_with_no_pills_and_no_glow)
     CHECK(p.shape == BarShape::Window && p.pill == 0 && p.pillBorder == 0 && p.below == 0 && p.underLine == 0);
     CHECK(p.panelBorder == 0xFF888888u);
 }
+
+TEST(a_box_is_drawn_as_the_game_draws_a_window_its_frame_over_its_shade_over_its_background)
+{
+    const SkinFrame frame{2, 1.5f, 0.5f, 1.0f};
+    const std::string rule = SkinDecorator(frame);
+    const auto at = [&](const std::string& part) { return rule.find(part); };
+    // 24 menu pixels at 1.5 are 36; 5 are 8; the tile 192.
+    for (const auto& [piece, pixels] : {std::pair{SkinPiece::TopLeft, 36}, std::pair{SkinPiece::Top, 8},
+             std::pair{SkinPiece::TopRight, 36}, std::pair{SkinPiece::Left, 8}, std::pair{SkinPiece::Right, 8},
+             std::pair{SkinPiece::BottomLeft, 36}, std::pair{SkinPiece::Bottom, 8}, std::pair{SkinPiece::BottomRight, 36}})
+        CHECK(at(SkinSource(2, piece, pixels)) != std::string::npos);
+    // The frame first, as RmlUi draws the first decorator on top; the background last, repeated.
+    CHECK(rule.starts_with("decorator:tiled-box("));
+    CHECK(at("vertical-gradient(#00000080 #00000000)") > at(SkinSource(2, SkinPiece::BottomRight, 36)));
+    CHECK(at(SkinSource(2, SkinPiece::Back, 192)) > at("vertical-gradient("));
+    CHECK(at("repeat") != std::string::npos && rule.ends_with(";"));
+}
+
+TEST(a_skins_look_is_its_frame_its_palette_and_its_menus_colors)
+{
+    WindowSkin skin  = Colored(0xFF1E2A6E, 0xFF888888);
+    skin.shadeTop    = 0.25f;
+    const GameSkinLook look = SkinLookOf(skin, 4, 2.0f);
+    CHECK((look.frame == SkinFrame{4, 2.0f, 0.25f, 1.0f}));
+    CHECK(look.palette == SkinPalette(skin) && look.menu == SkinMenuColors(skin));
+}

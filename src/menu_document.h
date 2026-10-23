@@ -1,6 +1,9 @@
 #pragma once
 
+#include "skin_frame.h"
+
 #include <cstdint>
+#include <optional>
 #include <string>
 
 namespace headsup
@@ -24,6 +27,7 @@ namespace headsup
         uint32_t text, heading, label, muted;
         uint32_t accent, accentHover, accentSoft; // accentSoft: the picked page, a hovered row
         uint32_t accentEnd;                       // what the accent runs into where it is a gradient
+        bool operator==(const MenuColors&) const = default;
     };
     // The Phoenix palette of phoenix-xi.com, which the bar's Phoenix themes share: its red runs into its ember.
     constexpr MenuColors kPhoenixMenuColors{0xF7150C0C, 0xFF24181A, 0xFF352325, 0xFF452D2F, 0xFF0F0808, 0x24D2ABAB,
@@ -40,8 +44,10 @@ namespace headsup
         int fontPixels = 0; // the window's text
         int textLift   = 0; // pixels its capitals stand under the middle of their line, which a line in a box is lifted by
         bool developer = false; // a developer's build: its frame has the layout file's Reload and Export
+        MenuColors colors = kPhoenixMenuColors;
+        std::optional<SkinFrame> skin; // the game's art the window is drawn in, for its Game Window theme
         bool operator==(const MenuLook&) const = default;
-        // The same but for the text's size: the style changes and the document stays.
+        // The same but for the text's size, the colors and the art: the style changes and the document stays.
         bool SameFrame(const MenuLook& other) const
         {
             return theme == other.theme && textFont == other.textFont && titleFont == other.titleFont && developer == other.developer;

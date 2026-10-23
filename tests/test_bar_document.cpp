@@ -1,4 +1,5 @@
 #include "bar_document.h"
+#include "window_skin.h"
 #include "test.h"
 
 #include <string>
@@ -11,7 +12,7 @@ namespace
     {
         const BarMetrics m  = MetricsFor(45, p.shape);
         return BarLook{p, settings, m, PillRow(m), TextRow{13, 11, true, 10.0f, 24.0f, 12.0f},
-            BarTitleFont(settings, p.shape), p.shape == BarShape::Ornate, BarTextFont(settings)};
+            BarTitleFont(settings, p.shape), p.shape == BarShape::Ornate, BarTextFont(settings), std::nullopt};
     }
     BarLook LookOf(BarTheme theme, const Settings& settings) { return LookOf(PaletteOf(theme), settings); }
 
@@ -335,4 +336,23 @@ TEST(the_line_of_light_and_the_glass_are_the_glass_shapes_alone)
     CHECK(Has(PopupDocument(LookOf(glassGold, settings), faces), "#panel{background-color:transparent;"));
     CHECK(!Has(BarDocument(LookOf(pillAurora, settings), Place()), "glint"));
     CHECK(!Has(PopupDocument(LookOf(pillAurora, settings), faces), "#panel{background-color:transparent;"));
+}
+
+TEST(the_strip_and_the_popups_are_drawn_with_the_games_art_when_the_shape_is_window)
+{
+    Settings settings;
+    BarPalette palette = PaletteOf(BarTheme::UmbraDark);
+    palette.shape      = BarShape::Window;
+    BarLook look       = LookOf(palette, settings);
+    look.skin          = SkinFrame{3, 1.0f, 0.5f, 1.0f};
+    const std::string bar = BarDocument(look, Place());
+    CHECK(bar.find(SkinSource(3, SkinPiece::Back, kSkinTile)) != std::string::npos);
+    CHECK(bar.find("hu:strip") == std::string::npos);
+    const PopupFaces faces{};
+    CHECK(PopupDocument(look, faces).find(SkinSource(3, SkinPiece::TopLeft, kFrameCorner)) != std::string::npos);
+    // Without the art read, the shape draws its colors.
+    look.skin = std::nullopt;
+    CHECK(BarDocument(look, Place()).find("hu:strip") != std::string::npos);
+    CHECK(BarDocument(look, Place()).find("hu:skin") == std::string::npos);
+    CHECK(PopupDocument(look, faces).find("hu:skin") == std::string::npos);
 }

@@ -7,6 +7,7 @@
 #include "plate_template.h"
 #include "rml_session.h"
 #include "test.h"
+#include "window_skin.h"
 
 #include <RmlUi/Core.h>
 
@@ -74,6 +75,12 @@ namespace
             Frames(2);
         }
         ~Window() { menu.Close(); }
+        // The game's window art read, as the plugin hands it over.
+        void Skin(const GameSkinLook& look)
+        {
+            m_Host.skin = look;
+            Frames(2);
+        }
         // What RmlUi complained of since the window opened.
         std::string Said() const { return m_Rml.Said(); }
         const test::NoRender& Render() const { return m_Rml.Render(); }
@@ -1271,9 +1278,11 @@ TEST(a_tip_stays_on_the_screen_and_off_the_pointer)
 
 TEST(every_control_of_every_page_takes_a_click_and_the_window_stands)
 {
-    for (const MenuTheme theme : {MenuTheme::Phoenix, MenuTheme::Aurora})
+    for (const MenuTheme theme : {MenuTheme::Phoenix, MenuTheme::Aurora, MenuTheme::GameWindow})
     {
         Window window(theme);
+        if (theme == MenuTheme::GameWindow)
+            window.Skin(GameSkinLook{SkinFrame{0, 4.0f / 3.0f, 0.5f, 1.0f}, PaletteOf(BarTheme::UmbraDark), kAuroraMenuColors});
         for (const LayoutPage& page : kWindowLayout.pages)
         {
             window.Page(page.key);
@@ -1554,4 +1563,17 @@ TEST(a_setting_of_something_switched_off_is_not_shown)
     window.settings.enabled = false;
     window.Frames(2);
     CHECK(!window.Shows("entities-colors-aggression-head") && !window.Shows(least));
+}
+
+TEST(the_game_window_theme_draws_the_window_in_the_art_and_its_colors)
+{
+    Window window(MenuTheme::GameWindow);
+    const GameSkinLook look{SkinFrame{5, 1.0f, 0.5f, 1.0f}, PaletteOf(BarTheme::UmbraDark), kAuroraMenuColors};
+    const MenuLook menu{MenuTheme::GameWindow, kBarlowCondensed, kMarcellusSC, 16, 0, false, look.menu, look.frame};
+    const std::string style = MenuStyle(menu);
+    CHECK(style.find(SkinSource(5, SkinPiece::Back, kSkinTile)) != std::string::npos);
+    CHECK(style.find(RcssColor(kAuroraMenuColors.text)) != std::string::npos);
+    CHECK(style.find(RcssColor(kPhoenixMenuColors.text)) == std::string::npos);
+    window.Skin(look);
+    CHECK_EQ(window.Said(), "");
 }
