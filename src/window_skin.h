@@ -1,10 +1,14 @@
 #pragma once
 
 #include "game_font.h"
+#include "plate_image.h"
 
+#include <array>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 
 namespace headsup
 {
@@ -23,4 +27,32 @@ namespace headsup
     };
     // A skin out of its whole DAT.
     Read<WindowSkin> ReadWindowSkin(std::span<const uint8_t> dat);
+    // The skins read, by type; none for a type whose file could not be.
+    using WindowSkins = std::array<std::optional<WindowSkin>, kWindowTypes>;
+
+    // How the game draws a window, in its menu pixels: the background repeated every tile from the window's corner,
+    // edges this thick stretched between corners this large.
+    constexpr int kSkinTile = 128, kFrameEdge = 5, kFrameCorner = 24;
+    // A size in the game's menu pixels in pixels of the screen, where the menu is drawn scale times as large.
+    int SkinPixels(int menuPixels, float scale);
+
+    // The pieces a window is drawn with, as RmlUi loads them, each at a size in pixels: the background square, an edge
+    // that thick (and its picture's length, which RmlUi stretches), a corner square, and a clear pixel for the middle
+    // of a tiled box, which draws something there.
+    enum class SkinPiece : uint8_t
+    {
+        Back,
+        Top,
+        Bottom,
+        Left,
+        Right,
+        TopLeft,
+        TopRight,
+        BottomLeft,
+        BottomRight,
+        Clear,
+    };
+    std::string SkinSource(int type, SkinPiece piece, int pixels);
+    // The picture a SkinSource name stands for; none for another name, or a skin that was not read.
+    std::optional<Image> SkinImage(const WindowSkins& skins, std::string_view name);
 }

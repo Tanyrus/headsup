@@ -3,7 +3,11 @@
 #include "test.h"
 #include "window_skin.h"
 
+#include <array>
+#include <optional>
 #include <string>
+#include <tuple>
+#include <utility>
 #include <vector>
 
 using namespace headsup;
@@ -42,12 +46,12 @@ namespace
 
     constexpr uint16_t kBlue565 = 0x001F, kRed565 = 0xF800, kGreen565 = 0x07E0, kWhite565 = 0xFFFF;
 
-    Bytes SkinDat(bool withDown = true, uint8_t top = 0x40, uint8_t bottom = 0x7F)
+    Bytes SkinDat(bool withDown = true, uint8_t top = 0x40, uint8_t bottom = 0x7F, int corner = 32)
     {
         Bytes out = Chunk("win0", 0x01, Bytes(16, 0)) + Chunk("newt", 0x20, Solid("menu    newtex  ", 128, kBlue565)) +
                     Chunk("hfr1", 0x20, Solid("menu    hfr1    ", 32, kRed565));
         if (withDown) out = out + Chunk("vfr1", 0x20, Solid("menu    vfr1    ", 32, kGreen565));
-        return out + Chunk("corn", 0x20, Solid("menu    corner  ", 32, kWhite565)) + Chunk("win0", 0x31, Shapes(top, bottom));
+        return out + Chunk("corn", 0x20, Solid("menu    corner  ", corner, kWhite565)) + Chunk("win0", 0x31, Shapes(top, bottom));
     }
 
     // A picture's first pixel as B, G, R, A.
@@ -78,6 +82,12 @@ TEST(a_dat_without_a_piece_is_refused_with_why)
     CHECK(!ReadWindowSkin(Bytes{}).value.has_value());
 }
 
+TEST(a_skin_whose_frame_is_too_small_to_cut_is_refused)
+{
+    // The bottom right corner is cut from 7, 7 to 31, 31.
+    CHECK(!ReadWindowSkin(SkinDat(true, 0x40, 0x7F, 28)).value.has_value());
+}
+
 TEST(a_shade_past_full_is_held_to_full)
 {
     const Read<WindowSkin> read = ReadWindowSkin(SkinDat(true, 0x90, 0xFF));
@@ -96,4 +106,115 @@ TEST(a_skin_is_read_where_xipivot_would_read_it)
 {
     CHECK((GameFileCandidates("[overlays]\n0=A\n", "D:\\d", "C:\\Game", WindowSkinFile(2)) ==
            std::vector<std::string>{"D:\\d\\A\\ROM\\0\\16.DAT", "C:\\Game\\ROM\\0\\16.DAT"}));
+}
+
+namespace
+{
+    // A picture whose every pixel says where it is: blue its column, green its row, opaque.
+    ColorPicture Placed(int width, int height)
+    {
+        ColorPicture p{"", width, height, std::vector<uint8_t>(static_cast<size_t>(width * height) * 4)};
+        for (int y = 0; y < height; ++y)
+            for (int x = 0; x < width; ++x)
+            {
+                uint8_t* pixel = p.bgra.data() + (static_cast<size_t>(y * width + x)) * 4;
+                pixel[0]       = static_cast<uint8_t>(x);
+                pixel[1]       = static_cast<uint8_t>(y);
+                pixel[3]       = 255;
+            }
+        return p;
+    }
+    WindowSkin PlacedSkin() { return WindowSkin{Placed(128, 128), Placed(32, 32), Placed(32, 32), Placed(32, 32)}; }
+
+    using Skins = std::array<std::optional<WindowSkin>, kWindowTypes>;
+    Skins Only(int type, WindowSkin skin)
+    {
+        Skins skins;
+        skins[static_cast<size_t>(type)] = std::move(skin);
+        return skins;
+    }
+    // A pixel's column and row as the placed picture wrote them.
+    std::pair<int, int> Where(const Image& image, int x, int y)
+    {
+        const uint32_t argb = image.argb[static_cast<size_t>(y * image.width + x)];
+        return {static_cast<int>(argb & 0xFF), static_cast<int>(argb >> 8 & 0xFF)};
+    }
+}
+
+TEST(a_corner_is_its_24_pixels_of_the_corner_picture)
+{
+    const Skins skins = Only(0, PlacedSkin());
+    const auto corner = [&](SkinPiece piece) { return SkinImage(skins, SkinSource(0, piece, 24)); };
+    for (const auto& [piece, u, v] : {std::tuple{SkinPiece::TopLeft, 1, 1}, std::tuple{SkinPiece::TopRight, 7, 1},
+             std::tuple{SkinPiece::BottomLeft, 1, 7}, std::tuple{SkinPiece::BottomRight, 7, 7}})
+    {
+        const std::optional<Image> image = corner(piece);
+        CHECK(image && image->width == 24 && image->height == 24);
+        CHECK((Where(*image, 0, 0) == std::pair{u, v}));
+        CHECK((Where(*image, 23, 23) == std::pair{u + 23, v + 23}));
+    }
+}
+
+TEST(an_edge_is_5_pixels_thick_and_its_pictures_length)
+{
+    const Skins skins = Only(0, PlacedSkin());
+    const std::optional<Image> top = SkinImage(skins, SkinSource(0, SkinPiece::Top, 5));
+    CHECK(top && top->width == 32 && top->height == 5);
+    CHECK((Where(*top, 0, 0) == std::pair{0, 1}) && (Where(*top, 31, 4) == std::pair{31, 5}));
+    const std::optional<Image> bottom = SkinImage(skins, SkinSource(0, SkinPiece::Bottom, 5));
+    CHECK(bottom && (Where(*bottom, 3, 0) == std::pair{3, 26}));
+    const std::optional<Image> left = SkinImage(skins, SkinSource(0, SkinPiece::Left, 5));
+    CHECK(left && left->width == 5 && left->height == 32 && (Where(*left, 0, 9) == std::pair{1, 9}));
+    const std::optional<Image> right = SkinImage(skins, SkinSource(0, SkinPiece::Right, 5));
+    CHECK(right && (Where(*right, 4, 31) == std::pair{30, 31}));
+    const std::optional<Image> back = SkinImage(skins, SkinSource(0, SkinPiece::Back, 128));
+    CHECK(back && back->width == 128 && (Where(*back, 127, 64) == std::pair{127, 64}));
+}
+
+TEST(a_piece_scaled_is_the_mean_of_what_each_of_its_pixels_covers)
+{
+    WindowSkin skin = PlacedSkin();
+    for (size_t p = 0; p < skin.corner.bgra.size(); p += 4)
+    {
+        const size_t pixel = p / 4;
+        const bool white   = (pixel % 32 + pixel / 32) % 2 == 0;
+        for (size_t c = 0; c < 3; ++c)
+            skin.corner.bgra[p + c] = white ? 255 : 0;
+    }
+    const std::optional<Image> half = SkinImage(Only(0, skin), SkinSource(0, SkinPiece::TopLeft, 12));
+    CHECK(half && half->width == 12);
+    for (const uint32_t argb : half->argb)
+        CHECK(argb == 0xFF808080u || argb == 0xFF7F7F7Fu);
+    // Half again as large: an edge's 5 rows become 8 and keep their order.
+    const std::optional<Image> grown = SkinImage(Only(0, PlacedSkin()), SkinSource(0, SkinPiece::Top, 8));
+    CHECK(grown && grown->height == 8 && Where(*grown, 0, 0).second == 1 && Where(*grown, 0, 7).second == 5);
+}
+
+TEST(a_skins_names_carry_its_type)
+{
+    const Skins skins = Only(3, PlacedSkin());
+    CHECK(SkinSource(0, SkinPiece::Top, 5) != SkinSource(3, SkinPiece::Top, 5));
+    CHECK(SkinImage(skins, SkinSource(3, SkinPiece::Top, 5)).has_value());
+    CHECK(!SkinImage(skins, SkinSource(0, SkinPiece::Top, 5)).has_value());
+}
+
+TEST(a_name_of_no_skin_or_no_piece_is_none)
+{
+    const Skins skins = Only(0, PlacedSkin());
+    for (const char* name : {"hu:icon/1", "hu:skin/9/top/5", "hu:skin/0/nope/5", "hu:skin/0/top/0", "hu:skin/0/top",
+             "hu:skin/0/top/5/1", "hu:skin/x/top/5", "hu:skin/0/top/100000"})
+        CHECK(!SkinImage(skins, name).has_value());
+}
+
+TEST(clear_is_one_clear_pixel)
+{
+    const std::optional<Image> clear = SkinImage(Only(0, PlacedSkin()), SkinSource(0, SkinPiece::Clear, 1));
+    CHECK(clear && clear->width == 1 && clear->height == 1 && clear->argb == std::vector<uint32_t>{0});
+}
+
+TEST(sizes_are_the_menus_pixels_times_its_scale)
+{
+    CHECK_EQ(SkinPixels(24, 4.0f / 3.0f), 32);
+    CHECK_EQ(SkinPixels(5, 4.0f / 3.0f), 7);
+    CHECK_EQ(SkinPixels(5, 0.01f), 1);
 }
