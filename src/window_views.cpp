@@ -25,29 +25,29 @@ namespace headsup
             return true;
         }
 
-        bool ReadWindow(const ProcessMemory& memory, uint32_t mcd, OpenWindow& out)
-        {
-            std::array<uint8_t, kRecordBytes> record;
-            std::array<char, kWindowNameLength> name;
-            if (!Copy(memory, mcd, record.data(), record.size()) ||
-                !Copy(memory, ReadAt<uint32_t>(record.data(), kWindowDescriptor) + kDescriptorName, name.data(),
-                    name.size()))
-                return false;
-            const std::optional<WindowKey> key = WindowKeyOf(name.data());
-            if (!key) return false;
-            const auto edge = [&](int side) {
-                return static_cast<int>(ReadAt<int16_t>(record.data(), kMcdRect + 2 * side));
-            };
-            out = OpenWindow{mcd, *key, edge(0), edge(1), edge(2), edge(3),
-                ReadAt<uint32_t>(record.data(), kMcdType) == kWindowOpening};
-            return true;
-        }
-
         // A shown window hanging from the top that moves with its view: not the strip, nor above its row.
         bool HangsInView(const FrameWindow& w, int screenBottom)
         {
             return !w.hidden && MovableWindow(w.key) && w.top >= kGameTopRow && HangsFromTop(w.top, screenBottom);
         }
+    }
+
+    bool ReadWindow(const ProcessMemory& memory, uint32_t mcd, OpenWindow& out)
+    {
+        std::array<uint8_t, kRecordBytes> record;
+        std::array<char, kWindowNameLength> name;
+        if (!Copy(memory, mcd, record.data(), record.size()) ||
+            !Copy(memory, ReadAt<uint32_t>(record.data(), kWindowDescriptor) + kDescriptorName, name.data(),
+                name.size()))
+            return false;
+        const std::optional<WindowKey> key = WindowKeyOf(name.data());
+        if (!key) return false;
+        const auto edge = [&](int side) {
+            return static_cast<int>(ReadAt<int16_t>(record.data(), kMcdRect + 2 * side));
+        };
+        out = OpenWindow{mcd, *key, edge(0), edge(1), edge(2), edge(3),
+            ReadAt<uint32_t>(record.data(), kMcdType) == kWindowOpening};
+        return true;
     }
 
     size_t ReadWindowList(uint32_t list, const ProcessMemory& memory, std::span<OpenWindow> out)

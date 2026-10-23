@@ -660,6 +660,41 @@ TEST(the_window_move_is_found_once_by_its_start)
 
 namespace
 {
+    // The builder of a window from the menu catalog, at RVA 0x117F40 in the client of 2026-10-22, called once at
+    // 0x15E4A1: push ebx; push ebp; push esi; mov esi,ecx; mov ecx,[esp+10h]; push edi; mov [esi+4],ecx; call.
+    constexpr uint32_t kBuildRva = 0x117F40, kBuildCallRva = 0x15E4A1;
+    void PutBuild(Image& image, uint32_t at)
+    {
+        image.Put(at, {0x53, 0x55, 0x56, 0x8B, 0xF1, 0x8B, 0x4C, 0x24, 0x10, 0x57, 0x89, 0x4E, 0x04, 0xE8, 0xBE, 0x33,
+                          0x00, 0x00, 0x8B, 0xD8, 0x85, 0xDB});
+    }
+    void PutCall(Image& image, uint32_t at, uint32_t to)
+    {
+        image.Put(at, {0xE8});
+        image.Put32(at + 1, to - (at + kBranchLength));
+    }
+}
+
+TEST(the_window_builder_is_found_with_its_one_call)
+{
+    Image image;
+    CHECK(LocateWindowBuild(image.Text()).problem == LocateProblem::NoWindowBuild);
+    PutBuild(image, kBuildRva);
+    CHECK(LocateWindowBuild(image.Text()).problem == LocateProblem::NoWindowBuild); // never called
+    PutCall(image, kBuildCallRva, kBuildRva);
+    const WindowBuildSite found = LocateWindowBuild(image.Text());
+    CHECK(found.problem == LocateProblem::None && found.call == kBuildCallRva && found.build == kBuildRva);
+    PutCall(image, kBuildCallRva + 0x100, kBuildRva);
+    CHECK(LocateWindowBuild(image.Text()).problem == LocateProblem::AmbiguousWindowBuild);
+    Image twice;
+    PutBuild(twice, kBuildRva);
+    PutBuild(twice, kBuildRva + 0x1000);
+    PutCall(twice, kBuildCallRva, kBuildRva);
+    CHECK(LocateWindowBuild(twice.Text()).problem == LocateProblem::AmbiguousWindowBuild);
+}
+
+namespace
+{
     // MCD::GetRect's start, at RVA 0x118F70 in the client of 2026-10-13: sub esp,0Ch; push esi; mov esi,ecx; mov al,
     // [esi+99h]; test al,al; jz, its rectangle copied into the place it is given.
     constexpr uint32_t kGetRectRva = 0x118F70;
@@ -935,6 +970,44 @@ TEST(where_the_game_put_a_window_is_where_it_came_from_once_moved_else_where_it_
     CHECK(placements.OriginOf(0x2000, menu, {0, 190}) == (WindowSpot{0, 60}));
     CHECK(placements.OriginOf(0x2000, menu, {0, 75}) == (WindowSpot{0, 75}));
     CHECK(HelpStripWindow(*WindowKeyOf("menu    helpwind")) && !HelpStripWindow(*WindowKeyOf("menu    netstat ")));
+}
+
+TEST(a_window_the_game_moves_goes_down_from_where_it_meant_and_is_not_moved_again)
+{
+    WindowPlacements placements;
+    const WindowKey profile = *KeyFromShortName("persona");
+    // The owner asks for 16, 32; HeadsUp takes it 16 lower at once, and the frame's pass finds it placed.
+    CHECK(placements.Moved(0x1000, profile, {16, 32}, 112, 190, 0, 16, kScreenRight, kScreenBottom) ==
+          (WindowSpot{16, 48}));
+    CHECK(!placements.PlaceFor(0x1000, profile, {16, 48}, 112, 190, 0, 16, kScreenRight, kScreenBottom));
+    CHECK(placements.OriginOf(0x1000, profile, {16, 48}) == (WindowSpot{16, 32}));
+    // Held to the screen as the frame's pass holds it.
+    CHECK(placements.Moved(0x2000, profile, {16, 100}, 112, 1000, 0, 130, kScreenRight, kScreenBottom) ==
+          (WindowSpot{16, 100}));
+}
+
+TEST(a_windows_course_is_where_headsup_puts_it_while_it_stands_at_either_end)
+{
+    WindowPlacements placements;
+    const WindowKey level = *KeyFromShortName("level");
+    // Unknown: where it stands, both ways.
+    CHECK(placements.CourseOf(0x1000, level, {16, 208}) == (WindowCourse{{16, 208}, {16, 208}}));
+    // Planned as it was built and not moved yet, then moved: the same course.
+    placements.Moved(0x1000, level, {16, 208}, 112, 88, 0, 16, kScreenRight, kScreenBottom);
+    CHECK(placements.CourseOf(0x1000, level, {16, 208}) == (WindowCourse{{16, 208}, {16, 224}}));
+    CHECK(placements.CourseOf(0x1000, level, {16, 224}) == (WindowCourse{{16, 208}, {16, 224}}));
+    // Put somewhere else since, by the game or the player: where it stands.
+    CHECK(placements.CourseOf(0x1000, level, {16, 300}) == (WindowCourse{{16, 300}, {16, 300}}));
+}
+
+TEST(a_top_the_game_asks_for_where_the_window_stands_is_the_one_it_had)
+{
+    // Profile put at a new top: that is the game's.
+    CHECK(GameMeant({16, 32}, {16, 64}, {16, 48}) == (WindowSpot{16, 32}));
+    // Besieged slid sideways from where it stands, and the Level box put beside the moved Profile: the top is the one
+    // HeadsUp gave it or means to, so the game's is still the origin's.
+    CHECK(GameMeant({1768, 64}, {1792, 64}, {1792, 48}) == (WindowSpot{1768, 48}));
+    CHECK(GameMeant({16, 224}, {16, 224}, {16, 208}) == (WindowSpot{16, 208}));
 }
 
 TEST(an_equipment_figure_still_in_the_windows_old_place_moves_with_it_and_no_other)

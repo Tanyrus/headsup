@@ -28,6 +28,8 @@ namespace headsup
     // next, +0x10 its window's record, +0x14 a byte set to skip it), in its order: at most out.size() windows and
     // kMaxListLinks links, stopping at anything memory says cannot be read. Returns how many it wrote.
     constexpr size_t kMaxListLinks = 256;
+    // One window as the list's reader reads each: false when its record cannot be read or it has no menu name.
+    bool ReadWindow(const ProcessMemory& memory, uint32_t mcd, OpenWindow& out);
     size_t ReadWindowList(uint32_t list, const ProcessMemory& memory, std::span<OpenWindow> out);
 
     // A view: the windows the game opens together, as it placed them with HeadsUp unloaded. top is the highest of

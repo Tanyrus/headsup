@@ -86,6 +86,10 @@ namespace headsup
         constexpr int16_t kWindowMoveTo[] = {0x83, 0xEC, 0x0C, 0x66, 0x8B, 0x44, 0x24, 0x14, 0x53, 0x55, 0x8B, 0x6C, 0x24,
             0x18, 0x56, 0x8B, 0xF1, 0x57, 0x33, 0xFF, 0x8D, 0x5E, 0x14, 0x66, 0x89, 0x6E, 0x52, 0x8B, 0xCB, 0x66, 0x89, 0x46,
             0x54};
+        // The catalog window builder's start: push ebx; push ebp; push esi; mov esi,ecx; mov ecx,[esp+10h]; push edi;
+        // mov [esi+4],ecx (the descriptor); call (its frame); mov ebx,eax; test ebx,ebx.
+        constexpr int16_t kWindowBuild[] = {0x53, 0x55, 0x56, 0x8B, 0xF1, 0x8B, 0x4C, 0x24, 0x10, 0x57, 0x89, 0x4E, 0x04,
+            0xE8, -1, -1, -1, -1, 0x8B, 0xD8, 0x85, 0xDB};
         // MCD::GetRect's start: sub esp,0Ch; push esi; mov esi,ecx; mov al,[esi+99h]; test al,al; jz.
         // mov edx,[the strip title's owner]; add esp,10h; lea ecx,[esp+4]; push ecx; mov ecx,[edx+8]; call GetRect; then
         // the label drawn at the rectangle's left and its bottom plus 3, in 80808080.
@@ -332,6 +336,8 @@ namespace headsup
         case LocateProblem::AmbiguousWeather: return "the game's weather was found more than once";
         case LocateProblem::NoWindowMove: return "the game's window move was not found";
         case LocateProblem::AmbiguousWindowMove: return "the game's window move was found more than once";
+        case LocateProblem::NoWindowBuild: return "where the game builds a window was not found";
+        case LocateProblem::AmbiguousWindowBuild: return "where the game builds a window was found more than once";
         case LocateProblem::NoScanLabel: return "where Wide Scan places its grid label was not found";
         case LocateProblem::AmbiguousScanLabel: return "where Wide Scan places its grid label was found more than once";
         case LocateProblem::ScanLabelChanged: return "Wide Scan's grid label is placed through an unexpected function";
@@ -528,6 +534,26 @@ namespace headsup
     }
 
     bool MoveUnderWay(int32_t move) { return move > 0; }
+
+    WindowBuildSite LocateWindowBuild(const ImageSection& text)
+    {
+        const std::vector<uint32_t> found = FindAll(kWindowBuild, text);
+        if (found.empty()) return WindowBuildSite{LocateProblem::NoWindowBuild};
+        if (found.size() > 1) return WindowBuildSite{LocateProblem::AmbiguousWindowBuild};
+        constexpr uint8_t kCall = 0xE8;
+        const uint32_t build = text.rva + found.front();
+        std::vector<uint32_t> calls;
+        for (uint32_t i = 0; i + kBranchLength <= text.size; ++i)
+            if (text.bytes[i] == kCall && CallTarget(text.rva + i, text) == build) calls.push_back(text.rva + i);
+        if (calls.empty()) return WindowBuildSite{LocateProblem::NoWindowBuild};
+        if (calls.size() > 1) return WindowBuildSite{LocateProblem::AmbiguousWindowBuild};
+        return WindowBuildSite{LocateProblem::None, calls.front(), build};
+    }
+
+    WindowSpot GameMeant(WindowSpot asked, WindowSpot placed, WindowSpot origin)
+    {
+        return WindowSpot{asked.left, asked.top == placed.top ? origin.top : asked.top};
+    }
 
     namespace
     {
@@ -845,14 +871,8 @@ namespace headsup
             }
             placed->from = now; // the game put it there
         }
-        placed->frame = m_Frame;
-        const WindowSpot from = placed->from;
-        int left = from.left;
-        if (dx != 0) left = std::clamp(from.left + dx, 0, std::max(0, screenRight - width));
-        int top = std::min(from.top + dy, screenBottom - height);
-        top     = dy >= 0 ? std::max(top, from.top) : std::max(top, 0);
-        placed->to = WindowSpot{left, top};
-        return placed->to != now ? std::optional<WindowSpot>(placed->to) : std::nullopt;
+        const WindowSpot to = Place(*placed, width, height, dx, dy, screenRight, screenBottom);
+        return to != now ? std::optional<WindowSpot>(to) : std::nullopt;
     }
 
     WindowSpot PlacedText::Follow(WindowSpot seen, WindowSpot origin, WindowSpot at)
@@ -871,6 +891,42 @@ namespace headsup
                             number.top < at.top + height;
         if (!inside || number == WindowSpot{}) return number;
         return WindowSpot{number.left + to.left - at.left, number.top + to.top - at.top};
+    }
+
+    WindowSpot WindowPlacements::Moved(uint32_t mcd, const WindowKey& key, WindowSpot from, int width, int height, int dx,
+        int dy, int screenRight, int screenBottom)
+    {
+        Placed* placed = nullptr;
+        for (Placed& p : m_Placed)
+            if (p.mcd == mcd && p.key == key) placed = &p;
+        if (placed == nullptr)
+        {
+            placed = &m_Placed[m_Next];
+            m_Next = (m_Next + 1) % m_Placed.size();
+            *placed = Placed{mcd, key};
+        }
+        placed->from = from;
+        return Place(*placed, width, height, dx, dy, screenRight, screenBottom);
+    }
+
+    WindowSpot WindowPlacements::Place(Placed& placed, int width, int height, int dx, int dy, int screenRight,
+        int screenBottom)
+    {
+        placed.frame          = m_Frame;
+        const WindowSpot from = placed.from;
+        int left              = from.left;
+        if (dx != 0) left = std::clamp(from.left + dx, 0, std::max(0, screenRight - width));
+        int top = std::min(from.top + dy, screenBottom - height);
+        top     = dy >= 0 ? std::max(top, from.top) : std::max(top, 0);
+        placed.to = WindowSpot{left, top};
+        return placed.to;
+    }
+
+    WindowCourse WindowPlacements::CourseOf(uint32_t mcd, const WindowKey& key, WindowSpot now) const
+    {
+        for (const Placed& p : m_Placed)
+            if (p.mcd == mcd && p.key == key && (p.to == now || p.from == now)) return WindowCourse{p.from, p.to};
+        return WindowCourse{now, now};
     }
 
     std::vector<WindowPlacements::Placed> WindowPlacements::MovedSince(uint32_t since) const

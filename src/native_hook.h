@@ -156,6 +156,8 @@ namespace headsup
         CodePatch m_Call;
         CodePatch m_LabelCall; // Wide Scan's grid label's ask for the strip title's place, when it was found
         CodePatch m_CountCall; // an item list's count's ask for it, when it was found
+        CodePatch m_MoveStart; // MCD::MoveTo's start, so a window the game moves goes where HeadsUp would put it
+        CodePatch m_BuildCall; // the catalog's window build, so where a new window goes is known before it draws
         std::string m_MoveProblem;
     };
 

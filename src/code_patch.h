@@ -11,7 +11,7 @@ namespace headsup
     // A few bytes of the client's code that HeadsUp writes its own over while it runs.
     struct CodePatch
     {
-        static constexpr uint32_t kMaxBytes = 6; // the longest: a five-byte instruction and a nop
+        static constexpr uint32_t kMaxBytes = 8; // the longest: a five-byte instruction and three nops
         uint8_t* at    = nullptr;
         uint32_t bytes = 0;
         uint8_t game[kMaxBytes] = {}; // as Apply found them
