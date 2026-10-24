@@ -212,6 +212,19 @@ namespace headsup
         std::array<StripWindowReader, 2> m_Readers; // by StripWindow
     };
     // The client's connection counters (LocateNetStats), read on the game's thread.
+    // The search server's address and port as the client keeps them since login (LocateSearchAddress), found once.
+    class SearchAddressReader
+    {
+    public:
+        // "" when found, else why not.
+        std::string Find();
+        // Nothing before Find succeeded or before the client has an address.
+        std::optional<std::pair<uint32_t, uint16_t>> Read() const;
+
+    private:
+        uint32_t m_Address = 0, m_Port = 0;
+    };
+
     // The Window Type the game is set to, by the client's own config getter, found once.
     class WindowTypeReader
     {

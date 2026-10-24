@@ -28,9 +28,11 @@
 #include "player_status.h"
 #include "pointer_keys.h"
 #include "pointer_swap.h"
+#include "player_lookup.h"
 #include "rml_bar.h"
 #include "rml_host.h"
 #include "rml_menu.h"
+#include "search_client.h"
 #include "settings.h"
 #include "shot_watch.h"
 #include "tracker.h"
@@ -276,6 +278,11 @@ class HeadsUp final : public IPlugin
     bool m_StripConverted = false;
     headsup::StripText m_Strip;
     headsup::WeatherReader m_WeatherReader;
+    headsup::PlayerLookups m_Lookups;             // whom Look Up Players asks the search server about, and when
+    headsup::SearchClient m_Search;
+    headsup::SearchAddressReader m_SearchAddress;
+    bool m_SearchAddressTried = false;            // it scans the client's code, so once
+    uint32_t m_SearchNonce    = 0;
     bool m_WeatherTried = false; // it scans the client's code, so once
     headsup::NetStatsReader m_NetStats;
     bool m_NetStatsTried = false; // it scans the client's code, so once
@@ -469,6 +476,7 @@ public:
         if (const std::string failure = m_PointerFix.Stop(); !failure.empty()) Print(failure + ".");
         m_Pointer.Stop();
         m_Fonts.Wait();
+        m_Search.Stop();
         m_Nameplates.Release();
         UnhookPresent();
         UnhookReset();
@@ -673,6 +681,7 @@ public:
         {
             m_Names.ForgetCamera();
             m_AutoCheck.Clear();
+            m_Lookups.Zoned();
         }
         if (next.check) OnCheckReply(*next.check);
         if (next.mobDied && m_Settings.phTimers)
@@ -2302,6 +2311,46 @@ private:
         return names;
     }
 
+    // Look Up Players: the players in view, their looks changing, the last answer taken and the next request sent.
+    void UpdateLookups(const std::vector<headsup::ActorInput>& inputs, double now)
+    {
+        const std::vector<uint16_t> changed = m_GameState.TakeLookChanges();
+        if (!m_Settings.lookUpPlayers) return;
+        if (!std::exchange(m_SearchAddressTried, true))
+            if (const std::string failure = m_SearchAddress.Find(); !failure.empty())
+                Note("Look Up Players asks no one: " + failure + ".");
+        std::vector<headsup::InView> inView;
+        std::unordered_map<uint32_t, uint16_t> indexOf;
+        for (const headsup::ActorInput& a : inputs)
+            if (a.kind == headsup::EntityKind::Player && !a.self && a.serverId != 0)
+            {
+                inView.push_back(headsup::InView{a.serverId, a.distance});
+                indexOf[a.serverId] = a.index;
+            }
+        m_Lookups.Frame(inView, now);
+        for (const uint16_t index : changed)
+            for (const headsup::ActorInput& a : inputs)
+                if (a.index == index) m_Lookups.LookChanged(a.serverId);
+        if (std::optional<headsup::SearchClient::Result> result = m_Search.Take())
+        {
+            if (!result->failure.empty())
+            {
+                m_Lookups.Failed(now);
+                Note("Look Up Players: " + result->failure + ".");
+            }
+            else
+                for (const headsup::LookupAnswer& answer : m_Lookups.Answered(result->players))
+                {
+                    const auto index = indexOf.find(answer.id);
+                    m_GameState.LookedUp(answer.id, index != indexOf.end() ? index->second : 0, answer.player);
+                }
+        }
+        if (const auto address = m_SearchAddress.Read())
+            if (const std::optional<std::vector<uint32_t>> ids = m_Lookups.NextRequest(now))
+                m_Search.Ask(headsup::SearchEndpoint{address->first, address->second}, *ids,
+                    static_cast<uint32_t>(GetTickCount()) ^ ++m_SearchNonce);
+    }
+
     std::optional<headsup::PlayerJobs> JobsOf(uint16_t index, uint32_t serverId) const
     {
         const auto member                                 = m_PartyJobs.find(serverId);
@@ -2426,6 +2475,7 @@ private:
         m_Player.inEvent = headsup::IsEventStatus(entity->GetStatusServer(m_SelfIndex));
         m_Player.inCombat = headsup::PlayerInCombat(inputs);
         m_Tracker.Update(inputs, m_Player, m_Settings, m_CursorTargets);
+        UpdateLookups(inputs, now);
         if (headsup::MayAutoCheck(autoChecks, player->GetIsZoning() != 0, m_Player.inEvent, m_Player.level))
             if (const std::optional<headsup::CheckCandidate> mob = m_AutoCheck.Due(checkable, now))
             {

@@ -1213,3 +1213,25 @@ TEST(the_config_getter_is_the_first_place_its_bytes_are)
     const ConfigGetSite found = LocateConfigGet(image.Text());
     CHECK(found.problem == LocateProblem::None && found.entry == kGetter);
 }
+
+TEST(the_search_servers_address_is_where_the_search_clients_setup_clears_it)
+{
+    // From the client (RVA 0xE1470): xor ebx,ebx; push edi; mov [address],ebx; mov [port],bx; call.
+    constexpr uint32_t kSetup = kTextRva + 0xE1470, kAddress = 0x0396E8BC;
+    const auto put = [](Image& image, uint32_t at, uint32_t address, uint32_t port) {
+        image.Put(at, {0x33, 0xDB, 0x57, 0x89, 0x1D});
+        image.Put32(at + 5, address);
+        image.Put(at + 9, {0x66, 0x89, 0x1D});
+        image.Put32(at + 12, port);
+        image.Put(at + 16, {0xE8});
+    };
+    Image image;
+    CHECK(LocateSearchAddress(image.Text()).problem == LocateProblem::NoSearchAddress);
+    put(image, kSetup, kAddress, kAddress + 4);
+    const SearchAddressSite found = LocateSearchAddress(image.Text());
+    CHECK(found.problem == LocateProblem::None && found.address == kAddress && found.port == kAddress + 4);
+    // Two clears not side by side are some other setup's.
+    Image apart;
+    put(apart, kSetup, kAddress, kAddress + 8);
+    CHECK(LocateSearchAddress(apart.Text()).problem == LocateProblem::NoSearchAddress);
+}

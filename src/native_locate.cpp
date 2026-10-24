@@ -213,6 +213,9 @@ namespace headsup
             0x3D, 0x14, 0x00};
         constexpr uint32_t kWeatherLoadGlobal = 2;
         // mov ecx,[config]; test ecx,ecx; jz; mov eax,[esp+4]; push eax; call get; ret; or eax,-1; ret.
+        // xor ebx,ebx; push edi; mov [address],ebx; mov [port],bx; call
+        constexpr int16_t kSearchSetup[] = {0x33, 0xDB, 0x57, 0x89, 0x1D, -1, -1, -1, -1, 0x66, 0x89, 0x1D, -1, -1, -1, -1, 0xE8};
+        constexpr uint32_t kSearchSetupAddress = 5, kSearchSetupPort = 12;
         constexpr int16_t kConfigGet[] = {0x8B, 0x0D, -1, -1, -1, -1, 0x85, 0xC9, 0x74, -1, 0x8B, 0x44, 0x24, 0x04, 0x50,
             0xE8, -1, -1, -1, -1, 0xC3, 0x83, 0xC8, 0xFF, 0xC3};
         constexpr size_t kCounterLoads        = 2;
@@ -338,6 +341,7 @@ namespace headsup
         case LocateProblem::NoWeather: return "the game's weather was not found";
         case LocateProblem::AmbiguousWeather: return "the game's weather was found more than once";
         case LocateProblem::NoConfigGet: return "the game's config values were not found";
+        case LocateProblem::NoSearchAddress: return "where the game keeps the search server's address was not found";
         case LocateProblem::NoWindowMove: return "the game's window move was not found";
         case LocateProblem::AmbiguousWindowMove: return "the game's window move was found more than once";
         case LocateProblem::NoWindowBuild: return "where the game builds a window was not found";
@@ -518,6 +522,17 @@ namespace headsup
         const std::vector<uint32_t> found = FindAll(kConfigGet, text);
         if (found.empty()) return ConfigGetSite{LocateProblem::NoConfigGet};
         return ConfigGetSite{LocateProblem::None, text.rva + found.front()};
+    }
+
+    SearchAddressSite LocateSearchAddress(const ImageSection& text)
+    {
+        for (const uint32_t at : FindAll(kSearchSetup, text))
+        {
+            const auto address = ReadAt<uint32_t>(text.bytes, at + kSearchSetupAddress);
+            const auto port    = ReadAt<uint32_t>(text.bytes, at + kSearchSetupPort);
+            if (port == address + sizeof(uint32_t)) return SearchAddressSite{LocateProblem::None, address, port};
+        }
+        return SearchAddressSite{LocateProblem::NoSearchAddress};
     }
 
     std::optional<NetCounters> CountersFrom(int32_t received, int32_t sent, int32_t health)

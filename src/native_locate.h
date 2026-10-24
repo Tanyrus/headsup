@@ -71,6 +71,7 @@ namespace headsup
         NoWeather,
         AmbiguousWeather,
         NoConfigGet,
+        NoSearchAddress,
     };
     const char* Describe(LocateProblem problem);
 
@@ -453,6 +454,15 @@ namespace headsup
     };
     ConfigGetSite LocateConfigGet(const ImageSection& text);
     constexpr int32_t kWindowTypeConfig = 18;
+
+    // Where the client keeps the search server's address (4 bytes as they go on the wire) and its uint16 port, filled
+    // in at login from the lobby: the two its search client's setup clears, side by side.
+    struct SearchAddressSite
+    {
+        LocateProblem problem = LocateProblem::None;
+        uint32_t address = 0, port = 0; // in the running client, as the code holds them
+    };
+    SearchAddressSite LocateSearchAddress(const ImageSection& text);
 
     struct NetCounters
     {

@@ -734,6 +734,30 @@ namespace headsup
         return "";
     }
 
+    std::string SearchAddressReader::Find()
+    {
+        const auto* base = reinterpret_cast<const uint8_t*>(GetModuleHandleA(kGameModule));
+        if (base == nullptr) return std::string(kGameModule) + " is not loaded";
+        ImageSection text{};
+        if (!FindSection(base, kCodeSection, text)) return kCodeNotRead;
+        const SearchAddressSite found = LocateSearchAddress(text);
+        if (found.problem != LocateProblem::None) return Describe(found.problem);
+        if (!InImage(base, Pointer(found.address), sizeof(uint32_t)) || !InImage(base, Pointer(found.port), sizeof(uint16_t)))
+            return "the search server's address is not in the game's image";
+        m_Address = found.address;
+        m_Port    = found.port;
+        return "";
+    }
+
+    std::optional<std::pair<uint32_t, uint16_t>> SearchAddressReader::Read() const
+    {
+        if (m_Address == 0) return std::nullopt;
+        const auto address = ReadAt<uint32_t>(Pointer(m_Address), 0);
+        const auto port    = ReadAt<uint16_t>(Pointer(m_Port), 0);
+        if (address == 0 || port == 0) return std::nullopt;
+        return std::pair{address, port};
+    }
+
     std::string WindowTypeReader::Find()
     {
         const auto* base = reinterpret_cast<const uint8_t*>(GetModuleHandleA(kGameModule));
