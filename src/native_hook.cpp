@@ -1097,6 +1097,27 @@ namespace headsup
 
         void PlaceWindow(uint32_t mcd, const WindowKey& key);
 
+        // A window just built whose owner copies its place in the layout that runs right after the build goes where
+        // it was noted to go now, before that layout: the owner may work spots of its own out of the copy once
+        // (delivery's Sender panel, its labels at owner +0x14 and +0x1C), which a later move would leave behind.
+        void MoveBuilt(uint32_t mcd, const WindowKey& key)
+        {
+            const uint32_t owner = ReadAt<uint32_t>(reinterpret_cast<const uint8_t*>(mcd + kMcdOwner), 0);
+            if (owner == 0 || !PlaceCopyAt(owner)) return;
+            auto* rect = reinterpret_cast<int16_t*>(mcd + kMcdRect);
+            const WindowSpot now{rect[0], rect[1]};
+            const WindowSpot to = g_Placements.CourseOf(mcd, key, now).to;
+            if (to == now) return;
+            // A move under way would lay every button out again from its catalog place.
+            auto* countdown       = reinterpret_cast<int32_t*>(mcd + kMcdMove);
+            const int32_t resting = *countdown;
+            MoveTo(mcd, to);
+            *countdown = resting;
+            auto* home = reinterpret_cast<int16_t*>(mcd + kMcdHome);
+            for (int side = 0; side < 4; ++side)
+                home[side] = static_cast<int16_t>(home[side] + (side % 2 == 0 ? to.left - now.left : to.top - now.top));
+        }
+
         // Twice a frame: at Present, from the whole list, the strip's shift, the line the windows go under and the
         // view's shift, and every listed window placed, those its parent draws too (the job level and skill lists,
         // which the list marks to skip while it draws); and at the first window draw, again with that plan unless a
@@ -1296,7 +1317,8 @@ extern "C" void HeadsUpOnGameMove(uint32_t mcd, uint32_t* frame)
 }
 
 // On the game's stack, right after it built a window from its catalog: nothing here may allocate, throw or call
-// Ashita. Where it goes is noted now; it moves at its first draw, once its owner has laid out what it draws.
+// Ashita. Where it goes is noted now; it moves at its first draw, once its owner has laid out what it draws, unless
+// its owner lays out from a copy of its place (MoveBuilt).
 extern "C" void HeadsUpOnBuilt(uint32_t mcd)
 {
     using namespace headsup;
@@ -1305,4 +1327,5 @@ extern "C" void HeadsUpOnBuilt(uint32_t mcd)
         !MovableWindow(built.key))
         return;
     PlaceFrame(false, &built);
+    MoveBuilt(mcd, built.key);
 }

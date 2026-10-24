@@ -234,6 +234,8 @@ namespace headsup
     // countdown (MoveUnderWay); +0x99 is set for windows kept in a 640 x 480 space instead; +0x10 is
     // kWindowOpening while the window has no owner to lay out yet.
     constexpr uint32_t kMcdType = 0x10, kMcdRect = 0x3A, kMcdMove = 0x94, kMcdVirtual = 0x99;
+    // The place the window was built at (int16 left, top, right, bottom), from its catalog's frame.
+    constexpr uint32_t kMcdHome = 0x42;
     // Where the window was last moved to (int16 x, y), which its move routine writes before it lays the window out.
     // The owners of the game's timer bars (the cast bar's update at RVA 0x12C410, and its neighbours') compare it
     // with their own spot every frame and move the window back when it differs.
