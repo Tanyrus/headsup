@@ -61,6 +61,14 @@ namespace headsup
         public:
             Bits(std::span<const uint8_t> data, size_t bit, size_t end) : m_Data(data), m_Bit(bit), m_End(end) {}
             bool Has(int bits) const { return m_Bit + static_cast<size_t>(bits) <= m_End; }
+            // The zeros that fill an entry's last byte: up to 7, so they can look like the start of a name field.
+            bool OnlyPadding() const
+            {
+                if (Has(kByteBits)) return false;
+                for (size_t b = m_Bit; b < m_End; ++b)
+                    if (m_Data[b / kByteBits] >> (kByteBits - 1 - b % kByteBits) & 1u) return false;
+                return true;
+            }
             uint32_t Read(int bits)
             {
                 uint32_t value = 0;
@@ -94,7 +102,7 @@ namespace headsup
         {
             SearchedPlayer p;
             uint32_t flags1 = kAnonymous;
-            while (bits.Has(kCodeBits))
+            while (bits.Has(kCodeBits) && !bits.OnlyPadding())
             {
                 const uint32_t code = bits.Read(kCodeBits);
                 const auto field = [&](int width) { return bits.Has(width) ? std::optional(bits.Read(width)) : std::nullopt; };

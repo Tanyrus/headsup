@@ -38,6 +38,9 @@ namespace
     const std::string kAnonRequest    = "3400000049584646d56a8e3f09a4af6151cd5a899fb6276e045c3dae0fa377c85fcb1ca5d20b976e644852ba593556b478563412";
     const std::string kAnonKey        = "30733d6d3c31495a327a424363387b7e785634120f000000";
     const std::string kAnonAnswer     = "48000000495846464ecc1dc544824bb9b7f9370b1d79ada20b41177e8d8ea80ce9e48a5619be422ddbeae0fe13ab5d206d2dacd504f0a7145dd28210907d86c19df7554b78563412";
+    // Recorded the same way (2026-10-24): Headsupfour (65004, THF 20 / WAR 10 in Valkurm Dunes), whose entry ends in
+    // 5 bits of padding, room for a field's code but not for the field.
+    const std::string kHeadsupfourAnswer = "54000000495846461881566de37def87d3f69548939e732e7321e252fd4bbe971d5291feedd1137aac5fbdb211cac1e44ed814931164c5ed42c0cfd263bfe2eb8108ef5b3a76567bb5d5c3bbf88162d278563412";
     constexpr uint32_t kNonce = 0x12345678;
     constexpr uint32_t kHeadsup = 65001;
 
@@ -86,6 +89,17 @@ TEST(an_answer_gives_each_players_jobs_and_levels)
     CHECK_EQ(p.name, std::string("Headsup"));
     CHECK(!p.anonymous && p.zone == kWestRonfaure);
     CHECK(p.mainJob == kRdm && p.mainLevel == 20 && p.subJob == kWhm && p.subLevel == 10);
+}
+
+TEST(an_entry_whose_padding_could_start_a_field_still_gives_its_player)
+{
+    const std::optional<SearchPacket> packet = ReadSearchPacket(Bytes(kHeadsupfourAnswer), Key(kHeadsupKey));
+    CHECK(packet && packet->last && packet->players.size() == 1u);
+    const SearchedPlayer& p = packet->players[0];
+    constexpr uint8_t kThf = 6, kWar = 1;
+    constexpr uint16_t kValkurmDunes = 103;
+    CHECK(p.id == 65004u && p.name == std::string("Headsupfour") && p.zone == kValkurmDunes);
+    CHECK(p.mainJob == kThf && p.mainLevel == 20 && p.subJob == kWar && p.subLevel == 10);
 }
 
 TEST(an_anonymous_player_answers_without_jobs_and_no_one_offline_answers)
