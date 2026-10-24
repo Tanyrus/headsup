@@ -236,9 +236,9 @@ namespace headsup
         return owners;
     }
 
-    uint8_t SeenLevel(bool autoCheck, uint8_t level, const PlayerStatus* status)
+    uint8_t SeenLevel(bool shown, uint8_t level, const PlayerStatus* status)
     {
-        return autoCheck && status != nullptr && !status->anonymous ? level : 0;
+        return shown && status != nullptr && !status->anonymous ? level : 0;
     }
 
     std::optional<PlayerJobs> KnownJobs(const PlayerJobs* own, const PlayerJobs* member, const PlayerJobs* reported,

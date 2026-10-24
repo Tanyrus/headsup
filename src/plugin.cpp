@@ -2309,7 +2309,7 @@ private:
         const headsup::PlayerSync sync                    = m_GameState.SyncOf(index);
         return headsup::KnownJobs(index == m_SelfIndex ? &m_OwnJobs : nullptr,
             member != m_PartyJobs.end() ? &member->second : nullptr, reported ? &*reported : nullptr,
-            headsup::SeenLevel(m_Settings.autoCheck, sync.level, m_GameState.PlayerStatusOf(index, m_SelfIndex)), sync.held,
+            headsup::SeenLevel(m_Settings.autoCheck || m_Settings.lookUpPlayers, sync.level, m_GameState.PlayerStatusOf(index, m_SelfIndex)), sync.held,
             sync.sameJob);
     }
 

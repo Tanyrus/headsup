@@ -2694,3 +2694,16 @@ TEST(the_game_pointer_is_swapped_for_another_icon_or_another_size)
     s.enabled = false;
     CHECK(!PointerSwapped(s));
 }
+
+TEST(looking_up_players_is_off_until_switched_on_and_kept)
+{
+    MapStore empty;
+    CHECK(!LoadSettings(empty).lookUpPlayers);
+    MapStore store;
+    store.values["lookUpPlayers"] = "true";
+    const Settings s = LoadSettings(store);
+    CHECK(s.lookUpPlayers);
+    MapStore saved;
+    SaveSettings(s, saved);
+    CHECK(saved.values["lookUpPlayers"] == "true");
+}

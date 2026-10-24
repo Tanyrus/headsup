@@ -215,13 +215,17 @@ namespace
         void PointAtTheLowestTip()
         {
             Rml::Element* lowest = nullptr;
+            // What scrolls under the page's foot is laid out but not seen: the pointer could not reach it.
+            Rml::Element* page = Find(kMenuPageId);
+            const float seenTo = std::min(static_cast<float>(test::RmlSession::kHeight),
+                page->GetAbsoluteOffset(Rml::BoxArea::Border).y + page->GetBox().GetSize(Rml::BoxArea::Border).y);
             std::vector<Rml::Element*> left{m_Host.context->GetDocument(0)};
             while (!left.empty())
             {
                 Rml::Element* element = left.back();
                 left.pop_back();
                 const float bottom = element->GetAbsoluteOffset(Rml::BoxArea::Border).y + element->GetBox().GetSize(Rml::BoxArea::Border).y;
-                if (element->HasAttribute("tip") && element->IsVisible(true) && bottom < test::RmlSession::kHeight &&
+                if (element->HasAttribute("tip") && element->IsVisible(true) && bottom < seenTo &&
                     (lowest == nullptr || bottom > lowest->GetAbsoluteOffset(Rml::BoxArea::Border).y + lowest->GetBox().GetSize(Rml::BoxArea::Border).y))
                     lowest = element;
                 for (int i = 0; i < element->GetNumChildren(); ++i)

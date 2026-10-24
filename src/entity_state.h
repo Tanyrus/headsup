@@ -85,7 +85,7 @@ namespace headsup
     // Null for a source the player has none of; a main job of 0 (zoning, another zone, anonymous) knows nothing.
     std::optional<PlayerJobs> KnownJobs(const PlayerJobs* own, const PlayerJobs* member, const PlayerJobs* reported,
         uint8_t seenLevel, bool seenHeld, bool seenSameJob);
-    // The level a player's sync packet gave, shown only with Auto-Check on and once their update has said they are
-    // not anonymous: the game hides an anonymous player's level.
-    uint8_t SeenLevel(bool autoCheck, uint8_t level, const PlayerStatus* status);
+    // The level a player's sync packet or a level up gave, shown only with Auto-Check or Look Up Players on (shown)
+    // and once their update has said they are not anonymous: the game hides an anonymous player's level.
+    uint8_t SeenLevel(bool shown, uint8_t level, const PlayerStatus* status);
 }

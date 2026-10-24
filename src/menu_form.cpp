@@ -962,6 +962,10 @@ namespace headsup
                 form.Fade(!plates);
                 form.Switch(label.c_str(), s.autoCheck, tip);
                 break;
+            case SettingPiece::LookUpPlayers:
+                form.Fade(!plates);
+                form.Switch(label.c_str(), s.lookUpPlayers, tip);
+                break;
             case SettingPiece::ReplaceDashes:
             {
                 form.Fade(!plates);

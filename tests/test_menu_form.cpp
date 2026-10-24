@@ -941,3 +941,14 @@ TEST(the_cursor_size_slider_sets_the_pointers_size)
     CHECK(w.Pass({{"mousecursor-mouse-pointer-pointer-size", kChangeEvent, "150"}}).changed);
     CHECK_EQ(w.settings.pointerSize, 150);
 }
+
+TEST(look_up_players_is_a_switch_beside_auto_check)
+{
+    Window w;
+    w.state.page = Page::Entities;
+    const Form page = w.Pass();
+    const FormBlock* card = Block(page, "entities-nameplates");
+    CHECK(At(card, "entities-nameplates-auto-check") < At(card, "entities-nameplates-look-up-players"));
+    CHECK(w.Pass({{"entities-nameplates-look-up-players", kClickEvent, ""}}).changed);
+    CHECK(w.settings.lookUpPlayers);
+}

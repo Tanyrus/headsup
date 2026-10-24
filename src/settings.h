@@ -167,6 +167,7 @@ namespace headsup
         int pearlOutline = 100;              // the linkpearl's outline, percent of XIUI's; 0 for none
         DashMark dashMark = DashMark::Diamond; // what a dash typed in a design is drawn as
         bool autoCheck    = false; // every mob that comes near is checked by HeadsUp, for its exact level
+        bool lookUpPlayers = false; // every player the server shows you is looked up by the search server, for their jobs
         std::string defaultFont = kDefaultFont;
         int scaleMin = 50, scaleMax = 250; // percent: the distance scale's limits
         int timerPercent = 85;
