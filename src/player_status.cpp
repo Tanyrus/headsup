@@ -39,6 +39,12 @@ namespace headsup
         constexpr int kOwnNewBit        = 3;
         constexpr int kOwnMentorBit     = 4;
 
+        constexpr uint8_t kSendModel       = 0x10; // the update carries the model
+        constexpr size_t kOtherModel       = 0x48;
+        constexpr size_t kLevelIndex       = 0x0C, kLevelNumber = 0x10, kLevelMessageAt = 0x18;
+        constexpr uint16_t kLevelUpMessage = 9, kLevelDownMessage = 11;
+        constexpr uint32_t kMaxLevel       = 99;
+
         constexpr size_t kSyncKind         = 0x04;
         constexpr uint8_t kSyncCharacter   = 0x02;
         constexpr size_t kSyncIndex        = 0x06;
@@ -85,6 +91,25 @@ namespace headsup
         s.linkshellArgb = Opaque(static_cast<uint8_t>(flags2), static_cast<uint8_t>(flags2 >> 8), static_cast<uint8_t>(flags2 >> 16));
         update.status   = s;
         return update;
+    }
+
+    std::optional<PlayerLook> ParseLook(const uint8_t* data, uint32_t size)
+    {
+        if (data == nullptr || size < kOtherModel + kModelParts * sizeof(uint16_t) || (data[kOtherSend] & kSendModel) == 0)
+            return std::nullopt;
+        PlayerLook look{};
+        for (size_t i = 0; i < kModelParts; ++i)
+            look[i] = ReadAt<uint16_t>(data, kOtherModel + i * sizeof(uint16_t));
+        return look;
+    }
+
+    std::optional<LevelChange> ParseLevelMessage(const uint8_t* data, uint32_t size)
+    {
+        if (data == nullptr || size < kLevelMessageAt + sizeof(uint16_t)) return std::nullopt;
+        const auto message = ReadAt<uint16_t>(data, kLevelMessageAt);
+        const auto level   = ReadAt<uint32_t>(data, kLevelNumber);
+        if ((message != kLevelUpMessage && message != kLevelDownMessage) || level == 0 || level > kMaxLevel) return std::nullopt;
+        return LevelChange{ReadAt<uint16_t>(data, kLevelIndex), static_cast<uint8_t>(level)};
     }
 
     std::optional<PlayerStatus> ParseOwnStatus(const uint8_t* data, uint32_t size)

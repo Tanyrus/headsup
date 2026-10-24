@@ -405,35 +405,23 @@ TEST(a_party_or_alliance_member_is_anyone_on_the_member_list_but_you)
     CHECK(!InYourParty(0x01098ABC, false, {}));
 }
 
-namespace
+TEST(a_players_jobs_come_from_the_game_then_the_party_list_then_the_last_report_or_sync)
 {
-    // RDM 52 / BLM 26, as a check's general part lists them: both jobs, then both levels.
-    InspectGeneral CheckedRedMage()
-    {
-        InspectGeneral g;
-        g.mainJob   = 5;
-        g.subJob    = 4;
-        g.mainLevel = 52;
-        g.subLevel  = 26;
-        return g;
-    }
-}
-
-TEST(a_players_jobs_come_from_the_game_then_the_party_list_then_the_last_check_or_sync)
-{
-    const PlayerJobs own{1, 75, 13, 37}, member{4, 60, 3, 30};
-    const InspectGeneral checked = CheckedRedMage();
-    CHECK(KnownJobs(&own, &member, &checked, 0, false) == own);
-    CHECK(KnownJobs(nullptr, &member, &checked, 0, false) == member);
-    CHECK(KnownJobs(nullptr, nullptr, &checked, 0, false) == (PlayerJobs{5, 52, 4, 26}));
-    CHECK(!KnownJobs(nullptr, nullptr, nullptr, 0, false).has_value());
+    // checked: RDM 52 / BLM 26, as a check's general part lists them.
+    const PlayerJobs own{1, 75, 13, 37}, member{4, 60, 3, 30}, checked{5, 52, 4, 26};
+    CHECK(KnownJobs(&own, &member, &checked, 0, false, false) == own);
+    CHECK(KnownJobs(nullptr, &member, &checked, 0, false, false) == member);
+    CHECK(KnownJobs(nullptr, nullptr, &checked, 0, false, false) == (PlayerJobs{5, 52, 4, 26}));
+    CHECK(!KnownJobs(nullptr, nullptr, nullptr, 0, false, false).has_value());
     // A level the server sent since the check wins. It has no job: held to a sync's cap, or the check's level still,
     // the check's job stays; another level of their own may come with another job, changed in their Mog House.
-    CHECK(KnownJobs(nullptr, nullptr, nullptr, 75, false) == (PlayerJobs{0, 75, 0, 0}));
-    CHECK(KnownJobs(nullptr, nullptr, &checked, 30, true) == (PlayerJobs{5, 30, 4, 26}));
-    CHECK(KnownJobs(nullptr, nullptr, &checked, 52, false) == (PlayerJobs{5, 52, 4, 26}));
-    CHECK(KnownJobs(nullptr, nullptr, &checked, 30, false) == (PlayerJobs{0, 30, 0, 0}));
-    CHECK(KnownJobs(nullptr, &member, nullptr, 75, false) == member);
+    CHECK(KnownJobs(nullptr, nullptr, nullptr, 75, false, false) == (PlayerJobs{0, 75, 0, 0}));
+    CHECK(KnownJobs(nullptr, nullptr, &checked, 30, true, false) == (PlayerJobs{5, 30, 4, 26}));
+    CHECK(KnownJobs(nullptr, nullptr, &checked, 52, false, false) == (PlayerJobs{5, 52, 4, 26}));
+    CHECK(KnownJobs(nullptr, nullptr, &checked, 30, false, false) == (PlayerJobs{0, 30, 0, 0}));
+    CHECK(KnownJobs(nullptr, &member, nullptr, 75, false, false) == member);
+    // A level up or down they were seen to take keeps the job: it is the same job's level.
+    CHECK(KnownJobs(nullptr, nullptr, &checked, 53, false, true) == (PlayerJobs{5, 53, 4, 26}));
 }
 
 TEST(a_players_level_the_server_sends_shows_with_auto_check_on_unless_they_are_anonymous)
@@ -449,10 +437,9 @@ TEST(a_players_level_the_server_sends_shows_with_auto_check_on_unless_they_are_a
 
 TEST(a_main_job_of_0_knows_nothing_so_the_next_source_is_asked)
 {
-    const PlayerJobs unknown{}, member{4, 60, 3, 30};
-    const InspectGeneral checked = CheckedRedMage(), anonymous{};
-    CHECK(KnownJobs(&unknown, &member, nullptr, 0, false) == member);                      // you, while zoning
-    CHECK(KnownJobs(nullptr, &unknown, &checked, 0, false) == (PlayerJobs{5, 52, 4, 26})); // a member in another zone
-    CHECK(!KnownJobs(nullptr, nullptr, &anonymous, 0, false).has_value());                 // an anonymous player's check
-    CHECK(!KnownJobs(&unknown, &unknown, &anonymous, 0, false).has_value());
+    const PlayerJobs unknown{}, member{4, 60, 3, 30}, checked{5, 52, 4, 26}, anonymous{};
+    CHECK(KnownJobs(&unknown, &member, nullptr, 0, false, false) == member);                      // you, while zoning
+    CHECK(KnownJobs(nullptr, &unknown, &checked, 0, false, false) == (PlayerJobs{5, 52, 4, 26})); // a member in another zone
+    CHECK(!KnownJobs(nullptr, nullptr, &anonymous, 0, false, false).has_value());                 // an anonymous player's check
+    CHECK(!KnownJobs(&unknown, &unknown, &anonymous, 0, false, false).has_value());
 }

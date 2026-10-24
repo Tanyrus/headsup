@@ -1,4 +1,5 @@
 #include "game_state.h"
+#include "search_server.h"
 #include "test.h"
 
 #include <cstring>
@@ -485,4 +486,73 @@ TEST(a_mob_the_server_makes_untargetable_is_known_until_it_says_otherwise)
     CHECK(!game.Untargetable(kChigoe));
     Feed(game, Cut(MobUpdate(kChigoe, kGeneral, kUntargetableFlag), 0x24)); // too short to hold the flags
     CHECK(!game.Untargetable(kChigoe));
+}
+
+namespace
+{
+    // GP_SERV_BATTLE_MESSAGE2 (0x02D): who at 0x04 and 0x0C, the number at 0x10, the message at 0x18.
+    Packet LevelMessage(uint16_t index, uint32_t level, uint16_t message)
+    {
+        return Blank(0x02D, 0x1C).Put<uint32_t>(0x04, 0x01006A2B).Put(0x0C, index).Put(0x10, level).Put(0x18, message);
+    }
+    constexpr uint16_t kLevelUp = 9, kLevelDown = 11, kOtherMessage = 6;
+    // An 0x00D with its model: the nine graphics ids from 0x48, the face and race first, then each piece of gear.
+    Packet Looking(uint16_t index, uint16_t body)
+    {
+        constexpr uint8_t kModel = 0x10;
+        return Blank(0x00D, 0x60).Put(0x08, index).Put(0x0A, kModel).Put<uint16_t>(0x48, 0x0102).Put<uint16_t>(0x4C, body);
+    }
+    constexpr uint32_t kOtherId = 0x01006A2B;
+}
+
+TEST(a_level_up_or_down_seen_in_range_is_their_level_with_their_job_kept)
+{
+    GameState game;
+    Feed(game, LevelMessage(kOther, 21, kLevelUp));
+    CHECK(game.SyncOf(kOther).level == 21 && game.SyncOf(kOther).sameJob);
+    Feed(game, LevelMessage(kOther, 20, kLevelDown));
+    CHECK_EQ(int{game.SyncOf(kOther).level}, 20);
+    Feed(game, LevelMessage(kSecond, 30, kOtherMessage));
+    CHECK_EQ(int{game.SyncOf(kSecond).level}, 0);
+    // Their next sync packet may follow a job change: its level says nothing of the job.
+    Feed(game, CharSync(kCharacter, kOther, 0, 37));
+    CHECK(game.SyncOf(kOther).level == 37 && !game.SyncOf(kOther).sameJob);
+    CHECK(!Feed(game, Cut(LevelMessage(kOther, 50, kLevelUp), 0x18)).zonedIn && game.SyncOf(kOther).level == 37);
+}
+
+TEST(a_players_look_changing_is_told_once_and_their_first_look_is_no_change)
+{
+    GameState game;
+    Feed(game, Looking(kOther, 0x2010));
+    CHECK(game.TakeLookChanges().empty());
+    Feed(game, Looking(kOther, 0x2010));
+    CHECK(game.TakeLookChanges().empty());
+    Feed(game, Looking(kOther, 0x2044)); // another body: gear came off as a job changed
+    CHECK((game.TakeLookChanges() == std::vector<uint16_t>{kOther}));
+    CHECK(game.TakeLookChanges().empty());
+    Feed(game, OtherPlayer(kOther, kDespawn, 0));
+    Feed(game, Looking(kOther, 0x2010)); // back, or someone else at that index: a first look again
+    CHECK(game.TakeLookChanges().empty());
+    Feed(game, Cut(Looking(kSecond, 0x2010), 0x50)); // too short to hold the model
+    Feed(game, Looking(kSecond, 0x2020));
+    CHECK(game.TakeLookChanges().empty());
+}
+
+TEST(the_newer_of_a_check_and_a_lookup_reports_a_players_jobs)
+{
+    GameState game;
+    CHECK(!game.ReportedJobs(kOtherId).has_value());
+    Feed(game, CharSync(kCharacter, kOther, 0, 75));
+    game.LookedUp(kOtherId, kOther, SearchedPlayer{kOtherId & kSearchIdMask, "Other", 100, false, 1, 13, 75, 37});
+    CHECK(game.ReportedJobs(kOtherId) == (PlayerJobs{1, 75, 13, 37}));
+    CHECK_EQ(int{game.SyncOf(kOther).level}, 0); // the answer is newer than their last sync
+    Packet general = Blank(0x0C9, 0x54).Put<uint32_t>(0x04, kOtherId).Put<uint16_t>(0x08, kOther)
+        .Put<uint8_t>(0x0A, 0x01).Put<uint8_t>(0x22, 5).Put<uint8_t>(0x23, 4).Put<uint8_t>(0x24, 52).Put<uint8_t>(0x25, 26);
+    Feed(game, general);
+    CHECK(game.ReportedJobs(kOtherId) == (PlayerJobs{5, 52, 4, 26}));
+    game.LookedUp(kOtherId, kOther, SearchedPlayer{kOtherId & kSearchIdMask, "Other", 100, false, 6, 13, 30, 15});
+    CHECK(game.ReportedJobs(kOtherId) == (PlayerJobs{6, 30, 13, 15}));
+    // Anonymous, the search server says nothing of the jobs: nothing is reported, the check's as much as the answer's.
+    game.LookedUp(kOtherId, kOther, SearchedPlayer{kOtherId & kSearchIdMask, "Other", 100, true});
+    CHECK(!game.ReportedJobs(kOtherId).has_value());
 }

@@ -4,6 +4,7 @@
 #include "currencies.h"
 #include "game_packets.h"
 #include "player_status.h"
+#include "search_server.h"
 
 #include <cstdint>
 #include <optional>
@@ -30,13 +31,15 @@ namespace headsup
     {
         InspectGeneral general;
         InspectMessage message; // empty when no message came before the general part
+        uint64_t order = 0;     // which came last of this and a lookup (GameState::ReportedJobs)
         bool operator==(const PlayerCheck&) const = default;
     };
 
     struct PlayerSync
     {
         bool synced = false, held = false; // as CharSyncUpdate's
-        uint8_t level = 0;                 // CharSyncUpdate's, or 0 since a check of them, which is newer
+        uint8_t level = 0;   // CharSyncUpdate's or a level up's, or 0 since a check or lookup of them, which is newer
+        bool sameJob  = false; // the level is from a level up or down, so of the job they had
     };
 
     // Whether the last check of a player names a linkshell you wear. No name is no linkshell.
@@ -66,6 +69,13 @@ namespace headsup
         // The last conquest packet as it came, which /hu debug writes to check its layout against.
         const std::vector<uint8_t>& LastConquestPacket() const { return m_ConquestBytes; }
         const PlayerCheck* PlayerCheckOf(uint32_t serverId) const;
+        // The search server's answer about the player at index: newer than their last sync, as a check is.
+        void LookedUp(uint32_t serverId, uint16_t index, const SearchedPlayer& answer);
+        // A player's jobs from the newer of their last check and their last lookup; none from neither, or from one
+        // that says nothing of them (anonymous).
+        std::optional<PlayerJobs> ReportedJobs(uint32_t serverId) const;
+        // The players whose look changed since the last call, by target index: not their first look.
+        std::vector<uint16_t> TakeLookChanges();
 
         // Whether HeadsUp should ask for the conquest standings (kConquestRequest) now: once after loading and once per
         // zone-in, while no conquest update has come since, never within kConquestAskGap of the last ask, and again
@@ -99,5 +109,14 @@ namespace headsup
         std::optional<double> m_CurrenciesAsked;
         std::optional<InspectMessage> m_CheckMessage;              // waits for its general part
         std::unordered_map<uint32_t, PlayerCheck> m_PlayerChecks; // by server id, kept across zoning
+        struct Lookup
+        {
+            PlayerJobs jobs;
+            uint64_t order = 0;
+        };
+        std::unordered_map<uint32_t, Lookup> m_Lookups;           // by server id, kept across zoning
+        uint64_t m_Order = 0;                                     // the last check's or lookup's
+        std::unordered_map<uint16_t, PlayerLook> m_Looks;         // by target index
+        std::vector<uint16_t> m_LookChanges;
     };
 }

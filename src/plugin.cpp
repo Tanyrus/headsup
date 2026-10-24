@@ -2304,12 +2304,13 @@ private:
 
     std::optional<headsup::PlayerJobs> JobsOf(uint16_t index, uint32_t serverId) const
     {
-        const auto member                 = m_PartyJobs.find(serverId);
-        const headsup::PlayerCheck* check = m_GameState.PlayerCheckOf(serverId);
-        const headsup::PlayerSync sync    = m_GameState.SyncOf(index);
+        const auto member                                 = m_PartyJobs.find(serverId);
+        const std::optional<headsup::PlayerJobs> reported = m_GameState.ReportedJobs(serverId);
+        const headsup::PlayerSync sync                    = m_GameState.SyncOf(index);
         return headsup::KnownJobs(index == m_SelfIndex ? &m_OwnJobs : nullptr,
-            member != m_PartyJobs.end() ? &member->second : nullptr, check != nullptr ? &check->general : nullptr,
-            headsup::SeenLevel(m_Settings.autoCheck, sync.level, m_GameState.PlayerStatusOf(index, m_SelfIndex)), sync.held);
+            member != m_PartyJobs.end() ? &member->second : nullptr, reported ? &*reported : nullptr,
+            headsup::SeenLevel(m_Settings.autoCheck, sync.level, m_GameState.PlayerStatusOf(index, m_SelfIndex)), sync.held,
+            sync.sameJob);
     }
 
     // Your own title is the client's; another player's comes with a check of them.
