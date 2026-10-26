@@ -168,6 +168,7 @@ namespace headsup
         constexpr const char* kGradientSuffix = "Gradient";
         constexpr const char* kBarCurrencyKey = "barCurrency";
         constexpr const char* kBarBagKey      = "barBag";
+        constexpr const char* kBarNationsKey  = "barNations";
         constexpr const char* kClockServerTimeKey = "clockServerTime";
         // Server time was a widget of its own, with this switch.
         constexpr const char* kServerTimeWidgetKey = "barServerTime";
@@ -208,7 +209,7 @@ namespace headsup
         const char* const kBarSeparatorsNames[kBarSeparatorsCount] = {"theme", "diamonds", "none"};
         const char* const kBarWidgetKeys[] = {"barZone", "barWeather", "barVanaTime", "barTarget", "barGil", "barBags",
             "barEarthTime", "barGameHelp", "barFps", "barJob", "barConnection", "barParty", "barSignet", "barDistance", "barMemory",
-            "barExp"};
+            "barExp", "barConquest"};
         static_assert(std::size(kBarWidgetKeys) == kBarWidgetCount);
         const char* const kBarSectionKeys[] = {"barLeft", "barCenter", "barRight"};
         static_assert(std::size(kBarSectionKeys) == kBarSectionCount);
@@ -1279,6 +1280,9 @@ namespace headsup
                 if (const std::optional<int> currency = CurrencyOfKey(text(kBarCurrencyKey))) o.currency = *currency;
                 break;
             case BarWidget::Bags: o.bag = number(kBarBagKey, o.bag); break;
+            case BarWidget::Conquest:
+                o.nations = static_cast<uint8_t>(std::clamp(number(kBarNationsKey, o.nations), 0, static_cast<int>(kAllNations)));
+                break;
             case BarWidget::EarthTime:
             {
                 const std::string zone = text(kClockZoneKey);
@@ -1336,6 +1340,7 @@ namespace headsup
             {
             case BarWidget::Gil: text(kBarCurrencyKey, kCurrencyTable[o.currency].key); break;
             case BarWidget::Bags: StoreFloat(store, CopyKey(kBarBagKey, w), static_cast<float>(o.bag)); break;
+            case BarWidget::Conquest: StoreFloat(store, CopyKey(kBarNationsKey, w), static_cast<float>(o.nations)); break;
             case BarWidget::EarthTime:
                 text(kClockZoneKey, o.clockZone ? kClockZoneNames[static_cast<int>(*o.clockZone)] : kLocalZone);
                 flag(kClock24Key, o.clock24);

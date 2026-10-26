@@ -511,6 +511,13 @@ namespace headsup
                         form.NumberDropdown(label.c_str(), o.currency, kGilCurrency, kCurrencyCount - 1,
                             [](int currency) { return std::string(kCurrencyTable[currency].name); }, row.tip);
                     break;
+                case WidgetTabsRow::Nations:
+                    if (kind == BarWidget::Conquest)
+                    {
+                        const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(WindowList::Nations));
+                        form.Toggles(label.c_str(), o.nations, names.data(), kContenderNations, row.tip);
+                    }
+                    break;
                 case WidgetTabsRow::Bag:
                     if (kind == BarWidget::Bags)
                         form.NumberDropdown(label.c_str(), o.bag, 0, kContainerCount - 1,

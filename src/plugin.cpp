@@ -760,11 +760,13 @@ public:
         g_BarOn     = headsup::BarRuns(m_Settings, loginStatus) && m_Rml.Running();
         g_BarHidden = m_UiHidden;
         // Opening Region Info asks the server for the conquest standings; HeadsUp asks the same once per zone-in, and
-        // again while the Zone popup shows them.
+        // again while the Zone or Conquest popup shows them.
+        const auto standings = [](headsup::BarWidget w) { return w == headsup::BarWidget::Zone || w == headsup::BarWidget::Conquest; };
         if (m_GameState.ConquestRequestDue(now,
-                g_BarOn && headsup::Shown(m_Settings, headsup::BarWidget::Zone) &&
+                g_BarOn &&
+                    (headsup::Shown(m_Settings, headsup::BarWidget::Zone) || headsup::Shown(m_Settings, headsup::BarWidget::Conquest)) &&
                     m_AshitaCore->GetMemoryManager()->GetPlayer()->GetIsZoning() == 0,
-                m_BarInput.Open() && m_BarInput.Open()->kind == headsup::BarWidget::Zone))
+                m_BarInput.Open() && standings(m_BarInput.Open()->kind)))
         {
             auto request = headsup::kConquestRequest; // Ashita takes the bytes as non-const
             m_AshitaCore->GetPacketManager()->AddOutgoingPacket(headsup::kConquestRequestPacket,

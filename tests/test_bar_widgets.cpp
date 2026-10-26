@@ -1911,3 +1911,27 @@ TEST(a_targeted_players_jobs_show_from_whatever_knows_them_unless_switched_off)
     player.status->anonymous = true;
     CHECK_EQ(BarWidgetContent(BarWidget::Target, state, settings).subtitle.front().text, "? ? ?");
 }
+
+TEST(the_conquest_widget_counts_the_regions_of_the_nations_picked_and_its_popup_names_them)
+{
+    Settings settings;
+    BarState state;
+    settings.Widget(BarWidget::Conquest).on = true;
+    CHECK_EQ(Joined(BarWidgetContent(BarWidget::Conquest, state, settings).title), "-"); // before the standings come
+    RegionOwners owners{};
+    owners.fill(Nation::Beastmen);
+    owners[0] = Nation::SanDoria;                         // Ronfaure
+    owners[3] = owners[4] = Nation::Bastok;               // Gustaberg and Derfland
+    owners[5] = Nation::Windurst;
+    owners[18] = Nation::None;
+    state.owners = owners;
+    const WidgetContent all = BarWidgetContent(BarWidget::Conquest, state, settings);
+    CHECK_EQ(Joined(all.title), "S 1  B 2  W 1  BM 14");
+    CHECK(all.title[2].argb == NationColor(Nation::Bastok) && all.hasPopup);
+    // Bastok alone: its name and count, and its regions in the popup.
+    settings.Widget(BarWidget::Conquest).nations = NationBit(Nation::Bastok);
+    CHECK_EQ(Joined(BarWidgetContent(BarWidget::Conquest, state, settings).title), "Bastok 2");
+    const PopupContent popup = BarPopupContent(BarWidget::Conquest, state, settings);
+    CHECK(popup.sections.size() == 1 && popup.sections[0].heading == "Bastok");
+    CHECK(Lines(popup.sections[0]) == (std::vector<std::string>{"Gustaberg", "Derfland"}));
+}

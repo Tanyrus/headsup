@@ -680,6 +680,17 @@ namespace headsup
 
         bool InConquest(const ZoneRecord* zone) { return zone != nullptr && zone->region < kConquestRegionCount; }
 
+        // The Conquest widget's nations, short, by Nation.
+        constexpr const char* kNationShort[] = {"", "S", "B", "W", "BM"};
+
+        std::vector<Nation> PickedNations(uint8_t bits)
+        {
+            std::vector<Nation> picked;
+            for (const Nation nation : {Nation::SanDoria, Nation::Bastok, Nation::Windurst, Nation::Beastmen})
+                if (bits & NationBit(nation)) picked.push_back(nation);
+            return picked;
+        }
+
         // Who holds the zone's region; no one before a conquest update or outside the conquest regions.
         Nation OwnerOf(const ZoneRecord* zone, const BarState& state)
         {
@@ -931,6 +942,27 @@ namespace headsup
             return JobWidget(state.job, o.expBar, o.jobNames, o.jobLayout, o.expText);
         case BarWidget::Exp:
             return JobWidget(state.job, o.expBar, true, JobLayout::ExpOnly, o.expText);
+        case BarWidget::Conquest:
+        {
+            w.subtitle = ListOf(Text("Conquest", Tone::Dim));
+            w.hasPopup = true;
+            if (!state.owners)
+            {
+                w.title = ListOf(Text("-"));
+                break;
+            }
+            // A nation alone by its name; several by their first letters, each in its color.
+            const std::vector<Nation> picked = PickedNations(o.nations);
+            for (const Nation nation : picked)
+            {
+                if (!w.title.empty()) w.title.push_back(Text("  "));
+                const std::string name = picked.size() == 1 ? NationName(nation) : kNationShort[static_cast<int>(nation)];
+                w.title.push_back(Colored(name + " " + std::to_string(std::ranges::count(*state.owners, nation)), NationColor(nation)));
+            }
+            if (w.title.empty()) w.title = ListOf(Text("-"));
+            w.figures = true;
+            break;
+        }
         case BarWidget::Connection:
             return ConnectionWidget(state.connection, o.latency, o.netMeter);
         case BarWidget::Party:
@@ -1087,6 +1119,25 @@ namespace headsup
         case BarWidget::Job:
         case BarWidget::Exp:
             return JobPopup(state.job);
+        case BarWidget::Conquest:
+        {
+            popup.title = ListOf(Text("Conquest"));
+            if (!state.owners)
+            {
+                popup.sections = ListOf(PopupSection{"", ListOf(LineOf("The standings show once the server sends them.", Tone::Dim))});
+                break;
+            }
+            for (const Nation nation : PickedNations(o.nations))
+            {
+                PopupSection held{NationName(nation), {}};
+                for (int region = 0; region < kConquestRegionCount; ++region)
+                    if ((*state.owners)[region] == nation)
+                        held.rows.push_back(LineOf(std::string(RegionName(static_cast<uint8_t>(region)))));
+                if (held.rows.empty()) held.rows.push_back(LineOf("None", Tone::Dim));
+                popup.sections.push_back(std::move(held));
+            }
+            break;
+        }
         case BarWidget::Connection:
             return ConnectionPopup(state.connection);
         case BarWidget::Party:

@@ -57,6 +57,8 @@ namespace headsup
     // Nothing for a short packet, or for shares of more than 100 in all, which a layout other than Phoenix's would
     // give.
     std::optional<RegionShares> ParseRegionShares(const uint8_t* data, uint32_t size);
+    constexpr int kContenderNations = 4; // San d'Oria to the beastmen, as kAllNations has them
+    constexpr uint8_t NationBit(Nation nation) { return static_cast<uint8_t>(1u << (static_cast<int>(nation) - 1)); }
     const char* NationName(Nation nation); // "San d'Oria", ...; "" for none
     uint32_t NationColor(Nation nation);
 

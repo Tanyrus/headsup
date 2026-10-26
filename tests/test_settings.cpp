@@ -289,6 +289,7 @@ barSignet=true
 barDistance=false
 barMemory=true
 barExp=true
+barConquest=true
 barZoneLine2=true
 barZoneIcons=true
 barWeatherLine2=true
@@ -338,7 +339,7 @@ untargetedOpacity=40.0000
 clockSeconds=true
 serverSeconds=true
 barLatency=true
-barLeft=zone weather vanaTime job exp party signet distance
+barLeft=zone weather vanaTime job exp party signet distance conquest
 barCenter=
 barRight=target gil bags connection memory fps earthTime
 hideHelpBar=true
@@ -1094,7 +1095,7 @@ TEST(each_theme_and_bar_widget_has_its_own_key)
     }
     const char* const widgetKeys[] = {"barZone", "barWeather", "barVanaTime", "barTarget", "barGil", "barBags",
         "barEarthTime", "barGameHelp", "barFps", "barJob", "barConnection", "barParty", "barSignet", "barDistance", "barMemory",
-        "barExp"}; // in BarWidget's order
+        "barExp", "barConquest"}; // in BarWidget's order
     static_assert(std::size(widgetKeys) == kBarWidgetCount);
     for (int w = 0; w < kBarWidgetCount; ++w)
     {

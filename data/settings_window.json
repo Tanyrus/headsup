@@ -396,6 +396,7 @@
                 {"key": "jobs", "name": "Jobs", "tip": "A player's jobs and levels under their name, once HeadsUp knows them: from your party, a check, or Look Up Players."},
                 {"key": "border", "name": "Border", "tip": "The frame around your target. Off, it has the same edge as every other widget."},
                 {"key": "currency", "name": "Currency"},
+                {"key": "nations", "name": "Nations", "tip": "Whose regions the widget counts and its popup lists."},
                 {"key": "bag", "name": "Bag", "tip": "The bag this widget shows on the panel. Hover it for every bag."},
                 {"key": "time-zone", "name": "Time Zone", "tip": "Local is your computer's. Another zone goes before the time, as in PDT 21:07."},
                 {"key": "server-time", "name": "Server Time", "tip": "Japan's time, which the server keeps and the resets go by, as a second line under your own."},
@@ -858,7 +859,17 @@
         {"name": "Signet", "tip": "Time left on Signet or Sanction, while one is on."},
         {"name": "Distance", "tip": "How far your target is, in yalms."},
         {"name": "Memory", "tip": "The game's memory used, over what is left before it runs out at 4 GB; amber, then red, as it runs low. Hover for the processor, the frames and the LinuxXI plugin's figures."},
-        {"name": "EXP", "tip": "Your EXP and its bar, on its own. Hover for EXP per hour."}
+        {"name": "EXP", "tip": "Your EXP and its bar, on its own. Hover for EXP per hour."},
+        {"name": "Conquest", "tip": "How many regions each nation holds. Hover for which ones."}
+      ]
+    },
+    {
+      "key": "nations",
+      "options": [
+        {"name": "San d'Oria"},
+        {"name": "Bastok"},
+        {"name": "Windurst"},
+        {"name": "Beastmen"}
       ]
     },
     {

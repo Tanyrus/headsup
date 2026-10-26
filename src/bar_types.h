@@ -47,14 +47,16 @@ namespace headsup
         Distance,
         Memory,
         Exp, // the Job widget's EXP and bar alone
+        Conquest,
     };
-    constexpr int kBarWidgetCount = static_cast<int>(BarWidget::Exp) + 1;
+    constexpr int kBarWidgetCount = static_cast<int>(BarWidget::Conquest) + 1;
     // Which widgets a new settings file shows, by BarWidget. to_array takes its size from the list, so a widget added
     // to BarWidget without a default here fails the assert.
     constexpr auto kBarWidgetDefaults =
-        std::to_array<bool>({true, true, true, true, true, true, true, true, true, true, true, false, false, true, false, false});
+        std::to_array<bool>({true, true, true, true, true, true, true, true, true, true, true, false, false, true, false, false, false});
     static_assert(kBarWidgetDefaults.size() == kBarWidgetCount);
 
+    constexpr uint8_t kAllNations = 0x0F; // the Conquest widget's: a bit each for the three nations and the beastmen
     constexpr int kContainerCount = 17; // Ashita's containers 0 (inventory) to 16 (wardrobe 8), the bags a widget can show
 
     // A widget on the panel: which, and which of its copies. Copy 0 is the one every settings file has; the others are

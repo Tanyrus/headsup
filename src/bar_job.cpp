@@ -31,7 +31,6 @@ namespace headsup
 
         uint32_t ToNext(const JobSample& s) { return s.expNeeded > s.exp ? s.expNeeded - s.exp : 0; }
 
-        constexpr const char* kPartGap = " · "; // between the parts of what the EXP says
         constexpr int kWholePercent    = 100;
 
         // The parts picked of points earned out of whole: the unit (EXP or LP) after the first number, and a percent
@@ -48,7 +47,7 @@ namespace headsup
                 said.push_back(std::to_string(whole > 0 ? static_cast<uint64_t>(std::min(earned, whole)) * kWholePercent / whole : 0) + "%");
             std::string text;
             for (const std::string& part : said)
-                text += (text.empty() ? "" : kPartGap) + part;
+                text += (text.empty() ? "" : kDot) + part;
             return text;
         }
     }
@@ -132,7 +131,7 @@ namespace headsup
             // The merits stand for what is left to the next.
             const std::string points = ExpParts(std::min(s.limitPoints, kLimitPointsPerMerit), kLimitPointsPerMerit, "LP",
                 static_cast<uint8_t>(expText & ~ExpTextBit(ExpText::ToNext)));
-            exp        = Text(std::to_string(s.merits) + (s.merits == 1 ? " merit" : " merits") + (points.empty() ? "" : kPartGap + points));
+            exp        = Text(std::to_string(s.merits) + (s.merits == 1 ? " merit" : " merits") + (points.empty() ? "" : kDot + points));
             w.progress = static_cast<float>(std::min(s.limitPoints, kLimitPointsPerMerit)) / kLimitPointsPerMerit;
         }
         else
