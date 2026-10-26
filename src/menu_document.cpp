@@ -24,6 +24,7 @@ namespace headsup
         constexpr float kNavSlide     = 0.35f; // how far a page's name moves under the pointer
         constexpr float kToggleKnob   = kToggleHeight - 2.0f * kToggleInset; // its peg's height
         constexpr float kArrow        = 0.35f; // half an arrow's base
+        constexpr float kArrowDepth   = 0.45f; // from its base to its point
         constexpr float kKnob         = 0.35f; // a slider's knob: a bright bar as tall as its track
         constexpr float kCrossLength  = 0.85f; // the close button's cross: each of its two bars
         constexpr float kCrossBar     = 0.12f;
@@ -365,6 +366,10 @@ namespace headsup
                " transparent;border-bottom:" + Em(kArrow) + " transparent;}";
         css += ".tri.left{left:0.5em;border-right:0.45em " + color(c.text) + ";}";
         css += ".tri.right{left:0.6em;border-left:0.45em " + color(c.text) + ";}";
+        css += ".tri.up,.tri.down{left:" + Em(kFrame / 2.0f - kArrow) + ";top:" + Em((kFrame - kArrowDepth) / 2.0f) + ";border-left:" + Em(kArrow) +
+               " transparent;border-right:" + Em(kArrow) + " transparent;}";
+        css += ".tri.up{border-top-width:0px;border-bottom:" + Em(kArrowDepth) + " " + color(c.text) + ";}";
+        css += ".tri.down{border-bottom-width:0px;border-top:" + Em(kArrowDepth) + " " + color(c.text) + ";}";
         css += ".chip img{width:1em;height:1em;margin-right:0.3em;vertical-align:-0.15em;}";
         // A chip of several tags: each a part of its own to drag, with a quiet word between.
         css += ".chip .part,.chip .or{display:inline-block;}";

@@ -213,6 +213,8 @@ namespace headsup
         bool operator==(const KindSettings&) const = default;
     };
     std::array<KindSettings, kPlateKindCount> DefaultKinds();
+    // Two lines of the design trade places, text and style, and a line that syncs with either still syncs with it.
+    void SwapLines(KindSettings& kind, int a, int b);
 
     int RowCountOf(PlateKind kind);                // 9, 4, 1, 1, 4
     const char* RowKey(PlateKind kind, int row);   // "aggressive", "partyMember", "self", ...: settings keys

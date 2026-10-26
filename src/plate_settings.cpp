@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace headsup
 {
@@ -144,4 +145,14 @@ namespace headsup
     }
 
     int Stepped(int value, int step) { return static_cast<int>(std::lround(static_cast<double>(value) / step)) * step; }
+
+    void SwapLines(KindSettings& kind, int a, int b)
+    {
+        std::swap(kind.lines[a], kind.lines[b]);
+        for (LineDesign& line : kind.lines)
+            if (line.syncWith == a)
+                line.syncWith = b;
+            else if (line.syncWith == b)
+                line.syncWith = a;
+    }
 }

@@ -553,7 +553,13 @@
         "name": "Nameplate Design",
         "description": "Design the nameplate for these entities. Drag buttons into the text boxes to include that information. You can also write in the text boxes to add text. Dashes (-) can optionally be replaced by a symbol set in the Entities/Nameplates section.",
         "settings": [
-          {"key": "design"},
+          {
+            "key": "design",
+            "words": [
+              {"key": "move-up", "tip": "Swaps this line with the one above it: its text and its whole Line Style."},
+              {"key": "move-down", "tip": "Swaps this line with the one below it: its text and its whole Line Style."}
+            ]
+          },
           {
             "key": "max-icons-shown",
             "name": "Max Icons Shown",

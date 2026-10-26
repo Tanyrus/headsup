@@ -1798,3 +1798,21 @@ TEST(the_faint_tag_follows_the_pointer_over_the_letters_before_it_and_a_drop_on_
     CHECK(window.Release());
     CHECK_EQ(text, "a${level}bcd");
 }
+
+TEST(a_lines_arrows_swap_it_with_the_one_above_or_below_and_the_ends_have_only_one)
+{
+    Window window;
+    window.Page("players");
+    KindSettings& players = window.settings.Kind(PlateKind::Players);
+    players.lines[0].text = "a";
+    players.lines[1].text = "b";
+    players.lines[2].text = "c";
+    window.Frames(2);
+    const std::string card = "players-nameplate-design-";
+    CHECK(!window.Shows(card + "move-up-players-0") && !window.Shows(card + "move-down-players-2"));
+    CHECK(window.Click(card + "move-down-players-0"));
+    CHECK(players.lines[0].text == "b" && players.lines[1].text == "a");
+    CHECK(window.Click(card + "move-up-players-2"));
+    CHECK(players.lines[1].text == "c" && players.lines[2].text == "a");
+    CHECK_EQ(window.Said(), "");
+}

@@ -703,6 +703,11 @@ namespace headsup
             (label + (next ? " next" : " previous")).c_str(), "btn step", nullptr);
     }
 
+    bool Form::ArrowAt(const char* id, bool down, const char* tip)
+    {
+        return Pressable(down ? "<div class=\"tri down\"></div>" : "<div class=\"tri up\"></div>", id, "btn step", tip);
+    }
+
     bool Form::Pressable(const std::string& inside, const char* id, const char* classes, const char* tip)
     {
         const std::string button = Id(id);

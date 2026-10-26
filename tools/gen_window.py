@@ -139,7 +139,7 @@ PIECES = Pieces(
         'visibility': Setting(entity=True, unnamed=True, rows=VISIBILITY_ROWS,
                               words={'nameplates': True, 'outlines': True}),
         'outline-colors': Setting(entity=True, unnamed=True),
-        'design': Setting(entity=True, unnamed=True),
+        'design': Setting(entity=True, unnamed=True, words={'move-up': False, 'move-down': False}),
         'max-icons-shown': Setting(entity=True, kinds=('players', 'self'), words={'all': True}),
         'unused-tags': Setting(entity=True, unnamed=True),
         'line-styles': Setting(entity=True, unnamed=True, rows=rows(

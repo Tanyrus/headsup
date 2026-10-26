@@ -303,6 +303,8 @@ namespace headsup
         void ArgbSwatchAt(const char* id, uint32_t& argb);
         // The arrow that puts a value back to its default, hidden while it is the default. True when it was clicked.
         bool ResetAt(const char* id, bool differs);
+        // A small square button with an arrow up or down in it. True when clicked.
+        bool ArrowAt(const char* id, bool down, const char* tip);
         // A pill. classes: kRaisedPill and the like, and any more for the page's own looks. True when clicked.
         bool Button(const char* label, const char* id, const char* classes = kRaisedPill, const char* tip = nullptr);
         // A text box. Committed: true when it was left by Enter or a click elsewhere with its text changed, which

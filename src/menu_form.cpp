@@ -696,13 +696,23 @@ namespace headsup
             DesignEditor& editor = c.state.design;
             const auto lines     = c.layout.OptionsOf(WindowList::PlateLines);
             form.Fade(!c.s.enabled || !c.s.nameplates || !c.plates);
+            std::optional<int> swapped; // the line that trades places with the one under it, once the lines are written
             for (int i = 0; i < kPlateLines; ++i)
             {
+                const std::string scope = std::string(" ") + KindKey(kind) + " " + std::to_string(i);
                 form.Line("line design");
                 form.Caption(lines[static_cast<size_t>(i)].name, "line-name");
-                form.LineBox((std::string("design ") + KindKey(kind) + " " + std::to_string(i)).c_str(), k.lines[i].text,
-                    editor.drafts[i]);
+                if (i > 0 && form.ArrowAt(("move up" + scope).c_str(), false, WordTip(c, WindowWord::DesignMoveUp))) swapped = i - 1;
+                if (i < kPlateLines - 1 && form.ArrowAt(("move down" + scope).c_str(), true, WordTip(c, WindowWord::DesignMoveDown)))
+                    swapped = i;
+                form.LineBox(("design" + scope).c_str(), k.lines[i].text, editor.drafts[i]);
                 form.EndLine();
+            }
+            if (swapped)
+            {
+                SwapLines(k, *swapped, *swapped + 1);
+                std::swap(editor.drafts[*swapped], editor.drafts[*swapped + 1]);
+                form.changed = true;
             }
             form.Line("line chips");
             for (const Tag tag : TagsFor(kind))
