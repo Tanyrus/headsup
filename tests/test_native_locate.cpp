@@ -970,6 +970,9 @@ TEST(where_the_game_put_a_window_is_where_it_came_from_once_moved_else_where_it_
     CHECK(placements.OriginOf(0x2000, menu, {0, 190}) == (WindowSpot{0, 60}));
     CHECK(placements.OriginOf(0x2000, menu, {0, 75}) == (WindowSpot{0, 75}));
     CHECK(HelpStripWindow(*WindowKeyOf("menu    helpwind")) && !HelpStripWindow(*WindowKeyOf("menu    netstat ")));
+    // The connection readout is no part of the strip, but goes where the strip goes.
+    CHECK(FollowsHelpStrip(*WindowKeyOf("menu    netstat ")) && FollowsHelpStrip(*WindowKeyOf("menu    titlewin")));
+    CHECK(!FollowsHelpStrip(*KeyFromShortName("equip")));
 }
 
 TEST(a_window_the_game_moves_goes_down_from_where_it_meant_and_is_not_moved_again)

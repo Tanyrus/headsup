@@ -1221,7 +1221,7 @@ namespace headsup
             if (!MovableWindow(key))
             {
                 WindowSpot at = now;
-                if (HelpStripWindow(key))
+                if (FollowsHelpStrip(key))
                     if (const std::optional<WindowSpot> to = g_Placements.PlaceFor(mcd, key, now, right - left,
                             bottom - top, 0, g_StripShift, band.screenRight, band.screenBottom))
                     {

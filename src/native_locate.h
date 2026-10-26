@@ -302,6 +302,8 @@ namespace headsup
     };
     // The game's own help bar's windows: its title and help.
     bool HelpStripWindow(const WindowKey& key);
+    // Those, and the connection readout beside them, which moves with them when the help bar goes under the panel.
+    bool FollowsHelpStrip(const WindowKey& key);
     // The title alone.
     bool TitleWindow(const WindowKey& key);
     struct WindowSpot

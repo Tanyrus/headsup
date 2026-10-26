@@ -766,6 +766,11 @@ namespace headsup
         return false;
     }
 
+    bool FollowsHelpStrip(const WindowKey& key)
+    {
+        return HelpStripWindow(key) || std::memcmp(key.data(), kNetstatWindow + kMenuPrefixLength, kWindowKeyLength) == 0;
+    }
+
     bool TitleWindow(const WindowKey& key)
     {
         return std::memcmp(key.data(), kTitleWindow + kMenuPrefixLength, kWindowKeyLength) == 0;
