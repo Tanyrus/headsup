@@ -964,11 +964,12 @@ namespace headsup
                 w.title = ListOf(Text("-"));
                 break;
             }
-            // A nation alone by its name; several by their first letters, each in its color.
+            // A nation alone by its name; several by their first letters, each in its color, a dot apart: RmlUi drops
+            // a span that holds spaces alone.
             const std::vector<Nation> picked = PickedNations(o.nations);
             for (const Nation nation : picked)
             {
-                if (!w.title.empty()) w.title.push_back(Text("  "));
+                if (!w.title.empty()) w.title.push_back(Text(kDot, Tone::Dim));
                 const std::string name = picked.size() == 1 ? NationName(nation) : kNationShort[static_cast<int>(nation)];
                 w.title.push_back(Colored(name + " " + std::to_string(std::ranges::count(*state.owners, nation)), NationColor(nation)));
             }

@@ -1927,7 +1927,8 @@ TEST(the_conquest_widget_counts_the_regions_of_the_nations_picked_and_its_popup_
     owners[18] = Nation::None;
     state.owners = owners;
     const WidgetContent all = BarWidgetContent(BarWidget::Conquest, state, settings);
-    CHECK_EQ(Joined(all.title), "S 1  B 2  W 1  BM 14");
+    CHECK_EQ(Joined(all.title), "S 1 · B 2 · W 1 · BM 14");
+    CHECK(all.title[1] == Text(kDot, Tone::Dim)); // not spaces alone, which the panel draws as nothing
     CHECK(all.title[2].argb == NationColor(Nation::Bastok) && all.hasPopup);
     // Bastok alone: its name and count, and its regions in the popup.
     settings.Widget(BarWidget::Conquest).nations = NationBit(Nation::Bastok);
