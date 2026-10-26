@@ -1,6 +1,7 @@
 #include "game_state.h"
 
 #include <algorithm>
+#include <utility>
 
 namespace headsup
 {
@@ -23,6 +24,8 @@ namespace headsup
         case kZoneInPacket:
             m_PlayerStatus.clear(); // target indexes are reused in the next zone
             m_PlayerSyncs.clear();
+            m_Looks.clear();
+            m_LookChanges.clear();
             m_Untargetable.clear();
             m_CalledForHelp.clear();
             m_ConquestOwed   = true;
@@ -61,9 +64,25 @@ namespace headsup
                 {
                     m_PlayerStatus.erase(update->index);
                     m_PlayerSyncs.erase(update->index);
+                    m_Looks.erase(update->index);
                 }
                 else if (update->status)
                     m_PlayerStatus[update->index] = *update->status;
+                if (const std::optional<PlayerLook> look = update->despawn ? std::nullopt : ParseLook(data, size))
+                {
+                    const auto [seen, first] = m_Looks.try_emplace(update->index, *look);
+                    if (!first && seen->second != *look) m_LookChanges.push_back(update->index);
+                    seen->second = *look;
+                }
+            }
+            break;
+        case kLevelMessagePacket:
+            if (const auto change = ParseLevelMessage(data, size))
+            {
+                PlayerSync& sync = m_PlayerSyncs[change->index];
+                sync.level       = change->level;
+                sync.held        = false;
+                sync.sameJob     = true;
             }
             break;
         case kEntityUpdatePacket:
@@ -99,7 +118,7 @@ namespace headsup
         case kInspectGeneralPacket:
             if (const auto general = ParseInspectGeneral(data, size))
             {
-                m_PlayerChecks[general->serverId] = PlayerCheck{*general, m_CheckMessage.value_or(InspectMessage{})};
+                m_PlayerChecks[general->serverId] = PlayerCheck{*general, m_CheckMessage.value_or(InspectMessage{}), ++m_Order};
                 if (const auto it = m_PlayerSyncs.find(general->index); it != m_PlayerSyncs.end()) it->second.level = 0;
                 m_CheckMessage.reset();
             }
@@ -151,6 +170,27 @@ namespace headsup
         const auto it = m_PlayerChecks.find(serverId);
         return it != m_PlayerChecks.end() ? &it->second : nullptr;
     }
+
+    void GameState::LookedUp(uint32_t serverId, uint16_t index, const SearchedPlayer& answer)
+    {
+        m_Lookups[serverId] = Lookup{PlayerJobs{answer.mainJob, answer.mainLevel, answer.subJob, answer.subLevel}, ++m_Order};
+        if (const auto it = m_PlayerSyncs.find(index); it != m_PlayerSyncs.end()) it->second.level = 0;
+    }
+
+    std::optional<PlayerJobs> GameState::ReportedJobs(uint32_t serverId) const
+    {
+        const auto check = m_PlayerChecks.find(serverId);
+        const auto found = m_Lookups.find(serverId);
+        const bool checked = check != m_PlayerChecks.end(), looked = found != m_Lookups.end();
+        if (!checked && !looked) return std::nullopt;
+        const PlayerJobs jobs = looked && (!checked || found->second.order > check->second.order)
+                                    ? found->second.jobs
+                                    : PlayerJobs{check->second.general.mainJob, check->second.general.mainLevel,
+                                          check->second.general.subJob, check->second.general.subLevel};
+        return jobs.mainJob != 0 ? std::optional(jobs) : std::nullopt;
+    }
+
+    std::vector<uint16_t> GameState::TakeLookChanges() { return std::exchange(m_LookChanges, {}); }
 
     bool SharesLinkshell(const PlayerCheck* check, std::span<const std::string> yours)
     {

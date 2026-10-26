@@ -25,6 +25,8 @@ namespace headsup
         constexpr int kShadowDrop          = 1; // pixels down
         // The accent's alpha in the target's frame as it breathes, from and to, and in a lit title's glow.
         constexpr uint32_t kBreatheLow = 0x59, kBreatheHigh = 0xCC, kLitGlow = 0x80;
+        // How a widget eases into its lit look.
+        const std::string kEaseBackground = "background-color 0.2s cubic-out", kEaseBorder = "border-color 0.2s cubic-out";
         constexpr float kGlint             = 2.0f;       // the line of light at the foot of a glass strip, in pixels
         constexpr uint32_t kGlassTop = 0xF21B2740, kGlassFoot = 0xF20C1220; // a popup's panel, down its height
         constexpr uint32_t kGlassFrame    = 0x40;       // the accent's alpha in a popup's frame
@@ -141,6 +143,9 @@ namespace headsup
                    ";border-radius:" + Px(style.radius) + ";decorator:vertical-gradient(" + RcssColor(style.top) + " " +
                    RcssColor(style.bottom) + ");";
         }
+
+        // A box drawn in the game's art, which is its own edge.
+        std::string ArtRules(const SkinFrame& frame) { return "box-sizing:border-box;" + SkinDecorator(frame); }
 
         // A box of one fill, its edge and, when it has them, its corners.
         std::string FlatRules(const BoxStyle& style, bool corners)
@@ -271,7 +276,9 @@ namespace headsup
         const BarRow& row    = look.row;
         const TextRow& lines = look.lines;
         const int stripRows = WholePixels(m.height), belowRows = WholePixels(m.below);
-        const float stripHeight = static_cast<float>(stripRows + belowRows) + (p.underLine != 0 ? 1.0f : 0.0f);
+        // The game's art frames the bar alone: the glow other themes fade out under the strip would hang its frame low.
+        const float stripHeight =
+            static_cast<float>(stripRows + (look.skin ? 0 : belowRows)) + (p.underLine != 0 ? 1.0f : 0.0f);
         const float mid         = row.y + row.height / 2.0f;
         const float rowTop      = row.y + kContentInset; // where a widget's content starts
         const float clear       = DiamondClearance(m);
@@ -290,8 +297,8 @@ namespace headsup
                RcssColor(p.title) + ";}";
         css += "div{display:block;}";
         css += std::string(".") + kHiddenClass + "{display:none;}";
-        css += std::string("#") + kStripId + "{position:absolute;left:0px;top:0px;width:100%;height:" + Px(stripHeight) +
-               ";decorator:image(\"" + StripSource(p, stripRows, belowRows) + "\");}";
+        css += std::string("#") + kStripId + "{position:absolute;left:0px;top:0px;width:100%;height:" + Px(stripHeight) + ";" +
+               (look.skin ? SkinDecorator(*look.skin) : "decorator:image(\"" + StripSource(p, stripRows, belowRows) + "\");") + "}";
         css += ".cap{position:absolute;top:" + centered(static_cast<float>(cap)) + ";" + square(static_cast<float>(cap)) + "}";
         css += "#cap-left{left:" + Px(std::round(m.cap / 2.0f - static_cast<float>(cap) / 2.0f)) + ";}";
         css += ".divider{position:absolute;top:" + centered(static_cast<float>(divider)) + ";" +
@@ -302,7 +309,7 @@ namespace headsup
         css += ".widget{position:absolute;top:" + Px(row.y) + ";height:" + Px(row.height) +
                ";box-sizing:border-box;white-space:nowrap;border-width:" + Px(kBoxBorder) + ";padding:0px " +
                Px(m.padding - kBoxBorder) + ";" + BoxRules(std::nullopt) +
-               "transition:background-color 0.2s cubic-out,border-color 0.2s cubic-out;}";
+               "transition:" + kEaseBackground + "," + kEaseBorder + ";}";
         if (look.ornate)
         {
             css += ".ornate .widget{border-width:0px;margin:0px " + Px(clear) + ";padding:" + Px(kContentInset) + " " +
@@ -321,7 +328,8 @@ namespace headsup
         }
         // A widget eases into its lit look (above) and its title glows there; the target's frame breathes from the
         // accent into what it runs into until it is lit.
-        css += ".widget.target{animation:2.4s sine-in-out infinite alternate breathe;}";
+        // RmlUi refuses a transition on a property an animation drives, once a border side, as the breathing comes back.
+        css += ".widget.target{animation:2.4s sine-in-out infinite alternate breathe;transition:" + kEaseBackground + ";}";
         css += "@keyframes breathe{from{border-color:" + RcssColor(Faded(p.accent, kBreatheLow)) + ";}to{border-color:" +
                RcssColor(Faded(p.accentEnd, kBreatheHigh)) + ";}}";
         css += std::string(".widget.") + kLitClass + "{animation:none;}";
@@ -365,7 +373,7 @@ namespace headsup
         // Game help's bar: its pieces are placed in the screen's own pixels.
         css += std::string("#") + kHelpId + "{position:absolute;left:0px;top:0px;width:0px;height:0px;}";
         css += ".p{position:absolute;white-space:pre;}";
-        css += ".help-box{position:absolute;" + PanelRules(HelpBarPanel(look)) + "}";
+        css += ".help-box{position:absolute;" + (look.skin ? ArtRules(*look.skin) : PanelRules(HelpBarPanel(look))) + "}";
         css += ".hc{" + FaceRules(look.titleFont, lines.title, place.title.height) + ShadowEffect(lines.title) + "}";
         css += ".hh{" + FaceRules(look.detailFont, lines.title, place.figures.height) + ShadowEffect(lines.title) + "}";
         const bool glass = look.palette.shape == BarShape::Glass;
@@ -426,7 +434,7 @@ namespace headsup
         if (panel.outer != 0)
             css += "#outer{position:absolute;box-sizing:border-box;border:1px " + RcssColor(panel.outer) +
                    ";border-radius:" + Px(panel.radius + static_cast<float>(OuterPad(panel))) + ";}";
-        css += "#panel{position:absolute;left:0px;top:0px;" + PanelRules(panel) + "}";
+        css += "#panel{position:absolute;left:0px;top:0px;" + (look.skin ? ArtRules(*look.skin) : PanelRules(panel)) + "}";
         css += ".card{" + FlatRules(PopupCard(look), true) + "}";
         css += ".tag{" + FlatRules(PopupTag(look, 0.0f), false) + "}";
         css += ".rule{height:1px;decorator:horizontal-gradient(" + RcssColor(look.palette.divider) + " " +

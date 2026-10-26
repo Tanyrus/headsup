@@ -109,7 +109,10 @@ namespace headsup
     // The font out of a whole 51.DAT.
     Read<GameFontFace> ReadGameFont(std::span<const uint8_t> dat);
 
-    // The files the game reads the font from, in the order XIPivot looks: each overlay its config names (pivotIni,
-    // empty without pivot) under its root_path or defaultRoot, the lowest number first, then the game's own.
-    std::vector<std::string> GameFontCandidates(std::string_view pivotIni, std::string_view defaultRoot, std::string_view gameFolder);
+    // Where the game reads a file of its install from (file under the game's folder), in the order XIPivot looks: each
+    // overlay its config names (pivotIni, empty without pivot) under its root_path or defaultRoot, the lowest number
+    // first, then the game's own.
+    std::vector<std::string> GameFileCandidates(std::string_view pivotIni, std::string_view defaultRoot, std::string_view gameFolder,
+        std::string_view file);
+    constexpr std::string_view kGameFontFile = "ROM\\119\\51.DAT";
 }

@@ -17,6 +17,7 @@
 #include "native_locate.h"
 #include "outline_math.h"
 #include "plate_settings.h"
+#include "window_skin.h"
 #include "window_views.h"
 
 #include <array>
@@ -68,6 +69,7 @@ namespace headsup
     constexpr int kMinOpacity = 10, kMaxOpacity = 100; // percent
 
     constexpr int kMinMenuFontSize = 10, kMaxMenuFontSize = 40, kDefaultMenuFontSize = 18; // pixels
+    constexpr int kMinPointerSize = 100, kMaxPointerSize = 300; // percent of the pointer's own size
     constexpr int kMinMenuOpacity = 30; // percent: fainter, the window could not be found to set it back
     constexpr int kMaxMenuSide  = 16384; // pixels: more than any screen is across
 
@@ -113,7 +115,7 @@ namespace headsup
         std::string menuFont = kDefaultMenuFont; // the settings window's text, by its kMenuFonts name
         int menuFontSize     = kDefaultMenuFontSize; // pixels: the settings window's text and everything sized by it
         int menuOpacity      = 100;              // percent
-        MenuTheme menuTheme  = MenuTheme::Phoenix;
+        int windowType       = kFollowGameWindow; // the game's art drawn: the Window Type the game is set to, or 1 to 8
         // Where the player left the settings window, in pixels; no width for one never moved, which opens in the
         // screen's middle.
         int menuX = 0, menuY = 0, menuWidth = 0, menuHeight = 0;
@@ -141,6 +143,7 @@ namespace headsup
         std::string cursorFile; // a File cursor's name in the cursors folder, without its extension
         PointerIcon pointerIcon = PointerIcon::Vanilla;
         std::string pointerFile; // a File pointer's name in the cursors folder, without its extension
+        int pointerSize = kMinPointerSize; // percent, the game's own pointer included
         bool fixPointer        = true;  // the game reads the mouse in its true client area and syncs its pointer before clicks
         int cursorWidth        = DefaultCursorWidth(); // pixels
         int cursorHeight       = kDefaultCursorHeight;
@@ -152,6 +155,7 @@ namespace headsup
         bool stackLine         = true;  // and a risen one has a line down to where it stood
         bool hideInEvent       = false; // no nameplate, HeadsUp's or the game's, while you are in a conversation
         bool debugMode         = false; // the HeadsUp Config page shows its readings and reports
+        bool logging           = false; // with debugMode, notes go to a log of their own
         Color weakBadgeColor   = {{0.40f, 1.00f, 0.40f}};
         Color resistBadgeColor = {{1.00f, 0.35f, 0.35f}};
         Color rankBadgeColor   = {{1.00f, 0.85f, 0.30f}};
@@ -163,6 +167,7 @@ namespace headsup
         int pearlOutline = 100;              // the linkpearl's outline, percent of XIUI's; 0 for none
         DashMark dashMark = DashMark::Diamond; // what a dash typed in a design is drawn as
         bool autoCheck    = false; // every mob that comes near is checked by HeadsUp, for its exact level
+        bool lookUpPlayers = false; // every player the server shows you is looked up by the search server, for their jobs
         std::string defaultFont = kDefaultFont;
         int scaleMin = 50, scaleMax = 250; // percent: the distance scale's limits
         int timerPercent = 85;
@@ -218,6 +223,8 @@ namespace headsup
 
     // Out-of-range values become the nearest limit; NaN and infinities become the default.
     Settings Clamp(Settings s);
+    // Whether HeadsUp shows a pointer of its own in place of the game's: another icon, or the game's at another size.
+    bool PointerSwapped(const Settings& s);
     Settings LoadSettings(SettingsStore& store);
     void SaveSettings(const Settings& s, SettingsStore& store);
 

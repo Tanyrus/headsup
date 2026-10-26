@@ -116,7 +116,7 @@ PIECES = Pieces(
     settings={
         # Entities
         'base-font-size': Setting(), 'default-font': Setting(), 'base-icon-size': Setting(), 'linkpearl-outline': Setting(),
-        'auto-check': Setting(),
+        'auto-check': Setting(), 'look-up-players': Setting(),
         'replace-dashes': Setting(options=4, nameless=frozenset({1, 2, 3})), 'scale-with-distance': Setting(),
         'min-size': Setting(), 'max-size': Setting(), 'stack-line-to-entity': Setting(), 'vertical-offset': Setting(),
         'stack-names': Setting(), 'hide-during-conversation': Setting(),
@@ -172,10 +172,10 @@ PIECES = Pieces(
         'window-list': Setting(unnamed=True, words={'note': True, 'find': True, 'name-hint': True, 'all-windows': False,
                                                     'hide': True, 'keep': True, 'row-tip': False}),
         # Top Panel and Widgets
-        'theme': Setting(), 'separators': Setting(options=3), 'title-font': Setting(), 'text-font': Setting(),
+        'theme': Setting(), 'window-type': Setting(options=9), 'separators': Setting(options=3), 'title-font': Setting(), 'text-font': Setting(),
         'height': Setting(), 'text-size': Setting(), 'one-line': Setting(options=3), 'popup-size': Setting(),
         'hide-readout': Setting(), 'shift-vanilla-ui': Setting(),
-        'theme-shape': Setting(options=3), 'theme-background': Setting(), 'theme-gradient': Setting(),
+        'theme-shape': Setting(options=4), 'theme-background': Setting(), 'theme-gradient': Setting(),
         'theme-top': Setting(), 'theme-bottom': Setting(), 'theme-border-color': Setting(),
         'theme-border-thickness': Setting(),
         'theme-palette': Setting(unnamed=True, rows=rows(
@@ -189,11 +189,12 @@ PIECES = Pieces(
             'seconds', 'layout', 'exp-bar', 'job-names', 'latency')),
         'trays': Setting(unnamed=True), 'reset-layout': Setting(),
         # Mouse Cursor and HeadsUp Config
-        'pointer-icon': Setting(options=3, nameless=frozenset({2})), 'pointer-fix': Setting(), 'keep-pointer': Setting(),
-        'enable-headsup': Setting(), 'window-theme': Setting(), 'font': Setting(), 'size': Setting(),
+        'pointer-icon': Setting(options=3, nameless=frozenset({2})), 'pointer-size': Setting(), 'pointer-fix': Setting(), 'keep-pointer': Setting(),
+        'enable-headsup': Setting(), 'font': Setting(), 'size': Setting(),
         'window-opacity': Setting(),
         'reset-all-settings': Setting(words={'note': True, 'reset-everything': True, 'keep-them': True}),
         'debug-report': Setting(words={'watch': True, 'stop': True, 'saved': True}),
+        'logging': Setting(words={'file': True}),
         'mobs-outlined': Setting(), 'meshes-outlined': Setting(), 'stencil-buffer': Setting(), 'nameplates': Setting(),
         'drawn': Setting(), 'game-s-names': Setting(), 'frame-time': Setting(), 'last-save': Setting(),
         'your-level': Setting(),
@@ -201,7 +202,7 @@ PIECES = Pieces(
     lists={
         'plate-mode': List(4), 'outline-mode': List(4, extra={3: 'tipOnClaimRows'}), 'color-source': List(7),
         'show-condition': List(13), 'ornament-place': List(5), 'align': List(3), 'font-style': List(3),
-        'smoothness': List(4), 'bar-theme': List(6), 'menu-theme': List(2), 'bar-sections': List(3),
+        'smoothness': List(4), 'bar-theme': List(7), 'bar-sections': List(3),
         'bar-widgets': List(15), 'plate-lines': List(3), 'job-layout': List(3), 'exp-bar': List(3), 'tags': List(24),
     },
     words={'switched-off': True, 'switch-off': True, 'switch-on': True, 'switched-off-top-panel': True,

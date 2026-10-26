@@ -24,9 +24,10 @@ namespace headsup
     {
     public:
         // Each frame: lays out the bar, shows it in the host's bar context and tells input where everything is.
-        // While the bar is off it closes its document. hidden: laid out, but not drawn.
-        void Update(RmlHost& host, const BarState& state, const Settings& settings, float screenWidth, float screenHeight,
-            BarInput& input, bool hidden);
+        // While the bar is off it closes its document. hidden: laid out, but not drawn. skin: the game's window art in
+        // use, once it is read.
+        void Update(RmlHost& host, const BarState& state, const Settings& settings, const GameSkinLook* skin,
+            float screenWidth, float screenHeight, BarInput& input, bool hidden);
         // Closes the bar's document; before the host stops, and while another renderer draws the bar.
         void Close();
         void Release();

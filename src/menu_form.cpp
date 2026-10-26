@@ -962,6 +962,10 @@ namespace headsup
                 form.Fade(!plates);
                 form.Switch(label.c_str(), s.autoCheck, tip);
                 break;
+            case SettingPiece::LookUpPlayers:
+                form.Fade(!plates);
+                form.Switch(label.c_str(), s.lookUpPlayers, tip);
+                break;
             case SettingPiece::ReplaceDashes:
             {
                 form.Fade(!plates);
@@ -1193,6 +1197,10 @@ namespace headsup
                 form.Fade(!BarOn(s));
                 OptionsDropdown(form, label, s.barTheme, c.layout.OptionsOf(WindowList::BarTheme), tip);
                 break;
+            case SettingPiece::WindowType:
+                form.Fade(!UsesGameArt(s));
+                OptionsDropdown(form, label, s.windowType, c.layout.OptionsOf(e), tip);
+                break;
             case SettingPiece::Separators:
             {
                 form.Fade(!BarOn(s));
@@ -1329,6 +1337,10 @@ namespace headsup
                 s.pointerFile = choice.file;
                 break;
             }
+            case SettingPiece::PointerSize:
+                form.Fade(!on);
+                form.SliderPercent(label.c_str(), s.pointerSize, kMinPointerSize, kMaxPointerSize, tip);
+                break;
             case SettingPiece::PointerFix:
                 form.Fade(!on);
                 form.Switch(label.c_str(), s.fixPointer, tip);
@@ -1336,10 +1348,6 @@ namespace headsup
             case SettingPiece::KeepPointer:
                 form.Fade(!on);
                 Keys(c, label, tip, s.keepPointerKeys, kMaxKeptKeys, c.state.keyCapture);
-                break;
-            case SettingPiece::WindowTheme:
-                form.Fade(false);
-                OptionsDropdown(form, label, s.menuTheme, c.layout.OptionsOf(WindowList::MenuTheme), tip);
                 break;
             case SettingPiece::Font:
                 form.Fade(false);
@@ -1372,6 +1380,12 @@ namespace headsup
                 form.EndLine();
                 if (r.lastReport != nullptr && !r.lastReport->empty())
                     form.Note(Filled(Word(c, WindowWord::DebugReportSaved), kFileMark, FileName(*r.lastReport)).c_str());
+                break;
+            case SettingPiece::Logging:
+                form.Fade(!s.debugMode);
+                form.Switch(label.c_str(), s.logging, tip);
+                if (r.logFile != nullptr && !r.logFile->empty())
+                    form.Note(Filled(Word(c, WindowWord::LoggingFile), kFileMark, FileName(*r.logFile)).c_str());
                 break;
             case SettingPiece::MobsOutlined:
                 form.Fade(!s.debugMode);

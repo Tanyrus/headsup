@@ -315,3 +315,75 @@ TEST(a_window_the_game_hangs_under_the_strip_beside_the_status_column_rises_to_l
     CHECK(top(hidden, 16, 48, 382) == 64 && top(hidden, 142, 48, 382) == 64);
     CHECK(FrameShifts{}.For(130, 382, kScreenRight) == 0); // windows not moved
 }
+
+TEST(the_full_map_covers_the_panel_and_other_windows_do_not)
+{
+    // The windows the test client drew with the map open, and before it in West Ronfaure (/hu windowlog).
+    CHECK(MapShown({"logwindo", "map0", "mapframe", "partywin"}));
+    CHECK(!MapShown({"buff", "logwin2", "logwindo", "partywin"}));
+    CHECK(!MapShown({}));
+}
+
+TEST(a_windows_buttons_are_read_with_their_places)
+{
+    // Unity Information (quest00) as the test client held it at the game's place: its record's list at +0x14, links
+    // as the window list's, and a button node (word 0 is 1) with its place on the screen at +0x2A and its place in
+    // the window at +0x32.
+    constexpr uint32_t kMcd = 0x1000, kFirst = 0x2000, kLink = 0x18, kNodes = 0x3000, kNode = 0x70;
+    FakeMemory memory;
+    memory.Map(kMcd, 0x100);
+    memory.Map(kFirst, 4 * kLink);
+    memory.Map(kNodes, 4 * kNode);
+    memory.Put32(kMcd + 0x14, kFirst);
+    const struct
+    {
+        uint16_t kind;
+        int16_t x, y;
+        std::array<int16_t, 4> place;
+        uint8_t skip;
+    } nodes[] = {{1, 54, 243, {39, 31, 359, 49}, 0}, {0, 0, 0, {}, 0}, {1, 55, 266, {39, 68, 359, 86}, 0},
+        {1, 55, 153, {39, 105, 359, 123}, 1}};
+    for (uint32_t i = 0; i < 4; ++i)
+    {
+        const uint32_t link = kFirst + i * kLink, node = kNodes + i * kNode;
+        memory.Put32(link, i + 1 < 4 ? link + kLink : 0);
+        memory.Put32(link + 0x10, node);
+        memory.Put(link + 0x14, &nodes[i].skip, 1);
+        memory.Put(node, &nodes[i].kind, 2);
+        memory.Put(node + 0x2A, &nodes[i].x, 2);
+        memory.Put(node + 0x2C, &nodes[i].y, 2);
+        memory.Put(node + 0x32, nodes[i].place.data(), 8);
+    }
+    const std::vector<ButtonSpot> buttons = ButtonSpots(kMcd, memory.Access());
+    CHECK(buttons.size() == 2);
+    CHECK(buttons[0].node == kNodes && buttons[0].x == 54 && buttons[0].y == 243);
+    CHECK((buttons[0].place == std::array<int16_t, 4>{39, 31, 359, 49}));
+    CHECK(buttons[1].node == kNodes + 2 * kNode && buttons[1].y == 266);
+}
+
+TEST(a_button_the_window_placed_itself_keeps_that_place_through_a_move)
+{
+    // The game's move lays each button out again at the window's corner plus its place in the window. Active stood
+    // at 243 under "Unity chat settings" with the window's corner at (16,48), though its place said the first row.
+    const ButtonSpot active{.node = 1, .x = 54, .y = 243, .place = {39, 31, 359, 49}};
+    const std::optional<std::array<int16_t, 4>> kept = PlaceKept(active, 16, 48);
+    CHECK(kept.has_value());
+    CHECK((*kept == std::array<int16_t, 4>{39, 195, 359, 213})); // the cursor's one pixel to the left is no place
+    // A button where its place puts it needs nothing.
+    CHECK(!PlaceKept(ButtonSpot{.node = 2, .x = 55, .y = 153, .place = {39, 105, 359, 123}}, 16, 48));
+}
+
+TEST(a_window_list_that_loops_is_read_to_an_end)
+{
+    constexpr uint32_t kMcd = 0x1000, kLink = 0x2000, kNode = 0x3000;
+    FakeMemory memory;
+    memory.Map(kMcd, 0x100);
+    memory.Map(kLink, 0x18);
+    memory.Map(kNode, 0x70);
+    memory.Put32(kMcd + 0x14, kLink);
+    memory.Put32(kLink, kLink); // the next link is itself
+    memory.Put32(kLink + 0x10, kNode);
+    const uint16_t button = 1;
+    memory.Put(kNode, &button, 2);
+    CHECK(ButtonSpots(kMcd, memory.Access()).size() == 1); // each button once, or a move would shift it twice
+}

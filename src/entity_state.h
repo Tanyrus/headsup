@@ -24,12 +24,6 @@ namespace headsup
     // From IEntity::GetSpawnFlags: the mob bit wins over the player bit, and neither means an NPC.
     EntityKind KindFromSpawnFlags(uint32_t flags);
 
-    struct PlayerJobs
-    {
-        uint8_t mainJob = 0, mainLevel = 0, subJob = 0, subLevel = 0;
-        bool operator==(const PlayerJobs&) const = default;
-    };
-
     struct EntityState
     {
         EntityKind kind     = EntityKind::Npc;
@@ -84,13 +78,14 @@ namespace headsup
     // the first listed.
     std::unordered_map<uint16_t, uint16_t> PetOwners(std::span<const PetLink> links);
 
-    // A player's jobs from the first source that knows them: the game's for you, the party list's, then their last
-    // check, then a level alone that the server sent since that check (0 for none), which wins over the check's level
-    // and, not held to a sync's cap (seenHeld) and other than the check's, leaves its job unknown.
+    // A player's jobs from the first source that knows them: the game's for you, the party list's, then the newer of
+    // their last check and lookup (reported), then a level alone that the server sent since (0 for none), which wins
+    // over the reported level and, not held to a sync's cap (seenHeld), not from a level up or down they were seen to
+    // take (seenSameJob) and other than the reported one, leaves its job unknown.
     // Null for a source the player has none of; a main job of 0 (zoning, another zone, anonymous) knows nothing.
-    std::optional<PlayerJobs> KnownJobs(const PlayerJobs* own, const PlayerJobs* member, const InspectGeneral* checked,
-        uint8_t seenLevel, bool seenHeld);
-    // The level a player's sync packet gave, shown only with Auto-Check on and once their update has said they are
-    // not anonymous: the game hides an anonymous player's level.
-    uint8_t SeenLevel(bool autoCheck, uint8_t level, const PlayerStatus* status);
+    std::optional<PlayerJobs> KnownJobs(const PlayerJobs* own, const PlayerJobs* member, const PlayerJobs* reported,
+        uint8_t seenLevel, bool seenHeld, bool seenSameJob);
+    // The level a player's sync packet or a level up gave, shown only with Auto-Check or Look Up Players on (shown)
+    // and once their update has said they are not anonymous: the game hides an anonymous player's level.
+    uint8_t SeenLevel(bool shown, uint8_t level, const PlayerStatus* status);
 }

@@ -27,6 +27,7 @@ namespace headsup
         // RmlUi's colors and textures carry premultiplied alpha.
         m_Device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
         m_Textured = true;
+        m_Wrapped  = false;
         m_Transform.reset();
         m_Masked = false;
         ApplyScissor();
@@ -36,6 +37,7 @@ namespace headsup
     {
         if (m_Device == nullptr) return;
         m_Device->SetTexture(0, nullptr);
+        Wrap(false);
         m_Stack.clear();
         if (m_GameTarget != nullptr)
         {
@@ -55,6 +57,15 @@ namespace headsup
         m_Textured = textured;
         m_Device->SetTextureStageState(0, D3DTSS_COLOROP, textured ? D3DTOP_MODULATE : D3DTOP_SELECTARG2);
         m_Device->SetTextureStageState(0, D3DTSS_ALPHAOP, textured ? D3DTOP_MODULATE : D3DTOP_SELECTARG2);
+    }
+
+    void RmlRender::Wrap(bool wrapped)
+    {
+        if (wrapped == m_Wrapped) return;
+        m_Wrapped          = wrapped;
+        const DWORD address = wrapped ? D3DTADDRESS_WRAP : D3DTADDRESS_CLAMP;
+        m_Device->SetTextureStageState(0, D3DTSS_ADDRESSU, address);
+        m_Device->SetTextureStageState(0, D3DTSS_ADDRESSV, address);
     }
 
     bool RmlRender::MakeLayer(size_t index)
@@ -137,6 +148,7 @@ namespace headsup
         // layer too, as a list hanging below the window, and is laid down with the rest.
         WholeTarget();
         UseTexture(true);
+        Wrap(false);
         m_Device->SetTexture(0, layer.texture);
         const auto quad = LayerQuad(m_Width, m_Height, static_cast<float>(m_Width) / static_cast<float>(layer.side[0]),
             static_cast<float>(m_Height) / static_cast<float>(layer.side[1]), LayerTint(opacity));
@@ -217,6 +229,7 @@ namespace headsup
         }
         const bool textured = texture != nullptr;
         UseTexture(textured);
+        Wrap(textured && texture->repeats);
         m_Device->SetTexture(0, textured ? texture->texture : nullptr);
         m_Device->DrawPrimitiveUP(D3DPT_TRIANGLELIST, static_cast<UINT>(m_Placed.size() / kVerticesPerTriangle),
             m_Placed.data(), sizeof(ScreenVertex));
@@ -249,8 +262,11 @@ namespace headsup
         m_Pixels.resize(image->argb.size());
         for (size_t i = 0; i < image->argb.size(); ++i)
             m_Pixels[i] = Premultiplied(image->argb[i]);
-        dimensions = Rml::Vector2i(image->width, image->height);
-        return Upload(m_Pixels.data(), image->width, image->height);
+        const bool repeats = image->shownWidth > 0 && image->shownHeight > 0;
+        dimensions = repeats ? Rml::Vector2i(image->shownWidth, image->shownHeight) : Rml::Vector2i(image->width, image->height);
+        const Rml::TextureHandle handle = Upload(m_Pixels.data(), image->width, image->height);
+        if (handle != 0) reinterpret_cast<Texture*>(handle)->repeats = repeats;
+        return handle;
     }
 
     Rml::TextureHandle RmlRender::GenerateTexture(Rml::Span<const Rml::byte> source, Rml::Vector2i dimensions)

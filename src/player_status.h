@@ -2,6 +2,8 @@
 
 #include "argb.h"
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 
@@ -25,12 +27,33 @@ namespace headsup
         uint32_t linkshellArgb = kWhite;
     };
 
+    struct PlayerJobs
+    {
+        uint8_t mainJob = 0, mainLevel = 0, subJob = 0, subLevel = 0;
+        bool operator==(const PlayerJobs&) const = default;
+    };
+
     struct PlayerUpdate
     {
         uint16_t index; // entity target index
         bool despawn;
         std::optional<PlayerStatus> status; // when the update carries it
     };
+
+    // A player's model as 0x00D carries it: the face and race, then each piece of gear's graphics.
+    constexpr size_t kModelParts = 9;
+    using PlayerLook = std::array<uint16_t, kModelParts>;
+    std::optional<PlayerLook> ParseLook(const uint8_t* data, uint32_t size);
+
+    // A level up or down the server shows everyone in range (0x02D, "<player> attains level #!", "falls to level #."):
+    // whose, and the main job's new level.
+    constexpr uint16_t kLevelMessagePacket = 0x02D;
+    struct LevelChange
+    {
+        uint16_t index;
+        uint8_t level;
+    };
+    std::optional<LevelChange> ParseLevelMessage(const uint8_t* data, uint32_t size);
 
     struct CharSyncUpdate
     {

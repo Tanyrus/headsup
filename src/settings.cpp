@@ -38,9 +38,10 @@ namespace headsup
             {"clockSeconds", &Settings::clockSeconds},
             {"stackNames", &Settings::stackNames}, {"stackLine", &Settings::stackLine}, {"hideInEvent", &Settings::hideInEvent},
             {"debugMode", &Settings::debugMode},
+            {"logging", &Settings::logging},
             {"nameplates", &Settings::nameplates}, {"outlines", &Settings::outlines},
             {"outlineFadeIn", &Settings::outlineFadeIn}, {"cursorFloat", &Settings::cursorFloat},
-            {"autoCheck", &Settings::autoCheck}};
+            {"autoCheck", &Settings::autoCheck}, {"lookUpPlayers", &Settings::lookUpPlayers}};
 
         struct IntKey
         {
@@ -53,6 +54,7 @@ namespace headsup
             {"outlineThickness", &Settings::outlineThickness, kMinOutlineThickness, kMaxOutlineThickness, kPercentStep},
             {"outlineOpacity", &Settings::outlineOpacity, kMinOpacity, kMaxOpacity, kPercentStep},
             {"menuOpacity", &Settings::menuOpacity, kMinMenuOpacity, kMaxOpacity, kPercentStep},
+            {"pointerSize", &Settings::pointerSize, kMinPointerSize, kMaxPointerSize, kPercentStep},
             {"cursorRaise", &Settings::cursorRaise, -kMaxCursorRaise, kMaxCursorRaise},
             {"nameRaise", &Settings::nameRaise, kMinNameRaise, kMaxNameRaise},
             {"elementWeakRank", &Settings::elementWeakRank, kNoWeakRank, kMaxWeakRank},
@@ -67,7 +69,8 @@ namespace headsup
             {"scaleMin", &Settings::scaleMin, kMinSizePercent, kMaxSizePercent, kPercentStep},
             {"scaleMax", &Settings::scaleMax, kMinSizePercent, kMaxSizePercent, kPercentStep},
             {"timerPercent", &Settings::timerPercent, kMinSizePercent, kMaxSizePercent, kPercentStep},
-            {"screenshotKey", &Settings::screenshotKey, 0, UINT8_MAX}};
+            {"screenshotKey", &Settings::screenshotKey, 0, UINT8_MAX},
+            {"windowType", &Settings::windowType, kFollowGameWindow, kWindowTypes}};
 
         // Numbers whose meaning changed and whose key changed with it: saved and bounded as the rest, and read through
         // Rebased, since a typed read of the new key would have Ashita's store hold its default before the old is asked.
@@ -158,7 +161,7 @@ namespace headsup
         constexpr const char* kDesignsSavedKey = "nameplateDesigns";
         constexpr const char* kBarThemeKey = "barTheme";
         const char* const kBarThemeNames[kBarThemeCount] = {"phoenixGold", "umbraDark", "phoenixRedOrnate",
-            "phoenixRedPills", "aurora", "custom"};
+            "phoenixRedPills", "aurora", "custom", "gameWindow"};
         // The Custom theme: this before each of kPaletteColors' names, and its shape and border.
         constexpr const char* kCustomThemeKey = "customTheme";
         constexpr const char* kShapeSuffix = "Shape";
@@ -176,8 +179,6 @@ namespace headsup
         const char* const kJobLayoutNames[kJobLayoutCount] = {"jobsFirst", "expFirst", "expOnly"};
         constexpr const char* kTargetDetailsKey = "barTargetDetails";
         constexpr const char* kMenuFontKey      = "menuFont";
-        constexpr const char* kMenuThemeKey     = "menuTheme";
-        const char* const kMenuThemeNames[kMenuThemeCount] = {"phoenix", "aurora"};
         constexpr const char* kMenuXKey = "menuX", *kMenuYKey = "menuY", *kMenuWidthKey = "menuWidth",
                               *kMenuHeightKey = "menuHeight";
         constexpr const char* kSecondLineSuffix = "Line2";
@@ -1206,7 +1207,6 @@ namespace headsup
         if (static_cast<int>(s.jobLayout) >= kJobLayoutCount) s.jobLayout = d.jobLayout;
         if (static_cast<int>(s.barSubtitle) >= kSubtitlePlaceCount) s.barSubtitle = d.barSubtitle;
         if (MenuFontNamed(s.menuFont) == nullptr) s.menuFont = d.menuFont;
-        if (static_cast<int>(s.menuTheme) >= kMenuThemeCount) s.menuTheme = d.menuTheme;
         for (int* side : {&s.menuX, &s.menuY, &s.menuWidth, &s.menuHeight})
             *side = std::clamp(*side, 0, kMaxMenuSide);
         if (static_cast<int>(s.barSeparators) >= kBarSeparatorsCount) s.barSeparators = d.barSeparators;
@@ -1305,9 +1305,6 @@ namespace headsup
             return kAshitaFontPixels * std::clamp(percent, kOldMinMenuScale, kOldMaxMenuScale) / kPercent *
                    (font != nullptr ? font->oldScale : 1.0f);
         });
-        const std::string menuTheme = store.GetString(kMenuThemeKey, "");
-        for (int t = 0; t < kMenuThemeCount; ++t)
-            if (menuTheme == kMenuThemeNames[t]) s.menuTheme = static_cast<MenuTheme>(t);
         s.menuX      = LoadInt(store, kMenuXKey, s.menuX);
         s.menuY      = LoadInt(store, kMenuYKey, s.menuY);
         s.menuWidth  = LoadInt(store, kMenuWidthKey, s.menuWidth);
@@ -1424,7 +1421,6 @@ namespace headsup
         store.Set(kClockZoneKey, s.clockZone ? kClockZoneNames[static_cast<int>(*s.clockZone)] : kLocalZone);
         setBool(kTargetDetailsKey, s.barTargetDetails);
         store.Set(kMenuFontKey, s.menuFont.c_str());
-        store.Set(kMenuThemeKey, kMenuThemeNames[static_cast<int>(s.menuTheme)]);
         setFloat(kMenuXKey, static_cast<float>(s.menuX));
         setFloat(kMenuYKey, static_cast<float>(s.menuY));
         setFloat(kMenuWidthKey, static_cast<float>(s.menuWidth));
@@ -1516,5 +1512,10 @@ namespace headsup
     {
         auto byte = [](float f) { return static_cast<uint8_t>(std::lround(f * 255.0f)); };
         return Opaque(byte(c.v[0]), byte(c.v[1]), byte(c.v[2]));
+    }
+
+    bool PointerSwapped(const Settings& s)
+    {
+        return s.enabled && (s.pointerIcon != PointerIcon::Vanilla || s.pointerSize != kMinPointerSize);
     }
 }

@@ -35,6 +35,7 @@ namespace headsup
         const std::vector<std::string>* themeFiles  = nullptr; // the themes folder's, the same way
         std::optional<bool> watching;            // whether the debug watch runs; none in a build without one
         const std::string* lastReport = nullptr; // the file the last report went to, empty before one
+        const std::string* logFile    = nullptr; // the file notes go to, empty before one
         bool exportable = false; // a developer's build, which can write its built-in layout out as a file
     };
 

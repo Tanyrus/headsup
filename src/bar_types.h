@@ -12,9 +12,10 @@ namespace headsup
         PhoenixRedOrnate,
         PhoenixRedPills,
         Aurora, // glass, and a line of light under the strip
-        Custom, // the player's own palette, Settings::customPalette
+        Custom,     // the player's own palette, Settings::customPalette
+        GameWindow, // the game's own window art, of the Window Type in use, and colors from it
     };
-    constexpr int kBarThemeCount   = static_cast<int>(BarTheme::Custom) + 1;
+    constexpr int kBarThemeCount   = static_cast<int>(BarTheme::GameWindow) + 1;
     constexpr int kFixedThemeCount = static_cast<int>(BarTheme::Custom); // those with a palette of their own
 
     // What divides neighbouring widgets: the theme's own (ornate diamonds, pills none), or the player's pick.

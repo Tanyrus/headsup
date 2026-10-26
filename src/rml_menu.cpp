@@ -1,5 +1,6 @@
 #include "rml_menu.h"
 
+#include "bar_look.h"
 #include "fonts.h"
 #include "markup.h"
 #include "menu_sizes.h"
@@ -188,7 +189,10 @@ namespace headsup
 
     bool RmlMenu::Document(const MenuHost& host, const Settings& settings)
     {
-        MenuLook look{settings.menuTheme, host.textFont, kMarcellusSC, settings.menuFontSize, m_Look.textLift, host.developer};
+        const GameSkinLook* skin = host.skin ? &*host.skin : nullptr;
+        const MenuTheme theme    = MenuThemeFor(settings, skin);
+        MenuLook look{theme, host.textFont, kMarcellusSC, settings.menuFontSize, m_Look.textLift, host.developer,
+            MenuColorsFor(settings, skin), theme == MenuTheme::GameWindow ? std::optional(skin->frame) : std::nullopt};
         if (m_Document != nullptr && look == m_Look) return true;
         look.textLift = LiftOf(host.textFont, settings.menuFontSize);
         if (m_Document != nullptr && look.SameFrame(m_Look))

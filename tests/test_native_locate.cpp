@@ -660,6 +660,41 @@ TEST(the_window_move_is_found_once_by_its_start)
 
 namespace
 {
+    // The builder of a window from the menu catalog, at RVA 0x117F40 in the client of 2026-10-22, called once at
+    // 0x15E4A1: push ebx; push ebp; push esi; mov esi,ecx; mov ecx,[esp+10h]; push edi; mov [esi+4],ecx; call.
+    constexpr uint32_t kBuildRva = 0x117F40, kBuildCallRva = 0x15E4A1;
+    void PutBuild(Image& image, uint32_t at)
+    {
+        image.Put(at, {0x53, 0x55, 0x56, 0x8B, 0xF1, 0x8B, 0x4C, 0x24, 0x10, 0x57, 0x89, 0x4E, 0x04, 0xE8, 0xBE, 0x33,
+                          0x00, 0x00, 0x8B, 0xD8, 0x85, 0xDB});
+    }
+    void PutCall(Image& image, uint32_t at, uint32_t to)
+    {
+        image.Put(at, {0xE8});
+        image.Put32(at + 1, to - (at + kBranchLength));
+    }
+}
+
+TEST(the_window_builder_is_found_with_its_one_call)
+{
+    Image image;
+    CHECK(LocateWindowBuild(image.Text()).problem == LocateProblem::NoWindowBuild);
+    PutBuild(image, kBuildRva);
+    CHECK(LocateWindowBuild(image.Text()).problem == LocateProblem::NoWindowBuild); // never called
+    PutCall(image, kBuildCallRva, kBuildRva);
+    const WindowBuildSite found = LocateWindowBuild(image.Text());
+    CHECK(found.problem == LocateProblem::None && found.call == kBuildCallRva && found.build == kBuildRva);
+    PutCall(image, kBuildCallRva + 0x100, kBuildRva);
+    CHECK(LocateWindowBuild(image.Text()).problem == LocateProblem::AmbiguousWindowBuild);
+    Image twice;
+    PutBuild(twice, kBuildRva);
+    PutBuild(twice, kBuildRva + 0x1000);
+    PutCall(twice, kBuildCallRva, kBuildRva);
+    CHECK(LocateWindowBuild(twice.Text()).problem == LocateProblem::AmbiguousWindowBuild);
+}
+
+namespace
+{
     // MCD::GetRect's start, at RVA 0x118F70 in the client of 2026-10-13: sub esp,0Ch; push esi; mov esi,ecx; mov al,
     // [esi+99h]; test al,al; jz, its rectangle copied into the place it is given.
     constexpr uint32_t kGetRectRva = 0x118F70;
@@ -937,6 +972,44 @@ TEST(where_the_game_put_a_window_is_where_it_came_from_once_moved_else_where_it_
     CHECK(HelpStripWindow(*WindowKeyOf("menu    helpwind")) && !HelpStripWindow(*WindowKeyOf("menu    netstat ")));
 }
 
+TEST(a_window_the_game_moves_goes_down_from_where_it_meant_and_is_not_moved_again)
+{
+    WindowPlacements placements;
+    const WindowKey profile = *KeyFromShortName("persona");
+    // The owner asks for 16, 32; HeadsUp takes it 16 lower at once, and the frame's pass finds it placed.
+    CHECK(placements.Moved(0x1000, profile, {16, 32}, 112, 190, 0, 16, kScreenRight, kScreenBottom) ==
+          (WindowSpot{16, 48}));
+    CHECK(!placements.PlaceFor(0x1000, profile, {16, 48}, 112, 190, 0, 16, kScreenRight, kScreenBottom));
+    CHECK(placements.OriginOf(0x1000, profile, {16, 48}) == (WindowSpot{16, 32}));
+    // Held to the screen as the frame's pass holds it.
+    CHECK(placements.Moved(0x2000, profile, {16, 100}, 112, 1000, 0, 130, kScreenRight, kScreenBottom) ==
+          (WindowSpot{16, 100}));
+}
+
+TEST(a_windows_course_is_where_headsup_puts_it_while_it_stands_at_either_end)
+{
+    WindowPlacements placements;
+    const WindowKey level = *KeyFromShortName("level");
+    // Unknown: where it stands, both ways.
+    CHECK(placements.CourseOf(0x1000, level, {16, 208}) == (WindowCourse{{16, 208}, {16, 208}}));
+    // Planned as it was built and not moved yet, then moved: the same course.
+    placements.Moved(0x1000, level, {16, 208}, 112, 88, 0, 16, kScreenRight, kScreenBottom);
+    CHECK(placements.CourseOf(0x1000, level, {16, 208}) == (WindowCourse{{16, 208}, {16, 224}}));
+    CHECK(placements.CourseOf(0x1000, level, {16, 224}) == (WindowCourse{{16, 208}, {16, 224}}));
+    // Put somewhere else since, by the game or the player: where it stands.
+    CHECK(placements.CourseOf(0x1000, level, {16, 300}) == (WindowCourse{{16, 300}, {16, 300}}));
+}
+
+TEST(a_top_the_game_asks_for_where_the_window_stands_is_the_one_it_had)
+{
+    // Profile put at a new top: that is the game's.
+    CHECK(GameMeant({16, 32}, {16, 64}, {16, 48}) == (WindowSpot{16, 32}));
+    // Besieged slid sideways from where it stands, and the Level box put beside the moved Profile: the top is the one
+    // HeadsUp gave it or means to, so the game's is still the origin's.
+    CHECK(GameMeant({1768, 64}, {1792, 64}, {1792, 48}) == (WindowSpot{1768, 48}));
+    CHECK(GameMeant({16, 224}, {16, 224}, {16, 208}) == (WindowSpot{16, 208}));
+}
+
 TEST(an_equipment_figure_still_in_the_windows_old_place_moves_with_it_and_no_other)
 {
     const WindowSpot at{100, 60}, to{100, 190};
@@ -1122,4 +1195,43 @@ TEST(an_owners_place_copy_is_found_in_its_layouts_call_for_the_windows_rectangle
     // lea eax,[esi]; nop; push eax: no displacement, and no copy read off the byte after it.
     const std::vector<uint8_t> noDisplacement{0x8D, 0x06, 0x90, 0x50, 0xE8, 0x3A, 0x07, 0xFD, 0xFF};
     CHECK(!PlaceCopyOffset(noDisplacement, 0x14882D, getRect));
+}
+
+TEST(the_config_getter_is_the_first_place_its_bytes_are)
+{
+    // From the client: mov ecx,[config]; test ecx,ecx; jz; mov eax,[esp+4]; push eax; call get; ret; or eax,-1; ret.
+    constexpr uint32_t kGetter = kTextRva + 0x153850;
+    const auto put = [&](Image& image, uint32_t at) {
+        image.Put(at, {0x8B, 0x0D, 0xA8, 0x3C, 0x57, 0x10, 0x85, 0xC9, 0x74, 0x0C, 0x8B, 0x44, 0x24, 0x04, 0x50, 0xE8, 0x10,
+                          0x20, 0x30, 0x00, 0xC3, 0x83, 0xC8, 0xFF, 0xC3});
+    };
+    Image image;
+    CHECK(LocateConfigGet(image.Text()).problem == LocateProblem::NoConfigGet);
+    put(image, kGetter);
+    // The client has a second getter of the same bytes after it, for another table: Ashita's config addon takes the first.
+    put(image, kGetter + 0x20);
+    const ConfigGetSite found = LocateConfigGet(image.Text());
+    CHECK(found.problem == LocateProblem::None && found.entry == kGetter);
+}
+
+TEST(the_search_servers_address_is_where_the_search_clients_setup_clears_it)
+{
+    // From the client (RVA 0xE1470): xor ebx,ebx; push edi; mov [address],ebx; mov [port],bx; call.
+    constexpr uint32_t kSetup = kTextRva + 0xE1470, kAddress = 0x0396E8BC;
+    const auto put = [](Image& image, uint32_t at, uint32_t address, uint32_t port) {
+        image.Put(at, {0x33, 0xDB, 0x57, 0x89, 0x1D});
+        image.Put32(at + 5, address);
+        image.Put(at + 9, {0x66, 0x89, 0x1D});
+        image.Put32(at + 12, port);
+        image.Put(at + 16, {0xE8});
+    };
+    Image image;
+    CHECK(LocateSearchAddress(image.Text()).problem == LocateProblem::NoSearchAddress);
+    put(image, kSetup, kAddress, kAddress + 4);
+    const SearchAddressSite found = LocateSearchAddress(image.Text());
+    CHECK(found.problem == LocateProblem::None && found.address == kAddress && found.port == kAddress + 4);
+    // Two clears not side by side are some other setup's.
+    Image apart;
+    put(apart, kSetup, kAddress, kAddress + 8);
+    CHECK(LocateSearchAddress(apart.Text()).problem == LocateProblem::NoSearchAddress);
 }

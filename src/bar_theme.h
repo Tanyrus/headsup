@@ -15,9 +15,10 @@ namespace headsup
         Ornate, // a strip with an edge line and glow, diamond caps and dividers, a framed target
         Pills,  // a strip with each widget in a rounded pill
         Glass,  // pills of glass that show only when lit, a line of light under the strip, and glass popups
+        Window, // the game's window art under the strip, the popups and the settings window; pills only when lit
     };
 
-    constexpr int kBarShapeCount = static_cast<int>(BarShape::Glass) + 1;
+    constexpr int kBarShapeCount = static_cast<int>(BarShape::Window) + 1;
     constexpr int kMaxStripBorder = 6; // rows of the strip's line at its foot
 
     // D3DCOLORs (ARGB); 0 is none.
@@ -53,7 +54,7 @@ namespace headsup
         {"PanelBorder", &BarPalette::panelBorder}, {"PanelOuter", &BarPalette::panelOuter}, {"Text", &BarPalette::text},
         {"Heading", &BarPalette::heading}, {"TagFill", &BarPalette::tagFill}, {"TagBorder", &BarPalette::tagBorder},
         {"TagText", &BarPalette::tagText}, {"Highlight", &BarPalette::highlight}};
-    inline constexpr const char* kBarShapeNames[kBarShapeCount] = {"ornate", "pills", "glass"};
+    inline constexpr const char* kBarShapeNames[kBarShapeCount] = {"ornate", "pills", "glass", "window"};
 
     // A saved theme's file, in the themes folder: a [theme] section of its palette's parts by kPaletteColors' names,
     // Shape, Border and Gradient. Read back, a part it lacks or that cannot be read is Phoenix Gold's, and a file of
@@ -86,7 +87,7 @@ namespace headsup
         float heading;      // 0.33 H, following the popup's text size
         float popupPadding; // 0.36 H, following the popup's text size
         float rowGap;       // 0.11 H between popup rows, following the popup's text size
-        float panelRadius;  // ornate 0.11 H, pills 0.28 H, following the popup's text size
+        float panelRadius;  // ornate 0.11 H, pills 0.28 H, following the popup's text size; none for the art's corners
         bool operator==(const BarMetrics&) const = default;
     };
     BarMetrics MetricsFor(int barHeight, BarShape shape, int barText = kAutoBarTextSize,

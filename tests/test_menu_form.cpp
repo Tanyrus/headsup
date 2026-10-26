@@ -228,6 +228,28 @@ TEST(a_build_that_watches_has_a_watch_button_and_the_card_says_where_the_last_re
     CHECK(Has(saved, "debug-20261015-101500.txt") && !Has(saved, "PhoenixXI"));
 }
 
+TEST(logging_is_a_switch_of_the_debug_mode_card_that_names_its_file)
+{
+    Window w;
+    w.state.page       = Page::ConfigMenu;
+    const char* toggle = "configmenu-debug-mode-logging";
+    CHECK(ClassOn(w.Pass(), "configmenu-debug-mode-logging-label-row", kOffClass));
+    w.Pass({{toggle, kClickEvent, ""}});
+    CHECK(!w.settings.logging); // the card is its title alone
+    w.settings.debugMode = true;
+    const Form on        = w.Pass({{toggle, kClickEvent, ""}});
+    CHECK(w.settings.logging && on.changed);
+    const FormBlock* card = Block(on, "configmenu-debug-mode");
+    CHECK(At(card, "configmenu-debug-mode-debug-report") < At(card, toggle));
+    CHECK(At(card, toggle) < At(card, "configmenu-debug-mode-mobs-outlined"));
+    // No file until a note opens one, then its name.
+    CHECK(!Has(card->rml, "headsup-20261022"));
+    const std::string file = "C:\\PhoenixXI\\logs\\headsup\\headsup-20261022-101500.txt";
+    w.readings.logFile     = &file;
+    const std::string named = Block(w.Pass(), "configmenu-debug-mode")->rml;
+    CHECK(Has(named, "headsup-20261022-101500.txt") && !Has(named, "PhoenixXI"));
+}
+
 TEST(a_build_that_exports_its_layout_has_an_export_button_after_the_report_and_the_watch)
 {
     Window w;
@@ -610,7 +632,7 @@ TEST(a_setting_moved_to_another_card_works_there_and_sets_only_its_own_key)
     CHECK_EQ(KeysChanged(before, w.settings).size(), size_t{1});
     // It comes first in its new card, and is gone from its old one.
     const FormBlock* card = Block(form, "configmenu-settings-window");
-    CHECK(At(card, "configmenu-settings-window-pointer-fix") < At(card, "configmenu-settings-window-window-theme"));
+    CHECK(At(card, "configmenu-settings-window-pointer-fix") < At(card, "configmenu-settings-window-font"));
     w.state.page = Page::MouseCursor;
     CHECK(At(Block(w.Pass(), "mousecursor-mouse-pointer"), "mousecursor-mouse-pointer-pointer-fix") == std::string::npos);
 }
@@ -831,6 +853,24 @@ TEST(an_edit_of_a_theme_color_makes_the_theme_custom_which_keeps_it)
     CHECK(w.settings.barTheme == BarTheme::Custom && PaletteFor(w.settings) == edited);
 }
 
+TEST(window_type_shows_while_the_games_art_is_in_use_and_picks_a_type_or_follows_the_game)
+{
+    Window w;
+    w.state.page             = Page::TopPanel;
+    const std::string type   = "toppanel-top-panel-window-type";
+    const auto shown = [&] { return !ClassOn(w.Pass(), (type + "-label-row").c_str(), "off"); };
+    CHECK(!shown());
+    w.Pass({{"toppanel-top-panel-theme", kClickEvent, ""}});
+    w.Pass({{"toppanel-top-panel-theme-o-6", kClickEvent, ""}});
+    CHECK(w.settings.barTheme == BarTheme::GameWindow && shown());
+    w.Pass({{type, kClickEvent, ""}});
+    CHECK(w.Pass({{type + "-o-5", kClickEvent, ""}}).changed);
+    CHECK_EQ(w.settings.windowType, 5);
+    w.Pass({{type, kClickEvent, ""}});
+    w.Pass({{type + "-o-0", kClickEvent, ""}});
+    CHECK_EQ(w.settings.windowType, 0);
+}
+
 TEST(the_theme_colors_card_sets_the_shape_the_border_and_one_color_or_a_gradient)
 {
     Window w;
@@ -892,4 +932,23 @@ TEST(the_nameplate_fonts_lead_with_the_games_font_and_the_top_panels_leave_it_ou
     w.state.page = Page::TopPanel;
     const Form open = w.Pass({{"toppanel-top-panel-title-font", kClickEvent, ""}});
     CHECK(open.popup && Has(open.popup->rml, "Arial") && !Has(open.popup->rml, kGameFontName));
+}
+
+TEST(the_cursor_size_slider_sets_the_pointers_size)
+{
+    Window w;
+    w.state.page = Page::MouseCursor;
+    CHECK(w.Pass({{"mousecursor-mouse-pointer-pointer-size", kChangeEvent, "150"}}).changed);
+    CHECK_EQ(w.settings.pointerSize, 150);
+}
+
+TEST(look_up_players_is_a_switch_beside_auto_check)
+{
+    Window w;
+    w.state.page = Page::Entities;
+    const Form page = w.Pass();
+    const FormBlock* card = Block(page, "entities-nameplates");
+    CHECK(At(card, "entities-nameplates-auto-check") < At(card, "entities-nameplates-look-up-players"));
+    CHECK(w.Pass({{"entities-nameplates-look-up-players", kClickEvent, ""}}).changed);
+    CHECK(w.settings.lookUpPlayers);
 }

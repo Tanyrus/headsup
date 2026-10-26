@@ -3,6 +3,7 @@
 #include "native_locate.h"
 #include "process_memory.h"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -27,6 +28,8 @@ namespace headsup
     // next, +0x10 its window's record, +0x14 a byte set to skip it), in its order: at most out.size() windows and
     // kMaxListLinks links, stopping at anything memory says cannot be read. Returns how many it wrote.
     constexpr size_t kMaxListLinks = 256;
+    // One window as the list's reader reads each: false when its record cannot be read or it has no menu name.
+    bool ReadWindow(const ProcessMemory& memory, uint32_t mcd, OpenWindow& out);
     size_t ReadWindowList(uint32_t list, const ProcessMemory& memory, std::span<OpenWindow> out);
 
     // A view: the windows the game opens together, as it placed them with HeadsUp unloaded. top is the highest of
@@ -82,6 +85,23 @@ namespace headsup
     // A mouse button's message at a point of the menu, in the game's menu pixels, over one of the windows hidden this
     // frame: kept from the game, which would act on a window no one sees. Moves and the wheel pass.
     bool SwallowsClick(uint32_t message, int x, int y, std::span<const WindowRect> hidden);
+    // Whether the game's full map is among the windows open, by short name: it starts at the screen's top, under the
+    // panel, and is too tall to move down.
+    bool MapShown(const std::vector<std::string>& open);
+    // Where a button node holds its place in the window: four int16 edges from the window's corner.
+    constexpr uint32_t kNodePlace = 0x32;
+    // A button of a window: where the game draws it in the menu's pixels, and its place in the window.
+    struct ButtonSpot
+    {
+        uint32_t node = 0;
+        int16_t x = 0, y = 0;
+        std::array<int16_t, 4> place{};
+    };
+    // The buttons in a window's list as the game holds them.
+    std::vector<ButtonSpot> ButtonSpots(uint32_t mcd, const ProcessMemory& memory);
+    // A move of the window lays each button out again at the window's corner plus its place, losing one the window put
+    // elsewhere itself (Unity Information's Active and Inactive): the place that keeps it where it stands, if it needs one.
+    std::optional<std::array<int16_t, 4>> PlaceKept(const ButtonSpot& button, int windowLeft, int windowTop);
     // What places a frame: the player's shift for its view and where the view's windows start, neither for a frame no
     // view holds.
     struct FramePlan

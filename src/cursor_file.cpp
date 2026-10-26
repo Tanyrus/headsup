@@ -184,6 +184,13 @@ namespace headsup
         return frames;
     }
 
+    PointerSize SizedPointer(const CursorImage& image, int percent)
+    {
+        constexpr double kWhole = 100.0;
+        const auto sized = [&](uint32_t side) { return static_cast<uint32_t>(std::lround(side * percent / kWhole)); };
+        return {sized(image.width), sized(image.height)};
+    }
+
     size_t FrameAt(const std::vector<CursorFrame>& frames, double seconds)
     {
         double total = 0.0;

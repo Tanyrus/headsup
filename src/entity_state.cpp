@@ -236,21 +236,21 @@ namespace headsup
         return owners;
     }
 
-    uint8_t SeenLevel(bool autoCheck, uint8_t level, const PlayerStatus* status)
+    uint8_t SeenLevel(bool shown, uint8_t level, const PlayerStatus* status)
     {
-        return autoCheck && status != nullptr && !status->anonymous ? level : 0;
+        return shown && status != nullptr && !status->anonymous ? level : 0;
     }
 
-    std::optional<PlayerJobs> KnownJobs(const PlayerJobs* own, const PlayerJobs* member, const InspectGeneral* checked,
-        uint8_t seenLevel, bool seenHeld)
+    std::optional<PlayerJobs> KnownJobs(const PlayerJobs* own, const PlayerJobs* member, const PlayerJobs* reported,
+        uint8_t seenLevel, bool seenHeld, bool seenSameJob)
     {
         for (const PlayerJobs* jobs : {own, member})
             if (jobs != nullptr && jobs->mainJob != 0) return *jobs;
-        if (checked != nullptr && checked->mainJob != 0)
+        if (reported != nullptr && reported->mainJob != 0)
         {
             // A job changes only in a Mog House, which their next sync packet follows with that job's level.
-            if (seenLevel != 0 && !seenHeld && seenLevel != checked->mainLevel) return PlayerJobs{0, seenLevel, 0, 0};
-            return PlayerJobs{checked->mainJob, seenLevel != 0 ? seenLevel : checked->mainLevel, checked->subJob, checked->subLevel};
+            if (seenLevel != 0 && !seenHeld && !seenSameJob && seenLevel != reported->mainLevel) return PlayerJobs{0, seenLevel, 0, 0};
+            return PlayerJobs{reported->mainJob, seenLevel != 0 ? seenLevel : reported->mainLevel, reported->subJob, reported->subLevel};
         }
         if (seenLevel != 0) return PlayerJobs{0, seenLevel, 0, 0};
         return std::nullopt;

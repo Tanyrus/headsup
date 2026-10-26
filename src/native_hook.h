@@ -156,6 +156,8 @@ namespace headsup
         CodePatch m_Call;
         CodePatch m_LabelCall; // Wide Scan's grid label's ask for the strip title's place, when it was found
         CodePatch m_CountCall; // an item list's count's ask for it, when it was found
+        CodePatch m_MoveStart; // MCD::MoveTo's start, so a window the game moves goes where HeadsUp would put it
+        CodePatch m_BuildCall; // the catalog's window build, so where a new window goes is known before it draws
         std::string m_MoveProblem;
     };
 
@@ -210,6 +212,32 @@ namespace headsup
         std::array<StripWindowReader, 2> m_Readers; // by StripWindow
     };
     // The client's connection counters (LocateNetStats), read on the game's thread.
+    // The search server's address and port as the client keeps them since login (LocateSearchAddress), found once.
+    class SearchAddressReader
+    {
+    public:
+        // "" when found, else why not.
+        std::string Find();
+        // Nothing before Find succeeded or before the client has an address.
+        std::optional<std::pair<uint32_t, uint16_t>> Read() const;
+
+    private:
+        uint32_t m_Address = 0, m_Port = 0;
+    };
+
+    // The Window Type the game is set to, by the client's own config getter, found once.
+    class WindowTypeReader
+    {
+    public:
+        // "" when found, else why not.
+        std::string Find();
+        // 0 to 7; nothing before Find succeeded or when the game answers no type.
+        std::optional<int> Read() const;
+
+    private:
+        int32_t(__cdecl* m_Get)(int32_t) = nullptr;
+    };
+
     // The zone's weather as the client keeps it, found once.
     class WeatherReader
     {

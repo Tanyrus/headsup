@@ -45,6 +45,9 @@ namespace headsup
         int width = 0;
         int height = 0;
         std::vector<uint32_t> argb;
+        // A picture that repeats is laid out at this size, its pixels a power of two stretched to it, as Direct3D 8
+        // repeats only a texture it was not padded into; 0 for one shown at its own size.
+        int shownWidth = 0, shownHeight = 0;
     };
 
     // How far a blur of this CSS radius reaches past what it blurs: the margin it needs.

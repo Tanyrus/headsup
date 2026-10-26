@@ -4,6 +4,7 @@
 #include "menu_document.h"
 #include "menu_form.h"
 #include "settings.h"
+#include "window_skin.h"
 
 #include <RmlUi/Core.h>
 
@@ -26,6 +27,7 @@ namespace headsup
         std::function<bool(uint8_t)> keyDown; // whether a key is down now, by its virtual-key code
         const WindowLayout* layout = &kWindowLayout; // its pages, cards and settings, in order, with their words
         bool developer = false; // a developer's build, whose window can read its layout's file anew and write it out
+        std::optional<GameSkinLook> skin = std::nullopt; // the game's window art of the Window Type in use, once it is read
     };
 
     // The /headsup settings window as an RmlUi document in the host's overlay. While it is open, each frame runs

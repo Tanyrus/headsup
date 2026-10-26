@@ -22,18 +22,22 @@
 #include "mobdata.h"
 #include "nameplate_render.h"
 #include "native_hook.h"
+#include "note_log.h"
 #include "outline.h"
 #include "ph_timers.h"
 #include "player_status.h"
 #include "pointer_keys.h"
 #include "pointer_swap.h"
+#include "player_lookup.h"
 #include "rml_bar.h"
 #include "rml_host.h"
 #include "rml_menu.h"
+#include "search_client.h"
 #include "settings.h"
 #include "shot_watch.h"
 #include "tracker.h"
 #include "window_file.h"
+#include "window_skin.h"
 #include "linuxxi_report.h"
 #include "memory_query.h"
 #ifdef HEADSUP_DEV
@@ -60,6 +64,7 @@
 #include <optional>
 #include <string>
 #include <unordered_set>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -79,6 +84,7 @@ namespace
     constexpr int kQueriesPerFrame           = 128;      // VirtualQuery calls a frame while the Memory widget shows
     constexpr double kLinuxXIStaleSeconds    = 3 * headsup::kLinuxXIReportSeconds; // three reports missed and it is gone
     constexpr const char* kCursorsFolder     = "cursors"; // inside HeadsUp's config folder: the player's cursor files
+    constexpr const char* kNoteLog           = "headsup";  // the log's name in HeadsUp's logs folder, before its time
     constexpr const char* kThemesFolder      = "themes";  // and their saved top panel themes
     constexpr const char* kSettingsFile      = "settings.ini";
     constexpr const char* kNewFileSuffix     = ".new";          // after the process id: the file while it is written
@@ -99,7 +105,7 @@ namespace
     constexpr const char* kPivotModule       = "pivot.dll";
     constexpr const char* kPivotConfig       = "config\\pivot\\pivot.ini";
     constexpr const char* kPivotDats         = "\\DATs";
-    constexpr uint64_t kMaxFontFileBytes     = 64u << 20; // the game's own is 4 MB
+    constexpr uint64_t kMaxDatBytes          = 64u << 20; // 51.DAT is 4 MB, the largest of the game files read
     constexpr uint32_t kPartyIconMembers     = 5;  // the other members of your party, whose buffs the game keeps
     constexpr uint32_t kPartyMembers         = 18; // you, your party and the two other alliance parties
     constexpr uint32_t kEngagedStatus        = 1;  // an entity's status while it fights
@@ -272,6 +278,11 @@ class HeadsUp final : public IPlugin
     bool m_StripConverted = false;
     headsup::StripText m_Strip;
     headsup::WeatherReader m_WeatherReader;
+    headsup::PlayerLookups m_Lookups;             // whom Look Up Players asks the search server about, and when
+    headsup::SearchClient m_Search;
+    headsup::SearchAddressReader m_SearchAddress;
+    bool m_SearchAddressTried = false;            // it scans the client's code, so once
+    uint32_t m_SearchNonce    = 0;
     bool m_WeatherTried = false; // it scans the client's code, so once
     headsup::NetStatsReader m_NetStats;
     bool m_NetStatsTried = false; // it scans the client's code, so once
@@ -287,7 +298,7 @@ class HeadsUp final : public IPlugin
     std::optional<double> m_LinuxXIAt; // when it came
     bool m_HooksTried = false;
     bool m_PointerFailed = false; // said once; tried again when the setting changes or the folder is read again
-    std::pair<headsup::PointerIcon, std::string> m_PointerFor; // the icon and file the pointer was started for
+    std::tuple<headsup::PointerIcon, std::string, int> m_PointerFor; // the icon, file and size the pointer was started for
     headsup::InstalledFonts m_Fonts;
     headsup::PlayerState m_Player;
     headsup::CheckResults m_Checks;
@@ -335,10 +346,11 @@ class HeadsUp final : public IPlugin
 #endif
     bool m_Drawing      = false; // drawing nameplates: our own draws come back through the hooks
     bool m_DrewInScene  = false; // this frame
-    // Said once each: Direct3D could not save the game's render states, so nameplates or the bar were not drawn.
-    bool m_PlatesUnsaved = false;
-    bool m_BarUnsaved    = false;
-    bool m_RestoreWarned = false; // said once that Direct3D did not put the game's states back
+    // What HeadsUp works around: written to a log while Debug Mode's Logging is on, and never to chat.
+    headsup::NoteLog m_Notes;
+    std::FILE* m_NoteFile = nullptr;
+    std::string m_NoteFileName; // the last one opened, for the Debug Mode card
+    bool m_NoteFileRefused = false; // could not be made; tried again when Logging is turned on again
     std::optional<DWORD> m_QuadStates; // the bar's (RecordQuadStates), freed at unload
     bool m_QuadStatesTried = false;
     IDirect3DDevice8* m_Device = nullptr;
@@ -350,6 +362,7 @@ class HeadsUp final : public IPlugin
     std::vector<headsup::WindowPlace> m_PlacedPins;
     std::vector<headsup::WindowPlace> m_WindowPlaces; // for the settings window, while it is open
     std::optional<std::string> m_WindowLog;   // /hu windowlog's file, while it runs
+    std::vector<std::string> m_OpenWindows;   // the game's windows drawn in the last frame, by short name
     std::vector<std::string> m_LastOpen;      // the open windows it wrote last // what the window hook has: the settings' windows and groups
     std::vector<std::string> m_SeenWindows;
     std::vector<std::string> m_CursorFiles;      // the cursors folder's, as the Target Cursor and Cursor Icon lists offer them
@@ -357,6 +370,11 @@ class HeadsUp final : public IPlugin
     std::optional<std::string> m_CursorFileRead; // the File cursor read last, whether or not it was one
     std::string m_GameFontFailure;                // why the game's font could not be read; empty when it was
     std::string m_GamePearlFailure;               // why the game's pearl could not be read; empty when it was
+    headsup::WindowSkins m_WindowSkins;           // the game's window art, by Window Type
+    std::array<std::string, headsup::kWindowTypes> m_SkinFailures; // why a type's art could not be read
+    std::array<bool, headsup::kWindowTypes> m_SkinWarned{};        // whether that was said
+    headsup::WindowTypeReader m_WindowTypeReader;
+    std::optional<headsup::GameSkinLook> m_SkinLook; // the art drawn now, while the panel or the window uses it
     std::optional<headsup::ColorPicture> m_GamePearl;
     std::optional<int> m_PearlOutlineDrawn;       // the outline the pearl was last drawn with
     bool m_GameFontWarned = false;
@@ -458,6 +476,7 @@ public:
         if (const std::string failure = m_PointerFix.Stop(); !failure.empty()) Print(failure + ".");
         m_Pointer.Stop();
         m_Fonts.Wait();
+        m_Search.Stop();
         m_Nameplates.Release();
         UnhookPresent();
         UnhookReset();
@@ -472,6 +491,7 @@ public:
         if (m_QuadStates) m_Device->DeleteStateBlock(*m_QuadStates);
         g_BarClicks = nullptr;
         g_BarOn     = false;
+        CloseNotes();
         // Ashita would keep the settings' values loaded after this, for the next load to find even with the file gone.
         m_AshitaCore->GetConfigurationManager()->Delete(kConfigAlias);
     }
@@ -661,6 +681,7 @@ public:
         {
             m_Names.ForgetCamera();
             m_AutoCheck.Clear();
+            m_Lookups.Zoned();
         }
         if (next.check) OnCheckReply(*next.check);
         if (next.mobDied && m_Settings.phTimers)
@@ -733,7 +754,8 @@ public:
         const uint8_t loginStatus = m_AshitaCore->GetMemoryManager()->GetPlayer()->GetLoginStatus();
         // A popup left open at logout would come back with the next character.
         if (loginStatus != headsup::kLoginInGame) m_BarInput.Reset();
-        m_UiHidden = m_Screenshot || m_Player.inEvent;
+        const bool mapShown = headsup::MapShown(m_OpenWindows);
+        m_UiHidden          = m_Screenshot || m_Player.inEvent || mapShown;
         StartRml();
         g_BarOn     = headsup::BarRuns(m_Settings, loginStatus) && m_Rml.Running();
         g_BarHidden = m_UiHidden;
@@ -780,18 +802,21 @@ public:
                 m_BarInput.Leave();
         }
         // Off, the bar is given nothing to show, and releases what it made.
+        UpdateSkin();
         if (m_Rml.Running())
-            m_RmlBar.Update(m_Rml, g_BarOn ? BarStateNow(now) : headsup::BarState{}, m_Settings, m_Names.BackBufferWidth(),
-                m_Names.BackBufferHeight(), m_BarInput, m_UiHidden);
+            m_RmlBar.Update(m_Rml, g_BarOn ? BarStateNow(now) : headsup::BarState{}, m_Settings, SkinNow(),
+                m_Names.BackBufferWidth(), m_Names.BackBufferHeight(), m_BarInput, m_UiHidden);
         // Over ImGui from Present; with the bar, under ImGui, when Present is not hooked.
         if (g_PresentSlot != nullptr)
             g_AfterGui = [] { if (g_Plugin != nullptr) g_Plugin->DrawOverGui(); };
         m_BarDrawn = false;
+        if (!Logging()) CloseNotes();
         m_ArrowHook.Hide(m_Settings.enabled && m_Settings.cursorStyle != headsup::CursorStyle::Vanilla);
         LoadCursorFile();
         LightGamePearl();
-        // The game's help bar is the only help left while an event hides HeadsUp's bar; a screenshot wants neither.
-        const bool helpGone = m_Settings.hideHelpBar && (m_Screenshot || !m_Player.inEvent);
+        // The game's help bar is the only help left while an event or the map hides HeadsUp's bar; a screenshot wants
+        // neither.
+        const bool helpGone = m_Settings.hideHelpBar && (m_Screenshot || !(m_Player.inEvent || mapShown));
         const headsup::HiddenWindows hidden{.helpBar = m_Settings.enabled && helpGone,
             .netstat = m_Settings.enabled && m_Settings.hideNetstat};
         const std::optional<headsup::HelpBand> band = HelpBandNow();
@@ -799,12 +824,13 @@ public:
         const bool movesWindows = (band && band->bottom != 0 && m_Settings.shiftVanillaUi) ||
                                   !m_Settings.pinnedWindows.empty() || m_Settings.moveGameHelp ||
                                   !m_Settings.hiddenWindows.empty();
-        if ((hidden.Any() || movesWindows) && !std::exchange(m_WindowHookTried, true))
+        // The panel also needs the hook to know when the game's map covers it.
+        if ((hidden.Any() || movesWindows || g_BarOn) && !std::exchange(m_WindowHookTried, true))
         {
             if (const std::string failure = m_WindowHook.Start(); !failure.empty())
                 Print("could not hide or move the game's windows: " + failure + ".");
             if (const std::string failure = m_WindowHook.TakeMoveProblem(); !failure.empty())
-                Print("the game's windows stay under the help bar: " + failure + ".");
+                Note("the game's windows stay under the help bar: " + failure + ".");
         }
         m_Shot.EndFrame();
         m_SceneCopied      = false;
@@ -833,7 +859,8 @@ public:
             m_WindowHook.Pin(m_PlacedPins);
         }
         if (m_WindowHook.SeenCount() != m_SeenWindows.size()) m_SeenWindows = m_WindowHook.SeenWindows();
-        if (std::vector<std::string> open = m_WindowHook.TakeOpen(); m_WindowLog && open != m_LastOpen)
+        m_OpenWindows = m_WindowHook.TakeOpen();
+        if (const std::vector<std::string>& open = m_OpenWindows; m_WindowLog && open != m_LastOpen)
         {
             if (FILE* log = std::fopen(m_WindowLog->c_str(), "a"))
             {
@@ -843,7 +870,7 @@ public:
                 std::fputc('\n', log);
                 std::fclose(log);
             }
-            m_LastOpen = std::move(open);
+            m_LastOpen = open;
         }
         m_PointerFix.Enable(m_Settings.enabled && m_Settings.fixPointer);
         m_PointerFix.KeepPointerFor(m_Settings.enabled ? m_Settings.keepPointerKeys : std::vector<uint8_t>{});
@@ -880,6 +907,7 @@ public:
                 .watching         = std::nullopt,
 #endif
                 .lastReport       = &m_LastReport,
+                .logFile          = &m_NoteFileName,
 #ifdef HEADSUP_DEV
                 .exportable       = true,
 #endif
@@ -1080,8 +1108,7 @@ private:
         m_Drawing = false;
         restore(texture);
         if (const std::string lost = headsup::StatesNotRestored(before, headsup::ReadCopyState(m_Device)); !lost.empty())
-            if (!std::exchange(m_RestoreWarned, true))
-                Print("Direct3D did not put back the game's " + lost + " after HeadsUp drew; HeadsUp puts them back itself.");
+            Note("Direct3D did not put back the game's " + lost + " after HeadsUp drew; HeadsUp puts them back itself.");
         headsup::RestoreCopyState(m_Device, before, texture);
         if (texture != nullptr) texture->Release();
     }
@@ -1128,13 +1155,9 @@ private:
         return true;
     }
 
-    void NotDrawn(const char* what, bool& said)
-    {
-        if (!std::exchange(said, true))
-            Print(std::string(what) + " not drawn: Direct3D could not save the game's render states.");
-    }
-    void PlatesNotDrawn() { NotDrawn("nameplates are", m_PlatesUnsaved); }
-    void BarNotDrawn() { NotDrawn("the top panel is", m_BarUnsaved); }
+    void NotDrawn(const char* what) { Note(std::string(what) + " not drawn: Direct3D could not save the game's render states."); }
+    void PlatesNotDrawn() { NotDrawn("nameplates are"); }
+    void BarNotDrawn() { NotDrawn("the top panel is"); }
 
     // Ashita's screenshot plugin, asked to hide, takes its fonts away for the frame it captures (shot_watch.h): that
     // frame is drawn as screenshot mode draws. HeadsUp's own hiding of the fonts is not a screenshot.
@@ -1260,16 +1283,17 @@ private:
         if (const std::string failure = m_ArrowHook.Start(); !failure.empty())
             Print("could not hook the game's target arrows, so it draws its own and HeadsUp none: " + failure + ".");
         if (const std::string failure = m_PointerFix.Start(); !failure.empty())
-            Print("could not fix the game's mouse pointer: " + failure + ".");
+            Note("could not fix the game's mouse pointer: " + failure + ".");
         ReadGameFont();
         SayGameFontFailure();
+        ReadWindowSkins();
         if (!m_GamePearlFailure.empty())
-            Print("the game's linkpearl could not be read (" + m_GamePearlFailure + "): the linkshell's is drawn as XIUI's.");
+            Note("the game's linkpearl could not be read (" + m_GamePearlFailure + "): the linkshell's is drawn as XIUI's.");
     }
 
-    // The font the game writes its names in and the pearl it draws before them, from the file it reads them from:
-    // while XIPivot is loaded, the first of its overlays that holds the file.
-    void ReadGameFont()
+    // A file of the game's install where the game reads it: while XIPivot is loaded, the first of its overlays that
+    // holds the file. Its bytes, or why there are none (failure, which names the file once one was found).
+    std::optional<std::vector<uint8_t>> GameFileBytes(std::string_view file, std::string& failure)
     {
         std::string pivotIni;
         const std::string pivotFolder = headsup::ModuleFolder(kPivotModule);
@@ -1279,42 +1303,87 @@ private:
             pivotIni.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
         }
         const std::string gameFolder = headsup::ModuleFolder(headsup::kGameModule);
-        for (const std::string& path : headsup::GameFontCandidates(pivotIni, pivotFolder + kPivotDats, gameFolder))
+        for (const std::string& path : headsup::GameFileCandidates(pivotIni, pivotFolder + kPivotDats, gameFolder, file))
         {
             std::ifstream in(path, std::ios::binary | std::ios::ate);
             const std::streamoff size = in.tellg();
             if (!in || size <= 0) continue;
-            m_GameFontFailure = path + ": ";
-            if (static_cast<uint64_t>(size) > kMaxFontFileBytes)
+            failure = path + ": ";
+            if (static_cast<uint64_t>(size) > kMaxDatBytes)
             {
-                m_GameFontFailure += "it is too large";
-                m_GamePearlFailure = m_GameFontFailure;
-                return;
+                failure += "it is too large";
+                return std::nullopt;
             }
             std::vector<uint8_t> bytes(static_cast<size_t>(size));
             in.seekg(0);
             if (!in.read(reinterpret_cast<char*>(bytes.data()), size))
             {
-                m_GameFontFailure += "it could not be read";
-                m_GamePearlFailure = m_GameFontFailure;
-                return;
+                failure += "it could not be read";
+                return std::nullopt;
             }
-            headsup::Read<headsup::ColorPicture> pearl = headsup::ReadGamePearl(bytes);
-            if (pearl.value) m_GamePearl = std::move(pearl.value);
-            else m_GamePearlFailure = path + ": " + pearl.failure;
-            headsup::Read<headsup::GameFontFace> font = headsup::ReadGameFont(bytes);
-            if (!font.value)
-            {
-                m_GameFontFailure += font.failure;
-                return;
-            }
-            m_GameFontFailure.clear();
-            m_Nameplates.SetGameFont(std::move(font.value));
+            return bytes;
+        }
+        failure = "the game's " + std::string(file) + " was not found under " + gameFolder;
+        return std::nullopt;
+    }
+
+    // The font the game writes its names in and the pearl it draws before them.
+    void ReadGameFont()
+    {
+        std::string where;
+        const std::optional<std::vector<uint8_t>> bytes = GameFileBytes(headsup::kGameFontFile, where);
+        if (!bytes)
+        {
+            m_GameFontFailure  = where;
+            m_GamePearlFailure = where;
             return;
         }
-        m_GameFontFailure  = "the game's ROM\\119\\51.DAT was not found under " + gameFolder;
-        m_GamePearlFailure = m_GameFontFailure;
+        headsup::Read<headsup::ColorPicture> pearl = headsup::ReadGamePearl(*bytes);
+        if (pearl.value) m_GamePearl = std::move(pearl.value);
+        else m_GamePearlFailure = where + pearl.failure;
+        headsup::Read<headsup::GameFontFace> font = headsup::ReadGameFont(*bytes);
+        if (!font.value)
+        {
+            m_GameFontFailure = where + font.failure;
+            return;
+        }
+        m_GameFontFailure.clear();
+        m_Nameplates.SetGameFont(std::move(font.value));
     }
+
+    // The game's eight window skins, and where it keeps the Window Type it is set to.
+    void ReadWindowSkins()
+    {
+        for (int type = 0; type < headsup::kWindowTypes; ++type)
+        {
+            std::string where;
+            const std::optional<std::vector<uint8_t>> bytes = GameFileBytes(headsup::WindowSkinFile(type), where);
+            headsup::Read<headsup::WindowSkin> skin =
+                bytes ? headsup::ReadWindowSkin(*bytes) : headsup::Read<headsup::WindowSkin>{std::nullopt, ""};
+            if (skin.value) m_WindowSkins[static_cast<size_t>(type)] = std::move(skin.value);
+            else m_SkinFailures[static_cast<size_t>(type)] = where + skin.failure;
+        }
+        if (const std::string failure = m_WindowTypeReader.Find(); !failure.empty())
+            Note("Game Window's Follow Game draws Type 1, as the game's Window Type cannot be read: " + failure + ".");
+    }
+
+    // The game's art the panel and the window are drawn in while they use it: the Window Type's, the game's own read
+    // every frame (one call into its config), at the menu's scale on the back buffer.
+    void UpdateSkin()
+    {
+        if (!headsup::UsesGameArt(m_Settings)) return;
+        const int type    = headsup::SkinTypeOf(m_Settings.windowType, m_WindowTypeReader.Read());
+        const float scale = m_MenuHeight > 0.0f ? m_Names.BackBufferHeight() / m_MenuHeight : 1.0f;
+        if (m_SkinLook && type == m_SkinLook->frame.type && scale == m_SkinLook->frame.scale) return;
+        const std::optional<headsup::WindowSkin>& skin = m_WindowSkins[static_cast<size_t>(type)];
+        m_SkinLook.reset();
+        if (skin) m_SkinLook = headsup::SkinLookOf(*skin, type, scale);
+        else if (!std::exchange(m_SkinWarned[static_cast<size_t>(type)], true))
+            Print("the game's window art for Type " + std::to_string(type + 1) + " could not be read (" +
+                  m_SkinFailures[static_cast<size_t>(type)] + "): Game Window looks as Phoenix Gold until HeadsUp reloads.");
+    }
+
+    const headsup::GameSkinLook* SkinNow() const { return m_SkinLook ? &*m_SkinLook : nullptr; }
 
     // The linkshell's pearl in the game's light and colors, drawn again when the settings ask for another outline.
     void LightGamePearl()
@@ -1329,7 +1398,7 @@ private:
     void SayGameFontFailure()
     {
         if (m_GameFontFailure.empty() || !headsup::UsesGameFont(m_Settings) || std::exchange(m_GameFontWarned, true)) return;
-        Print("the game's font could not be read (" + m_GameFontFailure + "): nameplates set in it are drawn in " +
+        Note("the game's font could not be read (" + m_GameFontFailure + "): nameplates set in it are drawn in " +
               headsup::kDefaultFont + " until HeadsUp is reloaded.");
     }
 
@@ -1378,6 +1447,41 @@ private:
         m_AshitaCore->GetChatManager()->Write(kChatMode, false, line.c_str());
     }
 
+    bool Logging() const { return m_Settings.debugMode && m_Settings.logging; }
+
+    // What HeadsUp works around and carries on from: to the log while Logging is on, else nowhere.
+    void Note(const std::string& message)
+    {
+        if (!Logging() || m_NoteFileRefused) return;
+        if (m_NoteFile == nullptr && (m_NoteFile = OpenLog(kNoteLog, m_NoteFileName)) == nullptr)
+        {
+            m_NoteFileRefused = true;
+            return;
+        }
+        char stamp[16];
+        const std::time_t now = std::time(nullptr);
+        std::strftime(stamp, sizeof(stamp), "%H:%M:%S", std::localtime(&now));
+        if (const std::optional<std::string> line = m_Notes.Line(message, stamp))
+        {
+            std::fprintf(m_NoteFile, "%s\n", line->c_str());
+            std::fflush(m_NoteFile);
+        }
+    }
+
+    // Ends the log with how often each note came again, once Logging is off or HeadsUp unloads.
+    void CloseNotes()
+    {
+        if (m_NoteFile != nullptr)
+        {
+            for (const std::string& repeat : m_Notes.Repeats())
+                std::fprintf(m_NoteFile, "%s\n", repeat.c_str());
+            std::fclose(m_NoteFile);
+            m_NoteFile = nullptr;
+        }
+        m_Notes           = {};
+        m_NoteFileRefused = false;
+    }
+
     // It scans the client's image, so once; the bar's widget and the dev dump share it.
     void FindStripText()
     {
@@ -1389,7 +1493,7 @@ private:
     {
         if (!std::exchange(m_WeatherTried, true))
             if (const std::string failure = m_WeatherReader.Find(); !failure.empty())
-                Print("the weather widget goes by the last weather change: " + failure + ".");
+                Note("the weather widget goes by the last weather change: " + failure + ".");
         if (m_Zone != 0)
             if (const std::optional<headsup::Weather> weather = m_WeatherReader.Read()) return weather;
         return m_GameState.ZoneWeather();
@@ -1399,7 +1503,7 @@ private:
     {
         if (!std::exchange(m_NetStatsTried, true))
             if (const std::string failure = m_NetStats.Find(); !failure.empty())
-                Print("the connection widget shows no S and R: " + failure + ".");
+                Note("the connection widget shows no S and R: " + failure + ".");
         return m_NetStats.Read();
     }
 
@@ -1449,7 +1553,7 @@ private:
         g_RealPresent = reinterpret_cast<PresentFn>(*slot);
         if (!WriteSlot(slot, reinterpret_cast<void*>(&HookedPresent)))
         {
-            Print("the top panel's popups draw under other addons' windows: Present could not be hooked.");
+            Note("the top panel's popups draw under other addons' windows: Present could not be hooked.");
             return;
         }
         g_PresentSlot = slot;
@@ -1464,7 +1568,7 @@ private:
         if (!WriteSlot(slot, reinterpret_cast<void*>(&HookedReset)))
         {
             m_Rml.RefuseLayers();
-            Print("the settings window is drawn opaque: Reset could not be hooked.");
+            Note("the settings window is drawn opaque: Reset could not be hooked.");
             return;
         }
         g_ResetSlot   = slot;
@@ -1504,6 +1608,7 @@ private:
     headsup::MenuHost MenuHostNow()
     {
         headsup::MenuHost host{m_Rml.Overlay(), headsup::kBarlowCondensed, {}, KeyDown};
+        host.skin = m_SkinLook;
         const headsup::MenuFont* font = headsup::MenuFontNamed(m_Settings.menuFont);
         if (font != nullptr && (font->file == nullptr ? m_Rml.EnsureFont(font->name)
                                                       : m_Rml.EnsureFontFile(font->name, headsup::WindowsFontPath(font->file))))
@@ -1670,13 +1775,16 @@ private:
         if (m_Rml.Running())
         {
             m_Rml.Resize(width, height);
-            if (const std::string failure = m_Rml.TakeFailure(); !failure.empty()) Print("RmlUi: " + failure + ".");
+            if (const std::string failure = m_Rml.TakeFailure(); !failure.empty()) Note("RmlUi: " + failure + ".");
             return;
         }
         if (std::exchange(m_RmlTried, true)) return;
         const bool started = m_Rml.Start(m_Device, width, height,
-            [this](const std::string& line) { Print("RmlUi: " + line); },
-            [](const std::string& name) { return headsup::HostImage(name); });
+            [this](const std::string& line) { Note("RmlUi: " + line); },
+            [this](const std::string& name) {
+                if (std::optional<headsup::Image> piece = headsup::SkinImage(m_WindowSkins, name)) return piece;
+                return headsup::HostImage(name);
+            });
         if (!started) Print("RmlUi did not start: the top panel and the settings window are off until HeadsUp reloads.");
     }
 
@@ -1772,7 +1880,7 @@ private:
         if (!wanted || m_CursorFileRead == m_Settings.cursorFile) return;
         m_CursorFileRead = m_Settings.cursorFile;
         std::optional<headsup::Image> picture = headsup::CursorFilePicture(CursorFileFrames(m_Settings.cursorFile));
-        if (!picture) Print("could not read the cursor " + m_Settings.cursorFile + " in " + CursorsFolder() + "; the feather stands in for it");
+        if (!picture) Note("could not read the cursor " + m_Settings.cursorFile + " in " + CursorsFolder() + "; the feather stands in for it");
         m_Nameplates.SetCursorFile(std::move(picture));
     }
 
@@ -1918,8 +2026,8 @@ private:
 
     void UpdatePointer()
     {
-        const bool wanted = m_Settings.enabled && m_Settings.pointerIcon != headsup::PointerIcon::Vanilla;
-        const std::pair<headsup::PointerIcon, std::string> pick{m_Settings.pointerIcon, m_Settings.pointerFile};
+        const bool wanted = headsup::PointerSwapped(m_Settings);
+        const std::tuple<headsup::PointerIcon, std::string, int> pick{m_Settings.pointerIcon, m_Settings.pointerFile, m_Settings.pointerSize};
         if (!wanted || pick != m_PointerFor)
         {
             m_PointerFailed = false;
@@ -1929,12 +2037,19 @@ private:
         if (!wanted) return;
         if (!m_Pointer.Running() && !m_PointerFailed)
         {
-            const bool chocobo        = m_Settings.pointerIcon == headsup::PointerIcon::Chocobo;
-            const std::string failure = m_Pointer.Start(chocobo ? headsup::ChocoboPointer() : CursorFileFrames(m_Settings.pointerFile));
-            m_PointerFailed           = !failure.empty();
+            const headsup::PointerIcon icon = m_Settings.pointerIcon;
+            const std::string failure = m_Pointer.Start(
+                icon == headsup::PointerIcon::Vanilla ? std::nullopt
+                : icon == headsup::PointerIcon::Chocobo ? std::optional(headsup::ChocoboPointer())
+                                                        : std::optional(CursorFileFrames(m_Settings.pointerFile)),
+                m_Settings.pointerSize);
+            m_PointerFailed = !failure.empty();
             if (m_PointerFailed)
-                Print("the mouse pointer is the game's, as " + (chocobo ? std::string("the chocobo") : m_Settings.pointerFile + " in " + CursorsFolder()) +
-                      " could not be shown: " + failure + ".");
+                Note("the mouse pointer is the game's, as " +
+                     (icon == headsup::PointerIcon::Vanilla   ? std::string("its own at another size")
+                      : icon == headsup::PointerIcon::Chocobo ? std::string("the chocobo")
+                                                              : m_Settings.pointerFile + " in " + CursorsFolder()) +
+                     " could not be shown: " + failure + ".");
         }
         m_Pointer.Animate();
     }
@@ -2196,14 +2311,55 @@ private:
         return names;
     }
 
+    // Look Up Players: the players in view, their looks changing, the last answer taken and the next request sent.
+    void UpdateLookups(const std::vector<headsup::ActorInput>& inputs, double now)
+    {
+        const std::vector<uint16_t> changed = m_GameState.TakeLookChanges();
+        if (!m_Settings.lookUpPlayers) return;
+        if (!std::exchange(m_SearchAddressTried, true))
+            if (const std::string failure = m_SearchAddress.Find(); !failure.empty())
+                Note("Look Up Players asks no one: " + failure + ".");
+        std::vector<headsup::InView> inView;
+        std::unordered_map<uint32_t, uint16_t> indexOf;
+        for (const headsup::ActorInput& a : inputs)
+            if (a.kind == headsup::EntityKind::Player && !a.self && a.serverId != 0)
+            {
+                inView.push_back(headsup::InView{a.serverId, a.distance});
+                indexOf[a.serverId] = a.index;
+            }
+        m_Lookups.Frame(inView, now);
+        for (const uint16_t index : changed)
+            for (const headsup::ActorInput& a : inputs)
+                if (a.index == index) m_Lookups.LookChanged(a.serverId);
+        if (std::optional<headsup::SearchClient::Result> result = m_Search.Take())
+        {
+            if (!result->failure.empty())
+            {
+                m_Lookups.Failed(now);
+                Note("Look Up Players: " + result->failure + ".");
+            }
+            else
+                for (const headsup::LookupAnswer& answer : m_Lookups.Answered(result->players))
+                {
+                    const auto index = indexOf.find(answer.id);
+                    m_GameState.LookedUp(answer.id, index != indexOf.end() ? index->second : 0, answer.player);
+                }
+        }
+        if (const auto address = m_SearchAddress.Read())
+            if (const std::optional<std::vector<uint32_t>> ids = m_Lookups.NextRequest(now))
+                m_Search.Ask(headsup::SearchEndpoint{address->first, address->second}, *ids,
+                    static_cast<uint32_t>(GetTickCount()) ^ ++m_SearchNonce);
+    }
+
     std::optional<headsup::PlayerJobs> JobsOf(uint16_t index, uint32_t serverId) const
     {
-        const auto member                 = m_PartyJobs.find(serverId);
-        const headsup::PlayerCheck* check = m_GameState.PlayerCheckOf(serverId);
-        const headsup::PlayerSync sync    = m_GameState.SyncOf(index);
+        const auto member                                 = m_PartyJobs.find(serverId);
+        const std::optional<headsup::PlayerJobs> reported = m_GameState.ReportedJobs(serverId);
+        const headsup::PlayerSync sync                    = m_GameState.SyncOf(index);
         return headsup::KnownJobs(index == m_SelfIndex ? &m_OwnJobs : nullptr,
-            member != m_PartyJobs.end() ? &member->second : nullptr, check != nullptr ? &check->general : nullptr,
-            headsup::SeenLevel(m_Settings.autoCheck, sync.level, m_GameState.PlayerStatusOf(index, m_SelfIndex)), sync.held);
+            member != m_PartyJobs.end() ? &member->second : nullptr, reported ? &*reported : nullptr,
+            headsup::SeenLevel(m_Settings.autoCheck || m_Settings.lookUpPlayers, sync.level, m_GameState.PlayerStatusOf(index, m_SelfIndex)), sync.held,
+            sync.sameJob);
     }
 
     // Your own title is the client's; another player's comes with a check of them.
@@ -2319,6 +2475,7 @@ private:
         m_Player.inEvent = headsup::IsEventStatus(entity->GetStatusServer(m_SelfIndex));
         m_Player.inCombat = headsup::PlayerInCombat(inputs);
         m_Tracker.Update(inputs, m_Player, m_Settings, m_CursorTargets);
+        UpdateLookups(inputs, now);
         if (headsup::MayAutoCheck(autoChecks, player->GetIsZoning() != 0, m_Player.inEvent, m_Player.level))
             if (const std::optional<headsup::CheckCandidate> mob = m_AutoCheck.Due(checkable, now))
             {

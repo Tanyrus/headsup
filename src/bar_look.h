@@ -6,6 +6,8 @@
 #include "plate_image.h"
 #include "popup_layout.h"
 #include "settings.h"
+#include "skin_frame.h"
+#include "window_skin.h"
 
 #include <cstdint>
 #include <optional>
@@ -31,6 +33,7 @@ namespace headsup
         const char* titleFont;
         bool ornate;
         const char* detailFont = kDetailFont; // details, figures and popup text
+        std::optional<SkinFrame> skin;        // the game's art the strip and the popups are drawn in, for the Window shape
 
         // A span's color on the bar, and in a popup.
         uint32_t BarColor(const Span& span) const;
@@ -48,8 +51,21 @@ namespace headsup
         std::optional<BoxStyle> BoxOf(BarWidget widget, bool lit) const;
     };
 
-    // The palette the bar is drawn with: the picked theme's, or the player's own for Custom.
-    const BarPalette& PaletteFor(const Settings& settings);
+    // Whether the game's window art is drawn: its theme, or a Custom theme of its shape.
+    bool UsesGameArt(const Settings& settings);
+    // The settings window in the top panel's theme: Aurora's glass for Aurora, the game's art once it is read for the
+    // Window shape, and the Phoenix window else; its colors phoenix-xi.com's for the Phoenix Red themes, Aurora's and
+    // the art's for theirs, and the panel's own for the rest (MenuColorsFrom).
+    MenuTheme MenuThemeFor(const Settings& settings, const GameSkinLook* skin);
+    MenuColors MenuColorsFor(const Settings& settings, const GameSkinLook* skin);
+    // A window in a panel's colors: its page the panel's foot, cards and controls each a step toward its text.
+    MenuColors MenuColorsFrom(const BarPalette& palette);
+
+    // What Game Window looks as while the game's art is not read.
+    constexpr BarTheme kGameArtFallback = BarTheme::PhoenixGold;
+    // The palette the bar is drawn with: the picked theme's, the player's own for Custom, or the skin's for Game
+    // Window (kGameArtFallback's while none is read).
+    const BarPalette& PaletteFor(const Settings& settings, const GameSkinLook* skin = nullptr);
 
     // The bar's fonts: the player's, or the theme's when they set none. Each name lasts as long as the process, for the
     // caches that keep it by reference.

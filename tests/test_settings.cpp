@@ -1082,7 +1082,7 @@ TEST(each_theme_and_bar_widget_has_its_own_key)
     for (const Named& t : {Named{"phoenixGold", BarTheme::PhoenixGold}, Named{"umbraDark", BarTheme::UmbraDark},
              Named{"phoenixRedOrnate", BarTheme::PhoenixRedOrnate},
              Named{"phoenixRedPills", BarTheme::PhoenixRedPills}, Named{"aurora", BarTheme::Aurora},
-             Named{"custom", BarTheme::Custom}})
+             Named{"custom", BarTheme::Custom}, Named{"gameWindow", BarTheme::GameWindow}})
     {
         MapStore store;
         store.values["barTheme"] = t.name;
@@ -1216,27 +1216,44 @@ TEST(text_sizes_start_at_auto_and_clamp_to_their_range)
 TEST(the_settings_window_keeps_its_theme_and_its_place)
 {
     MapStore store;
-    store.values["menuTheme"]  = "aurora";
+    store.values["menuTheme"]  = "aurora"; // the window's own theme of before it took the top panel's: never read again
     store.values["menuX"]      = "120";
     store.values["menuY"]      = "80";
     store.values["menuWidth"]  = "900";
     store.values["menuHeight"] = "700";
     const Settings s           = LoadSettings(store);
-    CHECK(s.menuTheme == MenuTheme::Aurora && s.menuX == 120 && s.menuY == 80 && s.menuWidth == 900 && s.menuHeight == 700);
+    CHECK(s.menuX == 120 && s.menuY == 80 && s.menuWidth == 900 && s.menuHeight == 700);
     MapStore saved;
     SaveSettings(s, saved);
-    CHECK(saved.values["menuTheme"] == "aurora" && saved.values["menuWidth"] == "900.0000" &&
+    CHECK(!saved.values.contains("menuTheme") && saved.values["menuWidth"] == "900.0000" &&
           saved.values["menuY"] == "80.0000");
-    // A theme the list lacks keeps the default, and a size of nonsense is no place at all.
-    store.values["menuTheme"]  = "neon";
+    // A size of nonsense is no place at all.
     store.values["menuWidth"]  = "-5";
     store.values["menuHeight"] = "1e9";
     const Settings odd         = LoadSettings(store);
-    CHECK(odd.menuTheme == MenuTheme::Phoenix && odd.menuWidth == 0 && odd.menuHeight == kMaxMenuSide);
+    CHECK(odd.menuWidth == 0 && odd.menuHeight == kMaxMenuSide);
     // A new file has neither: the window opens in the screen's middle, in the Phoenix look.
     MapStore empty;
     const Settings fresh = LoadSettings(empty);
-    CHECK(fresh.menuTheme == MenuTheme::Phoenix && fresh.menuWidth == 0 && fresh.menuHeight == 0);
+    CHECK(fresh.menuWidth == 0 && fresh.menuHeight == 0);
+}
+
+TEST(the_window_type_is_kept)
+{
+    MapStore store;
+    store.values["windowType"] = "5";
+    const Settings s           = LoadSettings(store);
+    CHECK(s.windowType == 5);
+    MapStore saved;
+    SaveSettings(s, saved);
+    CHECK(saved.values["windowType"] == "5.0000");
+    // Past Type 8 is Type 8, below Follow Game is Follow Game, as is a new file.
+    store.values["windowType"] = "9";
+    CHECK_EQ(LoadSettings(store).windowType, kWindowTypes);
+    store.values["windowType"] = "-1";
+    CHECK_EQ(LoadSettings(store).windowType, 0);
+    MapStore empty;
+    CHECK_EQ(LoadSettings(empty).windowType, 0);
 }
 
 TEST(a_menu_font_the_list_lacks_or_a_size_past_its_ends_keeps_the_defaults)
@@ -2652,4 +2669,41 @@ TEST(the_nameplate_fonts_are_the_games_two_then_the_font_list_which_never_holds_
     const std::vector<std::string> expected{kGameFontName, kGameFontNarrowName, "Montserrat SemiBold", "Marcellus SC", "Cinzel",
         "Cormorant SC", "Barlow Condensed", "Arial"};
     CHECK(choices == expected);
+}
+
+TEST(the_pointer_size_is_held_to_its_range_in_five_percent_steps)
+{
+    Settings s;
+    s.pointerSize = 999;
+    CHECK_EQ(Clamp(s).pointerSize, kMaxPointerSize);
+    s.pointerSize = 0;
+    CHECK_EQ(Clamp(s).pointerSize, kMinPointerSize);
+    s.pointerSize = 123;
+    CHECK_EQ(Clamp(s).pointerSize, 125);
+}
+
+TEST(the_game_pointer_is_swapped_for_another_icon_or_another_size)
+{
+    Settings s;
+    CHECK(!PointerSwapped(s)); // the vanilla pointer at its own size
+    s.pointerSize = 150;
+    CHECK(PointerSwapped(s));
+    s.pointerSize = 100;
+    s.pointerIcon = PointerIcon::Chocobo;
+    CHECK(PointerSwapped(s));
+    s.enabled = false;
+    CHECK(!PointerSwapped(s));
+}
+
+TEST(looking_up_players_is_off_until_switched_on_and_kept)
+{
+    MapStore empty;
+    CHECK(!LoadSettings(empty).lookUpPlayers);
+    MapStore store;
+    store.values["lookUpPlayers"] = "true";
+    const Settings s = LoadSettings(store);
+    CHECK(s.lookUpPlayers);
+    MapStore saved;
+    SaveSettings(s, saved);
+    CHECK(saved.values["lookUpPlayers"] == "true");
 }

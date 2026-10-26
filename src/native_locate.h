@@ -60,6 +60,8 @@ namespace headsup
         NetStatsChanged,
         NoWindowMove,
         AmbiguousWindowMove,
+        NoWindowBuild,
+        AmbiguousWindowBuild,
         NoScanLabel,
         AmbiguousScanLabel,
         ScanLabelChanged,
@@ -68,6 +70,8 @@ namespace headsup
         StripCountChanged,
         NoWeather,
         AmbiguousWeather,
+        NoConfigGet,
+        NoSearchAddress,
     };
     const char* Describe(LocateProblem problem);
 
@@ -159,6 +163,14 @@ namespace headsup
         uint32_t getRect = 0; // RVA of MCD::GetRect, 0 when it was not found once
         uint32_t entryRect = 0; // RVA of MCD::GetEntryRect, the same way
     };
+    // The one call that builds a window from the menu catalog (thiscall on the new window's MCD, its descriptor the
+    // one argument): RVAs of the five-byte call and of the builder.
+    struct WindowBuildSite
+    {
+        LocateProblem problem = LocateProblem::None;
+        uint32_t call = 0, build = 0;
+    };
+    WindowBuildSite LocateWindowBuild(const ImageSection& text);
     struct TitleRectSite
     {
         LocateProblem problem = LocateProblem::None;
@@ -223,6 +235,8 @@ namespace headsup
     // countdown (MoveUnderWay); +0x99 is set for windows kept in a 640 x 480 space instead; +0x10 is
     // kWindowOpening while the window has no owner to lay out yet.
     constexpr uint32_t kMcdType = 0x10, kMcdRect = 0x3A, kMcdMove = 0x94, kMcdVirtual = 0x99;
+    // The place the window was built at (int16 left, top, right, bottom), from its catalog's frame.
+    constexpr uint32_t kMcdHome = 0x42;
     // Where the window was last moved to (int16 x, y), which its move routine writes before it lays the window out.
     // The owners of the game's timer bars (the cast bar's update at RVA 0x12C410, and its neighbours') compare it
     // with their own spot every frame and move the window back when it differs.
@@ -326,6 +340,12 @@ namespace headsup
     // A number at x, y that is still in the window's old place, from at for width by height, moves with it to to;
     // one the game already placed elsewhere, or never placed (at 0, 0), stays.
     WindowSpot MovedNumber(WindowSpot number, WindowSpot at, int width, int height, WindowSpot to);
+    // Where the game had a window and where HeadsUp puts it.
+    struct WindowCourse
+    {
+        WindowSpot origin, to;
+        bool operator==(const WindowCourse&) const = default;
+    };
     // Where each moved window came from and went, so every one moves by the same amount and keeps its place beside
     // the others: a window that is not where HeadsUp put it was put there by the game, and moves from there. At most
     // kMaxWindowKeys windows, the oldest forgotten first; nothing is allocated.
@@ -337,8 +357,15 @@ namespace headsup
         // never goes up, however tall it is.
         std::optional<WindowSpot> PlaceFor(uint32_t mcd, const WindowKey& key, WindowSpot now, int width, int height,
             int dx, int dy, int screenRight, int screenBottom);
+        // The game moved the window at mcd to from and HeadsUp moves it on, dx over and dy down, as PlaceFor would:
+        // where it goes.
+        WindowSpot Moved(uint32_t mcd, const WindowKey& key, WindowSpot from, int width, int height, int dx, int dy,
+            int screenRight, int screenBottom);
         // Where the game put the window at mcd, now at now: where HeadsUp moved it from, or now when it is not.
         WindowSpot OriginOf(uint32_t mcd, const WindowKey& key, WindowSpot now) const;
+        // The course of the window at mcd, now at now: its last while it stands at either end (moved, or not moved
+        // yet), else now for both.
+        WindowCourse CourseOf(uint32_t mcd, const WindowKey& key, WindowSpot now) const;
         // The frame PlaceFor stamps the windows it sees with from now on.
         void SetFrame(uint32_t frame);
         // Whether this window's owner places it itself: it was back where the game had it right after HeadsUp moved
@@ -361,11 +388,17 @@ namespace headsup
         std::vector<Placed> MovedSince(uint32_t since) const;
 
     private:
+        WindowSpot Place(Placed& placed, int width, int height, int dx, int dy, int screenRight, int screenBottom);
+
         std::array<Placed, kMaxWindowKeys> m_Placed{};
         size_t m_Next    = 0; // the slot a new window takes
         uint32_t m_Frame = 0;
         WindowKeyList m_SelfPlaced;
     };
+
+    // Where the game meant a window it moves to go: asked, but for the top HeadsUp put it at or means to (placed), which
+    // was worked out from there (a slide sideways, or a place beside a window already moved) and so is origin's.
+    WindowSpot GameMeant(WindowSpot asked, WindowSpot placed, WindowSpot origin);
 
     // The game's top strip keeps its two strings in one text class (constructor RVA 0x220FD0): four levels of buffer,
     // the highest non-empty one shown. kStripShown points into the shown buffer, 0 while nothing is shown; kStripBusy is
@@ -411,6 +444,25 @@ namespace headsup
         uint32_t global       = 0; // the weather's address in the running client, as the code holds it
     };
     WeatherSite LocateWeather(const ImageSection& text);
+
+    // The client's getter of its config values (int32_t __cdecl get(int32_t key), -1 for none), as Ashita's config
+    // addon finds it: the first of the two routines of its bytes. Key 18 is Config > Windows > Shared > Window Type.
+    struct ConfigGetSite
+    {
+        LocateProblem problem = LocateProblem::None;
+        uint32_t entry        = 0; // RVA
+    };
+    ConfigGetSite LocateConfigGet(const ImageSection& text);
+    constexpr int32_t kWindowTypeConfig = 18;
+
+    // Where the client keeps the search server's address (4 bytes as they go on the wire) and its uint16 port, filled
+    // in at login from the lobby: the two its search client's setup clears, side by side.
+    struct SearchAddressSite
+    {
+        LocateProblem problem = LocateProblem::None;
+        uint32_t address = 0, port = 0; // in the running client, as the code holds them
+    };
+    SearchAddressSite LocateSearchAddress(const ImageSection& text);
 
     struct NetCounters
     {

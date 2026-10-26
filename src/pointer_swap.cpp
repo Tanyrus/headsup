@@ -65,10 +65,10 @@ namespace headsup
         }
     }
 
-    std::string PointerSwap::Start(std::vector<CursorFrame> shown)
+    std::string PointerSwap::Start(std::optional<std::vector<CursorFrame>> shown, int percent)
     {
         if (Running()) return "";
-        if (shown.empty()) return "its picture could not be read";
+        if (shown && shown->empty()) return "its picture could not be read";
         HMODULE game = GetModuleHandleA(kGameModule);
         if (game == nullptr) return std::string("the game's ") + kGameModule + " is not loaded";
         char path[MAX_PATH] = {};
@@ -87,11 +87,13 @@ namespace headsup
             m_Replaced.insert(m_Replaced.end(), frames.begin(), frames.end());
         }
 
-        m_Shown = std::move(shown);
+        m_Own   = !shown;
+        m_Shown = shown ? std::move(*shown) : m_Replaced;
         for (CursorFrame& f : m_Shown)
         {
+            const PointerSize size = SizedPointer(f.image, percent);
             HICON frame = CreateIconFromResourceEx(f.resource.data(), static_cast<DWORD>(f.resource.size()), FALSE, kCursorFormat,
-                static_cast<int>(f.image.width), static_cast<int>(f.image.height), LR_DEFAULTCOLOR);
+                static_cast<int>(size.width), static_cast<int>(size.height), LR_DEFAULTCOLOR);
             if (frame == nullptr)
             {
                 Release();
@@ -135,18 +137,20 @@ namespace headsup
         m_Replaced.clear();
         m_Shown.clear();
         m_GamePointer = nullptr;
+        m_Own         = false;
     }
 
     HCURSOR PointerSwap::OnSetCursor(HCURSOR cursor)
     {
-        if (cursor == nullptr || !Replaced(cursor)) return g_RealSetCursor(cursor);
+        const std::optional<size_t> replaced = cursor != nullptr ? Replaced(cursor) : std::nullopt;
+        if (!replaced) return g_RealSetCursor(cursor);
         m_GamePointer = cursor;
-        return g_RealSetCursor(Frame());
+        return g_RealSetCursor(m_Own ? m_Frames[*replaced] : Frame());
     }
 
     void PointerSwap::Animate()
     {
-        if (!Running()) return;
+        if (!Running() || m_Own) return; // the game steps its own pointers' frames
         const HCURSOR current = GetCursor();
         if (Ours(current) && current != Frame()) g_RealSetCursor(Frame());
     }
@@ -161,10 +165,10 @@ namespace headsup
         return m_Frames[FrameAt(m_Shown, seconds)];
     }
 
-    bool PointerSwap::Replaced(HCURSOR cursor)
+    std::optional<size_t> PointerSwap::Replaced(HCURSOR cursor)
     {
         if (const auto known = m_Known.find(cursor); known != m_Known.end()) return known->second;
-        bool replaced = false;
+        std::optional<size_t> replaced;
         ICONINFO info{};
         if (GetIconInfo(cursor, &info))
         {
@@ -179,7 +183,10 @@ namespace headsup
                 {
                     const CursorImage image = ImageFromBitmaps(static_cast<uint32_t>(bm.bmWidth), static_cast<uint32_t>(bm.bmHeight),
                         static_cast<uint16_t>(info.xHotspot), static_cast<uint16_t>(info.yHotspot), color, mask);
-                    replaced = std::any_of(m_Replaced.begin(), m_Replaced.end(), [&](const CursorFrame& f) { return SameCursor(f.image, image); });
+                    if (const auto same = std::find_if(m_Replaced.begin(), m_Replaced.end(),
+                            [&](const CursorFrame& f) { return SameCursor(f.image, image); });
+                        same != m_Replaced.end())
+                        replaced = static_cast<size_t>(same - m_Replaced.begin());
                 }
             }
             if (info.hbmColor != nullptr) DeleteObject(info.hbmColor);

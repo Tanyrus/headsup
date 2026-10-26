@@ -30,6 +30,7 @@
             {"key": "min-size", "name": "Min Scale", "indent": true, "tip": "The minimum scale for the nameplate. This affects its size when far away."},
             {"key": "max-size", "name": "Max Size", "indent": true, "tip": "The maximum scale for the nameplate. This affects its size when very close."},
             {"key": "auto-check", "name": "Auto-Check", "tip": "Automatically checks all nearby enemies to get their exact level and difficulty. Players are never checked: their level is read from what the server already sends, unless they are anonymous."},
+            {"key": "look-up-players", "name": "Look Up Players", "tip": "Asks the search server for the job and level of every player near you, as the friend list does; they are not told. Anonymous players stay hidden."},
             {"key": "stack-names", "name": "Stack Names", "tip": "If enabled, when nameplates would overlap, they instead stack on top of each other. NOTE: Your target's nameplate will be prioritized and stay in place."},
             {"key": "stack-line-to-entity", "name": "Show Line to Entity", "indent": true, "tip": "When a name is stacked upward, draw a line from the bottom of the nameplate down to it's original position to indicate the player it is attached to."},
             {"key": "hide-during-conversation", "name": "Hide During Conversation", "tip": "Hides all nameplates, outlines and target cursors while you are in a conversation with an NPC or a cutscene."}
@@ -253,7 +254,24 @@
           "name": "Top Panel",
           "description": "Hover a widget for details; click it to keep them open. The Widgets page has each one's options.",
           "settings": [
-            {"key": "theme", "name": "Theme"},
+            {"key": "theme", "name": "Theme", "tip": "The look of the top panel, its popups and this config window."},
+            {
+              "key": "window-type",
+              "name": "Window Type",
+              "indent": true,
+              "tip": "Which of the game's window frames the art is: the one picked in the game's Config, Windows, Shared, or one of the eight.",
+              "options": [
+                {"name": "Follow Game", "tip": "The Window Type the game is set to, followed as you change it."},
+                {"name": "Type 1"},
+                {"name": "Type 2"},
+                {"name": "Type 3"},
+                {"name": "Type 4"},
+                {"name": "Type 5"},
+                {"name": "Type 6"},
+                {"name": "Type 7"},
+                {"name": "Type 8"}
+              ]
+            },
             {
               "key": "separators",
               "name": "Separators",
@@ -294,7 +312,8 @@
               "options": [
                 {"name": "Ornate", "tip": "Diamonds between the widgets and a framed target, as Phoenix Gold has."},
                 {"name": "Pills", "tip": "Each widget in a rounded pill, as Umbra Dark has."},
-                {"name": "Glass", "tip": "Pills that show only when lit, a line of light under the strip and glass popups, as Aurora has."}
+                {"name": "Glass", "tip": "Pills that show only when lit, a line of light under the strip and glass popups, as Aurora has."},
+                {"name": "Window", "tip": "The game's own window art under the strip and the popups, with pills only when lit, as Game Window has."}
               ]
             },
             {"key": "theme-background", "name": "Background", "tip": "The strip's one color, with its opacity: lower it to see the game through the strip."},
@@ -411,6 +430,7 @@
                 {"tip": "Replaces the mouse cursor with this file from the config/headsup/cursors folder."}
               ]
             },
+            {"key": "pointer-size", "name": "Cursor Size", "tip": "How large the mouse cursor is, the game's own included."},
             {"key": "pointer-fix", "name": "Pointer Fix", "tip": "Keeps the game's pointer under yours after a resize, and clicks where you click. It also shows the pointer again over Ashita's windows."},
             {"key": "keep-pointer", "name": "Keep Pointer", "tip": "The game hides its pointer when a key runs a command. While only these keys are held, it stays."}
           ]
@@ -426,7 +446,6 @@
           "name": "Config Window",
           "settings": [
             {"key": "enable-headsup", "name": "Enable HeadsUp", "tip": "If turned off, all HeadsUp features will be disabled."},
-            {"key": "window-theme", "name": "Window Theme", "tip": "The color and style of this config window."},
             {"key": "font", "name": "Font", "tip": "The font used for this config window."},
             {"key": "size", "name": "Font Size", "tip": "The font size used for this config window, in pixels."},
             {"key": "window-opacity", "name": "Window Opacity", "tip": "The opacity of this config window."}
@@ -444,6 +463,14 @@
                 {"key": "watch", "name": "Start Watching", "tip": "As /hu drawdump watch: watches every frame for names that jump, flicker or vanish, and writes what it finds to logs/headsup until stopped."},
                 {"key": "stop", "name": "Stop Watching"},
                 {"key": "saved", "name": "Report saved to: {file}"}
+              ]
+            },
+            {
+              "key": "logging",
+              "name": "Logging",
+              "tip": "Writes what HeadsUp works around to logs/headsup, where chat only gets what stops working.",
+              "words": [
+                {"key": "file", "name": "Logging to: {file}"}
               ]
             },
             {"key": "mobs-outlined", "name": "Mobs Outlined"},
@@ -780,14 +807,8 @@
         {"name": "Phoenix Red, Ornate", "tip": "The ornate strip in Phoenix's dark red."},
         {"name": "Phoenix Red, Pills", "tip": "Each widget in a pill, in Phoenix's dark red."},
         {"name": "Aurora", "tip": "Slate glass, lit from cyan into violet."},
-        {"name": "Custom", "tip": "Your own colors and shape, from the Theme Colors card."}
-      ]
-    },
-    {
-      "key": "menu-theme",
-      "options": [
-        {"name": "Phoenix", "tip": "Phoenix's dark red, lit in its royal red."},
-        {"name": "Aurora", "tip": "Slate glass, lit from cyan into violet."}
+        {"name": "Custom", "tip": "Your own colors and shape, from the Theme Colors card."},
+        {"name": "Game Window", "tip": "The game's own window art, of the Window Type below, in colors taken from it."}
       ]
     },
     {

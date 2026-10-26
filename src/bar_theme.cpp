@@ -80,7 +80,7 @@ namespace headsup
             .icon = 0.50f * h, .padding = 0.33f * h, .gap = 0.17f * h, .cap = 0.64f * h, .diamond = 0.22f * h,
             .pillHeight = 0.80f * h, .pillRadius = 0.17f * h, .below = 0.28f * h, .popupText = kPopupTextShare * u,
             .heading = 0.33f * u, .popupPadding = 0.36f * u, .rowGap = 0.11f * u,
-            .panelRadius = (shape == BarShape::Ornate ? 0.11f : 0.28f) * u};
+            .panelRadius = (shape == BarShape::Ornate ? 0.11f : shape == BarShape::Window ? 0.0f : 0.28f) * u};
     }
 
     const char* TitleFont(BarShape shape) { return shape == BarShape::Ornate ? kMarcellusSC : kDetailFont; }
