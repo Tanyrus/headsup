@@ -82,6 +82,11 @@ namespace headsup
     Form::Form(std::vector<FormEvent> events, FormState& state, std::function<bool(uint8_t)> down)
         : keyDown(std::move(down)), m_Events(std::move(events)), m_State(state)
     {
+        for (const FormEvent& event : m_Events)
+            if (event.type == kDragOverEvent)
+                m_State.dragOver = event.id.empty() ? std::nullopt : std::optional<FormEvent>(event);
+            else if (event.type == kDropEvent || event.type == kDragEndEvent)
+                m_State.dragOver.reset();
         // A click anywhere but on the open popup or its control closes it.
         if (m_State.popup.empty()) return;
         for (const FormEvent& event : m_Events)
@@ -775,22 +780,75 @@ namespace headsup
             return slot.size() == 1 ? chip : chip + kChipTagInfix + std::to_string(tag);
         }
 
-        // A line's slot as a chip: one tag is the chip, and several are parts of it, each dragged alone.
-        std::string SlotMarkup(const WindowLayout& layout, const std::string& id, const TagSlot& slot)
+        // A line's slot as a chip: one tag is the chip, and several are parts of it, each dragged alone. A ghost is
+        // a faint one that shows where a held tag would go, and takes no drag.
+        std::string SlotMarkup(const WindowLayout& layout, const std::string& id, const TagSlot& slot, bool ghost = false)
         {
             const auto tips = layout.OptionsOf(WindowList::Tags);
+            const std::string chip = ghost ? std::string("btn accent chip ") + kGhostClass : "btn accent chip in";
             if (slot.size() == 1)
-                return TagMarkup(layout, id, slot.front(), slot.front() == Tag::Break ? "btn accent chip in drag break" : "btn accent chip in drag",
-                    tips[static_cast<size_t>(slot.front())].tip);
+                return TagMarkup(layout, id, slot.front(), (chip + (ghost ? "" : " drag") + (slot.front() == Tag::Break ? " break" : "")).c_str(),
+                    ghost ? nullptr : tips[static_cast<size_t>(slot.front())].tip);
             const char* shared = layout.WordOf(WindowWord::SlotTip).tip;
             std::string parts;
             for (size_t tag = 0; tag < slot.size(); ++tag)
             {
                 if (tag > 0) parts += "<div class=\"or\">" + EscapedRml(layout.WordOf(WindowWord::Or).name) + "</div>";
-                parts += TagMarkup(layout, TagIdOf(id, slot, static_cast<int>(tag)), slot[tag], "part drag", shared);
+                parts += TagMarkup(layout, TagIdOf(id, slot, static_cast<int>(tag)), slot[tag], ghost ? "part" : "part drag",
+                    ghost ? nullptr : shared);
             }
-            return "<div class=\"btn accent chip in\" id=\"" + id + "\"" + TipAttribute(shared) + ">" + parts + "</div>";
+            return "<div class=\"" + chip + "\" id=\"" + id + "\"" + TipAttribute(ghost ? nullptr : shared) + ">" + parts + "</div>";
         }
+
+        // Where a chip can be let go in a line box: on the box, a stretch, a chip, or one tag of a chip of several.
+        struct LinePlace
+        {
+            std::string id;
+            int run = -1, slot = -1, tag = -1;
+        };
+
+        // A drop of a slot on a place of a line whose stretches and tags were had, at the byte of a stretch the pointer
+        // was nearest; own is the line's own tag dragged from its place, which leaves it. On a stretch it goes in at
+        // the pointer, on a chip into that chip's slot, on another tag of its own chip into that tag's place, and
+        // anywhere else in the box at its end. False when nothing changed; caret is where it went in a stretch.
+        bool Dropped(std::string& text, const TemplateRuns& had, const LinePlace& place, const TagSlot& dropped, size_t at,
+            const std::optional<LinePlace>& own, RunCaret& caret)
+        {
+            RunCaret nowhere;
+            if (place.slot >= 0)
+            {
+                if (own && place.slot == own->slot) return MoveTag(text, place.slot, own->tag, place.tag);
+                // Nothing joined is nothing moved: the chip already holds what was dragged.
+                if (!JoinSlot(text, place.slot, dropped)) return false;
+                if (own) text = WithoutTag(text, own->slot, own->tag, nowhere);
+                return true;
+            }
+            RunCaret put = place.run < 0 ? RunCaret{} : RunCaret{place.run, at};
+            if (!PutTag(text, put, dropped)) return false;
+            // The slot went in before the stretch the caret is in: one of the line's own then leaves the place it
+            // had, which is a slot further on when the new one stands before it.
+            if (own)
+            {
+                const int went   = put.run - 1;
+                const bool whole = had.slots[static_cast<size_t>(own->slot)].size() == 1;
+                text             = WithoutTag(text, own->slot + (went <= own->slot ? 1 : 0), own->tag, nowhere);
+                if (whole && own->slot < went) --put.run;
+            }
+            caret = put;
+            return true;
+        }
+
+        // What a line box shows while a tag is held over it: the stretch it would split shown as head, ghost and the
+        // rest, or the chip it would join shown as the two joined.
+        struct LinePreview
+        {
+            int ghostAt = -1; // the stretch it stands before
+            TagSlot ghost;
+            std::string head; // what stands before the ghost there, of the stretch before which it stands
+            size_t split = 0; // and how much of that stretch it is
+            int replaced = -1; // the slot the ghost takes the place of
+            std::string leaving; // the id of the line's own tag held, which would leave its place
+        };
     }
 
     bool Form::LineBox(const char* id, std::string& text, LineDraft& draft)
@@ -849,71 +907,105 @@ namespace headsup
                 }
             }
         }
-        // Where a chip can be let go in the box: on the box, a stretch, a chip, or one tag of a chip of several.
-        struct Place
-        {
-            std::string id;
-            int run = -1, slot = -1, tag = -1;
-        };
-        std::vector<Place> places{Place{box}};
+        std::vector<LinePlace> places{LinePlace{box}};
         // One of the line's own tags dragged from its place: it leaves it, wherever it was let go.
-        std::optional<Place> taken;
+        std::optional<LinePlace> taken;
         for (int run = 0; run < runs; ++run)
         {
-            places.push_back(Place{runId(run), run});
+            places.push_back(LinePlace{runId(run), run});
             if (run == runs - 1) break;
             const TagSlot& slot = had.slots[static_cast<size_t>(run)];
-            if (slot.size() > 1) places.push_back(Place{chipId(run), -1, run});
+            if (slot.size() > 1) places.push_back(LinePlace{chipId(run), -1, run});
             for (int tag = 0; tag < static_cast<int>(slot.size()); ++tag)
             {
-                places.push_back(Place{TagIdOf(chipId(run), slot, tag), -1, run, tag});
+                places.push_back(LinePlace{TagIdOf(chipId(run), slot, tag), -1, run, tag});
                 if (Took(places.back().id, kDragEndEvent) != nullptr) taken = places.back();
             }
         }
-        RunCaret nowhere;
-        // A tag dropped on a stretch goes in at the pointer, on a chip into that chip's slot, on another tag of its own
-        // chip into that tag's place, and anywhere else in the box at its end.
-        for (const Place& place : places)
+        const auto ownOf = [&](const std::string& dragged) {
+            const auto own = std::ranges::find_if(places, [&](const LinePlace& p) { return p.tag >= 0 && p.id == dragged; });
+            return own != places.end() ? std::optional<LinePlace>(*own) : std::nullopt;
+        };
+        for (const LinePlace& place : places)
         {
             if (reshaped) break;
             const FormEvent* drop = Took(place.id, kDropEvent);
             const TagSlot dropped = DroppedSlot(drop);
             if (dropped.empty()) continue;
-            const bool own = taken && drop->value == taken->id;
-            reshaped       = true;
-            if (place.slot >= 0)
-            {
-                if (own && place.slot == taken->slot)
-                    MoveTag(text, place.slot, taken->tag, place.tag);
-                // Nothing joined is nothing moved: the chip already holds what was dragged.
-                else if (JoinSlot(text, place.slot, dropped) && own)
-                    text = WithoutTag(text, taken->slot, taken->tag, nowhere);
-                continue;
-            }
-            RunCaret at = place.run < 0 ? RunCaret{} : RunCaret{place.run, drop->at};
-            if (!PutTag(text, at, dropped)) continue;
-            // The slot went in before the stretch the caret is in: one of the line's own then leaves the place it
-            // had, which is a slot further on when the new one stands before it.
-            if (own)
-            {
-                const int put    = at.run - 1;
-                const bool whole = had.slots[static_cast<size_t>(taken->slot)].size() == 1;
-                text             = WithoutTag(text, taken->slot + (put <= taken->slot ? 1 : 0), taken->tag, nowhere);
-                if (whole && taken->slot < put) --at.run;
-            }
-            draft.caret = at;
+            reshaped = true;
+            RunCaret caret = draft.caret;
+            if (Dropped(text, had, place, dropped, drop->at, taken && drop->value == taken->id ? taken : std::nullopt, caret))
+                draft.caret = caret;
         }
-        if (taken && !reshaped) text = WithoutTag(text, taken->slot, taken->tag, nowhere);
+        if (taken && !reshaped)
+        {
+            RunCaret nowhere;
+            text = WithoutTag(text, taken->slot, taken->tag, nowhere);
+        }
         const bool edited = text != was;
+
+        // A tag held over the box shows where it would go, faint, and nothing is changed until it is let go.
+        LinePreview preview;
+        const FormEvent* over = m_State.dragOver ? &*m_State.dragOver : nullptr;
+        const auto under = over != nullptr && !edited
+                               ? std::ranges::find_if(places, [&](const LinePlace& p) { return p.id == over->id; })
+                               : places.end();
+        if (const TagSlot dropped = DroppedSlot(over); under != places.end() && !dropped.empty())
+        {
+            const std::optional<LinePlace> own = ownOf(over->value);
+            std::string after = text;
+            RunCaret caret;
+            if (Dropped(after, had, *under, dropped, over->at, own, caret))
+            {
+                if (own) preview.leaving = own->id;
+                if (under->slot >= 0)
+                {
+                    std::string joined = text;
+                    if (own && own->slot == under->slot)
+                        MoveTag(joined, under->slot, own->tag, under->tag);
+                    else
+                        JoinSlot(joined, under->slot, dropped);
+                    preview.ghost    = RunsOf(joined).slots[static_cast<size_t>(under->slot)];
+                    preview.ghostAt  = under->slot + 1;
+                    preview.replaced = under->slot;
+                    if (own && own->slot == under->slot) preview.leaving.clear();
+                }
+                else
+                {
+                    preview.ghost   = dropped;
+                    preview.ghostAt = under->run < 0 ? runs - 1 : under->run;
+                    const std::string& stretch = had.texts[static_cast<size_t>(preview.ghostAt)];
+                    preview.split = under->run < 0 ? stretch.size() : std::min(over->at, stretch.size());
+                    preview.head  = stretch.substr(0, preview.split);
+                }
+            }
+        }
 
         const TemplateRuns shown = RunsOf(text);
         Out() += std::string("<div class=\"") + kLineBoxClass + "\" id=\"" + box + "\">";
         for (size_t run = 0; run < shown.texts.size(); ++run)
         {
-            const std::string input = runId(static_cast<int>(run));
+            const int r             = static_cast<int>(run);
+            const std::string input = runId(r);
+            const std::string ghost = box + kGhostIdInfix + std::to_string(run);
+            const bool here         = preview.ghostAt == r;
+            Out() += std::string("<div class=\"") + kGhostSlotClass + "\" id=\"" + ghost + "\"></div>";
             Out() += std::string("<input type=\"text\" class=\"") + kRunClass + "\" id=\"" + input + "\"/>";
-            Set(input, FormValueKind::Value, {}, shown.texts[run]);
-            if (run < shown.slots.size()) Out() += SlotMarkup(*layout, chipId(static_cast<int>(run)), shown.slots[run]);
+            Set(ghost, FormValueKind::Markup, {},
+                here ? (preview.head.empty() ? std::string() : std::string("<div class=\"") + kGhostTextClass + "\">" + EscapedRml(preview.head) + "</div>") +
+                           SlotMarkup(*layout, ghost + kChipIdInfix, preview.ghost, true)
+                     : std::string());
+            Set(input, FormValueKind::Value, {}, here ? shown.texts[run].substr(preview.split) : shown.texts[run]);
+            Set(input, FormValueKind::Attribute, kSplitAttribute, here && preview.split > 0 ? std::to_string(preview.split) : std::string());
+            if (run >= shown.slots.size()) continue;
+            const TagSlot& slot = shown.slots[run];
+            Out() += SlotMarkup(*layout, chipId(r), slot);
+            Set(chipId(r), FormValueKind::Class, kReplacedClass, {}, preview.replaced == r);
+            for (int tag = 0; tag < static_cast<int>(slot.size()); ++tag)
+            {
+                const std::string id = TagIdOf(chipId(r), slot, tag);
+                Set(id, FormValueKind::Class, kLeavingClass, {}, id == preview.leaving);
+            }
         }
         Out() += "</div>";
         Set(box, FormValueKind::Class, kOffClass, {}, m_Off);

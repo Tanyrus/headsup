@@ -48,6 +48,9 @@ namespace headsup
     constexpr const char* kPopupGround = "-popup";
     // A dragged control was let go, on something or on nothing, anywhere but where it stands.
     constexpr const char* kDragEndEvent = "dragend";
+    // A dragged control held over another, told as a drop on it would be, or over nothing that is named (an empty
+    // id). Kept in FormState::dragOver until the next, a drop or the drag's end.
+    constexpr const char* kDragOverEvent = "dragover";
     // The attribute of a control that can be dragged which says what a drop of it brings: a tag chip's slot, as a
     // line's text holds it.
     constexpr const char* kCarriesAttribute = "carries";
@@ -69,11 +72,20 @@ namespace headsup
     constexpr const char* kLineBoxClass = "linebox"; // a design line's box
     constexpr const char* kRunClass     = "run";     // a stretch of text in it
     constexpr const char* kTypingClass  = "typing";  // on a box while one of its stretches has the keyboard
+    // While a tag is held over a line box: what it would add, faint; a chip it would take the place of; and the line's
+    // own tag held, which would leave its place.
+    constexpr const char* kGhostClass    = "ghost";
+    constexpr const char* kGhostSlotClass = "ghost-slot", *kGhostTextClass = "ghost-text"; // its place, and the letters before it
+    // On a stretch split by a held tag: the bytes of it that stand before the tag, which it does not show.
+    constexpr const char* kSplitAttribute = "split";
+    constexpr const char* kReplacedClass = "replaced";
+    constexpr const char* kLeavingClass  = "leaving";
     constexpr const char* kRunIdInfix  = "-t-";
     // The ids of a control's parts, after the control's own: a dropdown's option, a row of choices' choice and a tab
     // strip's tab, each with its number.
     constexpr const char* kOptionIdInfix = "-o-", *kSegmentIdInfix = "-s-", *kTabIdInfix = "-t-";
     constexpr const char* kChipIdInfix = "-c-";
+    constexpr const char* kGhostIdInfix = "-g-"; // before a stretch: where a held tag shows where it would go
     constexpr const char* kChipTagInfix = "-"; // after a chip's id and before a tag's number, in a chip of several
 
     // What an element shows that is no part of the markup: set on the element when it changes, so a slider being
@@ -125,6 +137,7 @@ namespace headsup
     {
         std::unordered_set<std::string> collapsed; // the ids of the collapsed cards
         std::string popup;                         // the control whose popup is open, or none
+        std::optional<FormEvent> dragOver;         // what a held drag is over (kDragOverEvent)
     };
 
     // What an option of a dropdown does, by its place in the list: its tooltip. None says nothing.

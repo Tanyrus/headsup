@@ -16,7 +16,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <cstdio>
 #include <utility>
 
 namespace headsup
@@ -89,10 +88,10 @@ namespace headsup
         // The stretch before (-1) or after (1) this one in its box, past the tag between them; none at an end.
         Rml::ElementFormControlInput* RunBeside(Rml::Element* run, int step)
         {
-            Rml::Element* at = run;
-            for (int sibling = 0; sibling < 2 && at != nullptr; ++sibling)
+            Rml::Element* at = step < 0 ? run->GetPreviousSibling() : run->GetNextSibling();
+            while (at != nullptr && !at->IsClassSet(kRunClass))
                 at = step < 0 ? at->GetPreviousSibling() : at->GetNextSibling();
-            return at != nullptr && at->IsClassSet(kRunClass) ? AsInput(at) : nullptr;
+            return at != nullptr ? AsInput(at) : nullptr;
         }
 
         void FocusAt(Rml::ElementFormControlInput* input, int character)
@@ -213,7 +212,7 @@ namespace headsup
         m_Popup      = m_Document->GetElementById(kMenuPopupId);
         m_Tip        = m_Document->GetElementById(kMenuTipId);
         for (const Rml::EventId id : {Rml::EventId::Click, Rml::EventId::Change, Rml::EventId::Dragdrop, Rml::EventId::Dragend,
-                 Rml::EventId::Mouseover, Rml::EventId::Mousemove})
+                 Rml::EventId::Dragmove, Rml::EventId::Mouseover, Rml::EventId::Mousemove})
             m_Document->AddEventListener(id, this);
         // On their way down: taking and losing the keyboard do not come back up, and a text box keeps its keys.
         for (const Rml::EventId id : {Rml::EventId::Focus, Rml::EventId::Blur, Rml::EventId::Keydown})
@@ -429,6 +428,38 @@ namespace headsup
             m_Document->SetProperty("filter", std::string(kOpacityFilter) + "(" + RcssNumber(static_cast<float>(m_Opacity) / kPercent) + ")");
     }
 
+    FormEvent RmlMenu::DropOn(Rml::Element* hovered, Rml::Element* dragged, const char* type, Rml::Event& event) const
+    {
+        Rml::Element* named = WithId(hovered);
+        for (Rml::Element* up = hovered; up != nullptr; up = up->GetParentNode())
+            if (up->IsClassSet(kGhostSlotClass)) named = up;
+        FormEvent drop{named != nullptr ? named->GetId() : std::string(), type, dragged->GetId(),
+            dragged->GetAttribute<Rml::String>(kCarriesAttribute, "")};
+        const float x = static_cast<float>(event.GetParameter<int>("mouse_x", 0));
+        // A stretch, or the letters of one a held tag shows itself after, is as wide as its letters from its
+        // content's left: the pointer says between which.
+        const auto byteIn = [&](Rml::Element* text, const std::string& letters) {
+            return ByteUnder(letters, x - text->GetAbsoluteOffset(Rml::BoxArea::Content).x, [&](std::string_view start) {
+                return static_cast<float>(Rml::ElementUtilities::GetStringWidth(text, Rml::String(start)));
+            });
+        };
+        if (named != nullptr && named->IsClassSet(kGhostSlotClass))
+        {
+            // On the held tag itself it is where it shows already; on the letters before it, on that stretch.
+            Rml::Element* head = named->GetFirstChild();
+            Rml::Element* run  = named->GetNextSibling();
+            const bool onHead  = head != nullptr && head->IsClassSet(kGhostTextClass) && (hovered == head || hovered->GetParentNode() == head);
+            if (!onHead || run == nullptr) return FormEvent{m_HeldOver.id, type, drop.value, drop.carried, m_HeldOver.at};
+            drop.id = run->GetId();
+            auto* letters = head->GetNumChildren() > 0 ? rmlui_dynamic_cast<Rml::ElementText*>(head->GetChild(0)) : nullptr;
+            drop.at = byteIn(head, letters != nullptr ? letters->GetText() : std::string());
+            return drop;
+        }
+        if (Rml::ElementFormControlInput* run = named != nullptr && named->IsClassSet(kRunClass) ? AsInput(named) : nullptr)
+            drop.at = std::strtoul(run->GetAttribute<Rml::String>(kSplitAttribute, "0").c_str(), nullptr, 10) + byteIn(run, run->GetValue());
+        return drop;
+    }
+
     void RmlMenu::ProcessEvent(Rml::Event& event)
     {
         if (m_Document == nullptr) return;
@@ -493,20 +524,24 @@ namespace headsup
         case Rml::EventId::Dragdrop:
             if (auto* dragged = static_cast<Rml::Element*>(event.GetParameter<void*>("drag_element", nullptr));
                 dragged != nullptr && !LetGoOn(dragged, event))
-            {
-                FormEvent drop{id, kDropEvent, dragged->GetId(), dragged->GetAttribute<Rml::String>(kCarriesAttribute, "")};
-                // A stretch is as wide as its letters from its content's left: the pointer says between which.
-                if (Rml::ElementFormControlInput* run = named != nullptr && named->IsClassSet(kRunClass) ? AsInput(named) : nullptr)
-                    drop.at = ByteUnder(run->GetValue(),
-                        static_cast<float>(event.GetParameter<int>("mouse_x", 0)) - run->GetAbsoluteOffset(Rml::BoxArea::Content).x,
-                        [&](std::string_view start) {
-                            return static_cast<float>(Rml::ElementUtilities::GetStringWidth(run, Rml::String(start)));
-                        });
-                m_Events.push_back(std::move(drop));
-            }
+                m_Events.push_back(DropOn(target, dragged, kDropEvent, event));
             break;
+        case Rml::EventId::Dragmove:
+        {
+            // Sent to what the drag is held over: told again only when that changes.
+            auto* dragged = static_cast<Rml::Element*>(event.GetParameter<void*>("drag_element", nullptr));
+            if (dragged == nullptr) break;
+            FormEvent held = DropOn(target, dragged, kDragOverEvent, event);
+            if (LetGoOn(dragged, event)) held.id.clear();
+            if (held.id == m_HeldOver.id && held.at == m_HeldOver.at) break;
+            m_HeldOver = held;
+            m_Events.push_back(std::move(held));
+            break;
+        }
         case Rml::EventId::Dragend:
             if (!LetGoOn(target, event)) m_Events.push_back(FormEvent{id, kDragEndEvent, {}, {}});
+            m_HeldOver = FormEvent{};
+            m_Events.push_back(FormEvent{{}, kDragOverEvent, {}, {}});
             break;
         case Rml::EventId::Mouseover:
         case Rml::EventId::Mousemove:

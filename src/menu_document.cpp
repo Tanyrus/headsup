@@ -30,6 +30,7 @@ namespace headsup
         constexpr float kPillEdge     = 1.0f;  // pixels: a pill's edge, inside its height
         constexpr float kSegmentGap   = 0.25f; // between two joined choices
         constexpr float kSegmentPad   = 0.3f;  // a choice's text from its sides, at the least
+        constexpr float kFaint        = 0.45f; // the opacity of a held tag where it would go, and of one leaving
     }
 
     namespace
@@ -294,6 +295,11 @@ namespace headsup
                "padding:0px 0.5em;margin:0.1em 0.1em;}";
         // A line break takes a row of the box to itself, so what follows it starts the next, as on the nameplate.
         css += ".linebox .chip.break{flex:1 0 100%;margin:0.1em 0px;text-align:center;}";
+        // Where a held tag would go: faint, after the letters of the stretch it would split that stand before it.
+        css += std::string(".") + kGhostSlotClass + "{display:flex;flex-direction:row;align-items:center;flex:0 0 auto;}";
+        css += std::string(".") + kGhostTextClass + "{white-space:pre;" + line(kFrame - kRunInset) + "}";
+        css += std::string(".") + kGhostClass + ",." + kLeavingClass + "{opacity:" + RcssNumber(kFaint) + ";}";
+        css += std::string(".") + kReplacedClass + "{display:none;}";
         css += "input.hex{width:6em;}";
         // A dropdown's closed control; its list is the popup.
         css += ".dd{position:relative;box-sizing:border-box;height:" + frame + ";" + framed + "padding:0px " +

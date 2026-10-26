@@ -16,6 +16,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -186,6 +187,33 @@ namespace
             }
             m_Host.context->ProcessMouseButtonUp(kLeftButton, 0);
             return Frames(3) || changed;
+        }
+        // Presses the left button on one control and holds it over another, until Release.
+        void HoldOver(const std::string& from, const std::string& onto, Rml::Vector2f nudge = {})
+        {
+            const Rml::Vector2f start = Center(from), by = Center(onto) + nudge - start;
+            m_Host.context->ProcessMouseMove(static_cast<int>(start.x), static_cast<int>(start.y), 0);
+            Frames();
+            m_Host.context->ProcessMouseButtonDown(kLeftButton, 0);
+            for (int step = 1; step <= kDragSteps; ++step)
+            {
+                const Rml::Vector2f at = start + by * (static_cast<float>(step) / kDragSteps);
+                m_Host.context->ProcessMouseMove(static_cast<int>(at.x), static_cast<int>(at.y), 0);
+                Frames();
+            }
+            Frames(2);
+        }
+        // Moves the held pointer onto another control.
+        void MoveOnto(const std::string& onto)
+        {
+            const Rml::Vector2f at = Center(onto);
+            m_Host.context->ProcessMouseMove(static_cast<int>(at.x), static_cast<int>(at.y), 0);
+            Frames(3);
+        }
+        bool Release()
+        {
+            m_Host.context->ProcessMouseButtonUp(kLeftButton, 0);
+            return Frames(3);
         }
         void Type(const std::string& text)
         {
@@ -1652,4 +1680,121 @@ TEST(a_picked_choice_and_tab_take_dark_text_where_the_accent_is_bright)
         window.Frames(kPastEasing);
         CHECK_EQ(pickedText(window, "tab") < 0.2f, bright);
     }
+}
+
+namespace
+{
+    // The text of an element and everything in it, as a player reads it.
+    std::string Read(Rml::Element* element)
+    {
+        if (element == nullptr) return "";
+        if (auto* input = rmlui_dynamic_cast<Rml::ElementFormControlInput*>(element)) return input->GetValue();
+        if (auto* text = rmlui_dynamic_cast<Rml::ElementText*>(element)) return text->GetText();
+        std::string read;
+        for (int i = 0; i < element->GetNumChildren(); ++i)
+            read += Read(element->GetChild(i));
+        return read;
+    }
+    // What a line box shows, part by part in its order, a faint part in brackets and a hidden one left out.
+    std::string Shown(Rml::Element* box)
+    {
+        std::string shown;
+        const std::function<void(Rml::Element*)> walk = [&](Rml::Element* element) {
+            if (!element->IsVisible()) return;
+            const bool faint = element->GetComputedValues().opacity() < 1.0f;
+            if (element->IsClassSet("chip") || rmlui_dynamic_cast<Rml::ElementFormControlInput*>(element) != nullptr ||
+                rmlui_dynamic_cast<Rml::ElementText*>(element) != nullptr)
+            {
+                const std::string text = Read(element);
+                if (!text.empty()) shown += (faint ? "[" + text + "]" : text) + "|";
+                return;
+            }
+            for (int i = 0; i < element->GetNumChildren(); ++i)
+                walk(element->GetChild(i));
+        };
+        for (int i = 0; i < box->GetNumChildren(); ++i)
+            walk(box->GetChild(i));
+        return shown;
+    }
+}
+
+TEST(a_tag_held_over_a_line_shows_faint_where_it_would_go_and_nothing_is_changed_until_let_go)
+{
+    Window window;
+    window.Page("players");
+    const std::string box = "players-nameplate-design-design-players-1";
+    std::string& text     = window.settings.Kind(PlateKind::Players).lines[1].text;
+    text                  = "abcd";
+    window.Frames(kPastEasing); // past the card's fading in
+    CHECK_EQ(Shown(window.Find(box)), "abcd|");
+    // Over the middle of the letters, the tag stands faint between them.
+    window.HoldOver("tag-1", box + "-t-0", Rml::Vector2f(-window.Find(box + "-t-0")->GetBox().GetSize().x / 2.0f +
+        static_cast<float>(Rml::ElementUtilities::GetStringWidth(window.Find(box + "-t-0"), "ab")), 0.0f));
+    CHECK_EQ(Shown(window.Find(box)), "ab|[Level]|cd|");
+    CHECK_EQ(text, "abcd");
+    // Over nothing of the line, the line is as it was; let go there, nothing changes.
+    window.MoveOnto("page-title");
+    CHECK_EQ(Shown(window.Find(box)), "abcd|");
+    window.MoveOnto(box);
+    CHECK_EQ(Shown(window.Find(box)), "abcd|[Level]|");
+    window.MoveOnto("page-title");
+    CHECK(!window.Release());
+    CHECK_EQ(Shown(window.Find(box)), "abcd|");
+    CHECK_EQ(window.Said(), "");
+}
+
+TEST(a_tag_held_over_a_chip_shows_the_two_joined_in_its_place)
+{
+    Window window;
+    window.Page("players");
+    const std::string box = "players-nameplate-design-design-players-1";
+    std::string& text     = window.settings.Kind(PlateKind::Players).lines[1].text;
+    text                  = "a${level}b";
+    window.Frames(kPastEasing); // past the card's fading in
+    window.HoldOver("tag-19", box + "-c-0");
+    const std::string or_ = kWindowLayout.WordOf(WindowWord::Or).name;
+    CHECK_EQ(Shown(window.Find(box)), "a|[Level" + or_ + "Job]|b|");
+    CHECK(window.Release());
+    CHECK_EQ(text, "a${level|job}b");
+    window.Frames(kPastEasing); // the card built anew fades in
+    CHECK_EQ(Shown(window.Find(box)), "a|Level" + or_ + "Job|b|");
+}
+
+TEST(a_lines_own_tag_held_elsewhere_stays_faint_where_it_was_and_shows_where_it_would_go)
+{
+    Window window;
+    window.Page("players");
+    const std::string box = "players-nameplate-design-design-players-1";
+    std::string& text     = window.settings.Kind(PlateKind::Players).lines[1].text;
+    text                  = "a${level}b";
+    window.Frames(kPastEasing); // past the card's fading in
+    window.HoldOver(box + "-c-0", box);
+    CHECK_EQ(Shown(window.Find(box)), "a|[Level]|b|[Level]|");
+    CHECK(window.Release());
+    CHECK_EQ(text, "ab$level");
+    CHECK_EQ(window.Said(), "");
+}
+
+TEST(the_faint_tag_follows_the_pointer_over_the_letters_before_it_and_a_drop_on_it_goes_where_it_shows)
+{
+    Window window;
+    window.Page("players");
+    const std::string box = "players-nameplate-design-design-players-1";
+    std::string& text     = window.settings.Kind(PlateKind::Players).lines[1].text;
+    text                  = "abcd";
+    window.Frames(kPastEasing);
+    Rml::Element* stretch = window.Find(box + "-t-0");
+    const auto letters    = [&](Rml::Element* in, const char* before) {
+        return in->GetAbsoluteOffset(Rml::BoxArea::Content) +
+               Rml::Vector2f(static_cast<float>(Rml::ElementUtilities::GetStringWidth(in, Rml::String(before))), in->GetBox().GetSize().y / 2.0f);
+    };
+    window.HoldOver("tag-1", box + "-t-0", letters(stretch, "abc") - window.Center(box + "-t-0"));
+    CHECK_EQ(Shown(window.Find(box)), "abc|[Level]|d|");
+    // Back over the letters before it, between a and b: it moves there, and stays while the pointer is on it.
+    window.PointerTo(letters(window.Find(box + "-g-0")->GetFirstChild(), "a"));
+    CHECK_EQ(Shown(window.Find(box)), "a|[Level]|bcd|");
+    window.PointerTo(window.Center(box + "-g-0-c-"));
+    CHECK_EQ(Shown(window.Find(box)), "a|[Level]|bcd|");
+    CHECK(window.Release());
+    CHECK_EQ(text, "a${level}bcd");
 }
