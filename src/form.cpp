@@ -921,12 +921,11 @@ namespace headsup
         return edited;
     }
 
-    bool Form::TagChip(Tag tag)
+    void Form::TagChip(Tag tag)
     {
         const std::string chip = kTagIdStart + std::to_string(static_cast<int>(tag));
         Out() += TagMarkup(*layout, chip, tag, "btn accent chip drag", layout->OptionsOf(WindowList::Tags)[static_cast<size_t>(tag)].tip);
         Set(chip, FormValueKind::Class, kOffClass, {}, m_Off);
-        return !m_Off && Clicked(chip);
     }
 
     void Form::Caption(const char* text, const char* classes, float width)

@@ -659,19 +659,14 @@ TEST(a_tag_dropped_inside_a_stretch_goes_in_between_the_letters_under_the_pointe
     CHECK_EQ(window.Said(), "");
 }
 
-TEST(a_tag_chip_goes_in_at_the_caret_by_click_and_after_what_it_is_dropped_on_by_drag)
+TEST(a_tag_chip_dropped_goes_in_after_what_it_lands_on)
 {
     Window window;
     window.Page("players");
     const std::string box = "players-nameplate-design-design-players-1";
     std::string& text     = window.settings.Kind(PlateKind::Players).lines[1].text;
-    text                  = "ab";
+    text                  = "a${level}b"; // the name closed off from the letter after it
     window.Frames(2);
-    window.Click(box + "-t-0");
-    window.Key(Rml::Input::KI_HOME);
-    window.Key(Rml::Input::KI_RIGHT);
-    CHECK(window.Click("tag-1"));
-    CHECK_EQ(text, "a${level}b"); // the name closed off from the letter after it
     CHECK(window.Shows(box + "-c-0") && window.Shows(box + "-t-1"));
     CHECK(window.Drag("tag-0", box + "-t-1"));
     CHECK_EQ(text, "a${level}b$name");
@@ -802,7 +797,7 @@ TEST(a_box_typed_in_keeps_the_keyboard_when_what_it_filters_is_listed_anew)
     CHECK_EQ(window.Typed(find), "equ");
 }
 
-TEST(a_tag_clicked_goes_to_the_line_that_last_had_the_keyboard)
+TEST(a_tag_clicked_goes_on_no_line_and_only_a_drag_puts_it_on_one)
 {
     Window window;
     window.Page("players");
@@ -810,18 +805,17 @@ TEST(a_tag_clicked_goes_to_the_line_that_last_had_the_keyboard)
     players.lines[0].text = "top";
     players.lines[1].text = "ab";
     window.Frames(2);
-    const std::string top = "players-nameplate-design-design-players-0", middle = "players-nameplate-design-design-players-1";
-    // Typing that makes a tag, and then Backspace at the stretch's start: the middle line is built anew.
-    window.Click(middle + "-t-0");
-    window.Key(Rml::Input::KI_END);
-    window.Type(" $job");
-    window.Key(Rml::Input::KI_HOME);
-    window.Key(Rml::Input::KI_BACK);
-    // Then the top line is typed in, and a tag clicked: it is the top line's.
+    const std::string top = "players-nameplate-design-design-players-0";
+    // The top line typed in and left, and then a tag clicked: no line takes it.
     window.Click(top + "-t-0");
-    window.Click("tag-1");
+    window.Type("x");
+    window.Click("page-title");
+    const std::string typed = players.lines[0].text;
+    CHECK(!window.Click("tag-1"));
+    CHECK_EQ(players.lines[0].text, typed);
+    CHECK_EQ(players.lines[1].text, "ab");
+    CHECK(window.Drag("tag-1", top));
     CHECK(players.lines[0].text.find("level") != std::string::npos);
-    CHECK(players.lines[1].text.find("level") == std::string::npos);
 }
 
 TEST(escape_gives_a_box_back_what_it_held_and_a_click_beside_a_lines_stretches_types_at_its_end)

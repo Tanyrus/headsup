@@ -687,7 +687,7 @@ namespace headsup
             });
         }
 
-        // The three lines' boxes, each named, then the kind's tags as chips to click or drag into them.
+        // The three lines' boxes, each named, then the kind's tags as chips to drag into them.
         void Design(Context& c)
         {
             Form& form           = c.form;
@@ -700,16 +700,13 @@ namespace headsup
             {
                 form.Line("line design");
                 form.Caption(lines[static_cast<size_t>(i)].name, "line-name");
-                if (form.LineBox((std::string("design ") + KindKey(kind) + " " + std::to_string(i)).c_str(), k.lines[i].text,
-                        editor.drafts[i]) ||
-                    editor.drafts[i].typing)
-                    editor.line = i;
+                form.LineBox((std::string("design ") + KindKey(kind) + " " + std::to_string(i)).c_str(), k.lines[i].text,
+                    editor.drafts[i]);
                 form.EndLine();
             }
             form.Line("line chips");
             for (const Tag tag : TagsFor(kind))
-                if (form.TagChip(tag) && PutTag(k.lines[editor.line].text, editor.drafts[editor.line].caret, {tag}))
-                    form.changed = true;
+                form.TagChip(tag);
             form.EndLine();
         }
 

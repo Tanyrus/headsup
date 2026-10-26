@@ -299,9 +299,9 @@ namespace headsup
         // A design line's box: stretches of text to type in with its slots as chips between them, which take drops
         // and can be dragged. True when its text changed. draft keeps its caret, and says whether it has the keyboard.
         bool LineBox(const char* id, std::string& text, LineDraft& draft);
-        // A tag as a chip that reads its name, after its icon when it draws one. True when clicked; dragged, it drops
-        // onto a line's box.
-        bool TagChip(Tag tag);
+        // A tag as a chip that reads its name, after its icon when it draws one. Only a drag places it: it drops onto a
+        // line's box, and a click puts it nowhere.
+        void TagChip(Tag tag);
         // Muted or plain text among a row's controls.
         void Caption(const char* text, const char* classes = "caption", float width = 0.0f);
         // Markup of the page's own, for what the kit has no control for; and a value for an element of it.

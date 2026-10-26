@@ -49,8 +49,8 @@ namespace headsup
     // Always turns Always off and leaves the others checked. False for no such row.
     bool ToggleCondition(LineShow& show, std::span<const ShowCondition> offered, int row);
 
-    // A design line's box: its caret, kept between frames for where a clicked tag goes, and whether one of its
-    // stretches has the keyboard this frame.
+    // A design line's box: its caret, kept between frames, and whether one of its stretches has the keyboard this
+    // frame.
     struct LineDraft
     {
         RunCaret caret;
@@ -64,12 +64,11 @@ namespace headsup
         std::vector<uint8_t> held;
     };
 
-    // A kind page's own state, begun anew when another kind's page opens: the line last typed in, which takes a
-    // clicked tag, the three lines' boxes and the Line Style tab that is open.
+    // A kind page's own state, begun anew when another kind's page opens: the three lines' boxes and the Line Style
+    // tab that is open.
     struct DesignEditor
     {
         PlateKind kind = PlateKind::Mobs;
-        int line       = 0;
         int styleTab   = 0;
         LineDraft drafts[kPlateLines] = {};
     };
