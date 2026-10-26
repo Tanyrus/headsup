@@ -216,7 +216,8 @@ namespace headsup
 
     bool RmlBar::Document(RmlHost& host, const BarLook& look, const BarTextPlace& place, const Widgets& widgets)
     {
-        DocumentKey key{look.palette, look.metrics, look.row, look.lines, place, look.titleFont, look.detailFont, {}};
+        DocumentKey key{look.palette, look.metrics, look.row, look.lines, place, look.titleFont, look.detailFont, {},
+            look.settings.gameWindowBorder};
         for (const std::optional<WidgetText>& text : widgets.text)
             if (text) key.own.push_back(*text);
         if (m_Document != nullptr && key == m_DocumentKey) return true;

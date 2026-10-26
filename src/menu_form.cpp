@@ -1294,6 +1294,10 @@ namespace headsup
                 form.Fade(!UsesGameArt(s));
                 OptionsDropdown(form, label, s.windowType, c.layout.OptionsOf(e), tip);
                 break;
+            case SettingPiece::WindowBorder:
+                form.Fade(!UsesGameArt(s));
+                form.Switch(label.c_str(), s.gameWindowBorder, tip);
+                break;
             case SettingPiece::Separators:
             {
                 form.Fade(!BarOn(s));

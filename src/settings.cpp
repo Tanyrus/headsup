@@ -40,7 +40,8 @@ namespace headsup
             {"logging", &Settings::logging},
             {"nameplates", &Settings::nameplates}, {"outlines", &Settings::outlines},
             {"outlineFadeIn", &Settings::outlineFadeIn}, {"cursorFloat", &Settings::cursorFloat},
-            {"autoCheck", &Settings::autoCheck}, {"lookUpPlayers", &Settings::lookUpPlayers}};
+            {"autoCheck", &Settings::autoCheck}, {"lookUpPlayers", &Settings::lookUpPlayers},
+            {"gameWindowBorder", &Settings::gameWindowBorder}};
 
         struct IntKey
         {

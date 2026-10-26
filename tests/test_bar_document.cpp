@@ -357,8 +357,16 @@ TEST(the_strip_and_the_popups_are_drawn_with_the_games_art_when_the_shape_is_win
     // glow other themes fade out under the strip.
     const std::string strip = bar.substr(bar.find("#strip{"));
     CHECK(strip.substr(0, strip.find('}')).find("height:" + Px(look.metrics.height) + ";") != std::string::npos);
-    // The strip is the art's fill alone, as the game's own strips are: a frame along it would line its top and bottom.
-    CHECK(strip.substr(0, strip.find('}')).find(SkinSource(3, SkinPiece::Top, kFrameEdge)) == std::string::npos);
+    // The strip and the help bar are framed as the game's windows are, unless their border is switched off.
+    const auto framed = [&](const std::string& document, const char* rule) {
+        const std::string box = document.substr(document.find(rule));
+        return box.substr(0, box.find('}')).find(SkinSource(3, SkinPiece::Top, kFrameEdge)) != std::string::npos;
+    };
+    CHECK(framed(bar, "#strip{") && framed(bar, ".help-box{"));
+    settings.gameWindowBorder = false;
+    const std::string plain = BarDocument(look, Place());
+    CHECK(!framed(plain, "#strip{") && !framed(plain, ".help-box{"));
+    CHECK(plain.find(SkinSource(3, SkinPiece::Back, kSkinTile)) != std::string::npos); // the fill stays
     const PopupFaces faces{};
     CHECK(PopupDocument(look, faces).find(SkinSource(3, SkinPiece::TopLeft, kFrameCorner)) != std::string::npos);
     // Without the art read, the shape draws its colors.

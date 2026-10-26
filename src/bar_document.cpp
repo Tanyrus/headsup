@@ -147,6 +147,12 @@ namespace headsup
         // A box drawn in the game's art, which is its own edge.
         std::string ArtRules(const SkinFrame& frame) { return "box-sizing:border-box;" + SkinDecorator(frame); }
 
+        // The top panel's strip and the help bar in the game's art: framed as its windows are, or its fill alone.
+        std::string StripArt(const BarLook& look)
+        {
+            return look.settings.gameWindowBorder ? SkinDecorator(*look.skin) : SkinFillDecorator(*look.skin);
+        }
+
         // A box of one fill, its edge and, when it has them, its corners.
         std::string FlatRules(const BoxStyle& style, bool corners)
         {
@@ -334,7 +340,7 @@ namespace headsup
         css += "div{display:block;}";
         css += std::string(".") + kHiddenClass + "{display:none;}";
         css += std::string("#") + kStripId + "{position:absolute;left:0px;top:0px;width:100%;height:" + Px(stripHeight) + ";" +
-               (look.skin ? SkinFillDecorator(*look.skin) : "decorator:image(\"" + StripSource(p, stripRows, belowRows) + "\");") + "}";
+               (look.skin ? StripArt(look) : "decorator:image(\"" + StripSource(p, stripRows, belowRows) + "\");") + "}";
         css += ".cap{position:absolute;top:" + centered(static_cast<float>(cap)) + ";" + square(static_cast<float>(cap)) + "}";
         css += "#cap-left{left:" + Px(std::round(m.cap / 2.0f - static_cast<float>(cap) / 2.0f)) + ";}";
         css += ".divider{position:absolute;top:" + centered(static_cast<float>(divider)) + ";" +
@@ -402,7 +408,7 @@ namespace headsup
         // Game help's bar: its pieces are placed in the screen's own pixels.
         css += std::string("#") + kHelpId + "{position:absolute;left:0px;top:0px;width:0px;height:0px;}";
         css += ".p{position:absolute;white-space:pre;}";
-        css += ".help-box{position:absolute;" + (look.skin ? ArtRules(*look.skin) : PanelRules(HelpBarPanel(look))) + "}";
+        css += ".help-box{position:absolute;" + (look.skin ? "box-sizing:border-box;" + StripArt(look) : PanelRules(HelpBarPanel(look))) + "}";
         css += ".hc{" + FaceRules(look.titleFont, lines.title, place.title.height) + ShadowEffect(lines.title) + "}";
         css += ".hh{" + FaceRules(look.detailFont, lines.title, place.figures.height) + ShadowEffect(lines.title) + "}";
         const bool glass = look.palette.shape == BarShape::Glass;

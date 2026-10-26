@@ -66,6 +66,7 @@ namespace headsup
             const char* titleFont  = nullptr;
             const char* detailFont = nullptr;
             std::vector<WidgetText> own;
+            bool border = true; // the game's art frames the strip
             bool operator==(const DocumentKey&) const = default;
         };
         // A value RmlUi was last given, so it is given only when it changes.

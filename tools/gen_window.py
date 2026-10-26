@@ -172,7 +172,7 @@ PIECES = Pieces(
         'window-list': Setting(unnamed=True, words={'note': True, 'find': True, 'name-hint': True, 'all-windows': False,
                                                     'hide': True, 'keep': True, 'row-tip': False}),
         # Top Panel and Widgets
-        'theme': Setting(), 'window-type': Setting(options=9), 'separators': Setting(options=3), 'title-font': Setting(), 'text-font': Setting(),
+        'theme': Setting(), 'window-type': Setting(options=9), 'window-border': Setting(), 'separators': Setting(options=3), 'title-font': Setting(), 'text-font': Setting(),
         'height': Setting(), 'text-size': Setting(), 'one-line': Setting(options=3), 'popup-size': Setting(),
         'hide-readout': Setting(), 'shift-vanilla-ui': Setting(),
         'theme-shape': Setting(options=4), 'theme-background': Setting(), 'theme-gradient': Setting(),

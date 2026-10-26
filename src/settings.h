@@ -143,6 +143,7 @@ namespace headsup
         int menuFontSize     = kDefaultMenuFontSize; // pixels: the settings window's text and everything sized by it
         int menuOpacity      = 100;              // percent
         int windowType       = kFollowGameWindow; // the game's art drawn: the Window Type the game is set to, or 1 to 8
+        bool gameWindowBorder = true; // the art's frame around the top panel and the help bar
         // Where the player left the settings window, in pixels; no width for one never moved, which opens in the
         // screen's middle.
         int menuX = 0, menuY = 0, menuWidth = 0, menuHeight = 0;
