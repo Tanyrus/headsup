@@ -349,7 +349,7 @@ TEST(the_strip_and_the_popups_are_drawn_with_the_games_art_when_the_shape_is_win
     BarPalette palette = PaletteOf(BarTheme::UmbraDark);
     palette.shape      = BarShape::Window;
     BarLook look       = LookOf(palette, settings);
-    look.skin          = SkinFrame{3, 1.0f, 0.5f, 1.0f};
+    look.skin          = SkinFrame{3, 1.0f, 0.5f, 1.0f, palette.panelBorder};
     const std::string bar = BarDocument(look, Place());
     CHECK(bar.find(SkinSource(3, SkinPiece::Back, kSkinTile)) != std::string::npos);
     CHECK(bar.find("hu:strip") == std::string::npos);
@@ -357,24 +357,18 @@ TEST(the_strip_and_the_popups_are_drawn_with_the_games_art_when_the_shape_is_win
     // glow other themes fade out under the strip.
     const std::string strip = bar.substr(bar.find("#strip{"));
     CHECK(strip.substr(0, strip.find('}')).find("height:" + Px(look.metrics.height) + ";") != std::string::npos);
-    // The strip and the help bar are the art's fill in an even border of its frame's color all round, not its frame,
-    // whose edges are a line thicker in the middle; unless the border is switched off.
+    // The strip, the help bar and the popups are each the art's own rules: its fill in its even border.
     const auto rule = [&](const std::string& document, const char* name) {
         const std::string box = document.substr(document.find(name));
         return box.substr(0, box.find('}'));
     };
-    const std::string border = "border:" + Px(kArtBorder) + " " + RcssColor(palette.panelBorder) + ";";
-    for (const char* name : {"#strip{", ".help-box{"})
-    {
-        CHECK(rule(bar, name).find(border) != std::string::npos);
-        CHECK(rule(bar, name).find(SkinSource(3, SkinPiece::Top, kFrameEdge)) == std::string::npos);
-        CHECK(rule(bar, name).find(SkinSource(3, SkinPiece::Back, kSkinTile)) != std::string::npos);
-    }
-    settings.gameWindowBorder = false;
-    const std::string plain = BarDocument(look, Place());
-    CHECK(rule(plain, "#strip{").find("border:") == std::string::npos && rule(plain, ".help-box{").find("border:") == std::string::npos);
     const PopupFaces faces{};
-    CHECK(PopupDocument(look, faces).find(SkinSource(3, SkinPiece::TopLeft, kFrameCorner)) != std::string::npos);
+    for (const char* name : {"#strip{", ".help-box{"})
+        CHECK(rule(bar, name).find(SkinRules(*look.skin)) != std::string::npos);
+    CHECK(rule(PopupDocument(look, faces), "#panel{").find(SkinRules(*look.skin)) != std::string::npos);
+    // Border off: the same art without its edge, everywhere.
+    settings.gameWindowBorder = false;
+    CHECK(FrameAsSet(settings, *look.skin) == (SkinFrame{3, 1.0f, 0.5f, 1.0f}));
     // Without the art read, the shape draws its colors.
     look.skin = std::nullopt;
     CHECK(BarDocument(look, Place()).find("hu:strip") != std::string::npos);

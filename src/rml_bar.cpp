@@ -216,8 +216,7 @@ namespace headsup
 
     bool RmlBar::Document(RmlHost& host, const BarLook& look, const BarTextPlace& place, const Widgets& widgets)
     {
-        DocumentKey key{look.palette, look.metrics, look.row, look.lines, place, look.titleFont, look.detailFont, {},
-            look.settings.gameWindowBorder};
+        DocumentKey key{look.palette, look.metrics, look.row, look.lines, place, look.titleFont, look.detailFont, {}, look.skin};
         for (const std::optional<WidgetText>& text : widgets.text)
             if (text) key.own.push_back(*text);
         if (m_Document != nullptr && key == m_DocumentKey) return true;
@@ -392,7 +391,7 @@ namespace headsup
 
     bool RmlBar::PopupDocumentFor(RmlHost& host, const BarLook& look)
     {
-        PopupDocumentKey key{look.palette, look.metrics, look.titleFont, look.detailFont};
+        PopupDocumentKey key{look.palette, look.metrics, look.titleFont, look.detailFont, look.skin};
         if (m_PopupDocument != nullptr && key == m_PopupDocumentKey) return true;
         ClosePopup();
         for (int f = 0; f < kPopupFontCount; ++f)
@@ -485,7 +484,7 @@ namespace headsup
         const Rows& rows = RowsFor(host, m, p.shape, settings.barTextSize, titleFont, detailFont);
         BarLook look{p, settings, m, PillRow(m), rows.lines, titleFont, p.shape == BarShape::Ornate, detailFont,
             std::nullopt};
-        if (p.shape == BarShape::Window && skin != nullptr) look.skin = skin->frame;
+        if (p.shape == BarShape::Window && skin != nullptr) look.skin = FrameAsSet(settings, skin->frame);
         m_TitlePixels = look.lines.title;
         m_BarBottom   = BarBottom(p, m);
         Widgets widgets;

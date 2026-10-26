@@ -313,17 +313,11 @@ namespace headsup
         }
     }
 
-    std::string SkinDecorator(const SkinFrame& f)
+    std::string SkinRules(const SkinFrame& f)
     {
-        const auto source = [&](SkinPiece piece, int menuPixels) { return SkinSourceOf(f, piece, menuPixels); };
-        return "decorator:tiled-box(" + source(SkinPiece::TopLeft, kFrameCorner) + "," + source(SkinPiece::Top, kFrameEdge) + "," +
-               source(SkinPiece::TopRight, kFrameCorner) + "," + source(SkinPiece::Left, kFrameEdge) + "," +
-               source(SkinPiece::Clear, 1) + "," + source(SkinPiece::Right, kFrameEdge) + "," +
-               source(SkinPiece::BottomLeft, kFrameCorner) + "," + source(SkinPiece::Bottom, kFrameEdge) + "," +
-               source(SkinPiece::BottomRight, kFrameCorner) + ")," + Fill(f) + ";";
+        return "box-sizing:border-box;decorator:" + Fill(f) + ";" +
+               (f.edge != 0 ? "border:" + RcssNumber(kSkinEdge) + "px " + RcssColor(f.edge) + ";" : std::string("border-width:0px;"));
     }
-
-    std::string SkinFillDecorator(const SkinFrame& f) { return "decorator:" + Fill(f) + ";"; }
 
     int SkinTypeOf(int windowType, std::optional<int> gameType)
     {
@@ -333,7 +327,8 @@ namespace headsup
 
     GameSkinLook SkinLookOf(const WindowSkin& skin, int type, float scale)
     {
-        return GameSkinLook{SkinFrame{type, scale, skin.shadeTop, skin.shadeBottom}, SkinPalette(skin), SkinMenuColors(skin)};
+        const BarPalette palette = SkinPalette(skin);
+        return GameSkinLook{SkinFrame{type, scale, skin.shadeTop, skin.shadeBottom, palette.panelBorder}, palette, SkinMenuColors(skin)};
     }
 
     Read<WindowSkin> ReadWindowSkin(std::span<const uint8_t> dat)

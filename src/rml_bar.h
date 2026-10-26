@@ -66,7 +66,7 @@ namespace headsup
             const char* titleFont  = nullptr;
             const char* detailFont = nullptr;
             std::vector<WidgetText> own;
-            bool border = true; // the game's art frames the strip
+            std::optional<SkinFrame> skin;
             bool operator==(const DocumentKey&) const = default;
         };
         // A value RmlUi was last given, so it is given only when it changes.
@@ -140,6 +140,7 @@ namespace headsup
             BarMetrics metrics{};
             const char* titleFont  = nullptr;
             const char* detailFont = nullptr;
+            std::optional<SkinFrame> skin;
             bool operator==(const PopupDocumentKey&) const = default;
         };
         // A font's line as GDI draws it, which the popups are laid out by (its height, and its ink's top and bottom

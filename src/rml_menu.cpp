@@ -191,7 +191,7 @@ namespace headsup
         const GameSkinLook* skin = host.skin ? &*host.skin : nullptr;
         const MenuTheme theme    = MenuThemeFor(settings, skin);
         MenuLook look{theme, host.textFont, kMarcellusSC, settings.menuFontSize, m_Look.textLift, host.developer,
-            MenuColorsFor(settings, skin), theme == MenuTheme::GameWindow ? std::optional(skin->frame) : std::nullopt};
+            MenuColorsFor(settings, skin), theme == MenuTheme::GameWindow ? std::optional(FrameAsSet(settings, skin->frame)) : std::nullopt};
         if (m_Document != nullptr && look == m_Look) return true;
         look.textLift = LiftOf(host.textFont, settings.menuFontSize);
         if (m_Document != nullptr && look.SameFrame(m_Look))

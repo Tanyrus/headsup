@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 namespace headsup
@@ -11,10 +12,11 @@ namespace headsup
         int type    = 0;
         float scale = 1.0f;
         float shadeTop = 1.0f, shadeBottom = 1.0f;
+        uint32_t edge = 0; // the even border's color, the frame's; 0 for none
         bool operator==(const SkinFrame&) const = default;
     };
-    // The RCSS decorator that draws it: the frame on top, the shade under it, the background repeated under that.
-    std::string SkinDecorator(const SkinFrame& frame);
-    // The same without the frame, as the game draws its strips across the screen (the help bar).
-    std::string SkinFillDecorator(const SkinFrame& frame);
+    constexpr float kSkinEdge = 2.0f; // pixels: the border HeadsUp draws in the frame's color
+    // The RCSS that draws it: the shade over the background repeated, in an even border of kSkinEdge all round. The
+    // art's own frame is not drawn: its edges are a line thicker in the middle.
+    std::string SkinRules(const SkinFrame& frame);
 }

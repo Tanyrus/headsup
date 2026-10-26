@@ -60,6 +60,8 @@ namespace headsup
     MenuColors MenuColorsFor(const Settings& settings, const GameSkinLook* skin);
     // A window in a panel's colors: its page the panel's foot, cards and controls each a step toward its text.
     MenuColors MenuColorsFrom(const BarPalette& palette);
+    // The game's art as the settings draw it: without its border while Border is off.
+    SkinFrame FrameAsSet(const Settings& settings, SkinFrame frame);
     // A widget's own title and text fonts, or the panel's: one pointer per name, as BarTitleFont and BarTextFont give.
     const char* WidgetTitleFont(const Settings& settings, BarShape shape, const WidgetOptions& options);
     const char* WidgetTextFont(const Settings& settings, const WidgetOptions& options);

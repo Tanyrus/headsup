@@ -118,6 +118,12 @@ namespace headsup
             toward(p.subtitle, page, kMutedShare), p.accent, p.accentEnd, WithAlpha(p.accent, kMenuSoftAlpha), p.accentEnd};
     }
 
+    SkinFrame FrameAsSet(const Settings& settings, SkinFrame frame)
+    {
+        if (!settings.gameWindowBorder) frame.edge = 0;
+        return frame;
+    }
+
     const char* WidgetTitleFont(const Settings& settings, BarShape shape, const WidgetOptions& options)
     {
         return options.titleFont.empty() ? BarTitleFont(settings, shape) : Interned(options.titleFont);

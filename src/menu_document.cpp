@@ -83,7 +83,7 @@ namespace headsup
         // The game's art in place of the window's fill and edge, and of its lists' and tips'.
         std::string SkinMenuRules(const SkinFrame& frame)
         {
-            const std::string art = "background-color:transparent;border-width:0px;border-radius:0px;" + SkinDecorator(frame);
+            const std::string art = "background-color:transparent;border-radius:0px;" + SkinRules(frame);
             return "body{" + art + "}#" + std::string(kMenuPopupId) + ",#" + kMenuTipId + "{" + art + "}";
         }
     }
