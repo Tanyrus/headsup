@@ -251,6 +251,7 @@ class HeadsUp final : public IPlugin
     size_t m_LastSaveKeys = 0; // how many keys the last save had for the file
     headsup::Tracker m_Tracker;
     headsup::PhTimers m_PhTimers;
+    headsup::Activity m_Activity; // whether you have moved or turned lately, which a placeholder's timer asks
     std::vector<headsup::TimerLine> m_TimerLines;
     uint16_t m_SelfIndex = 0;
     uint16_t m_Zone      = 0; // this frame
@@ -682,6 +683,7 @@ public:
             m_Names.ForgetCamera();
             m_AutoCheck.Clear();
             m_Lookups.Zoned();
+            m_PhTimers.Zoned();
         }
         if (next.check) OnCheckReply(*next.check);
         if (next.mobDied && m_Settings.phTimers)
@@ -2431,6 +2433,13 @@ private:
                 candidate.name      = name;
             }
             if (isMob && alive) aliveMobs.push_back(serverId);
+            const headsup::WorldPoint feet =
+                headsup::FromEntityPosition(entity->GetLocalPositionX(i), entity->GetLocalPositionY(i), entity->GetLocalPositionZ(i));
+            if (self) m_Activity.Pose(now, feet, entity->GetLocalPositionYaw(i));
+            if (isMob && alive && headsup::SightingOf(record) &&
+                headsup::EarnsTimer(headsup::Targeted(headsup::TargetStateOf(index, m_CursorTargets)),
+                    headsup::ClaimedByParty(claim, m_PartyIds), m_Names.MeshDraws(index) > 0, m_Activity.Active(now)))
+                m_PhTimers.Earned(serverId);
             inputs.push_back(headsup::ActorInput{
                 .actor    = static_cast<headsup::ActorPtr>(actor),
                 .index    = index,
@@ -2442,7 +2451,7 @@ private:
                 .checked  = checked,
                 .status   = CurrentStatus(entity, index, kind),
                 .pose     = isPlayer ? headsup::PoseFromStatus(state) : headsup::Pose::Standing,
-                .feet = headsup::FromEntityPosition(entity->GetLocalPositionX(i), entity->GetLocalPositionY(i), entity->GetLocalPositionZ(i)),
+                .feet = feet,
                 .claimedByParty = isMob && headsup::ClaimedByParty(claim, m_PartyIds),
                 .claimed        = isMob && headsup::IsClaimed(claim),
                 .party          = isPlayer && headsup::InYourParty(serverId, self, m_PartyIds),

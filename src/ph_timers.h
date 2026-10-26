@@ -1,11 +1,13 @@
 #pragma once
 
 #include "mobdata.h"
+#include "pose.h"
 
 #include <cstdint>
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace headsup
@@ -28,6 +30,25 @@ namespace headsup
     // respawn, which Phoenix sets on the placeholder when the NM dies; nullopt for any other mob.
     std::optional<PhSighting> SightingOf(const MobRecord* mob);
 
+    // Phoenix's rule: a timer is the player's who fought or watched the mob, not anyone's who stood near it. A death
+    // starts one only if, while the mob lived, the player targeted it, or was active while it was claimed by them or
+    // their party (curing them counts, as the claim is theirs), or while it was on their screen.
+    bool EarnsTimer(bool targeted, bool partyClaim, bool onScreen, bool active);
+    constexpr double kIdleSeconds = 150.0; // without moving or turning, a player is away from the keyboard
+
+    // Whether the player has moved or turned in the last kIdleSeconds.
+    class Activity
+    {
+    public:
+        void Pose(double now, WorldPoint at, float heading);
+        bool Active(double now) const { return m_MovedAt && now - *m_MovedAt <= kIdleSeconds; }
+
+    private:
+        std::optional<WorldPoint> m_At;
+        float m_Heading = 0.0f;
+        std::optional<double> m_MovedAt;
+    };
+
     struct TimerLine
     {
         std::string text;
@@ -38,8 +59,13 @@ namespace headsup
     class PhTimers
     {
     public:
-        // From the server's defeat message: the mob's placeholder is due back after the despawn and its respawn.
+        // This life of the mob earned its timer (EarnsTimer).
+        void Earned(uint32_t serverId) { m_Earned.insert(serverId); }
+        // From the server's defeat message: the mob's placeholder is due back after the despawn and its respawn, if
+        // this life of it earned the timer.
         void Died(double now, const PhSighting& mob);
+        // What was earned in the zone left is no longer anyone's.
+        void Zoned() { m_Earned.clear(); }
         // The mobs seen alive in range lose their timers; those long up go.
         void Update(double now, const std::vector<uint32_t>& aliveMobs);
         std::vector<TimerLine> Lines(uint16_t zone, double now) const;
@@ -54,6 +80,7 @@ namespace headsup
             double dueAt;
         };
         std::unordered_map<uint32_t, Timer> m_Timers;
+        std::unordered_set<uint32_t> m_Earned;
     };
 
     std::string Countdown(double seconds);
