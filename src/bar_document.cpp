@@ -334,7 +334,7 @@ namespace headsup
         css += "div{display:block;}";
         css += std::string(".") + kHiddenClass + "{display:none;}";
         css += std::string("#") + kStripId + "{position:absolute;left:0px;top:0px;width:100%;height:" + Px(stripHeight) + ";" +
-               (look.skin ? SkinDecorator(*look.skin) : "decorator:image(\"" + StripSource(p, stripRows, belowRows) + "\");") + "}";
+               (look.skin ? SkinFillDecorator(*look.skin) : "decorator:image(\"" + StripSource(p, stripRows, belowRows) + "\");") + "}";
         css += ".cap{position:absolute;top:" + centered(static_cast<float>(cap)) + ";" + square(static_cast<float>(cap)) + "}";
         css += "#cap-left{left:" + Px(std::round(m.cap / 2.0f - static_cast<float>(cap) / 2.0f)) + ";}";
         css += ".divider{position:absolute;top:" + centered(static_cast<float>(divider)) + ";" +

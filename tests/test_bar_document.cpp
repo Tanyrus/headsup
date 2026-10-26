@@ -357,6 +357,8 @@ TEST(the_strip_and_the_popups_are_drawn_with_the_games_art_when_the_shape_is_win
     // glow other themes fade out under the strip.
     const std::string strip = bar.substr(bar.find("#strip{"));
     CHECK(strip.substr(0, strip.find('}')).find("height:" + Px(look.metrics.height) + ";") != std::string::npos);
+    // The strip is the art's fill alone, as the game's own strips are: a frame along it would line its top and bottom.
+    CHECK(strip.substr(0, strip.find('}')).find(SkinSource(3, SkinPiece::Top, kFrameEdge)) == std::string::npos);
     const PopupFaces faces{};
     CHECK(PopupDocument(look, faces).find(SkinSource(3, SkinPiece::TopLeft, kFrameCorner)) != std::string::npos);
     // Without the art read, the shape draws its colors.

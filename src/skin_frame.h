@@ -15,4 +15,6 @@ namespace headsup
     };
     // The RCSS decorator that draws it: the frame on top, the shade under it, the background repeated under that.
     std::string SkinDecorator(const SkinFrame& frame);
+    // The same without the frame, as the game draws its strips across the screen (the help bar).
+    std::string SkinFillDecorator(const SkinFrame& frame);
 }

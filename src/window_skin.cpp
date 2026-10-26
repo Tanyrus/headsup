@@ -297,19 +297,33 @@ namespace headsup
             ArgbOf(RgbOf(Hsl{t.hue.h, t.hue.s, kAccentHoverLight})), WithAlpha(accent, kSoftAlpha), Lighter(frame)};
     }
 
+    namespace
+    {
+        std::string SkinSourceOf(const SkinFrame& f, SkinPiece piece, int menuPixels)
+        {
+            return "\"" + SkinSource(f.type, piece, SkinPixels(menuPixels, f.scale)) + "\"";
+        }
+
+        // The shade over the background, and the background repeated under it.
+        std::string Fill(const SkinFrame& f)
+        {
+            const auto shade = [](float level) { return RcssColor(WithAlpha(kBlack, static_cast<uint32_t>(std::lround((1.0f - std::min(level, 1.0f)) * kFullByte)))); };
+            return "vertical-gradient(" + shade(f.shadeTop) + " " + shade(f.shadeBottom) + "),image(" +
+                   SkinSourceOf(f, SkinPiece::Back, kSkinTile) + " none repeat)";
+        }
+    }
+
     std::string SkinDecorator(const SkinFrame& f)
     {
-        const auto source = [&](SkinPiece piece, int menuPixels) {
-            return "\"" + SkinSource(f.type, piece, SkinPixels(menuPixels, f.scale)) + "\"";
-        };
-        const auto shade = [](float level) { return RcssColor(WithAlpha(kBlack, static_cast<uint32_t>(std::lround((1.0f - std::min(level, 1.0f)) * kFullByte)))); };
+        const auto source = [&](SkinPiece piece, int menuPixels) { return SkinSourceOf(f, piece, menuPixels); };
         return "decorator:tiled-box(" + source(SkinPiece::TopLeft, kFrameCorner) + "," + source(SkinPiece::Top, kFrameEdge) + "," +
                source(SkinPiece::TopRight, kFrameCorner) + "," + source(SkinPiece::Left, kFrameEdge) + "," +
                source(SkinPiece::Clear, 1) + "," + source(SkinPiece::Right, kFrameEdge) + "," +
                source(SkinPiece::BottomLeft, kFrameCorner) + "," + source(SkinPiece::Bottom, kFrameEdge) + "," +
-               source(SkinPiece::BottomRight, kFrameCorner) + "),vertical-gradient(" + shade(f.shadeTop) + " " +
-               shade(f.shadeBottom) + "),image(" + source(SkinPiece::Back, kSkinTile) + " none repeat);";
+               source(SkinPiece::BottomRight, kFrameCorner) + ")," + Fill(f) + ";";
     }
+
+    std::string SkinFillDecorator(const SkinFrame& f) { return "decorator:" + Fill(f) + ";"; }
 
     int SkinTypeOf(int windowType, std::optional<int> gameType)
     {
