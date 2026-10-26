@@ -1835,3 +1835,27 @@ TEST(a_copy_added_has_a_tab_and_a_chip_of_its_own_and_its_settings_are_its_own)
     CHECK(!Placed(window.settings.barSections, copy));
     CHECK_EQ(window.Said(), "");
 }
+
+TEST(every_widget_tab_shows_its_whole_name_however_many_copies_there_are)
+{
+    for (const int copies : {0, 3, 12})
+    {
+        Window window;
+        for (int added = 0; added < copies; ++added)
+            AddWidgetCopy(window.settings, static_cast<BarWidget>(added % kBarWidgetCount == static_cast<int>(BarWidget::Target)
+                                                                     ? static_cast<int>(BarWidget::Gil)
+                                                                     : added % kBarWidgetCount));
+        window.Page("widgets");
+        window.Frames(2);
+        int tabs = 0;
+        for (Rml::Element* tab : window.OfClass("tab"))
+        {
+            if (tab->GetId().rfind("widgets-widgets-widget-t-", 0) != 0) continue;
+            ++tabs;
+            const float text = static_cast<float>(Rml::ElementUtilities::GetStringWidth(tab, tab->GetInnerRML()));
+            if (text > tab->GetBox().GetSize(Rml::BoxArea::Content).x)
+                throw test::Failure{"the tab " + tab->GetInnerRML() + " is cut with " + std::to_string(copies) + " copies"};
+        }
+        CHECK(tabs >= kPlacedWidgetCount);
+    }
+}

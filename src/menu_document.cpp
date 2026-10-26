@@ -366,6 +366,7 @@ namespace headsup
                " transparent;border-bottom:" + Em(kArrow) + " transparent;}";
         css += ".tri.left{left:0.5em;border-right:0.45em " + color(c.text) + ";}";
         css += ".tri.right{left:0.6em;border-left:0.45em " + color(c.text) + ";}";
+        css += std::string(".") + kArrowRoomClass + "{flex:0 0 auto;width:" + frame + ";height:" + frame + ";}";
         css += ".tri.up,.tri.down{left:" + Em(kFrame / 2.0f - kArrow) + ";top:" + Em((kFrame - kArrowDepth) / 2.0f) + ";border-left:" + Em(kArrow) +
                " transparent;border-right:" + Em(kArrow) + " transparent;}";
         css += ".tri.up{border-top-width:0px;border-bottom:" + Em(kArrowDepth) + " " + color(c.text) + ";}";

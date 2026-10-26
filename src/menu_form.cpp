@@ -565,7 +565,7 @@ namespace headsup
             const auto open = std::ranges::find(tabs, WidgetInSlot(c.state.widget));
             const int count = static_cast<int>(tabs.size());
             const int tab   = form.Tabs("widget", open != tabs.end() ? static_cast<int>(open - tabs.begin()) : 0,
-                labels.data(), count, TabsPerRow(count, kWidgetTabRows));
+                labels.data(), count, TabsPerRow(count, (count + kWidgetTabsPerRow - 1) / kWidgetTabsPerRow));
             c.state.widget  = SlotOf(tabs[static_cast<size_t>(tab)]);
             WidgetOptions(c, e, tabs[static_cast<size_t>(tab)]);
         }
@@ -757,8 +757,14 @@ namespace headsup
                 const std::string scope = std::string(" ") + KindKey(kind) + " " + std::to_string(i);
                 form.Line("line design");
                 form.Caption(lines[static_cast<size_t>(i)].name, "line-name");
-                if (i > 0 && form.ArrowAt(("move up" + scope).c_str(), false, WordTip(c, WindowWord::DesignMoveUp))) swapped = i - 1;
-                if (i < kPlateLines - 1 && form.ArrowAt(("move down" + scope).c_str(), true, WordTip(c, WindowWord::DesignMoveDown)))
+                // An end line's missing arrow keeps its room, so the three boxes start together.
+                if (i == 0)
+                    form.Raw(std::string("<div class=\"") + kArrowRoomClass + "\"></div>");
+                else if (form.ArrowAt(("move up" + scope).c_str(), false, WordTip(c, WindowWord::DesignMoveUp)))
+                    swapped = i - 1;
+                if (i == kPlateLines - 1)
+                    form.Raw(std::string("<div class=\"") + kArrowRoomClass + "\"></div>");
+                else if (form.ArrowAt(("move down" + scope).c_str(), true, WordTip(c, WindowWord::DesignMoveDown)))
                     swapped = i;
                 form.LineBox(("design" + scope).c_str(), k.lines[i].text, editor.drafts[i]);
                 form.EndLine();

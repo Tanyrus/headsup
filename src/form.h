@@ -72,6 +72,7 @@ namespace headsup
     constexpr const char* kLineBoxClass = "linebox"; // a design line's box
     constexpr const char* kRunClass     = "run";     // a stretch of text in it
     constexpr const char* kTypingClass  = "typing";  // on a box while one of its stretches has the keyboard
+    constexpr const char* kArrowRoomClass = "arrow-room"; // as wide as an arrow's button, with nothing in it
     // While a tag is held over a line box: what it would add, faint; a chip it would take the place of; and the line's
     // own tag held, which would leave its place.
     constexpr const char* kGhostClass    = "ghost";
