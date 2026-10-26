@@ -28,6 +28,8 @@ namespace headsup
         constexpr float kCrossLength  = 0.85f; // the close button's cross: each of its two bars
         constexpr float kCrossBar     = 0.12f;
         constexpr float kPillEdge     = 1.0f;  // pixels: a pill's edge, inside its height
+        constexpr float kSegmentGap   = 0.25f; // between two joined choices
+        constexpr float kSegmentPad   = 0.3f;  // a choice's text from its sides, at the least
     }
 
     namespace
@@ -42,14 +44,32 @@ namespace headsup
 
         uint32_t Faded(uint32_t argb, uint32_t alpha) { return (argb & ~kAlphaMask) | alpha << kAlphaShift; }
 
-        // What is Aurora's alone: glass in place of flat fills, and dark text on the picked choice's bright gradient.
+        // A fill this bright or brighter (WCAG's relative luminance, of its gradient's two ends) takes dark text: the
+        // gold, blue and cyan accents do, Phoenix's red does not.
+        constexpr float kBrightFill = 0.3f;
+
+        float Luminance(uint32_t argb)
+        {
+            const auto linear = [&](int shift) {
+                const float v = static_cast<float>(Channel(argb, shift)) / 255.0f;
+                return v <= 0.03928f ? v / 12.92f : std::pow((v + 0.055f) / 1.055f, 2.4f);
+            };
+            return 0.2126f * linear(kRedShift) + 0.7152f * linear(kGreenShift) + 0.0722f * linear(kBlueShift);
+        }
+
+        // The text on the accent's gradient: a picked choice or tab, and an accent button.
+        uint32_t OnAccent(const MenuColors& c)
+        {
+            return (Luminance(c.accent) + Luminance(c.accentEnd)) / 2.0f >= kBrightFill ? Opaque(c.inset) : c.text;
+        }
+
+        // What is Aurora's alone: glass in place of flat fills.
         std::string AuroraMenuRules(const MenuColors& c)
         {
             std::string css;
             css += "body{decorator:vertical-gradient(#111b2cf2 #090e17f2);background-color:transparent;border-color:" +
                    RcssColor(Faded(c.accent, kAuroraFrame)) + ";}";
             css += ".card{background-color:transparent;decorator:vertical-gradient(#1c283cb8 #131b2ab8);}";
-            css += ".seg.picked,.tab.picked,.btn.accent{color:" + RcssColor(Opaque(c.inset)) + ";}";
             css += "scrollbarvertical sliderbar{background-color:" + RcssColor(Faded(c.accent, kAuroraFrame)) + ";}";
             css += std::string("#") + kMenuPopupId + ",#" + kMenuTipId + "{border-color:" + RcssColor(Faded(c.accent, kAuroraPopupFrame)) + ";}";
             return css;
@@ -225,12 +245,17 @@ namespace headsup
         // Joined choices. These, tabs, buttons and lists ease between their looks, and the picked one is the gradient.
         css += std::string(".seg,.tab,.btn,.dd,.opt,.wchip{transition:background-color") + kEase + ",border-color" + kEase +
                ",color" + kEase + ";}";
-        css += ".seg.picked,.tab.picked,.btn.accent{decorator:horizontal-gradient(" + color(c.accent) + " " + color(c.accentEnd) + ");}";
-        css += ".segs{display:flex;flex-direction:row;}";
-        css += ".seg{height:" + frame + ";" + framed + "text-align:center;background-color:" + color(c.control) +
-               ";color:" + color(c.muted) + ";}";
+        css += ".seg.picked,.tab.picked,.btn.accent{decorator:horizontal-gradient(" + color(c.accent) + " " + color(c.accentEnd) +
+               ");color:" + color(OnAccent(c)) + ";}";
+        // Rounded buttons a little apart, as wide together as a slider, a longer name taking more of it; wider only
+        // where the names need it in a wide font.
+        css += ".segs{display:flex;flex-direction:row;min-width:" + control + ";}";
+        css += ".seg{flex:1 0 auto;height:" + frame + ";" + framed + "padding:0px " + Em(kSegmentPad) + ";margin-left:" +
+               Em(kSegmentGap) + ";border-radius:" + radius + ";text-align:center;white-space:nowrap;background-color:" +
+               color(c.control) + ";color:" + color(c.muted) + ";}";
+        css += ".seg:first-child{margin-left:0px;}";
         css += ".seg:hover{background-color:" + color(c.hover) + ";}";
-        css += ".seg.picked{background-color:" + color(c.accent) + ";color:" + color(c.text) + ";}";
+        css += ".seg.picked{background-color:" + color(c.accent) + ";}";
         // A slider, its value written over it.
         css += ".slider{position:relative;width:" + control + ";height:" + frame + ";}";
         css += "input.range{display:block;width:" + control + ";height:" + frame + ";}";
@@ -345,7 +370,7 @@ namespace headsup
                Em(kTabGap) + ";text-align:center;white-space:nowrap;border-radius:" + radius + " " + radius +
                " 0px 0px;background-color:" + color(c.control) + ";color:" + color(c.muted) + ";}";
         css += ".tab:hover{background-color:" + color(c.hover) + ";}";
-        css += ".tab.picked{background-color:" + color(c.accent) + ";color:" + color(c.text) + ";}";
+        css += ".tab.picked{background-color:" + color(c.accent) + ";}";
         css += ".tab-rule{height:" + Em(kTabRule) + ";margin-top:-" + Em(kTabGap) + ";margin-bottom:" + Em(kSpacing) +
                ";decorator:horizontal-gradient(" + color(c.accent) + fadingOut + ";}";
         // The widgets' trays.

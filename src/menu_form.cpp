@@ -477,7 +477,7 @@ namespace headsup
                     if (widget == BarWidget::Job)
                     {
                         const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(WindowList::JobLayout));
-                        form.Segments(own.c_str(), s.jobLayout, names.data(), kJobLayoutCount, row.tip, kWideSegmentWidth);
+                        form.Segments(own.c_str(), s.jobLayout, names.data(), kJobLayoutCount, row.tip);
                     }
                     break;
                 case WidgetTabsRow::ExpBar:
@@ -759,7 +759,7 @@ namespace headsup
                     if (n < kPlateLines - 1)
                     {
                         const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(WindowList::Align));
-                        form.Segments(label.c_str(), line.align, names.data(), kAlignCount, tip, kControlWidth / kAlignCount);
+                        form.Segments(label.c_str(), line.align, names.data(), kAlignCount, tip);
                     }
                     break;
                 case LineStylesRow::Font:
@@ -768,7 +768,7 @@ namespace headsup
                 case LineStylesRow::FontStyle:
                 {
                     const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(WindowList::FontStyle));
-                    form.Toggles(label.c_str(), line.style, names.data(), kFontStyleCount, tip, kControlWidth / kFontStyleCount);
+                    form.Toggles(label.c_str(), line.style, names.data(), kFontStyleCount, tip);
                     break;
                 }
                 case LineStylesRow::TextSize:
@@ -1205,7 +1205,7 @@ namespace headsup
             {
                 form.Fade(!BarOn(s));
                 const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(e));
-                form.Segments(label.c_str(), s.barSeparators, names.data(), kBarSeparatorsCount, tip, kWideSegmentWidth);
+                form.Segments(label.c_str(), s.barSeparators, names.data(), kBarSeparatorsCount, tip);
                 break;
             }
             case SettingPiece::TitleFont:
@@ -1257,7 +1257,7 @@ namespace headsup
                 form.Fade(!BarOn(s));
                 BarPalette edited = s.customPalette;
                 const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(e));
-                form.Segments(label.c_str(), edited.shape, names.data(), kBarShapeCount, tip, kWideSegmentWidth);
+                form.Segments(label.c_str(), edited.shape, names.data(), kBarShapeCount, tip);
                 EditTheme(c, edited);
                 break;
             }

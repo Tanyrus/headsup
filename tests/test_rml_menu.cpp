@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdint>
 #include <map>
 #include <string>
@@ -1581,4 +1582,80 @@ TEST(the_game_window_theme_draws_the_window_in_the_art_and_its_colors)
     CHECK(style.find(RcssColor(kPhoenixMenuColors.text)) == std::string::npos);
     window.Skin(look);
     CHECK_EQ(window.Said(), "");
+}
+
+namespace
+{
+    float Width(Rml::Element* element) { return element->GetBox().GetSize(Rml::BoxArea::Border).x; }
+    float Left(Rml::Element* element) { return element->GetAbsoluteOffset(Rml::BoxArea::Border).x; }
+
+    constexpr int kPastEasing = 10; // frames: a control has eased into its look
+
+    // WCAG's relative luminance of a computed color.
+    float Luminance(const Rml::Colourb& c)
+    {
+        const auto linear = [&](Rml::byte channel) {
+            const float v = static_cast<float>(channel) / 255.0f;
+            return v <= 0.03928f ? v / 12.92f : std::pow((v + 0.055f) / 1.055f, 2.4f);
+        };
+        return 0.2126f * linear(c.red) + 0.7152f * linear(c.green) + 0.0722f * linear(c.blue);
+    }
+}
+
+TEST(joined_choices_are_rounded_buttons_apart_from_each_other_as_wide_as_a_slider)
+{
+    for (const char* font : {kBarlowCondensed, kCinzel})
+    {
+        Window window(BarTheme::PhoenixGold, font);
+        int rows = 0;
+        for (const LayoutPage& info : kWindowLayout.pages)
+        {
+            window.Page(info.key);
+            float slider = 0.0f;
+            for (Rml::Element* element : window.OfClass("slider"))
+                if (element->IsVisible(true)) slider = Width(element);
+            for (Rml::Element* segs : window.OfClass("segs"))
+            {
+                if (!segs->IsVisible(true) || slider == 0.0f) continue;
+                ++rows;
+                // In the default font every row fits a slider's width; a wide font may need more, and never less.
+                CHECK(font == kCinzel ? Width(segs) >= slider - 1.0f : std::abs(Width(segs) - slider) <= 1.0f);
+                for (int i = 0; i < segs->GetNumChildren(); ++i)
+                {
+                    Rml::Element* seg = segs->GetChild(i);
+                    CHECK(seg->GetComputedValues().border_top_left_radius() > 0.0f);
+                    const float text = static_cast<float>(Rml::ElementUtilities::GetStringWidth(seg, seg->GetInnerRML()));
+                    if (text > seg->GetBox().GetSize(Rml::BoxArea::Content).x)
+                        throw test::Failure{seg->GetId() + " in " + font + " cuts " + seg->GetInnerRML() + ": " + std::to_string(text) +
+                                            " in " + std::to_string(seg->GetBox().GetSize(Rml::BoxArea::Content).x)};
+                    if (i > 0)
+                    {
+                        Rml::Element* before = segs->GetChild(i - 1);
+                        CHECK(Left(seg) - (Left(before) + Width(before)) >= 2.0f);
+                    }
+                }
+            }
+        }
+        CHECK(rows >= 4);
+    }
+}
+
+TEST(a_picked_choice_and_tab_take_dark_text_where_the_accent_is_bright)
+{
+    const auto pickedText = [](Window& window, const char* kind) {
+        for (Rml::Element* element : window.OfClass(kind))
+            if (element->IsVisible(true) && element->IsClassSet("picked")) return Luminance(element->GetComputedValues().color());
+        throw test::Failure{std::string("no picked ") + kind};
+    };
+    for (const auto [theme, bright] : {std::pair{BarTheme::PhoenixGold, true}, std::pair{BarTheme::UmbraDark, true},
+             std::pair{BarTheme::Aurora, true}, std::pair{BarTheme::PhoenixRedOrnate, false}})
+    {
+        Window window(theme);
+        window.Page("toppanel");
+        window.Frames(kPastEasing);
+        CHECK_EQ(pickedText(window, "seg") < 0.2f, bright);
+        window.Page("widgets");
+        window.Frames(kPastEasing);
+        CHECK_EQ(pickedText(window, "tab") < 0.2f, bright);
+    }
 }

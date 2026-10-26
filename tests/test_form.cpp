@@ -397,7 +397,7 @@ TEST(segments_and_tabs_mark_the_picked_one_and_take_a_click)
         return form;
     };
     const Form first = pass({});
-    CHECK(Has(first.blocks[0].rml, "<div class=\"seg\" id=\"p-c-one-line-s-0\" style=\"width:4.6em;\">Hide</div>"));
+    CHECK(Has(first.blocks[0].rml, "<div class=\"seg\" id=\"p-c-one-line-s-0\">Hide</div>"));
     CHECK(ClassOn(first, "p-c-one-line-s-2", "picked") && !ClassOn(first, "p-c-one-line-s-0", "picked"));
     // Three tabs, two to a row: a row of two and a row of one.
     CHECK(Has(first.blocks[0].rml, "<div class=\"tab-row\"><div class=\"tab\" id=\"p-c-tabs-t-0\">Hide</div>"

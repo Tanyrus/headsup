@@ -241,17 +241,15 @@ namespace headsup
         EndRow();
     }
 
-    void Form::SegmentRow(const std::string& base, const char* const* options, int count, float segment,
+    void Form::SegmentRow(const std::string& base, const char* const* options, int count,
         const std::function<void(int)>& press, const std::function<bool(int)>& picked)
     {
-        const std::string width = Em(segment > 0.0f ? segment : kSegmentWidth);
         Out() += "<div class=\"segs\" id=\"" + base + "\">";
         for (int option = 0; option < count; ++option)
         {
             const std::string seg = base + kSegmentIdInfix + std::to_string(option);
             if (!m_Off && Clicked(seg)) press(option);
-            Out() += "<div class=\"seg\" id=\"" + seg + "\" style=\"width:" + width + ";\">" +
-                     EscapedRml(options[option]) + "</div>";
+            Out() += "<div class=\"seg\" id=\"" + seg + "\">" + EscapedRml(options[option]) + "</div>";
         }
         Out() += "</div>";
         for (int option = 0; option < count; ++option)
@@ -259,9 +257,9 @@ namespace headsup
         Set(base, FormValueKind::Class, kOffClass, {}, m_Off);
     }
 
-    void Form::SegmentsAt(const char* id, int& value, const char* const* options, int count, float segment)
+    void Form::SegmentsAt(const char* id, int& value, const char* const* options, int count)
     {
-        SegmentRow(Id(id), options, count, segment,
+        SegmentRow(Id(id), options, count,
             [&](int option) {
                 changed |= value != option;
                 value = option;
@@ -419,11 +417,11 @@ namespace headsup
         return false;
     }
 
-    void Form::Toggles(const char* label, uint8_t& bits, const char* const* options, int count, const char* tip, float segment)
+    void Form::Toggles(const char* label, uint8_t& bits, const char* const* options, int count, const char* tip)
     {
         Row(label, tip);
         const auto bit = [](int option) { return static_cast<uint8_t>(1u << option); };
-        SegmentRow(Id(label), options, count, segment,
+        SegmentRow(Id(label), options, count,
             [&](int option) {
                 bits ^= bit(option);
                 changed = true;

@@ -19,7 +19,6 @@ namespace headsup
     constexpr float kTogglePeg      = 2.0f;  // the peg's width: a rectangle that slides from end to end
     constexpr float kToggleWidth    = 2.0f * kTogglePeg + 2.0f * kToggleInset; // a yes or no in a table: room to slide
     constexpr float kCardToggleWidth = 7.0f; // a card title's: OFF clears its peg in the widest font
-    constexpr float kSegmentWidth   = 4.6f;
     constexpr float kControlWidth   = 15.0f; // sliders and dropdowns
     constexpr float kFrame          = 1.6f;  // a control's height: a line of text and its padding above and below
     constexpr float kTallButton     = 2.0f;  // a page's own wide button, a little taller than a control
@@ -32,7 +31,6 @@ namespace headsup
     constexpr float kNumberName     = 1.1f;  // the X or Y before it
     constexpr float kFilterWidth    = 12.0f;
     constexpr float kGroupNameWidth = 9.0f;
-    constexpr float kWideSegmentWidth = 5.4f; // a choice as long as "Diamonds"
     constexpr float kChipHeight     = 1.9f;
     constexpr float kChipDot        = 0.5f;
     constexpr float kTabHeight      = 2.0f;

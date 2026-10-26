@@ -191,12 +191,11 @@ namespace headsup
             const char* onWord = nullptr);
         // Options as joined buttons, the picked one filled.
         template <typename Enum>
-        void Segments(const char* label, Enum& value, const char* const* options, int count, const char* tip,
-            float segment = 0.0f)
+        void Segments(const char* label, Enum& value, const char* const* options, int count, const char* tip)
         {
             Row(label, tip);
             int picked = static_cast<int>(value);
-            SegmentsAt(label, picked, options, count, segment);
+            SegmentsAt(label, picked, options, count);
             value = static_cast<Enum>(picked);
             EndRow();
         }
@@ -226,8 +225,7 @@ namespace headsup
         void FontDropdown(const char* label, std::string& font, const std::vector<std::string>& choices,
             const char* tip = nullptr, const char* unset = nullptr);
         // Joined buttons that each switch a bit of their own, the lowest first: any of them together.
-        void Toggles(const char* label, uint8_t& bits, const char* const* options, int count, const char* tip,
-            float segment = 0.0f);
+        void Toggles(const char* label, uint8_t& bits, const char* const* options, int count, const char* tip);
         // original: the color's default. While the color is another, an arrow before the swatch puts it back.
         void Swatch(const char* label, Color& color, const char* tip, const Color* original = nullptr);
         // A color with its opacity (ARGB): its popup has an alpha slider too, and its hex box keeps the alpha.
@@ -253,7 +251,7 @@ namespace headsup
         void CheckAt(const char* id, bool& on, const char* tip = nullptr);
         // A toggle among a row's controls that says its state in its middle.
         void ToggleAt(const char* id, bool& on, const char* offWord, const char* onWord);
-        void SegmentsAt(const char* id, int& value, const char* const* options, int count, float segment = 0.0f);
+        void SegmentsAt(const char* id, int& value, const char* const* options, int count);
         // A dropdown whose list is a popup of rows, the picked one marked. True when another row was chosen. The
         // closed control's tip is tip, or what option says of the row picked; markup rows are RML, not text.
         template <typename Name>
@@ -326,7 +324,7 @@ namespace headsup
         // A dropdown's closed control: what it shows and its arrow. True while its popup is open.
         // markup: shown, or name, is RML and not words to escape.
         // A row of joined buttons: press is told of each one clicked, and picked says which are lit.
-        void SegmentRow(const std::string& base, const char* const* options, int count, float segment,
+        void SegmentRow(const std::string& base, const char* const* options, int count,
             const std::function<void(int)>& press, const std::function<bool(int)>& picked);
         // A click on the control opens its popup, or closes it when it is the one open.
         void TogglePopup(const std::string& control);
