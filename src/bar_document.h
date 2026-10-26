@@ -47,10 +47,22 @@ namespace headsup
         bool operator==(const BarTextPlace&) const = default;
     };
 
+    // A widget's own text, where its fonts or size are not the bar's: those fonts, and the text row and places they
+    // come to.
+    struct WidgetText
+    {
+        PanelWidget widget;
+        const char* titleFont  = nullptr; // interned, as the bar's are
+        const char* detailFont = nullptr;
+        TextRow lines;
+        BarTextPlace place;
+        bool operator==(const WidgetText&) const = default;
+    };
+
     // The bar's markup and style: the strip across the screen, the ornate caps, a divider for each pair of
-    // neighbours and every placed widget's element, all sized from the look. The widgets and dividers carry the
-    // hidden class and no place: the plugin shows and places them.
-    std::string BarDocument(const BarLook& look, const BarTextPlace& place);
+    // neighbours and every placed widget's element, all sized from the look, with the text rules of each widget in
+    // own under its id. The widgets and dividers carry the hidden class and no place: the plugin shows and places them.
+    std::string BarDocument(const BarLook& look, const BarTextPlace& place, const std::vector<WidgetText>& own = {});
     std::string WidgetId(PanelWidget widget);
     // A widget's padding on each side as its element takes it, for a room from its edge to what it shows: inside a
     // pill's or a frame's border, or past a plain ornate widget's margin.

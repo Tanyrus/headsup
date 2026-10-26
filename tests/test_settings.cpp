@@ -2751,3 +2751,20 @@ TEST(a_widgets_spacing_and_padding_are_kept_for_each_copy_and_held_to_their_rang
     CHECK_EQ(held.Widget(BarWidget::Bags).spacing, kMaxWidgetSpacing);
     CHECK_EQ(held.Widget(*copy).padding, kThemePadding);
 }
+
+TEST(a_widgets_own_fonts_and_text_size_are_kept_and_default_to_the_panels)
+{
+    Settings s;
+    CHECK(s.Widget(BarWidget::Zone).titleFont.empty() && s.Widget(BarWidget::Zone).textSize == kPanelTextSize);
+    s.Widget(BarWidget::Zone).titleFont = "Cinzel";
+    s.Widget(BarWidget::Zone).textFont  = "Arial";
+    s.Widget(BarWidget::Zone).textSize  = 18;
+    MapStore store;
+    SaveSettings(s, store);
+    const Settings read = LoadSettings(store);
+    CHECK(read.Widget(BarWidget::Zone) == s.Widget(BarWidget::Zone));
+    store.values["barZoneTextSize"] = "99";
+    CHECK_EQ(LoadSettings(store).Widget(BarWidget::Zone).textSize, kMaxBarTextSize);
+    store.values["barZoneTextSize"] = "2";
+    CHECK_EQ(LoadSettings(store).Widget(BarWidget::Zone).textSize, kPanelTextSize);
+}

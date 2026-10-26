@@ -118,6 +118,21 @@ namespace headsup
             toward(p.subtitle, page, kMutedShare), p.accent, p.accentEnd, WithAlpha(p.accent, kMenuSoftAlpha), p.accentEnd};
     }
 
+    const char* WidgetTitleFont(const Settings& settings, BarShape shape, const WidgetOptions& options)
+    {
+        return options.titleFont.empty() ? BarTitleFont(settings, shape) : Interned(options.titleFont);
+    }
+
+    const char* WidgetTextFont(const Settings& settings, const WidgetOptions& options)
+    {
+        return options.textFont.empty() ? BarTextFont(settings) : Interned(options.textFont);
+    }
+
+    int WidgetTextSize(const Settings& settings, const WidgetOptions& options)
+    {
+        return options.textSize == kPanelTextSize ? settings.barTextSize : options.textSize;
+    }
+
     float WidgetPadding(const BarMetrics& metrics, const WidgetOptions& options)
     {
         return options.padding == kThemePadding ? metrics.padding : static_cast<float>(options.padding);

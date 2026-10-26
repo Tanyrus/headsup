@@ -266,3 +266,20 @@ TEST(a_widget_is_padded_by_the_theme_unless_it_has_its_own)
     o.padding = 4;
     CHECK_EQ(WidgetPadding(m, o), 4.0f);
 }
+
+TEST(a_widgets_fonts_and_text_size_are_its_own_or_the_panels)
+{
+    Settings settings;
+    settings.barTitleFont = "Cinzel";
+    settings.barTextSize  = 14;
+    WidgetOptions o;
+    CHECK_EQ(std::string(WidgetTitleFont(settings, BarShape::Pills, o)), "Cinzel");
+    CHECK(WidgetTextFont(settings, o) == BarTextFont(settings));
+    CHECK_EQ(WidgetTextSize(settings, o), 14);
+    o.titleFont = "Arial";
+    o.textFont  = "Arial";
+    o.textSize  = 20;
+    CHECK(WidgetTitleFont(settings, BarShape::Pills, o) == WidgetTextFont(settings, o)); // one pointer per name
+    CHECK_EQ(std::string(WidgetTextFont(settings, o)), "Arial");
+    CHECK_EQ(WidgetTextSize(settings, o), 20);
+}

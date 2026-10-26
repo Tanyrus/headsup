@@ -65,6 +65,7 @@ namespace headsup
             BarTextPlace place{};
             const char* titleFont  = nullptr;
             const char* detailFont = nullptr;
+            std::vector<WidgetText> own;
             bool operator==(const DocumentKey&) const = default;
         };
         // A value RmlUi was last given, so it is given only when it changes.
@@ -108,6 +109,7 @@ namespace headsup
             std::array<WidgetContent, kPanelSlots> contents;
             std::array<bool, kPanelSlots> hasPopup{};
             std::array<float, kPanelSlots> spacing{}; // each widget's own room more beside it
+            std::array<std::optional<WidgetText>, kPanelSlots> text; // a widget's own, where it has fonts or a size of its own
         };
         // The help bar's text follows the game's, its fonts and their sizes, and the room its lines and its caption
         // have beside the bag's count.
@@ -153,9 +155,17 @@ namespace headsup
 
         const Rows& RowsFor(RmlHost& host, const BarMetrics& metrics, BarShape shape, int barText, const char* titleFont,
             const char* detailFont);
+        Rows MakeRows(RmlHost& host, const BarMetrics& metrics, const char* titleFont, const char* detailFont);
+        // The same for a widget's own text, kept for each one asked for while it is asked for.
+        const Rows& WidgetRowsFor(RmlHost& host, const BarMetrics& metrics, BarShape shape, int barText, const char* titleFont,
+            const char* detailFont);
+        // The widgets with text of their own, as the document's rules and their content take it.
+        void OwnText(RmlHost& host, const BarLook& look, const Settings& settings, Widgets& widgets);
+        // The look a widget is measured and written in: the bar's, with its own text where it has some.
+        static BarLook LookOf(const BarLook& look, const Widgets& widgets, int slot);
         BarLinePlace PlaceLine(RmlHost& host, const char* family, int pixels, const char* glyphs, float top, float aloneTop);
         // Builds the document again when what it is made from changed. False when RmlUi refused it.
-        bool Document(RmlHost& host, const BarLook& look, const BarTextPlace& place);
+        bool Document(RmlHost& host, const BarLook& look, const BarTextPlace& place, const Widgets& widgets);
         BarLayout PlaceWidgets(RmlHost& host, const BarLook& look, const BarState& state, float screenWidth,
             Widgets& widgets);
         void ShowWidgets(const BarLook& look, const BarLayout& layout, const Widgets& widgets, const BarInput& input,
@@ -184,6 +194,7 @@ namespace headsup
 
         GdiText m_Gdi; // the bar's text rows are sized by GDI's ink, as the bar drawn with it is
         Memo<LinesKey, Rows> m_Rows;
+        std::vector<std::pair<LinesKey, Rows>> m_WidgetRows, m_WidgetRowsBefore; // this frame's, and the last frame's
         Rml::ElementDocument* m_Document = nullptr;
         DocumentKey m_DocumentKey;
         bool m_Visible = false;

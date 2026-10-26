@@ -184,6 +184,9 @@ namespace headsup
         constexpr const char* kIconsSuffix      = "Icons";
         constexpr const char* kSpacingSuffix    = "Spacing";
         constexpr const char* kPaddingSuffix    = "Padding";
+        constexpr const char* kTitleFontSuffix  = "TitleFont";
+        constexpr const char* kTextFontSuffix   = "TextFont";
+        constexpr const char* kTextSizeSuffix   = "TextSize";
         constexpr const char* kExpBarKey        = "expBar";
         const char* const kExpBarNames[kExpBarPlaceCount] = {"under", "beside", "off"};
         constexpr const char* kJobNamesKey  = "jobNames";
@@ -1209,6 +1212,9 @@ namespace headsup
             if (w.currency < 0 || w.currency >= kCurrencyCount) w.currency = fresh.currency;
             w.spacing = std::clamp(w.spacing, 0, kMaxWidgetSpacing);
             w.padding = w.padding < 0 ? kThemePadding : std::min(w.padding, kMaxWidgetPadding);
+            w.textSize = std::clamp(w.textSize, kPanelTextSize, kMaxBarTextSize);
+            for (std::string* font : {&w.titleFont, &w.textFont})
+                if (font->size() > kMaxFontName) font->clear();
             if (w.clockZone && static_cast<int>(*w.clockZone) >= kClockZoneCount) w.clockZone = fresh.clockZone;
             if (static_cast<int>(w.expBar) >= kExpBarPlaceCount) w.expBar = fresh.expBar;
             if (static_cast<int>(w.jobLayout) >= kJobLayoutCount) w.jobLayout = fresh.jobLayout;
@@ -1256,6 +1262,9 @@ namespace headsup
             o.icons      = flag(widget + kIconsSuffix, o.icons);
             o.spacing    = number(widget + kSpacingSuffix, o.spacing);
             o.padding    = number(widget + kPaddingSuffix, o.padding);
+            o.titleFont  = text((widget + kTitleFontSuffix).c_str());
+            o.textFont   = text((widget + kTextFontSuffix).c_str());
+            o.textSize   = number(widget + kTextSizeSuffix, o.textSize);
             switch (w.kind)
             {
             case BarWidget::Gil:
@@ -1298,6 +1307,9 @@ namespace headsup
             flag(widget + kIconsSuffix, o.icons);
             StoreFloat(store, CopyKey(widget + kSpacingSuffix, w), static_cast<float>(o.spacing));
             StoreFloat(store, CopyKey(widget + kPaddingSuffix, w), static_cast<float>(o.padding));
+            text((widget + kTitleFontSuffix).c_str(), o.titleFont.c_str());
+            text((widget + kTextFontSuffix).c_str(), o.textFont.c_str());
+            StoreFloat(store, CopyKey(widget + kTextSizeSuffix, w), static_cast<float>(o.textSize));
             switch (w.kind)
             {
             case BarWidget::Gil: text(kBarCurrencyKey, kCurrencyTable[o.currency].key); break;

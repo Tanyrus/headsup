@@ -42,6 +42,7 @@ namespace headsup
 
     constexpr int kMaxWidgetSpacing = 40; // pixels
     constexpr int kThemePadding = -1, kMaxWidgetPadding = 40; // pixels; the slider's leftmost is the theme's own
+    constexpr int kPanelTextSize = kAutoBarTextSize; // a widget's text size: the panel's, at the slider's leftmost
 
     // One copy of a widget on the panel: whether it shows, what of it, and its own settings.
     struct WidgetOptions
@@ -51,6 +52,8 @@ namespace headsup
         bool icons      = true; // and gil's coin
         int spacing     = 0;             // pixels more between it and each of its neighbours
         int padding     = kThemePadding; // pixels from its sides to what it shows
+        std::string titleFont, textFont;  // its own, as the panel's; empty for the panel's
+        int textSize    = kPanelTextSize; // its title's, or the panel's
         int currency    = kGilCurrency;             // Gil: by kCurrencyTable
         std::optional<ClockZone> clockZone;         // Clock: none for the computer's own
         bool clock24         = true;                // its two lines

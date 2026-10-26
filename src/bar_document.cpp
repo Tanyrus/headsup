@@ -278,7 +278,34 @@ namespace headsup
         }
     }
 
-    std::string BarDocument(const BarLook& look, const BarTextPlace& place)
+    namespace
+    {
+        // The rules of a widget's lines in its fonts and on its rows, each selector after scope.
+        std::string TextRules(const std::string& scope, const char* titleFont, const char* detailFont, const TextRow& lines,
+            const BarTextPlace& place, float rowTop)
+        {
+            auto square = [](float size) { return "width:" + Px(size) + ";height:" + Px(size) + ";"; };
+            std::string css;
+            css += scope + ".title{" + LineRules(titleFont, lines.title, place.title, rowTop) + "}";
+            css += scope + ".title.alone{margin-top:" + Px(std::round(place.title.aloneTop) - rowTop) + ";}";
+            css += scope + ".title.figures{" + LineRules(detailFont, lines.title, place.figures, rowTop) + "}";
+            css += scope + ".title.figures.alone{margin-top:" + Px(std::round(place.figures.aloneTop) - rowTop) + ";}";
+            css += scope + ".title .line-icon{" + square(static_cast<float>(lines.title)) + "margin-top:" + Px(place.title.iconDrop) + ";}";
+            css += scope + ".title.figures .line-icon{margin-top:" + Px(place.figures.iconDrop) + ";}";
+            if (lines.twoLines)
+            {
+                const float underTitle   = std::round(place.title.top) + static_cast<float>(place.title.height);
+                const float underFigures = std::round(place.figures.top) + static_cast<float>(place.figures.height);
+                css += scope + ".detail{" + LineRules(detailFont, lines.detail, place.detail, underTitle) + "}";
+                css += scope + ".detail.fig{margin-top:" + Px(std::round(place.detail.top) - underFigures) + ";}";
+                css += scope + ".detail .line-icon{" + square(static_cast<float>(lines.detail)) + "margin-top:" +
+                       Px(place.detail.iconDrop) + ";}";
+            }
+            return css;
+        }
+    }
+
+    std::string BarDocument(const BarLook& look, const BarTextPlace& place, const std::vector<WidgetText>& own)
     {
         const BarPalette& p  = look.palette;
         const BarMetrics& m  = look.metrics;
@@ -352,23 +379,11 @@ namespace headsup
         css += ".coin{" + square(static_cast<float>(coin)) + "margin-top:" +
                Px(std::round(mid - static_cast<float>(coin) / 2.0f) - rowTop) + ";margin-right:" + Px(m.gap) + ";}";
         css += ".t{white-space:pre;}";
-        css += ".title{" + LineRules(look.titleFont, lines.title, place.title, rowTop) + "}";
-        css += ".title.alone{margin-top:" + Px(std::round(place.title.aloneTop) - rowTop) + ";}";
-        css += ".title.figures{" + LineRules(look.detailFont, lines.title, place.figures, rowTop) + "}";
-        css += ".title.figures.alone{margin-top:" + Px(std::round(place.figures.aloneTop) - rowTop) + ";}";
         css += ".line-icons{margin-left:" + Px(kLineIconGap) + ";}";
         css += ".line-icon{margin-left:" + Px(kLineIconGap) + ";}";
-        css += ".title .line-icon{" + square(static_cast<float>(lines.title)) + "margin-top:" + Px(place.title.iconDrop) + ";}";
-        css += ".title.figures .line-icon{margin-top:" + Px(place.figures.iconDrop) + ";}";
-        if (lines.twoLines)
-        {
-            const float underTitle   = std::round(place.title.top) + static_cast<float>(place.title.height);
-            const float underFigures = std::round(place.figures.top) + static_cast<float>(place.figures.height);
-            css += ".detail{" + LineRules(look.detailFont, lines.detail, place.detail, underTitle) + "}";
-            css += ".detail.fig{margin-top:" + Px(std::round(place.detail.top) - underFigures) + ";}";
-            css += ".detail .line-icon{" + square(static_cast<float>(lines.detail)) + "margin-top:" +
-                   Px(place.detail.iconDrop) + ";}";
-        }
+        css += TextRules("", look.titleFont, look.detailFont, lines, place, rowTop);
+        for (const WidgetText& text : own)
+            css += TextRules("#" + WidgetId(text.widget) + " ", text.titleFont, text.detailFont, text.lines, text.place, rowTop);
         css += ".progress{position:absolute;left:0px;right:0px;top:" +
                Px(row.y + row.height - kProgressInset - underHeight - rowTop) + ";height:" + Px(underHeight) +
                ";background-color:" + RcssColor(p.divider) + ";}";

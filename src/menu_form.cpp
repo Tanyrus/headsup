@@ -487,6 +487,16 @@ namespace headsup
                     form.SliderInt(label.c_str(), o.padding, kThemePadding, kMaxWidgetPadding,
                         o.padding == kThemePadding ? Word(c, WindowWord::ThemesFont) : "%d px", row.tip);
                     break;
+                case WidgetTabsRow::TitleFont:
+                    form.FontDropdown(label.c_str(), o.titleFont, c.fonts, row.tip, Word(c, WindowWord::DefaultFont));
+                    break;
+                case WidgetTabsRow::TextFont:
+                    form.FontDropdown(label.c_str(), o.textFont, c.fonts, row.tip, Word(c, WindowWord::DefaultFont));
+                    break;
+                case WidgetTabsRow::TextSize:
+                    form.SliderInt(label.c_str(), o.textSize, kPanelTextSize, kMaxBarTextSize,
+                        o.textSize == kPanelTextSize ? Word(c, WindowWord::DefaultFont) : "%d px", row.tip);
+                    break;
                 case WidgetTabsRow::Details:
                     if (kind == BarWidget::Target) form.Switch(label.c_str(), o.targetDetails, row.tip);
                     break;

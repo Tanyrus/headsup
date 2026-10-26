@@ -363,3 +363,21 @@ TEST(the_strip_and_the_popups_are_drawn_with_the_games_art_when_the_shape_is_win
     CHECK(BarDocument(look, Place()).find("hu:skin") == std::string::npos);
     CHECK(PopupDocument(look, faces).find("hu:skin") == std::string::npos);
 }
+
+TEST(a_widget_with_text_of_its_own_has_rules_of_its_own_under_its_id)
+{
+    Settings settings;
+    const BarLook look = LookOf(BarTheme::PhoenixGold, settings);
+    const PanelWidget gil{BarWidget::Gil, 1};
+    // Its own fonts at 20 px titles over 15 px details, a line box 24 px tall from row 6.
+    const WidgetText own{gil, kCinzel, kMarcellusSC, TextRow{20, 15, true, 6.0f, 26.0f, 12.0f},
+        BarTextPlace{BarLinePlace{24, 6.0f, 12.0f, 2.0f}, BarLinePlace{24, 6.0f, 12.0f, 2.0f}, BarLinePlace{18, 26.0f, 0.0f, 2.0f}}};
+    const std::string rml = BarDocument(look, Place(), {own});
+    CHECK(Has(rml, "#w-gil-2 .title{font-family:\"Cinzel\";font-size:20px;line-height:24px;"));
+    CHECK(Has(rml, "#w-gil-2 .detail{font-family:\"Marcellus SC\";font-size:15px;"));
+    CHECK(!Has(rml, "#w-gil .title") && !Has(BarDocument(look, Place()), "#w-gil-2 .title"));
+    // A widget's own row without room for two lines has its title alone: no detail rules of its own.
+    WidgetText alone = own;
+    alone.lines.twoLines = false;
+    CHECK(!Has(BarDocument(look, Place(), {alone}), "#w-gil-2 .detail{"));
+}
