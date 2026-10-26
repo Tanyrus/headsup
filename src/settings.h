@@ -63,6 +63,9 @@ namespace headsup
         bool clockServerTime = false;               // the server's time under its own
         ExpBarPlace expBar   = ExpBarPlace::Under;  // Job and EXP
         uint8_t expText      = kDefaultExpText;     // by ExpTextBit
+        ExpPlaces expPlaces  = kDefaultExpPlaces;   // EXP: its texts around its bar
+        int expBarWidth      = kDefaultExpBarWidth;
+        int expBarHeight     = kDefaultExpBarHeight;
         JobLayout jobLayout  = JobLayout::JobsFirst;
         bool jobNames        = true;
         bool latency         = false; // Connection: its round trip after its rates

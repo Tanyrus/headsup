@@ -50,6 +50,25 @@ namespace headsup
                 text += (text.empty() ? "" : kDot) + part;
             return text;
         }
+
+        // What parts say of the EXP; at the cap the merits stand for what is left to the next, and the rest are limit
+        // points.
+        std::string ExpSaid(const JobSample& s, uint8_t parts)
+        {
+            if (!AtCap(s)) return ExpParts(s.exp, s.expNeeded, "EXP", parts);
+            const std::string points = ExpParts(std::min(s.limitPoints, kLimitPointsPerMerit), kLimitPointsPerMerit, "LP",
+                static_cast<uint8_t>(parts & ~ExpTextBit(ExpText::ToNext)));
+            if (!(parts & ExpTextBit(ExpText::ToNext))) return points;
+            return std::to_string(s.merits) + (s.merits == 1 ? " merit" : " merits") + (points.empty() ? "" : kDot + points);
+        }
+
+        // How full the bar is: of the level, or of the next merit at the cap; nothing without a level's worth.
+        std::optional<float> ExpDone(const JobSample& s)
+        {
+            if (AtCap(s)) return static_cast<float>(std::min(s.limitPoints, kLimitPointsPerMerit)) / kLimitPointsPerMerit;
+            if (s.expNeeded == 0) return std::nullopt;
+            return static_cast<float>(std::min(s.exp, s.expNeeded)) / static_cast<float>(s.expNeeded);
+        }
     }
 
     const char* JobName(uint8_t job) { return job < std::size(kJobNames) ? kJobNames[job] : ""; }
@@ -125,22 +144,10 @@ namespace headsup
                                         (s.subLevel > 0 && !std::string(JobName(s.subJob)).empty()
                                                 ? " / " + std::to_string(s.subLevel)
                                                 : ""));
-        Span exp;
-        if (AtCap(s))
-        {
-            // The merits stand for what is left to the next.
-            const std::string points = ExpParts(std::min(s.limitPoints, kLimitPointsPerMerit), kLimitPointsPerMerit, "LP",
-                static_cast<uint8_t>(expText & ~ExpTextBit(ExpText::ToNext)));
-            exp        = Text(std::to_string(s.merits) + (s.merits == 1 ? " merit" : " merits") + (points.empty() ? "" : kDot + points));
-            w.progress = static_cast<float>(std::min(s.limitPoints, kLimitPointsPerMerit)) / kLimitPointsPerMerit;
-        }
-        else
-        {
-            const std::string points = ExpParts(s.exp, s.expNeeded, "EXP", expText);
-            exp = Text(points.empty() ? "EXP" : points);
-            if (s.expNeeded > 0)
-                w.progress = static_cast<float>(std::min(s.exp, s.expNeeded)) / static_cast<float>(s.expNeeded);
-        }
+        // At the cap the merits always show, as they stand for what is left to the next.
+        const std::string said = ExpSaid(s, AtCap(s) ? static_cast<uint8_t>(expText | ExpTextBit(ExpText::ToNext)) : expText);
+        Span exp   = Text(said.empty() ? "EXP" : said);
+        w.progress = ExpDone(s);
         Span& smaller = layout == JobLayout::JobsFirst ? exp : jobs;
         smaller.tone  = Tone::Dim;
         w.title       = ListOf(layout == JobLayout::JobsFirst ? jobs : exp);
@@ -149,6 +156,35 @@ namespace headsup
         w.progressBeside = bar == ExpBarPlace::Beside;
         w.hasPopup       = true;
         w.figures        = true;
+        return w;
+    }
+
+    WidgetContent ExpWidget(const std::optional<JobReport>& job, const ExpPlaces& places, int width, int height)
+    {
+        WidgetContent w;
+        w.shown = true;
+        if (!job)
+        {
+            w.title = ListOf(Text("-"));
+            return w;
+        }
+        Meter m;
+        m.done   = ExpDone(job->sample).value_or(0.0f);
+        m.width  = width;
+        m.height = height;
+        const auto side = [&](ExpTextPlace place, std::vector<Span>& spans) {
+            uint8_t parts = 0;
+            for (int t = 0; t < kExpTextCount; ++t)
+                if (places[static_cast<size_t>(t)] == place) parts |= ExpTextBit(static_cast<ExpText>(t));
+            if (const std::string said = ExpSaid(job->sample, parts); !said.empty()) spans = ListOf(Text(said));
+        };
+        side(ExpTextPlace::Above, m.above);
+        side(ExpTextPlace::Below, m.below);
+        side(ExpTextPlace::Left, m.left);
+        side(ExpTextPlace::Right, m.right);
+        w.meter    = std::move(m);
+        w.hasPopup = true;
+        w.figures  = true;
         return w;
     }
 

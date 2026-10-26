@@ -70,5 +70,7 @@ namespace headsup
     // expText: ExpTextBit of each part the EXP says; none, and it says EXP.
     WidgetContent JobWidget(const std::optional<JobReport>& job, ExpBarPlace bar = ExpBarPlace::Under,
         bool jobNames = true, JobLayout layout = JobLayout::JobsFirst, uint8_t expText = kDefaultExpText);
+    // The EXP widget: its bar width by height pixels, each text on the side places puts it.
+    WidgetContent ExpWidget(const std::optional<JobReport>& job, const ExpPlaces& places, int width, int height);
     PopupContent JobPopup(const std::optional<JobReport>& job);
 }

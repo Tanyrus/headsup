@@ -87,6 +87,7 @@ namespace headsup
     constexpr float kCapScale      = 1.4f;  // an end cap's diamond, in diamonds
     constexpr float kLineIconGap   = 2.0f;  // pixels between the icons after a line's text
     constexpr float kPictureGap    = 6.0f;  // before a game picture among a line's text
+    constexpr float kMeterTextGap  = 2.0f;  // between a meter's bar and the text above or below it
     constexpr float kProgressInset = 2.0f;  // pixels from the pill row's foot, inside its border
     // A widget's progress bar: a thin track along the pill row's foot, or a taller one beside the text.
     float ProgressHeight(const BarMetrics& metrics, bool beside);

@@ -304,7 +304,7 @@ namespace headsup
             css += ".pills .widget.target{background-color:" + RcssColor(Faded(cyan, 0x14)) + ";}";
             css += ".pills .widget.lit{background-color:" + RcssColor(Faded(cyan, 0x2E)) + ";border-color:" +
                    RcssColor(Faded(cyan, 0xB3)) + ";}";
-            css += ".progress,.beside{background-color:#ffffff1f;}";
+            css += ".progress,.beside,.mbar{background-color:#ffffff1f;}";
             return css;
         }
     }
@@ -318,6 +318,9 @@ namespace headsup
             auto square = [](float size) { return "width:" + Px(size) + ";height:" + Px(size) + ";"; };
             std::string css;
             css += scope + ".title{" + LineRules(titleFont, lines.title, place.title, rowTop) + "}";
+            // A meter's texts are in the detail font; those beside its bar have their ink on the row's middle.
+            css += scope + ".mtext{" + FaceRules(detailFont, lines.side, place.side.height) + ShadowEffect(lines.side) + "}";
+            css += scope + ".mside{top:" + Px(std::round(place.side.top) - (rowTop - kContentInset)) + ";}";
             css += scope + ".title.alone{margin-top:" + Px(std::round(place.title.aloneTop) - rowTop) + ";}";
             css += scope + ".title.figures{" + LineRules(detailFont, lines.title, place.figures, rowTop) + "}";
             css += scope + ".title.figures.alone{margin-top:" + Px(std::round(place.figures.aloneTop) - rowTop) + ";}";
@@ -425,6 +428,10 @@ namespace headsup
         css += ".progress{position:absolute;left:0px;right:0px;top:" +
                Px(row.y + row.height - kProgressInset - underHeight - rowTop) + ";height:" + Px(underHeight) +
                ";background-color:" + RcssColor(p.divider) + ";}";
+        css += ".meter{display:inline-block;vertical-align:top;position:relative;height:" + Px(row.height) +
+               ";margin-top:" + Px(-kContentInset) + ";}";
+        css += ".mtext{position:absolute;white-space:pre;}";
+        css += ".mbar{position:absolute;background-color:" + RcssColor(p.divider) + ";}";
         css += ".beside{margin-left:" + Px(m.gap) + ";width:" + Px(BesideWidth(m)) + ";height:" + Px(besideHeight) +
                ";margin-top:" + Px(std::round(row.y + (row.height - besideHeight) / 2.0f) - rowTop) +
                ";background-color:" + RcssColor(p.divider) + ";}";
@@ -588,10 +595,39 @@ namespace headsup
         return columns.empty() ? 0.0f : total + gap * static_cast<float>(columns.size() - 1);
     }
 
-    std::string WidgetRml(const WidgetContent& content, const BarLook& look, const std::vector<float>& columns)
+    MeterPlace PlaceMeter(const Meter& meter, const MeterWidths& text, float gap)
+    {
+        const auto bar    = static_cast<float>(meter.width);
+        const auto beside = [&](float width) { return width > 0.0f ? width + gap : 0.0f; };
+        const float overhang = std::max({0.0f, (text.above - bar) / 2.0f, (text.below - bar) / 2.0f});
+        const float left = std::max(beside(text.left), overhang), right = std::max(beside(text.right), overhang);
+        return MeterPlace{left + bar + right, left, left + (bar - text.above) / 2.0f, left + (bar - text.below) / 2.0f};
+    }
+
+    std::string WidgetRml(const WidgetContent& content, const BarLook& look, const std::vector<float>& columns,
+        const MeterPlace& meter)
     {
         const bool alone = !look.lines.twoLines || content.subtitle.empty();
         std::string rml  = "<div class=\"content\">";
+        if (content.meter)
+        {
+            const Meter& m   = *content.meter;
+            const auto bar   = static_cast<float>(m.width), thick = static_cast<float>(m.height);
+            const float top  = std::round((look.row.height - thick) / 2.0f);
+            const float done = std::clamp(m.done, 0.0f, 1.0f) * kPercentWhole;
+            const auto text  = [&](const std::vector<Span>& spans, const char* classes, const std::string& place) {
+                return spans.empty() ? std::string()
+                                     : std::string("<div class=\"") + classes + "\" style=\"" + place + "\">" + Spans(spans, look) + "</div>";
+            };
+            rml += "<div class=\"meter\" style=\"width:" + Px(meter.width) + ";\">";
+            rml += "<div class=\"mbar\" style=\"left:" + Px(meter.barX) + ";top:" + Px(top) + ";width:" + Px(bar) +
+                   ";height:" + Px(thick) + ";\"><div class=\"fill\" style=\"width: " + RcssNumber(done) + "%\"></div></div>";
+            rml += text(m.above, "mtext", "left:" + Px(meter.aboveX) + ";bottom:" + Px(look.row.height - top + kMeterTextGap) + ";");
+            rml += text(m.below, "mtext", "left:" + Px(meter.belowX) + ";top:" + Px(top + thick + kMeterTextGap) + ";");
+            rml += text(m.left, "mtext mside", "right:" + Px(meter.width - meter.barX + look.metrics.gap) + ";");
+            rml += text(m.right, "mtext mside", "left:" + Px(meter.barX + bar + look.metrics.gap) + ";");
+            return rml + "</div></div>";
+        }
         for (const Icon icon : content.icons)
             rml += "<img class=\"icon\" src=\"" + IconSource(icon) + "\"/>";
         if (content.coin) rml += "<img class=\"coin\" src=\"" + CoinSource(CoinPixels(look.metrics)) + "\"/>";

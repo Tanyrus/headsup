@@ -2787,18 +2787,26 @@ TEST(the_exp_text_is_kept_apart_for_the_job_and_exp_widgets)
 {
     Settings s;
     CHECK(s.Widget(BarWidget::Job).expText == kDefaultExpText && !s.Widget(BarWidget::Exp).on);
-    s.Widget(BarWidget::Exp).on      = true;
-    s.Widget(BarWidget::Exp).expText = ExpTextBit(ExpText::Percent) | ExpTextBit(ExpText::Earned);
-    s.Widget(BarWidget::Exp).expBar  = ExpBarPlace::Off;
+    WidgetOptions& exp = s.Widget(BarWidget::Exp);
+    exp.on             = true;
+    exp.expPlaces      = {ExpTextPlace::Above, ExpTextPlace::Off, ExpTextPlace::Left};
+    exp.expBarWidth    = 250;
+    exp.expBarHeight   = 3;
     MapStore store;
     SaveSettings(s, store);
     CHECK_EQ(store.values["expBar"], "under"); // the Job widget's, under its key of before
     const Settings read = LoadSettings(store);
     CHECK(read.Widget(BarWidget::Exp) == s.Widget(BarWidget::Exp));
     CHECK(read.Widget(BarWidget::Job) == s.Widget(BarWidget::Job));
-    CHECK_EQ(store.values["barExpBar"], "off");
-    store.values["barExpText"] = "200";
-    CHECK_EQ(LoadSettings(store).Widget(BarWidget::Exp).expText, (1 << kExpTextCount) - 1);
+    CHECK_EQ(store.values["barExpEarned"], "above");
+    // A size past the slider's ends reads as that end; an unknown place as the default's.
+    store.values["barExpBarWidth"]  = "9999";
+    store.values["barExpBarHeight"] = "0";
+    store.values["barExpPercent"]   = "sideways";
+    const Settings reread        = LoadSettings(store);
+    const WidgetOptions& clamped = reread.Widget(BarWidget::Exp);
+    CHECK(clamped.expBarWidth == kMaxExpBarWidth && clamped.expBarHeight == kMinExpBarHeight);
+    CHECK(clamped.expPlaces[static_cast<int>(ExpText::Percent)] == kDefaultExpPlaces[static_cast<int>(ExpText::Percent)]);
 }
 
 TEST(the_bags_widgets_bag_is_kept_and_one_past_the_last_reads_as_the_inventory)

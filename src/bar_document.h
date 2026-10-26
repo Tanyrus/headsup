@@ -46,10 +46,10 @@ namespace headsup
         bool operator==(const BarLinePlace&) const = default;
     };
     // Where the widgets' lines go so their ink lands on the rows the bar's text row gives: a title in the title
-    // font, a title of figures in the detail font, and a detail line.
+    // font, a title of figures in the detail font, a detail line, and a meter's text beside its bar.
     struct BarTextPlace
     {
-        BarLinePlace title, figures, detail;
+        BarLinePlace title, figures, detail, side;
         bool operator==(const BarTextPlace&) const = default;
     };
 
@@ -81,8 +81,22 @@ namespace headsup
     constexpr const char* kLitClass    = "lit"; // hovered or open, with a popup
     constexpr const char* kBorderlessClass = "borderless"; // the target, its border switched off
     // A widget's inner markup: its icons, coin, title and detail lines in their colors, and its progress bar.
-    // columns: a widget of cells' column widths (CellColumns).
-    std::string WidgetRml(const WidgetContent& content, const BarLook& look, const std::vector<float>& columns = {});
+    // A meter's texts as wide as they are drawn, and where its parts go across it: its bar after barX, the texts
+    // above and below centered on the bar.
+    struct MeterWidths
+    {
+        float above = 0.0f, below = 0.0f, left = 0.0f, right = 0.0f;
+    };
+    struct MeterPlace
+    {
+        float width = 0.0f, barX = 0.0f, aboveX = 0.0f, belowX = 0.0f;
+        bool operator==(const MeterPlace&) const = default;
+    };
+    MeterPlace PlaceMeter(const Meter& meter, const MeterWidths& text, float gap);
+
+    // columns: a widget of cells' column widths (CellColumns); meter: a meter's place (PlaceMeter).
+    std::string WidgetRml(const WidgetContent& content, const BarLook& look, const std::vector<float>& columns = {},
+        const MeterPlace& meter = {});
     // A widget of cells' columns: each as wide as its widest cell, which width measures (title: on the first line).
     std::vector<float> CellColumns(const WidgetContent& content, FunctionRef<float(bool title, const Span&)> width);
     float CellsWidth(const std::vector<float>& columns, float gap);

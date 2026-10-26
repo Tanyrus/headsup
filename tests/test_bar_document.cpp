@@ -2,6 +2,7 @@
 #include "window_skin.h"
 #include "test.h"
 
+#include <cmath>
 #include <string>
 
 using namespace headsup;
@@ -20,7 +21,8 @@ namespace
     BarTextPlace Place()
     {
         return BarTextPlace{BarLinePlace{16, 9.0f, 14.0f, 2.0f}, BarLinePlace{17, 8.0f, 13.0f, 1.0f},
-            BarLinePlace{14, 23.0f, 0.0f, 3.0f}};
+            BarLinePlace{14, 23.0f, 0.0f, 3.0f},
+            BarLinePlace{14, 15.0f, 15.0f, 3.0f}};
     }
 
     bool Has(const std::string& text, const char* part) { return text.find(part) != std::string::npos; }
@@ -383,7 +385,7 @@ TEST(a_widget_with_text_of_its_own_has_rules_of_its_own_under_its_id)
     const PanelWidget gil{BarWidget::Gil, 1};
     // Its own fonts at 20 px titles over 15 px details, a line box 24 px tall from row 6.
     const WidgetText own{gil, kCinzel, kMarcellusSC, TextRow{20, 15, true, 6.0f, 26.0f, 12.0f},
-        BarTextPlace{BarLinePlace{24, 6.0f, 12.0f, 2.0f}, BarLinePlace{24, 6.0f, 12.0f, 2.0f}, BarLinePlace{18, 26.0f, 0.0f, 2.0f}}};
+        BarTextPlace{BarLinePlace{24, 6.0f, 12.0f, 2.0f}, BarLinePlace{24, 6.0f, 12.0f, 2.0f}, BarLinePlace{18, 26.0f, 0.0f, 2.0f}, BarLinePlace{18, 16.0f, 16.0f, 2.0f}}};
     const std::string rml = BarDocument(look, Place(), {own});
     CHECK(Has(rml, "#w-gil-2 .title{font-family:\"Cinzel\";font-size:20px;line-height:24px;"));
     CHECK(Has(rml, "#w-gil-2 .detail{font-family:\"Marcellus SC\";font-size:15px;"));
@@ -446,4 +448,44 @@ TEST(a_span_of_a_game_picture_draws_that_picture_as_tall_as_its_letters_from_wha
     CHECK(messenger && messenger->width == 1 && messenger->argb == std::vector<uint32_t>{0xFF060504u});
     CHECK(!GamePictureImage(std::nullopt, GamePictureSource(GamePicture::PlayOnlineMail)));
     CHECK(!GamePictureImage(icons, IconSource(Icon::Gm)));
+}
+
+TEST(a_meter_is_as_wide_as_its_bar_and_side_texts_with_the_texts_above_and_below_centered_on_the_bar)
+{
+    Meter m;
+    m.width = 100;
+    // Left 30 and a gap of 4 reach further than half of the 140 above past the bar; right 20 and its gap do too.
+    const MeterPlace p = PlaceMeter(m, MeterWidths{140.0f, 0.0f, 30.0f, 20.0f}, 4.0f);
+    CHECK_EQ(p.barX, 34.0f);
+    CHECK_EQ(p.width, 34.0f + 100.0f + 24.0f);
+    CHECK_EQ(p.aboveX, 34.0f + 50.0f - 70.0f);
+    // A text above wider than all of that sets the width, the bar in its middle.
+    const MeterPlace wide = PlaceMeter(m, MeterWidths{300.0f, 0.0f, 30.0f, 20.0f}, 4.0f);
+    CHECK(wide.barX == 100.0f && wide.width == 300.0f && wide.aboveX == 0.0f);
+}
+
+TEST(a_meters_bar_has_its_middle_on_the_rows_middle_with_its_texts_around_it)
+{
+    Settings settings;
+    const BarLook look = LookOf(BarTheme::PhoenixGold, settings);
+    WidgetContent c;
+    c.shown = true;
+    Meter m;
+    m.done   = 0.25f;
+    m.width  = 100;
+    m.height = 6;
+    m.above  = {Text("12,345 / 20,000 EXP")};
+    m.right  = {Text("61%")};
+    c.meter  = m;
+    const MeterPlace place = PlaceMeter(m, MeterWidths{120.0f, 0.0f, 0.0f, 20.0f}, look.metrics.gap);
+    const std::string rml = WidgetRml(c, look, {}, place);
+    const float barTop = std::round((look.row.height - 6.0f) / 2.0f);
+    const std::string bar = "class=\"mbar\" style=\"left:" + Px(place.barX) + ";top:" + Px(barTop) + ";width:" + Px(100.0f) +
+                            ";height:" + Px(6.0f) + ";\"";
+    CHECK(rml.find(bar) != std::string::npos);
+    CHECK(rml.find("width: 25%") != std::string::npos);
+    // Above ends a gap over the bar's top; right starts a gap after its end.
+    CHECK(rml.find("left:" + Px(place.aboveX) + ";bottom:" + Px(look.row.height - barTop + kMeterTextGap) + ";") != std::string::npos);
+    CHECK(rml.find("class=\"mtext mside\" style=\"left:" + Px(place.barX + 100.0f + look.metrics.gap) + ";\"") != std::string::npos);
+    CHECK(rml.find(">12,345 / 20,000 EXP<") != std::string::npos && rml.find(">61%<") != std::string::npos);
 }

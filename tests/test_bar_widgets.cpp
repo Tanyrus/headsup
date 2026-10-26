@@ -1857,7 +1857,7 @@ TEST(the_bags_popup_lists_mog_safe_2_only_once_it_holds_something)
     CHECK(listed("Mog Safe 2"));
 }
 
-TEST(the_exp_widget_is_the_exp_alone_with_its_bar_by_its_own_settings)
+TEST(the_exp_widget_is_its_bar_by_its_own_settings)
 {
     Settings settings;
     BarState state;
@@ -1865,12 +1865,14 @@ TEST(the_exp_widget_is_the_exp_alone_with_its_bar_by_its_own_settings)
     s.mainJob = 1, s.mainLevel = 30, s.exp = 12345, s.expNeeded = 20000;
     state.job = JobReport{s, std::nullopt};
     CHECK(!BarWidgetContent(BarWidget::Exp, state, settings).shown); // off on a new install
-    settings.Widget(BarWidget::Exp).on      = true;
-    settings.Widget(BarWidget::Exp).expText = ExpTextBit(ExpText::Percent);
-    settings.Widget(BarWidget::Exp).expBar  = ExpBarPlace::Beside;
+    WidgetOptions& o = settings.Widget(BarWidget::Exp);
+    o.on             = true;
+    o.expPlaces      = {ExpTextPlace::Off, ExpTextPlace::Off, ExpTextPlace::Left};
+    o.expBarWidth    = 200;
+    o.expBarHeight   = 8;
     const WidgetContent w = BarWidgetContent(BarWidget::Exp, state, settings);
-    CHECK(w.shown && w.title.front().text == "61%" && w.subtitle.empty());
-    CHECK(w.progress.has_value() && w.progressBeside);
+    CHECK(w.shown && w.meter && w.meter->left.front().text == "61%" && w.meter->right.empty());
+    CHECK(w.meter->width == 200 && w.meter->height == 8);
     CHECK(NeedsOf(settings, std::nullopt).job);
     // The Job widget keeps its own.
     CHECK_EQ(BarWidgetContent(BarWidget::Job, state, settings).subtitle.front().text, "7,655 EXP to next");

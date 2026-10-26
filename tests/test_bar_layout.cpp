@@ -456,6 +456,23 @@ TEST(a_title_without_a_detail_line_takes_the_rows_title_size_centered)
         }
 }
 
+// A meter's text beside its bar is in the detail size, or the title's where the row holds one line, its capitals
+// centered on the row as the bar is.
+TEST(the_text_beside_a_meter_has_its_capitals_on_the_rows_middle)
+{
+    for (int h = kMinBarHeight; h <= kMaxBarHeight; ++h)
+        for (const BarShape shape : {BarShape::Pills, BarShape::Ornate})
+        {
+            const BarMetrics m = MetricsFor(h, shape);
+            const BarRow row   = PillRow(m);
+            const TextRow t    = FitTextRow(m, FakeInk);
+            CHECK_EQ(t.side, t.twoLines ? t.detail : t.title);
+            const LineInk side = FakeInk(!t.twoLines, t.side);
+            const float above = (t.sideY + side.top) - row.y, below = row.y + row.height - (t.sideY + side.baseline);
+            CHECK(std::fabs(above - below) <= 0.01f);
+        }
+}
+
 TEST(text_shrinks_only_when_its_ink_would_not_fit)
 {
     const BarMetrics m = MetricsFor(36, BarShape::Pills);

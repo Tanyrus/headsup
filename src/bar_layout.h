@@ -55,6 +55,10 @@ namespace headsup
         bool twoLines = false;               // false: the row is too short for both, and titles show alone
         float titleY = 0.0f, detailY = 0.0f; // the title over the detail line
         float aloneY = 0.0f;                 // a title without one
+        // A meter's text beside its bar: the detail size, or the title's on a row of one line, its capitals on the
+        // row's middle.
+        int side     = 0;
+        float sideY  = 0.0f;
         bool operator==(const TextRow&) const = default;
     };
     // Placed by their ink, which ink gives for the title's or the detail's font at a size: the title's top to the

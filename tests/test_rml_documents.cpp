@@ -26,7 +26,8 @@ namespace
 TEST(rmlui_reads_every_themes_bar_and_popups_without_a_complaint)
 {
     const BarTextPlace place{BarLinePlace{16, 9.0f, 14.0f, 2.0f}, BarLinePlace{17, 8.0f, 13.0f, 1.0f},
-        BarLinePlace{14, 23.0f, 0.0f, 3.0f}};
+        BarLinePlace{14, 23.0f, 0.0f, 3.0f},
+            BarLinePlace{14, 15.0f, 15.0f, 3.0f}};
     const PopupFaces faces = {PopupFace{"Barlow Condensed", 24, 29, 0}, PopupFace{"Barlow Condensed", 18, 22, 0},
         PopupFace{"Barlow Condensed", 15, 18, 2}, PopupFace{"Barlow Condensed", 15, 18, 0}};
     Settings settings;
@@ -77,7 +78,8 @@ TEST(rmlui_reads_every_themes_bar_and_popups_without_a_complaint)
 TEST(the_target_widget_goes_back_to_breathing_after_its_popup_without_a_complaint)
 {
     const BarTextPlace place{BarLinePlace{16, 9.0f, 14.0f, 2.0f}, BarLinePlace{17, 8.0f, 13.0f, 1.0f},
-        BarLinePlace{14, 23.0f, 0.0f, 3.0f}};
+        BarLinePlace{14, 23.0f, 0.0f, 3.0f},
+            BarLinePlace{14, 15.0f, 15.0f, 3.0f}};
     Settings settings;
     for (int t = 0; t < kFixedThemeCount; ++t)
     {

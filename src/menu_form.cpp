@@ -555,18 +555,39 @@ namespace headsup
                     }
                     break;
                 case WidgetTabsRow::ExpText:
-                    if (kind == BarWidget::Job || kind == BarWidget::Exp)
+                    if (kind == BarWidget::Job)
                     {
                         const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(WindowList::ExpText));
                         form.Toggles(label.c_str(), o.expText, names.data(), kExpTextCount, row.tip);
                     }
                     break;
                 case WidgetTabsRow::ExpBar:
-                    if (kind == BarWidget::Job || kind == BarWidget::Exp)
+                    if (kind == BarWidget::Job)
                     {
                         const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(WindowList::ExpBar));
                         form.Segments(label.c_str(), o.expBar, names.data(), kExpBarPlaceCount, row.tip);
                     }
+                    break;
+                case WidgetTabsRow::ExpEarned:
+                case WidgetTabsRow::ExpToNext:
+                case WidgetTabsRow::ExpPercent:
+                    if (kind == BarWidget::Exp)
+                    {
+                        const auto which   = static_cast<WidgetTabsRow>(row.row);
+                        const ExpText text = which == WidgetTabsRow::ExpEarned ? ExpText::Earned
+                                             : which == WidgetTabsRow::ExpToNext ? ExpText::ToNext
+                                                                                 : ExpText::Percent;
+                        const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(WindowList::ExpPlace));
+                        form.Segments(label.c_str(), o.expPlaces[static_cast<size_t>(text)], names.data(), kExpTextPlaceCount, row.tip);
+                    }
+                    break;
+                case WidgetTabsRow::BarWidth:
+                    if (kind == BarWidget::Exp)
+                        form.SliderInt(label.c_str(), o.expBarWidth, kMinExpBarWidth, kMaxExpBarWidth, "%d px", row.tip);
+                    break;
+                case WidgetTabsRow::BarHeight:
+                    if (kind == BarWidget::Exp)
+                        form.SliderInt(label.c_str(), o.expBarHeight, kMinExpBarHeight, kMaxExpBarHeight, "%d px", row.tip);
                     break;
                 case WidgetTabsRow::JobNames:
                     if (kind == BarWidget::Job) form.Switch(label.c_str(), o.jobNames, row.tip);

@@ -263,6 +263,9 @@ namespace headsup
         const float centered = row.y + (row.height - (title.baseline - title.top)) / 2.0f;
         const float lowest   = row.y + row.height - kBorder - margin - (title.bottom - title.top);
         t.aloneY             = std::min(centered, lowest) - title.top;
+        const LineInk side   = t.twoLines ? detail : title;
+        t.side               = t.twoLines ? t.detail : t.title;
+        t.sideY              = row.y + (row.height - (side.baseline - side.top)) / 2.0f - side.top;
         return t;
     }
 

@@ -47,6 +47,15 @@ namespace headsup
         bool operator==(const Span&) const = default;
     };
 
+    // A bar in a widget's middle, filled to done of its width, with text on any side of it.
+    struct Meter
+    {
+        float done = 0.0f;
+        int width = 0, height = 0; // pixels
+        std::vector<Span> above, below, left, right;
+        bool operator==(const Meter&) const = default;
+    };
+
     struct WidgetContent
     {
         bool shown = false;
@@ -63,6 +72,7 @@ namespace headsup
         // Each span of either line is a cell, and the cells at one place of their lines a column, the columns a gap
         // apart: the Conquest widget's two by two.
         bool cells = false;
+        std::optional<Meter> meter; // in place of the lines
         bool operator==(const WidgetContent&) const = default;
     };
 

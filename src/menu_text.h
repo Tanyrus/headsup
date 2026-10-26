@@ -24,7 +24,7 @@ namespace headsup
     inline bool HasSecondLine(BarWidget w)
     {
         return w != BarWidget::EarthTime && w != BarWidget::Fps && w != BarWidget::Connection &&
-               w != BarWidget::Distance && w != BarWidget::GameHelp;
+               w != BarWidget::Distance && w != BarWidget::GameHelp && w != BarWidget::Exp;
     }
     inline bool HasIcons(BarWidget w) { return w == BarWidget::Weather || w == BarWidget::Target || w == BarWidget::Gil; }
 

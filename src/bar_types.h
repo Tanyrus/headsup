@@ -117,6 +117,20 @@ namespace headsup
     constexpr int kExpTextCount = static_cast<int>(ExpText::Percent) + 1;
     constexpr uint8_t ExpTextBit(ExpText part) { return static_cast<uint8_t>(1u << static_cast<int>(part)); }
     constexpr uint8_t kDefaultExpText = ExpTextBit(ExpText::ToNext);
+    // Where the EXP widget puts each of its texts around its bar.
+    enum class ExpTextPlace : uint8_t
+    {
+        Off,
+        Above,
+        Below,
+        Left,
+        Right,
+    };
+    constexpr int kExpTextPlaceCount = static_cast<int>(ExpTextPlace::Right) + 1;
+    using ExpPlaces                  = std::array<ExpTextPlace, kExpTextCount>; // by ExpText
+    constexpr ExpPlaces kDefaultExpPlaces{ExpTextPlace::Off, ExpTextPlace::Right, ExpTextPlace::Off};
+    constexpr int kMinExpBarWidth = 40, kMaxExpBarWidth = 400, kDefaultExpBarWidth = 100;  // pixels
+    constexpr int kMinExpBarHeight = 2, kMaxExpBarHeight = 16, kDefaultExpBarHeight = 6;   // pixels
 
     constexpr int kMinBarHeight = 24, kMaxBarHeight = 64; // pixels
     // A bar or popup text size setting's leftmost position, Auto: the size follows the bar height. Set sizes run from

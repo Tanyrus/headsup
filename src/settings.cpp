@@ -194,8 +194,11 @@ namespace headsup
         constexpr const char* kTextSizeSuffix   = "TextSize";
         constexpr const char* kExpBarKey        = "expBar";
         constexpr const char* kExpTextKey       = "expText";
-        constexpr const char* kExpWidgetBarKey  = "barExpBar", *kExpWidgetTextKey = "barExpText";
         const char* const kExpBarNames[kExpBarPlaceCount] = {"under", "beside", "off"};
+        // The EXP widget's: a place for each ExpText, and its bar's size.
+        const char* const kExpPlaceKeys[kExpTextCount] = {"barExpEarned", "barExpToNext", "barExpPercent"};
+        const char* const kExpPlaceNames[kExpTextPlaceCount] = {"off", "above", "below", "left", "right"};
+        constexpr const char* kExpBarWidthKey = "barExpBarWidth", *kExpBarHeightKey = "barExpBarHeight";
         constexpr const char* kJobNamesKey  = "jobNames";
         constexpr const char* kSubtitleKey  = "barSubtitle";
         const char* const kSubtitleNames[kSubtitlePlaceCount] = {"hide", "before", "after"};
@@ -1227,6 +1230,8 @@ namespace headsup
                 if (font->size() > kMaxFontName) font->clear();
             if (w.clockZone && static_cast<int>(*w.clockZone) >= kClockZoneCount) w.clockZone = fresh.clockZone;
             if (static_cast<int>(w.expBar) >= kExpBarPlaceCount) w.expBar = fresh.expBar;
+            w.expBarWidth  = std::clamp(w.expBarWidth, kMinExpBarWidth, kMaxExpBarWidth);
+            w.expBarHeight = std::clamp(w.expBarHeight, kMinExpBarHeight, kMaxExpBarHeight);
             if (static_cast<int>(w.jobLayout) >= kJobLayoutCount) w.jobLayout = fresh.jobLayout;
         }
         if (static_cast<int>(s.barSubtitle) >= kSubtitlePlaceCount) s.barSubtitle = d.barSubtitle;
@@ -1296,21 +1301,26 @@ namespace headsup
                 break;
             }
             case BarWidget::Job:
-            case BarWidget::Exp:
             {
-                // The Job widget's keys are its own from before there were two; the EXP widget's carry its name.
-                const bool exp = w.kind == BarWidget::Exp;
-                const std::string expBar = text(exp ? kExpWidgetBarKey : kExpBarKey), layout = text(kJobLayoutKey);
+                const std::string expBar = text(kExpBarKey), layout = text(kJobLayoutKey);
                 for (int e = 0; e < kExpBarPlaceCount; ++e)
                     if (expBar == kExpBarNames[e]) o.expBar = static_cast<ExpBarPlace>(e);
-                o.expText = static_cast<uint8_t>(
-                    std::clamp(number(exp ? kExpWidgetTextKey : kExpTextKey, o.expText), 0, (1 << kExpTextCount) - 1));
-                if (w.kind == BarWidget::Exp) break;
+                o.expText = static_cast<uint8_t>(std::clamp(number(kExpTextKey, o.expText), 0, (1 << kExpTextCount) - 1));
                 for (int l = 0; l < kJobLayoutCount; ++l)
                     if (layout == kJobLayoutNames[l]) o.jobLayout = static_cast<JobLayout>(l);
                 o.jobNames = flag(kJobNamesKey, o.jobNames);
                 break;
             }
+            case BarWidget::Exp:
+                for (int t = 0; t < kExpTextCount; ++t)
+                {
+                    const std::string place = text(kExpPlaceKeys[t]);
+                    for (int e = 0; e < kExpTextPlaceCount; ++e)
+                        if (place == kExpPlaceNames[e]) o.expPlaces[static_cast<size_t>(t)] = static_cast<ExpTextPlace>(e);
+                }
+                o.expBarWidth  = number(kExpBarWidthKey, o.expBarWidth);
+                o.expBarHeight = number(kExpBarHeightKey, o.expBarHeight);
+                break;
             case BarWidget::Connection:
                 o.latency  = flag(kLatencyKey, o.latency);
                 o.netMeter = flag(kNetMeterKey, o.netMeter);
@@ -1349,16 +1359,17 @@ namespace headsup
                 flag(kClockServerTimeKey, o.clockServerTime);
                 break;
             case BarWidget::Job:
-            case BarWidget::Exp:
-            {
-                const bool exp = w.kind == BarWidget::Exp;
-                text(exp ? kExpWidgetBarKey : kExpBarKey, kExpBarNames[static_cast<int>(o.expBar)]);
-                StoreFloat(store, CopyKey(exp ? kExpWidgetTextKey : kExpTextKey, w), static_cast<float>(o.expText));
-                if (w.kind == BarWidget::Exp) break;
+                text(kExpBarKey, kExpBarNames[static_cast<int>(o.expBar)]);
+                StoreFloat(store, CopyKey(kExpTextKey, w), static_cast<float>(o.expText));
                 text(kJobLayoutKey, kJobLayoutNames[static_cast<int>(o.jobLayout)]);
                 flag(kJobNamesKey, o.jobNames);
                 break;
-            }
+            case BarWidget::Exp:
+                for (int t = 0; t < kExpTextCount; ++t)
+                    text(kExpPlaceKeys[t], kExpPlaceNames[static_cast<int>(o.expPlaces[static_cast<size_t>(t)])]);
+                StoreFloat(store, CopyKey(kExpBarWidthKey, w), static_cast<float>(o.expBarWidth));
+                StoreFloat(store, CopyKey(kExpBarHeightKey, w), static_cast<float>(o.expBarHeight));
+                break;
             case BarWidget::Connection:
                 flag(kLatencyKey, o.latency);
                 flag(kNetMeterKey, o.netMeter);

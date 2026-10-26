@@ -82,6 +82,7 @@ namespace headsup
             float natural = 0.0f;
             float padded  = 0.0f; // the room from its edges to what it shows, that natural was measured with
             std::vector<float> columns; // a widget of cells', as measured
+            MeterPlace meter;           // a meter's
             bool measured = false;
             WidgetContent drawn; // as its markup was made from: the target's is cut to its room
             bool marked = false; // its markup is drawn's

@@ -169,6 +169,7 @@ namespace headsup
         rows.place.title   = PlaceLine(host, titleFont, t.title, kTitleGlyphs, t.titleY, t.aloneY);
         rows.place.figures = PlaceLine(host, detailFont, t.title, kTitleGlyphs, t.titleY, t.aloneY);
         rows.place.detail  = PlaceLine(host, detailFont, t.detail, kDetailGlyphs, t.detailY, t.detailY);
+        rows.place.side    = PlaceLine(host, detailFont, t.side, kDetailGlyphs, t.sideY, t.sideY);
         // A line box is as tall for any text in its font: the caption's and the help's, as GDI draws them.
         int width = 0, caption = 0, help = 0;
         m_Gdi.Extent("H", titleFont, t.title, 0, width, caption);
@@ -267,9 +268,14 @@ namespace headsup
                 shown.columns = c.cells ? CellColumns(c, [&](bool title, const Span& span) {
                     return SteadyWidth(host, {span}, {}, title ? own.TitleFace(c) : own.DetailFace());
                 }) : std::vector<float>{};
-                const float text = c.cells ? CellsWidth(shown.columns, m.gap)
-                                           : std::max(SteadyWidth(host, c.title, c.titleIcons, own.TitleFace(c)),
-                                                 own.lines.twoLines ? SteadyWidth(host, c.subtitle, c.subtitleIcons, own.DetailFace()) : 0.0f);
+                const auto detail = [&](const std::vector<Span>& spans) { return SteadyWidth(host, spans, {}, own.DetailFace()); };
+                shown.meter = c.meter ? PlaceMeter(*c.meter, MeterWidths{detail(c.meter->above), detail(c.meter->below),
+                                                                 detail(c.meter->left), detail(c.meter->right)}, m.gap)
+                                      : MeterPlace{};
+                const float text = c.meter ? shown.meter.width
+                                   : c.cells ? CellsWidth(shown.columns, m.gap)
+                                             : std::max(SteadyWidth(host, c.title, c.titleIcons, own.TitleFace(c)),
+                                                   own.lines.twoLines ? SteadyWidth(host, c.subtitle, c.subtitleIcons, own.DetailFace()) : 0.0f);
                 shown.natural  = 2.0f * padding + own.Leading(c) + text +
                                 (c.progress && c.progressBeside ? m.gap + BesideWidth(m) : 0.0f);
             }
@@ -333,7 +339,7 @@ namespace headsup
             if (shown.marked && shown.drawn == content) continue;
             shown.drawn  = content;
             shown.marked = true;
-            shown.element->SetInnerRML(WidgetRml(content, LookOf(look, widgets, w), shown.columns));
+            shown.element->SetInnerRML(WidgetRml(content, LookOf(look, widgets, w), shown.columns, shown.meter));
         }
         const auto diamond = static_cast<float>(WholePixels(m.diamond));
         for (size_t d = 0; d < m_Dividers.size(); ++d)
