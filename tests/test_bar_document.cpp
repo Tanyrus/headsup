@@ -381,3 +381,16 @@ TEST(a_widget_with_text_of_its_own_has_rules_of_its_own_under_its_id)
     alone.lines.twoLines = false;
     CHECK(!Has(BarDocument(look, Place(), {alone}), "#w-gil-2 .detail{"));
 }
+
+TEST(a_target_without_its_border_has_none_lit_or_not_and_does_not_breathe)
+{
+    Settings settings;
+    const std::string ornate = BarDocument(LookOf(BarTheme::PhoenixGold, settings), Place());
+    CHECK(Has(ornate, ".ornate .widget.target.borderless,.ornate .widget.target.borderless.lit{border-color:transparent;}"));
+    CHECK(Has(ornate, ".widget.target.borderless{animation:none;}"));
+    // Pills: the target's pill takes every widget's edge, and a lit one the accent as theirs do.
+    const BarPalette& umbra = PaletteOf(BarTheme::UmbraDark);
+    const std::string pills = BarDocument(LookOf(BarTheme::UmbraDark, settings), Place());
+    const std::string edge  = ".pills .widget.target.borderless{border-color:" + RcssColor(umbra.pillBorder) + ";}";
+    CHECK(pills.find(edge) != std::string::npos && pills.find(edge) < pills.find(".pills .widget.lit{"));
+}

@@ -177,6 +177,7 @@ namespace headsup
         constexpr const char* kJobLayoutKey       = "jobLayout";
         const char* const kJobLayoutNames[kJobLayoutCount] = {"jobsFirst", "expFirst", "expOnly"};
         constexpr const char* kTargetDetailsKey = "barTargetDetails";
+        constexpr const char* kTargetBorderKey  = "barTargetBorder";
         constexpr const char* kMenuFontKey      = "menuFont";
         constexpr const char* kMenuXKey = "menuX", *kMenuYKey = "menuY", *kMenuWidthKey = "menuWidth",
                               *kMenuHeightKey = "menuHeight";
@@ -1292,7 +1293,10 @@ namespace headsup
                 break;
             }
             case BarWidget::Connection: o.latency = flag(kLatencyKey, o.latency); break;
-            case BarWidget::Target: o.targetDetails = flag(kTargetDetailsKey, o.targetDetails); break;
+            case BarWidget::Target:
+                o.targetDetails = flag(kTargetDetailsKey, o.targetDetails);
+                o.targetBorder  = flag(kTargetBorderKey, o.targetBorder);
+                break;
             default: break;
             }
         }
@@ -1325,7 +1329,10 @@ namespace headsup
                 flag(kJobNamesKey, o.jobNames);
                 break;
             case BarWidget::Connection: flag(kLatencyKey, o.latency); break;
-            case BarWidget::Target: flag(kTargetDetailsKey, o.targetDetails); break;
+            case BarWidget::Target:
+                flag(kTargetDetailsKey, o.targetDetails);
+                flag(kTargetBorderKey, o.targetBorder);
+                break;
             default: break;
             }
         }

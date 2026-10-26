@@ -64,6 +64,7 @@ namespace headsup
         bool jobNames        = true;
         bool latency         = false; // Connection: its round trip after its rates
         bool targetDetails   = false; // Target: a mob's icons after its name and its weaknesses after its level
+        bool targetBorder    = true;  // and its frame, or its pill's own edge
         bool operator==(const WidgetOptions&) const = default;
     };
     // A copy as a new one is: shown, and the first copies as kBarWidgetDefaults has them.

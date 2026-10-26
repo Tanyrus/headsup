@@ -2768,3 +2768,14 @@ TEST(a_widgets_own_fonts_and_text_size_are_kept_and_default_to_the_panels)
     store.values["barZoneTextSize"] = "2";
     CHECK_EQ(LoadSettings(store).Widget(BarWidget::Zone).textSize, kPanelTextSize);
 }
+
+TEST(the_target_widgets_border_is_on_by_default_and_kept_off_once_turned_off)
+{
+    Settings s;
+    CHECK(s.Widget(BarWidget::Target).targetBorder);
+    s.Widget(BarWidget::Target).targetBorder = false;
+    MapStore store;
+    SaveSettings(s, store);
+    CHECK_EQ(store.values["barTargetBorder"], "false");
+    CHECK(!LoadSettings(store).Widget(BarWidget::Target).targetBorder);
+}

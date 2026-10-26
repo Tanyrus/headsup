@@ -324,6 +324,7 @@ namespace headsup
             }
             shown.element->SetClass(kLitClass,
                 widgets.hasPopup[w] && (input.Hovered() == widget || input.Open() == widget));
+            shown.element->SetClass(kBorderlessClass, widget.kind == BarWidget::Target && !look.settings.widgets[w].targetBorder);
             const WidgetContent& content = widgets.contents[w];
             if (shown.marked && shown.drawn == content) continue;
             shown.drawn  = content;
