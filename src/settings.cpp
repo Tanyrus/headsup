@@ -35,7 +35,6 @@ namespace headsup
             {"fixPointer", &Settings::fixPointer}, {"countYourAccuracy", &Settings::countAccuracy}, {"showBar", &Settings::showBar},
             {"hideHelpBar", &Settings::hideHelpBar}, {"hideNetstat", &Settings::hideNetstat},
             {"screenshotHidesGame", &Settings::screenshotHidesGame},
-            {"clockSeconds", &Settings::clockSeconds},
             {"stackNames", &Settings::stackNames}, {"stackLine", &Settings::stackLine}, {"hideInEvent", &Settings::hideInEvent},
             {"debugMode", &Settings::debugMode},
             {"logging", &Settings::logging},
@@ -189,6 +188,7 @@ namespace headsup
         constexpr const char* kSubtitleKey  = "barSubtitle";
         const char* const kSubtitleNames[kSubtitlePlaceCount] = {"hide", "before", "after"};
         constexpr const char* kClock24Key   = "clock24";
+        constexpr const char* kClockSecondsKey = "clockSeconds";
         constexpr const char* kLatencyKey   = "barLatency";
         const char* const kClockZoneNames[kClockZoneCount] = {"japan", "utc", "usEastern", "usCentral", "usMountain",
             "usArizona", "usPacific", "usAlaska", "usHawaii", "ukIreland", "centralEurope", "easternEurope",
@@ -983,12 +983,12 @@ namespace headsup
         UseHeadsUpWindowDefaults(s);
         s.moveGameHelp = false;
         s.hideHelpBar  = true;
-        s.barWidgets[static_cast<int>(BarWidget::GameHelp)] = true;
+        s.Widget(BarWidget::GameHelp).on = true;
     }
 
     HelpMode WindowHelpMode(const Settings& s)
     {
-        return ModeOf(s.showBar && s.barWidgets[static_cast<int>(BarWidget::GameHelp)], s.hideHelpBar);
+        return ModeOf(s.showBar && s.Widget(BarWidget::GameHelp).on, s.hideHelpBar);
     }
 
     void AutoAdjustWindows(Settings& s, int band, int barOnly)
@@ -1201,10 +1201,14 @@ namespace headsup
         if (static_cast<int>(s.barTheme) >= kBarThemeCount) s.barTheme = d.barTheme;
         if (static_cast<int>(s.customPalette.shape) >= kBarShapeCount) s.customPalette.shape = d.customPalette.shape;
         s.customPalette.border = std::clamp(s.customPalette.border, 0, kMaxStripBorder);
-        if (s.barCurrency < 0 || s.barCurrency >= kCurrencyCount) s.barCurrency = d.barCurrency;
-        if (s.clockZone && static_cast<int>(*s.clockZone) >= kClockZoneCount) s.clockZone = d.clockZone;
-        if (static_cast<int>(s.expBar) >= kExpBarPlaceCount) s.expBar = d.expBar;
-        if (static_cast<int>(s.jobLayout) >= kJobLayoutCount) s.jobLayout = d.jobLayout;
+        for (WidgetOptions& w : s.widgets)
+        {
+            const WidgetOptions fresh;
+            if (w.currency < 0 || w.currency >= kCurrencyCount) w.currency = fresh.currency;
+            if (w.clockZone && static_cast<int>(*w.clockZone) >= kClockZoneCount) w.clockZone = fresh.clockZone;
+            if (static_cast<int>(w.expBar) >= kExpBarPlaceCount) w.expBar = fresh.expBar;
+            if (static_cast<int>(w.jobLayout) >= kJobLayoutCount) w.jobLayout = fresh.jobLayout;
+        }
         if (static_cast<int>(s.barSubtitle) >= kSubtitlePlaceCount) s.barSubtitle = d.barSubtitle;
         if (MenuFontNamed(s.menuFont) == nullptr) s.menuFont = d.menuFont;
         for (int* side : {&s.menuX, &s.menuY, &s.menuWidth, &s.menuHeight})
@@ -1217,6 +1221,127 @@ namespace headsup
             status.resistRank = std::clamp(status.resistRank, kMinResistRank, kNoResistRank);
         }
         return s;
+    }
+
+    namespace
+    {
+        // A copy's key: the first copy's as files have always had it, the others' after it with their number.
+        std::string CopyKey(const std::string& key, PanelWidget w)
+        {
+            return w.copy == 0 ? key : key + "_" + std::to_string(w.copy + 1);
+        }
+
+        void LoadWidget(SettingsStore& store, PanelWidget w, WidgetOptions& o)
+        {
+            const std::string widget = kBarWidgetKeys[static_cast<int>(w.kind)];
+            // The first copy's switches are read as they always were; a later copy's as text, so that a file is
+            // given no keys of a copy it never had.
+            const auto flag = [&](const std::string& key, bool fallback) {
+                const std::string own = CopyKey(key, w);
+                return w.copy == 0 ? store.GetBool(own.c_str(), fallback) : HeldSwitch(store, own.c_str()).value_or(fallback);
+            };
+            const auto text = [&](const char* key) { return store.GetString(CopyKey(key, w).c_str(), ""); };
+            o.on         = flag(widget, o.on);
+            o.secondLine = flag(widget + kSecondLineSuffix, o.secondLine);
+            o.icons      = flag(widget + kIconsSuffix, o.icons);
+            switch (w.kind)
+            {
+            case BarWidget::Gil:
+                if (const std::optional<int> currency = CurrencyOfKey(text(kBarCurrencyKey))) o.currency = *currency;
+                break;
+            case BarWidget::EarthTime:
+            {
+                const std::string zone = text(kClockZoneKey);
+                for (int z = 0; z < kClockZoneCount; ++z)
+                    if (zone == kClockZoneNames[z]) o.clockZone = static_cast<ClockZone>(z);
+                o.clock24      = flag(kClock24Key, o.clock24);
+                o.clockSeconds = flag(kClockSecondsKey, o.clockSeconds);
+                // A file from when Server time was a widget, and shown, has the Clock stack it.
+                o.clockServerTime = flag(kClockServerTimeKey, w.copy == 0 && store.GetString(kServerTimeWidgetKey, "") == kTrue);
+                break;
+            }
+            case BarWidget::Job:
+            {
+                const std::string expBar = text(kExpBarKey), layout = text(kJobLayoutKey);
+                for (int e = 0; e < kExpBarPlaceCount; ++e)
+                    if (expBar == kExpBarNames[e]) o.expBar = static_cast<ExpBarPlace>(e);
+                for (int l = 0; l < kJobLayoutCount; ++l)
+                    if (layout == kJobLayoutNames[l]) o.jobLayout = static_cast<JobLayout>(l);
+                o.jobNames = flag(kJobNamesKey, o.jobNames);
+                break;
+            }
+            case BarWidget::Connection: o.latency = flag(kLatencyKey, o.latency); break;
+            case BarWidget::Target: o.targetDetails = flag(kTargetDetailsKey, o.targetDetails); break;
+            default: break;
+            }
+        }
+
+        void SaveWidget(SettingsStore& store, PanelWidget w, const WidgetOptions& o)
+        {
+            const std::string widget = kBarWidgetKeys[static_cast<int>(w.kind)];
+            const auto flag = [&](const std::string& key, bool v) { StoreBool(store, CopyKey(key, w), v); };
+            const auto text = [&](const char* key, const char* v) { store.Set(CopyKey(key, w).c_str(), v); };
+            flag(widget, o.on);
+            flag(widget + kSecondLineSuffix, o.secondLine);
+            flag(widget + kIconsSuffix, o.icons);
+            switch (w.kind)
+            {
+            case BarWidget::Gil: text(kBarCurrencyKey, kCurrencyTable[o.currency].key); break;
+            case BarWidget::EarthTime:
+                text(kClockZoneKey, o.clockZone ? kClockZoneNames[static_cast<int>(*o.clockZone)] : kLocalZone);
+                flag(kClock24Key, o.clock24);
+                flag(kClockSecondsKey, o.clockSeconds);
+                flag(kClockServerTimeKey, o.clockServerTime);
+                break;
+            case BarWidget::Job:
+                text(kExpBarKey, kExpBarNames[static_cast<int>(o.expBar)]);
+                text(kJobLayoutKey, kJobLayoutNames[static_cast<int>(o.jobLayout)]);
+                flag(kJobNamesKey, o.jobNames);
+                break;
+            case BarWidget::Connection: flag(kLatencyKey, o.latency); break;
+            case BarWidget::Target: flag(kTargetDetailsKey, o.targetDetails); break;
+            default: break;
+            }
+        }
+    }
+
+    WidgetOptions NewWidget(PanelWidget widget)
+    {
+        WidgetOptions o;
+        o.on = widget.copy > 0 || kBarWidgetDefaults[static_cast<int>(widget.kind)];
+        return o;
+    }
+
+    std::array<WidgetOptions, kPanelSlots> DefaultWidgets()
+    {
+        std::array<WidgetOptions, kPanelSlots> widgets;
+        for (int slot = 0; slot < kPanelSlots; ++slot)
+            widgets[slot] = NewWidget(WidgetInSlot(slot));
+        return widgets;
+    }
+
+    bool Shows(const Settings& s, PanelWidget widget)
+    {
+        return s.Widget(widget).on && (widget.copy == 0 || Placed(s.barSections, widget));
+    }
+
+    bool Shown(const Settings& s, BarWidget widget)
+    {
+        for (int copy = 0; copy < kMostCopies; ++copy)
+            if (Shows(s, PanelWidget{widget, copy})) return true;
+        return false;
+    }
+
+    std::optional<PanelWidget> AddWidgetCopy(Settings& s, BarWidget widget)
+    {
+        const std::optional<PanelWidget> added = AddCopy(s.barSections, widget);
+        if (added) s.Widget(*added) = NewWidget(*added);
+        return added;
+    }
+
+    void RemoveWidgetCopy(Settings& s, PanelWidget widget)
+    {
+        if (RemoveCopy(s.barSections, widget)) s.Widget(widget) = NewWidget(widget);
     }
 
     Settings LoadSettings(SettingsStore& store)
@@ -1295,9 +1420,6 @@ namespace headsup
             store.GetString((custom + kShapeSuffix).c_str(), ""), static_cast<int>(s.customPalette.shape)));
         s.customPalette.border = LoadInt(store, (custom + kBorderSuffix).c_str(), s.customPalette.border);
         s.customPalette.gradient = store.GetBool((custom + kGradientSuffix).c_str(), s.customPalette.gradient);
-        if (const std::optional<int> currency = CurrencyOfKey(store.GetString(kBarCurrencyKey, "")))
-            s.barCurrency = *currency;
-        s.barTargetDetails = store.GetBool(kTargetDetailsKey, s.barTargetDetails);
         s.menuFont         = store.GetString(kMenuFontKey, s.menuFont.c_str());
         // By the font named: one whose Windows file was missing was drawn in Barlow Condensed, which nothing here knows.
         s.menuFontSize     = Rebased(store, kMenuFontSizeKey, kOldMenuScaleKey, s.menuFontSize, [&](float percent) {
@@ -1309,38 +1431,19 @@ namespace headsup
         s.menuY      = LoadInt(store, kMenuYKey, s.menuY);
         s.menuWidth  = LoadInt(store, kMenuWidthKey, s.menuWidth);
         s.menuHeight = LoadInt(store, kMenuHeightKey, s.menuHeight);
-        const std::string clockZone = store.GetString(kClockZoneKey, "");
-        for (int z = 0; z < kClockZoneCount; ++z)
-            if (clockZone == kClockZoneNames[z]) s.clockZone = static_cast<ClockZone>(z);
-        // A file from when Server time was a widget, and shown, has the Clock stack it.
-        s.clockServerTime =
-            store.GetBool(kClockServerTimeKey, store.GetString(kServerTimeWidgetKey, "") == kTrue);
         const std::string separators = store.GetString(kBarSeparatorsKey, "");
         for (int t = 0; t < kBarSeparatorsCount; ++t)
             if (separators == kBarSeparatorsNames[t]) s.barSeparators = static_cast<BarSeparators>(t);
-        for (int w = 0; w < kBarWidgetCount; ++w)
-        {
-            const std::string key = kBarWidgetKeys[w];
-            s.barWidgets[w]       = store.GetBool(key.c_str(), s.barWidgets[w]);
-            s.barSecondLine[w]    = store.GetBool((key + kSecondLineSuffix).c_str(), s.barSecondLine[w]);
-            s.barIcons[w]         = store.GetBool((key + kIconsSuffix).c_str(), s.barIcons[w]);
-        }
-        const std::string expBar = store.GetString(kExpBarKey, "");
-        for (int e = 0; e < kExpBarPlaceCount; ++e)
-            if (expBar == kExpBarNames[e]) s.expBar = static_cast<ExpBarPlace>(e);
-        const std::string jobLayout = store.GetString(kJobLayoutKey, "");
-        for (int l = 0; l < kJobLayoutCount; ++l)
-            if (jobLayout == kJobLayoutNames[l]) s.jobLayout = static_cast<JobLayout>(l);
-        s.jobNames   = store.GetBool(kJobNamesKey, s.jobNames);
         const std::string subtitle = store.GetString(kSubtitleKey, "");
         for (int i = 0; i < kSubtitlePlaceCount; ++i)
             if (subtitle == kSubtitleNames[i]) s.barSubtitle = static_cast<SubtitlePlace>(i);
-        s.clock24    = store.GetBool(kClock24Key, s.clock24);
-        s.barLatency = store.GetBool(kLatencyKey, s.barLatency);
         std::array<std::string, kBarSectionCount> sections;
         for (int i = 0; i < kBarSectionCount; ++i)
             sections[i] = store.GetString(kBarSectionKeys[i], "");
         s.barSections = PlacementFrom(sections);
+        for (int slot = 0; slot < kPanelSlots; ++slot)
+            if (const PanelWidget w = WidgetInSlot(slot); Placed(s.barSections, w) || w.kind == BarWidget::GameHelp)
+                LoadWidget(store, w, s.widgets[slot]);
         s.pinnedWindows = WindowPlacesFrom(store.GetString(kPinnedWindowsKey, ""));
         s.hiddenWindows = HiddenWindowsFrom(store.GetString(kHiddenWindowsKey, ""));
         s.shiftVanillaUi =
@@ -1417,28 +1520,16 @@ namespace headsup
         setFloat(kCustomThemeKey + std::string(kBorderSuffix), static_cast<float>(s.customPalette.border));
         setBool(kCustomThemeKey + std::string(kGradientSuffix), s.customPalette.gradient);
         store.Set(kBarSeparatorsKey, kBarSeparatorsNames[static_cast<int>(s.barSeparators)]);
-        store.Set(kBarCurrencyKey, kCurrencyTable[s.barCurrency].key);
-        store.Set(kClockZoneKey, s.clockZone ? kClockZoneNames[static_cast<int>(*s.clockZone)] : kLocalZone);
-        setBool(kTargetDetailsKey, s.barTargetDetails);
         store.Set(kMenuFontKey, s.menuFont.c_str());
         setFloat(kMenuXKey, static_cast<float>(s.menuX));
         setFloat(kMenuYKey, static_cast<float>(s.menuY));
         setFloat(kMenuWidthKey, static_cast<float>(s.menuWidth));
         setFloat(kMenuHeightKey, static_cast<float>(s.menuHeight));
-        for (int w = 0; w < kBarWidgetCount; ++w)
-        {
-            const std::string key = kBarWidgetKeys[w];
-            setBool(key, s.barWidgets[w]);
-            setBool(key + kSecondLineSuffix, s.barSecondLine[w]);
-            setBool(key + kIconsSuffix, s.barIcons[w]);
-        }
-        store.Set(kExpBarKey, kExpBarNames[static_cast<int>(s.expBar)]);
-        store.Set(kJobLayoutKey, kJobLayoutNames[static_cast<int>(s.jobLayout)]);
-        setBool(kJobNamesKey, s.jobNames);
+        // A copy's keys are written while it is on the panel; the first copy's always.
+        for (int slot = 0; slot < kPanelSlots; ++slot)
+            if (const PanelWidget w = WidgetInSlot(slot); w.copy == 0 || Placed(s.barSections, w))
+                SaveWidget(store, w, s.widgets[slot]);
         store.Set(kSubtitleKey, kSubtitleNames[static_cast<int>(s.barSubtitle)]);
-        setBool(kClock24Key, s.clock24);
-        setBool(kClockServerTimeKey, s.clockServerTime);
-        setBool(kLatencyKey, s.barLatency);
         for (int i = 0; i < kBarSectionCount; ++i)
             store.Set(kBarSectionKeys[i], PlacementNames(s.barSections[i]).c_str());
         store.Set(kPinnedWindowsKey, WindowPlaceText(s.pinnedWindows).c_str());

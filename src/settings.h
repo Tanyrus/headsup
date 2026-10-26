@@ -40,12 +40,27 @@ namespace headsup
     constexpr const char* kBadgeFont   = kBarlowCondensed; // what badges were set in before they took the default font
     constexpr size_t kMaxFontName      = 31; // a Windows font name's longest, without its terminator
 
-    constexpr std::array<bool, kBarWidgetCount> AllOn()
+    // One copy of a widget on the panel: whether it shows, what of it, and its own settings.
+    struct WidgetOptions
     {
-        std::array<bool, kBarWidgetCount> on{};
-        on.fill(true);
-        return on;
-    }
+        bool on         = false;
+        bool secondLine = true;
+        bool icons      = true; // and gil's coin
+        int currency    = kGilCurrency;             // Gil: by kCurrencyTable
+        std::optional<ClockZone> clockZone;         // Clock: none for the computer's own
+        bool clock24         = true;                // its two lines
+        bool clockSeconds    = false;               // its own line's seconds
+        bool clockServerTime = false;               // the server's time under its own
+        ExpBarPlace expBar   = ExpBarPlace::Under;  // Job
+        JobLayout jobLayout  = JobLayout::JobsFirst;
+        bool jobNames        = true;
+        bool latency         = false; // Connection: its round trip after its rates
+        bool targetDetails   = false; // Target: a mob's icons after its name and its weaknesses after its level
+        bool operator==(const WidgetOptions&) const = default;
+    };
+    // A copy as a new one is: shown, and the first copies as kBarWidgetDefaults has them.
+    WidgetOptions NewWidget(PanelWidget widget);
+    std::array<WidgetOptions, kPanelSlots> DefaultWidgets();
 
     // The target cursor: the game's own, one of HeadsUp's shapes or pictures, or a cursor file of the player's.
     enum class CursorStyle : uint8_t { Vanilla, Triangle, Feather, Chocobo, File };
@@ -100,9 +115,7 @@ namespace headsup
         std::string barTitleFont; // widget titles and popup headings; empty for the theme's
         std::string barTextFont;  // details, figures and popup text; empty for the theme's
         int popupTextSize  = kAutoPopupTextSize; // the popups' text size, or Auto
-        std::array<bool, kBarWidgetCount> barWidgets = kBarWidgetDefaults; // by BarWidget
-        int barCurrency = kGilCurrency; // the Gil widget's, by kCurrencyTable
-        std::optional<ClockZone> clockZone;           // the Clock widget's; none for the computer's own
+        std::array<WidgetOptions, kPanelSlots> widgets = DefaultWidgets(); // by SlotOf; a copy not placed has none
         std::vector<WindowPlace> pinnedWindows;  // game windows the player put at places of their own, never shifted
         std::vector<std::string> hiddenWindows;  // game windows drawn as nothing, by short name
         bool shiftVanillaUi = true; // the game's windows that hang from the top go under the panel, a view at a time
@@ -119,17 +132,7 @@ namespace headsup
         // Where the player left the settings window, in pixels; no width for one never moved, which opens in the
         // screen's middle.
         int menuX = 0, menuY = 0, menuWidth = 0, menuHeight = 0;
-        bool barTargetDetails = false; // a mob's icons after its name and its weaknesses after its level
-        std::array<bool, kBarWidgetCount> barSecondLine = AllOn(); // by BarWidget: its second line
-        std::array<bool, kBarWidgetCount> barIcons      = AllOn(); // by BarWidget: its icons and gil's coin
-        ExpBarPlace expBar = ExpBarPlace::Under;
-        JobLayout jobLayout = JobLayout::JobsFirst;
         SubtitlePlace barSubtitle = SubtitlePlace::After; // a widget's second line on a bar too short for two
-        bool jobNames      = true;
-        bool clock24       = true;  // the Clock widget's two lines
-        bool clockSeconds  = false; // its own line's seconds
-        bool clockServerTime = false; // the server's time under its own
-        bool barLatency    = false; // the Connection widget's round trip after its rates
         BarPlacement barSections = DefaultPlacement(); // where each widget sits, by BarSection
         bool hideHelpBar = false; // skip the game's own help bar across the top of the screen
         bool hideNetstat = false; // and its connection readout (S, R and %) at the top right
@@ -177,6 +180,8 @@ namespace headsup
         uint32_t detectionShown = kDefaultDetection;
         ColorPick cursorColor{ColorSource::Target};
         ColorPick cursorEdgeColor{ColorSource::Custom, ColorFromRgb(0x000000)};
+        const WidgetOptions& Widget(PanelWidget w) const { return widgets[SlotOf(w)]; }
+        WidgetOptions& Widget(PanelWidget w) { return widgets[SlotOf(w)]; }
         const KindSettings& Kind(PlateKind k) const { return kinds[static_cast<int>(k)]; }
         KindSettings& Kind(PlateKind k) { return kinds[static_cast<int>(k)]; }
         bool operator==(const Settings&) const = default;
@@ -191,6 +196,13 @@ namespace headsup
     // have them.
     void UseHelpTextDefaults(Settings& s);
     bool BarOn(const Settings& s);
+    // A copy is on the panel and switched on; Shown for a widget asks whether any copy of it is.
+    bool Shows(const Settings& s, PanelWidget widget);
+    bool Shown(const Settings& s, BarWidget widget);
+    // Another copy of a widget, after the last of its copies, shown and with its settings as new; none when it has no
+    // more. Taking a copy off forgets its settings.
+    std::optional<PanelWidget> AddWidgetCopy(Settings& s, BarWidget widget);
+    void RemoveWidgetCopy(Settings& s, PanelWidget widget);
     // Whether the game's help shows under the panel, for the windows: the panel's help line or the game's own strip.
     HelpMode WindowHelpMode(const Settings& s);
     // Places every view under the band of now (in the game's menu pixels; 0 while the panel is off): band for the

@@ -727,23 +727,30 @@ namespace headsup
         return std::nullopt;
     }
 
-    BarNeeds NeedsOf(const Settings& settings, std::optional<BarWidget> open)
+    BarNeeds NeedsOf(const Settings& settings, std::optional<PanelWidget> open)
     {
-        auto shown = [&](BarWidget widget) { return settings.barWidgets[static_cast<int>(widget)]; };
+        const auto shown  = [&](BarWidget widget) { return Shown(settings, widget); };
+        const auto opened = [&](BarWidget widget) { return open && open->kind == widget; };
         BarNeeds needs;
-        // The Clock in a zone of its own goes by the time alone, as its server line and its popup's resets do; in the
+        // A Clock in a zone of its own goes by the time alone, as its server line and its popup's resets do; in the
         // computer's zone, by what Windows makes of the time.
-        const bool clock = shown(BarWidget::EarthTime), zonedClock = clock && settings.clockZone.has_value();
-        needs.unixTime   = shown(BarWidget::Weather) || shown(BarWidget::VanaTime) || zonedClock ||
-                           (clock && (settings.clockServerTime || open == BarWidget::EarthTime)) ||
-                           (shown(BarWidget::Zone) && open == BarWidget::Zone); // the popup counts down to the tally
-        needs.localTime  = clock && !zonedClock;
+        bool zonedClock = false, localClock = false, serverClock = false;
+        for (int copy = 0; copy < kMostCopies; ++copy)
+            if (const PanelWidget clock{BarWidget::EarthTime, copy}; Shows(settings, clock))
+            {
+                const WidgetOptions& o = settings.Widget(clock);
+                (o.clockZone ? zonedClock : localClock) = true;
+                serverClock = serverClock || o.clockServerTime;
+            }
+        needs.unixTime   = shown(BarWidget::Weather) || shown(BarWidget::VanaTime) || zonedClock || serverClock ||
+                           opened(BarWidget::EarthTime) || opened(BarWidget::Zone); // the Zone popup counts down to the tally
+        needs.localTime  = localClock;
         needs.zone       = shown(BarWidget::Zone) || shown(BarWidget::Weather) ||
-                     (shown(BarWidget::Signet) && open == BarWidget::Signet); // the popup says where it works
+                     opened(BarWidget::Signet); // the popup says where it works
         needs.target     = shown(BarWidget::Target) || shown(BarWidget::Distance);
         needs.gil        = shown(BarWidget::Gil);
         needs.strip      = shown(BarWidget::GameHelp);
-        const bool memoryPopup = shown(BarWidget::Memory) && open == BarWidget::Memory;
+        const bool memoryPopup = opened(BarWidget::Memory);
         needs.frames     = shown(BarWidget::Fps) || memoryPopup;
         needs.job        = shown(BarWidget::Job);
         needs.connection = shown(BarWidget::Connection);
@@ -753,26 +760,26 @@ namespace headsup
         needs.cpu        = memoryPopup;
         needs.linuxxi    = memoryPopup;
         // Ashita counts a container's items by walking its slots, so the others wait for the popup that lists them.
-        if (shown(BarWidget::Bags)) needs.containers = open == BarWidget::Bags ? kContainerCount : 1;
+        if (shown(BarWidget::Bags)) needs.containers = opened(BarWidget::Bags) ? kContainerCount : 1;
         return needs;
     }
 
     namespace
     {
-        WidgetContent ContentOf(BarWidget widget, const BarState& state, const Settings& settings);
+        WidgetContent ContentOf(PanelWidget widget, const BarState& state, const Settings& settings);
     }
 
-    WidgetContent BarWidgetContent(BarWidget widget, const BarState& state, const Settings& settings)
+    WidgetContent BarWidgetContent(PanelWidget widget, const BarState& state, const Settings& settings)
     {
         // Each widget's own content, less its second line or icons where they are switched off.
-        WidgetContent w = ContentOf(widget, state, settings);
-        const int i     = static_cast<int>(widget);
-        if (!settings.barSecondLine[i])
+        WidgetContent w        = ContentOf(widget, state, settings);
+        const WidgetOptions& o = settings.Widget(widget);
+        if (!o.secondLine)
         {
             w.subtitle.clear();
             w.subtitleIcons.clear();
         }
-        if (!settings.barIcons[i])
+        if (!o.icons)
         {
             w.icons.clear();
             w.titleIcons.clear();
@@ -784,12 +791,13 @@ namespace headsup
 
     namespace
     {
-    WidgetContent ContentOf(BarWidget widget, const BarState& state, const Settings& settings)
+    WidgetContent ContentOf(PanelWidget widget, const BarState& state, const Settings& settings)
     {
         WidgetContent w;
-        w.shown = settings.barWidgets[static_cast<int>(widget)];
+        w.shown = Shows(settings, widget);
         if (!w.shown) return w;
-        switch (widget)
+        const WidgetOptions& o = settings.Widget(widget);
+        switch (widget.kind)
         {
         case BarWidget::Zone:
         {
@@ -845,14 +853,14 @@ namespace headsup
             }
             else
             {
-                if (settings.barTargetDetails)
+                if (o.targetDetails)
                     w.titleIcons = MobIcons(*state.target);
                 else if (const std::optional<Icon> icon = MobIcon(*state.target))
                     w.icons.push_back(*icon);
                 w.title = ListOf(Colored(state.target->name, NameColor(*state.target, settings)));
                 if (HasLevel(*state.target))
                     w.subtitle = ListOf(Colored(state.target->level.text, ShadeColor(*state.target, settings)));
-                if (settings.barTargetDetails && IsMob(state.target))
+                if (o.targetDetails && IsMob(state.target))
                 {
                     // Weaknesses by SDT or rank, as the badges find them by default.
                     const InfoIconSet found = InfoIconsFor(&ResistancesOf(*state.target->mob), BadgeRules{});
@@ -866,7 +874,7 @@ namespace headsup
         case BarWidget::Gil:
         {
             // The picked currency; gil with its coin.
-            const int picked = settings.barCurrency;
+            const int picked = o.currency;
             if (picked == kGilCurrency)
             {
                 w.coin  = true;
@@ -887,13 +895,11 @@ namespace headsup
             w.hasPopup = true;
             break;
         case BarWidget::EarthTime:
-            w.title    = ListOf(Text(settings.clockZone
-                    ? ZoneClockText(ZoneAt(*settings.clockZone, state.unixMs), settings.clock24, settings.clockSeconds)
-                    : ClockText(state.earthHour, state.earthMinute, settings.clock24,
-                          settings.clockSeconds ? state.earthSecond : -1)));
-            if (settings.clockServerTime)
-                w.subtitle = ListOf(Text(
-                    ZoneClockText(ZoneAt(ClockZone::Japan, state.unixMs), settings.clock24, false), Tone::Dim));
+            w.title    = ListOf(Text(o.clockZone
+                    ? ZoneClockText(ZoneAt(*o.clockZone, state.unixMs), o.clock24, o.clockSeconds)
+                    : ClockText(state.earthHour, state.earthMinute, o.clock24, o.clockSeconds ? state.earthSecond : -1)));
+            if (o.clockServerTime)
+                w.subtitle = ListOf(Text(ZoneClockText(ZoneAt(ClockZone::Japan, state.unixMs), o.clock24, false), Tone::Dim));
             w.hasPopup = true;
             break;
         case BarWidget::GameHelp:
@@ -901,9 +907,9 @@ namespace headsup
         case BarWidget::Fps:
             return FpsWidget(state.frames);
         case BarWidget::Job:
-            return JobWidget(state.job, settings.expBar, settings.jobNames, settings.jobLayout);
+            return JobWidget(state.job, o.expBar, o.jobNames, o.jobLayout);
         case BarWidget::Connection:
-            return ConnectionWidget(state.connection, settings.barLatency);
+            return ConnectionWidget(state.connection, o.latency);
         case BarWidget::Party:
             return PartyWidget(state.party);
         case BarWidget::Signet:
@@ -923,10 +929,11 @@ namespace headsup
 
     }
 
-    PopupContent BarPopupContent(BarWidget widget, const BarState& state, const Settings& settings)
+    PopupContent BarPopupContent(PanelWidget widget, const BarState& state, const Settings& settings)
     {
         PopupContent popup;
-        switch (widget)
+        const WidgetOptions& o = settings.Widget(widget);
+        switch (widget.kind)
         {
         case BarWidget::Zone:
         {
@@ -1039,9 +1046,9 @@ namespace headsup
         case BarWidget::EarthTime:
         {
             int year = state.earthYear, month = state.earthMonth, day = state.earthDay;
-            if (settings.clockZone)
+            if (o.clockZone)
             {
-                const ZoneTime there = ZoneAt(*settings.clockZone, state.unixMs);
+                const ZoneTime there = ZoneAt(*o.clockZone, state.unixMs);
                 year = there.year, month = there.month, day = there.day;
             }
             popup.title =

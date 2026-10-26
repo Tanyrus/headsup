@@ -266,7 +266,8 @@ TEST(the_clocks_zone_dropdown_lists_local_first_and_then_every_zone)
 
 TEST(the_widgets_page_has_a_tab_for_every_widget_on_the_bar_in_rows_as_even_as_they_come)
 {
-    const std::vector<BarWidget> tabs = WidgetTabs();
+    BarPlacement placement = DefaultPlacement();
+    const std::vector<PanelWidget> tabs = WidgetTabs(placement);
     CHECK_EQ(tabs.size(), static_cast<size_t>(kPlacedWidgetCount));
     for (int w = 0; w < kBarWidgetCount; ++w)
     {

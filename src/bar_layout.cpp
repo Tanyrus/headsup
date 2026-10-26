@@ -23,9 +23,9 @@ namespace headsup
         constexpr float kShrinkStep  = 0.02f; // both lines get smaller together by this share of their size at a time
         constexpr int kShrinkSteps   = 25;    // to half at most
 
-        float Width(const std::array<float, kBarWidgetCount>& natural, BarWidget w)
+        float Width(const std::array<float, kPanelSlots>& natural, PanelWidget w)
         {
-            return natural[static_cast<int>(w)];
+            return natural[SlotOf(w)];
         }
 
         constexpr float kFitSlack = 0.01f; // pixels of float rounding: a widget that fits exactly is not dropped
@@ -37,8 +37,8 @@ namespace headsup
         struct Spacing
         {
             float between = 0.0f, frameClear = 0.0f;
-            float Lead(BarWidget w) const { return w == BarWidget::Target ? frameClear : 0.0f; }
-            float Apart(BarWidget a, BarWidget b) const { return between + Lead(a) + Lead(b); }
+            float Lead(PanelWidget w) const { return w.kind == BarWidget::Target ? frameClear : 0.0f; }
+            float Apart(PanelWidget a, PanelWidget b) const { return between + Lead(a) + Lead(b); }
         };
 
         struct Group
@@ -50,14 +50,14 @@ namespace headsup
 
         // Places order one after another from `from` towards `limit` (leftward when limit is less): each widget at its
         // width, spaced from the last; the first that does not fit goes with every one after it.
-        Group PlaceGroup(const std::vector<BarWidget>& order, float from, float limit, const Spacing& spacing,
-                         bool diamonds, const std::array<float, kBarWidgetCount>& widths, const BarRow& pill,
+        Group PlaceGroup(const std::vector<PanelWidget>& order, float from, float limit, const Spacing& spacing,
+                         bool diamonds, const std::array<float, kPanelSlots>& widths, const BarRow& pill,
                          float rowY, float rowH)
         {
             Group g;
             const float dir = limit >= from ? 1.0f : -1.0f;
             float at        = from;
-            for (const BarWidget w : order)
+            for (const PanelWidget w : order)
             {
                 const float width = Width(widths, w);
                 if (width <= 0.0f) continue;
@@ -67,7 +67,7 @@ namespace headsup
                 if (!first && diamonds)
                     g.dividers.push_back(at + dir * (spacing.Lead(g.widgets.back().widget) + spacing.between / 2.0f));
                 const float x       = dir > 0.0f ? at + gap : at - gap - width;
-                const bool isTarget = w == BarWidget::Target; // framed on the pill row in every shape
+                const bool isTarget = w.kind == BarWidget::Target; // framed on the pill row in every shape
                 g.widgets.push_back({w, BarRect{x, isTarget ? pill.y : rowY, width, isTarget ? pill.height : rowH}});
                 if (isTarget) g.targetWidth = width;
                 at = dir > 0.0f ? x + width : x;
@@ -75,12 +75,12 @@ namespace headsup
             return g;
         }
 
-        float GroupWidth(const std::vector<BarWidget>& order, const std::array<float, kBarWidgetCount>& widths,
+        float GroupWidth(const std::vector<PanelWidget>& order, const std::array<float, kPanelSlots>& widths,
                          const Spacing& spacing)
         {
             float total = 0.0f;
-            std::optional<BarWidget> last;
-            for (const BarWidget w : order)
+            std::optional<PanelWidget> last;
+            for (const PanelWidget w : order)
                 if (Width(widths, w) > 0.0f)
                 {
                     total += Width(widths, w) + (last ? spacing.Apart(*last, w) : 0.0f);
@@ -97,7 +97,7 @@ namespace headsup
     }
 
     BarLayout LayoutBar(float screenWidth, const BarMetrics& m, BarShape shape,
-                        const std::array<float, kBarWidgetCount>& natural, float targetMinimum,
+                        const std::array<float, kPanelSlots>& natural, float targetMinimum,
                         const BarPlacement& placement, BarSeparators separators)
     {
         const bool ornate   = shape == BarShape::Ornate;
@@ -117,18 +117,18 @@ namespace headsup
         // The target gives way first, wherever it sits: it gives up what the bar is short of, in whole pixels, and goes
         // when that leaves it less than min(its width, its minimum). Only then do other widgets go. Sections with
         // something shown are a gap apart and the outer ones an edge from the screen's sides.
-        const auto giveWay = [&](std::array<float, kBarWidgetCount> widths)
+        const auto giveWay = [&](std::array<float, kPanelSlots> widths)
         {
             const auto shortOf = [&]
             {
                 float demand = 2.0f * edge;
                 int filled   = 0;
-                for (const std::vector<BarWidget>* section : {&left, &center, &right})
+                for (const std::vector<PanelWidget>* section : {&left, &center, &right})
                     if (const float w = GroupWidth(*section, widths, spacing); w > 0.0f)
                         demand += w + (filled++ > 0 ? m.gap : 0.0f);
                 return demand - screenWidth;
             };
-            constexpr int kTarget = static_cast<int>(BarWidget::Target);
+            constexpr int kTarget = SlotOf(BarWidget::Target);
             if (const float want = widths[kTarget], lack = shortOf(); want > 0.0f && lack > kFitSlack)
             {
                 const float got = std::floor(want - lack);
@@ -137,14 +137,14 @@ namespace headsup
             return widths;
         };
 
-        const auto place = [&](const std::array<float, kBarWidgetCount>& widths)
+        const auto place = [&](const std::array<float, kPanelSlots>& widths)
         {
             BarLayout l;
             l.height = m.height;
             Group lg = PlaceGroup(left, edge, screenWidth - edge, spacing, diamonds, widths, pill, rowY, rowH);
             const float leftEnd =
                 lg.widgets.empty() ? edge - m.gap : lg.widgets.back().rect.x + lg.widgets.back().rect.width;
-            const std::vector<BarWidget> rightInward(right.rbegin(), right.rend());
+            const std::vector<PanelWidget> rightInward(right.rbegin(), right.rend());
             Group rg = PlaceGroup(rightInward, screenWidth - edge, leftEnd + m.gap, spacing, diamonds, widths, pill,
                 rowY, rowH);
             std::reverse(rg.widgets.begin(), rg.widgets.end());
@@ -152,8 +152,8 @@ namespace headsup
 
             // The center: what fits between the sides, a gap from each, its widgets going from its end.
             const float lowest = leftEnd + m.gap, highest = rightStart - m.gap;
-            std::vector<BarWidget> shown;
-            for (const BarWidget w : center)
+            std::vector<PanelWidget> shown;
+            for (const PanelWidget w : center)
                 if (Width(widths, w) > 0.0f) shown.push_back(w);
             while (!shown.empty() && GroupWidth(shown, widths, spacing) > highest - lowest + kFitSlack)
                 shown.pop_back();
@@ -179,14 +179,14 @@ namespace headsup
             return l;
         };
 
-        constexpr int kTarget = static_cast<int>(BarWidget::Target);
-        const std::array<float, kBarWidgetCount> widths = giveWay(natural);
+        constexpr int kTarget = SlotOf(BarWidget::Target);
+        const std::array<float, kPanelSlots> widths = giveWay(natural);
         BarLayout l = place(widths);
         // The target gave way against every widget; those that went anyway leave room it takes back.
-        std::array<float, kBarWidgetCount> kept = natural;
-        for (int w = 0; w < kBarWidgetCount; ++w)
-            if (w != kTarget && RectOf(l, static_cast<BarWidget>(w)) == nullptr) kept[w] = 0.0f;
-        if (const std::array<float, kBarWidgetCount> refit = giveWay(kept); refit[kTarget] != widths[kTarget])
+        std::array<float, kPanelSlots> kept = natural;
+        for (int w = 0; w < kPanelSlots; ++w)
+            if (w != kTarget && RectOf(l, WidgetInSlot(w)) == nullptr) kept[w] = 0.0f;
+        if (const std::array<float, kPanelSlots> refit = giveWay(kept); refit[kTarget] != widths[kTarget])
             l = place(refit);
         return l;
     }
@@ -275,14 +275,14 @@ namespace headsup
         return cut.empty() ? std::string() : cut + kEllipsis;
     }
 
-    std::optional<BarWidget> WidgetAt(const BarLayout& layout, float x, float y)
+    std::optional<PanelWidget> WidgetAt(const BarLayout& layout, float x, float y)
     {
         for (const PlacedWidget& p : layout.widgets)
             if (p.rect.Contains(x, y)) return p.widget;
         return std::nullopt;
     }
 
-    const BarRect* RectOf(const BarLayout& layout, BarWidget widget)
+    const BarRect* RectOf(const BarLayout& layout, PanelWidget widget)
     {
         for (const PlacedWidget& p : layout.widgets)
             if (p.widget == widget) return &p.rect;
@@ -323,7 +323,7 @@ namespace headsup
         return past == cuts.begin() ? std::string() : text.substr(0, *(past - 1)) + kEllipsis;
     }
 
-    void BarInput::Frame(const BarLayout& layout, const std::array<bool, kBarWidgetCount>& hasPopup)
+    void BarInput::Frame(const BarLayout& layout, const std::array<bool, kPanelSlots>& hasPopup)
     {
         m_Layout   = layout;
         m_HasPopup = hasPopup;
@@ -349,9 +349,9 @@ namespace headsup
     void BarInput::Reevaluate()
     {
         m_Under = WidgetAt(m_Layout, m_X, m_Y);
-        if (m_Under && m_HasPopup[static_cast<int>(*m_Under)])
+        if (m_Under && m_HasPopup[SlotOf(*m_Under)])
             m_Hover = m_Under;
-        else if (!(m_Hover && m_HasPopup[static_cast<int>(*m_Hover)] && InPopupColumn(m_X, m_Y)))
+        else if (!(m_Hover && m_HasPopup[SlotOf(*m_Hover)] && InPopupColumn(m_X, m_Y)))
             m_Hover.reset();
     }
 
@@ -369,8 +369,8 @@ namespace headsup
     {
         if (!Over(x, y)) return false;
         if (!left) return true;
-        const std::optional<BarWidget> under = WidgetAt(m_Layout, x, y);
-        if (under && m_HasPopup[static_cast<int>(*under)])
+        const std::optional<PanelWidget> under = WidgetAt(m_Layout, x, y);
+        if (under && m_HasPopup[SlotOf(*under)])
             m_Pinned = m_Pinned == under ? std::nullopt : under;
         else if (!under && Open() && m_Popup.Contains(x, y))
             m_Pinned = m_Pinned == Open() ? std::nullopt : Open();

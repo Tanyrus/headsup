@@ -51,9 +51,9 @@ namespace headsup
     // neighbours and every placed widget's element, all sized from the look. The widgets and dividers carry the
     // hidden class and no place: the plugin shows and places them.
     std::string BarDocument(const BarLook& look, const BarTextPlace& place);
-    std::string WidgetId(BarWidget widget);
+    std::string WidgetId(PanelWidget widget);
     std::string DividerId(int divider);
-    constexpr int kDividerCount       = kPlacedWidgetCount - 1;
+    constexpr int kDividerCount       = kMostPlaced - 1;
     constexpr const char* kStripId    = "strip";
     constexpr const char* kRightCapId = "cap-right";
     constexpr const char* kHiddenClass = "hidden";

@@ -31,8 +31,8 @@ namespace headsup
     // ("Hide Level and Icons"); letters already capital stay.
     std::string TitleCaseText(std::string_view text);
 
-    // The Widgets page's tabs: every widget on the bar, in BarWidget's order.
-    std::vector<BarWidget> WidgetTabs();
+    // The Widgets page's tabs: every widget on the bar, in BarWidget's order, each with its other copies after it.
+    std::vector<PanelWidget> WidgetTabs(const BarPlacement& placement);
     // How many tabs go in a row for count of them in rows rows: the rows as even as they come, the first the fuller.
     int TabsPerRow(int count, int rows);
 

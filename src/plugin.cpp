@@ -564,13 +564,13 @@ public:
         else if (args[1] == "popup" && args.size() > 2)
         {
             // Pins a widget's popup by the name the settings file gives it, in lower case, or none.
-            std::optional<headsup::BarWidget> pinned;
-            for (int w = 0; w < headsup::kBarWidgetCount; ++w)
+            std::optional<headsup::PanelWidget> pinned;
+            for (int slot = 0; slot < headsup::kPanelSlots; ++slot)
             {
-                std::string name = headsup::BarWidgetName(static_cast<headsup::BarWidget>(w));
+                std::string name = headsup::PanelWidgetName(headsup::WidgetInSlot(slot));
                 for (char& c : name)
                     c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-                if (name == args[2]) pinned = static_cast<headsup::BarWidget>(w);
+                if (name == args[2]) pinned = headsup::WidgetInSlot(slot);
             }
             if (!pinned && args[2] != "off")
                 Print("/hu popup: no widget is named " + args[2] + ".");
@@ -762,9 +762,9 @@ public:
         // Opening Region Info asks the server for the conquest standings; HeadsUp asks the same once per zone-in, and
         // again while the Zone popup shows them.
         if (m_GameState.ConquestRequestDue(now,
-                g_BarOn && m_Settings.barWidgets[static_cast<int>(headsup::BarWidget::Zone)] &&
+                g_BarOn && headsup::Shown(m_Settings, headsup::BarWidget::Zone) &&
                     m_AshitaCore->GetMemoryManager()->GetPlayer()->GetIsZoning() == 0,
-                m_BarInput.Open() == headsup::BarWidget::Zone))
+                m_BarInput.Open() && m_BarInput.Open()->kind == headsup::BarWidget::Zone))
         {
             auto request = headsup::kConquestRequest; // Ashita takes the bytes as non-const
             m_AshitaCore->GetPacketManager()->AddOutgoingPacket(headsup::kConquestRequestPacket,
@@ -772,9 +772,9 @@ public:
             m_GameState.ConquestRequested(now);
         }
         // Opening the Currencies menu asks for them; HeadsUp asks the same, as for the conquest standings.
-        const bool gilOpen = m_BarInput.Open() == headsup::BarWidget::Gil;
+        const bool gilOpen = m_BarInput.Open() && m_BarInput.Open()->kind == headsup::BarWidget::Gil;
         if (m_GameState.CurrencyRequestDue(now,
-                g_BarOn && m_Settings.barWidgets[static_cast<int>(headsup::BarWidget::Gil)] &&
+                g_BarOn && headsup::Shown(m_Settings, headsup::BarWidget::Gil) &&
                     m_AshitaCore->GetMemoryManager()->GetPlayer()->GetIsZoning() == 0,
                 gilOpen))
         {

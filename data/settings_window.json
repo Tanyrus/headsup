@@ -384,6 +384,7 @@
               "rows": [
                 {"key": "enabled", "name": "Enabled"},
                 {"key": "section", "name": "Section"},
+                {"key": "copies", "name": "Copies", "tip": "Another of this widget on the panel, with settings of its own. You can take a copy off again."},
                 {"key": "second-line", "name": "Second Line"},
                 {"key": "icons", "name": "Icons"},
                 {"key": "details", "name": "Details", "tip": "Aggro icons after the name, weaknesses after the level."},
@@ -396,6 +397,10 @@
                 {"key": "exp-bar", "name": "EXP Bar"},
                 {"key": "job-names", "name": "Job Names", "tip": "Off, the levels alone."},
                 {"key": "latency", "name": "Latency", "tip": "After the rates, once measured."}
+              ],
+              "words": [
+                {"key": "add-copy", "name": "Add a Copy", "tip": "Puts another of this widget on the panel after it, with its own tab here."},
+                {"key": "remove-copy", "name": "Remove This Copy", "tip": "Takes this copy off the panel. Its settings go with it."}
               ]
             }
           ]
@@ -406,7 +411,7 @@
           "description": "Drag a chip to move it; click it to open its tab above.",
           "settings": [
             {"key": "trays"},
-            {"key": "reset-layout", "name": "Reset Layout", "tip": "Puts every widget back in its first place. Switches stay."}
+            {"key": "reset-layout", "name": "Reset Layout", "tip": "Puts every widget back in its first place and takes off any copies. Switches stay."}
           ]
         }
       ]

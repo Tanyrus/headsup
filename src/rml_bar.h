@@ -104,8 +104,8 @@ namespace headsup
         };
         struct Widgets
         {
-            std::array<WidgetContent, kBarWidgetCount> contents;
-            std::array<bool, kBarWidgetCount> hasPopup{};
+            std::array<WidgetContent, kPanelSlots> contents;
+            std::array<bool, kPanelSlots> hasPopup{};
         };
         // The help bar's text follows the game's, its fonts and their sizes, and the room its lines and its caption
         // have beside the bag's count.
@@ -185,7 +185,7 @@ namespace headsup
         Rml::ElementDocument* m_Document = nullptr;
         DocumentKey m_DocumentKey;
         bool m_Visible = false;
-        std::array<Shown, kBarWidgetCount> m_Shown;
+        std::array<Shown, kPanelSlots> m_Shown;
         std::array<Divider, kDividerCount> m_Dividers;
         Rml::Element* m_RightCap = nullptr;
         Px m_RightCapLeft;

@@ -84,7 +84,10 @@ TEST(the_document_holds_the_strip_the_caps_the_dividers_and_every_placed_widget)
     CHECK(Has(rml, "height:59px")); // those, and the gold theme's line under the strip
     CHECK(Has(rml, "id=\"w-zone\"") && Has(rml, "id=\"w-target\"") && Has(rml, "id=\"w-earthTime\""));
     CHECK(!Has(rml, "id=\"w-gameHelp\"")); // never on the bar
-    CHECK(Has(rml, "id=\"d-0\"") && Has(rml, "id=\"d-12\"") && !Has(rml, "id=\"d-13\"")); // 14 placed widgets
+    // A divider between each two of the most widgets there can be: the target, and four copies of each of the rest.
+    CHECK(Has(rml, "id=\"d-0\"") && Has(rml, "id=\"d-51\"") && !Has(rml, "id=\"d-52\""));
+    CHECK(Has(rml, "id=\"w-gil-2\"") && Has(rml, "id=\"w-gil-4\"") && !Has(rml, "id=\"w-gil-5\""));
+    CHECK(!Has(rml, "id=\"w-target-2\"")); // one target only
     CHECK(Has(rml, "class=\"widget hidden target\" id=\"w-target\""));
     CHECK(Has(rml, "font-size:13px") && Has(rml, "font-size:11px"));
     CHECK(Has(rml, "\"Marcellus SC\"") && Has(rml, "\"Barlow Condensed\""));

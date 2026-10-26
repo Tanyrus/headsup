@@ -185,8 +185,8 @@ PIECES = Pieces(
         'theme-files': Setting(unnamed=True, words={'save-as': True, 'name-hint': True, 'save': True, 'load': True}),
         'hide-game-help': Setting(), 'position': Setting(), 'background': Setting(),
         'widget-tabs': Setting(unnamed=True, rows=rows(
-            'enabled', 'section', 'second-line', 'icons', 'details', 'currency', 'time-zone', 'server-time', '24-hour',
-            'seconds', 'layout', 'exp-bar', 'job-names', 'latency')),
+            'enabled', 'section', 'copies', 'second-line', 'icons', 'details', 'currency', 'time-zone', 'server-time', '24-hour',
+            'seconds', 'layout', 'exp-bar', 'job-names', 'latency'), words={'add-copy': True, 'remove-copy': True}),
         'trays': Setting(unnamed=True), 'reset-layout': Setting(),
         # Mouse Cursor and HeadsUp Config
         'pointer-icon': Setting(options=3, nameless=frozenset({2})), 'pointer-size': Setting(), 'pointer-fix': Setting(), 'keep-pointer': Setting(),

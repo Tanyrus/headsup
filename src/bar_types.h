@@ -54,6 +54,26 @@ namespace headsup
         std::to_array<bool>({true, true, true, true, true, true, true, true, true, true, true, false, false, true, false});
     static_assert(kBarWidgetDefaults.size() == kBarWidgetCount);
 
+    // A widget on the panel: which, and which of its copies. Copy 0 is the one every settings file has; the others are
+    // there while the player keeps them on the panel.
+    constexpr int kMostCopies = 4; // of one widget
+    struct PanelWidget
+    {
+        BarWidget kind = BarWidget::Zone;
+        int copy       = 0;
+        constexpr PanelWidget() = default;
+        constexpr PanelWidget(BarWidget widget, int number = 0) // a widget alone is its first copy
+            : kind(widget), copy(number)
+        {}
+        bool operator==(const PanelWidget&) const = default;
+    };
+    // Tables by PanelWidget hold a slot for every copy of every widget.
+    constexpr int kPanelSlots = kBarWidgetCount * kMostCopies;
+    constexpr int SlotOf(PanelWidget widget) { return static_cast<int>(widget.kind) * kMostCopies + widget.copy; }
+    constexpr PanelWidget WidgetInSlot(int slot) { return PanelWidget{static_cast<BarWidget>(slot / kMostCopies), slot % kMostCopies}; }
+    // The target has one frame the bar gives way around, and game help a bar of its own: neither has copies.
+    constexpr bool HasCopies(BarWidget widget) { return widget != BarWidget::Target && widget != BarWidget::GameHelp; }
+
     // Where a widget's second line goes when the bar is too short for two: nowhere, or beside its title.
     enum class SubtitlePlace : uint8_t
     {

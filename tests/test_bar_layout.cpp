@@ -15,10 +15,16 @@ namespace
 {
     bool Near(float a, float b) { return std::fabs(a - b) < 0.01f; }
 
-    std::array<float, kBarWidgetCount> Widths(float zone, float weather, float vana, float target, float gil,
+    std::array<float, kPanelSlots> Widths(float zone, float weather, float vana, float target, float gil,
                                               float bags, float earth)
     {
-        return {zone, weather, vana, target, gil, bags, earth};
+        std::array<float, kPanelSlots> widths{};
+        const std::pair<BarWidget, float> each[] = {{BarWidget::Zone, zone}, {BarWidget::Weather, weather},
+            {BarWidget::VanaTime, vana}, {BarWidget::Target, target}, {BarWidget::Gil, gil}, {BarWidget::Bags, bags},
+            {BarWidget::EarthTime, earth}};
+        for (const auto& [widget, width] : each)
+            widths[SlotOf(widget)] = width;
+        return widths;
     }
 
     // Natural widths, a 36 px bar.
@@ -38,10 +44,10 @@ TEST(pills_put_the_groups_at_the_edges_and_the_target_in_the_middle)
     CHECK(Near(RectOf(l, BarWidget::Target)->x, 860.0f) && Near(l.targetWidth, 200.0f));
     CHECK(Near(l.widgets[0].rect.height, PillRow(kPills).height) && Near(l.widgets[0].rect.y, PillRow(kPills).y));
     CHECK(l.dividers.empty());
-    std::vector<BarWidget> order;
+    std::vector<PanelWidget> order;
     for (const PlacedWidget& p : l.widgets)
         order.push_back(p.widget);
-    CHECK(order == (std::vector<BarWidget>{BarWidget::Zone, BarWidget::VanaTime, BarWidget::Target, BarWidget::Gil,
+    CHECK(order == (std::vector<PanelWidget>{BarWidget::Zone, BarWidget::VanaTime, BarWidget::Target, BarWidget::Gil,
                                            BarWidget::Bags, BarWidget::EarthTime})); // in bar order
 }
 
@@ -96,9 +102,9 @@ TEST(hit_tests_popup_placement_and_fitting_text)
 TEST(hovering_opens_leaving_closes_and_a_click_pins)
 {
     const BarLayout l = LayoutBar(1920.0f, kPills, BarShape::Pills, Widths(100, 0, 120, 200, 90, 60, 50), 0.0f);
-    std::array<bool, kBarWidgetCount> popups{};
-    popups[static_cast<int>(BarWidget::Target)]   = true;
-    popups[static_cast<int>(BarWidget::VanaTime)] = true;
+    std::array<bool, kPanelSlots> popups{};
+    popups[SlotOf(BarWidget::Target)]   = true;
+    popups[SlotOf(BarWidget::VanaTime)] = true;
     BarInput input;
     input.Frame(l, popups);
     input.Move(960.0f, 18.0f);
@@ -133,8 +139,8 @@ TEST(a_cut_help_bar_under_the_strip_opens_and_pins_its_popup_and_takes_only_its_
     // The renderer places Game help's own bar under the strip when its text was cut.
     BarLayout l = LayoutBar(1920.0f, kPills, BarShape::Pills, Widths(100, 0, 120, 200, 90, 60, 50), 0.0f);
     l.widgets.push_back(PlacedWidget{BarWidget::GameHelp, BarRect{0.0f, 46.0f, 480.0f, 60.0f}});
-    std::array<bool, kBarWidgetCount> popups{};
-    popups[static_cast<int>(BarWidget::GameHelp)] = true;
+    std::array<bool, kPanelSlots> popups{};
+    popups[SlotOf(BarWidget::GameHelp)] = true;
     BarInput input;
     input.Frame(l, popups);
     input.Move(100.0f, 70.0f);
@@ -147,9 +153,9 @@ TEST(a_cut_help_bar_under_the_strip_opens_and_pins_its_popup_and_takes_only_its_
 TEST(pinning_another_widget_moves_the_pin)
 {
     const BarLayout l = LayoutBar(1920.0f, kPills, BarShape::Pills, Widths(100, 0, 120, 200, 90, 60, 50), 0.0f);
-    std::array<bool, kBarWidgetCount> popups{};
-    popups[static_cast<int>(BarWidget::Target)]   = true;
-    popups[static_cast<int>(BarWidget::VanaTime)] = true;
+    std::array<bool, kPanelSlots> popups{};
+    popups[SlotOf(BarWidget::Target)]   = true;
+    popups[SlotOf(BarWidget::VanaTime)] = true;
     BarInput input;
     input.Frame(l, popups);
     CHECK(input.Press(960.0f, 18.0f, true));
@@ -164,9 +170,9 @@ TEST(pinning_another_widget_moves_the_pin)
 TEST(a_hovered_popup_closes_when_its_widget_stops_having_one)
 {
     const BarLayout l = LayoutBar(1920.0f, kPills, BarShape::Pills, Widths(100, 0, 120, 200, 90, 60, 50), 0.0f);
-    std::array<bool, kBarWidgetCount> popups{};
-    popups[static_cast<int>(BarWidget::Target)] = true;
-    std::array<bool, kBarWidgetCount> none{};
+    std::array<bool, kPanelSlots> popups{};
+    popups[SlotOf(BarWidget::Target)] = true;
+    std::array<bool, kPanelSlots> none{};
     BarInput input;
     input.Frame(l, popups);
     input.Move(960.0f, 18.0f);
@@ -184,8 +190,8 @@ TEST(a_hovered_popup_closes_when_its_widget_stops_having_one)
 
 TEST(a_pinned_widget_that_is_switched_off_loses_its_pin)
 {
-    std::array<bool, kBarWidgetCount> popups{};
-    popups[static_cast<int>(BarWidget::Target)] = true;
+    std::array<bool, kPanelSlots> popups{};
+    popups[SlotOf(BarWidget::Target)] = true;
     BarInput input;
     input.Frame(LayoutBar(1920.0f, kPills, BarShape::Pills, Widths(100, 0, 120, 200, 90, 60, 50), 0.0f), popups);
     input.Press(960.0f, 18.0f, true);
@@ -231,7 +237,7 @@ TEST(a_cut_text_is_the_longest_start_that_fits_at_every_width)
 
 TEST(a_shrunk_target_with_fractional_widths_stays_between_the_groups)
 {
-    const auto check = [](float screen, const std::array<float, kBarWidgetCount>& natural)
+    const auto check = [](float screen, const std::array<float, kPanelSlots>& natural)
     {
         const BarLayout l = LayoutBar(screen, kPills, BarShape::Pills, natural, 0.0f);
         const BarRect* target = RectOf(l, BarWidget::Target);
@@ -239,8 +245,8 @@ TEST(a_shrunk_target_with_fractional_widths_stays_between_the_groups)
         float leftEnd = 0.0f, rightStart = screen;
         for (const PlacedWidget& p : l.widgets)
         {
-            if (p.widget < BarWidget::Target) leftEnd = std::max(leftEnd, p.rect.x + p.rect.width);
-            if (p.widget > BarWidget::Target) rightStart = std::min(rightStart, p.rect.x);
+            if (p.widget.kind < BarWidget::Target) leftEnd = std::max(leftEnd, p.rect.x + p.rect.width);
+            if (p.widget.kind > BarWidget::Target) rightStart = std::min(rightStart, p.rect.x);
         }
         CHECK(target->x >= leftEnd + kPills.gap - 0.01f);
         CHECK(target->x + target->width <= rightStart - kPills.gap + 0.01f);
@@ -257,8 +263,8 @@ TEST(a_shrunk_target_with_fractional_widths_stays_between_the_groups)
 TEST(the_hover_holds_across_the_gap_between_a_widget_and_its_popup)
 {
     const BarLayout l = LayoutBar(1920.0f, kPills, BarShape::Pills, Widths(100, 0, 120, 200, 90, 60, 50), 0.0f);
-    std::array<bool, kBarWidgetCount> popups{};
-    popups[static_cast<int>(BarWidget::Target)] = true;
+    std::array<bool, kPanelSlots> popups{};
+    popups[SlotOf(BarWidget::Target)] = true;
     BarInput input;
     input.Frame(l, popups);
     input.Move(960.0f, 18.0f);
@@ -279,9 +285,9 @@ TEST(the_hover_holds_across_the_gap_between_a_widget_and_its_popup)
 TEST(leaving_the_game_closes_a_hovered_popup_until_the_pointer_is_back_and_keeps_a_pinned_one)
 {
     const BarLayout l = LayoutBar(1920.0f, kPills, BarShape::Pills, Widths(100, 0, 120, 200, 90, 60, 50), 0.0f);
-    std::array<bool, kBarWidgetCount> popups{};
-    popups[static_cast<int>(BarWidget::Target)]   = true;
-    popups[static_cast<int>(BarWidget::VanaTime)] = true;
+    std::array<bool, kPanelSlots> popups{};
+    popups[SlotOf(BarWidget::Target)]   = true;
+    popups[SlotOf(BarWidget::VanaTime)] = true;
     const BarRect popup{760.0f, 44.0f, 400.0f, 300.0f};
     BarInput input;
     input.Frame(l, popups);
@@ -311,8 +317,8 @@ TEST(leaving_the_game_closes_a_hovered_popup_until_the_pointer_is_back_and_keeps
 TEST(resetting_drops_a_pinned_popup_and_the_pointer)
 {
     const BarLayout l = LayoutBar(1920.0f, kPills, BarShape::Pills, Widths(100, 0, 120, 200, 90, 60, 50), 0.0f);
-    std::array<bool, kBarWidgetCount> popups{};
-    popups[static_cast<int>(BarWidget::Target)] = true;
+    std::array<bool, kPanelSlots> popups{};
+    popups[SlotOf(BarWidget::Target)] = true;
     BarInput input;
     input.Frame(l, popups);
     input.Move(960.0f, 18.0f);
@@ -523,8 +529,8 @@ namespace
         BarClicks clicks{input};
         Clicks()
         {
-            std::array<bool, kBarWidgetCount> popups{};
-            popups[static_cast<int>(BarWidget::Target)] = true;
+            std::array<bool, kPanelSlots> popups{};
+            popups[SlotOf(BarWidget::Target)] = true;
             input.Frame(LayoutBar(1920.0f, kPills, BarShape::Pills, Widths(100, 0, 120, 200, 90, 60, 50), 0.0f),
                 popups);
         }
@@ -636,7 +642,7 @@ TEST(the_bar_takes_nothing_off_it_or_while_it_may_not)
 
 TEST(every_widget_has_one_place_on_the_bar_and_none_overlap_on_a_narrow_screen)
 {
-    std::array<float, kBarWidgetCount> natural{};
+    std::array<float, kPanelSlots> natural{};
     natural.fill(10.0f);
     const BarLayout wide = LayoutBar(4000.0f, kPills, BarShape::Pills, natural, 0.0f);
     CHECK_EQ(wide.widgets.size(), static_cast<size_t>(kPlacedWidgetCount));
@@ -662,23 +668,23 @@ TEST(every_widget_has_one_place_on_the_bar_and_none_overlap_on_a_narrow_screen)
 
 namespace
 {
-    BarPlacement Sections(std::vector<BarWidget> left, std::vector<BarWidget> center, std::vector<BarWidget> right)
+    BarPlacement Sections(std::vector<PanelWidget> left, std::vector<PanelWidget> center, std::vector<PanelWidget> right)
     {
         return BarPlacement{std::move(left), std::move(center), std::move(right)};
     }
 
-    std::array<float, kBarWidgetCount> SomeWidths()
+    std::array<float, kPanelSlots> SomeWidths()
     {
-        std::array<float, kBarWidgetCount> natural{};
-        natural[static_cast<int>(BarWidget::Zone)]      = 100.0f;
-        natural[static_cast<int>(BarWidget::Target)]    = 200.0f;
-        natural[static_cast<int>(BarWidget::Gil)]       = 90.0f;
-        natural[static_cast<int>(BarWidget::Bags)]      = 60.0f;
-        natural[static_cast<int>(BarWidget::EarthTime)] = 50.0f;
+        std::array<float, kPanelSlots> natural{};
+        natural[SlotOf(BarWidget::Zone)]      = 100.0f;
+        natural[SlotOf(BarWidget::Target)]    = 200.0f;
+        natural[SlotOf(BarWidget::Gil)]       = 90.0f;
+        natural[SlotOf(BarWidget::Bags)]      = 60.0f;
+        natural[SlotOf(BarWidget::EarthTime)] = 50.0f;
         return natural;
     }
 
-    int SectionOf(const BarPlacement& p, BarWidget w)
+    int SectionOf(const BarPlacement& p, PanelWidget w)
     {
         for (int s = 0; s < kBarSectionCount; ++s)
             if (std::ranges::find(p[s], w) != p[s].end()) return s;
@@ -700,7 +706,7 @@ namespace
             CHECK(r.x >= edge - 0.01f && r.x + r.width <= screen - edge + 0.01f);
             for (size_t b = a + 1; b < l.widgets.size(); ++b)
             {
-                const BarWidget wa = l.widgets[a].widget, wb = l.widgets[b].widget;
+                const PanelWidget wa = l.widgets[a].widget, wb = l.widgets[b].widget;
                 const BarRect& o   = l.widgets[b].rect;
                 const bool framed  = wa == BarWidget::Target || wb == BarWidget::Target;
                 const float apart  = SectionOf(p, wa) != SectionOf(p, wb) || !ornate ? m.gap
@@ -784,7 +790,7 @@ TEST(a_crowded_center_shrinks_its_target_then_drops_it_then_drops_from_its_end)
 
 TEST(any_widget_in_any_section_keeps_every_widget_apart_and_on_screen)
 {
-    std::array<float, kBarWidgetCount> natural{};
+    std::array<float, kPanelSlots> natural{};
     for (int w = 0; w < kBarWidgetCount; ++w)
         for (int s = 0; s < kBarSectionCount && OnTheBar(static_cast<BarWidget>(w)); ++s)
             for (const auto& [width, screen] : {std::pair{10.0f, 4000.0f}, std::pair{120.0f, 1280.0f},
@@ -805,8 +811,8 @@ TEST(any_widget_in_any_section_keeps_every_widget_apart_and_on_screen)
                     if (screen > 3000.0f) CHECK_EQ(l.widgets.size(), static_cast<size_t>(kPlacedWidgetCount));
                     CheckApartAndInside(l, screen, p, shape);
                     // The target gives way first: whatever shows without it shows with it.
-                    std::array<float, kBarWidgetCount> noTarget = natural;
-                    noTarget[static_cast<int>(BarWidget::Target)] = 0.0f;
+                    std::array<float, kPanelSlots> noTarget = natural;
+                    noTarget[SlotOf(BarWidget::Target)] = 0.0f;
                     for (const PlacedWidget& kept : LayoutBar(screen, shape == BarShape::Pills ? kPills : kOrnate,
                              shape, noTarget, 60.0f, p).widgets)
                         CHECK(RectOf(l, kept.widget) != nullptr);
@@ -1020,4 +1026,18 @@ TEST(a_larger_bar_text_size_never_draws_smaller_titles)
                 last = drawn;
             }
         }
+}
+
+TEST(each_copy_of_a_widget_takes_a_place_of_its_own)
+{
+    BarPlacement placement = DefaultPlacement();
+    const std::optional<PanelWidget> copy = AddCopy(placement, BarWidget::Gil);
+    CHECK(copy.has_value());
+    std::array<float, kPanelSlots> natural = Widths(100, 0, 120, 200, 90, 60, 50);
+    natural[SlotOf(*copy)] = 70.0f;
+    const BarLayout l = LayoutBar(1920.0f, kPills, BarShape::Pills, natural, 0.0f, placement);
+    const BarRect* first = RectOf(l, BarWidget::Gil);
+    const BarRect* second = RectOf(l, *copy);
+    CHECK(first != nullptr && second != nullptr);
+    CHECK(Near(second->width, 70.0f) && Near(second->x, first->x + first->width + kPills.gap)); // right after it
 }

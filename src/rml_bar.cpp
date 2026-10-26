@@ -176,9 +176,8 @@ namespace headsup
         m_Document = host.Bar()->LoadDocumentFromMemory(BarDocument(look, place), kDocumentName);
         if (m_Document == nullptr) return false;
         m_DocumentKey = std::move(key);
-        for (int w = 0; w < kBarWidgetCount; ++w)
-            if (OnTheBar(static_cast<BarWidget>(w)))
-                m_Shown[w].element = m_Document->GetElementById(WidgetId(static_cast<BarWidget>(w)));
+        for (int slot = 0; slot < kPanelSlots; ++slot)
+            if (OnTheBar(WidgetInSlot(slot).kind)) m_Shown[slot].element = m_Document->GetElementById(WidgetId(WidgetInSlot(slot)));
         for (int d = 0; d < kDividerCount; ++d)
             m_Dividers[d].element = m_Document->GetElementById(DividerId(d));
         m_RightCap     = m_Document->GetElementById(kRightCapId);
@@ -193,11 +192,11 @@ namespace headsup
         Widgets& widgets)
     {
         const BarMetrics& m = look.metrics;
-        std::array<float, kBarWidgetCount> natural{};
-        for (int i = 0; i < kBarWidgetCount; ++i)
+        std::array<float, kPanelSlots> natural{};
+        for (int i = 0; i < kPanelSlots; ++i)
         {
             WidgetContent& c = widgets.contents[i];
-            c                = BarWidgetContent(static_cast<BarWidget>(i), state, look.settings);
+            c                = BarWidgetContent(WidgetInSlot(i), state, look.settings);
             if (!c.shown) continue;
             if (!look.lines.twoLines) OneLine(c, look.settings.barSubtitle);
             widgets.hasPopup[i] = c.hasPopup;
@@ -215,14 +214,14 @@ namespace headsup
             natural[i] = shown.natural;
         }
         // The target goes when its room cannot hold its padding, its icons and the start of its name.
-        WidgetContent& target = widgets.contents[static_cast<int>(BarWidget::Target)];
+        WidgetContent& target = widgets.contents[SlotOf(BarWidget::Target)];
         const float targetMinimum =
             2.0f * m.padding + look.Leading(target) +
             (target.title.empty() ? 0.0f
                                   : Width(host, Shortest(target.title.front().text, kFewLetters), look.TitleFace()));
         const BarLayout layout = LayoutBar(screenWidth, m, look.palette.shape, natural, targetMinimum,
             look.settings.barSections, look.settings.barSeparators);
-        if (layout.targetWidth > 0.0f && layout.targetWidth < natural[static_cast<int>(BarWidget::Target)] &&
+        if (layout.targetWidth > 0.0f && layout.targetWidth < natural[SlotOf(BarWidget::Target)] &&
             !target.title.empty())
         {
             // Each line's icons keep their room; its text is cut.
@@ -244,16 +243,16 @@ namespace headsup
         const BarInput& input, float screenWidth)
     {
         const BarMetrics& m = look.metrics;
-        for (int w = 0; w < kBarWidgetCount; ++w)
+        for (int w = 0; w < kPanelSlots; ++w)
         {
             Shown& shown = m_Shown[w];
             if (shown.element == nullptr) continue;
-            const auto widget   = static_cast<BarWidget>(w);
+            const PanelWidget widget = WidgetInSlot(w);
             const BarRect* rect = RectOf(layout, widget);
             shown.element->SetClass(kHiddenClass, rect == nullptr);
             if (rect == nullptr) continue;
             // A plain ornate widget keeps the divider's clear space either side as its margin.
-            const float inset = look.ornate && widget != BarWidget::Target ? DiamondClearance(m) : 0.0f;
+            const float inset = look.ornate && widget.kind != BarWidget::Target ? DiamondClearance(m) : 0.0f;
             Set(shown.element, Rml::PropertyId::Left, shown.left.value, rect->x);
             Set(shown.element, Rml::PropertyId::Width, shown.width.value, rect->width - 2.0f * inset);
             shown.element->SetClass(kLitClass,
@@ -284,7 +283,7 @@ namespace headsup
     {
         cut = false;
         HelpBarParts parts;
-        if (look.settings.barWidgets[static_cast<int>(BarWidget::GameHelp)] && state.strip &&
+        if (look.settings.Widget(BarWidget::GameHelp).on && state.strip &&
             !(state.strip->caption.empty() && state.strip->help.empty()))
         {
             const BarMetrics& m        = look.metrics;
@@ -346,7 +345,7 @@ namespace headsup
     BarRect RmlBar::ShowPopup(RmlHost& host, const BarLook& look, const BarState& state,
         const BarLayout& layout, float screenWidth, float screenHeight, const BarInput& input, bool hidden)
     {
-        const std::optional<BarWidget> open = input.Open();
+        const std::optional<PanelWidget> open = input.Open();
         const BarRect* anchor               = open ? RectOf(layout, *open) : nullptr;
         if (anchor == nullptr)
         {
@@ -368,7 +367,7 @@ namespace headsup
         // The ornate panel's outer border and the line under the strip count: the gap is from them. The help bar's
         // popup goes under the help bar's box.
         const auto out        = static_cast<float>(OuterPad(PopupPanel(look)));
-        const float barBottom = *open == BarWidget::GameHelp ? anchor->y + anchor->height : BarBottom(p, m);
+        const float barBottom = open->kind == BarWidget::GameHelp ? anchor->y + anchor->height : BarBottom(p, m);
         PopupKey key{BarPopupContent(*open, state, look.settings), input.Pinned() == open, m.height, m.popupText,
             p.shape, PopupRoom(barBottom, screenHeight, m.gap, out)};
         bool fresh            = false;
@@ -438,9 +437,9 @@ namespace headsup
         {
             // Hovered, it opens the popup with the rest, as a widget would.
             layout.widgets.push_back(PlacedWidget{BarWidget::GameHelp, help});
-            widgets.hasPopup[static_cast<int>(BarWidget::GameHelp)] = true;
+            widgets.hasPopup[SlotOf(BarWidget::GameHelp)] = true;
         }
-        if (settings.barWidgets[static_cast<int>(BarWidget::GameHelp)])
+        if (settings.Widget(BarWidget::GameHelp).on)
             m_HelpReach = BarRect{HelpBarLeft(m) + helpX, helpTop, HelpBarWidth(screenWidth), rows.helpBarHeight};
         input.Frame(layout, widgets.hasPopup);
         input.SetPopup(

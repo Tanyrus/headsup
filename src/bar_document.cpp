@@ -241,7 +241,10 @@ namespace headsup
         return std::nullopt;
     }
 
-    std::string WidgetId(BarWidget widget) { return std::string("w-") + BarWidgetName(widget); }
+    std::string WidgetId(PanelWidget widget)
+    {
+        return std::string("w-") + BarWidgetName(widget.kind) + (widget.copy > 0 ? "-" + std::to_string(widget.copy + 1) : "");
+    }
     std::string DividerId(int divider) { return "d-" + std::to_string(divider); }
 
     namespace
@@ -387,13 +390,13 @@ namespace headsup
                    "\" src=\"" + capSource + "\"/>";
         for (int d = 0; d < kDividerCount; ++d)
             rml += "<img class=\"divider hidden\" id=\"" + DividerId(d) + "\" src=\"" + dividerSource + "\"/>";
-        for (int w = 0; w < kBarWidgetCount; ++w)
+        for (int slot = 0; slot < kPanelSlots; ++slot)
         {
-            const auto widget = static_cast<BarWidget>(w);
-            if (!OnTheBar(widget)) continue;
+            const PanelWidget widget = WidgetInSlot(slot);
+            if (!OnTheBar(widget.kind) || (widget.copy > 0 && !HasCopies(widget.kind))) continue;
             // Zone and Earth time show no pill until lit.
-            const bool flat = !look.ornate && !boxOf(widget, false);
-            rml += std::string("<div class=\"widget hidden") + (widget == BarWidget::Target ? " target" : "") +
+            const bool flat = !look.ornate && !boxOf(widget.kind, false);
+            rml += std::string("<div class=\"widget hidden") + (widget.kind == BarWidget::Target ? " target" : "") +
                    (flat ? " flat" : "") + "\" id=\"" + WidgetId(widget) + "\"></div>";
         }
         rml += std::string("<div id=\"") + kHelpId + "\"></div>";

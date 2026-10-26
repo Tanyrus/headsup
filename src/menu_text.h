@@ -48,18 +48,6 @@ namespace headsup
         return label != nullptr ? label : window;
     }
 
-    // The section a widget is in, and where.
-    inline std::pair<int, size_t> PlaceOf(const BarPlacement& placement, BarWidget widget)
-    {
-        for (int section = 0; section < kBarSectionCount; ++section)
-        {
-            const std::vector<BarWidget>& list = placement[section];
-            if (const auto at = std::ranges::find(list, widget); at != list.end())
-                return {section, static_cast<size_t>(at - list.begin())};
-        }
-        return {0, 0};
-    }
-
     // The Replace Dashes list shows the marks themselves, as the window's style draws them (menu_document).
     constexpr const char* kDotMark     = "<div class=\"dash dot\"></div>";
     constexpr const char* kSquareMark  = "<div class=\"dash square\"></div>";

@@ -91,13 +91,13 @@ namespace headsup
         bool linuxxi    = false;
         int containers = 0; // bags from 0 up to this
     };
-    BarNeeds NeedsOf(const Settings& settings, std::optional<BarWidget> open);
+    BarNeeds NeedsOf(const Settings& settings, std::optional<PanelWidget> open);
 
     // Game help is never shown on the bar: it has a bar of its own, under the top bar.
-    WidgetContent BarWidgetContent(BarWidget widget, const BarState& state, const Settings& settings);
+    WidgetContent BarWidgetContent(PanelWidget widget, const BarState& state, const Settings& settings);
     // The used and total slots of the bag the game's caption names, as the Bags widget writes them.
     std::optional<Span> StripBagFill(const BarState& state);
-    PopupContent BarPopupContent(BarWidget widget, const BarState& state, const Settings& settings);
+    PopupContent BarPopupContent(PanelWidget widget, const BarState& state, const Settings& settings);
     // The element colors of the weekdays and weather, from the spec.
     uint32_t ElementColor(Element element);
 }

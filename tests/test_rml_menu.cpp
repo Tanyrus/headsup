@@ -1816,3 +1816,22 @@ TEST(a_lines_arrows_swap_it_with_the_one_above_or_below_and_the_ends_have_only_o
     CHECK(players.lines[1].text == "c" && players.lines[2].text == "a");
     CHECK_EQ(window.Said(), "");
 }
+
+TEST(a_copy_added_has_a_tab_and_a_chip_of_its_own_and_its_settings_are_its_own)
+{
+    Window window;
+    window.Page("widgets");
+    const PanelWidget copy{BarWidget::Gil, 1};
+    window.Click("widgets-widgets-widget-t-" + std::to_string(static_cast<int>(BarWidget::Gil))); // Gil's tab, after Target's
+    CHECK(window.Click("widgets-widgets-add-copy-gil"));
+    CHECK(Placed(window.settings.barSections, copy));
+    CHECK(window.Shows("widgets-layout-chip-" + std::to_string(SlotOf(copy))));
+    // Its tab opens on its own: a currency picked there is the copy's.
+    CHECK(window.Shows("widgets-widgets-remove-copy-gil-2"));
+    window.Click("widgets-widgets-currency-gil-2");
+    CHECK(window.Click("widgets-widgets-currency-gil-2-o-1"));
+    CHECK(window.settings.Widget(copy).currency == 1 && window.settings.Widget(BarWidget::Gil).currency == kGilCurrency);
+    CHECK(window.Click("widgets-widgets-remove-copy-gil-2"));
+    CHECK(!Placed(window.settings.barSections, copy));
+    CHECK_EQ(window.Said(), "");
+}

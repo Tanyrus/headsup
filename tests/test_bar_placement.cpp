@@ -11,7 +11,7 @@ using namespace headsup;
 namespace
 {
     constexpr BarSection kLeft = BarSection::Left, kCenter = BarSection::Center, kRight = BarSection::Right;
-    using List = std::vector<BarWidget>;
+    using List = std::vector<PanelWidget>;
 
     const List& In(const BarPlacement& p, BarSection s) { return p[static_cast<int>(s)]; }
 
@@ -19,8 +19,8 @@ namespace
     List Original(const List& section)
     {
         List kept;
-        for (const BarWidget w : section)
-            if (static_cast<int>(w) <= static_cast<int>(BarWidget::EarthTime)) kept.push_back(w);
+        for (const PanelWidget w : section)
+            if (static_cast<int>(w.kind) <= static_cast<int>(BarWidget::EarthTime)) kept.push_back(w);
         return kept;
     }
 }
@@ -97,4 +97,38 @@ TEST(a_drop_where_the_widget_already_is_or_out_of_range_changes_nothing)
     CHECK(!MoveWidget(p, kLeft, In(p, kLeft).size(), kRight, 0));                    // no such widget
     CHECK(!MoveWidget(p, kLeft, 0, kRight, In(p, kRight).size() + 1));                // past the end
     CHECK(p == DefaultPlacement());
+}
+
+TEST(a_copy_goes_after_the_last_of_its_widget_with_the_lowest_number_free_and_four_at_most)
+{
+    BarPlacement p = DefaultPlacement();
+    const auto [section, at] = PlaceOf(p, BarWidget::Gil);
+    CHECK(AddCopy(p, BarWidget::Gil) == (PanelWidget{BarWidget::Gil, 1}));
+    CHECK(p[section][at + 1] == (PanelWidget{BarWidget::Gil, 1}));
+    CHECK(AddCopy(p, BarWidget::Gil) == (PanelWidget{BarWidget::Gil, 2}));
+    CHECK(p[section][at + 2] == (PanelWidget{BarWidget::Gil, 2}));
+    // Taken off, a copy's number is the next one given.
+    CHECK(RemoveCopy(p, PanelWidget{BarWidget::Gil, 1}) && !Placed(p, PanelWidget{BarWidget::Gil, 1}));
+    CHECK(AddCopy(p, BarWidget::Gil) == (PanelWidget{BarWidget::Gil, 1}));
+    CHECK(AddCopy(p, BarWidget::Gil) == (PanelWidget{BarWidget::Gil, 3}));
+    CHECK(!AddCopy(p, BarWidget::Gil).has_value());
+    // The first copy always stays, and the target and game help have none.
+    CHECK(!RemoveCopy(p, BarWidget::Gil) && Placed(p, BarWidget::Gil));
+    CHECK(!AddCopy(p, BarWidget::Target).has_value() && !AddCopy(p, BarWidget::GameHelp).has_value());
+}
+
+TEST(copies_read_back_by_their_numbers_and_a_number_out_of_range_is_dropped)
+{
+    BarPlacement p = DefaultPlacement();
+    AddCopy(p, BarWidget::Gil);
+    AddCopy(p, BarWidget::Gil);
+    const std::array<std::string, kBarSectionCount> names{PlacementNames(In(p, kLeft)), PlacementNames(In(p, kCenter)),
+        PlacementNames(In(p, kRight))};
+    CHECK(names[static_cast<int>(kRight)].find("gil gil:2 gil:3") != std::string::npos);
+    CHECK(PlacementFrom(names) == p);
+    const BarPlacement odd = PlacementFrom({"gil:5 gil:1 target:2 gil:x zone:2", "", ""});
+    CHECK(In(odd, kLeft).front() == (PanelWidget{BarWidget::Zone, 1})); // and the first copies after, each in its place
+    for (int copy = 1; copy < kMostCopies; ++copy)
+        CHECK(!Placed(odd, PanelWidget{BarWidget::Gil, copy}));
+    CHECK(PlaceOf(odd, BarWidget::Target).first == static_cast<int>(kCenter));
 }
