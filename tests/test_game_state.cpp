@@ -556,3 +556,18 @@ TEST(the_newer_of_a_check_and_a_lookup_reports_a_players_jobs)
     game.LookedUp(kOtherId, kOther, SearchedPlayer{kOtherId & kSearchIdMask, "Other", 100, true});
     CHECK(!game.ReportedJobs(kOtherId).has_value());
 }
+
+TEST(an_overseers_event_is_handed_on_for_the_supply_runs)
+{
+    GameState game;
+    Packet event{kEventNumPacket, std::vector<uint8_t>(0x38, 0)};
+    const uint16_t bastok = 32761;
+    const int32_t mask    = 0x220;
+    std::memcpy(event.bytes.data() + 0x2C, &bastok, sizeof(bastok));
+    std::memcpy(event.bytes.data() + 0x08 + 4 * 4, &mask, sizeof(mask));
+    const PacketFollowUp next = Feed(game, event);
+    CHECK(next.guardEvent && next.guardEvent->nation == Nation::Bastok && next.guardEvent->numbers[4] == mask);
+    const uint16_t shop = 100;
+    std::memcpy(event.bytes.data() + 0x2C, &shop, sizeof(shop));
+    CHECK(!Feed(game, event).guardEvent.has_value());
+}

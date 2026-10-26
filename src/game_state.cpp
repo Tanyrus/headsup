@@ -47,6 +47,9 @@ namespace headsup
         case kWeatherPacket:
             if (const auto weather = ParseWeather(data, size)) m_Weather = *weather;
             break;
+        case kEventNumPacket:
+            next.guardEvent = ParseGuardEvent(data, size);
+            break;
         case kConquestPacket:
             m_ConquestOwed = false; // whether HeadsUp asked or not
             if (const auto owners = ParseConquest(data, size)) m_Owners = *owners;

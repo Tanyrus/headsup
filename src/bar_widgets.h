@@ -10,6 +10,7 @@
 #include "bar_types.h"
 #include "game_packets.h"
 #include "game_state.h"
+#include "outposts.h"
 #include "icons.h"
 #include "settings.h"
 #include "strip_text.h"
@@ -65,6 +66,8 @@ namespace headsup
         std::optional<Weather> weather; // the latest from the server; nullopt before one since loading or zoning
         std::optional<RegionOwners> owners; // nullopt before a conquest update
         std::optional<RegionShares> shares; // nullopt before a conquest update since the last zone-in
+        std::optional<Nation> nation;       // yours, once in game
+        const OutpostRuns* outposts = nullptr; // your character's supply runs, as overseers told them
         std::optional<FrameReport> frames; // nullopt before the first frame
         std::optional<JobReport> job; // nullopt while the game reports no job
         std::optional<ConnectionReport> connection;
@@ -93,6 +96,7 @@ namespace headsup
         bool memory     = false;
         bool cpu        = false;
         bool linuxxi    = false;
+        bool conquest   = false; // your nation and supply runs, for the Conquest popup
         int containers = 0; // bags from 0 up to this
     };
     BarNeeds NeedsOf(const Settings& settings, std::optional<PanelWidget> open);

@@ -777,6 +777,7 @@ namespace headsup
         needs.gil        = shown(BarWidget::Gil);
         needs.strip      = shown(BarWidget::GameHelp);
         const bool memoryPopup = opened(BarWidget::Memory);
+        needs.conquest   = opened(BarWidget::Conquest);
         needs.frames     = shown(BarWidget::Fps) || memoryPopup;
         needs.job        = shown(BarWidget::Job) || shown(BarWidget::Exp);
         needs.connection = shown(BarWidget::Connection);
@@ -1143,11 +1144,25 @@ namespace headsup
             }
             for (const Nation nation : PickedNations(o.nations))
             {
+                // Your nation's regions say which outposts you have not run supplies to, as far as overseers told.
+                const bool yours = state.nation == nation && state.outposts != nullptr;
+                bool unknown     = false;
                 PopupSection held{NationName(nation), {}};
                 for (int region = 0; region < kConquestRegionCount; ++region)
-                    if ((*state.owners)[region] == nation)
-                        held.rows.push_back(LineOf(std::string(RegionName(static_cast<uint8_t>(region)))));
+                {
+                    if ((*state.owners)[region] != nation) continue;
+                    const auto r              = static_cast<uint8_t>(region);
+                    const std::optional<bool> ran = yours ? state.outposts->Ran(nation, r) : std::optional<bool>(true);
+                    unknown = unknown || !ran;
+                    if (ran == false)
+                        held.rows.push_back(Line(Cell(ListOf(Text(std::string(RegionName(r))), Text(kDot, Tone::Dim),
+                            Text("no supply run", Tone::Dim)))));
+                    else
+                        held.rows.push_back(LineOf(std::string(RegionName(r))));
+                }
                 if (held.rows.empty()) held.rows.push_back(LineOf("None", Tone::Dim));
+                if (unknown)
+                    held.rows.push_back(LineOf("Talk to a conquest overseer in your nation's city to see your supply runs.", Tone::Dim));
                 popup.sections.push_back(std::move(held));
             }
             break;

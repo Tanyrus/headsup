@@ -1961,3 +1961,30 @@ TEST(the_bags_popup_always_lists_storage_and_never_the_temporary_items)
     for (int choice = 0; choice < static_cast<int>(BagChoices().size()); ++choice)
         CHECK(BagChoices()[static_cast<size_t>(choice)] != 3);
 }
+
+TEST(the_conquest_popup_marks_your_nations_regions_without_a_supply_run)
+{
+    Settings settings;
+    settings.Widget(BarWidget::Conquest).on = true;
+    BarState state;
+    RegionOwners owners{};
+    owners[3] = owners[4] = Nation::Bastok; // Gustaberg and Derfland
+    state.owners = owners;
+    state.nation = Nation::Bastok;
+    settings.Widget(BarWidget::Conquest).nations = NationBit(Nation::Bastok);
+    // Before an overseer has told: one line says how to learn them.
+    OutpostRuns runs;
+    state.outposts = &runs;
+    std::vector<std::string> lines = Lines(BarPopupContent(BarWidget::Conquest, state, settings).sections[0]);
+    CHECK(lines.size() == 3 && lines[0] == "Gustaberg" && lines[2].find("overseer") != std::string::npos);
+    // Told by Bastok's overseer that Gustaberg's was run: Derfland is marked, Gustaberg is not.
+    runs.Heard(GuardEvent{Nation::Bastok, {1, 0, 0, 0, 1 << (3 + 5), 0, 0, 0}}, 20);
+    lines = Lines(BarPopupContent(BarWidget::Conquest, state, settings).sections[0]);
+    CHECK((lines == std::vector<std::string>{"Gustaberg", "Derfland · no supply run"}));
+    // Another nation's regions are not yours to run supplies to.
+    settings.Widget(BarWidget::Conquest).nations = kAllNations;
+    owners[0] = Nation::SanDoria;
+    state.owners = owners;
+    const PopupContent all = BarPopupContent(BarWidget::Conquest, state, settings);
+    CHECK((Lines(all.sections[0]) == std::vector<std::string>{"Ronfaure"}));
+}

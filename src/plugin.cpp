@@ -86,6 +86,7 @@ namespace
     constexpr const char* kCursorsFolder     = "cursors"; // inside HeadsUp's config folder: the player's cursor files
     constexpr const char* kNoteLog           = "headsup";  // the log's name in HeadsUp's logs folder, before its time
     constexpr const char* kThemesFolder      = "themes";  // and their saved top panel themes
+    constexpr const char* kOutpostsFile      = "outposts.txt"; // every character's supply runs, as overseers told them
     constexpr const char* kSettingsFile      = "settings.ini";
     constexpr const char* kNewFileSuffix     = ".new";          // after the process id: the file while it is written
     constexpr long kMaxSettingsBytes         = 4 * 1024 * 1024; // past this the file is not HeadsUp's to rewrite
@@ -252,6 +253,7 @@ class HeadsUp final : public IPlugin
     headsup::Tracker m_Tracker;
     headsup::PhTimers m_PhTimers;
     headsup::Activity m_Activity; // whether you have moved or turned lately, which a placeholder's timer asks
+    std::optional<headsup::OutpostFile> m_Outposts; // read from its file when first needed
     std::vector<headsup::TimerLine> m_TimerLines;
     uint16_t m_SelfIndex = 0;
     uint16_t m_Zone      = 0; // this frame
@@ -686,6 +688,7 @@ public:
             m_PhTimers.Zoned();
         }
         if (next.check) OnCheckReply(*next.check);
+        if (next.guardEvent) HeardOverseer(*next.guardEvent);
         if (next.mobDied && m_Settings.phTimers)
             if (const auto mob = headsup::SightingOf(headsup::MobById(*next.mobDied))) m_PhTimers.Died(Now(), *mob);
         return next.answer && m_AutoCheck.TakeAnswer(*next.answer, Now());
@@ -1822,6 +1825,30 @@ private:
         return entries;
     }
 
+    std::string OutpostsPath() { return OwnFolder(kConfigFolder) + "\\" + kOutpostsFile; }
+
+    headsup::OutpostFile& Outposts()
+    {
+        if (!m_Outposts)
+        {
+            std::ifstream in(OutpostsPath(), std::ios::binary);
+            m_Outposts = headsup::OutpostFileFrom(std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>()));
+        }
+        return *m_Outposts;
+    }
+
+    // A conquest overseer's event in this zone: what it tells of your supply runs is kept, for every load after.
+    void HeardOverseer(const headsup::GuardEvent& event)
+    {
+        const uint32_t character = m_AshitaCore->GetMemoryManager()->GetParty()->GetMemberServerId(0);
+        const headsup::ZoneRecord* zone = headsup::KnownZone(m_Zone);
+        if (character == 0 || zone == nullptr || !Outposts()[character].Heard(event, zone->region)) return;
+        std::ofstream out(OutpostsPath(), std::ios::binary | std::ios::trunc);
+        const std::string text = headsup::OutpostFileText(Outposts());
+        out.write(text.data(), static_cast<std::streamsize>(text.size()));
+        if (!out.good()) Note("could not save the supply runs to " + OutpostsPath() + ".");
+    }
+
     void ScanThemes() { m_ThemeFiles = headsup::FolderFileNames(FolderEntries(ThemesFolder()), headsup::kThemeExtensions); }
 
     void SaveTheme(const std::string& name)
@@ -2094,6 +2121,12 @@ private:
         s.weather = WeatherNow();
         s.owners   = m_GameState.Owners();
         s.shares   = m_GameState.Shares();
+        if (needs.conquest)
+        {
+            // Ashita's nation is 0 for San d'Oria to 2 for Windurst.
+            s.nation = static_cast<headsup::Nation>(m_AshitaCore->GetMemoryManager()->GetPlayer()->GetNation() + 1);
+            s.outposts = &Outposts()[m_AshitaCore->GetMemoryManager()->GetParty()->GetMemberServerId(0)];
+        }
         if (needs.unixTime || needs.localTime || needs.signet)
         {
             const auto clock = std::chrono::system_clock::now();
