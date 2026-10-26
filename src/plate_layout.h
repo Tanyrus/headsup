@@ -24,7 +24,7 @@ namespace headsup
     };
 
     // A composed line as the renderer measured it, in screen pixels: its items' boxes, its tallest text's height (0
-    // without text), whether it holds icons, its ornament's size and side, and the room kept under and over it.
+    // without text), the least it is tall, its ornament's size and side, and the room kept under and over it.
     struct LineInput
     {
         std::vector<ItemSize> items;
@@ -32,7 +32,7 @@ namespace headsup
         float textHeight     = 0.0f;
         float inkTop = 0.0f, inkBottom = 0.0f; // its tallest text's capitals, which an icon beside it centers on
         float textSize = 0.0f;                 // its letters' size
-        bool hasIcons        = false;
+        float leastHeight    = 0.0f; // one of its icons' height: a line of text is as tall as one with an icon
         float padBelow = 0.0f, padAbove = 0.0f;
         int firstText = -1, lastText = -1; // its first and last text item; icons outside them hang past the text
         float ornamentWidth  = 0.0f;
@@ -61,9 +61,9 @@ namespace headsup
         CursorSpot cursor{};
     };
 
-    // Lines top to bottom: the last sits on the game's name and the rest stack above it. What sits above a line (a
-    // line, its ornament, your timers, the cursor) sinks kNameOverlap into that line's text; a line with icons never
-    // sinks into the line below it, as badges hang off its icons.
+    // Lines top to bottom: the last sits on the game's name and the rest stack above it, each a gap over the one under
+    // it, with or without icons. An ornament, your timers and the cursor sink kNameOverlap into the text of the line
+    // under them.
     PlateLayout LayoutPlate(const ScreenBox& anchor, std::span<const LineInput> lines, float cursorWidth,
         float cursorHeight, float cursorTip, int timerCount, float timerHeight, float cursorRaise = 0.0f);
     PlateBox BoxOf(const PlateLayout& layout);

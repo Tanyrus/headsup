@@ -25,7 +25,6 @@ namespace
     {
         LineInput line;
         line.items    = items;
-        line.hasIcons = true;
         return line;
     }
     // A line whose text runs from its first to its last item of these places; what is outside them is icons.
@@ -34,7 +33,6 @@ namespace
         LineInput line  = Text(items, align);
         line.firstText  = firstText;
         line.lastText   = lastText;
-        line.hasIcons   = true;
         return line;
     }
     PlateItem TextItem(const char* text)
@@ -70,7 +68,7 @@ namespace
     }
 }
 
-TEST(text_sinks_into_the_text_line_below_and_icons_stay_clear_of_it)
+TEST(every_line_sits_a_gap_over_the_one_under_it_text_or_icons)
 {
     // The default mob plate: an icon row, the level line, the name.
     const std::vector<LineInput> lines{Icons({{40.0f, 16.0f}}), Text({{60.0f, 13.0f}}), Text({{80.0f, 15.0f}})};
@@ -78,7 +76,7 @@ TEST(text_sinks_into_the_text_line_below_and_icons_stay_clear_of_it)
     CHECK_EQ(l.lines.size(), size_t{3});
     CHECK_EQ(l.lines[2].top, 210.0f - 7.5f);
     CHECK_EQ(l.lines[2].left, 60.0f);
-    CHECK_EQ(l.lines[1].top, l.lines[2].top + kNameOverlap - 13.0f);
+    CHECK_EQ(l.lines[1].top, l.lines[2].top - kLineGap - 13.0f);
     CHECK_EQ(l.lines[0].top, l.lines[1].top - kLineGap - 16.0f);
     CHECK_EQ(l.top, l.lines[0].top);
     CHECK_EQ(l.centerX, 100.0f);
@@ -94,7 +92,6 @@ TEST(nothing_sinks_into_an_icon_line_and_an_icon_line_never_sinks)
     CHECK_EQ(b.lines[0].top, b.lines[1].top - kLineGap - 16.0f);
     LineInput mixed = Text({{20.0f, 16.0f}, {40.0f, 13.0f}}); // icons beside text: it has icons, so it stays clear
     mixed.textHeight = 13.0f;
-    mixed.hasIcons   = true;
     const std::vector<LineInput> mixedOverText{mixed, Text({{80.0f, 15.0f}})};
     const PlateLayout c = LayoutPlate(Anchor(), mixedOverText, 0.0f, 0.0f, 0.5f, 0, 0.0f);
     CHECK_EQ(c.lines[0].top, c.lines[1].top - kLineGap - 16.0f);
@@ -363,7 +360,6 @@ TEST(a_measured_text_line_takes_its_texts_boxes_and_its_alignment)
     // What another plate left behind goes.
     LineInput in;
     in.items          = {{1.0f, 1.0f}, {2.0f, 2.0f}, {3.0f, 3.0f}};
-    in.hasIcons       = true;
     in.ornamentWidth  = 90.0f;
     in.ornamentHeight = 6.0f;
     in.ornamentUnder  = true;
@@ -374,7 +370,7 @@ TEST(a_measured_text_line_takes_its_texts_boxes_and_its_alignment)
     CHECK_EQ(in.items[1].width, 30.0f);
     CHECK_EQ(in.items[1].height, 19.0f);
     CHECK_EQ(in.textHeight, 19.0f);
-    CHECK(!in.hasIcons);
+    CHECK_EQ(in.leastHeight, 32.0f); // a line of text is as tall as one of its icons would be: 16 px, twice
     CHECK(in.align == Align::Right);
     CHECK_EQ(in.ornamentWidth, 0.0f);
     CHECK_EQ(in.ornamentHeight, 0.0f);
@@ -415,7 +411,6 @@ TEST(icon_runs_on_a_line_without_text_share_a_height_with_room_for_a_badge)
     CHECK(Near(in.items[2].width, 43.2f));  // an icon and its badge's overhang of 0.35
     CHECK(Near(in.items[2].height, 41.6f));
     CHECK_EQ(in.textHeight, 0.0f);
-    CHECK(in.hasIcons);
     const ComposedLine plain = Line({IconItem(2, 0), SpaceItem(2), IconItem(1, 0)}, 13.0f, 16.0f);
     MeasureLine(plain, {}, 1.0f, in);
     CHECK_EQ(in.items[0].height, 16.0f); // no badge on the line: the icons alone
@@ -435,7 +430,6 @@ TEST(icons_beside_text_are_as_tall_as_the_icons_alone)
     CHECK_EQ(in.items[1].width, 70.0f);
     CHECK_EQ(in.items[1].height, 20.0f);
     CHECK_EQ(in.textHeight, 20.0f);
-    CHECK(in.hasIcons);
 }
 
 TEST(a_badge_run_past_eight_icons_wraps_onto_rows_above_against_its_outer_edge)
@@ -529,16 +523,16 @@ TEST(a_wrapped_badge_group_stands_a_gap_and_a_hang_over_the_level_line_with_the_
     const IconSpot bottom = IconInRun(ShapeOfRun(composed[0], 1, 1.0f), composed[0].items[1], 0);
     const IconSpot upper  = IconInRun(ShapeOfRun(composed[0], 1, 1.0f), composed[0].items[1], 8);
     const IconSpot detect = IconInRun(ShapeOfRun(composed[0], 0, 1.0f), composed[0].items[0], 0);
-    CHECK_EQ(l.lines[1].top, 184.5f);
+    CHECK_EQ(l.lines[1].top, 179.5f);
     CHECK(Near(left.x + detect.x, -29.4f));
-    CHECK(Near(left.y + detect.y, 161.7f));
+    CHECK(Near(left.y + detect.y, 156.7f));
     CHECK(Near(right.x + bottom.x, 42.6f));
-    CHECK(Near(right.y + bottom.y, 161.7f));
+    CHECK(Near(right.y + bottom.y, 156.7f));
     CHECK(Near(right.x + upper.x, 137.0f));
-    CHECK(Near(right.y + upper.y, 138.9f));
-    CHECK(Near(l.cursor.y, 116.9f));
+    CHECK(Near(right.y + upper.y, 133.9f));
+    CHECK(Near(l.cursor.y, 111.9f));
     const PlateBox box = BoxOf(l);
-    CHECK(Near(box.top, 138.9f));
+    CHECK(Near(box.top, 133.9f));
     CHECK(Near(box.left, -29.4f));
 }
 
@@ -573,12 +567,12 @@ TEST(a_detection_run_and_a_badge_run_center_as_one_row_a_gap_and_a_hang_over_the
     MeasureLine(composed[1], level, 1.0f, lines[1]);
     MeasureLine(composed[2], name, 1.0f, lines[2]);
     const PlateLayout l = LayoutPlate(Anchor(), lines, 14.0f, 20.0f, 0.5f, 0, 0.0f);
-    CHECK_EQ(l.lines[1].top, 184.5f);
+    CHECK_EQ(l.lines[1].top, 179.5f);
     CHECK(Near(l.lines[0].items[0].x, 47.6f));
-    CHECK(Near(l.lines[0].items[0].y, 161.7f));
+    CHECK(Near(l.lines[0].items[0].y, 156.7f));
     CHECK(Near(l.lines[0].items[1].x, 83.6f)); // the first badged icon, a step past the second detection icon
-    CHECK(Near(l.lines[0].items[1].y, 161.7f));
-    CHECK(Near(l.cursor.y, 139.7f)); // a gap over the icons
+    CHECK(Near(l.lines[0].items[1].y, 156.7f));
+    CHECK(Near(l.cursor.y, 134.7f)); // a gap over the icons
 }
 
 TEST(a_plate_closes_up_around_a_text_left_out)
@@ -619,7 +613,6 @@ namespace
     {
         LineInput line = Text({{80.0f, 28.0f}});
         line.items.insert(line.items.begin(), ItemSize{20.0f, 34.0f});
-        line.hasIcons = true;
         return line;
     }
 }
@@ -636,7 +629,7 @@ TEST(what_sits_above_sinks_into_the_lines_text_not_its_taller_box)
     CHECK_EQ(m.cursor.y, t.cursor.y);
     const std::vector<LineInput> textAbove{Text({{60.0f, 13.0f}}), IconsAndText()};
     const PlateLayout a = LayoutPlate(Anchor(), textAbove, 0.0f, 0.0f, 0.5f, 0, 0.0f);
-    CHECK_EQ(a.lines[0].top, 196.0f + kNameOverlap - 13.0f);
+    CHECK_EQ(a.lines[0].top, 193.0f - kLineGap - 13.0f);
     const std::vector<LineInput> iconsAbove{Icons({{40.0f, 16.0f}}), IconsAndText()};
     const PlateLayout b = LayoutPlate(Anchor(), iconsAbove, 0.0f, 0.0f, 0.5f, 0, 0.0f);
     CHECK_EQ(b.lines[0].top, 193.0f - kLineGap - 16.0f);
@@ -680,8 +673,8 @@ TEST(the_default_mob_plate_has_each_line_its_ornament_timers_and_cursor_in_place
 {
     std::vector<LineInput> lines{Icons({{40.0f, 16.0f}}), Text({{60.0f, 13.0f}}), Text({{80.0f, 15.0f}})};
     const PlateLayout l = LayoutPlate(Anchor(), lines, 0.0f, 0.0f, 0.5f, 0, 0.0f);
-    CHECK_EQ(l.lines[0].top, 174.5f);
-    CHECK_EQ(l.lines[1].top, 192.5f);
+    CHECK_EQ(l.lines[0].top, 169.5f);
+    CHECK_EQ(l.lines[1].top, 187.5f);
     CHECK_EQ(l.lines[2].top, 202.5f);
     lines[2].ornamentWidth  = 90.0f;
     lines[2].ornamentHeight = 6.0f;
@@ -693,8 +686,8 @@ TEST(the_default_mob_plate_has_each_line_its_ornament_timers_and_cursor_in_place
     lines[2].ornamentHeight = 0.0f;
     const PlateLayout t = LayoutPlate(Anchor(), lines, 20.0f, 32.0f, 0.5f, 2, 13.0f);
     CHECK_EQ(t.timerStep, 15.0f);
-    CHECK_EQ(t.timersY, 144.5f);
-    CHECK_EQ(t.cursor.y, 110.5f);
+    CHECK_EQ(t.timersY, 139.5f);
+    CHECK_EQ(t.cursor.y, 105.5f);
 }
 
 TEST(an_ornament_over_an_icon_line_clears_it_by_a_gap)
@@ -731,4 +724,23 @@ TEST(an_empty_plates_top_is_the_games_name)
 {
     const std::vector<LineInput> none;
     CHECK_EQ(LayoutPlate(Anchor(), none, 0.0f, 0.0f, 0.5f, 0, 0.0f).top, 200.0f);
+}
+
+TEST(a_line_of_text_is_as_tall_as_its_icons_would_be_and_spaced_the_same_with_or_without_them)
+{
+    // Two text lines of 13 px text over the name, their icons 16 px: one with an icon beside its text, one without.
+    LineInput plain = Text({{60.0f, 13.0f}});
+    plain.leastHeight = 16.0f;
+    LineInput withIcon = Text({{16.0f, 16.0f}, {60.0f, 13.0f}});
+    withIcon.textHeight  = 13.0f;
+    withIcon.leastHeight = 16.0f;
+    LineInput name = Text({{80.0f, 15.0f}});
+    name.leastHeight = 16.0f;
+    const std::vector<LineInput> without{plain, name}, with{withIcon, name};
+    const PlateLayout a = LayoutPlate(Anchor(), without, 0.0f, 0.0f, 0.5f, 0, 0.0f);
+    const PlateLayout b = LayoutPlate(Anchor(), with, 0.0f, 0.0f, 0.5f, 0, 0.0f);
+    CHECK_EQ(a.lines[0].height, 16.0f);
+    CHECK_EQ(a.lines[0].top, b.lines[0].top);
+    CHECK_EQ(a.lines[1].top, b.lines[1].top);
+    CHECK_EQ(a.lines[0].top, a.lines[1].top - kLineGap - 16.0f);
 }

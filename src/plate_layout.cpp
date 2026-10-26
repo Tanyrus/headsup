@@ -80,6 +80,7 @@ namespace headsup
                 place.width += (j > 0 ? GapAfter(lines[i], j - 1) : 0.0f) + lines[i].items[j].width;
                 place.height = std::max(place.height, lines[i].items[j].height);
             }
+            if (!lines[i].items.empty()) place.height = std::max(place.height, lines[i].leastHeight);
         }
         // A line's text aligns, and the icons at its ends hang past it. The bottom line's stays centered on the game's
         // name. Another starts where it starts or ends where it ends, whichever is further to the side it is set to:
@@ -108,15 +109,13 @@ namespace headsup
             const LineInput& upperIn = lines[i - 1];
             LinePlace& lower         = layout.lines[i];
             LinePlace& upper         = layout.lines[i - 1];
-            const float sunk         = lowerIn.textHeight > 0.0f ? TextTop(lower, lowerIn) + kNameOverlap : lower.top;
-            float bottom;
+            float bottom             = lower.top - kLineGap;
             if (lowerIn.ornamentHeight > 0.0f && !lowerIn.ornamentUnder)
             {
+                const float sunk = lowerIn.textHeight > 0.0f ? TextTop(lower, lowerIn) + kNameOverlap : lower.top;
                 PlaceOrnament(lower, lowerIn, layout.centerX, sunk - kLineGap - lowerIn.ornamentHeight);
                 bottom = lower.ornament.y - kLineGap;
             }
-            else
-                bottom = lowerIn.textHeight > 0.0f && !upperIn.hasIcons ? sunk : lower.top - kLineGap;
             upper.top = bottom - upper.height - upperIn.padBelow - lowerIn.padAbove;
         }
 
@@ -241,7 +240,7 @@ namespace headsup
         into.inkTop         = 0.0f;
         into.inkBottom      = 0.0f;
         into.textSize       = line.look.textSize * scale;
-        into.hasIcons       = false;
+        into.leastHeight    = line.look.iconSize * scale;
         // The bottom design line stays on the game's name, so its padding is the space over it. A line broken into
         // rows has it under its last row, or over the first.
         const bool bottom   = line.source == kBottomLine;
@@ -272,7 +271,6 @@ namespace headsup
             case ItemKind::Icons:
             {
                 const RunShape shape = ShapeOfRun(line, i, scale);
-                into.hasIcons        = true;
                 into.items.push_back({shape.width, shape.height});
                 break;
             }
