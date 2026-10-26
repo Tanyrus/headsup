@@ -393,6 +393,7 @@
                 {"key": "text-font", "name": "Text Font", "tip": "This widget's second line and numbers. Default is the top panel's Text Font."},
                 {"key": "text-size", "name": "Text Size", "tip": "This widget's title size, with its second line to match. Default is the top panel's Text Size."},
                 {"key": "details", "name": "Details", "tip": "Aggro icons after the name, weaknesses after the level."},
+                {"key": "jobs", "name": "Jobs", "tip": "A player's jobs and levels under their name, once HeadsUp knows them: from your party, a check, or Look Up Players."},
                 {"key": "border", "name": "Border", "tip": "The frame around your target. Off, it has the same edge as every other widget."},
                 {"key": "currency", "name": "Currency"},
                 {"key": "bag", "name": "Bag", "tip": "The bag this widget shows on the panel. Hover it for every bag."},

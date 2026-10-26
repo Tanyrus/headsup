@@ -179,6 +179,7 @@ namespace headsup
         const char* const kJobLayoutNames[kJobLayoutCount] = {"jobsFirst", "expFirst", "expOnly"};
         constexpr const char* kTargetDetailsKey = "barTargetDetails";
         constexpr const char* kTargetBorderKey  = "barTargetBorder";
+        constexpr const char* kTargetJobsKey    = "barTargetJobs";
         constexpr const char* kMenuFontKey      = "menuFont";
         constexpr const char* kMenuXKey = "menuX", *kMenuYKey = "menuY", *kMenuWidthKey = "menuWidth",
                               *kMenuHeightKey = "menuHeight";
@@ -1312,6 +1313,7 @@ namespace headsup
             case BarWidget::Target:
                 o.targetDetails = flag(kTargetDetailsKey, o.targetDetails);
                 o.targetBorder  = flag(kTargetBorderKey, o.targetBorder);
+                o.targetJobs    = flag(kTargetJobsKey, o.targetJobs);
                 break;
             default: break;
             }
@@ -1358,6 +1360,7 @@ namespace headsup
             case BarWidget::Target:
                 flag(kTargetDetailsKey, o.targetDetails);
                 flag(kTargetBorderKey, o.targetBorder);
+                flag(kTargetJobsKey, o.targetJobs);
                 break;
             default: break;
             }

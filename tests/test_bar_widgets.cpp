@@ -1890,3 +1890,24 @@ TEST(the_bags_widget_shows_the_bag_picked_for_it_and_the_plugin_reads_that_far)
     settings.Widget(BarWidget::Bags).bag = 6;
     CHECK_EQ(BarWidgetContent(BarWidget::Bags, state, settings).title.front().text, "-");
 }
+
+TEST(a_targeted_players_jobs_show_from_whatever_knows_them_unless_switched_off)
+{
+    Settings settings;
+    BarState state;
+    ActorInfo player;
+    player.kind = EntityKind::Player;
+    std::snprintf(player.name, sizeof(player.name), "%s", "Tanyrus");
+    state.target = &player;
+    CHECK(BarWidgetContent(BarWidget::Target, state, settings).subtitle.empty()); // nothing known of them yet
+    player.jobs = PlayerJobs{1, 75, 13, 37}; // from a lookup, the party list or a check
+    CHECK_EQ(BarWidgetContent(BarWidget::Target, state, settings).subtitle.front().text, "WAR 75 / NIN 37");
+    settings.Widget(BarWidget::Target).targetJobs = false;
+    CHECK(BarWidgetContent(BarWidget::Target, state, settings).subtitle.empty());
+    // An anonymous player's are the game's question marks.
+    settings.Widget(BarWidget::Target).targetJobs = true;
+    player.jobs.reset();
+    player.status = PlayerStatus{};
+    player.status->anonymous = true;
+    CHECK_EQ(BarWidgetContent(BarWidget::Target, state, settings).subtitle.front().text, "? ? ?");
+}

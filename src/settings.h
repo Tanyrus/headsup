@@ -68,6 +68,7 @@ namespace headsup
         bool netMeter        = true;  // and the game's own meter after them
         bool targetDetails   = false; // Target: a mob's icons after its name and its weaknesses after its level
         bool targetBorder    = true;  // and its frame, or its pill's own edge
+        bool targetJobs      = true;  // and a player's jobs and levels, as far as they are known
         bool operator==(const WidgetOptions&) const = default;
     };
     // A copy as a new one is: shown, and the first copies as kBarWidgetDefaults has them.

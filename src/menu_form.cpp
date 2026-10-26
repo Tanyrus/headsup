@@ -500,6 +500,9 @@ namespace headsup
                 case WidgetTabsRow::Details:
                     if (kind == BarWidget::Target) form.Switch(label.c_str(), o.targetDetails, row.tip);
                     break;
+                case WidgetTabsRow::Jobs:
+                    if (kind == BarWidget::Target) form.Switch(label.c_str(), o.targetJobs, row.tip);
+                    break;
                 case WidgetTabsRow::Border:
                     if (kind == BarWidget::Target) form.Switch(label.c_str(), o.targetBorder, row.tip);
                     break;

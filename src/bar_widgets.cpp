@@ -25,6 +25,7 @@ namespace headsup
             "Mog Locker", "Mog Satchel", "Mog Sack", "Mog Case", "Mog Wardrobe", "Mog Safe 2", "Mog Wardrobe 2",
             "Mog Wardrobe 3", "Mog Wardrobe 4", "Mog Wardrobe 5", "Mog Wardrobe 6", "Mog Wardrobe 7", "Mog Wardrobe 8"};
         constexpr const char* kItemsMenu = "Items";
+        constexpr const char* kAnonymousJobs = "? ? ?"; // as the game writes an anonymous player's
         // The Mog House's own short captions for some of them, as the game's strip titles their lists.
         struct ShortCaption
         {
@@ -77,7 +78,7 @@ namespace headsup
         // "WAR 75 / NIN 37", or the game's "? ? ?" for an anonymous player, whose jobs come as 0.
         std::string CheckedJobs(const InspectGeneral& g)
         {
-            return g.mainJob == 0 ? "? ? ?" : JobsText(g.mainJob, g.mainLevel, g.subJob, g.subLevel);
+            return g.mainJob == 0 ? kAnonymousJobs : JobsText(g.mainJob, g.mainLevel, g.subJob, g.subLevel);
         }
 
         // The tracker fills a mob's level only while it lives; a dead target has none, but its record still names
@@ -852,10 +853,19 @@ namespace headsup
             else if (state.target->kind != EntityKind::Mob)
             {
                 w.title = ListOf(Text(state.target->name));
-                if (state.target->kind == EntityKind::Player && state.targetCheck)
+                if (state.target->kind == EntityKind::Player)
                 {
-                    w.subtitle = ListOf(Text(CheckedJobs(state.targetCheck->general), Tone::Dim));
-                    w.hasPopup = true;
+                    // What is known of their jobs, the newest first; a check alone has a popup to show.
+                    const std::optional<PlayerJobs>& jobs = state.target->jobs;
+                    std::string said;
+                    if (jobs && jobs->mainJob != 0)
+                        said = JobsText(jobs->mainJob, jobs->mainLevel, jobs->subJob, jobs->subLevel);
+                    else if (state.target->status && state.target->status->anonymous)
+                        said = kAnonymousJobs;
+                    else if (state.targetCheck)
+                        said = CheckedJobs(state.targetCheck->general);
+                    if (o.targetJobs && !said.empty()) w.subtitle = ListOf(Text(said, Tone::Dim));
+                    w.hasPopup = state.targetCheck.has_value();
                 }
                 w.hasPopup = w.hasPopup || NpcOf(state.target) != nullptr;
             }
