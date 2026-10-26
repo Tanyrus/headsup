@@ -704,10 +704,11 @@ namespace headsup
             return SdtIcon(kFirstElementSdt + static_cast<int>(*element));
         }
 
+        // Red when full; dim for a bag with no room yet, which is not full.
         Span BagFill(const BagCount& bag)
         {
             return Text(std::to_string(bag.used) + " / " + std::to_string(bag.max),
-                bag.used >= bag.max ? Tone::Resist : Tone::Normal);
+                bag.max == 0 ? Tone::Dim : bag.used >= bag.max ? Tone::Resist : Tone::Normal);
         }
     }
 
@@ -729,6 +730,17 @@ namespace headsup
     }
 
     const char* ContainerName(int container) { return kContainerNames[std::clamp(container, 0, kContainerCount - 1)]; }
+
+    const std::vector<int>& BagChoices()
+    {
+        static const std::vector<int> choices = [] {
+            std::vector<int> all;
+            for (int c = 0; c < kContainerCount; ++c)
+                if (c != kTemporaryItems) all.push_back(c);
+            return all;
+        }();
+        return choices;
+    }
 
     std::optional<int> ContainerNamed(const std::string& caption)
     {
@@ -1089,12 +1101,14 @@ namespace headsup
         {
             popup.title   = ListOf(Text("Bags"));
             PopupRow grid = Grid(kBagColumns, kBagColumns * kContainerCount);
-            for (int c = 0; c < kContainerCount; ++c)
+            for (const int c : BagChoices())
             {
-                // The server gives Mog Safe 2 its room before the second floor is open: only what is in it says it can be used.
-                if (!state.bags[c] || (c == kMogSafe2 && state.bags[c]->used == 0)) continue;
+                // Storage shows before its furniture gives it room. The server gives Mog Safe 2 its room before the
+                // second floor is open: only what is in it says it can be used.
+                const std::optional<BagCount> bag = c == kStorage && !state.bags[c] ? std::optional(BagCount{}) : state.bags[c];
+                if (!bag || (c == kMogSafe2 && bag->used == 0)) continue;
                 grid.cells.push_back(Cell(Text(kContainerNames[c])));
-                grid.cells.push_back(Cell(BagFill(*state.bags[c])));
+                grid.cells.push_back(Cell(BagFill(*bag)));
             }
             popup.sections = ListOf(PopupSection{"", ListOf(std::move(grid))});
             break;

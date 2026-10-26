@@ -477,9 +477,10 @@ TEST(gil_bags_and_earth_time)
     CHECK(Joined(b.title) == "45 / 80" && Joined(b.subtitle) == "Bags" && b.hasPopup);
     const PopupContent bagsPopup = BarPopupContent(BarWidget::Bags, state, settings);
     const PopupRow& rows         = bagsPopup.sections[0].rows[0];
-    CHECK(rows.kind == RowKind::Grid && rows.columns == 2 && rows.cells.size() == 4);
-    CHECK(Joined(rows.cells[2].text) == "Mog Satchel");
-    CHECK(rows.cells[3].text == (std::vector<Span>{{"30 / 30", Tone::Resist}}));
+    CHECK(rows.kind == RowKind::Grid && rows.columns == 2 && rows.cells.size() == 6); // Storage too, with no room
+    CHECK(Joined(rows.cells[2].text) == "Storage");
+    CHECK(Joined(rows.cells[4].text) == "Mog Satchel");
+    CHECK(rows.cells[5].text == (std::vector<Span>{{"30 / 30", Tone::Resist}}));
     state.earthHour   = 21;
     state.earthMinute = 7;
     state.earthYear   = 2026;
@@ -1934,4 +1935,29 @@ TEST(the_conquest_widget_counts_the_regions_of_the_nations_picked_and_its_popup_
     const PopupContent popup = BarPopupContent(BarWidget::Conquest, state, settings);
     CHECK(popup.sections.size() == 1 && popup.sections[0].heading == "Bastok");
     CHECK(Lines(popup.sections[0]) == (std::vector<std::string>{"Gustaberg", "Derfland"}));
+}
+
+TEST(the_bags_popup_always_lists_storage_and_never_the_temporary_items)
+{
+    // The user's pick: Storage (the Mog House's furniture storage) is listed even with no room yet, dim, and the
+    // Temporary Items bag is not listed.
+    Settings settings;
+    BarState state;
+    state.bags[0] = BagCount{26, 30};
+    state.bags[3] = BagCount{0, 50}; // the temporary items
+    const auto cell = [&](const char* name) -> std::optional<Span> {
+        for (const PopupSection& section : BarPopupContent(BarWidget::Bags, state, settings).sections)
+            for (const PopupRow& row : section.rows)
+                for (size_t i = 0; i + 1 < row.cells.size(); i += 2)
+                    if (!row.cells[i].text.empty() && row.cells[i].text.front().text == name) return row.cells[i + 1].text.front();
+        return std::nullopt;
+    };
+    const std::optional<Span> storage = cell("Storage");
+    CHECK(storage && storage->text == "0 / 0" && storage->tone == Tone::Dim);
+    CHECK(!cell("Temporary").has_value());
+    state.bags[2] = BagCount{12, 80};
+    CHECK(cell("Storage")->text == "12 / 80" && cell("Storage")->tone == Tone::Normal);
+    // Nor can the widget be set to show it.
+    for (int choice = 0; choice < static_cast<int>(BagChoices().size()); ++choice)
+        CHECK(BagChoices()[static_cast<size_t>(choice)] != 3);
 }

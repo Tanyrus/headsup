@@ -520,8 +520,14 @@ namespace headsup
                     break;
                 case WidgetTabsRow::Bag:
                     if (kind == BarWidget::Bags)
-                        form.NumberDropdown(label.c_str(), o.bag, 0, kContainerCount - 1,
-                            [](int bag) { return std::string(ContainerName(bag)); }, row.tip);
+                    {
+                        const std::vector<int>& bags = BagChoices();
+                        const auto at = std::ranges::find(bags, o.bag);
+                        int choice    = at != bags.end() ? static_cast<int>(at - bags.begin()) : 0;
+                        form.NumberDropdown(label.c_str(), choice, 0, static_cast<int>(bags.size()) - 1,
+                            [&](int i) { return std::string(ContainerName(bags[static_cast<size_t>(i)])); }, row.tip);
+                        o.bag = bags[static_cast<size_t>(choice)];
+                    }
                     break;
                 case WidgetTabsRow::TimeZone:
                     if (kind == BarWidget::EarthTime)
