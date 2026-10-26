@@ -147,10 +147,12 @@ namespace headsup
         // A box drawn in the game's art, which is its own edge.
         std::string ArtRules(const SkinFrame& frame) { return "box-sizing:border-box;" + SkinDecorator(frame); }
 
-        // The top panel's strip and the help bar in the game's art: framed as its windows are, or its fill alone.
+        // The top panel's strip and the help bar in the game's art: its fill in an even border of its frame's color, or
+        // the fill alone. The art's own edges are a line thicker in the middle.
         std::string StripArt(const BarLook& look)
         {
-            return look.settings.gameWindowBorder ? SkinDecorator(*look.skin) : SkinFillDecorator(*look.skin);
+            return "box-sizing:border-box;" + SkinFillDecorator(*look.skin) +
+                   (look.settings.gameWindowBorder ? "border:" + Px(kArtBorder) + " " + RcssColor(look.palette.panelBorder) + ";" : "");
         }
 
         // A box of one fill, its edge and, when it has them, its corners.
@@ -408,7 +410,7 @@ namespace headsup
         // Game help's bar: its pieces are placed in the screen's own pixels.
         css += std::string("#") + kHelpId + "{position:absolute;left:0px;top:0px;width:0px;height:0px;}";
         css += ".p{position:absolute;white-space:pre;}";
-        css += ".help-box{position:absolute;" + (look.skin ? "box-sizing:border-box;" + StripArt(look) : PanelRules(HelpBarPanel(look))) + "}";
+        css += ".help-box{position:absolute;" + (look.skin ? StripArt(look) : PanelRules(HelpBarPanel(look))) + "}";
         css += ".hc{" + FaceRules(look.titleFont, lines.title, place.title.height) + ShadowEffect(lines.title) + "}";
         css += ".hh{" + FaceRules(look.detailFont, lines.title, place.figures.height) + ShadowEffect(lines.title) + "}";
         const bool glass = look.palette.shape == BarShape::Glass;

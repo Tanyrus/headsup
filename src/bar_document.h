@@ -74,6 +74,7 @@ namespace headsup
     constexpr const char* kHiddenClass = "hidden";
     constexpr const char* kLitClass    = "lit"; // hovered or open, with a popup
     constexpr const char* kBorderlessClass = "borderless"; // the target, its border switched off
+    constexpr float kArtBorder = 2.0f; // pixels: the border around the top panel and the help bar in the game's art
     // A widget's inner markup: its icons, coin, title and detail lines in their colors, and its progress bar.
     std::string WidgetRml(const WidgetContent& content, const BarLook& look);
 

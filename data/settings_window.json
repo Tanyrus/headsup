@@ -272,7 +272,7 @@
                 {"name": "Type 8"}
               ]
             },
-            {"key": "window-border", "name": "Border", "indent": true, "tip": "The game's window frame around the top panel and the help bar. Off, they are the window's background alone."},
+            {"key": "window-border", "name": "Border", "indent": true, "tip": "A border around the top panel and the help bar, in the color of the game's window frame. Off, they are the window's background alone."},
             {
               "key": "separators",
               "name": "Separators",
