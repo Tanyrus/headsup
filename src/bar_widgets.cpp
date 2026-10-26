@@ -1036,7 +1036,8 @@ namespace headsup
             PopupRow grid = Grid(kBagColumns, kBagColumns * kContainerCount);
             for (int c = 0; c < kContainerCount; ++c)
             {
-                if (!state.bags[c]) continue;
+                // The server gives Mog Safe 2 its room before the second floor is open: only what is in it says it can be used.
+                if (!state.bags[c] || (c == kMogSafe2 && state.bags[c]->used == 0)) continue;
                 grid.cells.push_back(Cell(Text(kContainerNames[c])));
                 grid.cells.push_back(Cell(BagFill(*state.bags[c])));
             }

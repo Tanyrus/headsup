@@ -1833,3 +1833,24 @@ TEST(what_the_plugin_gathers_follows_every_copy)
     CHECK(NeedsOf(settings, std::nullopt).localTime);
     CHECK(NeedsOf(settings, PanelWidget{BarWidget::Bags, 2}).containers == 0); // Bags is off, any copy of it
 }
+
+TEST(the_bags_popup_lists_mog_safe_2_only_once_it_holds_something)
+{
+    // The server gives Mog Safe 2 its room before the second floor is open, so its room says nothing of whether
+    // it can be used; what is in it does.
+    Settings settings;
+    BarState state;
+    state.bags[0] = BagCount{26, 30};
+    state.bags[kMogSafe2] = BagCount{0, 50};
+    const auto listed = [&](const char* name) {
+        for (const PopupSection& section : BarPopupContent(BarWidget::Bags, state, settings).sections)
+            for (const PopupRow& row : section.rows)
+                for (const PopupCell& cell : row.cells)
+                    for (const Span& span : cell.text)
+                        if (span.text == name) return true;
+        return false;
+    };
+    CHECK(listed("Inventory") && !listed("Mog Safe 2"));
+    state.bags[kMogSafe2] = BagCount{3, 50};
+    CHECK(listed("Mog Safe 2"));
+}

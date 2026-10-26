@@ -30,6 +30,7 @@ namespace headsup
     };
     constexpr int kContainerCount = 17; // Ashita's containers 0 (inventory) to 16 (wardrobe 8)
     constexpr uint32_t kInventory = 0, kGilSlot = 0; // gil is an item in the inventory's first slot
+    constexpr int kMogSafe2 = 9;
     // That slot's item read as gil: its count when the item is gil, nullopt for anything else there.
     std::optional<uint32_t> GilOf(uint16_t item, uint32_t count);
     // A container as Ashita counts it: nullopt for one the character has no room in (locked, or not bought).
