@@ -395,6 +395,7 @@
                 {"key": "details", "name": "Details", "tip": "Aggro icons after the name, weaknesses after the level."},
                 {"key": "border", "name": "Border", "tip": "The frame around your target. Off, it has the same edge as every other widget."},
                 {"key": "currency", "name": "Currency"},
+                {"key": "bag", "name": "Bag", "tip": "The bag this widget shows on the panel. Hover it for every bag."},
                 {"key": "time-zone", "name": "Time Zone", "tip": "Local is your computer's. Another zone goes before the time, as in PDT 21:07."},
                 {"key": "server-time", "name": "Server Time", "tip": "Japan's time, which the server keeps and the resets go by, as a second line under your own."},
                 {"key": "24-hour", "name": "24-Hour"},

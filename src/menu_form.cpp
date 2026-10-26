@@ -508,6 +508,11 @@ namespace headsup
                         form.NumberDropdown(label.c_str(), o.currency, kGilCurrency, kCurrencyCount - 1,
                             [](int currency) { return std::string(kCurrencyTable[currency].name); }, row.tip);
                     break;
+                case WidgetTabsRow::Bag:
+                    if (kind == BarWidget::Bags)
+                        form.NumberDropdown(label.c_str(), o.bag, 0, kContainerCount - 1,
+                            [](int bag) { return std::string(ContainerName(bag)); }, row.tip);
+                    break;
                 case WidgetTabsRow::TimeZone:
                     if (kind == BarWidget::EarthTime)
                     {

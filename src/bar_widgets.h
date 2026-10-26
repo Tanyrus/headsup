@@ -28,7 +28,6 @@ namespace headsup
     {
         uint32_t used = 0, max = 0;
     };
-    constexpr int kContainerCount = 17; // Ashita's containers 0 (inventory) to 16 (wardrobe 8)
     constexpr uint32_t kInventory = 0, kGilSlot = 0; // gil is an item in the inventory's first slot
     constexpr int kMogSafe2 = 9;
     // That slot's item read as gil: its count when the item is gil, nullopt for anything else there.
@@ -38,6 +37,8 @@ namespace headsup
     // The container whose name, as the Bags popup gives it, the caption is: the game's caption for a bag list, or
     // "Items" for the inventory as that menu opens.
     std::optional<int> ContainerNamed(const std::string& caption);
+    // And the other way: a container's name, "Mog Satchel".
+    const char* ContainerName(int container);
 
     // What the widgets show, gathered by the plugin each frame.
     struct BarState

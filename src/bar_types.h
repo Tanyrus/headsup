@@ -55,6 +55,8 @@ namespace headsup
         std::to_array<bool>({true, true, true, true, true, true, true, true, true, true, true, false, false, true, false, false});
     static_assert(kBarWidgetDefaults.size() == kBarWidgetCount);
 
+    constexpr int kContainerCount = 17; // Ashita's containers 0 (inventory) to 16 (wardrobe 8), the bags a widget can show
+
     // A widget on the panel: which, and which of its copies. Copy 0 is the one every settings file has; the others are
     // there while the player keeps them on the panel.
     constexpr int kMostCopies = 4; // of one widget

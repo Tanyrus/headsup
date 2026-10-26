@@ -167,6 +167,7 @@ namespace headsup
         constexpr const char* kBorderSuffix = "Border";
         constexpr const char* kGradientSuffix = "Gradient";
         constexpr const char* kBarCurrencyKey = "barCurrency";
+        constexpr const char* kBarBagKey      = "barBag";
         constexpr const char* kClockServerTimeKey = "clockServerTime";
         // Server time was a widget of its own, with this switch.
         constexpr const char* kServerTimeWidgetKey = "barServerTime";
@@ -1214,6 +1215,7 @@ namespace headsup
         {
             const WidgetOptions fresh;
             if (w.currency < 0 || w.currency >= kCurrencyCount) w.currency = fresh.currency;
+            if (w.bag < 0 || w.bag >= kContainerCount) w.bag = fresh.bag;
             w.spacing = std::clamp(w.spacing, 0, kMaxWidgetSpacing);
             w.padding = w.padding < 0 ? kThemePadding : std::min(w.padding, kMaxWidgetPadding);
             w.textSize = std::clamp(w.textSize, kPanelTextSize, kMaxBarTextSize);
@@ -1274,6 +1276,7 @@ namespace headsup
             case BarWidget::Gil:
                 if (const std::optional<int> currency = CurrencyOfKey(text(kBarCurrencyKey))) o.currency = *currency;
                 break;
+            case BarWidget::Bags: o.bag = number(kBarBagKey, o.bag); break;
             case BarWidget::EarthTime:
             {
                 const std::string zone = text(kClockZoneKey);
@@ -1326,6 +1329,7 @@ namespace headsup
             switch (w.kind)
             {
             case BarWidget::Gil: text(kBarCurrencyKey, kCurrencyTable[o.currency].key); break;
+            case BarWidget::Bags: StoreFloat(store, CopyKey(kBarBagKey, w), static_cast<float>(o.bag)); break;
             case BarWidget::EarthTime:
                 text(kClockZoneKey, o.clockZone ? kClockZoneNames[static_cast<int>(*o.clockZone)] : kLocalZone);
                 flag(kClock24Key, o.clock24);

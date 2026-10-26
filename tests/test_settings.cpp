@@ -2799,3 +2799,14 @@ TEST(the_exp_text_is_kept_apart_for_the_job_and_exp_widgets)
     store.values["barExpText"] = "200";
     CHECK_EQ(LoadSettings(store).Widget(BarWidget::Exp).expText, (1 << kExpTextCount) - 1);
 }
+
+TEST(the_bags_widgets_bag_is_kept_and_one_past_the_last_reads_as_the_inventory)
+{
+    Settings s;
+    s.Widget(BarWidget::Bags).bag = 5;
+    MapStore store;
+    SaveSettings(s, store);
+    CHECK_EQ(LoadSettings(store).Widget(BarWidget::Bags).bag, 5);
+    store.values["barBag"] = std::to_string(kContainerCount);
+    CHECK_EQ(LoadSettings(store).Widget(BarWidget::Bags).bag, 0);
+}

@@ -1873,3 +1873,19 @@ TEST(the_exp_widget_is_the_exp_alone_with_its_bar_by_its_own_settings)
     // The Job widget keeps its own.
     CHECK_EQ(BarWidgetContent(BarWidget::Job, state, settings).subtitle.front().text, "7,655 EXP to next");
 }
+
+TEST(the_bags_widget_shows_the_bag_picked_for_it_and_the_plugin_reads_that_far)
+{
+    Settings settings;
+    BarState state;
+    state.bags[0] = BagCount{26, 30};
+    state.bags[5] = BagCount{12, 80}; // the satchel
+    CHECK_EQ(BarWidgetContent(BarWidget::Bags, state, settings).title.front().text, "26 / 30");
+    settings.Widget(BarWidget::Bags).bag = 5;
+    const WidgetContent satchel = BarWidgetContent(BarWidget::Bags, state, settings);
+    CHECK(satchel.title.front().text == "12 / 80" && satchel.subtitle.front().text == ContainerName(5));
+    CHECK_EQ(NeedsOf(settings, std::nullopt).containers, 6);
+    // A bag the character has no room in reads as nothing yet.
+    settings.Widget(BarWidget::Bags).bag = 6;
+    CHECK_EQ(BarWidgetContent(BarWidget::Bags, state, settings).title.front().text, "-");
+}

@@ -716,6 +716,8 @@ namespace headsup
         return max > 0 ? std::optional<BagCount>(BagCount{used, max}) : std::nullopt;
     }
 
+    const char* ContainerName(int container) { return kContainerNames[std::clamp(container, 0, kContainerCount - 1)]; }
+
     std::optional<int> ContainerNamed(const std::string& caption)
     {
         for (int c = 0; c < kContainerCount; ++c)
@@ -760,7 +762,13 @@ namespace headsup
         needs.cpu        = memoryPopup;
         needs.linuxxi    = memoryPopup;
         // Ashita counts a container's items by walking its slots, so the others wait for the popup that lists them.
-        if (shown(BarWidget::Bags)) needs.containers = opened(BarWidget::Bags) ? kContainerCount : 1;
+        if (shown(BarWidget::Bags))
+        {
+            needs.containers = opened(BarWidget::Bags) ? kContainerCount : 1;
+            for (int copy = 0; copy < kMostCopies; ++copy)
+                if (const PanelWidget bags{BarWidget::Bags, copy}; Shows(settings, bags))
+                    needs.containers = std::max(needs.containers, settings.Widget(bags).bag + 1);
+        }
         return needs;
     }
 
@@ -890,10 +898,13 @@ namespace headsup
             break;
         }
         case BarWidget::Bags:
-            w.title    = ListOf(state.bags[0] ? BagFill(*state.bags[0]) : Text("-"));
-            w.subtitle = ListOf(Text("Bags", Tone::Dim));
+        {
+            const std::optional<BagCount>& bag = state.bags[o.bag];
+            w.title    = ListOf(bag ? BagFill(*bag) : Text("-"));
+            w.subtitle = ListOf(Text(o.bag == static_cast<int>(kInventory) ? "Bags" : ContainerName(o.bag), Tone::Dim));
             w.hasPopup = true;
             break;
+        }
         case BarWidget::EarthTime:
             w.title    = ListOf(Text(o.clockZone
                     ? ZoneClockText(ZoneAt(*o.clockZone, state.unixMs), o.clock24, o.clockSeconds)
