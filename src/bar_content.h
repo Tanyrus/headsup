@@ -51,6 +51,9 @@ namespace headsup
         bool figures = false;
         std::optional<float> progress; // 0 to 1: a bar along the widget's foot, as EXP to the next level
         bool progressBeside = false;   // the bar after the text instead, centered on the row
+        // Each span of either line is a cell, and the cells at one place of their lines a column, the columns a gap
+        // apart: the Conquest widget's two by two.
+        bool cells = false;
         bool operator==(const WidgetContent&) const = default;
     };
 

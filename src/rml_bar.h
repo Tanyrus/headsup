@@ -81,6 +81,7 @@ namespace headsup
             WidgetContent content; // as the widget gave it, which its natural width was measured from
             float natural = 0.0f;
             float padded  = 0.0f; // the room from its edges to what it shows, that natural was measured with
+            std::vector<float> columns; // a widget of cells', as measured
             bool measured = false;
             WidgetContent drawn; // as its markup was made from: the target's is cut to its room
             bool marked = false; // its markup is drawn's

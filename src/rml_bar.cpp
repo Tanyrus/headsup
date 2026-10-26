@@ -263,10 +263,14 @@ namespace headsup
                 shown.content  = c;
                 shown.measured = true;
                 shown.padded   = padding;
-                shown.natural  = 2.0f * padding + own.Leading(c) +
-                                std::max(SteadyWidth(host, c.title, c.titleIcons, own.TitleFace(c)),
-                                    own.lines.twoLines ? SteadyWidth(host, c.subtitle, c.subtitleIcons, own.DetailFace())
-                                                       : 0.0f) +
+                // A widget of cells is as wide as its columns; another as its longer line.
+                shown.columns = c.cells ? CellColumns(c, [&](bool title, const Span& span) {
+                    return SteadyWidth(host, {span}, {}, title ? own.TitleFace(c) : own.DetailFace());
+                }) : std::vector<float>{};
+                const float text = c.cells ? CellsWidth(shown.columns, m.gap)
+                                           : std::max(SteadyWidth(host, c.title, c.titleIcons, own.TitleFace(c)),
+                                                 own.lines.twoLines ? SteadyWidth(host, c.subtitle, c.subtitleIcons, own.DetailFace()) : 0.0f);
+                shown.natural  = 2.0f * padding + own.Leading(c) + text +
                                 (c.progress && c.progressBeside ? m.gap + BesideWidth(m) : 0.0f);
             }
             natural[i] = shown.natural;
@@ -329,7 +333,7 @@ namespace headsup
             if (shown.marked && shown.drawn == content) continue;
             shown.drawn  = content;
             shown.marked = true;
-            shown.element->SetInnerRML(WidgetRml(content, LookOf(look, widgets, w)));
+            shown.element->SetInnerRML(WidgetRml(content, LookOf(look, widgets, w), shown.columns));
         }
         const auto diamond = static_cast<float>(WholePixels(m.diamond));
         for (size_t d = 0; d < m_Dividers.size(); ++d)

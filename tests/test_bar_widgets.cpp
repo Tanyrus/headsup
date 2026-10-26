@@ -1926,10 +1926,11 @@ TEST(the_conquest_widget_counts_the_regions_of_the_nations_picked_and_its_popup_
     owners[5] = Nation::Windurst;
     owners[18] = Nation::None;
     state.owners = owners;
+    // Two by two, in lined-up columns: San d'Oria and Bastok over Windurst and the beastmen.
     const WidgetContent all = BarWidgetContent(BarWidget::Conquest, state, settings);
-    CHECK_EQ(Joined(all.title), "S 1 · B 2 · W 1 · BM 14");
-    CHECK(all.title[1] == Text(kDot, Tone::Dim)); // not spaces alone, which the panel draws as nothing
-    CHECK(all.title[2].argb == NationColor(Nation::Bastok) && all.hasPopup);
+    CHECK(all.cells && all.title.size() == 2 && all.subtitle.size() == 2);
+    CHECK(all.title[0].text == "S 1" && all.title[1].text == "B 2" && all.subtitle[0].text == "W 1" && all.subtitle[1].text == "BM 14");
+    CHECK(all.title[1].argb == NationColor(Nation::Bastok) && all.hasPopup);
     // Bastok alone: its name and count, and its regions in the popup.
     settings.Widget(BarWidget::Conquest).nations = NationBit(Nation::Bastok);
     CHECK_EQ(Joined(BarWidgetContent(BarWidget::Conquest, state, settings).title), "Bastok 2");
@@ -1988,4 +1989,20 @@ TEST(the_conquest_popup_marks_your_nations_regions_without_a_supply_run)
     state.owners = owners;
     const PopupContent all = BarPopupContent(BarWidget::Conquest, state, settings);
     CHECK((Lines(all.sections[0]) == std::vector<std::string>{"Ronfaure"}));
+}
+
+TEST(two_nations_picked_are_one_line_of_two_cells_and_one_is_its_name_over_the_widgets)
+{
+    Settings settings;
+    settings.Widget(BarWidget::Conquest).on = true;
+    BarState state;
+    RegionOwners owners{};
+    owners[3] = Nation::Bastok;
+    state.owners = owners;
+    settings.Widget(BarWidget::Conquest).nations = NationBit(Nation::Bastok) | NationBit(Nation::Windurst);
+    const WidgetContent two = BarWidgetContent(BarWidget::Conquest, state, settings);
+    CHECK(two.cells && two.title.size() == 2 && two.subtitle.empty());
+    settings.Widget(BarWidget::Conquest).nations = NationBit(Nation::Bastok);
+    const WidgetContent one = BarWidgetContent(BarWidget::Conquest, state, settings);
+    CHECK(!one.cells && Joined(one.title) == "Bastok 1" && Joined(one.subtitle) == "Conquest");
 }

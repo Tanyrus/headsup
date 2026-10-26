@@ -406,3 +406,26 @@ TEST(a_target_without_its_border_has_none_lit_or_not_and_does_not_breathe)
     const std::string edge  = ".pills .widget.target.borderless{border-color:" + RcssColor(umbra.pillBorder) + ";}";
     CHECK(pills.find(edge) != std::string::npos && pills.find(edge) < pills.find(".pills .widget.lit{"));
 }
+
+TEST(a_widget_of_cells_lays_each_in_its_column_a_gap_apart)
+{
+    Settings settings;
+    const BarLook look = LookOf(BarTheme::PhoenixGold, settings);
+    WidgetContent c;
+    c.shown    = true;
+    c.cells    = true;
+    c.title    = {Text("S 1"), Text("B 2")};
+    c.subtitle = {Text("W 1"), Text("BM 14")};
+    const std::string rml = WidgetRml(c, look, {30.0f, 44.0f});
+    // The first column its width and the gap; the last its width.
+    const std::string first = "class=\"cell\" style=\"width:" + Px(30.0f + look.metrics.gap) + ";";
+    const std::string last  = "class=\"cell\" style=\"width:" + Px(44.0f) + ";";
+    CHECK(rml.find(first) != std::string::npos && rml.find(last) != std::string::npos);
+    CHECK(rml.find(">S 1<") < rml.find(">B 2<") && rml.find(">B 2<") < rml.find(">W 1<"));
+    CHECK_EQ(CellsWidth({30.0f, 44.0f}, look.metrics.gap), 30.0f + look.metrics.gap + 44.0f);
+    // Measured, a column is its widest cell over both lines.
+    const std::vector<float> columns = CellColumns(c, [](bool title, const Span& s) {
+        return static_cast<float>(s.text.size()) * (title ? 10.0f : 8.0f);
+    });
+    CHECK((columns == std::vector<float>{30.0f, 40.0f})); // "S 1" at 10 a letter, "BM 14" at 8
+}

@@ -682,6 +682,7 @@ namespace headsup
 
         // The Conquest widget's nations, short, by Nation.
         constexpr const char* kNationShort[] = {"", "S", "B", "W", "BM"};
+        constexpr size_t kNationsPerLine     = 2;
 
         std::vector<Nation> PickedNations(uint8_t bits)
         {
@@ -964,14 +965,16 @@ namespace headsup
                 w.title = ListOf(Text("-"));
                 break;
             }
-            // A nation alone by its name; several by their first letters, each in its color, a dot apart: RmlUi drops
-            // a span that holds spaces alone.
+            // A nation alone by its name; several by their first letters, each in its color, two to a line in columns.
             const std::vector<Nation> picked = PickedNations(o.nations);
-            for (const Nation nation : picked)
+            w.cells = picked.size() > 1; // its counts alone, without its name under them
+            if (w.cells) w.subtitle.clear();
+            for (size_t i = 0; i < picked.size(); ++i)
             {
-                if (!w.title.empty()) w.title.push_back(Text(kDot, Tone::Dim));
+                const Nation nation    = picked[i];
                 const std::string name = picked.size() == 1 ? NationName(nation) : kNationShort[static_cast<int>(nation)];
-                w.title.push_back(Colored(name + " " + std::to_string(std::ranges::count(*state.owners, nation)), NationColor(nation)));
+                const Span count = Colored(name + " " + std::to_string(std::ranges::count(*state.owners, nation)), NationColor(nation));
+                (i < kNationsPerLine ? w.title : w.subtitle).push_back(count);
             }
             if (w.title.empty()) w.title = ListOf(Text("-"));
             w.figures = true;

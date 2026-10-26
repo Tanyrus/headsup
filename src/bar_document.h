@@ -1,5 +1,7 @@
 #pragma once
 
+#include "function_ref.h"
+
 #include "bar_content.h"
 #include "bar_game_help.h"
 #include "bar_look.h"
@@ -75,7 +77,11 @@ namespace headsup
     constexpr const char* kLitClass    = "lit"; // hovered or open, with a popup
     constexpr const char* kBorderlessClass = "borderless"; // the target, its border switched off
     // A widget's inner markup: its icons, coin, title and detail lines in their colors, and its progress bar.
-    std::string WidgetRml(const WidgetContent& content, const BarLook& look);
+    // columns: a widget of cells' column widths (CellColumns).
+    std::string WidgetRml(const WidgetContent& content, const BarLook& look, const std::vector<float>& columns = {});
+    // A widget of cells' columns: each as wide as its widest cell, which width measures (title: on the first line).
+    std::vector<float> CellColumns(const WidgetContent& content, FunctionRef<float(bool title, const Span&)> width);
+    float CellsWidth(const std::vector<float>& columns, float gap);
 
     // Game help's own bar under the top bar: its box when it has a background, and its caption, the bag's count and
     // its help where the row puts them, each centered on the row. Nothing for a row with no box.

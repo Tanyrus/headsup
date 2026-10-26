@@ -77,10 +77,21 @@ namespace headsup
             return rml;
         }
 
-        std::string Line(const char* classes, const std::vector<Span>& spans, const std::vector<Icon>& icons,
-            const BarLook& look)
+        // A line of cells, each as wide as its column and the gap after it but the last.
+        std::string Cells(const std::vector<Span>& spans, const BarLook& look, const std::vector<float>& columns)
         {
-            std::string rml = std::string("<div class=\"") + classes + "\"><span class=\"t\">" + Spans(spans, look) + "</span>";
+            std::string rml;
+            for (size_t i = 0; i < spans.size() && i < columns.size(); ++i)
+                rml += "<span class=\"cell\" style=\"width:" + Px(columns[i] + (i + 1 < spans.size() ? look.metrics.gap : 0.0f)) +
+                       ";color:" + RcssColor(look.BarColor(spans[i])) + ";\">" + EscapedRml(spans[i].text) + "</span>";
+            return rml;
+        }
+
+        std::string Line(const char* classes, const std::vector<Span>& spans, const std::vector<Icon>& icons,
+            const BarLook& look, const std::vector<float>& columns = {})
+        {
+            std::string rml = std::string("<div class=\"") + classes + "\"><span class=\"t\">" +
+                              (columns.empty() ? Spans(spans, look) : Cells(spans, look, columns)) + "</span>";
             if (!icons.empty())
             {
                 rml += "<span class=\"line-icons\">";
@@ -384,6 +395,7 @@ namespace headsup
         css += ".coin{" + square(static_cast<float>(coin)) + "margin-top:" +
                Px(std::round(mid - static_cast<float>(coin) / 2.0f) - rowTop) + ";margin-right:" + Px(m.gap) + ";}";
         css += ".t{white-space:pre;}";
+        css += ".cell{display:inline-block;white-space:pre;}";
         css += ".line-icons{margin-left:" + Px(kLineIconGap) + ";}";
         css += ".line-icon{margin-left:" + Px(kLineIconGap) + ";}";
         css += TextRules("", look.titleFont, look.detailFont, lines, place, rowTop);
@@ -537,7 +549,25 @@ namespace headsup
         return rml;
     }
 
-    std::string WidgetRml(const WidgetContent& content, const BarLook& look)
+    std::vector<float> CellColumns(const WidgetContent& content, FunctionRef<float(bool title, const Span&)> width)
+    {
+        std::vector<float> columns(std::max(content.title.size(), content.subtitle.size()), 0.0f);
+        for (size_t i = 0; i < content.title.size(); ++i)
+            columns[i] = std::max(columns[i], width(true, content.title[i]));
+        for (size_t i = 0; i < content.subtitle.size(); ++i)
+            columns[i] = std::max(columns[i], width(false, content.subtitle[i]));
+        return columns;
+    }
+
+    float CellsWidth(const std::vector<float>& columns, float gap)
+    {
+        float total = 0.0f;
+        for (const float column : columns)
+            total += column;
+        return columns.empty() ? 0.0f : total + gap * static_cast<float>(columns.size() - 1);
+    }
+
+    std::string WidgetRml(const WidgetContent& content, const BarLook& look, const std::vector<float>& columns)
     {
         const bool alone = !look.lines.twoLines || content.subtitle.empty();
         std::string rml  = "<div class=\"content\">";
@@ -546,8 +576,10 @@ namespace headsup
         if (content.coin) rml += "<img class=\"coin\" src=\"" + CoinSource(CoinPixels(look.metrics)) + "\"/>";
         rml += "<div class=\"text\">";
         const std::string title = std::string("title") + (content.figures ? " figures" : "") + (alone ? " alone" : "");
-        rml += Line(title.c_str(), content.title, content.titleIcons, look);
-        if (!alone) rml += Line(content.figures ? "detail fig" : "detail", content.subtitle, content.subtitleIcons, look);
+        static const std::vector<float> kNoColumns;
+        const std::vector<float>& laid = content.cells ? columns : kNoColumns;
+        rml += Line(title.c_str(), content.title, content.titleIcons, look, laid);
+        if (!alone) rml += Line(content.figures ? "detail fig" : "detail", content.subtitle, content.subtitleIcons, look, laid);
         rml += "</div>";
         if (content.progress)
         {
