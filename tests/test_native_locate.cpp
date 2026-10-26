@@ -1238,3 +1238,43 @@ TEST(the_search_servers_address_is_where_the_search_clients_setup_clears_it)
     put(apart, kSetup, kAddress, kAddress + 8);
     CHECK(LocateSearchAddress(apart.Text()).problem == LocateProblem::NoSearchAddress);
 }
+
+namespace
+{
+    // The Network window's two PlayOnline getters as the code dump of 2026-10-26 has them, their global moved to the
+    // base the counters' fixture uses.
+    NetImage PlayOnlineClient()
+    {
+        NetImage image;
+        image.Put(0xF6F00, {0xA1, 0x08, 0xF9, 0x99, 0x03, 0x85, 0xC0, 0x74, 0x05, 0x66, 0x8B, 0x40, 0x0E, 0xC3, 0x33, 0xC0, 0xC3});
+        image.Put(0xF6F30, {0xA1, 0x08, 0xF9, 0x99, 0x03, 0x85, 0xC0, 0x74, 0x06, 0x66, 0x8B, 0x40, 0x0A, 0xEB, 0x02, 0x33, 0xC0,
+                               0x66, 0x3D, 0xC8, 0x00, 0x73, 0x06, 0x25, 0xFF, 0xFF, 0x00, 0x00, 0xC3, 0xB8, 0xC8, 0x00, 0x00,
+                               0x00, 0xC3});
+        return image;
+    }
+}
+
+TEST(the_playonline_counts_are_found_through_the_network_windows_two_getters)
+{
+    const PlayOnlineSite found = LocatePlayOnline(PlayOnlineClient().Text());
+    CHECK(found.problem == LocateProblem::None);
+    CHECK_EQ(found.global, 0x034C0000u + 0x4DF908u);
+}
+
+TEST(a_client_without_the_getters_or_with_getters_that_disagree_is_left_alone)
+{
+    CHECK(LocatePlayOnline(NetImage{}.Text()).problem == LocateProblem::NoPlayOnline);
+    NetImage apart = PlayOnlineClient();
+    apart.Put(0xF6F01, {0x0C}); // the envelope's count read from another global
+    CHECK(LocatePlayOnline(apart.Text()).problem == LocateProblem::AmbiguousPlayOnline);
+    NetImage twice = PlayOnlineClient();
+    twice.Put(0x150000, {0xA1, 0x08, 0xF9, 0x99, 0x03, 0x85, 0xC0, 0x74, 0x05, 0x66, 0x8B, 0x40, 0x0E, 0xC3});
+    CHECK(LocatePlayOnline(twice.Text()).problem == LocateProblem::AmbiguousPlayOnline);
+}
+
+TEST(playonline_counts_are_taken_as_the_network_window_shows_them)
+{
+    // A message and a friend request beside the messenger, nothing beside the envelope (the test server, 2026-10-26).
+    CHECK(PlayOnlineFrom(2, 0) == (PlayOnlineCounts{2, 0}));
+    CHECK(PlayOnlineFrom(250, 3) == (PlayOnlineCounts{200, 3})); // the window shows at most 200 messages
+}

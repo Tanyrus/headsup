@@ -39,6 +39,11 @@ namespace headsup
             if (state == LinkState::Normal) return Labeled("Last server data", Text(when));
             return Line(Cell(ListOf(Figure("Last server data ", state), Figure(when, state))));
         }
+
+        bool Waiting(const std::optional<PlayOnlineCounts>& counts)
+        {
+            return counts && (counts->messages > 0 || counts->mail > 0);
+        }
     }
 
     LinkState StateOf(const ConnectionReport& r)
@@ -126,6 +131,13 @@ namespace headsup
             Text("  R ", Tone::Dim), Figure(Rate(report->counters, &NetCounters::received), state));
         if (meter && report->counters) w.title.push_back(Figure(Printed("  %d%%", report->counters->health), state));
         if (latency && report->latency) w.title.push_back(Text(Printed("  %.0f ms", report->latency->medianMs), Tone::Dim));
+        if (Waiting(report->playOnline))
+            for (const auto& [picture, count] : {std::pair{GamePicture::PlayOnlineMail, report->playOnline->mail},
+                     std::pair{GamePicture::PlayOnlineMessenger, report->playOnline->messages}})
+            {
+                w.title.push_back(Span{"", Tone::Normal, 0, picture});
+                if (count > 0) w.title.push_back(Text(std::to_string(count), Tone::Dim));
+            }
         w.hasPopup = true;
         w.figures  = true;
         return w;
@@ -164,6 +176,10 @@ namespace headsup
         else
             totals.rows.push_back(LineOf("Counted once the game's counters can be read.", Tone::Dim));
         popup.sections = ListOf(std::move(now), std::move(totals));
+        if (Waiting(r.playOnline))
+            popup.sections.push_back(PopupSection{"PlayOnline",
+                ListOf(Labeled("Messages", Text(std::to_string(r.playOnline->messages))),
+                    Labeled("Mail", Text(std::to_string(r.playOnline->mail))))});
         return popup;
     }
 }

@@ -429,3 +429,21 @@ TEST(a_widget_of_cells_lays_each_in_its_column_a_gap_apart)
     });
     CHECK((columns == std::vector<float>{30.0f, 40.0f})); // "S 1" at 10 a letter, "BM 14" at 8
 }
+
+TEST(a_span_of_a_game_picture_draws_that_picture_as_tall_as_its_letters_from_what_was_read_at_load)
+{
+    Settings settings;
+    const BarLook look = LookOf(BarTheme::PhoenixGold, settings);
+    WidgetContent c;
+    c.shown = true;
+    c.title = {Text("S 300"), Span{"", Tone::Normal, 0, GamePicture::PlayOnlineMessenger}, Text("2", Tone::Dim)};
+    const std::string rml = WidgetRml(c, look);
+    const std::string img = "<img class=\"line-icon pic\" src=\"" + GamePictureSource(GamePicture::PlayOnlineMessenger) + "\"/>";
+    CHECK(rml.find(img) != std::string::npos && rml.find(img) < rml.find(">2<"));
+    // Its pixels are the game's, B, G, R, A as an ARGB word keeps them.
+    PlayOnlineIcons icons{ColorPicture{"menu    mesicon ", 1, 1, {1, 2, 3, 255}}, ColorPicture{"menu    mesicon ", 1, 1, {4, 5, 6, 255}}};
+    const std::optional<Image> messenger = GamePictureImage(icons, GamePictureSource(GamePicture::PlayOnlineMessenger));
+    CHECK(messenger && messenger->width == 1 && messenger->argb == std::vector<uint32_t>{0xFF060504u});
+    CHECK(!GamePictureImage(std::nullopt, GamePictureSource(GamePicture::PlayOnlineMail)));
+    CHECK(!GamePictureImage(icons, IconSource(Icon::Gm)));
+}

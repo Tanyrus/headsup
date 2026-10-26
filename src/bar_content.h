@@ -30,11 +30,20 @@ namespace headsup
         Own, // argb
     };
 
+    // A picture read from the game's files at load, drawn in place of a span's text as tall as its letters.
+    enum class GamePicture : uint8_t
+    {
+        None,
+        PlayOnlineMail,
+        PlayOnlineMessenger,
+    };
+
     struct Span
     {
         std::string text;
-        Tone tone     = Tone::Normal;
-        uint32_t argb = 0;
+        Tone tone           = Tone::Normal;
+        uint32_t argb       = 0;
+        GamePicture picture = GamePicture::None;
         bool operator==(const Span&) const = default;
     };
 

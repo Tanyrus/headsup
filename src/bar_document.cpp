@@ -17,7 +17,7 @@ namespace headsup
     namespace
     {
         constexpr std::string_view kIconKind = "icon", kStripKind = "strip", kDiamondKind = "diamond", kCoinKind = "coin",
-                                   kStarKind = "star", kResetKind = "reset";
+                                   kStarKind = "star", kResetKind = "reset", kGameKind = "game";
         // RmlUi blurs a glow by a Gaussian of this share of its width; the bar's shadow is a CSS blur radius, twice
         // its Gaussian's.
         constexpr float kGlowSigmaPerWidth = 0.4f;
@@ -73,7 +73,9 @@ namespace headsup
         {
             std::string rml;
             for (const Span& span : spans)
-                rml += "<span style=\"color:" + RcssColor(look.BarColor(span)) + ";\">" + EscapedRml(span.text) + "</span>";
+                rml += span.picture != GamePicture::None
+                           ? "<img class=\"line-icon pic\" src=\"" + GamePictureSource(span.picture) + "\"/>"
+                           : "<span style=\"color:" + RcssColor(look.BarColor(span)) + ";\">" + EscapedRml(span.text) + "</span>";
             return rml;
         }
 
@@ -170,6 +172,24 @@ namespace headsup
     std::string IconSource(Icon icon)
     {
         return std::string(kHostSource) + std::string(kIconKind) + kSeparator + std::to_string(static_cast<int>(icon));
+    }
+
+    std::string GamePictureSource(GamePicture picture)
+    {
+        return std::string(kHostSource) + std::string(kGameKind) + kSeparator + std::to_string(static_cast<int>(picture));
+    }
+
+    std::optional<Image> GamePictureImage(const std::optional<PlayOnlineIcons>& icons, std::string_view name)
+    {
+        const ColorPicture* picture = !icons                                                          ? nullptr
+                                      : name == GamePictureSource(GamePicture::PlayOnlineMail)      ? &icons->mail
+                                      : name == GamePictureSource(GamePicture::PlayOnlineMessenger) ? &icons->messenger
+                                                                                                    : nullptr;
+        if (picture == nullptr) return std::nullopt;
+        Image image{picture->width, picture->height, std::vector<uint32_t>(picture->bgra.size() / sizeof(uint32_t))};
+        // The picture's bytes are B, G, R, A: an ARGB word's bytes in memory.
+        std::memcpy(image.argb.data(), picture->bgra.data(), image.argb.size() * sizeof(uint32_t));
+        return image;
     }
 
     std::string StripSource(const BarPalette& palette, int rows, int belowRows)
@@ -398,6 +418,7 @@ namespace headsup
         css += ".cell{display:inline-block;white-space:pre;}";
         css += ".line-icons{margin-left:" + Px(kLineIconGap) + ";}";
         css += ".line-icon{margin-left:" + Px(kLineIconGap) + ";}";
+        css += ".line-icon.pic{margin-left:" + Px(kPictureGap) + ";}";
         css += TextRules("", look.titleFont, look.detailFont, lines, place, rowTop);
         for (const WidgetText& text : own)
             css += TextRules("#" + WidgetId(text.widget) + " ", text.titleFont, text.detailFont, text.lines, text.place, rowTop);

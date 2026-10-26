@@ -291,6 +291,9 @@ class HeadsUp final : public IPlugin
     bool m_NetStatsTried = false; // it scans the client's code, so once
     std::optional<headsup::NetCounters> m_Counters; // the last read, kept between samples
     std::optional<double> m_CountersReadAt;
+    headsup::PlayOnlineReader m_PlayOnline;
+    bool m_PlayOnlineTried = false; // it scans the client's code, so once
+    std::optional<headsup::PlayOnlineCounts> m_PlayOnlineCounts; // read with the counters
     headsup::ConnectionMeter m_Connection;
     headsup::FreeSpaceWalk m_SpaceWalk;
     headsup::CpuMeter m_Cpu;
@@ -373,12 +376,14 @@ class HeadsUp final : public IPlugin
     std::optional<std::string> m_CursorFileRead; // the File cursor read last, whether or not it was one
     std::string m_GameFontFailure;                // why the game's font could not be read; empty when it was
     std::string m_GamePearlFailure;               // why the game's pearl could not be read; empty when it was
+    std::string m_PlayOnlineIconsFailure;         // why its PlayOnline icons could not be; empty when they were
     headsup::WindowSkins m_WindowSkins;           // the game's window art, by Window Type
     std::array<std::string, headsup::kWindowTypes> m_SkinFailures; // why a type's art could not be read
     std::array<bool, headsup::kWindowTypes> m_SkinWarned{};        // whether that was said
     headsup::WindowTypeReader m_WindowTypeReader;
     std::optional<headsup::GameSkinLook> m_SkinLook; // the art drawn now, while the panel or the window uses it
     std::optional<headsup::ColorPicture> m_GamePearl;
+    std::optional<headsup::PlayOnlineIcons> m_PlayOnlineIcons;
     std::optional<int> m_PearlOutlineDrawn;       // the outline the pearl was last drawn with
     bool m_GameFontWarned = false;
     float m_MenuHeight  = 0.0f;
@@ -1296,6 +1301,9 @@ private:
         ReadWindowSkins();
         if (!m_GamePearlFailure.empty())
             Note("the game's linkpearl could not be read (" + m_GamePearlFailure + "): the linkshell's is drawn as XIUI's.");
+        if (!m_PlayOnlineIconsFailure.empty())
+            Note("the game's PlayOnline icons could not be read (" + m_PlayOnlineIconsFailure +
+                 "): the connection widget shows only their counts.");
     }
 
     // A file of the game's install where the game reads it: while XIPivot is loaded, the first of its overlays that
@@ -1341,13 +1349,17 @@ private:
         const std::optional<std::vector<uint8_t>> bytes = GameFileBytes(headsup::kGameFontFile, where);
         if (!bytes)
         {
-            m_GameFontFailure  = where;
-            m_GamePearlFailure = where;
+            m_GameFontFailure        = where;
+            m_GamePearlFailure       = where;
+            m_PlayOnlineIconsFailure = where;
             return;
         }
         headsup::Read<headsup::ColorPicture> pearl = headsup::ReadGamePearl(*bytes);
         if (pearl.value) m_GamePearl = std::move(pearl.value);
         else m_GamePearlFailure = where + pearl.failure;
+        headsup::Read<headsup::PlayOnlineIcons> icons = headsup::ReadPlayOnlineIcons(*bytes);
+        if (icons.value) m_PlayOnlineIcons = std::move(icons.value);
+        else m_PlayOnlineIconsFailure = where + icons.failure;
         headsup::Read<headsup::GameFontFace> font = headsup::ReadGameFont(*bytes);
         if (!font.value)
         {
@@ -1512,6 +1524,14 @@ private:
             if (const std::string failure = m_NetStats.Find(); !failure.empty())
                 Note("the connection widget shows no S and R: " + failure + ".");
         return m_NetStats.Read();
+    }
+
+    std::optional<headsup::PlayOnlineCounts> PlayOnlineNow()
+    {
+        if (!std::exchange(m_PlayOnlineTried, true))
+            if (const std::string failure = m_PlayOnline.Find(); !failure.empty())
+                Note("the connection widget shows no PlayOnline messages: " + failure + ".");
+        return m_PlayOnline.Read();
     }
 
     // The game's CP932 as UTF-8, through Windows; "" when it cannot be converted.
@@ -1790,6 +1810,7 @@ private:
             [this](const std::string& line) { Note("RmlUi: " + line); },
             [this](const std::string& name) {
                 if (std::optional<headsup::Image> piece = headsup::SkinImage(m_WindowSkins, name)) return piece;
+                if (std::optional<headsup::Image> picture = headsup::GamePictureImage(m_PlayOnlineIcons, name)) return picture;
                 return headsup::HostImage(name);
             });
         if (!started) Print("RmlUi did not start: the top panel and the settings window are off until HeadsUp reloads.");
@@ -2162,11 +2183,13 @@ private:
         {
             if (!m_CountersReadAt || now - *m_CountersReadAt >= headsup::kCounterSampling)
             {
-                m_Counters       = NetCountersNow();
-                m_CountersReadAt = now;
+                m_Counters         = NetCountersNow();
+                m_PlayOnlineCounts = PlayOnlineNow();
+                m_CountersReadAt   = now;
             }
             m_Connection.Frame(now, m_Counters);
             s.connection = m_Connection.Report(now, m_AshitaCore->GetMemoryManager()->GetPlayer()->GetIsZoning() != 0);
+            s.connection->playOnline = m_PlayOnlineCounts;
         }
         if (needs.party)
         {

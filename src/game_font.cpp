@@ -198,6 +198,10 @@ namespace headsup
         constexpr std::string_view kStatusChunk   = "usta";
         constexpr std::string_view kStatusPicture = "menu    ustatshd";
         constexpr int kPearlU = 0, kPearlV = 64, kPearlSourceSide = 32;
+        // The Network window's PlayOnline icons are 16 x 16 squares at the foot of its message icons' picture.
+        constexpr std::string_view kMessageChunk   = "mesi";
+        constexpr std::string_view kMessagePicture = "menu    mesicon ";
+        constexpr int kMailU = 32, kMessengerU = 48, kPlayOnlineV = 48, kPlayOnlineSide = 16;
         constexpr size_t kBgraBytes = 4;
 
         // What a picture chunk's header says, or why it is no picture.
@@ -416,29 +420,57 @@ namespace headsup
         return {std::move(picture), {}};
     }
 
+    namespace
+    {
+        // The named picture of a picture chunk (what, in a failure), whole.
+        Read<ColorPicture> NamedPicture(std::span<const uint8_t> dat, std::string_view chunkName, std::string_view picture,
+            const std::string& what)
+        {
+            const auto chunk = FindChunk(dat, chunkName, kPictureChunkType);
+            if (!chunk) return {std::nullopt, "it holds no " + what};
+            Read<ColorPicture> sheet = ReadColorPicture(*chunk);
+            if (!sheet.value) return sheet;
+            if (sheet.value->name != picture) return {std::nullopt, "its " + what + " are named " + sheet.value->name};
+            return sheet;
+        }
+
+        // The square of side pixels at u, v of a picture, or why not (what it would be, in a failure).
+        Read<ColorPicture> Square(const ColorPicture& sheet, int u, int v, int side, const std::string& what)
+        {
+            if (sheet.width < u + side || sheet.height < v + side) return {std::nullopt, "its picture is too small to hold " + what};
+            const size_t row = static_cast<size_t>(side) * kBgraBytes;
+            ColorPicture square{sheet.name, side, side, {}};
+            square.bgra.reserve(row * static_cast<size_t>(side));
+            for (int y = 0; y < side; ++y)
+            {
+                const auto from = sheet.bgra.begin() +
+                                  static_cast<std::ptrdiff_t>((static_cast<size_t>(v + y) * static_cast<size_t>(sheet.width) + static_cast<size_t>(u)) * kBgraBytes);
+                square.bgra.insert(square.bgra.end(), from, from + static_cast<std::ptrdiff_t>(row));
+            }
+            bool seen = false;
+            for (size_t p = kBgraBytes - 1; p < square.bgra.size(); p += kBgraBytes)
+                seen = seen || square.bgra[p] != 0;
+            if (!seen) return {std::nullopt, "its " + what + " shows nothing"};
+            return {std::move(square), {}};
+        }
+    }
+
     Read<ColorPicture> ReadGamePearl(std::span<const uint8_t> dat)
     {
-        const auto chunk = FindChunk(dat, kStatusChunk, kPictureChunkType);
-        if (!chunk) return {std::nullopt, "it holds no status icons"};
-        Read<ColorPicture> sheet = ReadColorPicture(*chunk);
+        Read<ColorPicture> sheet = NamedPicture(dat, kStatusChunk, kStatusPicture, "status icons");
         if (!sheet.value) return sheet;
-        if (sheet.value->name != kStatusPicture) return {std::nullopt, "its status icons are named " + sheet.value->name};
-        if (sheet.value->width < kPearlU + kPearlSourceSide || sheet.value->height < kPearlV + kPearlSourceSide)
-            return {std::nullopt, "its status icons are too small to hold the pearl"};
-        const size_t row = static_cast<size_t>(kPearlSourceSide) * kBgraBytes;
-        ColorPicture pearl{sheet.value->name, kPearlSourceSide, kPearlSourceSide, {}};
-        pearl.bgra.reserve(row * kPearlSourceSide);
-        for (int y = 0; y < kPearlSourceSide; ++y)
-        {
-            const auto from = sheet.value->bgra.begin() +
-                              static_cast<std::ptrdiff_t>((static_cast<size_t>(kPearlV + y) * static_cast<size_t>(sheet.value->width) + kPearlU) * kBgraBytes);
-            pearl.bgra.insert(pearl.bgra.end(), from, from + static_cast<std::ptrdiff_t>(row));
-        }
-        bool seen = false;
-        for (size_t p = kBgraBytes - 1; p < pearl.bgra.size(); p += kBgraBytes)
-            seen = seen || pearl.bgra[p] != 0;
-        if (!seen) return {std::nullopt, "its pearl shows nothing"};
-        return {std::move(pearl), {}};
+        return Square(*sheet.value, kPearlU, kPearlV, kPearlSourceSide, "the pearl");
+    }
+
+    Read<PlayOnlineIcons> ReadPlayOnlineIcons(std::span<const uint8_t> dat)
+    {
+        Read<ColorPicture> sheet = NamedPicture(dat, kMessageChunk, kMessagePicture, "message icons");
+        if (!sheet.value) return {std::nullopt, std::move(sheet.failure)};
+        Read<ColorPicture> mail      = Square(*sheet.value, kMailU, kPlayOnlineV, kPlayOnlineSide, "the envelope");
+        Read<ColorPicture> messenger = Square(*sheet.value, kMessengerU, kPlayOnlineV, kPlayOnlineSide, "the messenger");
+        if (!mail.value) return {std::nullopt, std::move(mail.failure)};
+        if (!messenger.value) return {std::nullopt, std::move(messenger.failure)};
+        return {PlayOnlineIcons{std::move(*mail.value), std::move(*messenger.value)}, {}};
     }
 
     Read<std::array<GlyphShape, kGlyphCount>> ReadGlyphShapes(std::span<const uint8_t> body, std::string_view picture, int width,

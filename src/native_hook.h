@@ -264,6 +264,19 @@ namespace headsup
         int m_Searches         = 0;
     };
 
+    // The game's PlayOnline message counts (LocatePlayOnline), read on the game's thread.
+    class PlayOnlineReader
+    {
+    public:
+        // Finds where the client keeps them: "" when found, else why not.
+        std::string Find();
+        // Nothing before Find succeeded, while the client has no session, or when they cannot be read.
+        std::optional<PlayOnlineCounts> Read() const;
+
+    private:
+        uint32_t m_Global = 0;
+    };
+
     class NetStatsReader
     {
     public:

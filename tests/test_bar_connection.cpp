@@ -1,6 +1,7 @@
 #include "bar_connection.h"
 #include "test.h"
 
+#include <algorithm>
 #include <cmath>
 
 using namespace headsup;
@@ -123,4 +124,33 @@ TEST(the_connection_widget_ends_in_the_games_own_meter_as_its_readout_does_unles
     r.counters->health = 40;
     const WidgetContent alarm = ConnectionWidget(r);
     CHECK(alarm.title.back().text == "  40%" && alarm.title.back().argb == kAlarmColor);
+}
+
+TEST(playonline_messages_waiting_add_the_games_envelope_and_messenger_each_with_its_count)
+{
+    ConnectionReport r;
+    r.counters   = NetCounters{1200, 300, 100};
+    r.playOnline = PlayOnlineCounts{2, 0}; // a message and a friend request, beside the messenger
+    const WidgetContent w = ConnectionWidget(r);
+    std::vector<GamePicture> pictures;
+    std::string afterMail, afterMessenger;
+    for (size_t i = 0; i < w.title.size(); ++i)
+        if (w.title[i].picture != GamePicture::None)
+        {
+            pictures.push_back(w.title[i].picture);
+            const std::string next = i + 1 < w.title.size() && w.title[i + 1].picture == GamePicture::None ? w.title[i + 1].text : "";
+            (w.title[i].picture == GamePicture::PlayOnlineMail ? afterMail : afterMessenger) = next;
+        }
+    // As the game's Network window: both icons while either count is above 0, a count beside each that is.
+    CHECK((pictures == std::vector<GamePicture>{GamePicture::PlayOnlineMail, GamePicture::PlayOnlineMessenger}));
+    CHECK(afterMessenger == "2" && afterMail.empty());
+    CHECK(w.title.front().text == "S "); // after the readout
+    r.playOnline = PlayOnlineCounts{0, 0};
+    const WidgetContent none = ConnectionWidget(r);
+    CHECK(std::none_of(none.title.begin(), none.title.end(), [](const Span& s) { return s.picture != GamePicture::None; }));
+    // The popup says it too, only while something waits.
+    r.playOnline = PlayOnlineCounts{2, 1};
+    const size_t sections = ConnectionPopup(r).sections.size();
+    r.playOnline = PlayOnlineCounts{0, 0};
+    CHECK_EQ(sections, ConnectionPopup(r).sections.size() + 1);
 }

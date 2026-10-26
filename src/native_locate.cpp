@@ -219,6 +219,12 @@ namespace headsup
         constexpr int16_t kConfigGet[] = {0x8B, 0x0D, -1, -1, -1, -1, 0x85, 0xC9, 0x74, -1, 0x8B, 0x44, 0x24, 0x04, 0x50,
             0xE8, -1, -1, -1, -1, 0xC3, 0x83, 0xC8, 0xFF, 0xC3};
         constexpr size_t kCounterLoads        = 2;
+        constexpr int16_t kMailGet[]          = {0xA1, -1, -1, -1, -1, 0x85, 0xC0, 0x74, 0x05, 0x66, 0x8B, 0x40, 0x0E, 0xC3};
+        constexpr int16_t kMessagesGet[]      = {0xA1, -1, -1, -1, -1, 0x85, 0xC0, 0x74, 0x06, 0x66, 0x8B, 0x40, 0x0A, 0xEB, 0x02,
+            0x33, 0xC0, 0x66, 0x3D, 0xC8, 0x00};
+        static_assert(static_cast<uint32_t>(kMailGet[12]) == kPlayOnlineMail &&
+                      static_cast<uint32_t>(kMessagesGet[12]) == kPlayOnlineMessages && kMessagesGet[19] == kMostPlayOnlineMessages);
+        constexpr uint32_t kPlayOnlineGetGlobal = 1;
         // The 3-second update: xor eax,eax; push 3000; clear both byte counts; mov edx,[net]; mov eax,[edx+4190h], the
         // milliseconds since the last server data.
         constexpr int16_t kCounterUpdate[] = {0x33, 0xC0, 0x68, 0xB8, 0x0B, 0x00, 0x00, 0x89, 0x46, 0x0C, 0x89, 0x46,
@@ -356,6 +362,8 @@ namespace headsup
         case LocateProblem::AmbiguousStripText: return "the game's help bar text was found in more places than one";
         case LocateProblem::StripTextChanged: return "the game's help bar text is not laid out as HeadsUp expects";
         case LocateProblem::NoNetStats: return "the game's connection readout was not found";
+        case LocateProblem::NoPlayOnline: return "the game's PlayOnline message counts were not found";
+        case LocateProblem::AmbiguousPlayOnline: return "the game's PlayOnline message counts were found more than once";
         case LocateProblem::AmbiguousNetStats: return "the game's connection readout was found in more places than one";
         case LocateProblem::NetStatsChanged: return "the game's connection counters are not where HeadsUp expects";
         }
@@ -533,6 +541,21 @@ namespace headsup
             if (port == address + sizeof(uint32_t)) return SearchAddressSite{LocateProblem::None, address, port};
         }
         return SearchAddressSite{LocateProblem::NoSearchAddress};
+    }
+
+    PlayOnlineSite LocatePlayOnline(const ImageSection& text)
+    {
+        const std::vector<uint32_t> mail = FindAll(kMailGet, text), messages = FindAll(kMessagesGet, text);
+        if (mail.empty() || messages.empty()) return PlayOnlineSite{LocateProblem::NoPlayOnline};
+        const uint32_t global = ReadAt<uint32_t>(text.bytes, messages.front() + kPlayOnlineGetGlobal);
+        if (mail.size() != 1 || messages.size() != 1 || ReadAt<uint32_t>(text.bytes, mail.front() + kPlayOnlineGetGlobal) != global)
+            return PlayOnlineSite{LocateProblem::AmbiguousPlayOnline};
+        return PlayOnlineSite{LocateProblem::None, global};
+    }
+
+    PlayOnlineCounts PlayOnlineFrom(uint16_t messages, uint16_t mail)
+    {
+        return PlayOnlineCounts{std::min<int>(messages, kMostPlayOnlineMessages), mail};
     }
 
     std::optional<NetCounters> CountersFrom(int32_t received, int32_t sent, int32_t health)

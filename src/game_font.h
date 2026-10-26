@@ -103,6 +103,12 @@ namespace headsup
     // The pearl the game draws before a name, out of a whole 51.DAT: a square of its status icons' picture, its colors
     // and alpha at half, as the game keeps them.
     Read<ColorPicture> ReadGamePearl(std::span<const uint8_t> dat);
+    // The envelope and messenger the game's Network window shows while PlayOnline messages wait, out of a whole 51.DAT.
+    struct PlayOnlineIcons
+    {
+        ColorPicture mail, messenger;
+    };
+    Read<PlayOnlineIcons> ReadPlayOnlineIcons(std::span<const uint8_t> dat);
     // The glyphs of a shapes chunk, each drawn from the picture of that name, which is width by height.
     Read<std::array<GlyphShape, kGlyphCount>> ReadGlyphShapes(std::span<const uint8_t> body, std::string_view picture, int width,
         int height);

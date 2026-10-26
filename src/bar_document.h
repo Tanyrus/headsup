@@ -7,6 +7,7 @@
 #include "bar_look.h"
 #include "bar_theme.h"
 #include "bar_types.h"
+#include "game_font.h"
 #include "icons.h"
 #include "markup.h"
 #include "plate_image.h"
@@ -31,6 +32,9 @@ namespace headsup
     std::string ResetSource(uint32_t argb, int pixels); // the circular arrow that puts a color back
     // The image a name stands for; nothing for a name that is none of the above.
     std::optional<Image> HostImage(std::string_view name);
+    // A picture of the game's, from what was read of its files at load: nothing for another name, or when it was not read.
+    std::string GamePictureSource(GamePicture picture);
+    std::optional<Image> GamePictureImage(const std::optional<PlayOnlineIcons>& icons, std::string_view name);
 
     // A line of a widget as RmlUi lays it out: its line box's height, where its top goes from the strip's top (over
     // a detail line, and alone), and how far under that top the icons after its text start.

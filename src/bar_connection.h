@@ -32,6 +32,7 @@ namespace headsup
         std::optional<Latency> latency;
         double receivedBytes = 0.0, sentBytes = 0.0; // since HeadsUp first read the counters
         double countedSeconds = 0.0;                 // how long those totals ran
+        std::optional<PlayOnlineCounts> playOnline;
         bool operator==(const ConnectionReport&) const = default;
     };
 
