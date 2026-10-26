@@ -752,7 +752,7 @@ namespace headsup
         needs.strip      = shown(BarWidget::GameHelp);
         const bool memoryPopup = opened(BarWidget::Memory);
         needs.frames     = shown(BarWidget::Fps) || memoryPopup;
-        needs.job        = shown(BarWidget::Job);
+        needs.job        = shown(BarWidget::Job) || shown(BarWidget::Exp);
         needs.connection = shown(BarWidget::Connection);
         needs.party      = shown(BarWidget::Party);
         needs.signet     = shown(BarWidget::Signet);
@@ -907,7 +907,9 @@ namespace headsup
         case BarWidget::Fps:
             return FpsWidget(state.frames);
         case BarWidget::Job:
-            return JobWidget(state.job, o.expBar, o.jobNames, o.jobLayout);
+            return JobWidget(state.job, o.expBar, o.jobNames, o.jobLayout, o.expText);
+        case BarWidget::Exp:
+            return JobWidget(state.job, o.expBar, true, JobLayout::ExpOnly, o.expText);
         case BarWidget::Connection:
             return ConnectionWidget(state.connection, o.latency);
         case BarWidget::Party:
@@ -1062,6 +1064,7 @@ namespace headsup
         case BarWidget::Fps:
             return FpsPopup(state.frames);
         case BarWidget::Job:
+        case BarWidget::Exp:
             return JobPopup(state.job);
         case BarWidget::Connection:
             return ConnectionPopup(state.connection);

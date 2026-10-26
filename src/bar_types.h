@@ -46,12 +46,13 @@ namespace headsup
         Signet,
         Distance,
         Memory,
+        Exp, // the Job widget's EXP and bar alone
     };
-    constexpr int kBarWidgetCount = static_cast<int>(BarWidget::Memory) + 1;
+    constexpr int kBarWidgetCount = static_cast<int>(BarWidget::Exp) + 1;
     // Which widgets a new settings file shows, by BarWidget. to_array takes its size from the list, so a widget added
     // to BarWidget without a default here fails the assert.
     constexpr auto kBarWidgetDefaults =
-        std::to_array<bool>({true, true, true, true, true, true, true, true, true, true, true, false, false, true, false});
+        std::to_array<bool>({true, true, true, true, true, true, true, true, true, true, true, false, false, true, false, false});
     static_assert(kBarWidgetDefaults.size() == kBarWidgetCount);
 
     // A widget on the panel: which, and which of its copies. Copy 0 is the one every settings file has; the others are
@@ -100,6 +101,18 @@ namespace headsup
         ExpOnly,
     };
     constexpr int kJobLayoutCount = static_cast<int>(JobLayout::ExpOnly) + 1;
+
+    // What the EXP says, any of them in this order: what is earned of the level, what is left to the next, and the
+    // share earned as a percent.
+    enum class ExpText : uint8_t
+    {
+        Earned,
+        ToNext,
+        Percent,
+    };
+    constexpr int kExpTextCount = static_cast<int>(ExpText::Percent) + 1;
+    constexpr uint8_t ExpTextBit(ExpText part) { return static_cast<uint8_t>(1u << static_cast<int>(part)); }
+    constexpr uint8_t kDefaultExpText = ExpTextBit(ExpText::ToNext);
 
     constexpr int kMinBarHeight = 24, kMaxBarHeight = 64; // pixels
     // A bar or popup text size setting's leftmost position, Auto: the size follows the bar height. Set sizes run from

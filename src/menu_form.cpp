@@ -533,8 +533,15 @@ namespace headsup
                         form.Segments(label.c_str(), o.jobLayout, names.data(), kJobLayoutCount, row.tip);
                     }
                     break;
+                case WidgetTabsRow::ExpText:
+                    if (kind == BarWidget::Job || kind == BarWidget::Exp)
+                    {
+                        const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(WindowList::ExpText));
+                        form.Toggles(label.c_str(), o.expText, names.data(), kExpTextCount, row.tip);
+                    }
+                    break;
                 case WidgetTabsRow::ExpBar:
-                    if (kind == BarWidget::Job)
+                    if (kind == BarWidget::Job || kind == BarWidget::Exp)
                     {
                         const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(WindowList::ExpBar));
                         form.Segments(label.c_str(), o.expBar, names.data(), kExpBarPlaceCount, row.tip);

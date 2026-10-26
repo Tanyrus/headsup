@@ -67,7 +67,8 @@ namespace headsup
 
     // jobNames off: the levels alone, "Lv 30 / 15". layout: which of the jobs and the EXP is the title, the other
     // under it, or the EXP alone.
+    // expText: ExpTextBit of each part the EXP says; none, and it says EXP.
     WidgetContent JobWidget(const std::optional<JobReport>& job, ExpBarPlace bar = ExpBarPlace::Under,
-        bool jobNames = true, JobLayout layout = JobLayout::JobsFirst);
+        bool jobNames = true, JobLayout layout = JobLayout::JobsFirst, uint8_t expText = kDefaultExpText);
     PopupContent JobPopup(const std::optional<JobReport>& job);
 }

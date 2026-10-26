@@ -400,6 +400,7 @@
                 {"key": "24-hour", "name": "24-Hour"},
                 {"key": "seconds", "name": "Seconds", "tip": "On your own line."},
                 {"key": "layout", "name": "Layout", "tip": "Which is the larger line, your jobs and levels or your EXP, with the other under it; or the EXP alone."},
+                {"key": "exp-text", "name": "EXP Text", "tip": "What the EXP says. At the level cap it is your limit points, after your merits."},
                 {"key": "exp-bar", "name": "EXP Bar"},
                 {"key": "job-names", "name": "Job Names", "tip": "Off, the levels alone."},
                 {"key": "latency", "name": "Latency", "tip": "After the rates, once measured."}
@@ -853,7 +854,16 @@
         {"name": "Party", "tip": "Party size and the lowest HP and MP. Hover for each member."},
         {"name": "Signet", "tip": "Time left on Signet or Sanction, while one is on."},
         {"name": "Distance", "tip": "How far your target is, in yalms."},
-        {"name": "Memory", "tip": "The game's memory used, over what is left before it runs out at 4 GB; amber, then red, as it runs low. Hover for the processor, the frames and the LinuxXI plugin's figures."}
+        {"name": "Memory", "tip": "The game's memory used, over what is left before it runs out at 4 GB; amber, then red, as it runs low. Hover for the processor, the frames and the LinuxXI plugin's figures."},
+        {"name": "EXP", "tip": "Your EXP and its bar, on its own. Hover for EXP per hour."}
+      ]
+    },
+    {
+      "key": "exp-text",
+      "options": [
+        {"name": "Earned", "tip": "The EXP you have of this level, out of what it takes."},
+        {"name": "To Next", "tip": "The EXP left to the next level."},
+        {"name": "Percent", "tip": "How much of the level you have, as a percent."}
       ]
     },
     {

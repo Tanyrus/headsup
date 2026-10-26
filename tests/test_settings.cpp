@@ -288,6 +288,7 @@ barParty=true
 barSignet=true
 barDistance=false
 barMemory=true
+barExp=true
 barZoneLine2=true
 barZoneIcons=true
 barWeatherLine2=true
@@ -337,7 +338,7 @@ untargetedOpacity=40.0000
 clockSeconds=true
 serverSeconds=true
 barLatency=true
-barLeft=zone weather vanaTime job party signet distance
+barLeft=zone weather vanaTime job exp party signet distance
 barCenter=
 barRight=target gil bags connection memory fps earthTime
 hideHelpBar=true
@@ -1092,7 +1093,8 @@ TEST(each_theme_and_bar_widget_has_its_own_key)
         CHECK(saved.values["barTheme"] == t.name);
     }
     const char* const widgetKeys[] = {"barZone", "barWeather", "barVanaTime", "barTarget", "barGil", "barBags",
-        "barEarthTime", "barGameHelp", "barFps", "barJob", "barConnection", "barParty", "barSignet", "barDistance", "barMemory"}; // in BarWidget's order
+        "barEarthTime", "barGameHelp", "barFps", "barJob", "barConnection", "barParty", "barSignet", "barDistance", "barMemory",
+        "barExp"}; // in BarWidget's order
     static_assert(std::size(widgetKeys) == kBarWidgetCount);
     for (int w = 0; w < kBarWidgetCount; ++w)
     {
@@ -2778,4 +2780,22 @@ TEST(the_target_widgets_border_is_on_by_default_and_kept_off_once_turned_off)
     SaveSettings(s, store);
     CHECK_EQ(store.values["barTargetBorder"], "false");
     CHECK(!LoadSettings(store).Widget(BarWidget::Target).targetBorder);
+}
+
+TEST(the_exp_text_is_kept_apart_for_the_job_and_exp_widgets)
+{
+    Settings s;
+    CHECK(s.Widget(BarWidget::Job).expText == kDefaultExpText && !s.Widget(BarWidget::Exp).on);
+    s.Widget(BarWidget::Exp).on      = true;
+    s.Widget(BarWidget::Exp).expText = ExpTextBit(ExpText::Percent) | ExpTextBit(ExpText::Earned);
+    s.Widget(BarWidget::Exp).expBar  = ExpBarPlace::Off;
+    MapStore store;
+    SaveSettings(s, store);
+    CHECK_EQ(store.values["expBar"], "under"); // the Job widget's, under its key of before
+    const Settings read = LoadSettings(store);
+    CHECK(read.Widget(BarWidget::Exp) == s.Widget(BarWidget::Exp));
+    CHECK(read.Widget(BarWidget::Job) == s.Widget(BarWidget::Job));
+    CHECK_EQ(store.values["barExpBar"], "off");
+    store.values["barExpText"] = "200";
+    CHECK_EQ(LoadSettings(store).Widget(BarWidget::Exp).expText, (1 << kExpTextCount) - 1);
 }
