@@ -404,6 +404,7 @@
                 {"key": "exp-text", "name": "EXP Text", "tip": "What the EXP says. At the level cap it is your limit points, after your merits."},
                 {"key": "exp-bar", "name": "EXP Bar"},
                 {"key": "job-names", "name": "Job Names", "tip": "Off, the levels alone."},
+                {"key": "percent", "name": "Percent", "tip": "The game's own connection meter after the rates, as its readout shows it: 100% while data comes in, less once it stops."},
                 {"key": "latency", "name": "Latency", "tip": "After the rates, once measured."}
               ],
               "words": [

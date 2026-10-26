@@ -65,6 +65,7 @@ namespace headsup
         JobLayout jobLayout  = JobLayout::JobsFirst;
         bool jobNames        = true;
         bool latency         = false; // Connection: its round trip after its rates
+        bool netMeter        = true;  // and the game's own meter after them
         bool targetDetails   = false; // Target: a mob's icons after its name and its weaknesses after its level
         bool targetBorder    = true;  // and its frame, or its pill's own edge
         bool operator==(const WidgetOptions&) const = default;

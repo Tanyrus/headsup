@@ -922,7 +922,7 @@ namespace headsup
         case BarWidget::Exp:
             return JobWidget(state.job, o.expBar, true, JobLayout::ExpOnly, o.expText);
         case BarWidget::Connection:
-            return ConnectionWidget(state.connection, o.latency);
+            return ConnectionWidget(state.connection, o.latency, o.netMeter);
         case BarWidget::Party:
             return PartyWidget(state.party);
         case BarWidget::Signet:

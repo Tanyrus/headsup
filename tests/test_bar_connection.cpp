@@ -106,3 +106,21 @@ TEST(bytes_read_in_b_kb_and_mb)
     CHECK_EQ(ByteText(35328.0), std::string("34.5 KB"));
     CHECK_EQ(ByteText(1258291.0), std::string("1.2 MB"));
 }
+
+TEST(the_connection_widget_ends_in_the_games_own_meter_as_its_readout_does_unless_switched_off)
+{
+    ConnectionReport r;
+    r.counters = NetCounters{1200, 300, 100};
+    const auto joined = [](const WidgetContent& w) {
+        std::string text;
+        for (const Span& s : w.title)
+            text += s.text;
+        return text;
+    };
+    CHECK_EQ(joined(ConnectionWidget(r)), "S 300  R 1,200  100%");
+    CHECK_EQ(joined(ConnectionWidget(r, false, false)), "S 300  R 1,200");
+    // Under 100 it is the game's alarm, red as the rates are.
+    r.counters->health = 40;
+    const WidgetContent alarm = ConnectionWidget(r);
+    CHECK(alarm.title.back().text == "  40%" && alarm.title.back().argb == kAlarmColor);
+}

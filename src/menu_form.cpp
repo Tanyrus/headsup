@@ -555,6 +555,9 @@ namespace headsup
                 case WidgetTabsRow::JobNames:
                     if (kind == BarWidget::Job) form.Switch(label.c_str(), o.jobNames, row.tip);
                     break;
+                case WidgetTabsRow::Percent:
+                    if (kind == BarWidget::Connection) form.Switch(label.c_str(), o.netMeter, row.tip);
+                    break;
                 case WidgetTabsRow::Latency:
                     if (kind == BarWidget::Connection) form.Switch(label.c_str(), o.latency, row.tip);
                     break;

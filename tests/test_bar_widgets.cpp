@@ -1059,7 +1059,7 @@ TEST(the_connection_widget_shows_the_games_rates_on_one_line_and_turns_amber_the
     BarState state;
     state.connection = SteadyLink();
     WidgetContent w  = BarWidgetContent(BarWidget::Connection, state, settings);
-    CHECK(w.shown && w.hasPopup && w.figures && Joined(w.title) == "S 175  R 227" && w.subtitle.empty());
+    CHECK(w.shown && w.hasPopup && w.figures && Joined(w.title) == "S 175  R 227  100%" && w.subtitle.empty());
     CHECK(w.title[1] == Text("175"));
 
     state.connection->silence = 3.0;
@@ -1470,6 +1470,7 @@ TEST(the_connection_widget_adds_its_latency_when_asked)
     Settings settings;
     BarState state;
     state.connection = SteadyLink();
+    settings.Widget(BarWidget::Connection).netMeter = false;
     CHECK(Joined(BarWidgetContent(BarWidget::Connection, state, settings).title) == "S 175  R 227");
     settings.Widget(BarWidget::Connection).latency = true;
     CHECK(Joined(BarWidgetContent(BarWidget::Connection, state, settings).title) == "S 175  R 227  48 ms");

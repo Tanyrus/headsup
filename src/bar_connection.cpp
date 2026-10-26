@@ -111,7 +111,7 @@ namespace headsup
         return Printed("%.1f MB", bytes / (kBytesPerKb * kBytesPerKb));
     }
 
-    WidgetContent ConnectionWidget(const std::optional<ConnectionReport>& report, bool latency)
+    WidgetContent ConnectionWidget(const std::optional<ConnectionReport>& report, bool latency, bool meter)
     {
         WidgetContent w;
         w.shown = true;
@@ -124,6 +124,7 @@ namespace headsup
         const LinkState state = StateOf(*report);
         w.title = ListOf(Text("S ", Tone::Dim), Figure(Rate(report->counters, &NetCounters::sent), state),
             Text("  R ", Tone::Dim), Figure(Rate(report->counters, &NetCounters::received), state));
+        if (meter && report->counters) w.title.push_back(Figure(Printed("  %d%%", report->counters->health), state));
         if (latency && report->latency) w.title.push_back(Text(Printed("  %.0f ms", report->latency->medianMs), Tone::Dim));
         w.hasPopup = true;
         w.figures  = true;

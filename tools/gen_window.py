@@ -186,7 +186,7 @@ PIECES = Pieces(
         'hide-game-help': Setting(), 'position': Setting(), 'background': Setting(),
         'widget-tabs': Setting(unnamed=True, rows=rows(
             'enabled', 'section', 'copies', 'second-line', 'icons', 'spacing', 'padding', 'title-font', 'text-font', 'text-size', 'details', 'border', 'currency', 'bag', 'time-zone', 'server-time', '24-hour',
-            'seconds', 'layout', 'exp-text', 'exp-bar', 'job-names', 'latency'), words={'add-copy': True, 'remove-copy': True}),
+            'seconds', 'layout', 'exp-text', 'exp-bar', 'job-names', 'percent', 'latency'), words={'add-copy': True, 'remove-copy': True}),
         'trays': Setting(unnamed=True), 'reset-layout': Setting(),
         # Mouse Cursor and HeadsUp Config
         'pointer-icon': Setting(options=3, nameless=frozenset({2})), 'pointer-size': Setting(), 'pointer-fix': Setting(), 'keep-pointer': Setting(),

@@ -199,6 +199,7 @@ namespace headsup
         constexpr const char* kClock24Key   = "clock24";
         constexpr const char* kClockSecondsKey = "clockSeconds";
         constexpr const char* kLatencyKey   = "barLatency";
+        constexpr const char* kNetMeterKey  = "barNetMeter";
         const char* const kClockZoneNames[kClockZoneCount] = {"japan", "utc", "usEastern", "usCentral", "usMountain",
             "usArizona", "usPacific", "usAlaska", "usHawaii", "ukIreland", "centralEurope", "easternEurope",
             "australiaEastern"};
@@ -1304,7 +1305,10 @@ namespace headsup
                 o.jobNames = flag(kJobNamesKey, o.jobNames);
                 break;
             }
-            case BarWidget::Connection: o.latency = flag(kLatencyKey, o.latency); break;
+            case BarWidget::Connection:
+                o.latency  = flag(kLatencyKey, o.latency);
+                o.netMeter = flag(kNetMeterKey, o.netMeter);
+                break;
             case BarWidget::Target:
                 o.targetDetails = flag(kTargetDetailsKey, o.targetDetails);
                 o.targetBorder  = flag(kTargetBorderKey, o.targetBorder);
@@ -1347,7 +1351,10 @@ namespace headsup
                 flag(kJobNamesKey, o.jobNames);
                 break;
             }
-            case BarWidget::Connection: flag(kLatencyKey, o.latency); break;
+            case BarWidget::Connection:
+                flag(kLatencyKey, o.latency);
+                flag(kNetMeterKey, o.netMeter);
+                break;
             case BarWidget::Target:
                 flag(kTargetDetailsKey, o.targetDetails);
                 flag(kTargetBorderKey, o.targetBorder);
