@@ -40,12 +40,17 @@ namespace headsup
     constexpr const char* kBadgeFont   = kBarlowCondensed; // what badges were set in before they took the default font
     constexpr size_t kMaxFontName      = 31; // a Windows font name's longest, without its terminator
 
+    constexpr int kMaxWidgetSpacing = 40; // pixels
+    constexpr int kThemePadding = -1, kMaxWidgetPadding = 40; // pixels; the slider's leftmost is the theme's own
+
     // One copy of a widget on the panel: whether it shows, what of it, and its own settings.
     struct WidgetOptions
     {
         bool on         = false;
         bool secondLine = true;
         bool icons      = true; // and gil's coin
+        int spacing     = 0;             // pixels more between it and each of its neighbours
+        int padding     = kThemePadding; // pixels from its sides to what it shows
         int currency    = kGilCurrency;             // Gil: by kCurrencyTable
         std::optional<ClockZone> clockZone;         // Clock: none for the computer's own
         bool clock24         = true;                // its two lines

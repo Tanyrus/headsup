@@ -201,11 +201,14 @@ namespace headsup
             if (!look.lines.twoLines) OneLine(c, look.settings.barSubtitle);
             widgets.hasPopup[i] = c.hasPopup;
             Shown& shown        = m_Shown[i];
-            if (!shown.measured || !(shown.content == c))
+            const float padding = WidgetPadding(m, look.settings.widgets[i]);
+            widgets.spacing[i]  = static_cast<float>(look.settings.widgets[i].spacing);
+            if (!shown.measured || !(shown.content == c) || shown.padded != padding)
             {
                 shown.content  = c;
                 shown.measured = true;
-                shown.natural  = 2.0f * m.padding + look.Leading(c) +
+                shown.padded   = padding;
+                shown.natural  = 2.0f * padding + look.Leading(c) +
                                 std::max(SteadyWidth(host, c.title, c.titleIcons, look.TitleFace(c)),
                                     look.lines.twoLines ? SteadyWidth(host, c.subtitle, c.subtitleIcons, look.DetailFace())
                                                         : 0.0f) +
@@ -215,17 +218,18 @@ namespace headsup
         }
         // The target goes when its room cannot hold its padding, its icons and the start of its name.
         WidgetContent& target = widgets.contents[SlotOf(BarWidget::Target)];
+        const float targetPadding = WidgetPadding(m, look.settings.Widget(BarWidget::Target));
         const float targetMinimum =
-            2.0f * m.padding + look.Leading(target) +
+            2.0f * targetPadding + look.Leading(target) +
             (target.title.empty() ? 0.0f
                                   : Width(host, Shortest(target.title.front().text, kFewLetters), look.TitleFace()));
         const BarLayout layout = LayoutBar(screenWidth, m, look.palette.shape, natural, targetMinimum,
-            look.settings.barSections, look.settings.barSeparators);
+            look.settings.barSections, look.settings.barSeparators, widgets.spacing);
         if (layout.targetWidth > 0.0f && layout.targetWidth < natural[SlotOf(BarWidget::Target)] &&
             !target.title.empty())
         {
             // Each line's icons keep their room; its text is cut.
-            const float room   = layout.targetWidth - 2.0f * m.padding - look.Leading(target);
+            const float room   = layout.targetWidth - 2.0f * targetPadding - look.Leading(target);
             std::string& title = target.title.front().text;
             title = Fitted(host, m_TitleFit, std::move(title), look.TitleFace(),
                 room - LineWidth(host, {}, target.titleIcons, look.TitleFace()));
@@ -255,6 +259,13 @@ namespace headsup
             const float inset = look.ornate && widget.kind != BarWidget::Target ? DiamondClearance(m) : 0.0f;
             Set(shown.element, Rml::PropertyId::Left, shown.left.value, rect->x);
             Set(shown.element, Rml::PropertyId::Width, shown.width.value, rect->width - 2.0f * inset);
+            const float side = SidePadding(look, widget, shown.padded);
+            if (shown.padding.value != side)
+            {
+                shown.padding.value = side;
+                for (const Rml::PropertyId edge : {Rml::PropertyId::PaddingLeft, Rml::PropertyId::PaddingRight})
+                    shown.element->SetProperty(edge, Rml::Property(side, Rml::Unit::PX));
+            }
             shown.element->SetClass(kLitClass,
                 widgets.hasPopup[w] && (input.Hovered() == widget || input.Open() == widget));
             const WidgetContent& content = widgets.contents[w];

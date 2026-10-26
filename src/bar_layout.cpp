@@ -37,8 +37,12 @@ namespace headsup
         struct Spacing
         {
             float between = 0.0f, frameClear = 0.0f;
-            float Lead(PanelWidget w) const { return w.kind == BarWidget::Target ? frameClear : 0.0f; }
-            float Apart(PanelWidget a, PanelWidget b) const { return between + Lead(a) + Lead(b); }
+            const std::array<float, kPanelSlots>* own = nullptr; // each widget's room more
+            float Frame(PanelWidget w) const { return w.kind == BarWidget::Target ? frameClear : 0.0f; }
+            float Room(PanelWidget w) const { return (*own)[SlotOf(w)]; }
+            float Apart(PanelWidget a, PanelWidget b) const { return between + Frame(a) + Frame(b) + Room(a) + Room(b); }
+            // From a's edge: the middle of what is between them, but for a's frame's clear space.
+            float Middle(PanelWidget a, PanelWidget b) const { return Frame(a) + (between + Room(a) + Room(b)) / 2.0f; }
         };
 
         struct Group
@@ -65,7 +69,7 @@ namespace headsup
                 const float gap  = first ? 0.0f : spacing.Apart(g.widgets.back().widget, w);
                 if (width > (limit - at) * dir - gap + kFitSlack) break;
                 if (!first && diamonds)
-                    g.dividers.push_back(at + dir * (spacing.Lead(g.widgets.back().widget) + spacing.between / 2.0f));
+                    g.dividers.push_back(at + dir * spacing.Middle(g.widgets.back().widget, w));
                 const float x       = dir > 0.0f ? at + gap : at - gap - width;
                 const bool isTarget = w.kind == BarWidget::Target; // framed on the pill row in every shape
                 g.widgets.push_back({w, BarRect{x, isTarget ? pill.y : rowY, width, isTarget ? pill.height : rowH}});
@@ -98,14 +102,15 @@ namespace headsup
 
     BarLayout LayoutBar(float screenWidth, const BarMetrics& m, BarShape shape,
                         const std::array<float, kPanelSlots>& natural, float targetMinimum,
-                        const BarPlacement& placement, BarSeparators separators)
+                        const BarPlacement& placement, BarSeparators separators,
+                        const std::array<float, kPanelSlots>& spacing)
     {
         const bool ornate   = shape == BarShape::Ornate;
         const bool diamonds = DiamondsOn(separators, shape);
         // Ornate neighbours abut, a diamond on their boundary, the tints keeping clear of it. Pills sit a gap apart; a
         // diamond between them takes its width and a gap on either side.
         const float pillGap = diamonds ? 2.0f * m.gap + static_cast<float>(WholePixels(m.diamond)) : m.gap;
-        const Spacing spacing{.between = ornate ? 0.0f : pillGap, .frameClear = ornate ? DiamondClearance(m) : 0.0f};
+        const Spacing apart{.between = ornate ? 0.0f : pillGap, .frameClear = ornate ? DiamondClearance(m) : 0.0f, .own = &spacing};
         const float edge    = ornate ? m.cap : m.gap; // between a section and the screen's edge
         const BarRow pill   = PillRow(m);
         const float rowY    = ornate ? 0.0f : pill.y;
@@ -124,7 +129,7 @@ namespace headsup
                 float demand = 2.0f * edge;
                 int filled   = 0;
                 for (const std::vector<PanelWidget>* section : {&left, &center, &right})
-                    if (const float w = GroupWidth(*section, widths, spacing); w > 0.0f)
+                    if (const float w = GroupWidth(*section, widths, apart); w > 0.0f)
                         demand += w + (filled++ > 0 ? m.gap : 0.0f);
                 return demand - screenWidth;
             };
@@ -141,11 +146,11 @@ namespace headsup
         {
             BarLayout l;
             l.height = m.height;
-            Group lg = PlaceGroup(left, edge, screenWidth - edge, spacing, diamonds, widths, pill, rowY, rowH);
+            Group lg = PlaceGroup(left, edge, screenWidth - edge, apart, diamonds, widths, pill, rowY, rowH);
             const float leftEnd =
                 lg.widgets.empty() ? edge - m.gap : lg.widgets.back().rect.x + lg.widgets.back().rect.width;
             const std::vector<PanelWidget> rightInward(right.rbegin(), right.rend());
-            Group rg = PlaceGroup(rightInward, screenWidth - edge, leftEnd + m.gap, spacing, diamonds, widths, pill,
+            Group rg = PlaceGroup(rightInward, screenWidth - edge, leftEnd + m.gap, apart, diamonds, widths, pill,
                 rowY, rowH);
             std::reverse(rg.widgets.begin(), rg.widgets.end());
             const float rightStart = rg.widgets.empty() ? screenWidth - edge + m.gap : rg.widgets.front().rect.x;
@@ -155,17 +160,17 @@ namespace headsup
             std::vector<PanelWidget> shown;
             for (const PanelWidget w : center)
                 if (Width(widths, w) > 0.0f) shown.push_back(w);
-            while (!shown.empty() && GroupWidth(shown, widths, spacing) > highest - lowest + kFitSlack)
+            while (!shown.empty() && GroupWidth(shown, widths, apart) > highest - lowest + kFitSlack)
                 shown.pop_back();
             Group cg;
             if (!shown.empty())
             {
-                const float total = GroupWidth(shown, widths, spacing);
+                const float total = GroupWidth(shown, widths, apart);
                 // The two bounds are equal when the center got all the room, and float rounding can put the first an
                 // ulp above the second, which std::clamp does not allow.
                 const float x = std::max(lowest, std::min(screenWidth / 2.0f - total / 2.0f, highest - total));
                 // Its widths fit already: no limit, so float rounding cannot drop its last widget.
-                cg = PlaceGroup(shown, x, std::numeric_limits<float>::infinity(), spacing, diamonds, widths, pill,
+                cg = PlaceGroup(shown, x, std::numeric_limits<float>::infinity(), apart, diamonds, widths, pill,
                     rowY, rowH);
             }
 

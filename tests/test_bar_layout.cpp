@@ -1041,3 +1041,24 @@ TEST(each_copy_of_a_widget_takes_a_place_of_its_own)
     CHECK(first != nullptr && second != nullptr);
     CHECK(Near(second->width, 70.0f) && Near(second->x, first->x + first->width + kPills.gap)); // right after it
 }
+
+TEST(a_widgets_own_spacing_adds_room_between_it_and_each_neighbour)
+{
+    const std::array<float, kPanelSlots> natural = Widths(100, 80, 120, 200, 90, 60, 50);
+    std::array<float, kPanelSlots> spacing{};
+    spacing[SlotOf(BarWidget::Weather)] = 10.0f;
+    for (const auto& [shape, metrics] : {std::pair{BarShape::Pills, kPills}, std::pair{BarShape::Ornate, kOrnate}})
+    {
+        const BarLayout plain = LayoutBar(1920.0f, metrics, shape, natural, 0.0f);
+        const BarLayout spaced = LayoutBar(1920.0f, metrics, shape, natural, 0.0f, DefaultPlacement(), BarSeparators::Theme, spacing);
+        CHECK(Near(RectOf(spaced, BarWidget::Zone)->x, RectOf(plain, BarWidget::Zone)->x));
+        CHECK(Near(RectOf(spaced, BarWidget::Weather)->x, RectOf(plain, BarWidget::Weather)->x + 10.0f));
+        CHECK(Near(RectOf(spaced, BarWidget::VanaTime)->x, RectOf(plain, BarWidget::VanaTime)->x + 20.0f));
+        // An ornate divider stands in the middle of the room it is in.
+        if (shape == BarShape::Ornate)
+        {
+            const BarRect& zone = *RectOf(spaced, BarWidget::Zone);
+            CHECK(Near(spaced.dividers[0], zone.x + zone.width + 5.0f));
+        }
+    }
+}

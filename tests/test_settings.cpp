@@ -2731,3 +2731,23 @@ TEST(a_copy_keeps_its_own_settings_under_its_own_keys_and_a_file_without_copies_
     CHECK(!Placed(s.barSections, *copy) && !Shows(s, *copy));
     CHECK(AddWidgetCopy(s, BarWidget::Gil) == copy && s.Widget(*copy) == NewWidget(*copy));
 }
+
+TEST(a_widgets_spacing_and_padding_are_kept_for_each_copy_and_held_to_their_range)
+{
+    Settings s;
+    const std::optional<PanelWidget> copy = AddWidgetCopy(s, BarWidget::Bags);
+    CHECK(copy.has_value());
+    s.Widget(BarWidget::Bags).spacing = 12;
+    s.Widget(*copy).padding           = 3;
+    MapStore store;
+    SaveSettings(s, store);
+    const Settings read = LoadSettings(store);
+    CHECK_EQ(read.Widget(BarWidget::Bags).spacing, 12);
+    CHECK_EQ(read.Widget(BarWidget::Bags).padding, kThemePadding);
+    CHECK_EQ(read.Widget(*copy).padding, 3);
+    store.values["barBagsSpacing"] = "500";
+    store.values["barBagsPadding_2"] = "-9";
+    const Settings held = LoadSettings(store);
+    CHECK_EQ(held.Widget(BarWidget::Bags).spacing, kMaxWidgetSpacing);
+    CHECK_EQ(held.Widget(*copy).padding, kThemePadding);
+}

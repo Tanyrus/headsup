@@ -60,6 +60,8 @@ namespace headsup
     MenuColors MenuColorsFor(const Settings& settings, const GameSkinLook* skin);
     // A window in a panel's colors: its page the panel's foot, cards and controls each a step toward its text.
     MenuColors MenuColorsFrom(const BarPalette& palette);
+    // The room from a widget's sides to what it shows: its own, or the theme's.
+    float WidgetPadding(const BarMetrics& metrics, const WidgetOptions& options);
 
     // What Game Window looks as while the game's art is not read.
     constexpr BarTheme kGameArtFallback = BarTheme::PhoenixGold;

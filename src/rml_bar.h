@@ -78,10 +78,11 @@ namespace headsup
             Rml::Element* element = nullptr;
             WidgetContent content; // as the widget gave it, which its natural width was measured from
             float natural = 0.0f;
+            float padded  = 0.0f; // the room from its edges to what it shows, that natural was measured with
             bool measured = false;
             WidgetContent drawn; // as its markup was made from: the target's is cut to its room
             bool marked = false; // its markup is drawn's
-            Px left, width;
+            Px left, width, padding;
         };
         struct Divider
         {
@@ -106,6 +107,7 @@ namespace headsup
         {
             std::array<WidgetContent, kPanelSlots> contents;
             std::array<bool, kPanelSlots> hasPopup{};
+            std::array<float, kPanelSlots> spacing{}; // each widget's own room more beside it
         };
         // The help bar's text follows the game's, its fonts and their sizes, and the room its lines and its caption
         // have beside the bag's count.

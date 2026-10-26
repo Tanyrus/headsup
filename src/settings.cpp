@@ -182,6 +182,8 @@ namespace headsup
                               *kMenuHeightKey = "menuHeight";
         constexpr const char* kSecondLineSuffix = "Line2";
         constexpr const char* kIconsSuffix      = "Icons";
+        constexpr const char* kSpacingSuffix    = "Spacing";
+        constexpr const char* kPaddingSuffix    = "Padding";
         constexpr const char* kExpBarKey        = "expBar";
         const char* const kExpBarNames[kExpBarPlaceCount] = {"under", "beside", "off"};
         constexpr const char* kJobNamesKey  = "jobNames";
@@ -1205,6 +1207,8 @@ namespace headsup
         {
             const WidgetOptions fresh;
             if (w.currency < 0 || w.currency >= kCurrencyCount) w.currency = fresh.currency;
+            w.spacing = std::clamp(w.spacing, 0, kMaxWidgetSpacing);
+            w.padding = w.padding < 0 ? kThemePadding : std::min(w.padding, kMaxWidgetPadding);
             if (w.clockZone && static_cast<int>(*w.clockZone) >= kClockZoneCount) w.clockZone = fresh.clockZone;
             if (static_cast<int>(w.expBar) >= kExpBarPlaceCount) w.expBar = fresh.expBar;
             if (static_cast<int>(w.jobLayout) >= kJobLayoutCount) w.jobLayout = fresh.jobLayout;
@@ -1241,9 +1245,17 @@ namespace headsup
                 return w.copy == 0 ? store.GetBool(own.c_str(), fallback) : HeldSwitch(store, own.c_str()).value_or(fallback);
             };
             const auto text = [&](const char* key) { return store.GetString(CopyKey(key, w).c_str(), ""); };
+            const auto number = [&](const std::string& key, int fallback) {
+                const std::string own = CopyKey(key, w);
+                if (w.copy == 0) return LoadInt(store, own.c_str(), fallback);
+                const std::optional<float> held = HeldNumber(store, own);
+                return held ? Whole(*held) : fallback;
+            };
             o.on         = flag(widget, o.on);
             o.secondLine = flag(widget + kSecondLineSuffix, o.secondLine);
             o.icons      = flag(widget + kIconsSuffix, o.icons);
+            o.spacing    = number(widget + kSpacingSuffix, o.spacing);
+            o.padding    = number(widget + kPaddingSuffix, o.padding);
             switch (w.kind)
             {
             case BarWidget::Gil:
@@ -1284,6 +1296,8 @@ namespace headsup
             flag(widget, o.on);
             flag(widget + kSecondLineSuffix, o.secondLine);
             flag(widget + kIconsSuffix, o.icons);
+            StoreFloat(store, CopyKey(widget + kSpacingSuffix, w), static_cast<float>(o.spacing));
+            StoreFloat(store, CopyKey(widget + kPaddingSuffix, w), static_cast<float>(o.padding));
             switch (w.kind)
             {
             case BarWidget::Gil: text(kBarCurrencyKey, kCurrencyTable[o.currency].key); break;

@@ -73,10 +73,14 @@ namespace headsup
     // where they would reach the left, and the center loses them from its end; the target then takes back the room
     // those leave. In ornate, the target's frame keeps DiamondClearance from the diamond on a
     // neighbour's edge. Pills with diamonds sit a gap, the diamond and a gap apart.
+    // spacing: each widget's room more between it and each neighbour, by SlotOf; an ornate diamond stands in the middle
+    // of the room it is in.
+    inline constexpr std::array<float, kPanelSlots> kNoSpacing{};
     BarLayout LayoutBar(float screenWidth, const BarMetrics& metrics, BarShape shape,
                         const std::array<float, kPanelSlots>& natural, float targetMinimum,
                         const BarPlacement& placement = DefaultPlacement(),
-                        BarSeparators separators = BarSeparators::Theme);
+                        BarSeparators separators = BarSeparators::Theme,
+                        const std::array<float, kPanelSlots>& spacing = kNoSpacing);
     std::optional<PanelWidget> WidgetAt(const BarLayout& layout, float x, float y);
     const BarRect* RectOf(const BarLayout& layout, PanelWidget widget);
     // Under its widget below the bar, moved inward from the screen's sides, its height cut at the bottom: a ring

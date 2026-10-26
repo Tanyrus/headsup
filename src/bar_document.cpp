@@ -247,6 +247,12 @@ namespace headsup
     }
     std::string DividerId(int divider) { return "d-" + std::to_string(divider); }
 
+    float SidePadding(const BarLook& look, PanelWidget widget, float room)
+    {
+        const float inside = look.ornate && widget.kind != BarWidget::Target ? DiamondClearance(look.metrics) : kBoxBorder;
+        return std::max(0.0f, room - inside);
+    }
+
     namespace
     {
         // A color with another alpha.

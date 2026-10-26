@@ -480,6 +480,13 @@ namespace headsup
                 case WidgetTabsRow::Icons:
                     if (HasIcons(kind)) form.Switch(label.c_str(), o.icons, row.tip);
                     break;
+                case WidgetTabsRow::Spacing:
+                    form.SliderInt(label.c_str(), o.spacing, 0, kMaxWidgetSpacing, "%d px", row.tip);
+                    break;
+                case WidgetTabsRow::Padding:
+                    form.SliderInt(label.c_str(), o.padding, kThemePadding, kMaxWidgetPadding,
+                        o.padding == kThemePadding ? Word(c, WindowWord::ThemesFont) : "%d px", row.tip);
+                    break;
                 case WidgetTabsRow::Details:
                     if (kind == BarWidget::Target) form.Switch(label.c_str(), o.targetDetails, row.tip);
                     break;

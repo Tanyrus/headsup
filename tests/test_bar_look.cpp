@@ -257,3 +257,12 @@ TEST(a_window_from_a_panels_colors_reads_well_and_steps_up_from_its_page)
         CHECK(c.accent == PaletteOf(static_cast<BarTheme>(t)).accent);
     }
 }
+
+TEST(a_widget_is_padded_by_the_theme_unless_it_has_its_own)
+{
+    const BarMetrics m = MetricsFor(45, BarShape::Pills);
+    WidgetOptions o;
+    CHECK_EQ(WidgetPadding(m, o), m.padding);
+    o.padding = 4;
+    CHECK_EQ(WidgetPadding(m, o), 4.0f);
+}

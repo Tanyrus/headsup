@@ -52,6 +52,9 @@ namespace headsup
     // hidden class and no place: the plugin shows and places them.
     std::string BarDocument(const BarLook& look, const BarTextPlace& place);
     std::string WidgetId(PanelWidget widget);
+    // A widget's padding on each side as its element takes it, for a room from its edge to what it shows: inside a
+    // pill's or a frame's border, or past a plain ornate widget's margin.
+    float SidePadding(const BarLook& look, PanelWidget widget, float room);
     std::string DividerId(int divider);
     constexpr int kDividerCount       = kMostPlaced - 1;
     constexpr const char* kStripId    = "strip";

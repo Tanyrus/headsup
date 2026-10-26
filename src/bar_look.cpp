@@ -118,6 +118,11 @@ namespace headsup
             toward(p.subtitle, page, kMutedShare), p.accent, p.accentEnd, WithAlpha(p.accent, kMenuSoftAlpha), p.accentEnd};
     }
 
+    float WidgetPadding(const BarMetrics& metrics, const WidgetOptions& options)
+    {
+        return options.padding == kThemePadding ? metrics.padding : static_cast<float>(options.padding);
+    }
+
     const char* BarTitleFont(const Settings& settings, BarShape shape)
     {
         return settings.barTitleFont.empty() ? TitleFont(shape) : Interned(settings.barTitleFont);
