@@ -1118,3 +1118,45 @@ TEST(a_text_left_out_beside_icons_takes_the_gap_that_set_it_apart)
     CHECK_EQ(Rendered(last.lines[0]), "Young Quadav [3]");
     CHECK_EQ(Rendered(last.lines[1]), "[3]"); // nor a gap after them
 }
+
+namespace
+{
+    std::vector<Icon> IconsOn(const ComposedPlate& plate)
+    {
+        std::vector<Icon> drawn;
+        for (const ComposedLine& line : plate.lines)
+            for (const PlateItem& item : line.items)
+                for (const IconDraw& icon : item.icons) drawn.push_back(icon.icon);
+        return drawn;
+    }
+}
+
+TEST(a_gms_icon_is_on_every_plate_of_theirs_where_the_design_puts_it_or_before_their_name)
+{
+    Settings s;
+    KindSettings& players = s.Kind(PlateKind::Players);
+    PlayerStatus gm;
+    gm.gm = true;
+    // Where the design puts it, once.
+    players.lines[2].text = "$name $gm";
+    CHECK_EQ(Rendered(Compose(PlayerWith(gm), s).lines.back()), "Chadmage [1]");
+    // A design without it: before the name, a space apart.
+    players.lines[2].text = "$name";
+    const ComposedPlate plain = Compose(PlayerWith(gm), s);
+    CHECK_EQ(Rendered(plain.lines.back()), "[1] Chadmage");
+    CHECK((IconsOn(plain) == std::vector<Icon>{Icon::Gm}));
+    // On a line that does not show now: before the name all the same.
+    players.lines[0].text = "$gm";
+    players.lines[0].show = LineShow{false, 0};
+    CHECK((IconsOn(Compose(PlayerWith(gm), s)) == std::vector<Icon>{Icon::Gm}));
+    CHECK_EQ(Rendered(Compose(PlayerWith(gm), s).lines.back()), "[1] Chadmage");
+    // A design with no name: at the start of its first line; with nothing at all, a line of its own.
+    players.lines[2].text = "$job";
+    CHECK_EQ(Rendered(Compose(PlayerWith(gm), s).lines.back()).rfind("[1]", 0), size_t{0});
+    for (LineDesign& line : players.lines)
+        line.text.clear();
+    const ComposedPlate empty = Compose(PlayerWith(gm), s);
+    CHECK(empty.lines.size() == 1 && Rendered(empty.lines[0]) == "[1]");
+    // Someone who is no GM gets none.
+    CHECK(Compose(PlayerWith(PlayerStatus{}), s).lines.empty());
+}

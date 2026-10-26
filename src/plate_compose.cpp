@@ -289,6 +289,35 @@ namespace headsup
         };
     }
 
+    namespace
+    {
+        // A GM's icon is on every plate of theirs, whatever the design shows (Phoenix's rule): where the design did
+        // not draw it, before their name a space apart, else at the start of the first line, else on a line of its
+        // own in the bottom line's look.
+        void PutGmIcon(ComposedPlate& plate, const LineLook& bottomLook)
+        {
+            PlateItem icon = ItemOf(ItemKind::Icons);
+            icon.icons.push_back(DrawOf(*TagIcon(Tag::Gm)));
+            PlateItem gap = ItemOf(ItemKind::Space);
+            gap.spaces    = 1;
+            for (ComposedLine& line : plate.lines)
+                if (const auto name = std::ranges::find_if(line.items, [](const PlateItem& item) { return item.name; });
+                    name != line.items.end())
+                {
+                    line.items.insert(line.items.insert(name, gap), icon);
+                    return;
+                }
+            if (!plate.lines.empty())
+            {
+                std::vector<PlateItem>& first = plate.lines.front().items;
+                if (first.front().kind == ItemKind::Text) first.insert(first.begin(), gap);
+                first.insert(first.begin(), icon);
+                return;
+            }
+            plate.lines.push_back(ComposedLine{kBottomLine, {std::move(icon)}, bottomLook});
+        }
+    }
+
     float BasePixels(const Settings& s, int percent)
     {
         return static_cast<float>(s.baseSize) * static_cast<float>(percent) / kPercent;
@@ -327,6 +356,7 @@ namespace headsup
         };
         std::optional<BadgeRules> badgeRules;
         int statusIcons = 0; // the plate's so far, of those its kind limits
+        bool gmDrawn    = false;
         plate.lines.reserve(kPlateLines);
         for (int i = 0; i < kPlateLines; ++i)
         {
@@ -373,6 +403,7 @@ namespace headsup
                     std::vector<IconDraw> icons = TagIcons(tag, info, player, s, badgeRules);
                     drawn                       = !icons.empty();
                     if (drawn && counted) ++statusIcons;
+                    gmDrawn = gmDrawn || (drawn && tag == Tag::Gm);
                     if (drawn) builder.Icons(std::move(icons), IsBadgeTag(tag));
                 }
                 if (!drawn && !deadMob) builder.Empty();
@@ -381,6 +412,8 @@ namespace headsup
             for (size_t row = firstRow; row + 1 < plate.lines.size(); ++row)
                 plate.lines[row].lastRow = false;
         }
+        if (!gmDrawn && st.kind == EntityKind::Player && info.status && info.status->gm)
+            PutGmIcon(plate, LookOf(StyleLine(kind, kBottomLine), st, s, gameArgb));
         plate.ornament      = kind.ornament.place;
         plate.ornamentColor = ResolveColor(kind.ornament.color, st, s.palette, gameArgb);
         return plate;
