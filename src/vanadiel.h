@@ -10,6 +10,7 @@ namespace headsup
     // Firesday, and runs 25 times faster than Earth.
     constexpr int64_t kVanaEpochUnixMs = 1009810800000LL;
     constexpr int kVanaDaysPerWeek     = 8;
+    constexpr double kEarthSecondsPerVanaDay = 86400.0 / 25.0; // a Vana'diel day, running 25 times faster than Earth
 
     enum class MoonDirection : uint8_t
     {
@@ -36,4 +37,8 @@ namespace headsup
     double SecondsToNextDay(int64_t unixMs);
     // Earth seconds until the moon's phase name next changes.
     double SecondsToNextPhase(int64_t unixMs);
+    // Earth seconds until the Vana'diel day starts, less than 0 once it has.
+    double SecondsToDay(int64_t unixMs, uint32_t day);
+    // The first day after this one when the moon is full (100%), or new (0%).
+    uint32_t NextMoonDay(uint32_t day, bool full);
 }

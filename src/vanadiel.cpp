@@ -10,7 +10,6 @@ namespace headsup
         constexpr int64_t kVanaSpeed  = 25;
         constexpr int64_t kVanaDayMs  = 86400000LL, kVanaHourMs = 3600000LL, kVanaMinuteMs = 60000LL; // Vana'diel ms
         constexpr double kMsPerSecond = 1000.0;
-        constexpr double kEarthSecondsPerVanaDay = static_cast<double>(kVanaDayMs) / kVanaSpeed / kMsPerSecond;
         constexpr int kStartYear = 886, kDaysPerYear = 360, kDaysPerMonth = 30, kMonthsPerYear = 12, kHoursPerDay = 24;
         constexpr int kMinutesPerHour = 60;
         // Phoenix's get_phase: the cycle is 84 days, and day 0 of the epoch is day 38 of it (886 years plus 26 days).
@@ -88,5 +87,19 @@ namespace headsup
                 return SecondsToNextDay(unixMs) + (ahead - 1) * kEarthSecondsPerVanaDay;
         }
         return 0.0;
+    }
+
+    double SecondsToDay(int64_t unixMs, uint32_t day)
+    {
+        const double start = static_cast<double>(day) * static_cast<double>(kVanaDayMs);
+        return (start - static_cast<double>(VanaMs(unixMs))) / static_cast<double>(kVanaSpeed) / kMsPerSecond;
+    }
+
+    uint32_t NextMoonDay(uint32_t day, bool full)
+    {
+        const int target = full ? 0 : kMoonHalf;
+        const int into   = static_cast<int>((static_cast<int64_t>(day) + kMoonOffset) % kMoonCycle);
+        const int ahead  = ((target - into) % kMoonCycle + kMoonCycle) % kMoonCycle;
+        return day + static_cast<uint32_t>(ahead == 0 ? kMoonCycle : ahead);
     }
 }
