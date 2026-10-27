@@ -323,13 +323,24 @@ namespace headsup
         return static_cast<float>(s.baseSize) * static_cast<float>(percent) / kPercent;
     }
 
-    HookAction HookActionFor(const EntityState& state, const Settings& s, const PlayerState& player, bool screenshot, bool namesFailed)
+    namespace
+    {
+        // A GM has a plate whatever their row says (Phoenix's rule), so their icon always shows.
+        PlateMode PlateModeOf(const ActorInfo& info, const Settings& s)
+        {
+            if (info.state.kind == EntityKind::Player && info.status && info.status->gm) return PlateMode::Shown;
+            return s.Kind(PlateKindOf(info.state)).rows[RowOf(info.state)].plate;
+        }
+    }
+
+    HookAction HookActionFor(const ActorInfo& info, const Settings& s, const PlayerState& player, bool screenshot, bool namesFailed)
     {
         if (screenshot) return HookAction::Hide;
         if (!s.enabled || !s.nameplates) return HookAction::Keep;
         if (HiddenInEvent(s, player)) return HookAction::Hide;
         const HookAction drawn = namesFailed ? HookAction::Keep : HookAction::Replace;
-        switch (s.Kind(PlateKindOf(state)).rows[RowOf(state)].plate)
+        const EntityState& state = info.state;
+        switch (PlateModeOf(info, s))
         {
         case PlateMode::Vanilla: return HookAction::Keep;
         case PlateMode::Hidden: return HookAction::Hide;
@@ -344,7 +355,7 @@ namespace headsup
         const EntityState& st = info.state;
         if (!s.enabled || !s.nameplates || HiddenInEvent(s, player)) return plate;
         const KindSettings& kind = s.Kind(PlateKindOf(st));
-        const PlateMode mode     = kind.rows[RowOf(st)].plate;
+        const PlateMode mode     = PlateModeOf(info, s);
         if (!DrawsPlate(mode)) return plate;
         if (mode == PlateMode::WhenTargeted && !Targeted(st.target)) return plate;
         // An NPC has no life to lose, whatever its health reads.

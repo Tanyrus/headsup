@@ -1282,7 +1282,7 @@ private:
         for (const headsup::ActorPtr actor : m_Tracker.Actors())
             if (const headsup::ActorInfo* info = m_Tracker.Find(actor))
                 owners.push_back({actor, info->index,
-                    headsup::HookActionFor(info->state, m_Settings, m_Player, m_Screenshot, m_Nameplates.NamesFailed())});
+                    headsup::HookActionFor(*info, m_Settings, m_Player, m_Screenshot, m_Nameplates.NamesFailed())});
         return owners;
     }
 
