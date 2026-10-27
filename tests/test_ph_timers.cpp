@@ -154,12 +154,13 @@ TEST(a_death_starts_a_timer_only_once_it_was_earned_while_the_mob_lived)
     CHECK(!t.SecondsLeft(kOtherWorm, 900.0).has_value());
 }
 
-TEST(a_timer_is_earned_by_targeting_or_by_being_active_with_it_claimed_by_your_party_or_on_your_screen)
+TEST(a_timer_is_earned_by_targeting_or_by_being_active_with_it_on_your_screen)
 {
-    CHECK(EarnsTimer(true, false, false, false)); // targeting counts even standing still
-    CHECK(EarnsTimer(false, true, false, true) && EarnsTimer(false, false, true, true));
-    CHECK(!EarnsTimer(false, true, false, false) && !EarnsTimer(false, false, true, false)); // away from the keyboard
-    CHECK(!EarnsTimer(false, false, false, true)); // in range and active, but neither fought nor seen
+    CHECK(EarnsTimer(true, false, false)); // targeting counts even standing still
+    CHECK(EarnsTimer(false, true, true));
+    CHECK(!EarnsTimer(false, true, false)); // away from the keyboard
+    // In range and active, but not seen: a party member's claim off your screen earns you nothing (the user, 2026-10-26).
+    CHECK(!EarnsTimer(false, false, true));
 }
 
 TEST(you_are_active_until_you_have_not_moved_or_turned_for_two_and_a_half_minutes)

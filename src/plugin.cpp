@@ -2494,7 +2494,7 @@ private:
             if (self) m_Activity.Pose(now, feet, entity->GetLocalPositionYaw(i));
             if (isMob && alive && headsup::SightingOf(record) &&
                 headsup::EarnsTimer(headsup::Targeted(headsup::TargetStateOf(index, m_CursorTargets)),
-                    headsup::ClaimedByParty(claim, m_PartyIds), m_Names.MeshDraws(index) > 0, m_Activity.Active(now)))
+                    m_Names.MeshDraws(index) > 0, m_Activity.Active(now)))
                 m_PhTimers.Earned(serverId);
             inputs.push_back(headsup::ActorInput{
                 .actor    = static_cast<headsup::ActorPtr>(actor),

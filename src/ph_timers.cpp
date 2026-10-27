@@ -26,10 +26,7 @@ namespace headsup
         return PhSighting{mob->id, mob->respawn, nm != nullptr ? nm->name : kUnknownNmName};
     }
 
-    bool EarnsTimer(bool targeted, bool partyClaim, bool onScreen, bool active)
-    {
-        return targeted || (active && (partyClaim || onScreen));
-    }
+    bool EarnsTimer(bool targeted, bool onScreen, bool active) { return targeted || (active && onScreen); }
 
     void Activity::Pose(double now, WorldPoint at, float heading)
     {

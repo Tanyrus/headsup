@@ -31,9 +31,9 @@ namespace headsup
     std::optional<PhSighting> SightingOf(const MobRecord* mob);
 
     // Phoenix's rule: a timer is the player's who fought or watched the mob, not anyone's who stood near it. A death
-    // starts one only if, while the mob lived, the player targeted it, or was active while it was claimed by them or
-    // their party (curing them counts, as the claim is theirs), or while it was on their screen.
-    bool EarnsTimer(bool targeted, bool partyClaim, bool onScreen, bool active);
+    // starts one only if, while the mob lived, the player targeted it, or was active while it was on their screen; a
+    // party member's claim alone earns nothing.
+    bool EarnsTimer(bool targeted, bool onScreen, bool active);
     constexpr double kIdleSeconds = 150.0; // without moving or turning, a player is away from the keyboard
 
     // Whether the player has moved or turned in the last kIdleSeconds.
