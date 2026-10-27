@@ -2048,6 +2048,10 @@ TEST(the_world_info_widget_tells_what_you_picked_with_its_countdown)
     };
     // The airship's door opens at 28 s into the next cycle: 864 - 576 + 28 s from now.
     CHECK_EQ(shown(WorldLine::Departure), "Jeuno to San d'Oria / Boards in 5:16");
+    // Its second line is dim, as every widget's is.
+    for (int line = 0; line < kWorldLineCount; ++line)
+        for (const Span& span : BarWidgetContent(BarWidget::World, state, WorldShowing(static_cast<WorldLine>(line))).subtitle)
+            CHECK(span.tone == Tone::Dim);
     // Open until 21:00, 11 Vana'diel hours away.
     CHECK_EQ(shown(WorldLine::Guild), std::string("Woodworking / Open") + kDot + "closes in 26:24");
     // Week 1: Hume Female in Gusgen Mines, until day 16.

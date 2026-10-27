@@ -791,6 +791,8 @@ namespace headsup
                 break;
             }
             }
+            for (Span& span : w.subtitle)
+                span.tone = Tone::Dim;
             return w;
         }
 
