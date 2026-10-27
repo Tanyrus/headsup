@@ -1,5 +1,8 @@
 #include "pointer_swap.h"
 
+#include "import_slot.h"
+#include "native_hook.h" // kGameModule
+
 #include <algorithm>
 #include <cstring>
 #include <fstream>
@@ -9,7 +12,6 @@ namespace headsup
 {
     namespace
     {
-        constexpr const char* kGameModule    = "FFXiMain.dll";
         constexpr const char* kUser32        = "user32.dll"; // matched without case, as the import table spells it USER32
         constexpr const char* kSetCursor     = "SetCursor";
         constexpr const char* kReplacedPointers[] = {"mousenor.ani", "mousehit.ani"}; // the normal and the hover pointers
@@ -22,31 +24,6 @@ namespace headsup
         HCURSOR WINAPI SetCursorHook(HCURSOR cursor)
         {
             return g_Swap != nullptr ? g_Swap->OnSetCursor(cursor) : g_RealSetCursor(cursor);
-        }
-
-        // The module's import address slot that holds `function` from `library`; nullptr when it has none.
-        void** ImportSlot(HMODULE module, const char* library, void* function)
-        {
-            auto* base     = reinterpret_cast<uint8_t*>(module);
-            const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS32*>(base + reinterpret_cast<const IMAGE_DOS_HEADER*>(base)->e_lfanew);
-            const IMAGE_DATA_DIRECTORY& imports = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
-            if (imports.VirtualAddress == 0) return nullptr;
-            for (auto* d = reinterpret_cast<IMAGE_IMPORT_DESCRIPTOR*>(base + imports.VirtualAddress); d->Name != 0; ++d)
-            {
-                if (_stricmp(reinterpret_cast<const char*>(base + d->Name), library) != 0) continue;
-                for (auto* slot = reinterpret_cast<void**>(base + d->FirstThunk); *slot != nullptr; ++slot)
-                    if (*slot == function) return slot;
-            }
-            return nullptr;
-        }
-
-        bool Write(void** slot, void* value)
-        {
-            DWORD old = 0;
-            if (!VirtualProtect(slot, sizeof(void*), PAGE_READWRITE, &old)) return false;
-            *slot = value;
-            VirtualProtect(slot, sizeof(void*), old, &old);
-            return true;
         }
 
         // A bitmap's pixels at 32 bits, top to bottom.
@@ -104,7 +81,7 @@ namespace headsup
 
         g_RealSetCursor = reinterpret_cast<SetCursorFn>(reinterpret_cast<void*>(GetProcAddress(GetModuleHandleA(kUser32), kSetCursor)));
         void** slot     = ImportSlot(game, kUser32, reinterpret_cast<void*>(g_RealSetCursor));
-        if (slot == nullptr || !Write(slot, reinterpret_cast<void*>(&SetCursorHook)))
+        if (slot == nullptr || !WriteSlot(slot, reinterpret_cast<void*>(&SetCursorHook)))
         {
             Release();
             return std::string("could not reach ") + kGameModule + "'s " + kSetCursor;
@@ -120,7 +97,7 @@ namespace headsup
     {
         if (m_Slot != nullptr)
         {
-            Write(m_Slot, reinterpret_cast<void*>(g_RealSetCursor));
+            WriteSlot(m_Slot, reinterpret_cast<void*>(g_RealSetCursor));
             m_Slot = nullptr;
         }
         g_Swap = nullptr;

@@ -33,6 +33,7 @@
 #include "rml_host.h"
 #include "rml_menu.h"
 #include "search_client.h"
+#include "server_ping.h"
 #include "settings.h"
 #include "shot_watch.h"
 #include "tracker.h"
@@ -295,6 +296,8 @@ class HeadsUp final : public IPlugin
     bool m_PlayOnlineTried = false; // it scans the client's code, so once
     std::optional<headsup::PlayOnlineCounts> m_PlayOnlineCounts; // read with the counters
     headsup::ConnectionMeter m_Connection;
+    headsup::ServerPing m_Ping;
+    bool m_PingTried = false; // it redirects the game's import of sendto, so once someone wants the ping
     headsup::FreeSpaceWalk m_SpaceWalk;
     headsup::CpuMeter m_Cpu;
     std::optional<uint64_t> m_Mapped; // the process's VirtualSize, read with the processor time
@@ -483,6 +486,7 @@ public:
         if (const std::string failure = m_WindowHook.Stop(); !failure.empty()) Print(failure + ".");
         if (const std::string failure = m_PointerFix.Stop(); !failure.empty()) Print(failure + ".");
         m_Pointer.Stop();
+        m_Ping.Stop();
         m_Fonts.Wait();
         m_Search.Stop();
         m_Nameplates.Release();
@@ -706,7 +710,6 @@ public:
         UNREFERENCED_PARAMETER(modified);
         UNREFERENCED_PARAMETER(sizeChunk);
         UNREFERENCED_PARAMETER(dataChunk);
-        if (!blocked) m_Connection.Sent(Now());
         if (const std::optional<uint32_t> target = headsup::PlayersCheck(id, data, size, injected, blocked))
             m_AutoCheck.PlayerAsked(*target, Now());
         return false;
@@ -2187,6 +2190,14 @@ private:
                 m_PlayOnlineCounts = PlayOnlineNow();
                 m_CountersReadAt   = now;
             }
+            if (!m_PingTried)
+            {
+                m_PingTried = true;
+                if (const std::string failure = m_Ping.Start(); !failure.empty())
+                    Note("the ping is not measured, as HeadsUp " + failure + ".");
+            }
+            for (const double ms : m_Ping.TakeRoundTrips())
+                m_Connection.RoundTrip(ms);
             m_Connection.Frame(now, m_Counters);
             s.connection = m_Connection.Report(now, m_AshitaCore->GetMemoryManager()->GetPlayer()->GetIsZoning() != 0);
             s.connection->playOnline = m_PlayOnlineCounts;

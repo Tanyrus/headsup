@@ -57,20 +57,10 @@ namespace headsup
         return LinkState::Normal;
     }
 
-    void ConnectionMeter::Sent(double now)
-    {
-        if (m_Pending) return;
-        m_Pending     = now;
-        m_PendingSeen = false;
-    }
+    void ConnectionMeter::Received(double now) { m_LastReceived = now; }
 
-    void ConnectionMeter::Received(double now)
+    void ConnectionMeter::RoundTrip(double ms)
     {
-        m_LastReceived = now;
-        if (!m_Pending || !m_PendingSeen) return;
-        const double ms = (now - *m_Pending) * kMsPerSecondF;
-        m_Pending.reset();
-        if (ms > kLongestRoundTrip * kMsPerSecondF) return;
         m_RoundTrips.push_back(ms);
         if (m_RoundTrips.size() > kRoundTrips) m_RoundTrips.pop_front();
         if (m_RoundTrips.size() < kLeastRoundTrips) return;
@@ -93,7 +83,6 @@ namespace headsup
         }
         m_LastFrame = now;
         m_Counters  = counters;
-        if (m_Pending) m_PendingSeen = true;
     }
 
     ConnectionReport ConnectionMeter::Report(double now, bool zoning) const
@@ -154,13 +143,13 @@ namespace headsup
         now.rows.push_back(Labeled("Received", Text(PerSecond(r.counters, &NetCounters::received))));
         if (r.latency)
         {
-            now.rows.push_back(Labeled("Latency", Text(Printed("%.0f ms", r.latency->medianMs))));
+            now.rows.push_back(Labeled("Ping", Text(Printed("%.0f ms", r.latency->medianMs))));
             now.rows.push_back(LineOf(Printed("%.0f", r.latency->lowestMs) + " to " +
-                                          Printed("%.0f ms over recent replies", r.latency->highestMs),
+                                          Printed("%.0f ms over recent pings", r.latency->highestMs),
                 Tone::Dim));
         }
         else
-            now.rows.push_back(Labeled("Latency", Text("-", Tone::Dim)));
+            now.rows.push_back(Labeled("Ping", Text("-", Tone::Dim)));
         now.rows.push_back(LastData(r));
         if (r.counters && r.counters->health < kFullHealth)
             now.rows.push_back(LineOf("The game's own meter is at " + std::to_string(r.counters->health) +

@@ -418,7 +418,7 @@
                 {"key": "bar-height", "name": "Bar Height", "tip": "How thick the bar is. It stays in the middle of the panel."},
                 {"key": "job-names", "name": "Job Names", "tip": "Off, the levels alone."},
                 {"key": "percent", "name": "Percent", "tip": "The game's own connection meter after the rates, as its readout shows it: 100% while data comes in, less once it stops."},
-                {"key": "latency", "name": "Latency", "tip": "After the rates, once measured."}
+                {"key": "latency", "name": "Ping", "tip": "Your ping to the server, after the rates. It shows once a few of the server's answers are timed."}
               ],
               "words": [
                 {"key": "add-copy", "name": "Add a Copy", "tip": "Puts another of this widget on the panel after it, with its own tab here."},
@@ -866,7 +866,7 @@
         {"name": "Game Help", "tip": "The game's help text, in a bar of its own under the top panel."},
         {"name": "FPS", "tip": "Frames per second. Hover for frame times."},
         {"name": "Job", "tip": "Jobs, levels and EXP to the next level, with a bar. Hover for EXP per hour."},
-        {"name": "Connection", "tip": "Bytes sent and received each second; amber or red when data stops. Hover for latency."},
+        {"name": "Connection", "tip": "Bytes sent and received each second; amber or red when data stops. Hover for your ping."},
         {"name": "Party", "tip": "Party size and the lowest HP and MP. Hover for each member."},
         {"name": "Signet", "tip": "Time left on Signet or Sanction, while one is on."},
         {"name": "Distance", "tip": "How far your target is, in yalms."},

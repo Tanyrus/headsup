@@ -1084,7 +1084,7 @@ TEST(the_connection_widget_shows_the_games_rates_on_one_line_and_turns_amber_the
     CHECK(Joined(BarWidgetContent(BarWidget::Connection, state, settings).title) == "S -  R -");
 }
 
-TEST(the_connection_popup_gives_the_rates_latency_last_data_and_session_totals)
+TEST(the_connection_popup_gives_the_rates_ping_last_data_and_session_totals)
 {
     Settings settings;
     BarState state;
@@ -1092,8 +1092,8 @@ TEST(the_connection_popup_gives_the_rates_latency_last_data_and_session_totals)
     const PopupContent p = BarPopupContent(BarWidget::Connection, state, settings);
     CHECK(Joined(p.title) == "Connection" && p.sections.size() == 2);
     // Short lines only: no sentence on where S and R come from (the menu tip says it).
-    CHECK(Lines(p.sections[0]) == (std::vector<std::string>{"Sent 175 B/s", "Received 227 B/s", "Latency 48 ms",
-                                      "40 to 66 ms over recent replies", "Last server data 1s"})); // 0.3 s, rounded up
+    CHECK(Lines(p.sections[0]) == (std::vector<std::string>{"Sent 175 B/s", "Received 227 B/s", "Ping 48 ms",
+                                      "40 to 66 ms over recent pings", "Last server data 1s"})); // 0.3 s, rounded up
     CHECK(p.sections[0].rows[4] == Labeled("Last server data", Text("1s")));
     CHECK(p.sections[1].heading == "This session");
     CHECK(Lines(p.sections[1]) == (std::vector<std::string>{"Sent 1.2 MB", "Received 34.5 KB", "Over 1h 12m"}));
@@ -1470,7 +1470,7 @@ TEST(the_clocks_add_seconds_when_asked)
     CHECK(Joined(BarWidgetContent(BarWidget::EarthTime, state, settings).title) == "09:30:07");
 }
 
-TEST(the_connection_widget_adds_its_latency_when_asked)
+TEST(the_connection_widget_adds_its_ping_when_asked)
 {
     Settings settings;
     BarState state;

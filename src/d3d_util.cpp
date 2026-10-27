@@ -1,5 +1,7 @@
 #include "d3d_util.h"
 
+#include "native_hook.h" // kGameModule
+
 #include <algorithm>
 
 namespace headsup
@@ -8,7 +10,6 @@ namespace headsup
     {
         constexpr DWORD kWineDeclarationHandles = 0xF0000000; // Wine numbers declaration handles from here
         constexpr uintptr_t kStackScanBytes     = 0x1000;     // the game's draw call chain fits well inside this
-        constexpr const char* kGameModule       = "FFXiMain.dll";
 
         struct CodeRange
         {
