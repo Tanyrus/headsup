@@ -617,7 +617,7 @@ namespace headsup
             const auto open = std::ranges::find(tabs, WidgetInSlot(c.state.widget));
             const int count = static_cast<int>(tabs.size());
             const int tab   = form.Tabs("widget", open != tabs.end() ? static_cast<int>(open - tabs.begin()) : 0,
-                labels.data(), count, TabsPerRow(count, (count + kWidgetTabsPerRow - 1) / kWidgetTabsPerRow));
+                labels.data(), count, true);
             c.state.widget  = SlotOf(tabs[static_cast<size_t>(tab)]);
             WidgetOptions(c, e, tabs[static_cast<size_t>(tab)]);
         }

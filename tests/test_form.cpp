@@ -392,17 +392,18 @@ TEST(segments_and_tabs_mark_the_picked_one_and_take_a_click)
         form.Row("One line", nullptr);
         form.SegmentsAt("One line", picked, options, 3);
         form.EndRow();
-        tab = form.Tabs("tabs", tab, options, 3, 2);
+        tab = form.Tabs("tabs", tab, options, 3, true);
         form.EndCard();
         return form;
     };
     const Form first = pass({});
     CHECK(Has(first.blocks[0].rml, "<div class=\"seg\" id=\"p-c-one-line-s-0\">Hide</div>"));
     CHECK(ClassOn(first, "p-c-one-line-s-2", "picked") && !ClassOn(first, "p-c-one-line-s-0", "picked"));
-    // Three tabs, two to a row: a row of two and a row of one.
-    CHECK(Has(first.blocks[0].rml, "<div class=\"tab-row\"><div class=\"tab\" id=\"p-c-tabs-t-0\">Hide</div>"
-                                   "<div class=\"tab\" id=\"p-c-tabs-t-1\">Before</div></div><div class=\"tab-row\">"
-                                   "<div class=\"tab\" id=\"p-c-tabs-t-2\">After</div></div><div class=\"tab-rule\"></div>"));
+    // Three tabs in a row that wraps.
+    CHECK(Has(first.blocks[0].rml, "<div class=\"tab-row wrap\"><div class=\"tab\" id=\"p-c-tabs-t-0\">Hide</div>"
+                                   "<div class=\"tab\" id=\"p-c-tabs-t-1\">Before</div>"
+                                   "<div class=\"tab\" id=\"p-c-tabs-t-2\">After</div><div class=\"tab-fill\"></div></div>"
+                                   "<div class=\"tab-rule\"></div>"));
     const Form clicked = pass({{"p-c-one-line-s-0", kClickEvent, ""}, {"p-c-tabs-t-2", kClickEvent, ""}});
     CHECK(picked == 0 && clicked.changed && tab == 2);
     CHECK(ClassOn(clicked, "p-c-tabs-t-2", "picked") && ClassOn(clicked, "p-c-one-line-s-0", "picked"));

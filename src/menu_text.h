@@ -18,8 +18,6 @@
 // What the settings window's pages say and the small questions they ask.
 namespace headsup
 {
-    constexpr int kWidgetTabsPerRow  = 7; // the most a row of the Widgets page's tabs holds: more, and names are cut
-
     // Which widgets have a second line, or icons, for their options to offer switching off.
     inline bool HasSecondLine(BarWidget w)
     {

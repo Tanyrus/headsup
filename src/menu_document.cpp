@@ -381,6 +381,10 @@ namespace headsup
         css += ".tab{flex:1 1 0px;height:" + Em(kTabHeight) + ";" + line(kTabHeight) + "margin-right:" +
                Em(kTabGap) + ";text-align:center;white-space:nowrap;border-radius:" + radius + " " + radius +
                " 0px 0px;background-color:" + color(c.control) + ";color:" + color(c.muted) + ";}";
+        // Tabs that wrap: each as wide as its name, the rows filled out but the last, whose room the filler takes.
+        css += ".tab-row.wrap{flex-wrap:wrap;margin-bottom:0px;}";
+        css += ".tab-row.wrap .tab{flex:1 1 auto;padding:0px " + Em(kTabPadding) + ";margin-bottom:" + Em(kTabGap) + ";}";
+        css += ".tab-fill{flex:" + std::to_string(kTabFillGrow) + " 1 0px;}";
         css += ".tab:hover{background-color:" + color(c.hover) + ";}";
         css += ".tab.picked{background-color:" + color(c.accent) + ";}";
         css += ".tab-rule{height:" + Em(kTabRule) + ";margin-top:-" + Em(kTabGap) + ";margin-bottom:" + Em(kSpacing) +
