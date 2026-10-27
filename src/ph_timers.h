@@ -16,8 +16,6 @@ namespace headsup
     // message that tells of the death (m_DropItemTime).
     constexpr double kDeathToDespawnSeconds = 15.0;
     constexpr double kDefeatMessageSeconds  = 1.0;
-    // How long a timer stays, reading "up", once its placeholder is due back.
-    constexpr double kUpSeconds = 300.0;
 
     struct PhSighting
     {
@@ -66,8 +64,8 @@ namespace headsup
         void Died(double now, const PhSighting& mob);
         // What was earned in the zone left is no longer anyone's.
         void Zoned() { m_Earned.clear(); }
-        // The mobs seen alive in range lose their timers; those long up go.
-        void Update(double now, const std::vector<uint32_t>& aliveMobs);
+        // The mobs seen alive in range lose their timers; those up for more than upMinutes go.
+        void Update(double now, const std::vector<uint32_t>& aliveMobs, int upMinutes);
         std::vector<TimerLine> Lines(uint16_t zone, double now) const;
         // Seconds until this placeholder is due back, 0 once it is; nullopt when no timer runs for it.
         std::optional<double> SecondsLeft(uint32_t serverId, double now) const;

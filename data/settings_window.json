@@ -737,8 +737,9 @@
         "description": "Some enemies are placeholders for a notorious monster. When they die, the notorious monster has a chance to spawn. These settings allow you to see a timer for the next possible spawn.",
         "kinds": ["self"],
         "settings": [
-          {"key": "respawn-timers", "name": "Respawn Timer", "tip": "If enabled, it shows a timer until the next possible spawn when an NM or its placeholder dies within 50 yalms of you, if you took part: you targeted it, or you were active (moved or turned in the last 2:30) while it was claimed by your party or on your screen. Phoenix's rule, so standing AFK earns no timers. If the NM or placeholder is up, it reads 'Up'."},
-          {"key": "timer-size", "name": "Timer Size", "tip": "The font size of the timer text, as a multiplier of the base font size set by the Entities/Nameplates section."}
+          {"key": "respawn-timers", "name": "Respawn Timer", "tip": "If enabled, it shows a timer until the next possible spawn when an NM or its placeholder dies within 50 yalms of you, if you took part: you targeted it, or you were active (moved or turned in the last 2:30) while it was on your screen. Phoenix's rule, so standing AFK earns no timers. If the NM or placeholder is up, it reads 'Up'."},
+          {"key": "timer-size", "name": "Timer Size", "tip": "The font size of the timer text, as a multiplier of the base font size set by the Entities/Nameplates section."},
+          {"key": "up-time", "name": "Up Time", "tip": "How long a timer stays, reading 'Up', once the NM or its placeholder can spawn. Then it goes. At 0 it goes as soon as it is up. Default is 5 minutes."}
         ]
       }
     ]

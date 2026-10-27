@@ -106,6 +106,7 @@ namespace headsup
     constexpr int kMaxMenuSide  = 16384; // pixels: more than any screen is across
 
     constexpr int kMaxHelpBarOffset = 4000; // pixels either way
+    constexpr int kMaxUpMinutes = 60, kDefaultUpMinutes = 5; // how long a respawn timer reads "up" before it goes
 
     struct Settings
     {
@@ -192,6 +193,7 @@ namespace headsup
         std::string defaultFont = kDefaultFont;
         int scaleMin = 50, scaleMax = 250; // percent: the distance scale's limits
         int timerPercent = 85;
+        int phUpMinutes  = kDefaultUpMinutes;
         std::array<KindSettings, kPlateKindCount> kinds = DefaultKinds();
         OpacitySettings opacity; // every kind's nameplates
         Palette palette = DefaultPalette();

@@ -1,4 +1,5 @@
 #include "ph_timers.h"
+#include "settings.h"
 #include "test.h"
 
 using namespace headsup;
@@ -78,9 +79,9 @@ TEST(a_mob_seen_alive_again_loses_its_timer)
 {
     PhTimers t;
     Fought(t, 101.0, Worm());
-    t.Update(250.0, {kOtherWorm});
+    t.Update(250.0, {kOtherWorm}, kDefaultUpMinutes);
     CHECK_EQ(t.Lines(kEastRonfaure, 250.0).size(), 1u);
-    t.Update(251.0, {kWorm});
+    t.Update(251.0, {kWorm}, kDefaultUpMinutes);
     CHECK(t.Lines(kEastRonfaure, 251.0).empty());
 }
 
@@ -97,13 +98,18 @@ TEST(a_timer_reads_up_when_due_then_goes)
     PhTimers t;
     Fought(t, 101.0, Worm());
     const double due = 101.0 + kWormSpan;
-    t.Update(due, {});
+    t.Update(due, {}, 12);
     const std::vector<TimerLine> lines = t.Lines(kEastRonfaure, due);
     CHECK(lines.size() == 1 && lines[0].text == "Bigmouth Billy [11A] up" && lines[0].up);
-    t.Update(due + kUpSeconds, {});
-    CHECK_EQ(t.Lines(kEastRonfaure, due + kUpSeconds).size(), 1u);
-    t.Update(due + kUpSeconds + 1.0, {});
-    CHECK(t.Lines(kEastRonfaure, due + kUpSeconds + 1.0).empty());
+    // Up for the minutes you set, then gone.
+    t.Update(due + 12 * 60.0, {}, 12);
+    CHECK_EQ(t.Lines(kEastRonfaure, due + 12 * 60.0).size(), 1u);
+    t.Update(due + 12 * 60.0 + 1.0, {}, 12);
+    CHECK(t.Lines(kEastRonfaure, due + 12 * 60.0 + 1.0).empty());
+    // At 0 minutes it goes the moment it is due.
+    Fought(t, 101.0, Worm());
+    t.Update(due + 1.0, {}, 0);
+    CHECK(t.Lines(kEastRonfaure, due + 1.0).empty());
 }
 
 TEST(only_this_zones_timers_show_soonest_first)
@@ -144,7 +150,7 @@ TEST(a_death_starts_a_timer_only_once_it_was_earned_while_the_mob_lived)
     t.Died(400.0, Worm());
     CHECK_EQ(*t.SecondsLeft(kWorm, 400.0), kWormSpan);
     // Earned once is for that life: its next death starts nothing unless earned again.
-    t.Update(700.0, {kWorm});
+    t.Update(700.0, {kWorm}, kDefaultUpMinutes);
     t.Died(800.0, Worm());
     CHECK(!t.SecondsLeft(kWorm, 800.0).has_value());
     // A zone change forgets what was earned there.

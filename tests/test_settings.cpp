@@ -699,6 +699,20 @@ TEST(a_file_from_before_hide_during_conversation_keeps_plates_in_conversations)
     CHECK(!LoadSettings(file).debugMode); // nor had it a debug mode
 }
 
+TEST(a_timers_up_time_is_saved_and_clamped)
+{
+    CHECK_EQ(Settings{}.phUpMinutes, kDefaultUpMinutes);
+    Settings s;
+    s.phUpMinutes = 12;
+    MapStore file;
+    SaveSettings(s, file);
+    CHECK_EQ(LoadSettings(file).phUpMinutes, 12);
+    s.phUpMinutes = 999;
+    CHECK_EQ(Clamp(s).phUpMinutes, kMaxUpMinutes);
+    s.phUpMinutes = -3;
+    CHECK_EQ(Clamp(s).phUpMinutes, 0);
+}
+
 TEST(called_for_help_has_its_own_color_orange_until_one_is_saved)
 {
     const int help = static_cast<int>(ClaimState::CalledForHelp);

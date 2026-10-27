@@ -69,6 +69,7 @@ namespace headsup
             {"scaleMin", &Settings::scaleMin, kMinSizePercent, kMaxSizePercent, kPercentStep},
             {"scaleMax", &Settings::scaleMax, kMinSizePercent, kMaxSizePercent, kPercentStep},
             {"timerPercent", &Settings::timerPercent, kMinSizePercent, kMaxSizePercent, kPercentStep},
+            {"phUpMinutes", &Settings::phUpMinutes, 0, kMaxUpMinutes},
             {"screenshotKey", &Settings::screenshotKey, 0, UINT8_MAX},
             {"windowType", &Settings::windowType, kFollowGameWindow, kWindowTypes}};
 

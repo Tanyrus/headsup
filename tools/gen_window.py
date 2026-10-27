@@ -161,7 +161,7 @@ PIECES = Pieces(
         'status-table': Setting(unnamed=True, rows=rows(
             'paralyze', 'bind', 'silence', 'slow', 'poison', 'light-sleep', 'dark-sleep', 'blind', 'stun', 'gravity'),
             words={'weak': True, 'resist': True}),
-        'respawn-timers': Setting(), 'timer-size': Setting(),
+        'respawn-timers': Setting(), 'timer-size': Setting(), 'up-time': Setting(),
         # User Interface
         'key': Setting(), 'hide-game-windows': Setting(),
         'groups': Setting(unnamed=True, words={'note': True, 'help-on': True, 'help-off': True, 'starts-at': True,

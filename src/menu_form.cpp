@@ -1283,6 +1283,10 @@ namespace headsup
                 form.Fade(!on || !s.phTimers);
                 form.SliderPercent(label.c_str(), s.timerPercent, kMinSizePercent, kMaxSizePercent, tip);
                 break;
+            case SettingPiece::UpTime:
+                form.Fade(!on || !s.phTimers);
+                form.SliderInt(label.c_str(), s.phUpMinutes, 0, kMaxUpMinutes, "%d min", tip);
+                break;
             // User Interface
             case SettingPiece::Key:
             {

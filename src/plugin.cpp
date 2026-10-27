@@ -2550,7 +2550,7 @@ private:
                 m_AshitaCore->GetPacketManager()->AddOutgoingPacket(headsup::kCheckRequestPacket,
                     static_cast<uint32_t>(request.size()), request.data());
             }
-        m_PhTimers.Update(now, aliveMobs);
+        m_PhTimers.Update(now, aliveMobs, m_Settings.phUpMinutes);
         m_Zone = static_cast<uint16_t>(party->GetMemberZone(0));
         m_TimerLines.clear();
         if (m_Settings.phTimers) m_TimerLines = m_PhTimers.Lines(m_Zone, now);
