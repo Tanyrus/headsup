@@ -1,6 +1,7 @@
 #include "game_font.h"
 #include "pointer_keys.h"
 #include "settings.h"
+#include "world_info.h"
 #include "release_file.h"
 #include "test.h"
 
@@ -290,6 +291,7 @@ barDistance=false
 barMemory=true
 barExp=true
 barConquest=true
+barWorld=true
 barZoneLine2=true
 barZoneIcons=true
 barWeatherLine2=true
@@ -339,7 +341,7 @@ untargetedOpacity=40.0000
 clockSeconds=true
 serverSeconds=true
 barLatency=true
-barLeft=zone weather vanaTime job exp party signet distance conquest
+barLeft=zone weather vanaTime job exp party signet distance conquest world
 barCenter=
 barRight=target gil bags connection memory fps earthTime
 hideHelpBar=true
@@ -1109,7 +1111,7 @@ TEST(each_theme_and_bar_widget_has_its_own_key)
     }
     const char* const widgetKeys[] = {"barZone", "barWeather", "barVanaTime", "barTarget", "barGil", "barBags",
         "barEarthTime", "barGameHelp", "barFps", "barJob", "barConnection", "barParty", "barSignet", "barDistance", "barMemory",
-        "barExp", "barConquest"}; // in BarWidget's order
+        "barExp", "barConquest", "barWorld"}; // in BarWidget's order
     static_assert(std::size(widgetKeys) == kBarWidgetCount);
     for (int w = 0; w < kBarWidgetCount; ++w)
     {
@@ -2832,4 +2834,34 @@ TEST(the_bags_widgets_bag_is_kept_and_one_past_the_last_reads_as_the_inventory)
     CHECK_EQ(LoadSettings(store).Widget(BarWidget::Bags).bag, 5);
     store.values["barBag"] = std::to_string(kContainerCount);
     CHECK_EQ(LoadSettings(store).Widget(BarWidget::Bags).bag, 0);
+}
+
+TEST(the_world_info_widget_keeps_its_picks_by_name)
+{
+    Settings s;
+    WidgetOptions& world = s.Widget(BarWidget::World);
+    CHECK(!world.on && world.worldLine == WorldLine::Departure && world.worldSections == kAllWorldSections);
+    world.on            = true;
+    world.worldLine     = WorldLine::Guild;
+    world.worldRoute    = 3;
+    world.worldElement  = Element::Lightning;
+    world.worldGuild    = 5;
+    world.worldSections = WorldBit(WorldSection::Travel) | WorldBit(WorldSection::Calendar);
+    MapStore store;
+    SaveSettings(s, store);
+    CHECK(LoadSettings(store).Widget(BarWidget::World) == world);
+    // Its picks are saved by what players read, so a refresh that adds a route keeps the one picked.
+    CHECK_EQ(store.values["barWorldRoute"], TravelRoutes()[3].name);
+    CHECK_EQ(store.values["barWorldGuild"], GuildShops()[5].shops);
+    CHECK_EQ(store.values["barWorldElement"], "Lightning");
+    CHECK_EQ(store.values["barWorldLine"], "guild");
+    // A name no longer in the data leaves the default.
+    store.values["barWorldRoute"] = "Jeuno to Mars";
+    CHECK_EQ(LoadSettings(store).Widget(BarWidget::World).worldRoute, 0);
+    // The window relies on Clamp to keep its picks inside the tables.
+    world.worldRoute = 999;
+    world.worldGuild = -1;
+    const Settings bounded       = Clamp(s);
+    const WidgetOptions& clamped = bounded.Widget(BarWidget::World);
+    CHECK(clamped.worldRoute == 0 && clamped.worldGuild == 0);
 }

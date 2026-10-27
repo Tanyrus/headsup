@@ -8,6 +8,7 @@
 #include "ph_timers.h"
 #include "titles.h"
 #include "vanadiel.h"
+#include "world_info.h"
 #include "zones.h"
 
 #include <algorithm>
@@ -45,6 +46,8 @@ namespace headsup
             {kTraitRegain, "Regain"}, {kTraitShadows, "Shadows"}, {kTraitCounter, "Counter"}};
         constexpr int kWholeAbsorb = 100; // percent
         constexpr int kForecastDays = 5, kForecastColumns = 4;
+        constexpr int kWorldWeatherColumns = 3; // the element, its next weather here, its zones today
+        constexpr int kWorldGuildColumns   = 3; // the guild, its hours now, where
         constexpr uint16_t kGilItem  = 0xFFFF;
 
         Span Percent(int percent)
@@ -705,6 +708,159 @@ namespace headsup
             return SdtIcon(kFirstElementSdt + static_cast<int>(*element));
         }
 
+        // A ship's line: boarding until it leaves, or when its door opens.
+        std::vector<Span> SailingText(const TravelRoute& route, int64_t unixMs)
+        {
+            const Sailing next = NextSailing(route, unixMs);
+            if (next.boarding) return ListOf(Text("Boarding"), Text(kDot, Tone::Dim), Text("leaves in " + Countdown(next.leaveIn)));
+            return ListOf(Text("Boards in " + Countdown(next.boardIn)));
+        }
+
+        std::vector<Span> GuildText(const GuildShop& shop, int64_t unixMs)
+        {
+            const GuildHours hours = GuildAt(shop, unixMs);
+            const char* now        = hours.open ? "Open" : hours.holiday ? "Holiday" : "Closed";
+            return ListOf(Text(now, hours.open ? Tone::Normal : Tone::Dim), Text(kDot, Tone::Dim),
+                Text(std::string(hours.open ? "closes in " : "opens in ") + Countdown(hours.changeIn)));
+        }
+
+        // The element's next weather in the zone: its likeliest, with the element's chance that day.
+        struct ZoneWeather
+        {
+            std::optional<ElementWeather> next;
+            std::string when;
+        };
+        ZoneWeather WeatherHere(uint16_t zoneId, Element element, int64_t unixMs)
+        {
+            const ZoneRecord* zone = KnownZone(zoneId);
+            const uint32_t today   = VanaAt(unixMs).day;
+            ZoneWeather here{zone ? NextElementWeather(*zone, element, today) : std::nullopt, "Not in this zone"};
+            if (here.next)
+                here.when = here.next->day == today ? "Can roll here now" : "Here in " + Countdown(SecondsToDay(unixMs, here.next->day));
+            return here;
+        }
+
+        WidgetContent WorldWidget(const BarState& state, const WidgetOptions& o)
+        {
+            WidgetContent w;
+            w.shown    = true;
+            w.hasPopup = true;
+            switch (o.worldLine)
+            {
+            case WorldLine::Departure:
+            {
+                const TravelRoute& route = TravelRoutes()[static_cast<size_t>(o.worldRoute)];
+                w.title    = ListOf(Text(route.name));
+                w.subtitle = SailingText(route, state.unixMs);
+                break;
+            }
+            case WorldLine::Weather:
+            {
+                const ZoneWeather here = WeatherHere(state.zone, o.worldElement, state.unixMs);
+                w.title = here.next ? ListOf(Text(std::string(WeatherName(here.next->weather)) + " " +
+                                                  std::to_string(here.next->percent) + "%"))
+                                    : ListOf(Text(std::string(ElementName(o.worldElement)) + " weather"));
+                if (here.next)
+                    if (const std::optional<Icon> icon = WeatherIcon(here.next->weather)) w.icons.push_back(*icon);
+                w.subtitle = ListOf(Text(here.when, Tone::Dim));
+                break;
+            }
+            case WorldLine::Guild:
+            {
+                const GuildShop& shop = GuildShops()[static_cast<size_t>(o.worldGuild)];
+                w.title    = ListOf(Text(shop.guild));
+                w.subtitle = GuildText(shop, state.unixMs);
+                break;
+            }
+            case WorldLine::Rse:
+            {
+                const Rse rse = RseAt(state.unixMs);
+                w.title    = ListOf(Text(rse.race));
+                w.subtitle = ListOf(Text(rse.place), Text(kDot, Tone::Dim), Text("ends in " + Countdown(rse.endsIn)));
+                break;
+            }
+            case WorldLine::Moon:
+            {
+                const VanaTime t     = VanaAt(state.unixMs);
+                const uint32_t full  = NextMoonDay(t.day, true), fresh = NextMoonDay(t.day, false);
+                const bool fullFirst = full < fresh;
+                w.title    = ListOf(Text(std::string(MoonPhaseName(t.moonPercent, t.moonDirection)) + " " +
+                                         std::to_string(t.moonPercent) + "%"));
+                w.subtitle = ListOf(Text(std::string(fullFirst ? "Full" : "New") + " moon in " +
+                                         Countdown(SecondsToDay(state.unixMs, fullFirst ? full : fresh))));
+                break;
+            }
+            }
+            return w;
+        }
+
+        PopupContent WorldPopup(const BarState& state, const WidgetOptions& o)
+        {
+            PopupContent popup;
+            popup.title = ListOf(Text("World Info"));
+            const auto picked = [&](WorldSection section) { return (o.worldSections & WorldBit(section)) != 0; };
+            if (picked(WorldSection::Travel))
+                for (const TravelRoute& route : TravelRoutes())
+                {
+                    if (popup.sections.empty() || popup.sections.back().heading != route.group)
+                        popup.sections.push_back(PopupSection{route.group, {}});
+                    std::vector<Span> when = SailingText(route, state.unixMs);
+                    PopupRow row = Labeled(route.name, when.front());
+                    for (size_t i = 1; i < when.size(); ++i)
+                        row.cells.back().text.push_back(when[i]);
+                    popup.sections.back().rows.push_back(std::move(row));
+                }
+            if (picked(WorldSection::Weather))
+            {
+                // Each element: when it can next roll here, and in how many zones today.
+                PopupRow grid = Grid(kWorldWeatherColumns, kElementCount * kWorldWeatherColumns);
+                const uint32_t today = VanaAt(state.unixMs).day;
+                for (int e = 0; e < kElementCount; ++e)
+                {
+                    const auto element    = static_cast<Element>(e);
+                    const ZoneWeather here = WeatherHere(state.zone, element, state.unixMs);
+                    grid.cells.push_back(Cell(Colored(ElementName(element), ElementColor(element))));
+                    grid.cells.push_back(here.next ? Cell(ListOf(Text(std::string(WeatherName(here.next->weather)) + " " +
+                                                                      std::to_string(here.next->percent) + "%"),
+                                                              Text(kDot, Tone::Dim), Text(here.when, Tone::Dim)),
+                                                         WeatherIcon(here.next->weather))
+                                                   : Cell(Text(here.when, Tone::Dim)));
+                    grid.cells.push_back(Cell(Text(std::to_string(ZonesWithElement(element, today)) + " zones today", Tone::Dim)));
+                }
+                popup.sections.push_back(PopupSection{"Weather", ListOf(std::move(grid))});
+            }
+            if (picked(WorldSection::Guilds))
+            {
+                PopupRow grid = Grid(kWorldGuildColumns, GuildShops().size() * kWorldGuildColumns);
+                for (const GuildShop& shop : GuildShops())
+                {
+                    grid.cells.push_back(Cell(Text(shop.guild)));
+                    grid.cells.push_back(Cell(GuildText(shop, state.unixMs)));
+                    grid.cells.push_back(Cell(Text(std::string(shop.shops) + ", " + shop.zone, Tone::Dim)));
+                }
+                popup.sections.push_back(PopupSection{"Guilds", ListOf(std::move(grid))});
+            }
+            if (picked(WorldSection::Calendar))
+            {
+                const Rse now = RseAt(state.unixMs), next = RseAt(state.unixMs, 1);
+                const uint32_t today = VanaAt(state.unixMs).day;
+                PopupSection calendar{"Calendar", {}};
+                PopupRow rse = Labeled("RSE", Text(now.race));
+                rse.cells.back().text.push_back(Text(kDot, Tone::Dim));
+                rse.cells.back().text.push_back(Text(now.place));
+                calendar.rows.push_back(std::move(rse));
+                PopupRow coming = Labeled("Next RSE", Text(next.race));
+                coming.cells.back().text.push_back(Text(kDot, Tone::Dim));
+                coming.cells.back().text.push_back(Text("in " + Countdown(now.endsIn)));
+                calendar.rows.push_back(std::move(coming));
+                calendar.rows.push_back(Labeled("Full Moon", Text("in " + Countdown(SecondsToDay(state.unixMs, NextMoonDay(today, true))))));
+                calendar.rows.push_back(Labeled("New Moon", Text("in " + Countdown(SecondsToDay(state.unixMs, NextMoonDay(today, false))))));
+                calendar.rows.push_back(Labeled("Conquest Tally", Text("in " + Countdown(SecondsToTally(state.unixMs)))));
+                popup.sections.push_back(std::move(calendar));
+            }
+            return popup;
+        }
+
         // Red when full; dim for a bag with no room yet, which is not full.
         Span BagFill(const BagCount& bag)
         {
@@ -769,10 +925,17 @@ namespace headsup
                 (o.clockZone ? zonedClock : localClock) = true;
                 serverClock = serverClock || o.clockServerTime;
             }
+        // World Info reads the zone for a weather, on the panel or in its popup.
+        bool worldWeather = open && open->kind == BarWidget::World &&
+                            (settings.Widget(*open).worldSections & WorldBit(WorldSection::Weather)) != 0;
+        for (int copy = 0; copy < kMostCopies; ++copy)
+            if (const PanelWidget world{BarWidget::World, copy}; Shows(settings, world))
+                worldWeather = worldWeather || settings.Widget(world).worldLine == WorldLine::Weather;
         needs.unixTime   = shown(BarWidget::Weather) || shown(BarWidget::VanaTime) || zonedClock || serverClock ||
-                           opened(BarWidget::EarthTime) || opened(BarWidget::Zone); // the Zone popup counts down to the tally
+                           shown(BarWidget::World) || opened(BarWidget::EarthTime) ||
+                           opened(BarWidget::Zone); // the Zone popup counts down to the tally
         needs.localTime  = localClock;
-        needs.zone       = shown(BarWidget::Zone) || shown(BarWidget::Weather) ||
+        needs.zone       = shown(BarWidget::Zone) || shown(BarWidget::Weather) || worldWeather ||
                      opened(BarWidget::Signet); // the popup says where it works
         needs.target     = shown(BarWidget::Target) || shown(BarWidget::Distance);
         needs.gil        = shown(BarWidget::Gil);
@@ -995,6 +1158,8 @@ namespace headsup
             break;
         case BarWidget::Memory:
             return MemoryWidget(state.memory);
+        case BarWidget::World:
+            return WorldWidget(state, o);
         }
         return w;
     }
@@ -1180,6 +1345,8 @@ namespace headsup
         case BarWidget::Distance: break;
         case BarWidget::Memory:
             return MemoryPopup(state.memory, state.cpuPercent, state.frames, state.linuxxi);
+        case BarWidget::World:
+            return WorldPopup(state, o);
         }
         return popup;
     }

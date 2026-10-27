@@ -73,6 +73,11 @@ namespace headsup
         bool targetDetails   = false; // Target: a mob's icons after its name and its weaknesses after its level
         bool targetBorder    = true;  // and its frame, or its pill's own edge
         bool targetJobs      = true;  // and a player's jobs and levels, as far as they are known
+        WorldLine worldLine  = WorldLine::Departure; // World Info: what it tells on the panel
+        int worldRoute       = 0;                    // its departure, by TravelRoutes
+        Element worldElement = Element::Fire;        // its weather
+        int worldGuild       = 0;                    // its guild shop, by GuildShops
+        uint8_t worldSections = kAllWorldSections;   // its popup's parts, by WorldBit
         bool operator==(const WidgetOptions&) const = default;
     };
     // A copy as a new one is: shown, and the first copies as kBarWidgetDefaults has them.

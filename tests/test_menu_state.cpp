@@ -274,6 +274,6 @@ TEST(the_widgets_page_has_a_tab_for_every_widget_on_the_bar_in_rows_as_even_as_t
         const auto widget = static_cast<BarWidget>(w);
         CHECK_EQ(std::ranges::count(tabs, widget), OnTheBar(widget) ? 1 : 0); // Game help has a card of its own
     }
-    CHECK(tabs.front() == BarWidget::Zone && tabs.back() == BarWidget::Conquest);
+    CHECK(tabs.front() == BarWidget::Zone && tabs.back() == BarWidget::World);
 }
 

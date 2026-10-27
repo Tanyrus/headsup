@@ -398,6 +398,11 @@
                 {"key": "border", "name": "Border", "tip": "The frame around your target. Off, it has the same edge as every other widget."},
                 {"key": "currency", "name": "Currency"},
                 {"key": "nations", "name": "Nations", "tip": "Whose regions the widget counts and its popup lists."},
+                {"key": "shows", "name": "Shows", "tip": "What the widget tells on the panel, with a countdown. Add a copy to show another."},
+                {"key": "ship", "name": "Ship", "tip": "The boat or airship whose next departure the widget shows."},
+                {"key": "element", "name": "Element", "tip": "Shows when that element's weather can next roll in the zone you are in, and its chance that day."},
+                {"key": "guild", "name": "Guild", "tip": "The guild shop whose hours the widget shows."},
+                {"key": "popup", "name": "Popup", "tip": "The parts its popup shows when you hover it."},
                 {"key": "bag", "name": "Bag", "tip": "The bag this widget shows on the panel. Hover it for every bag."},
                 {"key": "time-zone", "name": "Time Zone", "tip": "Local is your computer's. Another zone goes before the time, as in PDT 21:07."},
                 {"key": "server-time", "name": "Server Time", "tip": "Japan's time, which the server keeps and the resets go by, as a second line under your own."},
@@ -867,7 +872,27 @@
         {"name": "Distance", "tip": "How far your target is, in yalms."},
         {"name": "Memory", "tip": "The game's memory used, over what is left before it runs out at 4 GB; amber, then red, as it runs low. Hover for the processor, the frames and the LinuxXI plugin's figures."},
         {"name": "EXP", "tip": "Your EXP and its bar, on its own. Hover for EXP per hour."},
-        {"name": "Conquest", "tip": "How many regions each nation holds. Hover for which ones."}
+        {"name": "Conquest", "tip": "How many regions each nation holds. Hover for which ones."},
+        {"name": "World Info", "tip": "The next ship, a weather, a guild's hours, the RSE or the moon, as you pick. Hover for every ship, the weather by element, the guilds and the calendar."}
+      ]
+    },
+    {
+      "key": "world-line",
+      "options": [
+        {"name": "Next Ship"},
+        {"name": "Weather"},
+        {"name": "Guild Hours"},
+        {"name": "RSE"},
+        {"name": "Moon"}
+      ]
+    },
+    {
+      "key": "world-sections",
+      "options": [
+        {"name": "Travel"},
+        {"name": "Weather"},
+        {"name": "Guilds"},
+        {"name": "Calendar"}
       ]
     },
     {

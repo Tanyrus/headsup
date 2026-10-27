@@ -1836,6 +1836,25 @@ TEST(a_copy_added_has_a_tab_and_a_chip_of_its_own_and_its_settings_are_its_own)
     CHECK_EQ(window.Said(), "");
 }
 
+TEST(the_world_info_tab_offers_the_pick_for_what_it_shows)
+{
+    Window window;
+    WidgetOptions& world = window.settings.Widget(BarWidget::World);
+    world.on             = true;
+    window.Page("widgets");
+    // Its tab is the last: Game help has none.
+    window.Click("widgets-widgets-widget-t-" + std::to_string(static_cast<int>(BarWidget::World) - 1));
+    CHECK(window.Shows("widgets-widgets-ship-world") && !window.Shows("widgets-widgets-element-world"));
+    window.Click("widgets-widgets-shows-world");
+    CHECK(window.Click("widgets-widgets-shows-world-o-1"));
+    CHECK(world.worldLine == WorldLine::Weather);
+    CHECK(window.Shows("widgets-widgets-element-world") && !window.Shows("widgets-widgets-ship-world"));
+    window.Click("widgets-widgets-element-world");
+    CHECK(window.Click("widgets-widgets-element-world-o-4"));
+    CHECK(world.worldElement == Element::Lightning);
+    CHECK_EQ(window.Said(), "");
+}
+
 TEST(every_widget_tab_shows_its_whole_name_however_many_copies_there_are)
 {
     // The narrowest and the widest of the fonts the window can be set in.

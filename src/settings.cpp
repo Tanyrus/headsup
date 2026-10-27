@@ -6,6 +6,7 @@
 #include "game_font.h"
 #include "pointer_keys.h"
 #include "utf16.h"
+#include "world_info.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -171,6 +172,12 @@ namespace headsup
         constexpr const char* kBarCurrencyKey = "barCurrency";
         constexpr const char* kBarBagKey      = "barBag";
         constexpr const char* kBarNationsKey  = "barNations";
+        constexpr const char* kWorldLineKey     = "barWorldLine";
+        constexpr const char* kWorldRouteKey    = "barWorldRoute";
+        constexpr const char* kWorldElementKey  = "barWorldElement";
+        constexpr const char* kWorldGuildKey    = "barWorldGuild";
+        constexpr const char* kWorldSectionsKey = "barWorldSections";
+        const char* const kWorldLineNames[kWorldLineCount] = {"departure", "weather", "guild", "rse", "moon"};
         constexpr const char* kClockServerTimeKey = "clockServerTime";
         // Server time was a widget of its own, with this switch.
         constexpr const char* kServerTimeWidgetKey = "barServerTime";
@@ -214,7 +221,7 @@ namespace headsup
         const char* const kBarSeparatorsNames[kBarSeparatorsCount] = {"theme", "diamonds", "none"};
         const char* const kBarWidgetKeys[] = {"barZone", "barWeather", "barVanaTime", "barTarget", "barGil", "barBags",
             "barEarthTime", "barGameHelp", "barFps", "barJob", "barConnection", "barParty", "barSignet", "barDistance", "barMemory",
-            "barExp", "barConquest"};
+            "barExp", "barConquest", "barWorld"};
         static_assert(std::size(kBarWidgetKeys) == kBarWidgetCount);
         const char* const kBarSectionKeys[] = {"barLeft", "barCenter", "barRight"};
         static_assert(std::size(kBarSectionKeys) == kBarSectionCount);
@@ -1234,6 +1241,11 @@ namespace headsup
             w.expBarWidth  = std::clamp(w.expBarWidth, kMinExpBarWidth, kMaxExpBarWidth);
             w.expBarHeight = std::clamp(w.expBarHeight, kMinExpBarHeight, kMaxExpBarHeight);
             if (static_cast<int>(w.jobLayout) >= kJobLayoutCount) w.jobLayout = fresh.jobLayout;
+            if (static_cast<int>(w.worldLine) >= kWorldLineCount) w.worldLine = fresh.worldLine;
+            if (w.worldRoute < 0 || w.worldRoute >= static_cast<int>(TravelRoutes().size())) w.worldRoute = fresh.worldRoute;
+            if (w.worldGuild < 0 || w.worldGuild >= static_cast<int>(GuildShops().size())) w.worldGuild = fresh.worldGuild;
+            if (static_cast<int>(w.worldElement) >= kElementCount) w.worldElement = fresh.worldElement;
+            w.worldSections &= kAllWorldSections;
         }
         if (static_cast<int>(s.barSubtitle) >= kSubtitlePlaceCount) s.barSubtitle = d.barSubtitle;
         if (MenuFontNamed(s.menuFont) == nullptr) s.menuFont = d.menuFont;
@@ -1290,6 +1302,22 @@ namespace headsup
             case BarWidget::Conquest:
                 o.nations = static_cast<uint8_t>(std::clamp(number(kBarNationsKey, o.nations), 0, static_cast<int>(kAllNations)));
                 break;
+            case BarWidget::World:
+            {
+                const std::string line = text(kWorldLineKey), route = text(kWorldRouteKey), guild = text(kWorldGuildKey);
+                const std::string element = text(kWorldElementKey);
+                for (int l = 0; l < kWorldLineCount; ++l)
+                    if (line == kWorldLineNames[l]) o.worldLine = static_cast<WorldLine>(l);
+                for (size_t r = 0; r < TravelRoutes().size(); ++r)
+                    if (route == TravelRoutes()[r].name) o.worldRoute = static_cast<int>(r);
+                for (size_t g = 0; g < GuildShops().size(); ++g)
+                    if (guild == GuildShops()[g].shops) o.worldGuild = static_cast<int>(g);
+                for (int e = 0; e < kElementCount; ++e)
+                    if (element == ElementName(static_cast<Element>(e))) o.worldElement = static_cast<Element>(e);
+                o.worldSections = static_cast<uint8_t>(
+                    std::clamp(number(kWorldSectionsKey, o.worldSections), 0, static_cast<int>(kAllWorldSections)));
+                break;
+            }
             case BarWidget::EarthTime:
             {
                 const std::string zone = text(kClockZoneKey);
@@ -1353,6 +1381,13 @@ namespace headsup
             case BarWidget::Gil: text(kBarCurrencyKey, kCurrencyTable[o.currency].key); break;
             case BarWidget::Bags: StoreFloat(store, CopyKey(kBarBagKey, w), static_cast<float>(o.bag)); break;
             case BarWidget::Conquest: StoreFloat(store, CopyKey(kBarNationsKey, w), static_cast<float>(o.nations)); break;
+            case BarWidget::World:
+                text(kWorldLineKey, kWorldLineNames[static_cast<int>(o.worldLine)]);
+                text(kWorldRouteKey, TravelRoutes()[static_cast<size_t>(o.worldRoute)].name);
+                text(kWorldElementKey, ElementName(o.worldElement));
+                text(kWorldGuildKey, GuildShops()[static_cast<size_t>(o.worldGuild)].shops);
+                StoreFloat(store, CopyKey(kWorldSectionsKey, w), static_cast<float>(o.worldSections));
+                break;
             case BarWidget::EarthTime:
                 text(kClockZoneKey, o.clockZone ? kClockZoneNames[static_cast<int>(*o.clockZone)] : kLocalZone);
                 flag(kClock24Key, o.clock24);

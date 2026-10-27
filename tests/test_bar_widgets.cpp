@@ -1,14 +1,18 @@
 #include "bar_widgets.h"
+#include "bar_server_time.h"
+#include "ph_timers.h"
 #include "labels.h"
 #include "test.h"
 #include "vanadiel.h"
 #include "weather.h"
+#include "world_info.h"
 
 #include <cmath>
 
 #include <algorithm>
 #include <cstdio>
 #include <map>
+#include <span>
 #include <string>
 #include <utility>
 
@@ -2007,4 +2011,87 @@ TEST(two_nations_picked_are_one_line_of_two_cells_and_one_is_its_name_over_the_w
     settings.Widget(BarWidget::Conquest).nations = NationBit(Nation::Bastok);
     const WidgetContent one = BarWidgetContent(BarWidget::Conquest, state, settings);
     CHECK(!one.cells && Joined(one.title) == "Bastok 1" && Joined(one.subtitle) == "Conquest");
+}
+
+namespace
+{
+    // Day 9, an Earthsday, at 10:00: 576 s into the airships' 864 s cycle.
+    constexpr int64_t kEarthsdayTen = kVanaEpochUnixMs + (9LL * 3456 + 10 * 144) * 1000;
+    template <typename T>
+    int IndexOf(std::span<const T> items, const char* name, const char* T::*field)
+    {
+        for (size_t i = 0; i < items.size(); ++i)
+            if (std::string(items[i].*field) == name) return static_cast<int>(i);
+        return -1;
+    }
+    Settings WorldShowing(WorldLine line)
+    {
+        Settings settings;
+        WidgetOptions& o = settings.Widget(BarWidget::World);
+        o.on             = true;
+        o.worldLine      = line;
+        o.worldRoute     = IndexOf(TravelRoutes(), "Jeuno to San d'Oria", &TravelRoute::name);
+        o.worldGuild     = IndexOf(GuildShops(), "Chaupire", &GuildShop::shops);
+        o.worldElement   = Element::Water;
+        return settings;
+    }
+}
+
+TEST(the_world_info_widget_tells_what_you_picked_with_its_countdown)
+{
+    BarState state;
+    state.unixMs = kEarthsdayTen;
+    state.zone   = 79; // Caedarva Mire
+    const auto shown = [&](WorldLine line) {
+        const WidgetContent w = BarWidgetContent(BarWidget::World, state, WorldShowing(line));
+        return Joined(w.title) + " / " + Joined(w.subtitle);
+    };
+    // The airship's door opens at 28 s into the next cycle: 864 - 576 + 28 s from now.
+    CHECK_EQ(shown(WorldLine::Departure), "Jeuno to San d'Oria / Boards in 5:16");
+    // Open until 21:00, 11 Vana'diel hours away.
+    CHECK_EQ(shown(WorldLine::Guild), std::string("Woodworking / Open") + kDot + "closes in 26:24");
+    // Week 1: Hume Female in Gusgen Mines, until day 16.
+    CHECK_EQ(shown(WorldLine::Rse), std::string("Hume Female / Gusgen Mines") + kDot + "ends in 6:19:12");
+    // Day 9 is 12% and waxing; full on day 46.
+    CHECK_EQ(shown(WorldLine::Moon), "Waxing Crescent 12% / Full moon in 35:07:12");
+    const std::optional<ElementWeather> rain = NextElementWeather(*ZoneById(79), Element::Water, VanaAt(kEarthsdayTen).day);
+    const std::string when = rain->day == VanaAt(kEarthsdayTen).day ? "Can roll here now"
+                                                                     : "Here in " + Countdown(SecondsToDay(kEarthsdayTen, rain->day));
+    CHECK_EQ(shown(WorldLine::Weather), std::string(WeatherName(rain->weather)) + " " + std::to_string(rain->percent) + "% / " + when);
+    // A zone that never rolls it.
+    state.zone = 100; // West Ronfaure: sunshine and clouds only
+    CHECK_EQ(shown(WorldLine::Weather), "Water weather / Not in this zone");
+}
+
+TEST(the_world_info_popup_has_the_parts_you_picked)
+{
+    BarState state;
+    state.unixMs = kEarthsdayTen;
+    state.zone   = 79;
+    Settings settings = WorldShowing(WorldLine::Departure);
+    const auto headings = [&] {
+        std::vector<std::string> out;
+        for (const PopupSection& section : BarPopupContent(BarWidget::World, state, settings).sections)
+            out.push_back(section.heading);
+        return out;
+    };
+    CHECK((headings() == std::vector<std::string>{"Airships", "Boats", "Manaclipper", "Barge", "Weather", "Guilds", "Calendar"}));
+    settings.Widget(BarWidget::World).worldSections = WorldBit(WorldSection::Calendar);
+    CHECK((headings() == std::vector<std::string>{"Calendar"}));
+    const PopupContent calendar = BarPopupContent(BarWidget::World, state, settings);
+    const std::vector<std::string> lines = Lines(calendar.sections[0]);
+    CHECK_EQ(lines[0], std::string("RSE Hume Female") + kDot + "Gusgen Mines");
+    CHECK_EQ(lines[1], std::string("Next RSE Elvaan Male") + kDot + "in 6:19:12");
+    CHECK_EQ(lines[2], "Full Moon in 35:07:12");
+    // The next new moon is day 88.
+    CHECK_EQ(lines[3], "New Moon in " + Countdown(SecondsToDay(kEarthsdayTen, 88)));
+    CHECK_EQ(lines[4], "Conquest Tally in " + Countdown(SecondsToTally(kEarthsdayTen)));
+    // Each ship's line says when it boards, or that it is boarding.
+    settings.Widget(BarWidget::World).worldSections = WorldBit(WorldSection::Travel);
+    const PopupContent travel = BarPopupContent(BarWidget::World, state, settings);
+    const std::vector<std::string> airships = Lines(travel.sections[0]);
+    CHECK(std::ranges::find(airships, "Jeuno to San d'Oria Boards in 5:16") != airships.end());
+    state.unixMs = kVanaEpochUnixMs + 864LL * 1000 + 100 * 1000; // 100 s into a cycle: its door opened at 28 s
+    const std::vector<std::string> boarding = Lines(BarPopupContent(BarWidget::World, state, settings).sections[0]);
+    CHECK(std::ranges::find(boarding, std::string("Jeuno to San d'Oria Boarding") + kDot + "leaves in 1:22") != boarding.end());
 }
