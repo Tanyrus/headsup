@@ -10,6 +10,7 @@
 #include "bar_types.h"
 #include "game_packets.h"
 #include "game_state.h"
+#include "outposts.h"
 #include "icons.h"
 #include "settings.h"
 #include "strip_text.h"
@@ -28,8 +29,8 @@ namespace headsup
     {
         uint32_t used = 0, max = 0;
     };
-    constexpr int kContainerCount = 17; // Ashita's containers 0 (inventory) to 16 (wardrobe 8)
     constexpr uint32_t kInventory = 0, kGilSlot = 0; // gil is an item in the inventory's first slot
+    constexpr int kStorage = 2, kTemporaryItems = 3, kMogSafe2 = 9;
     // That slot's item read as gil: its count when the item is gil, nullopt for anything else there.
     std::optional<uint32_t> GilOf(uint16_t item, uint32_t count);
     // A container as Ashita counts it: nullopt for one the character has no room in (locked, or not bought).
@@ -37,6 +38,10 @@ namespace headsup
     // The container whose name, as the Bags popup gives it, the caption is: the game's caption for a bag list, or
     // "Items" for the inventory as that menu opens.
     std::optional<int> ContainerNamed(const std::string& caption);
+    // And the other way: a container's name, "Mog Satchel".
+    const char* ContainerName(int container);
+    // The containers the Bags widget lists and may show, in their order: every one but the temporary items.
+    const std::vector<int>& BagChoices();
 
     // What the widgets show, gathered by the plugin each frame.
     struct BarState
@@ -61,6 +66,8 @@ namespace headsup
         std::optional<Weather> weather; // the latest from the server; nullopt before one since loading or zoning
         std::optional<RegionOwners> owners; // nullopt before a conquest update
         std::optional<RegionShares> shares; // nullopt before a conquest update since the last zone-in
+        std::optional<Nation> nation;       // yours, once in game
+        const OutpostRuns* outposts = nullptr; // your character's supply runs, as overseers told them
         std::optional<FrameReport> frames; // nullopt before the first frame
         std::optional<JobReport> job; // nullopt while the game reports no job
         std::optional<ConnectionReport> connection;
@@ -89,15 +96,16 @@ namespace headsup
         bool memory     = false;
         bool cpu        = false;
         bool linuxxi    = false;
+        bool conquest   = false; // your nation and supply runs, for the Conquest popup
         int containers = 0; // bags from 0 up to this
     };
-    BarNeeds NeedsOf(const Settings& settings, std::optional<BarWidget> open);
+    BarNeeds NeedsOf(const Settings& settings, std::optional<PanelWidget> open);
 
     // Game help is never shown on the bar: it has a bar of its own, under the top bar.
-    WidgetContent BarWidgetContent(BarWidget widget, const BarState& state, const Settings& settings);
+    WidgetContent BarWidgetContent(PanelWidget widget, const BarState& state, const Settings& settings);
     // The used and total slots of the bag the game's caption names, as the Bags widget writes them.
     std::optional<Span> StripBagFill(const BarState& state);
-    PopupContent BarPopupContent(BarWidget widget, const BarState& state, const Settings& settings);
+    PopupContent BarPopupContent(PanelWidget widget, const BarState& state, const Settings& settings);
     // The element colors of the weekdays and weather, from the spec.
     uint32_t ElementColor(Element element);
 }

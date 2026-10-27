@@ -75,7 +75,7 @@ namespace headsup
     {
         float width = 0.0f;
         for (const Span& s : spans)
-            width += Width(host, s.text, face);
+            width += s.picture != GamePicture::None ? kPictureGap + std::round(face.size) : Width(host, s.text, face);
         return width;
     }
 
@@ -143,28 +143,83 @@ namespace headsup
     const RmlBar::Rows& RmlBar::RowsFor(RmlHost& host, const BarMetrics& m, BarShape shape, int barText,
         const char* titleFont, const char* detailFont)
     {
-        return m_Rows.Get(LinesKey{m.height, shape, barText, titleFont, detailFont}, [&](const LinesKey&) {
-            Rows rows;
-            rows.lines = FitTextRow(m, [&](bool title, int pixels) {
-                return title ? m_Gdi.FontInk(titleFont, pixels, kTitleGlyphs)
-                             : m_Gdi.FontInk(detailFont, pixels, kDetailGlyphs);
-            });
-            const TextRow& t = rows.lines;
-            rows.place.title   = PlaceLine(host, titleFont, t.title, kTitleGlyphs, t.titleY, t.aloneY);
-            rows.place.figures = PlaceLine(host, detailFont, t.title, kTitleGlyphs, t.titleY, t.aloneY);
-            rows.place.detail  = PlaceLine(host, detailFont, t.detail, kDetailGlyphs, t.detailY, t.detailY);
-            // A line box is as tall for any text in its font: the caption's and the help's, as GDI draws them.
-            int width = 0, caption = 0, help = 0;
-            m_Gdi.Extent("H", titleFont, t.title, 0, width, caption);
-            m_Gdi.Extent("H", detailFont, t.title, 0, width, help);
-            rows.helpBarHeight = std::round(static_cast<float>(std::max(caption, help)) + 2.0f * HelpBarPad(m));
-            return rows;
-        });
+        return m_Rows.Get(LinesKey{m.height, shape, barText, titleFont, detailFont},
+            [&](const LinesKey&) { return MakeRows(host, m, titleFont, detailFont); });
     }
 
-    bool RmlBar::Document(RmlHost& host, const BarLook& look, const BarTextPlace& place)
+    const RmlBar::Rows& RmlBar::WidgetRowsFor(RmlHost& host, const BarMetrics& m, BarShape shape, int barText,
+        const char* titleFont, const char* detailFont)
     {
-        DocumentKey key{look.palette, look.metrics, look.row, look.lines, place, look.titleFont, look.detailFont};
+        const LinesKey key{m.height, shape, barText, titleFont, detailFont};
+        for (const auto& [known, rows] : m_WidgetRows)
+            if (known == key) return rows;
+        for (auto& [known, rows] : m_WidgetRowsBefore)
+            if (known == key) return m_WidgetRows.emplace_back(known, std::move(rows)).second;
+        return m_WidgetRows.emplace_back(key, MakeRows(host, m, titleFont, detailFont)).second;
+    }
+
+    RmlBar::Rows RmlBar::MakeRows(RmlHost& host, const BarMetrics& m, const char* titleFont, const char* detailFont)
+    {
+        Rows rows;
+        rows.lines = FitTextRow(m, [&](bool title, int pixels) {
+            return title ? m_Gdi.FontInk(titleFont, pixels, kTitleGlyphs)
+                         : m_Gdi.FontInk(detailFont, pixels, kDetailGlyphs);
+        });
+        const TextRow& t = rows.lines;
+        rows.place.title   = PlaceLine(host, titleFont, t.title, kTitleGlyphs, t.titleY, t.aloneY);
+        rows.place.figures = PlaceLine(host, detailFont, t.title, kTitleGlyphs, t.titleY, t.aloneY);
+        rows.place.detail  = PlaceLine(host, detailFont, t.detail, kDetailGlyphs, t.detailY, t.detailY);
+        rows.place.side    = PlaceLine(host, detailFont, t.side, kDetailGlyphs, t.sideY, t.sideY);
+        // A line box is as tall for any text in its font: the caption's and the help's, as GDI draws them.
+        int width = 0, caption = 0, help = 0;
+        m_Gdi.Extent("H", titleFont, t.title, 0, width, caption);
+        m_Gdi.Extent("H", detailFont, t.title, 0, width, help);
+        rows.helpBarHeight = std::round(static_cast<float>(std::max(caption, help)) + 2.0f * HelpBarPad(m));
+        return rows;
+    }
+
+    void RmlBar::OwnText(RmlHost& host, const BarLook& look, const Settings& settings, Widgets& widgets)
+    {
+        // The rows asked for last frame and not again go.
+        m_WidgetRowsBefore = std::move(m_WidgetRows);
+        m_WidgetRows.clear();
+        const BarShape shape = look.palette.shape;
+        for (int slot = 0; slot < kPanelSlots; ++slot)
+        {
+            const PanelWidget widget = WidgetInSlot(slot);
+            const WidgetOptions& o   = settings.widgets[slot];
+            if (!OnTheBar(widget.kind) || !Shows(settings, widget) ||
+                (o.titleFont.empty() && o.textFont.empty() && o.textSize == kPanelTextSize))
+                continue;
+            // Its own fonts where RmlUi can read them, the bar's where it cannot.
+            const char* titleFont = WidgetTitleFont(settings, shape, o);
+            if (!host.EnsureFont(titleFont)) titleFont = look.titleFont;
+            const char* detailFont = WidgetTextFont(settings, o);
+            if (!host.EnsureFont(detailFont)) detailFont = look.detailFont;
+            const int size     = WidgetTextSize(settings, o);
+            const BarMetrics m = MetricsFor(settings.barHeight, shape, size, settings.popupTextSize);
+            const Rows& rows   = WidgetRowsFor(host, m, shape, size, titleFont, detailFont);
+            widgets.text[slot] = WidgetText{widget, titleFont, detailFont, rows.lines, rows.place};
+        }
+    }
+
+    BarLook RmlBar::LookOf(const BarLook& look, const Widgets& widgets, int slot)
+    {
+        BarLook own = look;
+        if (const std::optional<WidgetText>& text = widgets.text[slot])
+        {
+            own.titleFont  = text->titleFont;
+            own.detailFont = text->detailFont;
+            own.lines      = text->lines;
+        }
+        return own;
+    }
+
+    bool RmlBar::Document(RmlHost& host, const BarLook& look, const BarTextPlace& place, const Widgets& widgets)
+    {
+        DocumentKey key{look.palette, look.metrics, look.row, look.lines, place, look.titleFont, look.detailFont, {}, look.skin};
+        for (const std::optional<WidgetText>& text : widgets.text)
+            if (text) key.own.push_back(*text);
         if (m_Document != nullptr && key == m_DocumentKey) return true;
         // A strip of other colors or rows is another image: the one before is let go, or every step of a color's
         // slider would keep its own.
@@ -173,12 +228,11 @@ namespace headsup
         };
         if (m_Document != nullptr && strip(m_DocumentKey) != strip(key)) Rml::ReleaseTexture(strip(m_DocumentKey));
         Close();
-        m_Document = host.Bar()->LoadDocumentFromMemory(BarDocument(look, place), kDocumentName);
+        m_Document = host.Bar()->LoadDocumentFromMemory(BarDocument(look, place, key.own), kDocumentName);
         if (m_Document == nullptr) return false;
         m_DocumentKey = std::move(key);
-        for (int w = 0; w < kBarWidgetCount; ++w)
-            if (OnTheBar(static_cast<BarWidget>(w)))
-                m_Shown[w].element = m_Document->GetElementById(WidgetId(static_cast<BarWidget>(w)));
+        for (int slot = 0; slot < kPanelSlots; ++slot)
+            if (OnTheBar(WidgetInSlot(slot).kind)) m_Shown[slot].element = m_Document->GetElementById(WidgetId(WidgetInSlot(slot)));
         for (int d = 0; d < kDividerCount; ++d)
             m_Dividers[d].element = m_Document->GetElementById(DividerId(d));
         m_RightCap     = m_Document->GetElementById(kRightCapId);
@@ -193,48 +247,63 @@ namespace headsup
         Widgets& widgets)
     {
         const BarMetrics& m = look.metrics;
-        std::array<float, kBarWidgetCount> natural{};
-        for (int i = 0; i < kBarWidgetCount; ++i)
+        std::array<float, kPanelSlots> natural{};
+        for (int i = 0; i < kPanelSlots; ++i)
         {
             WidgetContent& c = widgets.contents[i];
-            c                = BarWidgetContent(static_cast<BarWidget>(i), state, look.settings);
+            c                = BarWidgetContent(WidgetInSlot(i), state, look.settings);
             if (!c.shown) continue;
-            if (!look.lines.twoLines) OneLine(c, look.settings.barSubtitle);
+            const BarLook own = LookOf(look, widgets, i);
+            if (!own.lines.twoLines) OneLine(c, look.settings.barSubtitle);
             widgets.hasPopup[i] = c.hasPopup;
             Shown& shown        = m_Shown[i];
-            if (!shown.measured || !(shown.content == c))
+            const float padding = WidgetPadding(m, look.settings.widgets[i]);
+            widgets.spacing[i]  = static_cast<float>(look.settings.widgets[i].spacing);
+            if (!shown.measured || !(shown.content == c) || shown.padded != padding)
             {
                 shown.content  = c;
                 shown.measured = true;
-                shown.natural  = 2.0f * m.padding + look.Leading(c) +
-                                std::max(SteadyWidth(host, c.title, c.titleIcons, look.TitleFace(c)),
-                                    look.lines.twoLines ? SteadyWidth(host, c.subtitle, c.subtitleIcons, look.DetailFace())
-                                                        : 0.0f) +
+                shown.padded   = padding;
+                // A widget of cells is as wide as its columns; another as its longer line.
+                shown.columns = c.cells ? CellColumns(c, [&](bool title, const Span& span) {
+                    return SteadyWidth(host, {span}, {}, title ? own.TitleFace(c) : own.DetailFace());
+                }) : std::vector<float>{};
+                const auto detail = [&](const std::vector<Span>& spans) { return SteadyWidth(host, spans, {}, own.DetailFace()); };
+                shown.meter = c.meter ? PlaceMeter(*c.meter, MeterWidths{detail(c.meter->above), detail(c.meter->below),
+                                                                 detail(c.meter->left), detail(c.meter->right)}, m.gap)
+                                      : MeterPlace{};
+                const float text = c.meter ? shown.meter.width
+                                   : c.cells ? CellsWidth(shown.columns, m.gap)
+                                             : std::max(SteadyWidth(host, c.title, c.titleIcons, own.TitleFace(c)),
+                                                   own.lines.twoLines ? SteadyWidth(host, c.subtitle, c.subtitleIcons, own.DetailFace()) : 0.0f);
+                shown.natural  = 2.0f * padding + own.Leading(c) + text +
                                 (c.progress && c.progressBeside ? m.gap + BesideWidth(m) : 0.0f);
             }
             natural[i] = shown.natural;
         }
         // The target goes when its room cannot hold its padding, its icons and the start of its name.
-        WidgetContent& target = widgets.contents[static_cast<int>(BarWidget::Target)];
+        WidgetContent& target = widgets.contents[SlotOf(BarWidget::Target)];
+        const BarLook targetLook  = LookOf(look, widgets, SlotOf(BarWidget::Target));
+        const float targetPadding = WidgetPadding(m, look.settings.Widget(BarWidget::Target));
         const float targetMinimum =
-            2.0f * m.padding + look.Leading(target) +
+            2.0f * targetPadding + targetLook.Leading(target) +
             (target.title.empty() ? 0.0f
-                                  : Width(host, Shortest(target.title.front().text, kFewLetters), look.TitleFace()));
+                                  : Width(host, Shortest(target.title.front().text, kFewLetters), targetLook.TitleFace()));
         const BarLayout layout = LayoutBar(screenWidth, m, look.palette.shape, natural, targetMinimum,
-            look.settings.barSections, look.settings.barSeparators);
-        if (layout.targetWidth > 0.0f && layout.targetWidth < natural[static_cast<int>(BarWidget::Target)] &&
+            look.settings.barSections, look.settings.barSeparators, widgets.spacing);
+        if (layout.targetWidth > 0.0f && layout.targetWidth < natural[SlotOf(BarWidget::Target)] &&
             !target.title.empty())
         {
             // Each line's icons keep their room; its text is cut.
-            const float room   = layout.targetWidth - 2.0f * m.padding - look.Leading(target);
+            const float room   = layout.targetWidth - 2.0f * targetPadding - targetLook.Leading(target);
             std::string& title = target.title.front().text;
-            title = Fitted(host, m_TitleFit, std::move(title), look.TitleFace(),
-                room - LineWidth(host, {}, target.titleIcons, look.TitleFace()));
-            if (look.lines.twoLines && !target.subtitle.empty())
+            title = Fitted(host, m_TitleFit, std::move(title), targetLook.TitleFace(),
+                room - LineWidth(host, {}, target.titleIcons, targetLook.TitleFace()));
+            if (targetLook.lines.twoLines && !target.subtitle.empty())
             {
                 std::string& detail = target.subtitle.front().text;
-                detail = Fitted(host, m_SubtitleFit, std::move(detail), look.DetailFace(),
-                    room - LineWidth(host, {}, target.subtitleIcons, look.DetailFace()));
+                detail = Fitted(host, m_SubtitleFit, std::move(detail), targetLook.DetailFace(),
+                    room - LineWidth(host, {}, target.subtitleIcons, targetLook.DetailFace()));
             }
         }
         return layout;
@@ -244,25 +313,33 @@ namespace headsup
         const BarInput& input, float screenWidth)
     {
         const BarMetrics& m = look.metrics;
-        for (int w = 0; w < kBarWidgetCount; ++w)
+        for (int w = 0; w < kPanelSlots; ++w)
         {
             Shown& shown = m_Shown[w];
             if (shown.element == nullptr) continue;
-            const auto widget   = static_cast<BarWidget>(w);
+            const PanelWidget widget = WidgetInSlot(w);
             const BarRect* rect = RectOf(layout, widget);
             shown.element->SetClass(kHiddenClass, rect == nullptr);
             if (rect == nullptr) continue;
             // A plain ornate widget keeps the divider's clear space either side as its margin.
-            const float inset = look.ornate && widget != BarWidget::Target ? DiamondClearance(m) : 0.0f;
+            const float inset = look.ornate && widget.kind != BarWidget::Target ? DiamondClearance(m) : 0.0f;
             Set(shown.element, Rml::PropertyId::Left, shown.left.value, rect->x);
             Set(shown.element, Rml::PropertyId::Width, shown.width.value, rect->width - 2.0f * inset);
+            const float side = SidePadding(look, widget, shown.padded);
+            if (shown.padding.value != side)
+            {
+                shown.padding.value = side;
+                for (const Rml::PropertyId edge : {Rml::PropertyId::PaddingLeft, Rml::PropertyId::PaddingRight})
+                    shown.element->SetProperty(edge, Rml::Property(side, Rml::Unit::PX));
+            }
             shown.element->SetClass(kLitClass,
                 widgets.hasPopup[w] && (input.Hovered() == widget || input.Open() == widget));
+            shown.element->SetClass(kBorderlessClass, widget.kind == BarWidget::Target && !look.settings.widgets[w].targetBorder);
             const WidgetContent& content = widgets.contents[w];
             if (shown.marked && shown.drawn == content) continue;
             shown.drawn  = content;
             shown.marked = true;
-            shown.element->SetInnerRML(WidgetRml(content, look));
+            shown.element->SetInnerRML(WidgetRml(content, LookOf(look, widgets, w), shown.columns, shown.meter));
         }
         const auto diamond = static_cast<float>(WholePixels(m.diamond));
         for (size_t d = 0; d < m_Dividers.size(); ++d)
@@ -284,7 +361,7 @@ namespace headsup
     {
         cut = false;
         HelpBarParts parts;
-        if (look.settings.barWidgets[static_cast<int>(BarWidget::GameHelp)] && state.strip &&
+        if (look.settings.Widget(BarWidget::GameHelp).on && state.strip &&
             !(state.strip->caption.empty() && state.strip->help.empty()))
         {
             const BarMetrics& m        = look.metrics;
@@ -324,7 +401,7 @@ namespace headsup
 
     bool RmlBar::PopupDocumentFor(RmlHost& host, const BarLook& look)
     {
-        PopupDocumentKey key{look.palette, look.metrics, look.titleFont, look.detailFont};
+        PopupDocumentKey key{look.palette, look.metrics, look.titleFont, look.detailFont, look.skin};
         if (m_PopupDocument != nullptr && key == m_PopupDocumentKey) return true;
         ClosePopup();
         for (int f = 0; f < kPopupFontCount; ++f)
@@ -346,7 +423,7 @@ namespace headsup
     BarRect RmlBar::ShowPopup(RmlHost& host, const BarLook& look, const BarState& state,
         const BarLayout& layout, float screenWidth, float screenHeight, const BarInput& input, bool hidden)
     {
-        const std::optional<BarWidget> open = input.Open();
+        const std::optional<PanelWidget> open = input.Open();
         const BarRect* anchor               = open ? RectOf(layout, *open) : nullptr;
         if (anchor == nullptr)
         {
@@ -368,7 +445,7 @@ namespace headsup
         // The ornate panel's outer border and the line under the strip count: the gap is from them. The help bar's
         // popup goes under the help bar's box.
         const auto out        = static_cast<float>(OuterPad(PopupPanel(look)));
-        const float barBottom = *open == BarWidget::GameHelp ? anchor->y + anchor->height : BarBottom(p, m);
+        const float barBottom = open->kind == BarWidget::GameHelp ? anchor->y + anchor->height : BarBottom(p, m);
         PopupKey key{BarPopupContent(*open, state, look.settings), input.Pinned() == open, m.height, m.popupText,
             p.shape, PopupRoom(barBottom, screenHeight, m.gap, out)};
         bool fresh            = false;
@@ -417,16 +494,17 @@ namespace headsup
         const Rows& rows = RowsFor(host, m, p.shape, settings.barTextSize, titleFont, detailFont);
         BarLook look{p, settings, m, PillRow(m), rows.lines, titleFont, p.shape == BarShape::Ornate, detailFont,
             std::nullopt};
-        if (p.shape == BarShape::Window && skin != nullptr) look.skin = skin->frame;
+        if (p.shape == BarShape::Window && skin != nullptr) look.skin = FrameAsSet(settings, skin->frame);
         m_TitlePixels = look.lines.title;
         m_BarBottom   = BarBottom(p, m);
-        if (!Document(host, look, rows.place))
+        Widgets widgets;
+        OwnText(host, look, settings, widgets);
+        if (!Document(host, look, rows.place, widgets))
         {
             input.Frame(BarLayout{}, {});
             input.SetPopup(BarRect{});
             return;
         }
-        Widgets widgets;
         BarLayout layout = PlaceWidgets(host, look, state, screenWidth, widgets);
         ShowWidgets(look, layout, widgets, input, screenWidth);
         // The help bar where the player moved it from its place under the top bar.
@@ -438,9 +516,9 @@ namespace headsup
         {
             // Hovered, it opens the popup with the rest, as a widget would.
             layout.widgets.push_back(PlacedWidget{BarWidget::GameHelp, help});
-            widgets.hasPopup[static_cast<int>(BarWidget::GameHelp)] = true;
+            widgets.hasPopup[SlotOf(BarWidget::GameHelp)] = true;
         }
-        if (settings.barWidgets[static_cast<int>(BarWidget::GameHelp)])
+        if (settings.Widget(BarWidget::GameHelp).on)
             m_HelpReach = BarRect{HelpBarLeft(m) + helpX, helpTop, HelpBarWidth(screenWidth), rows.helpBarHeight};
         input.Frame(layout, widgets.hasPopup);
         input.SetPopup(

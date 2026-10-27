@@ -30,12 +30,30 @@ namespace headsup
         Own, // argb
     };
 
+    // A picture read from the game's files at load, drawn in place of a span's text as tall as its letters.
+    enum class GamePicture : uint8_t
+    {
+        None,
+        PlayOnlineMail,
+        PlayOnlineMessenger,
+    };
+
     struct Span
     {
         std::string text;
-        Tone tone     = Tone::Normal;
-        uint32_t argb = 0;
+        Tone tone           = Tone::Normal;
+        uint32_t argb       = 0;
+        GamePicture picture = GamePicture::None;
         bool operator==(const Span&) const = default;
+    };
+
+    // A bar in a widget's middle, filled to done of its width, with text on any side of it.
+    struct Meter
+    {
+        float done = 0.0f;
+        int width = 0, height = 0; // pixels
+        std::vector<Span> above, below, left, right;
+        bool operator==(const Meter&) const = default;
     };
 
     struct WidgetContent
@@ -51,6 +69,10 @@ namespace headsup
         bool figures = false;
         std::optional<float> progress; // 0 to 1: a bar along the widget's foot, as EXP to the next level
         bool progressBeside = false;   // the bar after the text instead, centered on the row
+        // Each span of either line is a cell, and the cells at one place of their lines a column, the columns a gap
+        // apart: the Conquest widget's two by two.
+        bool cells = false;
+        std::optional<Meter> meter; // in place of the lines
         bool operator==(const WidgetContent&) const = default;
     };
 

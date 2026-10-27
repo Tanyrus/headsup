@@ -18,13 +18,13 @@
 // What the settings window's pages say and the small questions they ask.
 namespace headsup
 {
-    constexpr int kWidgetTabRows     = 2;
+    constexpr int kWidgetTabsPerRow  = 7; // the most a row of the Widgets page's tabs holds: more, and names are cut
 
     // Which widgets have a second line, or icons, for their options to offer switching off.
     inline bool HasSecondLine(BarWidget w)
     {
         return w != BarWidget::EarthTime && w != BarWidget::Fps && w != BarWidget::Connection &&
-               w != BarWidget::Distance && w != BarWidget::GameHelp;
+               w != BarWidget::Distance && w != BarWidget::GameHelp && w != BarWidget::Exp;
     }
     inline bool HasIcons(BarWidget w) { return w == BarWidget::Weather || w == BarWidget::Target || w == BarWidget::Gil; }
 
@@ -46,18 +46,6 @@ namespace headsup
     {
         const char* label = WindowLabel(window);
         return label != nullptr ? label : window;
-    }
-
-    // The section a widget is in, and where.
-    inline std::pair<int, size_t> PlaceOf(const BarPlacement& placement, BarWidget widget)
-    {
-        for (int section = 0; section < kBarSectionCount; ++section)
-        {
-            const std::vector<BarWidget>& list = placement[section];
-            if (const auto at = std::ranges::find(list, widget); at != list.end())
-                return {section, static_cast<size_t>(at - list.begin())};
-        }
-        return {0, 0};
     }
 
     // The Replace Dashes list shows the marks themselves, as the window's style draws them (menu_document).

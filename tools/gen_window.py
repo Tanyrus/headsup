@@ -139,7 +139,7 @@ PIECES = Pieces(
         'visibility': Setting(entity=True, unnamed=True, rows=VISIBILITY_ROWS,
                               words={'nameplates': True, 'outlines': True}),
         'outline-colors': Setting(entity=True, unnamed=True),
-        'design': Setting(entity=True, unnamed=True),
+        'design': Setting(entity=True, unnamed=True, words={'move-up': False, 'move-down': False}),
         'max-icons-shown': Setting(entity=True, kinds=('players', 'self'), words={'all': True}),
         'unused-tags': Setting(entity=True, unnamed=True),
         'line-styles': Setting(entity=True, unnamed=True, rows=rows(
@@ -172,7 +172,7 @@ PIECES = Pieces(
         'window-list': Setting(unnamed=True, words={'note': True, 'find': True, 'name-hint': True, 'all-windows': False,
                                                     'hide': True, 'keep': True, 'row-tip': False}),
         # Top Panel and Widgets
-        'theme': Setting(), 'window-type': Setting(options=9), 'separators': Setting(options=3), 'title-font': Setting(), 'text-font': Setting(),
+        'theme': Setting(), 'window-type': Setting(options=9), 'window-border': Setting(), 'separators': Setting(options=3), 'title-font': Setting(), 'text-font': Setting(),
         'height': Setting(), 'text-size': Setting(), 'one-line': Setting(options=3), 'popup-size': Setting(),
         'hide-readout': Setting(), 'shift-vanilla-ui': Setting(),
         'theme-shape': Setting(options=4), 'theme-background': Setting(), 'theme-gradient': Setting(),
@@ -185,8 +185,9 @@ PIECES = Pieces(
         'theme-files': Setting(unnamed=True, words={'save-as': True, 'name-hint': True, 'save': True, 'load': True}),
         'hide-game-help': Setting(), 'position': Setting(), 'background': Setting(),
         'widget-tabs': Setting(unnamed=True, rows=rows(
-            'enabled', 'section', 'second-line', 'icons', 'details', 'currency', 'time-zone', 'server-time', '24-hour',
-            'seconds', 'layout', 'exp-bar', 'job-names', 'latency')),
+            'enabled', 'section', 'copies', 'second-line', 'icons', 'spacing', 'padding', 'title-font', 'text-font', 'text-size', 'details', 'border', 'jobs', 'currency', 'bag', 'nations', 'time-zone', 'server-time', '24-hour',
+            'seconds', 'layout', 'exp-text', 'exp-bar', 'exp-earned', 'exp-to-next', 'exp-percent', 'bar-width', 'bar-height',
+            'job-names', 'percent', 'latency'), words={'add-copy': True, 'remove-copy': True}),
         'trays': Setting(unnamed=True), 'reset-layout': Setting(),
         # Mouse Cursor and HeadsUp Config
         'pointer-icon': Setting(options=3, nameless=frozenset({2})), 'pointer-size': Setting(), 'pointer-fix': Setting(), 'keep-pointer': Setting(),
@@ -203,7 +204,7 @@ PIECES = Pieces(
         'plate-mode': List(4), 'outline-mode': List(4, extra={3: 'tipOnClaimRows'}), 'color-source': List(7),
         'show-condition': List(13), 'ornament-place': List(5), 'align': List(3), 'font-style': List(3),
         'smoothness': List(4), 'bar-theme': List(7), 'bar-sections': List(3),
-        'bar-widgets': List(15), 'plate-lines': List(3), 'job-layout': List(3), 'exp-bar': List(3), 'tags': List(24),
+        'bar-widgets': List(17), 'plate-lines': List(3), 'job-layout': List(3), 'exp-bar': List(3), 'exp-text': List(3), 'exp-place': List(5), 'nations': List(4), 'tags': List(24),
     },
     words={'switched-off': True, 'switch-off': True, 'switch-on': True, 'switched-off-top-panel': True,
            'switched-off-headsup': True, 'key-add': True, 'key-waiting': True, 'always': True, 'never': True, 'conditions': True, 'local': True, 'themes-font': True,

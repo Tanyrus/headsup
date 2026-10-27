@@ -60,6 +60,15 @@ namespace headsup
     MenuColors MenuColorsFor(const Settings& settings, const GameSkinLook* skin);
     // A window in a panel's colors: its page the panel's foot, cards and controls each a step toward its text.
     MenuColors MenuColorsFrom(const BarPalette& palette);
+    // The game's art as the settings draw it: without its border while Border is off.
+    SkinFrame FrameAsSet(const Settings& settings, SkinFrame frame);
+    // A widget's own title and text fonts, or the panel's: one pointer per name, as BarTitleFont and BarTextFont give.
+    const char* WidgetTitleFont(const Settings& settings, BarShape shape, const WidgetOptions& options);
+    const char* WidgetTextFont(const Settings& settings, const WidgetOptions& options);
+    // Its title size setting: its own, or the panel's.
+    int WidgetTextSize(const Settings& settings, const WidgetOptions& options);
+    // The room from a widget's sides to what it shows: its own, or the theme's.
+    float WidgetPadding(const BarMetrics& metrics, const WidgetOptions& options);
 
     // What Game Window looks as while the game's art is not read.
     constexpr BarTheme kGameArtFallback = BarTheme::PhoenixGold;
@@ -77,6 +86,8 @@ namespace headsup
     constexpr uint32_t kCoinColor  = 0xFFE8C35A;
     constexpr float kCapScale      = 1.4f;  // an end cap's diamond, in diamonds
     constexpr float kLineIconGap   = 2.0f;  // pixels between the icons after a line's text
+    constexpr float kPictureGap    = 6.0f;  // before a game picture among a line's text
+    constexpr float kMeterTextGap  = 2.0f;  // between a meter's bar and the text above or below it
     constexpr float kProgressInset = 2.0f;  // pixels from the pill row's foot, inside its border
     // A widget's progress bar: a thin track along the pill row's foot, or a taller one beside the text.
     float ProgressHeight(const BarMetrics& metrics, bool beside);

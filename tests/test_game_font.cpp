@@ -424,3 +424,28 @@ TEST(a_glyph_drawn_smaller_averages_the_pixels_each_pixel_covers)
     const Coverage c = GameFontRasterize(face, GameFontVariant::Narrow, "I", 6, kPlain, 0, 0);
     CHECK(c.width == 2 && At(c, 0, 1) == 32 && At(c, 1, 1) == 96);
 }
+
+TEST(the_games_playonline_icons_are_the_envelope_and_messenger_squares_of_its_message_icons)
+{
+    // 64 x 64 in DXT1: blue in the envelope's 16 x 16 at (32, 48), green in the messenger's at (48, 48), red elsewhere.
+    Bytes blocks;
+    for (int by = 0; by < 16; ++by)
+        for (int bx = 0; bx < 16; ++bx)
+            blocks = blocks + ColorBlock(by >= 12 && bx >= 8 && bx < 12 ? 0x001F : by >= 12 && bx >= 12 ? 0x07E0 : 0xF800, 0, {});
+    const Bytes icons = Chunk("mesi", 0x20, PictureBody(64, 64, "DXT1", blocks, 0xA1, "menu    mesicon "));
+    const Bytes other = Chunk("font", 0x20, PictureBody(4, 4, "DXT1", ColorBlock(0xFFFF, 0, {})));
+    const Read<PlayOnlineIcons> read = ReadPlayOnlineIcons(other + icons);
+    CHECK(read.value && read.failure.empty());
+    const auto all = [](const ColorPicture& p, uint8_t b, uint8_t g, uint8_t r) {
+        bool same = p.width == 16 && p.height == 16 && p.bgra.size() == 16 * 16 * 4;
+        for (size_t i = 0; same && i < p.bgra.size(); i += 4)
+            same = p.bgra[i] == b && p.bgra[i + 1] == g && p.bgra[i + 2] == r && p.bgra[i + 3] == 255;
+        return same;
+    };
+    CHECK(all(read.value->mail, 255, 0, 0));
+    CHECK(all(read.value->messenger, 0, 255, 0));
+    CHECK(!ReadPlayOnlineIcons(other).value && !ReadPlayOnlineIcons(other).failure.empty());
+    const Bytes small = Chunk("mesi", 0x20, PictureBody(32, 32, "DXT1", Bytes(64 * 8, 0), 0xA1, "menu    mesicon "));
+    CHECK(!ReadPlayOnlineIcons(small).value);
+    CHECK(!ReadPlayOnlineIcons(Chunk("mesi", 0x20, PictureBody(64, 64, "DXT1", blocks, 0xA1, "menu    mesicxx "))).value);
+}

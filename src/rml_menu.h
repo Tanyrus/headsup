@@ -85,6 +85,8 @@ namespace headsup
         bool Place(const MenuHost& host, Settings& settings, float pixels);
         void ApplyOpacity();
         bool RunKey(Rml::ElementFormControlInput* input, const std::string& id, Rml::Input::KeyIdentifier key);
+        // A drop, or a drag held (type), of dragged on the control under the pointer, as the form is told of it.
+        FormEvent DropOn(Rml::Element* hovered, Rml::Element* dragged, const char* type, Rml::Event& event) const;
         // One pass of the pages over these events, told which control has the keyboard.
         Form Pass(std::vector<FormEvent> events, const MenuHost& host, Settings& settings, const MenuReadings& readings,
             const std::vector<std::string>& fonts);
@@ -116,6 +118,7 @@ namespace headsup
         std::unordered_map<std::string, Applied> m_Applied; // what each value was last set to, by its id, kind and name
         std::unordered_map<std::string, std::string> m_FocusValue; // a text box's text as it took the keyboard
         std::vector<FormEvent> m_Events; // since the last pass
+        FormEvent m_HeldOver;            // the drag held, as last told
         MenuFormState m_State;
         std::optional<float> m_ScrollTo;
         bool m_Closed = false; // its close button was clicked

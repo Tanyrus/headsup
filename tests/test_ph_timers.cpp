@@ -17,6 +17,12 @@ namespace
 
     PhSighting Worm(uint32_t serverId = kWorm) { return PhSighting{serverId, 180, "Bigmouth Billy"}; }
     PhSighting Billy() { return PhSighting{kBigmouthBilly, 180, "Bigmouth Billy"}; }
+    // A death the player had earned the timer of while it lived.
+    void Fought(PhTimers& timers, double at, const PhSighting& mob)
+    {
+        timers.Earned(mob.serverId);
+        timers.Died(at, mob);
+    }
 }
 
 TEST(a_placeholder_is_seen_with_its_respawn_and_its_nms_name)
@@ -45,7 +51,7 @@ TEST(a_lottery_nm_is_seen_with_its_placeholders_respawn_and_its_own_name)
 TEST(a_placeholders_defeat_starts_its_timer)
 {
     PhTimers t;
-    t.Died(101.0, Worm());
+    Fought(t, 101.0, Worm());
     const std::vector<TimerLine> lines = t.Lines(kEastRonfaure, 101.0);
     CHECK_EQ(lines.size(), 1u);
     CHECK(lines[0].text == "Bigmouth Billy [11A] 3:14" && !lines[0].up); // despawn 14 s after the message, then 180 s
@@ -55,7 +61,7 @@ TEST(a_placeholders_defeat_starts_its_timer)
 TEST(an_nms_defeat_starts_its_placeholders_timer_under_the_nms_id)
 {
     PhTimers t;
-    t.Died(101.0, Billy());
+    Fought(t, 101.0, Billy());
     CHECK(t.Lines(kEastRonfaure, 101.0)[0].text == "Bigmouth Billy [11C] 3:14");
     CHECK_EQ(*t.SecondsLeft(kBigmouthBilly, 101.0), kWormSpan);
     CHECK(!t.SecondsLeft(kWorm, 101.0).has_value());
@@ -64,14 +70,14 @@ TEST(an_nms_defeat_starts_its_placeholders_timer_under_the_nms_id)
 TEST(a_death_with_no_respawn_starts_nothing)
 {
     PhTimers t; // a Dynamis statue's spawn: it never comes back on a timer
-    t.Died(101.0, PhSighting{kWorm, 0, "Bigmouth Billy"});
+    Fought(t, 101.0, PhSighting{kWorm, 0, "Bigmouth Billy"});
     CHECK(t.Lines(kEastRonfaure, 101.0).empty());
 }
 
 TEST(a_mob_seen_alive_again_loses_its_timer)
 {
     PhTimers t;
-    t.Died(101.0, Worm());
+    Fought(t, 101.0, Worm());
     t.Update(250.0, {kOtherWorm});
     CHECK_EQ(t.Lines(kEastRonfaure, 250.0).size(), 1u);
     t.Update(251.0, {kWorm});
@@ -81,15 +87,15 @@ TEST(a_mob_seen_alive_again_loses_its_timer)
 TEST(a_later_defeat_starts_the_timer_again)
 {
     PhTimers t;
-    t.Died(101.0, Worm());
-    t.Died(400.0, Worm());
+    Fought(t, 101.0, Worm());
+    Fought(t, 400.0, Worm());
     CHECK_EQ(*t.SecondsLeft(kWorm, 400.0), kWormSpan);
 }
 
 TEST(a_timer_reads_up_when_due_then_goes)
 {
     PhTimers t;
-    t.Died(101.0, Worm());
+    Fought(t, 101.0, Worm());
     const double due = 101.0 + kWormSpan;
     t.Update(due, {});
     const std::vector<TimerLine> lines = t.Lines(kEastRonfaure, due);
@@ -103,9 +109,9 @@ TEST(a_timer_reads_up_when_due_then_goes)
 TEST(only_this_zones_timers_show_soonest_first)
 {
     PhTimers t;
-    t.Died(101.0, Worm(kLaTheineMob));
-    t.Died(110.0, Worm());
-    t.Died(111.0, Worm(kOtherWorm));
+    Fought(t, 101.0, Worm(kLaTheineMob));
+    Fought(t, 110.0, Worm());
+    Fought(t, 111.0, Worm(kOtherWorm));
     const std::vector<TimerLine> lines = t.Lines(kEastRonfaure, 120.0);
     CHECK_EQ(lines.size(), 2u);
     CHECK(lines[0].text == "Bigmouth Billy [11A] 3:04" && lines[1].text == "Bigmouth Billy [11B] 3:05");
@@ -123,8 +129,50 @@ TEST(a_countdown_reads_minutes_and_seconds_or_hours)
 TEST(a_placeholders_seconds_left_count_down_to_zero)
 {
     PhTimers timers;
-    timers.Died(110.0, PhSighting{0x1001ABC, 300, "Some NM"});
+    Fought(timers, 110.0, PhSighting{0x1001ABC, 300, "Some NM"});
     CHECK(!timers.SecondsLeft(0x1001DEF, 110.0).has_value());
     CHECK_EQ(*timers.SecondsLeft(0x1001ABC, 110.0), kDeathToDespawnSeconds - kDefeatMessageSeconds + 300.0);
     CHECK_EQ(*timers.SecondsLeft(0x1001ABC, 110.0 + kDeathToDespawnSeconds + 400.0), 0.0);
+}
+
+TEST(a_death_starts_a_timer_only_once_it_was_earned_while_the_mob_lived)
+{
+    PhTimers t;
+    t.Died(101.0, Worm()); // in range of the defeat message, and nothing more
+    CHECK(t.Lines(kEastRonfaure, 101.0).empty());
+    t.Earned(kWorm);
+    t.Died(400.0, Worm());
+    CHECK_EQ(*t.SecondsLeft(kWorm, 400.0), kWormSpan);
+    // Earned once is for that life: its next death starts nothing unless earned again.
+    t.Update(700.0, {kWorm});
+    t.Died(800.0, Worm());
+    CHECK(!t.SecondsLeft(kWorm, 800.0).has_value());
+    // A zone change forgets what was earned there.
+    t.Earned(kOtherWorm);
+    t.Zoned();
+    t.Died(900.0, Worm(kOtherWorm));
+    CHECK(!t.SecondsLeft(kOtherWorm, 900.0).has_value());
+}
+
+TEST(a_timer_is_earned_by_targeting_or_by_being_active_with_it_on_your_screen)
+{
+    CHECK(EarnsTimer(true, false, false)); // targeting counts even standing still
+    CHECK(EarnsTimer(false, true, true));
+    CHECK(!EarnsTimer(false, true, false)); // away from the keyboard
+    // In range and active, but not seen: a party member's claim off your screen earns you nothing (the user, 2026-10-26).
+    CHECK(!EarnsTimer(false, false, true));
+}
+
+TEST(you_are_active_until_you_have_not_moved_or_turned_for_two_and_a_half_minutes)
+{
+    Activity a;
+    CHECK(!a.Active(10.0)); // never seen moving
+    a.Pose(10.0, WorldPoint{1.0f, 2.0f, 3.0f}, 0.5f);
+    a.Pose(20.0, WorldPoint{1.0f, 2.0f, 3.0f}, 0.5f); // the first pose is where you stand, not a move
+    CHECK(!a.Active(20.0));
+    a.Pose(30.0, WorldPoint{1.5f, 2.0f, 3.0f}, 0.5f);
+    CHECK(a.Active(30.0) && a.Active(30.0 + kIdleSeconds));
+    CHECK(!a.Active(30.0 + kIdleSeconds + 1.0));
+    a.Pose(400.0, WorldPoint{1.5f, 2.0f, 3.0f}, 1.0f); // turning on the spot counts
+    CHECK(a.Active(400.0));
 }

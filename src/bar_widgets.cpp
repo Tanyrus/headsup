@@ -25,6 +25,7 @@ namespace headsup
             "Mog Locker", "Mog Satchel", "Mog Sack", "Mog Case", "Mog Wardrobe", "Mog Safe 2", "Mog Wardrobe 2",
             "Mog Wardrobe 3", "Mog Wardrobe 4", "Mog Wardrobe 5", "Mog Wardrobe 6", "Mog Wardrobe 7", "Mog Wardrobe 8"};
         constexpr const char* kItemsMenu = "Items";
+        constexpr const char* kAnonymousJobs = "? ? ?"; // as the game writes an anonymous player's
         // The Mog House's own short captions for some of them, as the game's strip titles their lists.
         struct ShortCaption
         {
@@ -77,7 +78,7 @@ namespace headsup
         // "WAR 75 / NIN 37", or the game's "? ? ?" for an anonymous player, whose jobs come as 0.
         std::string CheckedJobs(const InspectGeneral& g)
         {
-            return g.mainJob == 0 ? "? ? ?" : JobsText(g.mainJob, g.mainLevel, g.subJob, g.subLevel);
+            return g.mainJob == 0 ? kAnonymousJobs : JobsText(g.mainJob, g.mainLevel, g.subJob, g.subLevel);
         }
 
         // The tracker fills a mob's level only while it lives; a dead target has none, but its record still names
@@ -679,6 +680,18 @@ namespace headsup
 
         bool InConquest(const ZoneRecord* zone) { return zone != nullptr && zone->region < kConquestRegionCount; }
 
+        // The Conquest widget's nations, short, by Nation.
+        constexpr const char* kNationShort[] = {"", "S", "B", "W", "BM"};
+        constexpr size_t kNationsPerLine     = 2;
+
+        std::vector<Nation> PickedNations(uint8_t bits)
+        {
+            std::vector<Nation> picked;
+            for (const Nation nation : {Nation::SanDoria, Nation::Bastok, Nation::Windurst, Nation::Beastmen})
+                if (bits & NationBit(nation)) picked.push_back(nation);
+            return picked;
+        }
+
         // Who holds the zone's region; no one before a conquest update or outside the conquest regions.
         Nation OwnerOf(const ZoneRecord* zone, const BarState& state)
         {
@@ -692,10 +705,11 @@ namespace headsup
             return SdtIcon(kFirstElementSdt + static_cast<int>(*element));
         }
 
+        // Red when full; dim for a bag with no room yet, which is not full.
         Span BagFill(const BagCount& bag)
         {
             return Text(std::to_string(bag.used) + " / " + std::to_string(bag.max),
-                bag.used >= bag.max ? Tone::Resist : Tone::Normal);
+                bag.max == 0 ? Tone::Dim : bag.used >= bag.max ? Tone::Resist : Tone::Normal);
         }
     }
 
@@ -716,6 +730,19 @@ namespace headsup
         return max > 0 ? std::optional<BagCount>(BagCount{used, max}) : std::nullopt;
     }
 
+    const char* ContainerName(int container) { return kContainerNames[std::clamp(container, 0, kContainerCount - 1)]; }
+
+    const std::vector<int>& BagChoices()
+    {
+        static const std::vector<int> choices = [] {
+            std::vector<int> all;
+            for (int c = 0; c < kContainerCount; ++c)
+                if (c != kTemporaryItems) all.push_back(c);
+            return all;
+        }();
+        return choices;
+    }
+
     std::optional<int> ContainerNamed(const std::string& caption)
     {
         for (int c = 0; c < kContainerCount; ++c)
@@ -727,25 +754,33 @@ namespace headsup
         return std::nullopt;
     }
 
-    BarNeeds NeedsOf(const Settings& settings, std::optional<BarWidget> open)
+    BarNeeds NeedsOf(const Settings& settings, std::optional<PanelWidget> open)
     {
-        auto shown = [&](BarWidget widget) { return settings.barWidgets[static_cast<int>(widget)]; };
+        const auto shown  = [&](BarWidget widget) { return Shown(settings, widget); };
+        const auto opened = [&](BarWidget widget) { return open && open->kind == widget; };
         BarNeeds needs;
-        // The Clock in a zone of its own goes by the time alone, as its server line and its popup's resets do; in the
+        // A Clock in a zone of its own goes by the time alone, as its server line and its popup's resets do; in the
         // computer's zone, by what Windows makes of the time.
-        const bool clock = shown(BarWidget::EarthTime), zonedClock = clock && settings.clockZone.has_value();
-        needs.unixTime   = shown(BarWidget::Weather) || shown(BarWidget::VanaTime) || zonedClock ||
-                           (clock && (settings.clockServerTime || open == BarWidget::EarthTime)) ||
-                           (shown(BarWidget::Zone) && open == BarWidget::Zone); // the popup counts down to the tally
-        needs.localTime  = clock && !zonedClock;
+        bool zonedClock = false, localClock = false, serverClock = false;
+        for (int copy = 0; copy < kMostCopies; ++copy)
+            if (const PanelWidget clock{BarWidget::EarthTime, copy}; Shows(settings, clock))
+            {
+                const WidgetOptions& o = settings.Widget(clock);
+                (o.clockZone ? zonedClock : localClock) = true;
+                serverClock = serverClock || o.clockServerTime;
+            }
+        needs.unixTime   = shown(BarWidget::Weather) || shown(BarWidget::VanaTime) || zonedClock || serverClock ||
+                           opened(BarWidget::EarthTime) || opened(BarWidget::Zone); // the Zone popup counts down to the tally
+        needs.localTime  = localClock;
         needs.zone       = shown(BarWidget::Zone) || shown(BarWidget::Weather) ||
-                     (shown(BarWidget::Signet) && open == BarWidget::Signet); // the popup says where it works
+                     opened(BarWidget::Signet); // the popup says where it works
         needs.target     = shown(BarWidget::Target) || shown(BarWidget::Distance);
         needs.gil        = shown(BarWidget::Gil);
         needs.strip      = shown(BarWidget::GameHelp);
-        const bool memoryPopup = shown(BarWidget::Memory) && open == BarWidget::Memory;
+        const bool memoryPopup = opened(BarWidget::Memory);
+        needs.conquest   = opened(BarWidget::Conquest);
         needs.frames     = shown(BarWidget::Fps) || memoryPopup;
-        needs.job        = shown(BarWidget::Job);
+        needs.job        = shown(BarWidget::Job) || shown(BarWidget::Exp);
         needs.connection = shown(BarWidget::Connection);
         needs.party      = shown(BarWidget::Party);
         needs.signet     = shown(BarWidget::Signet);
@@ -753,26 +788,32 @@ namespace headsup
         needs.cpu        = memoryPopup;
         needs.linuxxi    = memoryPopup;
         // Ashita counts a container's items by walking its slots, so the others wait for the popup that lists them.
-        if (shown(BarWidget::Bags)) needs.containers = open == BarWidget::Bags ? kContainerCount : 1;
+        if (shown(BarWidget::Bags))
+        {
+            needs.containers = opened(BarWidget::Bags) ? kContainerCount : 1;
+            for (int copy = 0; copy < kMostCopies; ++copy)
+                if (const PanelWidget bags{BarWidget::Bags, copy}; Shows(settings, bags))
+                    needs.containers = std::max(needs.containers, settings.Widget(bags).bag + 1);
+        }
         return needs;
     }
 
     namespace
     {
-        WidgetContent ContentOf(BarWidget widget, const BarState& state, const Settings& settings);
+        WidgetContent ContentOf(PanelWidget widget, const BarState& state, const Settings& settings);
     }
 
-    WidgetContent BarWidgetContent(BarWidget widget, const BarState& state, const Settings& settings)
+    WidgetContent BarWidgetContent(PanelWidget widget, const BarState& state, const Settings& settings)
     {
         // Each widget's own content, less its second line or icons where they are switched off.
-        WidgetContent w = ContentOf(widget, state, settings);
-        const int i     = static_cast<int>(widget);
-        if (!settings.barSecondLine[i])
+        WidgetContent w        = ContentOf(widget, state, settings);
+        const WidgetOptions& o = settings.Widget(widget);
+        if (!o.secondLine)
         {
             w.subtitle.clear();
             w.subtitleIcons.clear();
         }
-        if (!settings.barIcons[i])
+        if (!o.icons)
         {
             w.icons.clear();
             w.titleIcons.clear();
@@ -784,12 +825,13 @@ namespace headsup
 
     namespace
     {
-    WidgetContent ContentOf(BarWidget widget, const BarState& state, const Settings& settings)
+    WidgetContent ContentOf(PanelWidget widget, const BarState& state, const Settings& settings)
     {
         WidgetContent w;
-        w.shown = settings.barWidgets[static_cast<int>(widget)];
+        w.shown = Shows(settings, widget);
         if (!w.shown) return w;
-        switch (widget)
+        const WidgetOptions& o = settings.Widget(widget);
+        switch (widget.kind)
         {
         case BarWidget::Zone:
         {
@@ -836,23 +878,32 @@ namespace headsup
             else if (state.target->kind != EntityKind::Mob)
             {
                 w.title = ListOf(Text(state.target->name));
-                if (state.target->kind == EntityKind::Player && state.targetCheck)
+                if (state.target->kind == EntityKind::Player)
                 {
-                    w.subtitle = ListOf(Text(CheckedJobs(state.targetCheck->general), Tone::Dim));
-                    w.hasPopup = true;
+                    // What is known of their jobs, the newest first; a check alone has a popup to show.
+                    const std::optional<PlayerJobs>& jobs = state.target->jobs;
+                    std::string said;
+                    if (jobs && jobs->mainJob != 0)
+                        said = JobsText(jobs->mainJob, jobs->mainLevel, jobs->subJob, jobs->subLevel);
+                    else if (state.target->status && state.target->status->anonymous)
+                        said = kAnonymousJobs;
+                    else if (state.targetCheck)
+                        said = CheckedJobs(state.targetCheck->general);
+                    if (o.targetJobs && !said.empty()) w.subtitle = ListOf(Text(said, Tone::Dim));
+                    w.hasPopup = state.targetCheck.has_value();
                 }
                 w.hasPopup = w.hasPopup || NpcOf(state.target) != nullptr;
             }
             else
             {
-                if (settings.barTargetDetails)
+                if (o.targetDetails)
                     w.titleIcons = MobIcons(*state.target);
                 else if (const std::optional<Icon> icon = MobIcon(*state.target))
                     w.icons.push_back(*icon);
                 w.title = ListOf(Colored(state.target->name, NameColor(*state.target, settings)));
                 if (HasLevel(*state.target))
                     w.subtitle = ListOf(Colored(state.target->level.text, ShadeColor(*state.target, settings)));
-                if (settings.barTargetDetails && IsMob(state.target))
+                if (o.targetDetails && IsMob(state.target))
                 {
                     // Weaknesses by SDT or rank, as the badges find them by default.
                     const InfoIconSet found = InfoIconsFor(&ResistancesOf(*state.target->mob), BadgeRules{});
@@ -866,7 +917,7 @@ namespace headsup
         case BarWidget::Gil:
         {
             // The picked currency; gil with its coin.
-            const int picked = settings.barCurrency;
+            const int picked = o.currency;
             if (picked == kGilCurrency)
             {
                 w.coin  = true;
@@ -882,18 +933,19 @@ namespace headsup
             break;
         }
         case BarWidget::Bags:
-            w.title    = ListOf(state.bags[0] ? BagFill(*state.bags[0]) : Text("-"));
-            w.subtitle = ListOf(Text("Bags", Tone::Dim));
+        {
+            const std::optional<BagCount>& bag = state.bags[o.bag];
+            w.title    = ListOf(bag ? BagFill(*bag) : Text("-"));
+            w.subtitle = ListOf(Text(o.bag == static_cast<int>(kInventory) ? "Bags" : ContainerName(o.bag), Tone::Dim));
             w.hasPopup = true;
             break;
+        }
         case BarWidget::EarthTime:
-            w.title    = ListOf(Text(settings.clockZone
-                    ? ZoneClockText(ZoneAt(*settings.clockZone, state.unixMs), settings.clock24, settings.clockSeconds)
-                    : ClockText(state.earthHour, state.earthMinute, settings.clock24,
-                          settings.clockSeconds ? state.earthSecond : -1)));
-            if (settings.clockServerTime)
-                w.subtitle = ListOf(Text(
-                    ZoneClockText(ZoneAt(ClockZone::Japan, state.unixMs), settings.clock24, false), Tone::Dim));
+            w.title    = ListOf(Text(o.clockZone
+                    ? ZoneClockText(ZoneAt(*o.clockZone, state.unixMs), o.clock24, o.clockSeconds)
+                    : ClockText(state.earthHour, state.earthMinute, o.clock24, o.clockSeconds ? state.earthSecond : -1)));
+            if (o.clockServerTime)
+                w.subtitle = ListOf(Text(ZoneClockText(ZoneAt(ClockZone::Japan, state.unixMs), o.clock24, false), Tone::Dim));
             w.hasPopup = true;
             break;
         case BarWidget::GameHelp:
@@ -901,9 +953,35 @@ namespace headsup
         case BarWidget::Fps:
             return FpsWidget(state.frames);
         case BarWidget::Job:
-            return JobWidget(state.job, settings.expBar, settings.jobNames, settings.jobLayout);
+            return JobWidget(state.job, o.expBar, o.jobNames, o.jobLayout, o.expText);
+        case BarWidget::Exp:
+            return ExpWidget(state.job, o.expPlaces, o.expBarWidth, o.expBarHeight);
+        case BarWidget::Conquest:
+        {
+            w.subtitle = ListOf(Text("Conquest", Tone::Dim));
+            w.hasPopup = true;
+            if (!state.owners)
+            {
+                w.title = ListOf(Text("-"));
+                break;
+            }
+            // A nation alone by its name; several by their first letters, each in its color, two to a line in columns.
+            const std::vector<Nation> picked = PickedNations(o.nations);
+            w.cells = picked.size() > 1; // its counts alone, without its name under them
+            if (w.cells) w.subtitle.clear();
+            for (size_t i = 0; i < picked.size(); ++i)
+            {
+                const Nation nation    = picked[i];
+                const std::string name = picked.size() == 1 ? NationName(nation) : kNationShort[static_cast<int>(nation)];
+                const Span count = Colored(name + " " + std::to_string(std::ranges::count(*state.owners, nation)), NationColor(nation));
+                (i < kNationsPerLine ? w.title : w.subtitle).push_back(count);
+            }
+            if (w.title.empty()) w.title = ListOf(Text("-"));
+            w.figures = true;
+            break;
+        }
         case BarWidget::Connection:
-            return ConnectionWidget(state.connection, settings.barLatency);
+            return ConnectionWidget(state.connection, o.latency, o.netMeter);
         case BarWidget::Party:
             return PartyWidget(state.party);
         case BarWidget::Signet:
@@ -923,10 +1001,11 @@ namespace headsup
 
     }
 
-    PopupContent BarPopupContent(BarWidget widget, const BarState& state, const Settings& settings)
+    PopupContent BarPopupContent(PanelWidget widget, const BarState& state, const Settings& settings)
     {
         PopupContent popup;
-        switch (widget)
+        const WidgetOptions& o = settings.Widget(widget);
+        switch (widget.kind)
         {
         case BarWidget::Zone:
         {
@@ -1027,11 +1106,14 @@ namespace headsup
         {
             popup.title   = ListOf(Text("Bags"));
             PopupRow grid = Grid(kBagColumns, kBagColumns * kContainerCount);
-            for (int c = 0; c < kContainerCount; ++c)
+            for (const int c : BagChoices())
             {
-                if (!state.bags[c]) continue;
+                // Storage shows before its furniture gives it room. The server gives Mog Safe 2 its room before the
+                // second floor is open: only what is in it says it can be used.
+                const std::optional<BagCount> bag = c == kStorage && !state.bags[c] ? std::optional(BagCount{}) : state.bags[c];
+                if (!bag || (c == kMogSafe2 && bag->used == 0)) continue;
                 grid.cells.push_back(Cell(Text(kContainerNames[c])));
-                grid.cells.push_back(Cell(BagFill(*state.bags[c])));
+                grid.cells.push_back(Cell(BagFill(*bag)));
             }
             popup.sections = ListOf(PopupSection{"", ListOf(std::move(grid))});
             break;
@@ -1039,9 +1121,9 @@ namespace headsup
         case BarWidget::EarthTime:
         {
             int year = state.earthYear, month = state.earthMonth, day = state.earthDay;
-            if (settings.clockZone)
+            if (o.clockZone)
             {
-                const ZoneTime there = ZoneAt(*settings.clockZone, state.unixMs);
+                const ZoneTime there = ZoneAt(*o.clockZone, state.unixMs);
                 year = there.year, month = there.month, day = there.day;
             }
             popup.title =
@@ -1054,7 +1136,41 @@ namespace headsup
         case BarWidget::Fps:
             return FpsPopup(state.frames);
         case BarWidget::Job:
+        case BarWidget::Exp:
             return JobPopup(state.job);
+        case BarWidget::Conquest:
+        {
+            popup.title = ListOf(Text("Conquest"));
+            if (!state.owners)
+            {
+                popup.sections = ListOf(PopupSection{"", ListOf(LineOf("The standings show once the server sends them.", Tone::Dim))});
+                break;
+            }
+            for (const Nation nation : PickedNations(o.nations))
+            {
+                // Your nation's regions say which outposts you have not run supplies to, as far as overseers told.
+                const bool yours = state.nation == nation && state.outposts != nullptr;
+                bool unknown     = false;
+                PopupSection held{NationName(nation), {}};
+                for (int region = 0; region < kConquestRegionCount; ++region)
+                {
+                    if ((*state.owners)[region] != nation) continue;
+                    const auto r              = static_cast<uint8_t>(region);
+                    const std::optional<bool> ran = yours ? state.outposts->Ran(nation, r) : std::optional<bool>(true);
+                    unknown = unknown || !ran;
+                    if (ran == false)
+                        held.rows.push_back(Line(Cell(ListOf(Text(std::string(RegionName(r))), Text(kDot, Tone::Dim),
+                            Text("no supply run", Tone::Dim)))));
+                    else
+                        held.rows.push_back(LineOf(std::string(RegionName(r))));
+                }
+                if (held.rows.empty()) held.rows.push_back(LineOf("None", Tone::Dim));
+                if (unknown)
+                    held.rows.push_back(LineOf("Talk to a conquest overseer in your nation's city to see your supply runs.", Tone::Dim));
+                popup.sections.push_back(std::move(held));
+            }
+            break;
+        }
         case BarWidget::Connection:
             return ConnectionPopup(state.connection);
         case BarWidget::Party:

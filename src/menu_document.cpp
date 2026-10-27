@@ -24,10 +24,14 @@ namespace headsup
         constexpr float kNavSlide     = 0.35f; // how far a page's name moves under the pointer
         constexpr float kToggleKnob   = kToggleHeight - 2.0f * kToggleInset; // its peg's height
         constexpr float kArrow        = 0.35f; // half an arrow's base
+        constexpr float kArrowDepth   = 0.45f; // from its base to its point
         constexpr float kKnob         = 0.35f; // a slider's knob: a bright bar as tall as its track
         constexpr float kCrossLength  = 0.85f; // the close button's cross: each of its two bars
         constexpr float kCrossBar     = 0.12f;
         constexpr float kPillEdge     = 1.0f;  // pixels: a pill's edge, inside its height
+        constexpr float kSegmentGap   = 0.25f; // between two joined choices
+        constexpr float kSegmentPad   = 0.3f;  // a choice's text from its sides, at the least
+        constexpr float kFaint        = 0.45f; // the opacity of a held tag where it would go, and of one leaving
     }
 
     namespace
@@ -42,14 +46,32 @@ namespace headsup
 
         uint32_t Faded(uint32_t argb, uint32_t alpha) { return (argb & ~kAlphaMask) | alpha << kAlphaShift; }
 
-        // What is Aurora's alone: glass in place of flat fills, and dark text on the picked choice's bright gradient.
+        // A fill this bright or brighter (WCAG's relative luminance, of its gradient's two ends) takes dark text: the
+        // gold, blue and cyan accents do, Phoenix's red does not.
+        constexpr float kBrightFill = 0.3f;
+
+        float Luminance(uint32_t argb)
+        {
+            const auto linear = [&](int shift) {
+                const float v = static_cast<float>(Channel(argb, shift)) / 255.0f;
+                return v <= 0.03928f ? v / 12.92f : std::pow((v + 0.055f) / 1.055f, 2.4f);
+            };
+            return 0.2126f * linear(kRedShift) + 0.7152f * linear(kGreenShift) + 0.0722f * linear(kBlueShift);
+        }
+
+        // The text on the accent's gradient: a picked choice or tab, and an accent button.
+        uint32_t OnAccent(const MenuColors& c)
+        {
+            return (Luminance(c.accent) + Luminance(c.accentEnd)) / 2.0f >= kBrightFill ? Opaque(c.inset) : c.text;
+        }
+
+        // What is Aurora's alone: glass in place of flat fills.
         std::string AuroraMenuRules(const MenuColors& c)
         {
             std::string css;
             css += "body{decorator:vertical-gradient(#111b2cf2 #090e17f2);background-color:transparent;border-color:" +
                    RcssColor(Faded(c.accent, kAuroraFrame)) + ";}";
             css += ".card{background-color:transparent;decorator:vertical-gradient(#1c283cb8 #131b2ab8);}";
-            css += ".seg.picked,.tab.picked,.btn.accent{color:" + RcssColor(Opaque(c.inset)) + ";}";
             css += "scrollbarvertical sliderbar{background-color:" + RcssColor(Faded(c.accent, kAuroraFrame)) + ";}";
             css += std::string("#") + kMenuPopupId + ",#" + kMenuTipId + "{border-color:" + RcssColor(Faded(c.accent, kAuroraPopupFrame)) + ";}";
             return css;
@@ -61,7 +83,7 @@ namespace headsup
         // The game's art in place of the window's fill and edge, and of its lists' and tips'.
         std::string SkinMenuRules(const SkinFrame& frame)
         {
-            const std::string art = "background-color:transparent;border-width:0px;border-radius:0px;" + SkinDecorator(frame);
+            const std::string art = "background-color:transparent;border-radius:0px;" + SkinRules(frame);
             return "body{" + art + "}#" + std::string(kMenuPopupId) + ",#" + kMenuTipId + "{" + art + "}";
         }
     }
@@ -225,12 +247,17 @@ namespace headsup
         // Joined choices. These, tabs, buttons and lists ease between their looks, and the picked one is the gradient.
         css += std::string(".seg,.tab,.btn,.dd,.opt,.wchip{transition:background-color") + kEase + ",border-color" + kEase +
                ",color" + kEase + ";}";
-        css += ".seg.picked,.tab.picked,.btn.accent{decorator:horizontal-gradient(" + color(c.accent) + " " + color(c.accentEnd) + ");}";
-        css += ".segs{display:flex;flex-direction:row;}";
-        css += ".seg{height:" + frame + ";" + framed + "text-align:center;background-color:" + color(c.control) +
-               ";color:" + color(c.muted) + ";}";
+        css += ".seg.picked,.tab.picked,.btn.accent{decorator:horizontal-gradient(" + color(c.accent) + " " + color(c.accentEnd) +
+               ");color:" + color(OnAccent(c)) + ";}";
+        // Rounded buttons a little apart, as wide together as a slider, a longer name taking more of it; wider only
+        // where the names need it in a wide font.
+        css += ".segs{display:flex;flex-direction:row;min-width:" + control + ";}";
+        css += ".seg{flex:1 0 auto;height:" + frame + ";" + framed + "padding:0px " + Em(kSegmentPad) + ";margin-left:" +
+               Em(kSegmentGap) + ";border-radius:" + radius + ";text-align:center;white-space:nowrap;background-color:" +
+               color(c.control) + ";color:" + color(c.muted) + ";}";
+        css += ".seg:first-child{margin-left:0px;}";
         css += ".seg:hover{background-color:" + color(c.hover) + ";}";
-        css += ".seg.picked{background-color:" + color(c.accent) + ";color:" + color(c.text) + ";}";
+        css += ".seg.picked{background-color:" + color(c.accent) + ";}";
         // A slider, its value written over it.
         css += ".slider{position:relative;width:" + control + ";height:" + frame + ";}";
         css += "input.range{display:block;width:" + control + ";height:" + frame + ";}";
@@ -269,6 +296,11 @@ namespace headsup
                "padding:0px 0.5em;margin:0.1em 0.1em;}";
         // A line break takes a row of the box to itself, so what follows it starts the next, as on the nameplate.
         css += ".linebox .chip.break{flex:1 0 100%;margin:0.1em 0px;text-align:center;}";
+        // Where a held tag would go: faint, after the letters of the stretch it would split that stand before it.
+        css += std::string(".") + kGhostSlotClass + "{display:flex;flex-direction:row;align-items:center;flex:0 0 auto;}";
+        css += std::string(".") + kGhostTextClass + "{white-space:pre;" + line(kFrame - kRunInset) + "}";
+        css += std::string(".") + kGhostClass + ",." + kLeavingClass + "{opacity:" + RcssNumber(kFaint) + ";}";
+        css += std::string(".") + kReplacedClass + "{display:none;}";
         css += "input.hex{width:6em;}";
         // A dropdown's closed control; its list is the popup.
         css += ".dd{position:relative;box-sizing:border-box;height:" + frame + ";" + framed + "padding:0px " +
@@ -334,6 +366,11 @@ namespace headsup
                " transparent;border-bottom:" + Em(kArrow) + " transparent;}";
         css += ".tri.left{left:0.5em;border-right:0.45em " + color(c.text) + ";}";
         css += ".tri.right{left:0.6em;border-left:0.45em " + color(c.text) + ";}";
+        css += std::string(".") + kArrowRoomClass + "{flex:0 0 auto;width:" + frame + ";height:" + frame + ";}";
+        css += ".tri.up,.tri.down{left:" + Em(kFrame / 2.0f - kArrow) + ";top:" + Em((kFrame - kArrowDepth) / 2.0f) + ";border-left:" + Em(kArrow) +
+               " transparent;border-right:" + Em(kArrow) + " transparent;}";
+        css += ".tri.up{border-top-width:0px;border-bottom:" + Em(kArrowDepth) + " " + color(c.text) + ";}";
+        css += ".tri.down{border-bottom-width:0px;border-top:" + Em(kArrowDepth) + " " + color(c.text) + ";}";
         css += ".chip img{width:1em;height:1em;margin-right:0.3em;vertical-align:-0.15em;}";
         // A chip of several tags: each a part of its own to drag, with a quiet word between.
         css += ".chip .part,.chip .or{display:inline-block;}";
@@ -345,7 +382,7 @@ namespace headsup
                Em(kTabGap) + ";text-align:center;white-space:nowrap;border-radius:" + radius + " " + radius +
                " 0px 0px;background-color:" + color(c.control) + ";color:" + color(c.muted) + ";}";
         css += ".tab:hover{background-color:" + color(c.hover) + ";}";
-        css += ".tab.picked{background-color:" + color(c.accent) + ";color:" + color(c.text) + ";}";
+        css += ".tab.picked{background-color:" + color(c.accent) + ";}";
         css += ".tab-rule{height:" + Em(kTabRule) + ";margin-top:-" + Em(kTabGap) + ";margin-bottom:" + Em(kSpacing) +
                ";decorator:horizontal-gradient(" + color(c.accent) + fadingOut + ";}";
         // The widgets' trays.

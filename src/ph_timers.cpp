@@ -26,9 +26,18 @@ namespace headsup
         return PhSighting{mob->id, mob->respawn, nm != nullptr ? nm->name : kUnknownNmName};
     }
 
+    bool EarnsTimer(bool targeted, bool onScreen, bool active) { return targeted || (active && onScreen); }
+
+    void Activity::Pose(double now, WorldPoint at, float heading)
+    {
+        if (m_At && (at.x != m_At->x || at.y != m_At->y || at.z != m_At->z || heading != m_Heading)) m_MovedAt = now;
+        m_At      = at;
+        m_Heading = heading;
+    }
+
     void PhTimers::Died(double now, const PhSighting& mob)
     {
-        if (mob.respawnSeconds == 0) return;
+        if (!m_Earned.erase(mob.serverId) || mob.respawnSeconds == 0) return;
         m_Timers[mob.serverId] = Timer{mob.serverId, mob.nmName,
             now - kDefeatMessageSeconds + kDeathToDespawnSeconds + static_cast<double>(mob.respawnSeconds)};
     }

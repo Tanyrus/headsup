@@ -1,6 +1,8 @@
 #include "bar_job.h"
 #include "test.h"
 
+#include <cmath>
+
 using namespace headsup;
 
 namespace
@@ -165,4 +167,61 @@ TEST(exp_per_hour_is_taken_at_the_last_whole_second_so_its_figure_changes_once_a
     Run(t, 131.0, 630.0, Sample(30, 1400, 7600));
     t.Update(630.5, Sample(30, 1400, 7600), kMe);
     CHECK_EQ(*t.PerHour(630.5), 400.0 * 3600.0 / 600.0);
+}
+
+TEST(the_exp_says_what_it_is_set_to_earned_to_next_and_a_percent_in_that_order)
+{
+    const auto bits = [](std::initializer_list<ExpText> parts) {
+        uint8_t b = 0;
+        for (const ExpText part : parts)
+            b |= ExpTextBit(part);
+        return b;
+    };
+    const JobReport level30{Sample(30, 12345, 20000), std::nullopt};
+    const auto title = [](const WidgetContent& w) { return w.title.front().text; };
+    CHECK_EQ(title(JobWidget(level30, ExpBarPlace::Under, true, JobLayout::ExpFirst)), "7,655 EXP to next"); // as before
+    CHECK_EQ(title(JobWidget(level30, ExpBarPlace::Under, true, JobLayout::ExpFirst, bits({ExpText::Percent}))), "61%");
+    CHECK_EQ(title(JobWidget(level30, ExpBarPlace::Under, true, JobLayout::ExpFirst,
+                 bits({ExpText::Percent, ExpText::Earned, ExpText::ToNext}))),
+        "12,345 / 20,000 EXP · 7,655 to next · 61%");
+    // At the cap the points are limit points, after the merits.
+    const JobReport capped{AtCap(3, 4000), std::nullopt};
+    CHECK_EQ(title(JobWidget(capped, ExpBarPlace::Under, true, JobLayout::ExpFirst, bits({ExpText::Earned, ExpText::Percent}))),
+        "3 merits · 4,000 / 10,000 LP · 40%");
+    // To Next at the cap: the merits say how far along you are, as they always have.
+    CHECK_EQ(title(JobWidget(capped, ExpBarPlace::Under, true, JobLayout::ExpFirst, bits({ExpText::ToNext}))), "3 merits");
+    // A percent is never rounded up to a level not reached.
+    CHECK_EQ(title(JobWidget(JobReport{Sample(30, 19999, 20000), std::nullopt}, ExpBarPlace::Under, true,
+                 JobLayout::ExpFirst, bits({ExpText::Percent}))),
+        "99%");
+    // Nothing picked: the bar's name alone.
+    CHECK_EQ(title(JobWidget(level30, ExpBarPlace::Under, true, JobLayout::ExpFirst, 0)), "EXP");
+}
+
+TEST(the_exp_widget_is_its_bar_with_each_text_on_the_side_it_is_set_to)
+{
+    const auto said = [](const std::vector<Span>& spans) {
+        std::string text;
+        for (const Span& s : spans)
+            text += s.text;
+        return text;
+    };
+    const JobReport level30{Sample(30, 12345, 20000), std::nullopt};
+    const WidgetContent w =
+        ExpWidget(level30, {ExpTextPlace::Above, ExpTextPlace::Right, ExpTextPlace::Right}, 150, 6);
+    CHECK(w.meter && w.title.empty() && w.hasPopup);
+    CHECK(std::fabs(w.meter->done - 12345.0f / 20000.0f) < 1e-6f && w.meter->width == 150 && w.meter->height == 6);
+    CHECK_EQ(said(w.meter->above), "12,345 / 20,000 EXP");
+    CHECK_EQ(said(w.meter->right), "7,655 EXP to next · 61%"); // two on a side say it as the Job widget does
+    CHECK(w.meter->left.empty() && w.meter->below.empty());
+    // At the cap the bar fills with limit points, and To Next says the merits.
+    const WidgetContent capped =
+        ExpWidget(JobReport{AtCap(3, 4000), std::nullopt}, {ExpTextPlace::Left, ExpTextPlace::Below, ExpTextPlace::Off}, 150, 6);
+    CHECK(capped.meter && std::fabs(capped.meter->done - 0.4f) < 1e-6f);
+    CHECK_EQ(said(capped.meter->left), "4,000 / 10,000 LP");
+    CHECK_EQ(said(capped.meter->below), "3 merits");
+    CHECK(capped.meter->above.empty() && capped.meter->right.empty());
+    // Before the server has sent the jobs, a dash.
+    const WidgetContent none = ExpWidget(std::nullopt, kDefaultExpPlaces, 150, 6);
+    CHECK(!none.meter && none.title.front().text == "-");
 }

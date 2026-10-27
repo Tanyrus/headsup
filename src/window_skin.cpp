@@ -297,18 +297,26 @@ namespace headsup
             ArgbOf(RgbOf(Hsl{t.hue.h, t.hue.s, kAccentHoverLight})), WithAlpha(accent, kSoftAlpha), Lighter(frame)};
     }
 
-    std::string SkinDecorator(const SkinFrame& f)
+    namespace
     {
-        const auto source = [&](SkinPiece piece, int menuPixels) {
+        std::string SkinSourceOf(const SkinFrame& f, SkinPiece piece, int menuPixels)
+        {
             return "\"" + SkinSource(f.type, piece, SkinPixels(menuPixels, f.scale)) + "\"";
-        };
-        const auto shade = [](float level) { return RcssColor(WithAlpha(kBlack, static_cast<uint32_t>(std::lround((1.0f - std::min(level, 1.0f)) * kFullByte)))); };
-        return "decorator:tiled-box(" + source(SkinPiece::TopLeft, kFrameCorner) + "," + source(SkinPiece::Top, kFrameEdge) + "," +
-               source(SkinPiece::TopRight, kFrameCorner) + "," + source(SkinPiece::Left, kFrameEdge) + "," +
-               source(SkinPiece::Clear, 1) + "," + source(SkinPiece::Right, kFrameEdge) + "," +
-               source(SkinPiece::BottomLeft, kFrameCorner) + "," + source(SkinPiece::Bottom, kFrameEdge) + "," +
-               source(SkinPiece::BottomRight, kFrameCorner) + "),vertical-gradient(" + shade(f.shadeTop) + " " +
-               shade(f.shadeBottom) + "),image(" + source(SkinPiece::Back, kSkinTile) + " none repeat);";
+        }
+
+        // The shade over the background, and the background repeated under it.
+        std::string Fill(const SkinFrame& f)
+        {
+            const auto shade = [](float level) { return RcssColor(WithAlpha(kBlack, static_cast<uint32_t>(std::lround((1.0f - std::min(level, 1.0f)) * kFullByte)))); };
+            return "vertical-gradient(" + shade(f.shadeTop) + " " + shade(f.shadeBottom) + "),image(" +
+                   SkinSourceOf(f, SkinPiece::Back, kSkinTile) + " none repeat)";
+        }
+    }
+
+    std::string SkinRules(const SkinFrame& f)
+    {
+        return "box-sizing:border-box;decorator:" + Fill(f) + ";" +
+               (f.edge != 0 ? "border:" + RcssNumber(kSkinEdge) + "px " + RcssColor(f.edge) + ";" : std::string("border-width:0px;"));
     }
 
     int SkinTypeOf(int windowType, std::optional<int> gameType)
@@ -319,7 +327,8 @@ namespace headsup
 
     GameSkinLook SkinLookOf(const WindowSkin& skin, int type, float scale)
     {
-        return GameSkinLook{SkinFrame{type, scale, skin.shadeTop, skin.shadeBottom}, SkinPalette(skin), SkinMenuColors(skin)};
+        const BarPalette palette = SkinPalette(skin);
+        return GameSkinLook{SkinFrame{type, scale, skin.shadeTop, skin.shadeBottom, palette.panelBorder}, palette, SkinMenuColors(skin)};
     }
 
     Read<WindowSkin> ReadWindowSkin(std::span<const uint8_t> dat)

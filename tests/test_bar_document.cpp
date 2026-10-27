@@ -2,6 +2,7 @@
 #include "window_skin.h"
 #include "test.h"
 
+#include <cmath>
 #include <string>
 
 using namespace headsup;
@@ -20,7 +21,8 @@ namespace
     BarTextPlace Place()
     {
         return BarTextPlace{BarLinePlace{16, 9.0f, 14.0f, 2.0f}, BarLinePlace{17, 8.0f, 13.0f, 1.0f},
-            BarLinePlace{14, 23.0f, 0.0f, 3.0f}};
+            BarLinePlace{14, 23.0f, 0.0f, 3.0f},
+            BarLinePlace{14, 15.0f, 15.0f, 3.0f}};
     }
 
     bool Has(const std::string& text, const char* part) { return text.find(part) != std::string::npos; }
@@ -84,7 +86,12 @@ TEST(the_document_holds_the_strip_the_caps_the_dividers_and_every_placed_widget)
     CHECK(Has(rml, "height:59px")); // those, and the gold theme's line under the strip
     CHECK(Has(rml, "id=\"w-zone\"") && Has(rml, "id=\"w-target\"") && Has(rml, "id=\"w-earthTime\""));
     CHECK(!Has(rml, "id=\"w-gameHelp\"")); // never on the bar
-    CHECK(Has(rml, "id=\"d-0\"") && Has(rml, "id=\"d-12\"") && !Has(rml, "id=\"d-13\"")); // 14 placed widgets
+    // A divider between each two of the most widgets there can be: the target, and four copies of each of the rest.
+    CHECK(Has(rml, "id=\"d-0\"") && Has(rml, ("id=\"d-" + std::to_string(kDividerCount - 1) + "\"").c_str()) &&
+          !Has(rml, ("id=\"d-" + std::to_string(kDividerCount) + "\"").c_str()));
+    CHECK_EQ(kDividerCount, 1 + (kBarWidgetCount - 2) * kMostCopies - 1); // game help is not on the bar
+    CHECK(Has(rml, "id=\"w-gil-2\"") && Has(rml, "id=\"w-gil-4\"") && !Has(rml, "id=\"w-gil-5\""));
+    CHECK(!Has(rml, "id=\"w-target-2\"")); // one target only
     CHECK(Has(rml, "class=\"widget hidden target\" id=\"w-target\""));
     CHECK(Has(rml, "font-size:13px") && Has(rml, "font-size:11px"));
     CHECK(Has(rml, "\"Marcellus SC\"") && Has(rml, "\"Barlow Condensed\""));
@@ -344,7 +351,7 @@ TEST(the_strip_and_the_popups_are_drawn_with_the_games_art_when_the_shape_is_win
     BarPalette palette = PaletteOf(BarTheme::UmbraDark);
     palette.shape      = BarShape::Window;
     BarLook look       = LookOf(palette, settings);
-    look.skin          = SkinFrame{3, 1.0f, 0.5f, 1.0f};
+    look.skin          = SkinFrame{3, 1.0f, 0.5f, 1.0f, palette.panelBorder};
     const std::string bar = BarDocument(look, Place());
     CHECK(bar.find(SkinSource(3, SkinPiece::Back, kSkinTile)) != std::string::npos);
     CHECK(bar.find("hu:strip") == std::string::npos);
@@ -352,11 +359,133 @@ TEST(the_strip_and_the_popups_are_drawn_with_the_games_art_when_the_shape_is_win
     // glow other themes fade out under the strip.
     const std::string strip = bar.substr(bar.find("#strip{"));
     CHECK(strip.substr(0, strip.find('}')).find("height:" + Px(look.metrics.height) + ";") != std::string::npos);
+    // The strip, the help bar and the popups are each the art's own rules: its fill in its even border.
+    const auto rule = [&](const std::string& document, const char* name) {
+        const std::string box = document.substr(document.find(name));
+        return box.substr(0, box.find('}'));
+    };
     const PopupFaces faces{};
-    CHECK(PopupDocument(look, faces).find(SkinSource(3, SkinPiece::TopLeft, kFrameCorner)) != std::string::npos);
+    for (const char* name : {"#strip{", ".help-box{"})
+        CHECK(rule(bar, name).find(SkinRules(*look.skin)) != std::string::npos);
+    CHECK(rule(PopupDocument(look, faces), "#panel{").find(SkinRules(*look.skin)) != std::string::npos);
+    // Border off: the same art without its edge, everywhere.
+    settings.gameWindowBorder = false;
+    CHECK(FrameAsSet(settings, *look.skin) == (SkinFrame{3, 1.0f, 0.5f, 1.0f}));
     // Without the art read, the shape draws its colors.
     look.skin = std::nullopt;
     CHECK(BarDocument(look, Place()).find("hu:strip") != std::string::npos);
     CHECK(BarDocument(look, Place()).find("hu:skin") == std::string::npos);
     CHECK(PopupDocument(look, faces).find("hu:skin") == std::string::npos);
+}
+
+TEST(a_widget_with_text_of_its_own_has_rules_of_its_own_under_its_id)
+{
+    Settings settings;
+    const BarLook look = LookOf(BarTheme::PhoenixGold, settings);
+    const PanelWidget gil{BarWidget::Gil, 1};
+    // Its own fonts at 20 px titles over 15 px details, a line box 24 px tall from row 6.
+    const WidgetText own{gil, kCinzel, kMarcellusSC, TextRow{20, 15, true, 6.0f, 26.0f, 12.0f},
+        BarTextPlace{BarLinePlace{24, 6.0f, 12.0f, 2.0f}, BarLinePlace{24, 6.0f, 12.0f, 2.0f}, BarLinePlace{18, 26.0f, 0.0f, 2.0f}, BarLinePlace{18, 16.0f, 16.0f, 2.0f}}};
+    const std::string rml = BarDocument(look, Place(), {own});
+    CHECK(Has(rml, "#w-gil-2 .title{font-family:\"Cinzel\";font-size:20px;line-height:24px;"));
+    CHECK(Has(rml, "#w-gil-2 .detail{font-family:\"Marcellus SC\";font-size:15px;"));
+    CHECK(!Has(rml, "#w-gil .title") && !Has(BarDocument(look, Place()), "#w-gil-2 .title"));
+    // A widget's own row without room for two lines has its title alone: no detail rules of its own.
+    WidgetText alone = own;
+    alone.lines.twoLines = false;
+    CHECK(!Has(BarDocument(look, Place(), {alone}), "#w-gil-2 .detail{"));
+}
+
+TEST(a_target_without_its_border_has_none_lit_or_not_and_does_not_breathe)
+{
+    Settings settings;
+    const std::string ornate = BarDocument(LookOf(BarTheme::PhoenixGold, settings), Place());
+    CHECK(Has(ornate, ".ornate .widget.target.borderless,.ornate .widget.target.borderless.lit{border-color:transparent;}"));
+    CHECK(Has(ornate, ".widget.target.borderless{animation:none;}"));
+    // Pills: the target's pill takes every widget's edge, and a lit one the accent as theirs do.
+    const BarPalette& umbra = PaletteOf(BarTheme::UmbraDark);
+    const std::string pills = BarDocument(LookOf(BarTheme::UmbraDark, settings), Place());
+    const std::string edge  = ".pills .widget.target.borderless{border-color:" + RcssColor(umbra.pillBorder) + ";}";
+    CHECK(pills.find(edge) != std::string::npos && pills.find(edge) < pills.find(".pills .widget.lit{"));
+}
+
+TEST(a_widget_of_cells_lays_each_in_its_column_a_gap_apart)
+{
+    Settings settings;
+    const BarLook look = LookOf(BarTheme::PhoenixGold, settings);
+    WidgetContent c;
+    c.shown    = true;
+    c.cells    = true;
+    c.title    = {Text("S 1"), Text("B 2")};
+    c.subtitle = {Text("W 1"), Text("BM 14")};
+    const std::string rml = WidgetRml(c, look, {30.0f, 44.0f});
+    // The first column its width and the gap; the last its width.
+    const std::string first = "class=\"cell\" style=\"width:" + Px(30.0f + look.metrics.gap) + ";";
+    const std::string last  = "class=\"cell\" style=\"width:" + Px(44.0f) + ";";
+    CHECK(rml.find(first) != std::string::npos && rml.find(last) != std::string::npos);
+    CHECK(rml.find(">S 1<") < rml.find(">B 2<") && rml.find(">B 2<") < rml.find(">W 1<"));
+    CHECK_EQ(CellsWidth({30.0f, 44.0f}, look.metrics.gap), 30.0f + look.metrics.gap + 44.0f);
+    // Measured, a column is its widest cell over both lines.
+    const std::vector<float> columns = CellColumns(c, [](bool title, const Span& s) {
+        return static_cast<float>(s.text.size()) * (title ? 10.0f : 8.0f);
+    });
+    CHECK((columns == std::vector<float>{30.0f, 40.0f})); // "S 1" at 10 a letter, "BM 14" at 8
+}
+
+TEST(a_span_of_a_game_picture_draws_that_picture_as_tall_as_its_letters_from_what_was_read_at_load)
+{
+    Settings settings;
+    const BarLook look = LookOf(BarTheme::PhoenixGold, settings);
+    WidgetContent c;
+    c.shown = true;
+    c.title = {Text("S 300"), Span{"", Tone::Normal, 0, GamePicture::PlayOnlineMessenger}, Text("2", Tone::Dim)};
+    const std::string rml = WidgetRml(c, look);
+    const std::string img = "<img class=\"line-icon pic\" src=\"" + GamePictureSource(GamePicture::PlayOnlineMessenger) + "\"/>";
+    CHECK(rml.find(img) != std::string::npos && rml.find(img) < rml.find(">2<"));
+    // Its pixels are the game's, B, G, R, A as an ARGB word keeps them.
+    PlayOnlineIcons icons{ColorPicture{"menu    mesicon ", 1, 1, {1, 2, 3, 255}}, ColorPicture{"menu    mesicon ", 1, 1, {4, 5, 6, 255}}};
+    const std::optional<Image> messenger = GamePictureImage(icons, GamePictureSource(GamePicture::PlayOnlineMessenger));
+    CHECK(messenger && messenger->width == 1 && messenger->argb == std::vector<uint32_t>{0xFF060504u});
+    CHECK(!GamePictureImage(std::nullopt, GamePictureSource(GamePicture::PlayOnlineMail)));
+    CHECK(!GamePictureImage(icons, IconSource(Icon::Gm)));
+}
+
+TEST(a_meter_is_as_wide_as_its_bar_and_side_texts_with_the_texts_above_and_below_centered_on_the_bar)
+{
+    Meter m;
+    m.width = 100;
+    // Left 30 and a gap of 4 reach further than half of the 140 above past the bar; right 20 and its gap do too.
+    const MeterPlace p = PlaceMeter(m, MeterWidths{140.0f, 0.0f, 30.0f, 20.0f}, 4.0f);
+    CHECK_EQ(p.barX, 34.0f);
+    CHECK_EQ(p.width, 34.0f + 100.0f + 24.0f);
+    CHECK_EQ(p.aboveX, 34.0f + 50.0f - 70.0f);
+    // A text above wider than all of that sets the width, the bar in its middle.
+    const MeterPlace wide = PlaceMeter(m, MeterWidths{300.0f, 0.0f, 30.0f, 20.0f}, 4.0f);
+    CHECK(wide.barX == 100.0f && wide.width == 300.0f && wide.aboveX == 0.0f);
+}
+
+TEST(a_meters_bar_has_its_middle_on_the_rows_middle_with_its_texts_around_it)
+{
+    Settings settings;
+    const BarLook look = LookOf(BarTheme::PhoenixGold, settings);
+    WidgetContent c;
+    c.shown = true;
+    Meter m;
+    m.done   = 0.25f;
+    m.width  = 100;
+    m.height = 6;
+    m.above  = {Text("12,345 / 20,000 EXP")};
+    m.right  = {Text("61%")};
+    c.meter  = m;
+    const MeterPlace place = PlaceMeter(m, MeterWidths{120.0f, 0.0f, 0.0f, 20.0f}, look.metrics.gap);
+    const std::string rml = WidgetRml(c, look, {}, place);
+    const float barTop = std::round((look.row.height - 6.0f) / 2.0f);
+    const std::string bar = "class=\"mbar\" style=\"left:" + Px(place.barX) + ";top:" + Px(barTop) + ";width:" + Px(100.0f) +
+                            ";height:" + Px(6.0f) + ";\"";
+    CHECK(rml.find(bar) != std::string::npos);
+    CHECK(rml.find("width: 25%") != std::string::npos);
+    // Above ends a gap over the bar's top; right starts a gap after its end.
+    CHECK(rml.find("left:" + Px(place.aboveX) + ";bottom:" + Px(look.row.height - barTop + kMeterTextGap) + ";") != std::string::npos);
+    CHECK(rml.find("class=\"mtext mside\" style=\"left:" + Px(place.barX + 100.0f + look.metrics.gap) + ";\"") != std::string::npos);
+    CHECK(rml.find(">12,345 / 20,000 EXP<") != std::string::npos && rml.find(">61%<") != std::string::npos);
 }

@@ -1,5 +1,6 @@
 #include "bar_placement.h"
 
+#include <algorithm>
 #include <iterator>
 #include <optional>
 #include <sstream>
@@ -10,30 +11,53 @@ namespace headsup
     namespace
     {
         const char* const kWidgetNames[] = {"zone", "weather", "vanaTime", "target", "gil", "bags", "earthTime", "gameHelp",
-            "fps", "job", "connection", "party", "signet", "distance", "memory"};
+            "fps", "job", "connection", "party", "signet", "distance", "memory", "exp", "conquest"};
         static_assert(std::size(kWidgetNames) == kBarWidgetCount); // by BarWidget
         constexpr BarWidget kDefaultLeft[]   = {BarWidget::Zone, BarWidget::Weather, BarWidget::VanaTime, BarWidget::Job,
-            BarWidget::Party, BarWidget::Signet, BarWidget::Distance};
+            BarWidget::Exp, BarWidget::Party, BarWidget::Signet, BarWidget::Distance, BarWidget::Conquest};
         constexpr BarWidget kDefaultCenter[] = {BarWidget::Target};
         constexpr BarWidget kDefaultRight[]  = {BarWidget::Gil, BarWidget::Bags, BarWidget::Connection, BarWidget::Memory,
             BarWidget::Fps, BarWidget::EarthTime};
         static_assert(std::size(kDefaultLeft) + std::size(kDefaultCenter) + std::size(kDefaultRight) ==
                       kPlacedWidgetCount);
 
-        std::optional<BarWidget> WidgetNamed(const std::string& name)
+        constexpr char kCopyMark = ':'; // between a widget's name and its copy's number in the settings file
+
+        std::optional<PanelWidget> WidgetNamed(const std::string& name)
         {
+            const size_t mark = name.find(kCopyMark);
+            const std::string kind = name.substr(0, mark);
+            int copy = 0;
+            if (mark != std::string::npos)
+            {
+                const std::string number = name.substr(mark + 1);
+                if (number.empty() || number.size() > 1 || number[0] < '2' || number[0] > '0' + kMostCopies) return std::nullopt;
+                copy = number[0] - '1';
+            }
             for (int w = 0; w < kBarWidgetCount; ++w)
-                if (name == kWidgetNames[w]) return static_cast<BarWidget>(w);
+                if (kind == kWidgetNames[w] && (copy == 0 || HasCopies(static_cast<BarWidget>(w))))
+                    return PanelWidget{static_cast<BarWidget>(w), copy};
             return std::nullopt;
+        }
+
+        template <size_t N>
+        std::vector<PanelWidget> Section(const BarWidget (&widgets)[N])
+        {
+            return std::vector<PanelWidget>(std::begin(widgets), std::end(widgets));
         }
     }
 
     const BarPlacement& DefaultPlacement()
     {
-        static const BarPlacement placement{std::vector<BarWidget>(std::begin(kDefaultLeft), std::end(kDefaultLeft)),
-            std::vector<BarWidget>(std::begin(kDefaultCenter), std::end(kDefaultCenter)),
-            std::vector<BarWidget>(std::begin(kDefaultRight), std::end(kDefaultRight))};
+        static const BarPlacement placement{Section(kDefaultLeft), Section(kDefaultCenter), Section(kDefaultRight)};
         return placement;
+    }
+
+    std::string PanelWidgetName(PanelWidget widget)
+    {
+        const char* name = BarWidgetName(widget.kind);
+        if (name == nullptr) return {};
+        return widget.copy == 0 ? std::string(name) : std::string(name) + kCopyMark + std::to_string(widget.copy + 1);
     }
 
     const char* BarWidgetName(BarWidget widget)
@@ -45,38 +69,80 @@ namespace headsup
     BarPlacement PlacementFrom(const std::array<std::string, kBarSectionCount>& names)
     {
         BarPlacement placement;
-        std::array<bool, kBarWidgetCount> placed{};
+        std::array<bool, kPanelSlots> placed{};
         for (int s = 0; s < kBarSectionCount; ++s)
         {
             std::istringstream words(names[s]);
             for (std::string word; words >> word;)
             {
-                const std::optional<BarWidget> w = WidgetNamed(word);
-                if (w && OnTheBar(*w) && !std::exchange(placed[static_cast<int>(*w)], true)) placement[s].push_back(*w);
+                const std::optional<PanelWidget> w = WidgetNamed(word);
+                if (w && OnTheBar(w->kind) && !std::exchange(placed[SlotOf(*w)], true)) placement[s].push_back(*w);
             }
         }
         const BarPlacement& home = DefaultPlacement();
         for (int s = 0; s < kBarSectionCount; ++s)
-            for (const BarWidget w : home[s])
-                if (!placed[static_cast<int>(w)]) placement[s].push_back(w);
+            for (const PanelWidget w : home[s])
+                if (!placed[SlotOf(w)]) placement[s].push_back(w);
         return placement;
     }
 
-    std::string PlacementNames(const std::vector<BarWidget>& section)
+    std::string PlacementNames(const std::vector<PanelWidget>& section)
     {
         std::string text;
-        for (const BarWidget w : section)
-            text += (text.empty() ? "" : " ") + std::string(BarWidgetName(w));
+        for (const PanelWidget w : section)
+            text += (text.empty() ? "" : " ") + PanelWidgetName(w);
         return text;
+    }
+
+    std::pair<int, size_t> PlaceOf(const BarPlacement& placement, PanelWidget widget)
+    {
+        for (int s = 0; s < kBarSectionCount; ++s)
+            if (const auto at = std::ranges::find(placement[s], widget); at != placement[s].end())
+                return {s, static_cast<size_t>(at - placement[s].begin())};
+        return {0, placement[0].size()};
+    }
+
+    bool Placed(const BarPlacement& placement, PanelWidget widget)
+    {
+        return std::ranges::any_of(placement, [&](const auto& section) { return std::ranges::find(section, widget) != section.end(); });
+    }
+
+    std::optional<PanelWidget> AddCopy(BarPlacement& placement, BarWidget widget)
+    {
+        if (!HasCopies(widget)) return std::nullopt;
+        int copy = 1;
+        while (copy < kMostCopies && Placed(placement, PanelWidget{widget, copy}))
+            ++copy;
+        if (copy == kMostCopies) return std::nullopt;
+        // After the last copy there is, in its section.
+        std::pair<int, size_t> after = PlaceOf(placement, widget);
+        for (int c = 1; c < kMostCopies; ++c)
+            if (Placed(placement, PanelWidget{widget, c})) after = PlaceOf(placement, PanelWidget{widget, c});
+        std::vector<PanelWidget>& section = placement[after.first];
+        const PanelWidget added{widget, copy};
+        section.insert(section.begin() + static_cast<std::ptrdiff_t>(std::min(after.second + 1, section.size())), added);
+        return added;
+    }
+
+    bool RemoveCopy(BarPlacement& placement, PanelWidget widget)
+    {
+        if (widget.copy == 0) return false;
+        for (std::vector<PanelWidget>& section : placement)
+            if (const auto at = std::ranges::find(section, widget); at != section.end())
+            {
+                section.erase(at);
+                return true;
+            }
+        return false;
     }
 
     bool MoveWidget(BarPlacement& placement, BarSection from, size_t index, BarSection to, size_t at)
     {
-        std::vector<BarWidget>& source = placement[static_cast<int>(from)];
-        std::vector<BarWidget>& target = placement[static_cast<int>(to)];
+        std::vector<PanelWidget>& source = placement[static_cast<int>(from)];
+        std::vector<PanelWidget>& target = placement[static_cast<int>(to)];
         if (index >= source.size() || at > target.size()) return false;
         if (from == to && (at == index || at == index + 1)) return false;
-        const BarWidget widget = source[index];
+        const PanelWidget widget = source[index];
         source.erase(source.begin() + static_cast<std::ptrdiff_t>(index));
         if (from == to && at > index) --at;
         target.insert(target.begin() + static_cast<std::ptrdiff_t>(at), widget);

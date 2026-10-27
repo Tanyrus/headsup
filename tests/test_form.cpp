@@ -397,7 +397,7 @@ TEST(segments_and_tabs_mark_the_picked_one_and_take_a_click)
         return form;
     };
     const Form first = pass({});
-    CHECK(Has(first.blocks[0].rml, "<div class=\"seg\" id=\"p-c-one-line-s-0\" style=\"width:4.6em;\">Hide</div>"));
+    CHECK(Has(first.blocks[0].rml, "<div class=\"seg\" id=\"p-c-one-line-s-0\">Hide</div>"));
     CHECK(ClassOn(first, "p-c-one-line-s-2", "picked") && !ClassOn(first, "p-c-one-line-s-0", "picked"));
     // Three tabs, two to a row: a row of two and a row of one.
     CHECK(Has(first.blocks[0].rml, "<div class=\"tab-row\"><div class=\"tab\" id=\"p-c-tabs-t-0\">Hide</div>"
@@ -534,7 +534,7 @@ namespace
         FormState state;
         std::string text;
         LineDraft draft;
-        bool edited = false, chip = false;
+        bool edited = false;
         std::string focused; // the control with the keyboard
 
         Form Pass(const std::vector<FormEvent>& events)
@@ -544,7 +544,7 @@ namespace
             form.pageKey = "p";
             form.BeginCard("C");
             edited = form.LineBox("line", text, draft);
-            chip   = form.TagChip(Tag::Con);
+            form.TagChip(Tag::Con);
             form.EndCard();
             return form;
         }
@@ -648,12 +648,12 @@ TEST(a_tag_chip_dropped_in_a_line_box_goes_after_what_it_is_dropped_on)
     CHECK_EQ(card.text, "L${con}v $level end");
     CHECK((card.draft.caret == RunCaret{1, 0}));
     card.text = "Lv $con$level end";
-    // Anything else dropped is nothing, and a click on the chip under the box is the page's to place.
+    // Anything else dropped is nothing, and a click on the chip under the box puts it nowhere.
     card.Pass({{"p-c-line", kDropEvent, "page-title"}});
     card.Pass({Drop("p-c-line", "page-title", "no tag")});
     CHECK_EQ(card.text, "Lv $con$level end");
-    card.Pass({{kConChip, kClickEvent, ""}});
-    CHECK(card.chip && card.text == "Lv $con$level end");
+    CHECK(!card.Pass({{kConChip, kClickEvent, ""}}).changed);
+    CHECK_EQ(card.text, "Lv $con$level end");
 }
 
 TEST(enter_in_a_stretch_breaks_the_line_there_and_typing_goes_on_after_the_break)

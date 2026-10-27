@@ -45,11 +45,12 @@ namespace headsup
         return result;
     }
 
-    std::vector<BarWidget> WidgetTabs()
+    std::vector<PanelWidget> WidgetTabs(const BarPlacement& placement)
     {
-        std::vector<BarWidget> tabs;
-        for (int w = 0; w < kBarWidgetCount; ++w)
-            if (OnTheBar(static_cast<BarWidget>(w))) tabs.push_back(static_cast<BarWidget>(w));
+        std::vector<PanelWidget> tabs;
+        for (int slot = 0; slot < kPanelSlots; ++slot)
+            if (const PanelWidget w = WidgetInSlot(slot); OnTheBar(w.kind) && (w.copy == 0 || Placed(placement, w)))
+                tabs.push_back(w);
         return tabs;
     }
 

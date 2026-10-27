@@ -721,6 +721,19 @@ namespace headsup
         return "";
     }
 
+    std::string PlayOnlineReader::Find()
+    {
+        const auto* base = reinterpret_cast<const uint8_t*>(GetModuleHandleA(kGameModule));
+        if (base == nullptr) return std::string(kGameModule) + " is not loaded";
+        ImageSection text{};
+        if (!FindSection(base, kCodeSection, text)) return kCodeNotRead;
+        const PlayOnlineSite found = LocatePlayOnline(text);
+        if (found.problem != LocateProblem::None) return Describe(found.problem);
+        if (!InImage(base, Pointer(found.global), sizeof(uint32_t))) return "their pointer is not in the game's image";
+        m_Global = found.global;
+        return "";
+    }
+
     std::string WeatherReader::Find()
     {
         const auto* base = reinterpret_cast<const uint8_t*>(GetModuleHandleA(kGameModule));
@@ -797,6 +810,14 @@ namespace headsup
     {
         if (m_Global == 0) return std::nullopt;
         return WeatherFromId(ReadAt<uint16_t>(Pointer(m_Global), 0));
+    }
+
+    std::optional<PlayOnlineCounts> PlayOnlineReader::Read() const
+    {
+        if (m_Global == 0) return std::nullopt;
+        const uint32_t counts = ReadAt<uint32_t>(Pointer(m_Global), 0);
+        if (counts == 0 || !Readable(Pointer(counts), kPlayOnlineMail + sizeof(uint16_t))) return std::nullopt;
+        return PlayOnlineFrom(ReadAt<uint16_t>(Pointer(counts), kPlayOnlineMessages), ReadAt<uint16_t>(Pointer(counts), kPlayOnlineMail));
     }
 
     std::optional<NetCounters> NetStatsReader::Read() const
@@ -1221,7 +1242,7 @@ namespace headsup
             if (!MovableWindow(key))
             {
                 WindowSpot at = now;
-                if (HelpStripWindow(key))
+                if (FollowsHelpStrip(key))
                     if (const std::optional<WindowSpot> to = g_Placements.PlaceFor(mcd, key, now, right - left,
                             bottom - top, 0, g_StripShift, band.screenRight, band.screenBottom))
                     {

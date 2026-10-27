@@ -153,7 +153,7 @@ TEST(a_dead_mob_keeps_its_name_alone)
     dead.state.row = Category::Dead;
     d.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::Dead)].plate = PlateMode::Hidden;
     CHECK(ComposePlate(dead, kPlayer, d, kGame).lines.empty());
-    CHECK(HookActionFor(dead.state, d, kPlayer, false, false) == HookAction::Hide);
+    CHECK(HookActionFor(dead, d, kPlayer, false, false) == HookAction::Hide);
 }
 
 TEST(a_dead_entitys_text_is_dark_grey_whatever_its_colors)
@@ -210,7 +210,7 @@ TEST(in_a_conversation_the_hook_hides_every_name_only_when_asked)
     Settings s;
     PlayerState talking = kPlayer;
     talking.inEvent     = true;
-    const EntityState mob = AggressiveMob().state;
+    const ActorInfo mob = AggressiveMob();
     PlateMode& row        = s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WillAttack)].plate;
     CHECK(HookActionFor(mob, s, talking, false, false) == HookAction::Replace);
     row = PlateMode::Vanilla;
@@ -476,7 +476,7 @@ TEST(the_job_and_level_tag_shows_what_is_known_of_the_two)
 TEST(the_hook_keeps_vanilla_names_hides_hidden_ones_and_replaces_the_rest)
 {
     Settings s;
-    const EntityState mob = AggressiveMob().state;
+    const ActorInfo mob = AggressiveMob();
     CHECK(HookActionFor(mob, s, kPlayer, false, false) == HookAction::Replace);
     s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WillAttack)].plate = PlateMode::Vanilla;
     CHECK(HookActionFor(mob, s, kPlayer, false, false) == HookAction::Keep);
@@ -484,8 +484,8 @@ TEST(the_hook_keeps_vanilla_names_hides_hidden_ones_and_replaces_the_rest)
     CHECK(HookActionFor(mob, s, kPlayer, false, false) == HookAction::Hide);
     s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WillAttack)].plate = PlateMode::WhenTargeted;
     CHECK(HookActionFor(mob, s, kPlayer, false, false) == HookAction::Hide);
-    EntityState targeted = mob;
-    targeted.target      = TargetState::Targeted;
+    ActorInfo targeted    = mob;
+    targeted.state.target = TargetState::Targeted;
     CHECK(HookActionFor(targeted, s, kPlayer, false, false) == HookAction::Replace);
     s.nameplates = false;
     CHECK(HookActionFor(targeted, s, kPlayer, false, false) == HookAction::Keep);
@@ -500,9 +500,9 @@ TEST(a_name_headsup_cannot_draw_goes_back_to_the_game_and_a_hidden_one_stays_hid
 {
     Settings s;
     PlateMode& row        = s.Kind(PlateKind::Mobs).rows[CategoryIndex(Category::WillAttack)].plate;
-    const EntityState mob = AggressiveMob().state;
-    EntityState targeted  = mob;
-    targeted.target       = TargetState::Targeted;
+    const ActorInfo mob   = AggressiveMob();
+    ActorInfo targeted    = mob;
+    targeted.state.target = TargetState::Targeted;
     row = PlateMode::Shown;
     CHECK(HookActionFor(mob, s, kPlayer, false, true) == HookAction::Keep);
     row = PlateMode::WhenTargeted;
@@ -1117,4 +1117,66 @@ TEST(a_text_left_out_beside_icons_takes_the_gap_that_set_it_apart)
     DropTexts(last, std::vector<uint8_t>{0, 1, 0, 0});
     CHECK_EQ(Rendered(last.lines[0]), "Young Quadav [3]");
     CHECK_EQ(Rendered(last.lines[1]), "[3]"); // nor a gap after them
+}
+
+namespace
+{
+    std::vector<Icon> IconsOn(const ComposedPlate& plate)
+    {
+        std::vector<Icon> drawn;
+        for (const ComposedLine& line : plate.lines)
+            for (const PlateItem& item : line.items)
+                for (const IconDraw& icon : item.icons) drawn.push_back(icon.icon);
+        return drawn;
+    }
+}
+
+TEST(a_gms_icon_is_on_every_plate_of_theirs_where_the_design_puts_it_or_before_their_name)
+{
+    Settings s;
+    KindSettings& players = s.Kind(PlateKind::Players);
+    PlayerStatus gm;
+    gm.gm = true;
+    // Where the design puts it, once.
+    players.lines[2].text = "$name $gm";
+    CHECK_EQ(Rendered(Compose(PlayerWith(gm), s).lines.back()), "Chadmage [1]");
+    // A design without it: before the name, a space apart.
+    players.lines[2].text = "$name";
+    const ComposedPlate plain = Compose(PlayerWith(gm), s);
+    CHECK_EQ(Rendered(plain.lines.back()), "[1] Chadmage");
+    CHECK((IconsOn(plain) == std::vector<Icon>{Icon::Gm}));
+    // On a line that does not show now: before the name all the same.
+    players.lines[0].text = "$gm";
+    players.lines[0].show = LineShow{false, 0};
+    CHECK((IconsOn(Compose(PlayerWith(gm), s)) == std::vector<Icon>{Icon::Gm}));
+    CHECK_EQ(Rendered(Compose(PlayerWith(gm), s).lines.back()), "[1] Chadmage");
+    // A design with no name: at the start of its first line; with nothing at all, a line of its own.
+    players.lines[2].text = "$job";
+    CHECK_EQ(Rendered(Compose(PlayerWith(gm), s).lines.back()).rfind("[1]", 0), size_t{0});
+    for (LineDesign& line : players.lines)
+        line.text.clear();
+    const ComposedPlate empty = Compose(PlayerWith(gm), s);
+    CHECK(empty.lines.size() == 1 && Rendered(empty.lines[0]) == "[1]");
+    // Someone who is no GM gets none.
+    CHECK(Compose(PlayerWith(PlayerStatus{}), s).lines.empty());
+}
+
+TEST(a_gm_has_a_plate_whatever_their_row_is_set_to)
+{
+    Settings s;
+    PlayerStatus gm;
+    gm.gm = true;
+    const ActorInfo staff = PlayerWith(gm), other = PlainPlayer();
+    for (const PlateMode mode : {PlateMode::Hidden, PlateMode::Vanilla, PlateMode::WhenTargeted})
+    {
+        for (RowSettings& row : s.Kind(PlateKind::Players).rows)
+            row.plate = mode;
+        const ComposedPlate plate = Compose(staff, s);
+        CHECK(!plate.lines.empty() && (IconsOn(plate) == std::vector<Icon>{Icon::Gm}));
+        CHECK(HookActionFor(staff, s, kPlayer, false, false) == HookAction::Replace);
+        // Anyone else keeps what the row says.
+        CHECK(Compose(other, s).lines.empty());
+        CHECK(HookActionFor(other, s, kPlayer, false, false) != HookAction::Replace);
+    }
+    CHECK(HookActionFor(staff, s, kPlayer, true, false) == HookAction::Hide); // screenshot mode still hides every name
 }

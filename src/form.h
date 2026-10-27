@@ -48,6 +48,9 @@ namespace headsup
     constexpr const char* kPopupGround = "-popup";
     // A dragged control was let go, on something or on nothing, anywhere but where it stands.
     constexpr const char* kDragEndEvent = "dragend";
+    // A dragged control held over another, told as a drop on it would be, or over nothing that is named (an empty
+    // id). Kept in FormState::dragOver until the next, a drop or the drag's end.
+    constexpr const char* kDragOverEvent = "dragover";
     // The attribute of a control that can be dragged which says what a drop of it brings: a tag chip's slot, as a
     // line's text holds it.
     constexpr const char* kCarriesAttribute = "carries";
@@ -69,11 +72,21 @@ namespace headsup
     constexpr const char* kLineBoxClass = "linebox"; // a design line's box
     constexpr const char* kRunClass     = "run";     // a stretch of text in it
     constexpr const char* kTypingClass  = "typing";  // on a box while one of its stretches has the keyboard
+    constexpr const char* kArrowRoomClass = "arrow-room"; // as wide as an arrow's button, with nothing in it
+    // While a tag is held over a line box: what it would add, faint; a chip it would take the place of; and the line's
+    // own tag held, which would leave its place.
+    constexpr const char* kGhostClass    = "ghost";
+    constexpr const char* kGhostSlotClass = "ghost-slot", *kGhostTextClass = "ghost-text"; // its place, and the letters before it
+    // On a stretch split by a held tag: the bytes of it that stand before the tag, which it does not show.
+    constexpr const char* kSplitAttribute = "split";
+    constexpr const char* kReplacedClass = "replaced";
+    constexpr const char* kLeavingClass  = "leaving";
     constexpr const char* kRunIdInfix  = "-t-";
     // The ids of a control's parts, after the control's own: a dropdown's option, a row of choices' choice and a tab
     // strip's tab, each with its number.
     constexpr const char* kOptionIdInfix = "-o-", *kSegmentIdInfix = "-s-", *kTabIdInfix = "-t-";
     constexpr const char* kChipIdInfix = "-c-";
+    constexpr const char* kGhostIdInfix = "-g-"; // before a stretch: where a held tag shows where it would go
     constexpr const char* kChipTagInfix = "-"; // after a chip's id and before a tag's number, in a chip of several
 
     // What an element shows that is no part of the markup: set on the element when it changes, so a slider being
@@ -125,6 +138,7 @@ namespace headsup
     {
         std::unordered_set<std::string> collapsed; // the ids of the collapsed cards
         std::string popup;                         // the control whose popup is open, or none
+        std::optional<FormEvent> dragOver;         // what a held drag is over (kDragOverEvent)
     };
 
     // What an option of a dropdown does, by its place in the list: its tooltip. None says nothing.
@@ -191,12 +205,11 @@ namespace headsup
             const char* onWord = nullptr);
         // Options as joined buttons, the picked one filled.
         template <typename Enum>
-        void Segments(const char* label, Enum& value, const char* const* options, int count, const char* tip,
-            float segment = 0.0f)
+        void Segments(const char* label, Enum& value, const char* const* options, int count, const char* tip)
         {
             Row(label, tip);
             int picked = static_cast<int>(value);
-            SegmentsAt(label, picked, options, count, segment);
+            SegmentsAt(label, picked, options, count);
             value = static_cast<Enum>(picked);
             EndRow();
         }
@@ -226,8 +239,7 @@ namespace headsup
         void FontDropdown(const char* label, std::string& font, const std::vector<std::string>& choices,
             const char* tip = nullptr, const char* unset = nullptr);
         // Joined buttons that each switch a bit of their own, the lowest first: any of them together.
-        void Toggles(const char* label, uint8_t& bits, const char* const* options, int count, const char* tip,
-            float segment = 0.0f);
+        void Toggles(const char* label, uint8_t& bits, const char* const* options, int count, const char* tip);
         // original: the color's default. While the color is another, an arrow before the swatch puts it back.
         void Swatch(const char* label, Color& color, const char* tip, const Color* original = nullptr);
         // A color with its opacity (ARGB): its popup has an alpha slider too, and its hex box keeps the alpha.
@@ -253,7 +265,7 @@ namespace headsup
         void CheckAt(const char* id, bool& on, const char* tip = nullptr);
         // A toggle among a row's controls that says its state in its middle.
         void ToggleAt(const char* id, bool& on, const char* offWord, const char* onWord);
-        void SegmentsAt(const char* id, int& value, const char* const* options, int count, float segment = 0.0f);
+        void SegmentsAt(const char* id, int& value, const char* const* options, int count);
         // A dropdown whose list is a popup of rows, the picked one marked. True when another row was chosen. The
         // closed control's tip is tip, or what option says of the row picked; markup rows are RML, not text.
         template <typename Name>
@@ -292,6 +304,8 @@ namespace headsup
         void ArgbSwatchAt(const char* id, uint32_t& argb);
         // The arrow that puts a value back to its default, hidden while it is the default. True when it was clicked.
         bool ResetAt(const char* id, bool differs);
+        // A small square button with an arrow up or down in it. True when clicked.
+        bool ArrowAt(const char* id, bool down, const char* tip);
         // A pill. classes: kRaisedPill and the like, and any more for the page's own looks. True when clicked.
         bool Button(const char* label, const char* id, const char* classes = kRaisedPill, const char* tip = nullptr);
         // A text box. Committed: true when it was left by Enter or a click elsewhere with its text changed, which
@@ -301,9 +315,9 @@ namespace headsup
         // A design line's box: stretches of text to type in with its slots as chips between them, which take drops
         // and can be dragged. True when its text changed. draft keeps its caret, and says whether it has the keyboard.
         bool LineBox(const char* id, std::string& text, LineDraft& draft);
-        // A tag as a chip that reads its name, after its icon when it draws one. True when clicked; dragged, it drops
-        // onto a line's box.
-        bool TagChip(Tag tag);
+        // A tag as a chip that reads its name, after its icon when it draws one. Only a drag places it: it drops onto a
+        // line's box, and a click puts it nowhere.
+        void TagChip(Tag tag);
         // Muted or plain text among a row's controls.
         void Caption(const char* text, const char* classes = "caption", float width = 0.0f);
         // Markup of the page's own, for what the kit has no control for; and a value for an element of it.
@@ -326,7 +340,7 @@ namespace headsup
         // A dropdown's closed control: what it shows and its arrow. True while its popup is open.
         // markup: shown, or name, is RML and not words to escape.
         // A row of joined buttons: press is told of each one clicked, and picked says which are lit.
-        void SegmentRow(const std::string& base, const char* const* options, int count, float segment,
+        void SegmentRow(const std::string& base, const char* const* options, int count,
             const std::function<void(int)>& press, const std::function<bool(int)>& picked);
         // A click on the control opens its popup, or closes it when it is the one open.
         void TogglePopup(const std::string& control);

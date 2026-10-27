@@ -160,16 +160,16 @@ TEST(a_widgets_chip_dropped_on_another_goes_before_it)
 {
     Window w;
     w.state.page = Page::Widgets;
-    const std::vector<BarWidget> left = w.settings.barSections[static_cast<int>(BarSection::Left)];
+    const std::vector<PanelWidget> left = w.settings.barSections[static_cast<int>(BarSection::Left)];
     CHECK(left.size() >= 2);
-    const std::string first  = "widgets-layout-chip-" + std::to_string(static_cast<int>(left[0]));
-    const std::string second = "widgets-layout-chip-" + std::to_string(static_cast<int>(left[1]));
+    const std::string first  = "widgets-layout-chip-" + std::to_string(SlotOf(left[0]));
+    const std::string second = "widgets-layout-chip-" + std::to_string(SlotOf(left[1]));
     const Form form = w.Pass({{first, kDropEvent, second}});
-    const std::vector<BarWidget>& now = w.settings.barSections[static_cast<int>(BarSection::Left)];
+    const std::vector<PanelWidget>& now = w.settings.barSections[static_cast<int>(BarSection::Left)];
     CHECK(form.changed && now[0] == left[1] && now[1] == left[0]);
     // A click on a chip opens its tab, at the page's top.
     const Form clicked = w.Pass({{first, kClickEvent, ""}});
-    CHECK(w.state.widget == static_cast<int>(left[0]) && clicked.scrollToTop);
+    CHECK(w.state.widget == SlotOf(left[0]) && clicked.scrollToTop);
 }
 
 TEST(the_reset_card_asks_twice)

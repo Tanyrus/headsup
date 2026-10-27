@@ -70,3 +70,26 @@ TEST(only_a_drawn_outline_has_a_color_to_pick_and_only_headsups_plates_a_design)
     CHECK(DrawsPlate(PlateMode::WhenTargeted));
     CHECK(!DrawsPlate(PlateMode::Vanilla));
 }
+
+TEST(two_lines_swapped_trade_everything_and_a_sync_follows_the_line_it_named)
+{
+    KindSettings kind = DefaultKinds()[static_cast<int>(PlateKind::Mobs)];
+    kind.lines[0].text      = "top";
+    kind.lines[0].textSize  = 80;
+    kind.lines[1].text      = "middle";
+    kind.lines[2].text      = "bottom";
+    kind.lines[2].syncWith  = 0; // the bottom line takes the top line's style
+    const LineDesign top = kind.lines[0], middle = kind.lines[1];
+    SwapLines(kind, 0, 1);
+    CHECK_EQ(kind.lines[0].text, "middle");
+    CHECK(kind.lines[1].text == "top" && kind.lines[1].textSize == 80);
+    CHECK_EQ(kind.lines[2].syncWith, 1); // still the line that was on top
+    // A line synced with the one it is swapped with still follows it, from its new place.
+    kind.lines[1].syncWith = 0;
+    SwapLines(kind, 0, 1);
+    CHECK_EQ(kind.lines[0].syncWith, 1);
+    CHECK_EQ(kind.lines[0].text, "top");
+    CHECK_EQ(kind.lines[2].syncWith, 0);
+    CHECK_EQ(kind.lines[1].text, middle.text);
+    CHECK_EQ(kind.lines[0].textSize, top.textSize);
+}

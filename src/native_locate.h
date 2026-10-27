@@ -56,6 +56,8 @@ namespace headsup
         AmbiguousStripText,
         StripTextChanged,
         NoNetStats,
+        NoPlayOnline,
+        AmbiguousPlayOnline,
         AmbiguousNetStats,
         NetStatsChanged,
         NoWindowMove,
@@ -302,6 +304,8 @@ namespace headsup
     };
     // The game's own help bar's windows: its title and help.
     bool HelpStripWindow(const WindowKey& key);
+    // Those, and the connection readout beside them, which moves with them when the help bar goes under the panel.
+    bool FollowsHelpStrip(const WindowKey& key);
     // The title alone.
     bool TitleWindow(const WindowKey& key);
     struct WindowSpot
@@ -473,4 +477,23 @@ namespace headsup
     constexpr int32_t kMaxRate    = 1000000; // bytes a second, far past what the game sends
     // The three as read; nothing when they cannot be the client's, as when the object is not what HeadsUp expects.
     std::optional<NetCounters> CountersFrom(int32_t received, int32_t sent, int32_t health);
+
+    // While either is above 0 the game's Network window takes turns between its readout and PlayOnline's envelope and
+    // messenger, each with its count beside it. They are uint16s in an object a global points to (0 before a
+    // session): the messenger's (messages and friend requests waiting) at +0x0A, the envelope's at +0x0E.
+    constexpr uint32_t kPlayOnlineMessages = 0x0A, kPlayOnlineMail = 0x0E;
+    constexpr int kMostPlayOnlineMessages  = 200; // the most the window shows
+    struct PlayOnlineCounts
+    {
+        int messages = 0, mail = 0;
+        bool operator==(const PlayOnlineCounts&) const = default;
+    };
+    PlayOnlineCounts PlayOnlineFrom(uint16_t messages, uint16_t mail);
+    // From the window's getters of the two: mov eax,[global]; test eax,eax; je; mov ax,[eax+0Eh] (and +0Ah).
+    struct PlayOnlineSite
+    {
+        LocateProblem problem = LocateProblem::None;
+        uint32_t global       = 0;
+    };
+    PlayOnlineSite LocatePlayOnline(const ImageSection& text);
 }

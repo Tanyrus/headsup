@@ -272,6 +272,7 @@
                 {"name": "Type 8"}
               ]
             },
+            {"key": "window-border", "name": "Border", "indent": true, "tip": "A border around the top panel, the help bar, the popups and this window, in the color of the game's window frame. Off, they are the window's background alone."},
             {
               "key": "separators",
               "name": "Separators",
@@ -384,18 +385,39 @@
               "rows": [
                 {"key": "enabled", "name": "Enabled"},
                 {"key": "section", "name": "Section"},
+                {"key": "copies", "name": "Copies", "tip": "Another of this widget on the panel, with settings of its own. You can take a copy off again."},
                 {"key": "second-line", "name": "Second Line"},
                 {"key": "icons", "name": "Icons"},
+                {"key": "spacing", "name": "Spacing", "tip": "More room between this widget and the widgets beside it."},
+                {"key": "padding", "name": "Padding", "tip": "The room inside this widget, from its edges to its text. Theme's is the theme's own."},
+                {"key": "title-font", "name": "Title Font", "tip": "This widget's title. Default is the top panel's Title Font."},
+                {"key": "text-font", "name": "Text Font", "tip": "This widget's second line and numbers. Default is the top panel's Text Font."},
+                {"key": "text-size", "name": "Text Size", "tip": "This widget's title size, with its second line to match. Default is the top panel's Text Size."},
                 {"key": "details", "name": "Details", "tip": "Aggro icons after the name, weaknesses after the level."},
+                {"key": "jobs", "name": "Jobs", "tip": "A player's jobs and levels under their name, once HeadsUp knows them: from your party, a check, or Look Up Players."},
+                {"key": "border", "name": "Border", "tip": "The frame around your target. Off, it has the same edge as every other widget."},
                 {"key": "currency", "name": "Currency"},
+                {"key": "nations", "name": "Nations", "tip": "Whose regions the widget counts and its popup lists."},
+                {"key": "bag", "name": "Bag", "tip": "The bag this widget shows on the panel. Hover it for every bag."},
                 {"key": "time-zone", "name": "Time Zone", "tip": "Local is your computer's. Another zone goes before the time, as in PDT 21:07."},
                 {"key": "server-time", "name": "Server Time", "tip": "Japan's time, which the server keeps and the resets go by, as a second line under your own."},
                 {"key": "24-hour", "name": "24-Hour"},
                 {"key": "seconds", "name": "Seconds", "tip": "On your own line."},
                 {"key": "layout", "name": "Layout", "tip": "Which is the larger line, your jobs and levels or your EXP, with the other under it; or the EXP alone."},
+                {"key": "exp-text", "name": "EXP Text", "tip": "What the EXP says. At the level cap it is your limit points, after your merits."},
                 {"key": "exp-bar", "name": "EXP Bar"},
+                {"key": "exp-earned", "name": "Earned", "tip": "Where the EXP you have of this level, out of what it takes, goes around the bar. At the level cap it is your limit points."},
+                {"key": "exp-to-next", "name": "To Next", "tip": "Where the EXP left to the next level goes around the bar. At the level cap it is your merits."},
+                {"key": "exp-percent", "name": "Percent", "tip": "Where how much of the level you have, as a percent, goes around the bar."},
+                {"key": "bar-width", "name": "Bar Width", "tip": "How long the bar is."},
+                {"key": "bar-height", "name": "Bar Height", "tip": "How thick the bar is. It stays in the middle of the panel."},
                 {"key": "job-names", "name": "Job Names", "tip": "Off, the levels alone."},
+                {"key": "percent", "name": "Percent", "tip": "The game's own connection meter after the rates, as its readout shows it: 100% while data comes in, less once it stops."},
                 {"key": "latency", "name": "Latency", "tip": "After the rates, once measured."}
+              ],
+              "words": [
+                {"key": "add-copy", "name": "Add a Copy", "tip": "Puts another of this widget on the panel after it, with its own tab here."},
+                {"key": "remove-copy", "name": "Remove This Copy", "tip": "Takes this copy off the panel. Its settings go with it."}
               ]
             }
           ]
@@ -406,7 +428,7 @@
           "description": "Drag a chip to move it; click it to open its tab above.",
           "settings": [
             {"key": "trays"},
-            {"key": "reset-layout", "name": "Reset Layout", "tip": "Puts every widget back in its first place. Switches stay."}
+            {"key": "reset-layout", "name": "Reset Layout", "tip": "Puts every widget back in its first place and takes off any copies. Switches stay."}
           ]
         }
       ]
@@ -553,7 +575,13 @@
         "name": "Nameplate Design",
         "description": "Design the nameplate for these entities. Drag buttons into the text boxes to include that information. You can also write in the text boxes to add text. Dashes (-) can optionally be replaced by a symbol set in the Entities/Nameplates section.",
         "settings": [
-          {"key": "design"},
+          {
+            "key": "design",
+            "words": [
+              {"key": "move-up", "tip": "Swaps this line with the one above it: its text and its whole Line Style."},
+              {"key": "move-down", "tip": "Swaps this line with the one below it: its text and its whole Line Style."}
+            ]
+          },
           {
             "key": "max-icons-shown",
             "name": "Max Icons Shown",
@@ -709,7 +737,7 @@
         "description": "Some enemies are placeholders for a notorious monster. When they die, the notorious monster has a chance to spawn. These settings allow you to see a timer for the next possible spawn.",
         "kinds": ["self"],
         "settings": [
-          {"key": "respawn-timers", "name": "Respawn Timer", "tip": "If enabled, it will automatically detect when any NM Placeholder dies within 50 yalms of you, then display a timer until the next possible spawn. If the NM or placeholder is up, it will simply read 'Up'."},
+          {"key": "respawn-timers", "name": "Respawn Timer", "tip": "If enabled, it shows a timer until the next possible spawn when an NM or its placeholder dies within 50 yalms of you, if you took part: you targeted it, or you were active (moved or turned in the last 2:30) while it was claimed by your party or on your screen. Phoenix's rule, so standing AFK earns no timers. If the NM or placeholder is up, it reads 'Up'."},
           {"key": "timer-size", "name": "Timer Size", "tip": "The font size of the timer text, as a multiplier of the base font size set by the Entities/Nameplates section."}
         ]
       }
@@ -836,7 +864,26 @@
         {"name": "Party", "tip": "Party size and the lowest HP and MP. Hover for each member."},
         {"name": "Signet", "tip": "Time left on Signet or Sanction, while one is on."},
         {"name": "Distance", "tip": "How far your target is, in yalms."},
-        {"name": "Memory", "tip": "The game's memory used, over what is left before it runs out at 4 GB; amber, then red, as it runs low. Hover for the processor, the frames and the LinuxXI plugin's figures."}
+        {"name": "Memory", "tip": "The game's memory used, over what is left before it runs out at 4 GB; amber, then red, as it runs low. Hover for the processor, the frames and the LinuxXI plugin's figures."},
+        {"name": "EXP", "tip": "Your EXP and its bar, on its own. Hover for EXP per hour."},
+        {"name": "Conquest", "tip": "How many regions each nation holds. Hover for which ones."}
+      ]
+    },
+    {
+      "key": "nations",
+      "options": [
+        {"name": "San d'Oria"},
+        {"name": "Bastok"},
+        {"name": "Windurst"},
+        {"name": "Beastmen"}
+      ]
+    },
+    {
+      "key": "exp-text",
+      "options": [
+        {"name": "Earned", "tip": "The EXP you have of this level, out of what it takes."},
+        {"name": "To Next", "tip": "The EXP left to the next level."},
+        {"name": "Percent", "tip": "How much of the level you have, as a percent."}
       ]
     },
     {
@@ -853,6 +900,16 @@
         {"name": "Jobs First"},
         {"name": "EXP First"},
         {"name": "EXP Only"}
+      ]
+    },
+    {
+      "key": "exp-place",
+      "options": [
+        {"name": "Off"},
+        {"name": "Above"},
+        {"name": "Below"},
+        {"name": "Left"},
+        {"name": "Right"}
       ]
     },
     {

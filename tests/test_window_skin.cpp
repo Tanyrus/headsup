@@ -2,6 +2,7 @@
 #include "game_font.h"
 #include "test.h"
 #include "window_skin.h"
+#include "markup.h"
 
 #include <algorithm>
 #include <array>
@@ -306,21 +307,21 @@ TEST(the_palette_is_the_window_shape_with_no_pills_and_no_glow)
     CHECK(p.panelBorder == 0xFF888888u);
 }
 
-TEST(a_box_is_drawn_as_the_game_draws_a_window_its_frame_over_its_shade_over_its_background)
+TEST(a_box_is_the_games_background_under_its_shade_in_an_even_border_of_the_frames_color)
 {
-    const SkinFrame frame{2, 1.5f, 0.5f, 1.0f};
-    const std::string rule = SkinDecorator(frame);
+    const SkinFrame frame{2, 1.5f, 0.5f, 1.0f, 0xFF888888};
+    const std::string rule = SkinRules(frame);
     const auto at = [&](const std::string& part) { return rule.find(part); };
-    // 24 menu pixels at 1.5 are 36; 5 are 8; the tile 192.
-    for (const auto& [piece, pixels] : {std::pair{SkinPiece::TopLeft, 36}, std::pair{SkinPiece::Top, 8},
-             std::pair{SkinPiece::TopRight, 36}, std::pair{SkinPiece::Left, 8}, std::pair{SkinPiece::Right, 8},
-             std::pair{SkinPiece::BottomLeft, 36}, std::pair{SkinPiece::Bottom, 8}, std::pair{SkinPiece::BottomRight, 36}})
-        CHECK(at(SkinSource(2, piece, pixels)) != std::string::npos);
-    // The frame first, as RmlUi draws the first decorator on top; the background last, repeated.
-    CHECK(rule.starts_with("decorator:tiled-box("));
-    CHECK(at("vertical-gradient(#00000080 #00000000)") > at(SkinSource(2, SkinPiece::BottomRight, 36)));
+    // The shade first, as RmlUi draws the first decorator on top; the background, its tile 128 menu pixels at 1.5,
+    // under it, repeated.
+    CHECK(at("vertical-gradient(#00000080 #00000000)") != std::string::npos);
     CHECK(at(SkinSource(2, SkinPiece::Back, 192)) > at("vertical-gradient("));
-    CHECK(at("repeat") != std::string::npos && rule.ends_with(";"));
+    CHECK(at("repeat") != std::string::npos);
+    // None of the art's frame, whose edges are thicker in the middle: a border as thick on every side.
+    CHECK(at(SkinSource(2, SkinPiece::Top, 8)) == std::string::npos && at("tiled-box") == std::string::npos);
+    CHECK(at("border:" + RcssNumber(kSkinEdge) + "px " + RcssColor(0xFF888888) + ";") != std::string::npos);
+    // Without an edge color, no border.
+    CHECK(SkinRules(SkinFrame{2, 1.5f, 0.5f, 1.0f}).find("border:") == std::string::npos);
 }
 
 TEST(a_skins_look_is_its_frame_its_palette_and_its_menus_colors)
@@ -328,7 +329,7 @@ TEST(a_skins_look_is_its_frame_its_palette_and_its_menus_colors)
     WindowSkin skin  = Colored(0xFF1E2A6E, 0xFF888888);
     skin.shadeTop    = 0.25f;
     const GameSkinLook look = SkinLookOf(skin, 4, 2.0f);
-    CHECK((look.frame == SkinFrame{4, 2.0f, 0.25f, 1.0f}));
+    CHECK((look.frame == SkinFrame{4, 2.0f, 0.25f, 1.0f, 0xFF888888})); // its border in the frame's color
     CHECK(look.palette == SkinPalette(skin) && look.menu == SkinMenuColors(skin));
 }
 

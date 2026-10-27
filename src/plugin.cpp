@@ -86,6 +86,7 @@ namespace
     constexpr const char* kCursorsFolder     = "cursors"; // inside HeadsUp's config folder: the player's cursor files
     constexpr const char* kNoteLog           = "headsup";  // the log's name in HeadsUp's logs folder, before its time
     constexpr const char* kThemesFolder      = "themes";  // and their saved top panel themes
+    constexpr const char* kOutpostsFile      = "outposts.txt"; // every character's supply runs, as overseers told them
     constexpr const char* kSettingsFile      = "settings.ini";
     constexpr const char* kNewFileSuffix     = ".new";          // after the process id: the file while it is written
     constexpr long kMaxSettingsBytes         = 4 * 1024 * 1024; // past this the file is not HeadsUp's to rewrite
@@ -251,6 +252,8 @@ class HeadsUp final : public IPlugin
     size_t m_LastSaveKeys = 0; // how many keys the last save had for the file
     headsup::Tracker m_Tracker;
     headsup::PhTimers m_PhTimers;
+    headsup::Activity m_Activity; // whether you have moved or turned lately, which a placeholder's timer asks
+    std::optional<headsup::OutpostFile> m_Outposts; // read from its file when first needed
     std::vector<headsup::TimerLine> m_TimerLines;
     uint16_t m_SelfIndex = 0;
     uint16_t m_Zone      = 0; // this frame
@@ -288,6 +291,9 @@ class HeadsUp final : public IPlugin
     bool m_NetStatsTried = false; // it scans the client's code, so once
     std::optional<headsup::NetCounters> m_Counters; // the last read, kept between samples
     std::optional<double> m_CountersReadAt;
+    headsup::PlayOnlineReader m_PlayOnline;
+    bool m_PlayOnlineTried = false; // it scans the client's code, so once
+    std::optional<headsup::PlayOnlineCounts> m_PlayOnlineCounts; // read with the counters
     headsup::ConnectionMeter m_Connection;
     headsup::FreeSpaceWalk m_SpaceWalk;
     headsup::CpuMeter m_Cpu;
@@ -370,12 +376,14 @@ class HeadsUp final : public IPlugin
     std::optional<std::string> m_CursorFileRead; // the File cursor read last, whether or not it was one
     std::string m_GameFontFailure;                // why the game's font could not be read; empty when it was
     std::string m_GamePearlFailure;               // why the game's pearl could not be read; empty when it was
+    std::string m_PlayOnlineIconsFailure;         // why its PlayOnline icons could not be; empty when they were
     headsup::WindowSkins m_WindowSkins;           // the game's window art, by Window Type
     std::array<std::string, headsup::kWindowTypes> m_SkinFailures; // why a type's art could not be read
     std::array<bool, headsup::kWindowTypes> m_SkinWarned{};        // whether that was said
     headsup::WindowTypeReader m_WindowTypeReader;
     std::optional<headsup::GameSkinLook> m_SkinLook; // the art drawn now, while the panel or the window uses it
     std::optional<headsup::ColorPicture> m_GamePearl;
+    std::optional<headsup::PlayOnlineIcons> m_PlayOnlineIcons;
     std::optional<int> m_PearlOutlineDrawn;       // the outline the pearl was last drawn with
     bool m_GameFontWarned = false;
     float m_MenuHeight  = 0.0f;
@@ -564,13 +572,13 @@ public:
         else if (args[1] == "popup" && args.size() > 2)
         {
             // Pins a widget's popup by the name the settings file gives it, in lower case, or none.
-            std::optional<headsup::BarWidget> pinned;
-            for (int w = 0; w < headsup::kBarWidgetCount; ++w)
+            std::optional<headsup::PanelWidget> pinned;
+            for (int slot = 0; slot < headsup::kPanelSlots; ++slot)
             {
-                std::string name = headsup::BarWidgetName(static_cast<headsup::BarWidget>(w));
+                std::string name = headsup::PanelWidgetName(headsup::WidgetInSlot(slot));
                 for (char& c : name)
                     c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-                if (name == args[2]) pinned = static_cast<headsup::BarWidget>(w);
+                if (name == args[2]) pinned = headsup::WidgetInSlot(slot);
             }
             if (!pinned && args[2] != "off")
                 Print("/hu popup: no widget is named " + args[2] + ".");
@@ -682,8 +690,10 @@ public:
             m_Names.ForgetCamera();
             m_AutoCheck.Clear();
             m_Lookups.Zoned();
+            m_PhTimers.Zoned();
         }
         if (next.check) OnCheckReply(*next.check);
+        if (next.guardEvent) HeardOverseer(*next.guardEvent);
         if (next.mobDied && m_Settings.phTimers)
             if (const auto mob = headsup::SightingOf(headsup::MobById(*next.mobDied))) m_PhTimers.Died(Now(), *mob);
         return next.answer && m_AutoCheck.TakeAnswer(*next.answer, Now());
@@ -760,11 +770,13 @@ public:
         g_BarOn     = headsup::BarRuns(m_Settings, loginStatus) && m_Rml.Running();
         g_BarHidden = m_UiHidden;
         // Opening Region Info asks the server for the conquest standings; HeadsUp asks the same once per zone-in, and
-        // again while the Zone popup shows them.
+        // again while the Zone or Conquest popup shows them.
+        const auto standings = [](headsup::BarWidget w) { return w == headsup::BarWidget::Zone || w == headsup::BarWidget::Conquest; };
         if (m_GameState.ConquestRequestDue(now,
-                g_BarOn && m_Settings.barWidgets[static_cast<int>(headsup::BarWidget::Zone)] &&
+                g_BarOn &&
+                    (headsup::Shown(m_Settings, headsup::BarWidget::Zone) || headsup::Shown(m_Settings, headsup::BarWidget::Conquest)) &&
                     m_AshitaCore->GetMemoryManager()->GetPlayer()->GetIsZoning() == 0,
-                m_BarInput.Open() == headsup::BarWidget::Zone))
+                m_BarInput.Open() && standings(m_BarInput.Open()->kind)))
         {
             auto request = headsup::kConquestRequest; // Ashita takes the bytes as non-const
             m_AshitaCore->GetPacketManager()->AddOutgoingPacket(headsup::kConquestRequestPacket,
@@ -772,9 +784,9 @@ public:
             m_GameState.ConquestRequested(now);
         }
         // Opening the Currencies menu asks for them; HeadsUp asks the same, as for the conquest standings.
-        const bool gilOpen = m_BarInput.Open() == headsup::BarWidget::Gil;
+        const bool gilOpen = m_BarInput.Open() && m_BarInput.Open()->kind == headsup::BarWidget::Gil;
         if (m_GameState.CurrencyRequestDue(now,
-                g_BarOn && m_Settings.barWidgets[static_cast<int>(headsup::BarWidget::Gil)] &&
+                g_BarOn && headsup::Shown(m_Settings, headsup::BarWidget::Gil) &&
                     m_AshitaCore->GetMemoryManager()->GetPlayer()->GetIsZoning() == 0,
                 gilOpen))
         {
@@ -1270,7 +1282,7 @@ private:
         for (const headsup::ActorPtr actor : m_Tracker.Actors())
             if (const headsup::ActorInfo* info = m_Tracker.Find(actor))
                 owners.push_back({actor, info->index,
-                    headsup::HookActionFor(info->state, m_Settings, m_Player, m_Screenshot, m_Nameplates.NamesFailed())});
+                    headsup::HookActionFor(*info, m_Settings, m_Player, m_Screenshot, m_Nameplates.NamesFailed())});
         return owners;
     }
 
@@ -1289,6 +1301,9 @@ private:
         ReadWindowSkins();
         if (!m_GamePearlFailure.empty())
             Note("the game's linkpearl could not be read (" + m_GamePearlFailure + "): the linkshell's is drawn as XIUI's.");
+        if (!m_PlayOnlineIconsFailure.empty())
+            Note("the game's PlayOnline icons could not be read (" + m_PlayOnlineIconsFailure +
+                 "): the connection widget shows only their counts.");
     }
 
     // A file of the game's install where the game reads it: while XIPivot is loaded, the first of its overlays that
@@ -1334,13 +1349,17 @@ private:
         const std::optional<std::vector<uint8_t>> bytes = GameFileBytes(headsup::kGameFontFile, where);
         if (!bytes)
         {
-            m_GameFontFailure  = where;
-            m_GamePearlFailure = where;
+            m_GameFontFailure        = where;
+            m_GamePearlFailure       = where;
+            m_PlayOnlineIconsFailure = where;
             return;
         }
         headsup::Read<headsup::ColorPicture> pearl = headsup::ReadGamePearl(*bytes);
         if (pearl.value) m_GamePearl = std::move(pearl.value);
         else m_GamePearlFailure = where + pearl.failure;
+        headsup::Read<headsup::PlayOnlineIcons> icons = headsup::ReadPlayOnlineIcons(*bytes);
+        if (icons.value) m_PlayOnlineIcons = std::move(icons.value);
+        else m_PlayOnlineIconsFailure = where + icons.failure;
         headsup::Read<headsup::GameFontFace> font = headsup::ReadGameFont(*bytes);
         if (!font.value)
         {
@@ -1505,6 +1524,14 @@ private:
             if (const std::string failure = m_NetStats.Find(); !failure.empty())
                 Note("the connection widget shows no S and R: " + failure + ".");
         return m_NetStats.Read();
+    }
+
+    std::optional<headsup::PlayOnlineCounts> PlayOnlineNow()
+    {
+        if (!std::exchange(m_PlayOnlineTried, true))
+            if (const std::string failure = m_PlayOnline.Find(); !failure.empty())
+                Note("the connection widget shows no PlayOnline messages: " + failure + ".");
+        return m_PlayOnline.Read();
     }
 
     // The game's CP932 as UTF-8, through Windows; "" when it cannot be converted.
@@ -1783,6 +1810,7 @@ private:
             [this](const std::string& line) { Note("RmlUi: " + line); },
             [this](const std::string& name) {
                 if (std::optional<headsup::Image> piece = headsup::SkinImage(m_WindowSkins, name)) return piece;
+                if (std::optional<headsup::Image> picture = headsup::GamePictureImage(m_PlayOnlineIcons, name)) return picture;
                 return headsup::HostImage(name);
             });
         if (!started) Print("RmlUi did not start: the top panel and the settings window are off until HeadsUp reloads.");
@@ -1816,6 +1844,30 @@ private:
             FindClose(search);
         }
         return entries;
+    }
+
+    std::string OutpostsPath() { return OwnFolder(kConfigFolder) + "\\" + kOutpostsFile; }
+
+    headsup::OutpostFile& Outposts()
+    {
+        if (!m_Outposts)
+        {
+            std::ifstream in(OutpostsPath(), std::ios::binary);
+            m_Outposts = headsup::OutpostFileFrom(std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>()));
+        }
+        return *m_Outposts;
+    }
+
+    // A conquest overseer's event in this zone: what it tells of your supply runs is kept, for every load after.
+    void HeardOverseer(const headsup::GuardEvent& event)
+    {
+        const uint32_t character = m_AshitaCore->GetMemoryManager()->GetParty()->GetMemberServerId(0);
+        const headsup::ZoneRecord* zone = headsup::KnownZone(m_Zone);
+        if (character == 0 || zone == nullptr || !Outposts()[character].Heard(event, zone->region)) return;
+        std::ofstream out(OutpostsPath(), std::ios::binary | std::ios::trunc);
+        const std::string text = headsup::OutpostFileText(Outposts());
+        out.write(text.data(), static_cast<std::streamsize>(text.size()));
+        if (!out.good()) Note("could not save the supply runs to " + OutpostsPath() + ".");
     }
 
     void ScanThemes() { m_ThemeFiles = headsup::FolderFileNames(FolderEntries(ThemesFolder()), headsup::kThemeExtensions); }
@@ -2090,6 +2142,12 @@ private:
         s.weather = WeatherNow();
         s.owners   = m_GameState.Owners();
         s.shares   = m_GameState.Shares();
+        if (needs.conquest)
+        {
+            // Ashita's nation is 0 for San d'Oria to 2 for Windurst.
+            s.nation = static_cast<headsup::Nation>(m_AshitaCore->GetMemoryManager()->GetPlayer()->GetNation() + 1);
+            s.outposts = &Outposts()[m_AshitaCore->GetMemoryManager()->GetParty()->GetMemberServerId(0)];
+        }
         if (needs.unixTime || needs.localTime || needs.signet)
         {
             const auto clock = std::chrono::system_clock::now();
@@ -2125,11 +2183,13 @@ private:
         {
             if (!m_CountersReadAt || now - *m_CountersReadAt >= headsup::kCounterSampling)
             {
-                m_Counters       = NetCountersNow();
-                m_CountersReadAt = now;
+                m_Counters         = NetCountersNow();
+                m_PlayOnlineCounts = PlayOnlineNow();
+                m_CountersReadAt   = now;
             }
             m_Connection.Frame(now, m_Counters);
             s.connection = m_Connection.Report(now, m_AshitaCore->GetMemoryManager()->GetPlayer()->GetIsZoning() != 0);
+            s.connection->playOnline = m_PlayOnlineCounts;
         }
         if (needs.party)
         {
@@ -2429,6 +2489,13 @@ private:
                 candidate.name      = name;
             }
             if (isMob && alive) aliveMobs.push_back(serverId);
+            const headsup::WorldPoint feet =
+                headsup::FromEntityPosition(entity->GetLocalPositionX(i), entity->GetLocalPositionY(i), entity->GetLocalPositionZ(i));
+            if (self) m_Activity.Pose(now, feet, entity->GetLocalPositionYaw(i));
+            if (isMob && alive && headsup::SightingOf(record) &&
+                headsup::EarnsTimer(headsup::Targeted(headsup::TargetStateOf(index, m_CursorTargets)),
+                    m_Names.MeshDraws(index) > 0, m_Activity.Active(now)))
+                m_PhTimers.Earned(serverId);
             inputs.push_back(headsup::ActorInput{
                 .actor    = static_cast<headsup::ActorPtr>(actor),
                 .index    = index,
@@ -2440,7 +2507,7 @@ private:
                 .checked  = checked,
                 .status   = CurrentStatus(entity, index, kind),
                 .pose     = isPlayer ? headsup::PoseFromStatus(state) : headsup::Pose::Standing,
-                .feet = headsup::FromEntityPosition(entity->GetLocalPositionX(i), entity->GetLocalPositionY(i), entity->GetLocalPositionZ(i)),
+                .feet = feet,
                 .claimedByParty = isMob && headsup::ClaimedByParty(claim, m_PartyIds),
                 .claimed        = isMob && headsup::IsClaimed(claim),
                 .party          = isPlayer && headsup::InYourParty(serverId, self, m_PartyIds),

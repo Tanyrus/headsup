@@ -31,8 +31,8 @@ namespace headsup
     // ("Hide Level and Icons"); letters already capital stay.
     std::string TitleCaseText(std::string_view text);
 
-    // The Widgets page's tabs: every widget on the bar, in BarWidget's order.
-    std::vector<BarWidget> WidgetTabs();
+    // The Widgets page's tabs: every widget on the bar, in BarWidget's order, each with its other copies after it.
+    std::vector<PanelWidget> WidgetTabs(const BarPlacement& placement);
     // How many tabs go in a row for count of them in rows rows: the rows as even as they come, the first the fuller.
     int TabsPerRow(int count, int rows);
 
@@ -49,8 +49,8 @@ namespace headsup
     // Always turns Always off and leaves the others checked. False for no such row.
     bool ToggleCondition(LineShow& show, std::span<const ShowCondition> offered, int row);
 
-    // A design line's box: its caret, kept between frames for where a clicked tag goes, and whether one of its
-    // stretches has the keyboard this frame.
+    // A design line's box: its caret, kept between frames, and whether one of its stretches has the keyboard this
+    // frame.
     struct LineDraft
     {
         RunCaret caret;
@@ -64,12 +64,11 @@ namespace headsup
         std::vector<uint8_t> held;
     };
 
-    // A kind page's own state, begun anew when another kind's page opens: the line last typed in, which takes a
-    // clicked tag, the three lines' boxes and the Line Style tab that is open.
+    // A kind page's own state, begun anew when another kind's page opens: the three lines' boxes and the Line Style
+    // tab that is open.
     struct DesignEditor
     {
         PlateKind kind = PlateKind::Mobs;
-        int line       = 0;
         int styleTab   = 0;
         LineDraft drafts[kPlateLines] = {};
     };

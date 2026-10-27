@@ -79,8 +79,9 @@ namespace headsup
     OrnamentAt OrnamentLineOf(const ComposedPlate& plate);
 
     // Screenshot mode hides names first, even after /hu off; then the game's stay while HeadsUp or its nameplates are
-    // off, and the row decides the rest: a name HeadsUp cannot draw (namesFailed) is the game's, a hidden one hidden.
-    HookAction HookActionFor(const EntityState& state, const Settings& settings, const PlayerState& player, bool screenshot,
+    // off, and the row decides the rest (a GM always has a plate): a name HeadsUp cannot draw (namesFailed) is the
+    // game's, a hidden one hidden.
+    HookAction HookActionFor(const ActorInfo& info, const Settings& settings, const PlayerState& player, bool screenshot,
         bool namesFailed);
     // The lines this entity shows now, with every tag rendered; empty for a mode that shows nothing.
     ComposedPlate ComposePlate(const ActorInfo& info, const PlayerState& player, const Settings& settings, uint32_t gameArgb);

@@ -1,10 +1,13 @@
 #pragma once
 
+#include "function_ref.h"
+
 #include "bar_content.h"
 #include "bar_game_help.h"
 #include "bar_look.h"
 #include "bar_theme.h"
 #include "bar_types.h"
+#include "game_font.h"
 #include "icons.h"
 #include "markup.h"
 #include "plate_image.h"
@@ -29,6 +32,9 @@ namespace headsup
     std::string ResetSource(uint32_t argb, int pixels); // the circular arrow that puts a color back
     // The image a name stands for; nothing for a name that is none of the above.
     std::optional<Image> HostImage(std::string_view name);
+    // A picture of the game's, from what was read of its files at load: nothing for another name, or when it was not read.
+    std::string GamePictureSource(GamePicture picture);
+    std::optional<Image> GamePictureImage(const std::optional<PlayOnlineIcons>& icons, std::string_view name);
 
     // A line of a widget as RmlUi lays it out: its line box's height, where its top goes from the strip's top (over
     // a detail line, and alone), and how far under that top the icons after its text start.
@@ -40,26 +46,60 @@ namespace headsup
         bool operator==(const BarLinePlace&) const = default;
     };
     // Where the widgets' lines go so their ink lands on the rows the bar's text row gives: a title in the title
-    // font, a title of figures in the detail font, and a detail line.
+    // font, a title of figures in the detail font, a detail line, and a meter's text beside its bar.
     struct BarTextPlace
     {
-        BarLinePlace title, figures, detail;
+        BarLinePlace title, figures, detail, side;
         bool operator==(const BarTextPlace&) const = default;
     };
 
+    // A widget's own text, where its fonts or size are not the bar's: those fonts, and the text row and places they
+    // come to.
+    struct WidgetText
+    {
+        PanelWidget widget;
+        const char* titleFont  = nullptr; // interned, as the bar's are
+        const char* detailFont = nullptr;
+        TextRow lines;
+        BarTextPlace place;
+        bool operator==(const WidgetText&) const = default;
+    };
+
     // The bar's markup and style: the strip across the screen, the ornate caps, a divider for each pair of
-    // neighbours and every placed widget's element, all sized from the look. The widgets and dividers carry the
-    // hidden class and no place: the plugin shows and places them.
-    std::string BarDocument(const BarLook& look, const BarTextPlace& place);
-    std::string WidgetId(BarWidget widget);
+    // neighbours and every placed widget's element, all sized from the look, with the text rules of each widget in
+    // own under its id. The widgets and dividers carry the hidden class and no place: the plugin shows and places them.
+    std::string BarDocument(const BarLook& look, const BarTextPlace& place, const std::vector<WidgetText>& own = {});
+    std::string WidgetId(PanelWidget widget);
+    // A widget's padding on each side as its element takes it, for a room from its edge to what it shows: inside a
+    // pill's or a frame's border, or past a plain ornate widget's margin.
+    float SidePadding(const BarLook& look, PanelWidget widget, float room);
     std::string DividerId(int divider);
-    constexpr int kDividerCount       = kPlacedWidgetCount - 1;
+    constexpr int kDividerCount       = kMostPlaced - 1;
     constexpr const char* kStripId    = "strip";
     constexpr const char* kRightCapId = "cap-right";
     constexpr const char* kHiddenClass = "hidden";
     constexpr const char* kLitClass    = "lit"; // hovered or open, with a popup
+    constexpr const char* kBorderlessClass = "borderless"; // the target, its border switched off
     // A widget's inner markup: its icons, coin, title and detail lines in their colors, and its progress bar.
-    std::string WidgetRml(const WidgetContent& content, const BarLook& look);
+    // A meter's texts as wide as they are drawn, and where its parts go across it: its bar after barX, the texts
+    // above and below centered on the bar.
+    struct MeterWidths
+    {
+        float above = 0.0f, below = 0.0f, left = 0.0f, right = 0.0f;
+    };
+    struct MeterPlace
+    {
+        float width = 0.0f, barX = 0.0f, aboveX = 0.0f, belowX = 0.0f;
+        bool operator==(const MeterPlace&) const = default;
+    };
+    MeterPlace PlaceMeter(const Meter& meter, const MeterWidths& text, float gap);
+
+    // columns: a widget of cells' column widths (CellColumns); meter: a meter's place (PlaceMeter).
+    std::string WidgetRml(const WidgetContent& content, const BarLook& look, const std::vector<float>& columns = {},
+        const MeterPlace& meter = {});
+    // A widget of cells' columns: each as wide as its widest cell, which width measures (title: on the first line).
+    std::vector<float> CellColumns(const WidgetContent& content, FunctionRef<float(bool title, const Span&)> width);
+    float CellsWidth(const std::vector<float>& columns, float gap);
 
     // Game help's own bar under the top bar: its box when it has a background, and its caption, the bag's count and
     // its help where the row puts them, each centered on the row. Nothing for a row with no box.

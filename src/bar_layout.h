@@ -22,7 +22,7 @@ namespace headsup
 
     struct PlacedWidget
     {
-        BarWidget widget;
+        PanelWidget widget;
         BarRect rect;
     };
 
@@ -55,6 +55,10 @@ namespace headsup
         bool twoLines = false;               // false: the row is too short for both, and titles show alone
         float titleY = 0.0f, detailY = 0.0f; // the title over the detail line
         float aloneY = 0.0f;                 // a title without one
+        // A meter's text beside its bar: the detail size, or the title's on a row of one line, its capitals on the
+        // row's middle.
+        int side     = 0;
+        float sideY  = 0.0f;
         bool operator==(const TextRow&) const = default;
     };
     // Placed by their ink, which ink gives for the title's or the detail's font at a size: the title's top to the
@@ -65,7 +69,7 @@ namespace headsup
     // never made smaller to keep two lines: the detail line alone shrinks, to 9 px, before the titles show alone.
     TextRow FitTextRow(const BarMetrics& metrics, FunctionRef<LineInk(bool title, int pixels)> ink);
 
-    // natural: each widget's width by BarWidget, 0 for one not shown. The left section starts after the left end cap
+    // natural: each widget's width by SlotOf, 0 for one not shown. The left section starts after the left end cap
     // (ornate) or a gap (pills), the right one ends before the right one, and the center one is centered as a group
     // in what is left. When the bar is too narrow, the target gives way first, wherever it sits: it shrinks, in whole
     // pixels, down to targetMinimum (or all of its width when that is less), then goes. Then a left widget that would
@@ -73,12 +77,16 @@ namespace headsup
     // where they would reach the left, and the center loses them from its end; the target then takes back the room
     // those leave. In ornate, the target's frame keeps DiamondClearance from the diamond on a
     // neighbour's edge. Pills with diamonds sit a gap, the diamond and a gap apart.
+    // spacing: each widget's room more between it and each neighbour, by SlotOf; an ornate diamond stands in the middle
+    // of the room it is in.
+    inline constexpr std::array<float, kPanelSlots> kNoSpacing{};
     BarLayout LayoutBar(float screenWidth, const BarMetrics& metrics, BarShape shape,
-                        const std::array<float, kBarWidgetCount>& natural, float targetMinimum,
+                        const std::array<float, kPanelSlots>& natural, float targetMinimum,
                         const BarPlacement& placement = DefaultPlacement(),
-                        BarSeparators separators = BarSeparators::Theme);
-    std::optional<BarWidget> WidgetAt(const BarLayout& layout, float x, float y);
-    const BarRect* RectOf(const BarLayout& layout, BarWidget widget);
+                        BarSeparators separators = BarSeparators::Theme,
+                        const std::array<float, kPanelSlots>& spacing = kNoSpacing);
+    std::optional<PanelWidget> WidgetAt(const BarLayout& layout, float x, float y);
+    const BarRect* RectOf(const BarLayout& layout, PanelWidget widget);
     // Under its widget below the bar, moved inward from the screen's sides, its height cut at the bottom: a ring
     // drawn ring pixels around it stays gap from the bar and the screen's edges.
     BarRect PlacePopup(const BarRect& widget, float barHeight, float width, float height, float screenWidth,
@@ -98,7 +106,7 @@ namespace headsup
     {
     public:
         // Each frame: where the widgets are now and which have popups. A pinned widget that is gone loses its pin.
-        void Frame(const BarLayout& layout, const std::array<bool, kBarWidgetCount>& hasPopup);
+        void Frame(const BarLayout& layout, const std::array<bool, kPanelSlots>& hasPopup);
         // Where the open popup was drawn, or an empty rectangle.
         void SetPopup(const BarRect& popup);
         void Move(float x, float y);
@@ -110,14 +118,14 @@ namespace headsup
         bool Press(float x, float y, bool left);
         bool Over(float x, float y) const;
         // Pins this widget's popup, or none, as a press on it would; a widget not on the bar loses it next frame.
-        void Pin(std::optional<BarWidget> widget)
+        void Pin(std::optional<PanelWidget> widget)
         {
             m_Pinned = widget;
             m_Hover.reset();
         }
-        std::optional<BarWidget> Open() const { return m_Hover ? m_Hover : m_Pinned; }
-        std::optional<BarWidget> Pinned() const { return m_Pinned; }
-        std::optional<BarWidget> Hovered() const { return m_Under; }
+        std::optional<PanelWidget> Open() const { return m_Hover ? m_Hover : m_Pinned; }
+        std::optional<PanelWidget> Pinned() const { return m_Pinned; }
+        std::optional<PanelWidget> Hovered() const { return m_Under; }
 
     private:
         void Reevaluate();
@@ -127,12 +135,12 @@ namespace headsup
         static constexpr float kAway = -1.0f; // left of and above everything placed: a pointer off the game
 
         BarLayout m_Layout;
-        std::array<bool, kBarWidgetCount> m_HasPopup{};
+        std::array<bool, kPanelSlots> m_HasPopup{};
         BarRect m_Popup;
         float m_X = kAway, m_Y = kAway;
-        std::optional<BarWidget> m_Under;  // the widget under the pointer
-        std::optional<BarWidget> m_Hover;  // the popup hovering keeps open
-        std::optional<BarWidget> m_Pinned;
+        std::optional<PanelWidget> m_Under;  // the widget under the pointer
+        std::optional<PanelWidget> m_Hover;  // the popup hovering keeps open
+        std::optional<PanelWidget> m_Pinned;
     };
 
     // Which of the game's mouse messages the bar takes, by their Windows numbers: a press on the bar or its open

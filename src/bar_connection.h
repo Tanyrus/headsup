@@ -32,6 +32,7 @@ namespace headsup
         std::optional<Latency> latency;
         double receivedBytes = 0.0, sentBytes = 0.0; // since HeadsUp first read the counters
         double countedSeconds = 0.0;                 // how long those totals ran
+        std::optional<PlayOnlineCounts> playOnline;
         bool operator==(const ConnectionReport&) const = default;
     };
 
@@ -72,7 +73,8 @@ namespace headsup
     // "820 B", "34.5 KB", "1.2 MB", a KB being 1,024 bytes.
     std::string ByteText(double bytes);
 
-    // latency: the median round trip after the rates, once there is one.
-    WidgetContent ConnectionWidget(const std::optional<ConnectionReport>& report, bool latency = false);
+    // latency: the median round trip after the rates, once there is one; meter: the game's own meter after them, as its
+    // readout has it.
+    WidgetContent ConnectionWidget(const std::optional<ConnectionReport>& report, bool latency = false, bool meter = true);
     PopupContent ConnectionPopup(const std::optional<ConnectionReport>& report);
 }
