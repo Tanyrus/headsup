@@ -268,7 +268,7 @@ namespace headsup
                 shown.columns = c.cells ? CellColumns(c, [&](bool title, const Span& span) {
                     return SteadyWidth(host, {span}, {}, title ? own.TitleFace(c) : own.DetailFace());
                 }) : std::vector<float>{};
-                const auto detail = [&](const std::vector<Span>& spans) { return SteadyWidth(host, spans, {}, own.DetailFace()); };
+                const auto detail = [&](const std::vector<Span>& spans) { return SteadyWidth(host, spans, {}, own.MeterFace()); };
                 shown.meter = c.meter ? PlaceMeter(*c.meter, MeterWidths{detail(c.meter->above), detail(c.meter->below),
                                                                  detail(c.meter->left), detail(c.meter->right)}, m.gap)
                                       : MeterPlace{};

@@ -464,6 +464,21 @@ TEST(a_meter_is_as_wide_as_its_bar_and_side_texts_with_the_texts_above_and_below
     CHECK(wide.barX == 100.0f && wide.width == 300.0f && wide.aboveX == 0.0f);
 }
 
+TEST(a_meters_texts_are_measured_in_the_face_they_are_drawn_in)
+{
+    Settings settings;
+    BarLook look = LookOf(BarTheme::PhoenixGold, settings);
+    for (const bool twoLines : {true, false})
+    {
+        // On a row of one line they take the title's size.
+        look.lines.twoLines = twoLines;
+        look.lines.side     = twoLines ? look.lines.detail : look.lines.title;
+        const TextFace face = look.MeterFace();
+        const std::string rule = ".mtext{font-family:\"" + std::string(face.family) + "\";font-size:" + Px(face.size) + ";";
+        CHECK(Has(BarDocument(look, Place()), rule.c_str()));
+    }
+}
+
 TEST(a_meters_bar_has_its_middle_on_the_rows_middle_with_its_texts_around_it)
 {
     Settings settings;

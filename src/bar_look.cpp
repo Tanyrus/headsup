@@ -163,6 +163,8 @@ namespace headsup
 
     TextFace BarLook::DetailFace() const { return TextFace{detailFont, static_cast<float>(lines.detail)}; }
 
+    TextFace BarLook::MeterFace() const { return TextFace{detailFont, static_cast<float>(lines.side)}; }
+
     TextFace BarLook::FaceOf(PopupFont font) const
     {
         switch (font)
