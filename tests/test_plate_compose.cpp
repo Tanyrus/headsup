@@ -1145,6 +1145,17 @@ TEST(a_gms_icon_is_on_every_plate_of_theirs_where_the_design_puts_it_or_before_t
     const ComposedPlate plain = Compose(PlayerWith(gm), s);
     CHECK_EQ(Rendered(plain.lines.back()), "[1] Chadmage");
     CHECK((IconsOn(plain) == std::vector<Icon>{Icon::Gm}));
+    // Icons before the name take it into their run, spaced as if the design had it after them.
+    PlayerStatus pearl = gm;
+    pearl.linkshell    = true;
+    for (const auto& [without, with] : {std::pair{"$linkshell$name", "$linkshell$gm$name"}, {"$linkshell $name", "$linkshell$gm $name"}})
+    {
+        players.lines[2].text = without;
+        const std::string forced = Rendered(Compose(PlayerWith(pearl), s).lines.back());
+        players.lines[2].text = with;
+        CHECK_EQ(forced, Rendered(Compose(PlayerWith(pearl), s).lines.back()));
+    }
+    players.lines[2].text = "$name";
     // On a line that does not show now: before the name all the same.
     players.lines[0].text = "$gm";
     players.lines[0].show = LineShow{false, 0};

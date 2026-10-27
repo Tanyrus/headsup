@@ -292,8 +292,8 @@ namespace headsup
     namespace
     {
         // A GM's icon is on every plate of theirs, whatever the design shows (Phoenix's rule): where the design did
-        // not draw it, before their name a space apart, else at the start of the first line, else on a line of its
-        // own in the bottom line's look.
+        // not draw it, at the end of the icons before their name, or before it a space apart, else at the start of
+        // the first line, else on a line of its own in the bottom line's look.
         void PutGmIcon(ComposedPlate& plate, const LineLook& bottomLook)
         {
             PlateItem icon = ItemOf(ItemKind::Icons);
@@ -304,7 +304,12 @@ namespace headsup
                 if (const auto name = std::ranges::find_if(line.items, [](const PlateItem& item) { return item.name; });
                     name != line.items.end())
                 {
-                    line.items.insert(line.items.insert(name, gap), icon);
+                    auto before = name;
+                    if (before != line.items.begin() && std::prev(before)->kind == ItemKind::Space) --before;
+                    if (before != line.items.begin() && std::prev(before)->kind == ItemKind::Icons)
+                        std::prev(before)->icons.push_back(icon.icons.front());
+                    else
+                        line.items.insert(line.items.insert(name, gap), icon);
                     return;
                 }
             if (!plate.lines.empty())
