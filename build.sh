@@ -28,6 +28,7 @@ generate() {
     python3 "$ROOT/tools/gen_shapes.py"
     python3 "$ROOT/tools/gen_zones.py"
     python3 "$ROOT/tools/gen_titles.py"
+    python3 "$ROOT/tools/gen_world.py"
     python3 "$ROOT/tools/gen_window.py"
     python3 "$ROOT/tools/gen_views.py"
 }
