@@ -65,7 +65,9 @@ TEST(a_frame_is_read_at_the_routines_offsets)
 
     const NameFrame frame = ReadNameFrame(bytes.data());
     CHECK_EQ(frame.caller, 0x035908A8u);
-    CHECK_EQ(frame.actor, 0x3116EA10u);
+    // Carrott's actor was in the routine's first locals, but only left there by calls before it: the routine never sets
+    // them, and xirml's hook on the wrapper leaves its own words there.
+    CHECK_EQ(frame.actor, 0u);
     CHECK_EQ(frame.length, 9u);
     CHECK(std::fabs(frame.x / 1.5f - 1279.7f) < 0.1f);
     CHECK(std::fabs(frame.y / 1.5f - 656.9f) < 0.1f);

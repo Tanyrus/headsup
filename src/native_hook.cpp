@@ -24,6 +24,9 @@ extern "C"
     uintptr_t g_HeadsUpNameResume = 0;
     uintptr_t g_HeadsUpNameExit   = 0;
     void HeadsUpNameGate();
+    uint32_t g_HeadsUpNameActor        = 0;
+    uintptr_t g_HeadsUpEntityNameDraw = 0;
+    void HeadsUpEntityNameGate();
     __attribute__((used)) uint32_t HeadsUpOnName(uint32_t frame);
     uintptr_t g_HeadsUpArrowDraw = 0;
     void HeadsUpArrowGate();
@@ -126,6 +129,19 @@ _HeadsUpNameGate:
     xor ebp, ebp
     xor esi, esi
     jmp dword ptr [_g_HeadsUpNameResume]
+    .att_syntax prefix
+)");
+
+// In place of the entity loop's call into the wrapper that draws an entity's name, which takes the actor in ecx and
+// drops it before the routine runs. It goes on to whatever the call went to, the wrapper or another plugin's hook on it.
+asm(R"(
+    .text
+    .p2align 4
+    .globl _HeadsUpEntityNameGate
+_HeadsUpEntityNameGate:
+    .intel_syntax noprefix
+    mov dword ptr [_g_HeadsUpNameActor], ecx
+    jmp dword ptr [_g_HeadsUpEntityNameDraw]
     .att_syntax prefix
 )");
 
@@ -451,11 +467,18 @@ namespace headsup
         g_EntityCaller      = moduleBase + routine.entityCaller;
         g_HeadsUpNameResume = moduleBase + routine.resume;
         g_HeadsUpNameExit   = moduleBase + routine.exit;
+        g_HeadsUpNameActor  = 0;
+        g_HeadsUpEntityNameDraw = moduleBase + routine.wrapper;
 
-        CodePatch jump = Instruction(site, sizeof(kNameHookBytes), kJumpOpcode,
-            BranchOperand(Address(site), Address(&HeadsUpNameGate)));
-        if (const std::string failure = PutIn({&jump, 1}); !failure.empty()) return failure;
-        m_Patch      = jump;
+        std::vector<CodePatch> patches = {Instruction(site, sizeof(kNameHookBytes), kJumpOpcode,
+            BranchOperand(Address(site), Address(&HeadsUpNameGate)))};
+        for (const uint32_t rva : routine.wrapperCalls)
+        {
+            uint8_t* call = const_cast<uint8_t*>(base) + rva;
+            patches.push_back(Retarget(call, Address(call), Address(&HeadsUpEntityNameGate)));
+        }
+        if (const std::string failure = PutIn(patches); !failure.empty()) return failure;
+        m_Patches    = std::move(patches);
         m_ModuleBase = moduleBase;
         return "";
     }
@@ -463,10 +486,10 @@ namespace headsup
     std::string NameHook::Stop()
     {
         if (!Running()) return "";
-        const CodePatch jump = std::exchange(m_Patch, {});
+        const std::vector<CodePatch> patches = std::exchange(m_Patches, {});
         g_Owners.clear(); // the gate then resumes the routine for every name
         g_HideNames = false;
-        return KeptLoaded(PutBack({&jump, 1},
+        return KeptLoaded(PutBack(patches,
             "the game's name routine was changed again after HeadsUp hooked it, so it was left as it is",
             "the game's name routine could not be put back"));
     }
@@ -1318,13 +1341,14 @@ extern "C" uint32_t HeadsUpOnName(uint32_t frame)
 {
     using namespace headsup;
     const auto* bytes          = reinterpret_cast<const uint8_t*>(frame);
-    const NameFrame name       = ReadNameFrame(bytes);
+    NameFrame name             = ReadNameFrame(bytes);
     const bool fromRoutine = FromNameRoutine(name, g_CallerReturns);
     const auto* text       = fromRoutine ? reinterpret_cast<const uint8_t*>(name.text) : nullptr;
+    // The other caller draws world labels, which have no actor.
+    if (name.caller == g_EntityCaller) name.actor = g_HeadsUpNameActor;
 #ifdef HEADSUP_DEV
-    CaptureNameCall(bytes, text, name.length);
+    CaptureNameCall(bytes, name.actor, text, name.length);
 #endif
-    // The other caller draws world labels, whose frames hold no actor: whatever is there is stale.
     if (!fromRoutine || name.caller != g_EntityCaller || !Placeable(name) || !SingleLine(text, name.length)) return 0;
     const NameOwner* owner = FindOwner(name.actor);
     if (owner == nullptr) return 0;

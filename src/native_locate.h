@@ -35,6 +35,8 @@ namespace headsup
         UnexpectedExit,
         NoCallers,
         NoEntityCaller,
+        EntityWrapperChanged,
+        NoEntityWrapperCalls,
         NoArrowDraws,
         AmbiguousArrowDraws,
         ArrowDrawsDiffer,
@@ -84,6 +86,8 @@ namespace headsup
         uint32_t entry = 0, hook = 0, resume = 0, exit = 0;
         std::vector<uint32_t> callerReturns;
         uint32_t entityCaller = 0; // the one of those that entities' names come back to
+        uint32_t wrapper = 0;               // the wrapper that one is in, which takes the actor in ecx
+        std::vector<uint32_t> wrapperCalls; // the calls into it
     };
 
     // Found by the two icon tables it reads (from .rdata, which is in the file) rather than by its own bytes, so it

@@ -54,7 +54,7 @@ namespace headsup
         std::string Start();
         // Puts the game's bytes back if they are still HeadsUp's. Returns why it could not, or an empty string.
         std::string Stop();
-        bool Running() const { return m_Patch.at != nullptr; }
+        bool Running() const { return !m_Patches.empty(); }
 
         uint32_t ModuleBase() const { return m_ModuleBase; }
         std::span<const uint32_t> CallerReturns() const;
@@ -72,7 +72,7 @@ namespace headsup
         IDirect3DSurface8* SceneDepth() const;
 
     private:
-        CodePatch m_Patch;
+        std::vector<CodePatch> m_Patches; // the jump into the gate, then the calls into the entity wrapper
         uint32_t m_ModuleBase = 0;
     };
 

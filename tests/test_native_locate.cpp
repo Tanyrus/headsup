@@ -56,7 +56,12 @@ namespace
         image.Put(kRoutine + 0x1D1, {0x33, 0xD2, 0x33, 0xED, 0x33, 0xF6});
         PutTableReads(image, kRoutine, 0x037ED36C, 0x037ED374);
         image.Put(kRoutine + 0x6D7, {0x8D, 0x8C, 0x24, 0x84, 0x00, 0x00, 0x00});
-        image.Put(0x0D08A3, {0xE8, 0x68, 0x59, 0xFB, 0xFF, 0x83, 0xC4, 0x14, 0xC2, 0x14, 0x00}); // a wrapper: returns at once
+        // The wrapper: a check on the actor in ecx, its five arguments passed on, the call, and it returns at once.
+        image.Put(0x0D0880, {0x66, 0x83, 0xB9, 0xB2, 0x00, 0x00, 0x00, 0x00, 0x75, 0x21, 0x8B, 0x44, 0x24, 0x14, 0x8B, 0x4C,
+                                0x24, 0x10, 0x8B, 0x54, 0x24, 0x0C, 0x50, 0x8B, 0x44, 0x24, 0x0C, 0x51, 0x8B, 0x4C, 0x24, 0x0C,
+                                0x52, 0x50, 0x51});
+        image.Put(0x0D08A3, {0xE8, 0x68, 0x59, 0xFB, 0xFF, 0x83, 0xC4, 0x14, 0xC2, 0x14, 0x00});
+        image.Put(0x0D068A, {0x8B, 0xCE, 0xE8, 0xEF, 0x01, 0x00, 0x00}); // the entity loop: mov ecx,esi; call the wrapper
         image.Put(0x17570C, {0xE8, 0xFF, 0x0A, 0xF1, 0xFF, 0x83, 0xC4, 0x14, 0x8B, 0x47, 0x10}); // a loop over world labels
         return image;
     }
@@ -91,6 +96,39 @@ TEST(entity_names_come_through_the_wrapper_that_returns_straight_after)
     // The other caller walks lists of world labels, whose frames hold no actor.
     const NameRoutine found = Locate(ClientImage());
     CHECK_EQ(found.entityCaller, 0x0D08A8u);
+}
+
+TEST(the_entity_loops_call_into_the_wrapper_is_found)
+{
+    // The actor goes into the wrapper in ecx and no further, so it is caught at this call.
+    const NameRoutine found = Locate(ClientImage());
+    CHECK(found.problem == LocateProblem::None);
+    CHECK_EQ(found.wrapper, 0x0D0880u);
+    CHECK((found.wrapperCalls == std::vector<uint32_t>{0x0D068C}));
+}
+
+TEST(a_jump_another_plugin_put_over_the_wrappers_start_leaves_it_found)
+{
+    // xirml 0.20's hook, as it stood in the live client on 2026-10-27.
+    Image image = ClientImage();
+    image.Put(0x0D0880, {0xE9, 0xCB, 0x89, 0x89, 0x73});
+    const NameRoutine found = Locate(image);
+    CHECK(found.problem == LocateProblem::None);
+    CHECK((found.wrapperCalls == std::vector<uint32_t>{0x0D068C}));
+}
+
+TEST(a_wrapper_that_passes_its_arguments_otherwise_is_refused)
+{
+    Image image = ClientImage();
+    image.Put(0x0D0896, {0x90}); // push eax, the fifth argument, gone
+    CHECK(Locate(image).problem == LocateProblem::EntityWrapperChanged);
+}
+
+TEST(a_wrapper_nothing_calls_is_refused)
+{
+    Image image = ClientImage();
+    image.Put(0x0D068C, {0xE8, 0x00, 0x00, 0x00, 0x00});
+    CHECK(Locate(image).problem == LocateProblem::NoEntityWrapperCalls);
 }
 
 TEST(without_that_wrapper_the_routine_is_refused)
@@ -427,6 +465,19 @@ TEST(the_window_draw_call_is_found_by_its_loop_and_checked_by_the_routines_start
     PutWindowLoop(twice, 0x160000);
     CHECK(LocateWindowDraw(twice.Text()).problem == LocateProblem::AmbiguousWindowDraw);
     CHECK(LocateWindowDraw(Image{}.Text()).problem == LocateProblem::NoWindowDraw);
+}
+
+TEST(a_jump_another_plugin_put_over_the_window_draws_start_leaves_it_found)
+{
+    // xirml 0.20's hook over sub esp,24h; push ebx; push ebp, as it stood in the live client on 2026-10-27.
+    Image hooked = WindowClient();
+    hooked.Put(kWindowRoutine, {0xE9, 0xAB, 0xF5, 0x8D, 0x73});
+    const WindowDraw found = LocateWindowDraw(hooked.Text());
+    CHECK(found.problem == LocateProblem::None && found.draw == kWindowRoutine);
+    // A jump into a routine that goes on otherwise is not the window draw.
+    Image other = WindowClient();
+    other.Put(kWindowRoutine, {0xE9, 0xAB, 0xF5, 0x8D, 0x73, 0x55});
+    CHECK(LocateWindowDraw(other.Text()).problem == LocateProblem::WindowDrawChanged);
 }
 
 TEST(the_window_list_is_the_one_the_draw_loop_starts_on)
