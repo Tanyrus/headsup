@@ -5,6 +5,7 @@
 #include "function_ref.h"
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace headsup
@@ -28,6 +29,7 @@ namespace headsup
             Rule,       // an ornate heading's fading line
             Tag,        // a tag's frame, under its text
             Card,       // a section's rounded ground, under its heading and rows
+            Fold,       // a fold row's arrow: pointing right while closed, down while open
         };
         Kind kind = Kind::Text;
         float x = 0.0f, y = 0.0f, width = 0.0f, height = 0.0f; // from the popup's top-left corner
@@ -35,6 +37,15 @@ namespace headsup
         PopupFont font = PopupFont::Text;
         Icon icon      = Icon::AggroNQ; // Icon
         size_t line    = 0;             // in the layout's lines
+        bool open      = false;         // Fold
+    };
+
+    // Where a fold row is, from the popup's top-left corner: the whole row across its card, to click.
+    struct PopupFold
+    {
+        std::string key;
+        float x = 0.0f, y = 0.0f, width = 0.0f, height = 0.0f;
+        size_t line = 0;
     };
 
     // The title, or a section's card: a popup cut short keeps or drops each whole.
@@ -48,6 +59,7 @@ namespace headsup
         float width = 0.0f, height = 0.0f;
         std::vector<PopupPiece> pieces; // line by line
         std::vector<PopupLine> lines;   // top to bottom
+        std::vector<PopupFold> folds;
     };
 
     struct TextSize

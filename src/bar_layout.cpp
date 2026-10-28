@@ -339,9 +339,10 @@ namespace headsup
         Reevaluate();
     }
 
-    void BarInput::SetPopup(const BarRect& popup)
+    void BarInput::SetPopup(const BarRect& popup, std::vector<BarFold> folds)
     {
         m_Popup = popup;
+        m_Folds = std::move(folds);
         Reevaluate();
     }
 
@@ -381,7 +382,18 @@ namespace headsup
         if (under && m_HasPopup[SlotOf(*under)])
             m_Pinned = m_Pinned == under ? std::nullopt : under;
         else if (!under && Open() && m_Popup.Contains(x, y))
+        {
+            for (const BarFold& fold : m_Folds)
+                if (fold.rect.Contains(x, y))
+                {
+                    if (const auto open = std::ranges::find(m_OpenFolds, fold.key); open != m_OpenFolds.end())
+                        m_OpenFolds.erase(open);
+                    else
+                        m_OpenFolds.push_back(fold.key);
+                    return true;
+                }
             m_Pinned = m_Pinned == Open() ? std::nullopt : Open();
+        }
         return true;
     }
 

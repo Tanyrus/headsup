@@ -179,8 +179,10 @@ namespace headsup
         BarRect ShowHelpBar(RmlHost& host, const BarLook& look, const Rows& rows, const BarState& state, float top,
             float offsetX, float screenWidth, bool& cut);
         // The open popup in the host's overlay, and where it went (an empty rectangle for none).
+        // Places the open popup, and adds its fold rows at their places on the screen to folds.
         BarRect ShowPopup(RmlHost& host, const BarLook& look, const BarState& state,
-            const BarLayout& layout, float screenWidth, float screenHeight, const BarInput& input, bool hidden);
+            const BarLayout& layout, float screenWidth, float screenHeight, const BarInput& input, bool hidden,
+            std::vector<BarFold>& folds);
         bool PopupDocumentFor(RmlHost& host, const BarLook& look);
         void ClosePopup();
         const FaceLine& FaceLineOf(RmlHost& host, const char* family, int pixels);

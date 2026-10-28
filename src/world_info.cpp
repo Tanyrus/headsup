@@ -2,6 +2,7 @@
 
 #include "vanadiel.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace headsup
@@ -88,13 +89,23 @@ namespace headsup
         return std::nullopt;
     }
 
-    int ZonesWithElement(Element element, uint32_t day)
+    std::vector<ZoneRoll> ZonesRolling(Element element, uint32_t day)
     {
-        int count = 0;
+        std::vector<ZoneRoll> rolls;
         for (uint16_t id = 1; const ZoneRecord* zone = ZoneById(id); ++id)
-            if (const std::optional<WeatherOdds> odds = WeatherOn(*zone, day))
-                count += WeatherElement(odds->normal) == element || WeatherElement(odds->common) == element ||
-                         WeatherElement(odds->rare) == element;
-        return count;
+        {
+            const std::optional<WeatherOdds> odds = WeatherOn(*zone, day);
+            if (!odds) continue;
+            ZoneRoll roll{id};
+            for (const WeatherChance& chance : Chances(*odds))
+                if (WeatherElement(chance.weather) == element)
+                {
+                    roll.weathers.push_back(chance);
+                    roll.percent += chance.percent;
+                }
+            if (roll.percent > 0) rolls.push_back(std::move(roll));
+        }
+        std::ranges::stable_sort(rolls, [](const ZoneRoll& a, const ZoneRoll& b) { return a.percent > b.percent; });
+        return rolls;
     }
 }

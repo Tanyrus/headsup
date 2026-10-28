@@ -604,6 +604,60 @@ TEST(the_reroll_note_is_in_earth_minutes_and_left_out_where_the_weather_never_ch
     CHECK(Joined(forecast->rows[0].cells[1].text) == "Stellar Glare 100%");
 }
 
+TEST(the_weather_popup_folds_each_element_over_the_zones_that_can_roll_it_today_and_tomorrow)
+{
+    Settings settings;
+    BarState state;
+    state.zone   = 103;
+    state.unixMs = kVanaEpochUnixMs + 777LL * 3456 * 1000; // day 777
+    const uint32_t today = 777;
+    const auto byElement = [&] { return *Section(BarPopupContent(BarWidget::Weather, state, settings), "By Element"); };
+    // Closed, a row an element: how many zones can roll it today, and tomorrow.
+    const PopupSection closed = byElement();
+    CHECK_EQ(closed.rows.size(), static_cast<size_t>(kElementCount));
+    const std::vector<std::string> lines = Lines(closed);
+    for (int e = 0; e < kElementCount; ++e)
+    {
+        const auto element = static_cast<Element>(e);
+        CHECK(closed.rows[e].fold == ElementName(element) && !closed.rows[e].open);
+        CHECK_EQ(lines[e], std::string(ElementName(element)) + " " + std::to_string(ZonesRolling(element, today).size()) +
+                               " zones today" + kDot + std::to_string(ZonesRolling(element, today + 1).size()) + " tomorrow");
+    }
+    // Open, a grid of the zones that can roll it either day, today's likeliest first, then tomorrow's.
+    state.openFolds = {"Ice"};
+    const PopupSection open = byElement();
+    const size_t ice = static_cast<size_t>(Element::Ice);
+    CHECK(open.rows[ice].open && open.rows.size() == closed.rows.size() + 1);
+    const PopupRow& grid = open.rows[ice + 1];
+    CHECK(grid.nested && grid.kind == RowKind::Grid && grid.columns == 3);
+    std::map<uint16_t, std::pair<int, int>> chance; // today's and tomorrow's
+    for (const ZoneRoll& roll : ZonesRolling(Element::Ice, today))
+        chance[roll.zone].first = roll.percent;
+    for (const ZoneRoll& roll : ZonesRolling(Element::Ice, today + 1))
+        chance[roll.zone].second = roll.percent;
+    std::vector<uint16_t> order;
+    for (const auto& [zone, odds] : chance)
+        order.push_back(zone);
+    std::ranges::stable_sort(order, [&](uint16_t a, uint16_t b) { return chance[a] > chance[b]; });
+    CHECK_EQ(grid.cells.size(), 3 * (order.size() + 1));
+    CHECK(Joined(grid.cells[0].text) == "Zone" && Joined(grid.cells[1].text) == "Today" &&
+          Joined(grid.cells[2].text) == "Tomorrow");
+    for (size_t i = 0; i < order.size(); ++i)
+    {
+        CHECK_EQ(Joined(grid.cells[3 * (i + 1)].text), ZoneById(order[i])->name);
+        // A day the zone cannot roll it reads as a dash.
+        if (chance[order[i]].second == 0) CHECK_EQ(Joined(grid.cells[3 * (i + 1) + 2].text), "-");
+    }
+    // The first zone's weathers today, each with its share.
+    const ZoneRoll top = ZonesRolling(Element::Ice, today).front();
+    std::string shares;
+    for (const WeatherChance& w : top.weathers)
+        shares += (shares.empty() ? "" : kDot) + std::string(WeatherName(w.weather)) + " " + std::to_string(w.percent) + "%";
+    const size_t row = static_cast<size_t>(std::ranges::find(order, top.zone) - order.begin());
+    CHECK(row < order.size());
+    CHECK_EQ(Joined(grid.cells[3 * (row + 1) + 1].text), shares);
+}
+
 TEST(a_zone_without_a_calendar_or_weather_hides_the_widget)
 {
     Settings settings;
@@ -2079,7 +2133,7 @@ TEST(the_world_info_popup_has_the_parts_you_picked)
             out.push_back(section.heading);
         return out;
     };
-    CHECK((headings() == std::vector<std::string>{"Airships", "Boats", "Manaclipper", "Barge", "Weather", "Guilds", "Calendar"}));
+    CHECK((headings() == std::vector<std::string>{"Travel", "Guilds", "Calendar"}));
     settings.Widget(BarWidget::World).worldSections = WorldBit(WorldSection::Calendar);
     CHECK((headings() == std::vector<std::string>{"Calendar"}));
     const PopupContent calendar = BarPopupContent(BarWidget::World, state, settings);
@@ -2090,12 +2144,83 @@ TEST(the_world_info_popup_has_the_parts_you_picked)
     // The next new moon is day 88.
     CHECK_EQ(lines[3], "New Moon in " + Countdown(SecondsToDay(kEarthsdayTen, 88)));
     CHECK_EQ(lines[4], "Conquest Tally in " + Countdown(SecondsToTally(kEarthsdayTen)));
-    // Each ship's line says when it boards, or that it is boarding.
+}
+
+TEST(each_kind_of_ship_folds_its_routes_under_the_next_to_leave)
+{
+    BarState state;
+    state.unixMs = kEarthsdayTen;
+    Settings settings = WorldShowing(WorldLine::Departure);
     settings.Widget(BarWidget::World).worldSections = WorldBit(WorldSection::Travel);
-    const PopupContent travel = BarPopupContent(BarWidget::World, state, settings);
-    const std::vector<std::string> airships = Lines(travel.sections[0]);
-    CHECK(std::ranges::find(airships, "Jeuno to San d'Oria Boards in 5:16") != airships.end());
+    const auto travel = [&] { return BarPopupContent(BarWidget::World, state, settings).sections.at(0); };
+    // Closed, a row a kind, each telling when its next ship leaves.
+    PopupSection closed = travel();
+    CHECK_EQ(closed.heading, "Travel");
+    std::vector<std::string> kinds;
+    for (const PopupRow& row : closed.rows)
+    {
+        CHECK(!row.fold.empty() && !row.open && !row.nested);
+        kinds.push_back(row.fold);
+    }
+    CHECK((kinds == std::vector<std::string>{"Airships", "Boats", "Manaclipper", "Barge"}));
+    // The airship that leaves first: every one leaves within a cycle, so the soonest is the least time to leave.
+    double soonest = 1e9;
+    std::string first;
+    for (const TravelRoute& route : TravelRoutes())
+        if (std::string(route.group) == "Airships" && NextSailing(route, state.unixMs).leaveIn < soonest)
+        {
+            soonest = NextSailing(route, state.unixMs).leaveIn;
+            first   = route.name;
+        }
+    const std::vector<std::string> shut = Lines(closed);
+    CHECK_EQ(shut[0].rfind("Airships ", 0), static_cast<size_t>(0));
+    CHECK(shut[0].find(first) != std::string::npos);
+    // Open, its routes follow it, under it.
+    state.openFolds = {"Airships"};
+    const PopupSection open = travel();
+    CHECK(open.rows[0].open && open.rows[1].nested);
+    const std::vector<std::string> routes = Lines(open);
+    CHECK(std::ranges::find(routes, "Jeuno to San d'Oria Boards in 5:16") != routes.end());
+    const auto airships = std::ranges::count_if(TravelRoutes(), [](const TravelRoute& r) { return std::string(r.group) == "Airships"; });
+    CHECK_EQ(open.rows.size(), closed.rows.size() + static_cast<size_t>(airships));
     state.unixMs = kVanaEpochUnixMs + 864LL * 1000 + 100 * 1000; // 100 s into a cycle: its door opened at 28 s
-    const std::vector<std::string> boarding = Lines(BarPopupContent(BarWidget::World, state, settings).sections[0]);
+    const std::vector<std::string> boarding = Lines(travel());
     CHECK(std::ranges::find(boarding, std::string("Jeuno to San d'Oria Boarding") + kDot + "leaves in 1:22") != boarding.end());
+}
+
+TEST(each_guild_folds_its_shops_under_how_many_are_open)
+{
+    BarState state;
+    state.unixMs = kEarthsdayTen;
+    Settings settings = WorldShowing(WorldLine::Departure);
+    settings.Widget(BarWidget::World).worldSections = WorldBit(WorldSection::Guilds);
+    const auto guilds = [&] { return BarPopupContent(BarWidget::World, state, settings).sections.at(0); };
+    // A row a guild, in the shops' order, saying how many of its shops are open.
+    std::vector<std::string> names;
+    int woodworking = 0, woodworkingOpen = 0;
+    for (const GuildShop& shop : GuildShops())
+    {
+        if (names.empty() || names.back() != shop.guild) names.push_back(shop.guild);
+        if (std::string(shop.guild) == "Woodworking")
+        {
+            ++woodworking;
+            woodworkingOpen += GuildAt(shop, state.unixMs).open;
+        }
+    }
+    const PopupSection closed = guilds();
+    CHECK_EQ(closed.heading, "Guilds");
+    CHECK_EQ(closed.rows.size(), names.size());
+    for (size_t i = 0; i < names.size(); ++i)
+        CHECK(closed.rows[i].fold == names[i] && !closed.rows[i].open);
+    CHECK_EQ(Lines(closed).back(), "Woodworking " + std::to_string(woodworkingOpen) + " of " + std::to_string(woodworking) + " open");
+    // Open, its shops follow it: each one's hours, then who and where.
+    state.openFolds = {"Woodworking"};
+    const PopupSection open = guilds();
+    CHECK(open.rows.back().nested && open.rows.back().kind == RowKind::Grid && open.rows.back().columns == 2);
+    const std::vector<PopupCell>& cells = open.rows.back().cells;
+    CHECK_EQ(cells.size(), static_cast<size_t>(2 * woodworking));
+    const auto at = std::ranges::find_if(cells, [](const PopupCell& c) { return Joined(c.text) == "Chaupire, Northern San d'Oria"; });
+    CHECK(at != cells.end() && (at - cells.begin()) % 2 == 1);
+    // Its hours before it: open until 21:00, 11 Vana'diel hours away, as the panel line says.
+    CHECK_EQ(Joined((at - 1)->text), std::string("Open") + kDot + "closes in 26:24");
 }

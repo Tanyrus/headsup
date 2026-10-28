@@ -76,6 +76,7 @@ namespace headsup
         std::optional<MemoryReport> memory; // nullopt before the first whole walk of the space
         std::optional<double> cpuPercent;   // of one core; nullopt before two samples
         LinuxXIState linuxxi;
+        std::vector<std::string> openFolds; // the popup rows the player opened, by their fold keys
     };
 
     // The parts of BarState that the shown widgets and the open popup read, for the plugin to gather only those; it

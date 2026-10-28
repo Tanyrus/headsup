@@ -98,6 +98,11 @@ namespace headsup
         RowKind kind = RowKind::Line;
         int columns  = 0; // Grid
         std::vector<PopupCell> cells;
+        // A row a click opens and closes, by this key, with an arrow before it; while open, the nested rows after it
+        // are its own, set in under its first cell.
+        std::string fold{};
+        bool open   = false;
+        bool nested = false;
         bool operator==(const PopupRow&) const = default;
     };
 

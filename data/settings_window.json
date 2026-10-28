@@ -857,7 +857,7 @@
       "key": "bar-widgets",
       "options": [
         {"name": "Zone", "tip": "The zone, its region and who holds it. Hover for the influence there and the conquest tally."},
-        {"name": "Weather", "tip": "The weather now and today's chance of it. Hover for the forecast."},
+        {"name": "Weather", "tip": "The weather now and today's chance of it. Hover for the forecast, and for the zones that can roll each element today and tomorrow."},
         {"name": "Vana'diel", "tip": "The Vana'diel day, time and moon."},
         {"name": "Target", "tip": "Your target's name, level and con. Hover a mob for its details."},
         {"name": "Gil", "tip": "Gil, or another currency. Hover for every currency."},
@@ -873,7 +873,7 @@
         {"name": "Memory", "tip": "The game's memory used, over what is left before it runs out at 4 GB; amber, then red, as it runs low. Hover for the processor, the frames and the LinuxXI plugin's figures."},
         {"name": "EXP", "tip": "Your EXP and its bar, on its own. Hover for EXP per hour."},
         {"name": "Conquest", "tip": "How many regions each nation holds. Hover for which ones."},
-        {"name": "World Info", "tip": "The next ship, a weather, a guild's hours, the RSE or the moon, as you pick. Hover for every ship, the weather by element, the guilds and the calendar."}
+        {"name": "World Info", "tip": "The next ship, a weather, a guild's hours, the RSE or the moon, as you pick. Hover for every ship, the guilds and the calendar."}
       ]
     },
     {
@@ -890,7 +890,6 @@
       "key": "world-sections",
       "options": [
         {"name": "Travel"},
-        {"name": "Weather"},
         {"name": "Guilds"},
         {"name": "Calendar"}
       ]

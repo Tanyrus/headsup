@@ -3,6 +3,7 @@
 #include "test.h"
 
 #include <cstring>
+#include <map>
 
 using namespace headsup;
 
@@ -130,16 +131,37 @@ TEST(the_next_day_a_zone_can_roll_an_elements_weather)
     CHECK(!NextElementWeather(ZoneRecord{"None", kUnknownRegion, kNoCalendar}, Element::Fire, 0));
 }
 
-TEST(zones_rolling_an_element_are_counted_by_their_calendars)
+TEST(the_zones_that_can_roll_an_element_come_likeliest_first_with_their_chance)
 {
     for (const uint32_t day : {0u, 777u})
     {
-        int expected = 0;
+        // Each zone's chance of Ice that day: its three weathers' shares added up.
+        std::map<uint16_t, int> expected;
         for (uint16_t id = 1; const ZoneRecord* zone = ZoneById(id); ++id)
             if (const std::optional<WeatherOdds> odds = WeatherOn(*zone, day))
-                expected += WeatherElement(odds->normal) == Element::Ice || WeatherElement(odds->common) == Element::Ice ||
-                            WeatherElement(odds->rare) == Element::Ice;
-        CHECK_EQ(ZonesWithElement(Element::Ice, day), expected);
+            {
+                const int percent = (WeatherElement(odds->normal) == Element::Ice ? kNormalChance : 0) +
+                                    (WeatherElement(odds->common) == Element::Ice ? kCommonChance : 0) +
+                                    (WeatherElement(odds->rare) == Element::Ice ? kRareChance : 0);
+                if (percent > 0) expected[id] = percent;
+            }
+        const std::vector<ZoneRoll> rolls = ZonesRolling(Element::Ice, day);
+        CHECK_EQ(rolls.size(), expected.size());
+        for (size_t i = 0; i < rolls.size(); ++i)
+        {
+            CHECK_EQ(rolls[i].percent, expected[rolls[i].zone]);
+            // Its weathers of the element, likeliest first, add up to it.
+            int sum = 0;
+            for (size_t w = 0; w < rolls[i].weathers.size(); ++w)
+            {
+                CHECK(WeatherElement(rolls[i].weathers[w].weather) == Element::Ice);
+                CHECK(w == 0 || rolls[i].weathers[w - 1].percent >= rolls[i].weathers[w].percent);
+                sum += rolls[i].weathers[w].percent;
+            }
+            CHECK_EQ(sum, rolls[i].percent);
+            if (i > 0) CHECK(rolls[i - 1].percent > rolls[i].percent ||
+                             (rolls[i - 1].percent == rolls[i].percent && rolls[i - 1].zone < rolls[i].zone));
+        }
     }
     CHECK_EQ(std::strcmp(ElementName(Element::Lightning), "Lightning"), 0);
 }

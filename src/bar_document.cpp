@@ -17,7 +17,8 @@ namespace headsup
     namespace
     {
         constexpr std::string_view kIconKind = "icon", kStripKind = "strip", kDiamondKind = "diamond", kCoinKind = "coin",
-                                   kStarKind = "star", kResetKind = "reset", kGameKind = "game";
+                                   kStarKind = "star", kResetKind = "reset", kGameKind = "game",
+                                   kFoldKind = "fold";
         // RmlUi blurs a glow by a Gaussian of this share of its width; the bar's shadow is a CSS blur radius, twice
         // its Gaussian's.
         constexpr float kGlowSigmaPerWidth = 0.4f;
@@ -219,6 +220,12 @@ namespace headsup
         return std::string(kHostSource) + std::string(kStarKind) + kSeparator + std::to_string(pixels);
     }
 
+    std::string FoldSource(uint32_t argb, int pixels, bool open)
+    {
+        return std::string(kHostSource) + std::string(kFoldKind) + kSeparator + Hex(argb) + kSeparator +
+               std::to_string(pixels) + kSeparator + (open ? "1" : "0");
+    }
+
     std::string ResetSource(uint32_t argb, int pixels)
     {
         return std::string(kHostSource) + std::string(kResetKind) + kSeparator + Hex(argb) + kSeparator + std::to_string(pixels);
@@ -262,6 +269,12 @@ namespace headsup
             const std::optional<uint32_t> color = number(1, kHexBase), pixels = number(2);
             if (!color || !pixels) return std::nullopt;
             return kind == kDiamondKind ? Diamond(static_cast<int>(*pixels), *color) : ResetArrow(static_cast<int>(*pixels), *color);
+        }
+        if (kind == kFoldKind && parts.size() == 4)
+        {
+            const std::optional<uint32_t> color = number(1, kHexBase), pixels = number(2), open = number(3);
+            if (!color || !pixels || !open || *open > 1) return std::nullopt;
+            return FoldArrow(static_cast<int>(*pixels), *color, *open == 1);
         }
         if ((kind == kCoinKind || kind == kStarKind) && parts.size() == 2)
         {
@@ -558,6 +571,13 @@ namespace headsup
             {
                 const int pixels = WholePixels(piece.width);
                 rml += "<img class=\"p\" src=\"" + StarSource(pixels) + "\" style=\"" + place +
+                       size(static_cast<float>(pixels), static_cast<float>(pixels)) + "\"/>";
+                break;
+            }
+            case PopupPiece::Kind::Fold:
+            {
+                const int pixels = WholePixels(piece.width);
+                rml += "<img class=\"p\" src=\"" + FoldSource(color, pixels, piece.open) + "\" style=\"" + place +
                        size(static_cast<float>(pixels), static_cast<float>(pixels)) + "\"/>";
                 break;
             }

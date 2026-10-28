@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <vector>
 
 namespace headsup
 {
@@ -72,6 +73,14 @@ namespace headsup
         int percent     = 0;
     };
     std::optional<ElementWeather> NextElementWeather(const ZoneRecord& zone, Element element, uint32_t today);
-    // How many zones can roll a weather of the element on the day.
-    int ZonesWithElement(Element element, uint32_t day);
+    // A zone that can roll a weather of the element on a day: its weathers of that element, likeliest first, and their
+    // chances added up.
+    struct ZoneRoll
+    {
+        uint16_t zone = 0;
+        int percent   = 0;
+        std::vector<WeatherChance> weathers{};
+    };
+    // Every zone that can roll the element on the day, likeliest first, then by zone id.
+    std::vector<ZoneRoll> ZonesRolling(Element element, uint32_t day);
 }

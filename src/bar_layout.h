@@ -102,20 +102,30 @@ namespace headsup
     // widget losing its popup, closes it, and the pointer crossing the gap between them does not. A left press on a
     // widget pins its popup, or unpins it if it was pinned; a left press on the open popup toggles its pin too. While
     // a popup is pinned, hovering another shows that one until the pointer leaves.
+    // A fold row of the open popup, where it was drawn on the screen.
+    struct BarFold
+    {
+        std::string key;
+        BarRect rect;
+    };
+
     class BarInput
     {
     public:
         // Each frame: where the widgets are now and which have popups. A pinned widget that is gone loses its pin.
         void Frame(const BarLayout& layout, const std::array<bool, kPanelSlots>& hasPopup);
-        // Where the open popup was drawn, or an empty rectangle.
-        void SetPopup(const BarRect& popup);
+        // Where the open popup was drawn, or an empty rectangle, and its fold rows.
+        void SetPopup(const BarRect& popup, std::vector<BarFold> folds = {});
         void Move(float x, float y);
         // The pointer is off the game: over an Ashita window or out of the client area, where no move reports it.
         void Leave();
         // Forget the layout, the pointer and any pin, as before the first frame.
         void Reset() { *this = BarInput{}; }
         // True when the press landed on the bar, a widget placed under it or the open popup: the game must not get it.
+        // A left press on a fold row opens or closes it, and pins nothing.
         bool Press(float x, float y, bool left);
+        // The fold rows opened since loading, by their keys, in the order they were opened.
+        const std::vector<std::string>& OpenFolds() const { return m_OpenFolds; }
         bool Over(float x, float y) const;
         // Pins this widget's popup, or none, as a press on it would; a widget not on the bar loses it next frame.
         void Pin(std::optional<PanelWidget> widget)
@@ -137,6 +147,8 @@ namespace headsup
         BarLayout m_Layout;
         std::array<bool, kPanelSlots> m_HasPopup{};
         BarRect m_Popup;
+        std::vector<BarFold> m_Folds;
+        std::vector<std::string> m_OpenFolds;
         float m_X = kAway, m_Y = kAway;
         std::optional<PanelWidget> m_Under;  // the widget under the pointer
         std::optional<PanelWidget> m_Hover;  // the popup hovering keeps open

@@ -129,6 +129,8 @@ namespace headsup
     Image Star(int size, uint32_t color);
     // A circular arrow in a square size pixels across: most of a ring, turning counterclockwise to a head at its top.
     Image ResetArrow(int size, uint32_t color);
+    // A fold row's arrow in a square size pixels across: a triangle pointing right, or down when open.
+    Image FoldArrow(int size, uint32_t color, bool open);
 
     // A size in whole pixels, at least one: what text and images are drawn at.
     int WholePixels(float size);

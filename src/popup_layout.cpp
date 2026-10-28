@@ -20,6 +20,7 @@ namespace headsup
         constexpr float kCardPad     = 0.55f; // a card's contents from its edges
         constexpr float kCardGap     = 0.45f; // between cards, and between the columns of them
         constexpr float kMinWidth    = 12.0f; // popupText, so a short popup is not a sliver
+        constexpr float kFoldArrow   = 0.6f;  // a fold row's arrow
 
         std::string Upper(std::string text)
         {
@@ -77,6 +78,12 @@ namespace headsup
                 float right;        // where the value ends now
             };
             std::vector<Value> values;
+            struct Fold
+            {
+                std::string key;
+                float y, height; // its row, with half the gap to each neighbour
+            };
+            std::vector<Fold> folds;
             bool card = false;
         };
 
@@ -105,9 +112,12 @@ namespace headsup
                 const bool tags = row.kind == RowKind::Tags;
                 const bool pair = row.kind == RowKind::Pair && row.cells.size() == 2;
                 const float gap = unit * (tags ? kTagGap : pair ? kPairGap : kCellGap);
+                const bool fold = !row.fold.empty();
+                // A fold row's cells after its arrow, and the rows it holds lined up with them.
+                const float indent = fold || row.nested ? std::round(unit * (kFoldArrow + kIconGap)) : 0.0f;
                 cells.clear();
                 columns.assign(grid ? static_cast<size_t>(row.columns) : 0, 0.0f);
-                float rowWidth = 0.0f;
+                float rowWidth = indent;
                 for (size_t i = 0; i < row.cells.size(); ++i)
                 {
                     const TextSize s = cells.emplace_back(CellSize(row.cells[i], unit, measure));
@@ -122,14 +132,23 @@ namespace headsup
                 contentWidth = std::max(contentWidth, rowWidth);
 
                 const size_t perLine = grid ? columns.size() : row.cells.size();
-                float lineHeight = 0.0f, x = b.pad;
+                float lineHeight = 0.0f, x = b.pad + indent;
+                const float top  = y;
+                if (fold)
+                {
+                    const float s = unit * kFoldArrow;
+                    PopupPiece arrow{PopupPiece::Kind::Fold, b.pad, y + (cells[0].inkTop + cells[0].inkBottom - s) / 2.0f,
+                        s, s, {Text("", Tone::Dim)}};
+                    arrow.open = row.open;
+                    b.pieces.push_back(std::move(arrow));
+                }
                 for (size_t i = 0; i < row.cells.size(); ++i)
                 {
                     if (i > 0 && i % perLine == 0)
                     {
                         y += lineHeight + metrics.rowGap;
                         lineHeight = 0.0f;
-                        x          = b.pad;
+                        x          = b.pad + indent;
                     }
                     const PopupCell& cell = row.cells[i];
                     TextSize size         = cells[i];
@@ -170,6 +189,8 @@ namespace headsup
                     lineHeight = std::max(lineHeight, size.height);
                     x += grid ? columns[i % columns.size()] + unit * kColumnGap : size.width + gap;
                 }
+                if (fold)
+                    b.folds.push_back(Block::Fold{row.fold, top - metrics.rowGap / 2.0f, y + lineHeight - top + metrics.rowGap});
                 y += lineHeight + metrics.rowGap;
             }
             b.width  = contentWidth + 2.0f * b.pad;
@@ -192,6 +213,8 @@ namespace headsup
                 piece.line = line;
                 l.pieces.push_back(std::move(piece));
             }
+            for (Block::Fold& fold : b.folds)
+                l.folds.push_back(PopupFold{std::move(fold.key), x, y + fold.y, width, fold.height, line});
             l.lines.push_back(PopupLine{y + b.height});
         }
     }
@@ -300,6 +323,7 @@ namespace headsup
             if (kept[i]) bottom = std::max(bottom, layout.lines[i].bottom);
         }
         std::erase_if(layout.pieces, [&](const PopupPiece& piece) { return !kept[piece.line]; });
+        std::erase_if(layout.folds, [&](const PopupFold& fold) { return !kept[fold.line]; });
         layout.height = bottom + padding;
     }
 }

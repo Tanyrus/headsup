@@ -204,7 +204,7 @@ PIECES = Pieces(
         'plate-mode': List(4), 'outline-mode': List(4, extra={3: 'tipOnClaimRows'}), 'color-source': List(7),
         'show-condition': List(13), 'ornament-place': List(5), 'align': List(3), 'font-style': List(3),
         'smoothness': List(4), 'bar-theme': List(7), 'bar-sections': List(3),
-        'bar-widgets': List(18), 'plate-lines': List(3), 'job-layout': List(3), 'exp-bar': List(3), 'exp-text': List(3), 'exp-place': List(5), 'nations': List(4), 'world-line': List(5), 'world-sections': List(4), 'tags': List(24),
+        'bar-widgets': List(18), 'plate-lines': List(3), 'job-layout': List(3), 'exp-bar': List(3), 'exp-text': List(3), 'exp-place': List(5), 'nations': List(4), 'world-line': List(5), 'world-sections': List(3), 'tags': List(24),
     },
     words={'switched-off': True, 'switch-off': True, 'switch-on': True, 'switched-off-top-panel': True,
            'switched-off-headsup': True, 'key-add': True, 'key-waiting': True, 'always': True, 'never': True, 'conditions': True, 'local': True, 'themes-font': True,

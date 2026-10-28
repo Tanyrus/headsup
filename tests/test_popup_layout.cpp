@@ -178,6 +178,46 @@ TEST(a_starred_cell_has_a_star_after_its_text_from_the_top_of_the_texts_ink)
     CHECK(Near(Find(l, "61%")->x + Find(l, "61%")->width, Find(l, "21%")->x + Find(l, "21%")->width));
 }
 
+TEST(a_fold_row_has_its_arrow_and_its_whole_row_to_click_and_the_rows_it_holds_sit_under_its_label)
+{
+    const BarMetrics m = MetricsFor(36, BarShape::Pills);
+    PopupContent c;
+    c.title = {{"World Info", Tone::Normal}};
+    PopupRow airships = Labeled("Airships", Text("Boards in 1:24"));
+    airships.fold     = "Airships";
+    airships.open     = true;
+    PopupRow route    = Labeled("Jeuno to Bastok", Text("Boards in 1:24"));
+    route.nested      = true;
+    PopupRow boats    = Labeled("Boats", Text("Boards in 2:23"));
+    boats.fold        = "Boats";
+    c.sections.push_back(PopupSection{"Travel", {airships, route, boats}});
+    const PopupLayout l = LayoutPopup(c, m, BarShape::Pills, false, Fake);
+    const std::vector<const PopupPiece*> arrows = Of(l, PopupPiece::Kind::Fold);
+    CHECK_EQ(arrows.size(), static_cast<size_t>(2));
+    CHECK(arrows[0]->open && !arrows[1]->open);
+    CHECK(AllInside(l, m));
+    const PopupPiece& card  = *Of(l, PopupPiece::Kind::Card).front();
+    const PopupPiece& label = *Find(l, "Airships "), &nested = *Find(l, "Jeuno to Bastok "), &next = *Find(l, "Boats ");
+    // The label after its arrow, the arrow centered on its line's ink, and the row it holds under the label.
+    CHECK(label.x >= arrows[0]->x + arrows[0]->width);
+    const TextSize t = Fake(label.span, PopupFont::Text);
+    CHECK(Near(arrows[0]->y + arrows[0]->height / 2.0f, label.y + (t.inkTop + t.inkBottom) / 2.0f));
+    CHECK(Near(nested.x, label.x) && Near(next.x, label.x));
+    // Each fold's place is its row across the card, and holds neither its neighbour's label.
+    CHECK_EQ(l.folds.size(), static_cast<size_t>(2));
+    CHECK(l.folds[0].key == "Airships" && l.folds[1].key == "Boats");
+    for (const PopupFold& fold : l.folds)
+        CHECK(Near(fold.x, card.x) && Near(fold.width, card.width));
+    const auto holds = [](const PopupFold& f, const PopupPiece& p) {
+        return p.y >= f.y - 0.01f && p.y + p.height <= f.y + f.height + 0.01f;
+    };
+    CHECK(holds(l.folds[0], label) && !holds(l.folds[0], nested) && holds(l.folds[1], next));
+    // A cut that drops the card drops its folds.
+    PopupLayout cut = l;
+    CutPopup(cut, card.y - 0.5f, m.popupPadding);
+    CHECK(cut.folds.empty());
+}
+
 TEST(a_pairs_value_ends_at_its_cards_right_edge_and_its_label_at_the_left)
 {
     const BarMetrics m = MetricsFor(36, BarShape::Pills);

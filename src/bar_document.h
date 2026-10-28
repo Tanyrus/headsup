@@ -29,6 +29,8 @@ namespace headsup
     std::string DiamondSource(uint32_t argb, int pixels);
     std::string CoinSource(int pixels);
     std::string StarSource(int pixels);
+    // A fold row's arrow, pointing down when open.
+    std::string FoldSource(uint32_t argb, int pixels, bool open);
     std::string ResetSource(uint32_t argb, int pixels); // the circular arrow that puts a color back
     // The image a name stands for; nothing for a name that is none of the above.
     std::optional<Image> HostImage(std::string_view name);

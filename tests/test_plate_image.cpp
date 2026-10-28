@@ -408,6 +408,23 @@ TEST(a_star_covers_each_pixel_as_far_as_a_five_pointed_star_with_a_point_up_does
     }
 }
 
+TEST(a_fold_arrow_points_right_while_closed_and_down_while_open)
+{
+    for (const int size : {7, 10, 13})
+    {
+        const Image closed = FoldArrow(size, 0xFFB0A8C0, false), open = FoldArrow(size, 0xFFB0A8C0, true);
+        CHECK(closed.width == size && closed.height == size && open.width == size && open.height == size);
+        const int mid = size / 2;
+        // Closed: solid along its left edge's middle, clear at the right corners, its tip at the right edge's middle.
+        CHECK(Alpha(closed, 0, mid) > 200 && Alpha(closed, size - 1, 0) == 0 && Alpha(closed, size - 1, size - 1) == 0);
+        CHECK(Alpha(closed, size - 1, mid) > 0);
+        // Open is the same triangle turned to point down.
+        for (int y = 0; y < size; ++y)
+            for (int x = 0; x < size; ++x)
+                CHECK_EQ(Alpha(open, x, y), Alpha(closed, y, x));
+    }
+}
+
 TEST(an_opaque_coin_is_opaque_wherever_its_disc_covers_a_pixel_whole)
 {
     const int size = 13;

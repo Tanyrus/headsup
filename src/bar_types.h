@@ -61,7 +61,7 @@ namespace headsup
     // What the World Info widget tells on the panel, and the parts of its popup, a bit each.
     enum class WorldLine : uint8_t { Departure, Weather, Guild, Rse, Moon };
     constexpr int kWorldLineCount = static_cast<int>(WorldLine::Moon) + 1;
-    enum class WorldSection : uint8_t { Travel, Weather, Guilds, Calendar };
+    enum class WorldSection : uint8_t { Travel, Guilds, Calendar };
     constexpr int kWorldSectionCount     = static_cast<int>(WorldSection::Calendar) + 1;
     constexpr uint8_t kAllWorldSections  = (1u << kWorldSectionCount) - 1;
     constexpr uint8_t WorldBit(WorldSection section) { return static_cast<uint8_t>(1u << static_cast<int>(section)); }

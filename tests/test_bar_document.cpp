@@ -276,6 +276,14 @@ TEST(a_star_is_served_in_the_coins_gold)
     CHECK(star->argb[7 * 15 + 7] == 0xFFE8C35Au); // its middle
 }
 
+TEST(a_fold_arrow_is_served_in_its_color_and_way)
+{
+    CHECK_EQ(FoldSource(0xFFB0A8C0, 9, true), "hu:fold/ffb0a8c0/9/1");
+    const std::optional<Image> down = HostImage(FoldSource(0xFFB0A8C0, 9, true)), right = HostImage(FoldSource(0xFFB0A8C0, 9, false));
+    CHECK(down && right && down->argb == FoldArrow(9, 0xFFB0A8C0, true).argb && right->argb == FoldArrow(9, 0xFFB0A8C0, false).argb);
+    CHECK(!HostImage("hu:fold/ffb0a8c0/9/2"));
+}
+
 TEST(every_theme_eases_breathes_and_pulses_in_its_own_colors)
 {
     Settings settings;
