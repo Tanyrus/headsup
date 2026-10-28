@@ -397,6 +397,10 @@ TEST(a_scrolling_socket_has_a_scrollbar_in_its_right_padding_showing_where_it_is
         CHECK(Near(thumb.x, track.x) && Near(thumb.width, track.width));
         CHECK(thumb.y >= track.y - 0.01f && thumb.y + thumb.height <= track.y + track.height + 0.01f);
         CHECK(Near(thumb.height, track.height * 10.0f / 31.0f));
+        // Its grip, to drag, is the socket's right padding down the track; the thumb's length goes with it.
+        const PopupScroll& area = l.scrolls.front();
+        CHECK(Near(area.grip.x, sock.x + sock.width - (name.x - sock.x)) && Near(area.grip.x + area.grip.width, sock.x + sock.width));
+        CHECK(Near(area.grip.y, track.y) && Near(area.grip.height, track.height) && Near(area.thumb, thumb.height));
         thumbs.emplace_back((thumb.y - track.y) / track.height, (thumb.y + thumb.height - track.y) / track.height);
     }
     // At the top, five lines down of 21, and at the end.

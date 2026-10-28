@@ -1,5 +1,6 @@
 #pragma once
 
+#include "bar_layout.h"
 #include "bar_theme.h"
 #include "bar_widgets.h"
 #include "function_ref.h"
@@ -63,6 +64,8 @@ namespace headsup
         float x = 0.0f, y = 0.0f, width = 0.0f, height = 0.0f;
         size_t line = 0;
         size_t most = 0;
+        BarRect grip{};      // the socket's right padding down its scrollbar's track, which a press drags
+        float thumb = 0.0f;  // the thumb's length in it
     };
 
     // The title, or a section's card: a popup cut short keeps or drops each whole.

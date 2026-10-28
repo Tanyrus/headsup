@@ -105,7 +105,9 @@ namespace headsup
             {
                 std::string key;
                 float y, height;
-                size_t most; // lines it scrolls
+                size_t most;              // lines it scrolls
+                float trackY, track, thumb; // its scrollbar
+                float grip;               // the right padding's width, the scrollbar in it
             };
             std::vector<Scroll> scrolls;
             bool card     = false;
@@ -192,7 +194,8 @@ namespace headsup
                 size_t piece;
                 std::string key;
                 size_t lines = 0, shown = 0, from = 0, at = 0; // its lines, how many show, the first shown, the next
-                float top = 0.0f;                              // its first row's
+                float top  = 0.0f;                             // its first row's
+                size_t bar = 0;                                // its scrollbar's track, then its thumb, in the pieces
             };
             std::optional<Socket> socket;
             const auto closeSocket = [&] {
@@ -205,6 +208,7 @@ namespace headsup
                     const float thumb = track * static_cast<float>(socket->shown) / static_cast<float>(socket->lines);
                     const float down  = static_cast<float>(socket->from) / static_cast<float>(socket->lines - socket->shown);
                     const float right = b.pad + (inset + bar) / 2.0f;
+                    socket->bar       = b.pieces.size();
                     b.anchors.push_back(Block::Anchor{b.pieces.size(), right});
                     b.pieces.push_back(PopupPiece{PopupPiece::Kind::ScrollTrack, 0.0f, socket->top, bar, track, {}});
                     b.anchors.push_back(Block::Anchor{b.pieces.size(), right});
@@ -223,7 +227,11 @@ namespace headsup
                 y                  = ground.y + ground.height + metrics.rowGap;
                 b.sockets.push_back(socket->piece);
                 if (socket->shown < socket->lines)
-                    b.scrolls.push_back(Block::Scroll{socket->key, ground.y, ground.height, socket->lines - socket->shown});
+                {
+                    const PopupPiece& track = b.pieces[socket->bar], &thumb = b.pieces[socket->bar + 1];
+                    b.scrolls.push_back(Block::Scroll{socket->key, ground.y, ground.height, socket->lines - socket->shown,
+                        track.y, track.height, thumb.height, inset});
+                }
                 socket.reset();
             };
             // Whether a socket's line shows, taking the next of its lines; heads always show.
@@ -370,7 +378,8 @@ namespace headsup
                     fold.x < 0.0f ? width : fold.width, fold.height, line, std::move(fold.tab)});
             for (Block::Scroll& scroll : b.scrolls)
                 l.scrolls.push_back(PopupScroll{std::move(scroll.key), x + b.pad, y + scroll.y, width - 2.0f * b.pad,
-                    scroll.height, line, scroll.most});
+                    scroll.height, line, scroll.most,
+                    BarRect{x + width - b.pad - scroll.grip, y + scroll.trackY, scroll.grip, scroll.track}, scroll.thumb});
             l.lines.push_back(PopupLine{y + b.height});
         }
         // A card as LayoutSection lays it out, with its reserve: its height with each tab picked in turn and its fold

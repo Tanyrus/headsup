@@ -348,6 +348,17 @@ namespace headsup
         Reevaluate();
     }
 
+    void BarInput::DragTo(float y)
+    {
+        if (!m_Drag) return;
+        for (const BarScroll& scroll : m_Scrolls)
+            if (scroll.key == m_Drag->key && scroll.track.height > scroll.thumb)
+            {
+                const float along = (y - m_Drag->grab - scroll.track.y) / (scroll.track.height - scroll.thumb);
+                m_Scrolled[scroll.key] = static_cast<size_t>(std::lround(std::clamp(along, 0.0f, 1.0f) * static_cast<float>(scroll.most)));
+            }
+    }
+
     bool BarInput::Wheel(int notches)
     {
         if (!InPopup(m_X, m_Y)) return false;
@@ -398,6 +409,17 @@ namespace headsup
             m_Pinned = m_Pinned == under ? std::nullopt : under;
         else if (!under && Open() && m_Popup.Contains(x, y))
         {
+            for (const BarScroll& scroll : m_Scrolls)
+                if (scroll.track.Contains(x, y) && scroll.most > 0)
+                {
+                    const size_t now = std::min(m_Scrolled[scroll.key], scroll.most);
+                    const float top  = scroll.track.y + (scroll.track.height - scroll.thumb) * static_cast<float>(now) /
+                                                           static_cast<float>(scroll.most);
+                    const bool held  = y >= top && y < top + scroll.thumb;
+                    m_Drag           = Drag{scroll.key, held ? y - top : scroll.thumb / 2.0f};
+                    DragTo(y);
+                    return true;
+                }
             for (const BarFold& fold : m_Folds)
                 if (fold.rect.Contains(x, y))
                 {
@@ -427,6 +449,16 @@ namespace headsup
             // A move with a button up is the first news of a release outside the window, which nothing else reports.
             m_Left  = m_Left && (buttons & kLeftButton) != 0;
             m_Right = m_Right && (buttons & kRightButton) != 0;
+            // A drag goes on wherever the pointer goes while the button is held; the game sees none of it.
+            if (m_Input.Dragging())
+            {
+                if ((buttons & kLeftButton) != 0)
+                {
+                    m_Input.DragTo(y);
+                    return true;
+                }
+                m_Input.EndDrag();
+            }
             if (barsTurn)
                 m_Input.Move(x, y);
             else
@@ -436,7 +468,9 @@ namespace headsup
         case kMouseWheel:
             return barOn && !blocked &&
                    m_Input.Wheel(static_cast<int>(std::lround(WheelNotches(static_cast<int16_t>(buttons >> kWheelShift)))));
-        case kLeftUp: return std::exchange(m_Left, false);
+        case kLeftUp:
+            m_Input.EndDrag();
+            return std::exchange(m_Left, false);
         case kRightUp: return std::exchange(m_Right, false);
         // A new press shows the last one ended, even when its release went to another window.
         case kLeftDown:

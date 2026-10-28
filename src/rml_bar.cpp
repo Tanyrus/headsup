@@ -475,7 +475,8 @@ namespace headsup
             folds.push_back(BarFold{fold.key, BarRect{rect.x + fold.x, rect.y + fold.y, fold.width, fold.height}, fold.tab});
         for (const PopupScroll& scroll : pl.scrolls)
             scrolls.push_back(BarScroll{scroll.key, BarRect{rect.x + scroll.x, rect.y + scroll.y, scroll.width, scroll.height},
-                scroll.most});
+                scroll.most, BarRect{rect.x + scroll.grip.x, rect.y + scroll.grip.y, scroll.grip.width, scroll.grip.height},
+                scroll.thumb});
         return rect;
     }
 

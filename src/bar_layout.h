@@ -116,6 +116,8 @@ namespace headsup
         std::string key;
         BarRect rect;
         size_t most = 0;
+        BarRect track{};    // where a press drags its scrollbar's thumb
+        float thumb = 0.0f; // the thumb's length down the track
     };
 
     class BarInput
@@ -128,6 +130,11 @@ namespace headsup
         // The wheel turned notches toward the player: true when the pointer, where it last moved, is over a part of the
         // popup that scrolls, which then scrolls kLinesPerNotch lines a notch, no further than its ends.
         bool Wheel(int notches);
+        // A left press on a scrollbar's track drags its thumb, from where it was pressed on it or, off it, from its
+        // middle, which jumps there; moves drag it, held, until the button goes up.
+        bool Dragging() const { return m_Drag.has_value(); }
+        void DragTo(float y);
+        void EndDrag() { m_Drag.reset(); }
         // How many lines each part has been scrolled since loading, by its key.
         const std::map<std::string, size_t>& Scrolled() const { return m_Scrolled; }
         void Move(float x, float y);
@@ -170,6 +177,12 @@ namespace headsup
         std::vector<std::string> m_OpenFolds;
         std::map<std::string, std::string> m_Tabs;
         std::vector<BarScroll> m_Scrolls;
+        struct Drag
+        {
+            std::string key;
+            float grab; // from the thumb's top
+        };
+        std::optional<Drag> m_Drag;
         std::map<std::string, size_t> m_Scrolled;
         float m_X = kAway, m_Y = kAway;
         std::optional<PanelWidget> m_Under;  // the widget under the pointer

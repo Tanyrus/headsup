@@ -684,7 +684,7 @@ TEST(the_wheel_over_a_popups_scrolling_area_scrolls_it_three_lines_a_notch)
     Clicks c;
     CHECK(!c.Take(WM_MOUSEMOVE, kOnBarY));
     c.input.SetPopup(BarRect{760.0f, 44.0f, 400.0f, 300.0f}, {},
-        {BarScroll{"By Element/Dark", BarRect{770.0f, 150.0f, 380.0f, 120.0f}, 7}});
+        {BarScroll{"By Element/Dark", BarRect{770.0f, 150.0f, 380.0f, 120.0f}, 7, BarRect{1140.0f, 155.0f, 10.0f, 110.0f}, 30.0f}});
     const auto wheel = [&](int notches) {
         return c.clicks.Take(WM_MOUSEWHEEL, static_cast<uint32_t>(static_cast<uint16_t>(-notches * 120)) << 16, 0.0f, 0.0f,
             true, false, false);
@@ -695,6 +695,36 @@ TEST(the_wheel_over_a_popups_scrolling_area_scrolls_it_three_lines_a_notch)
     CHECK(wheel(-1) && c.input.Scrolled().at("By Element/Dark") == 4);
     CHECK(!c.Take(WM_MOUSEMOVE, 100.0f)); // the popup, above the area: the game keeps its wheel
     CHECK(!wheel(1) && c.input.Scrolled().at("By Element/Dark") == 4);
+}
+
+TEST(the_scrollbar_drags_its_thumb_and_a_press_on_its_track_jumps_there)
+{
+    Clicks c;
+    CHECK(!c.Take(WM_MOUSEMOVE, kOnBarY));
+    // The track runs 100 to 300 down the grip at x 950 to 970; its thumb is 50 tall; 30 lines to scroll.
+    const auto popup = [&] {
+        c.input.SetPopup(BarRect{760.0f, 44.0f, 400.0f, 300.0f}, {},
+            {BarScroll{"By Element/Dark", BarRect{770.0f, 90.0f, 380.0f, 220.0f}, 30, BarRect{950.0f, 100.0f, 20.0f, 200.0f}, 50.0f}});
+    };
+    popup();
+    const auto scrolled = [&] { return c.input.Scrolled().count("By Element/Dark") ? c.input.Scrolled().at("By Element/Dark") : 0; };
+    CHECK(!c.Take(WM_MOUSEMOVE, 125.0f));
+    CHECK(c.Take(WM_LBUTTONDOWN, 125.0f)); // the thumb's middle
+    CHECK(c.Take(WM_MOUSEMOVE, 200.0f, MK_LBUTTON)); // its top to 175: halfway down the 150 it moves
+    CHECK_EQ(scrolled(), static_cast<size_t>(15));
+    popup();
+    CHECK(c.Take(WM_MOUSEMOVE, 600.0f, MK_LBUTTON)); // far below the popup: it stops at the end and keeps the drag
+    CHECK_EQ(scrolled(), static_cast<size_t>(30));
+    CHECK(c.Take(WM_LBUTTONUP, 600.0f));
+    CHECK(!c.input.Pinned().has_value());
+    CHECK(!c.Take(WM_MOUSEMOVE, 125.0f)); // let go: moving does nothing
+    CHECK_EQ(scrolled(), static_cast<size_t>(30));
+    popup();
+    // A press on the track above the thumb centers it there: 110 puts its top above the track, so the start.
+    CHECK(c.Take(WM_LBUTTONDOWN, 110.0f));
+    CHECK_EQ(scrolled(), static_cast<size_t>(0));
+    CHECK(c.Take(WM_LBUTTONUP, 110.0f));
+    CHECK(!c.input.Pinned().has_value());
 }
 
 TEST(the_bar_going_off_gives_the_game_every_release)
