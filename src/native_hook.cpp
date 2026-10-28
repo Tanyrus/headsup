@@ -1374,3 +1374,44 @@ extern "C" void HeadsUpOnBuilt(uint32_t mcd)
     PlaceFrame(false, &built);
     MoveBuilt(mcd, built.key);
 }
+
+#ifdef HEADSUP_DEV
+namespace headsup
+{
+    std::string WindowHook::OwnersReport()
+    {
+        if (g_WindowList == 0) return "the game's list of open windows was not found\n";
+        std::array<OpenWindow, kMaxWindowKeys> windows{};
+        const size_t count = ReadWindowList(g_WindowList, kProcessMemory, windows);
+        const auto base    = reinterpret_cast<uint32_t>(GetModuleHandleA(kGameModule));
+        const auto rva     = [&](uint32_t at) { return at >= base ? at - base : 0u; };
+        const auto offset  = [](std::optional<uint32_t> at) { return at ? std::to_string(*at) : std::string("none"); };
+        std::string out;
+        for (size_t i = 0; i < count; ++i)
+        {
+            const OpenWindow& w  = windows[i];
+            const auto* record   = reinterpret_cast<const uint8_t*>(w.mcd + kMcdOwner);
+            const uint32_t owner = Readable(record, sizeof(uint32_t)) ? ReadAt<uint32_t>(record, 0) : 0;
+            const auto* object   = reinterpret_cast<const uint8_t*>(owner);
+            const uint32_t vtable = owner != 0 && Readable(object, sizeof(uint32_t)) ? ReadAt<uint32_t>(object, 0) : 0;
+            const auto layout     = vtable != 0 ? OwnerLayout(owner) : std::nullopt;
+            char line[256];
+            std::snprintf(line, sizeof(line), "%.*s mcd %08X rect %d,%d,%d,%d%s owner %08X class %06X layout %06X place %s entry %s\n",
+                static_cast<int>(kWindowKeyLength), w.key.data(), w.mcd, w.left, w.top, w.right, w.bottom,
+                w.hidden ? " hidden" : "", owner, rva(vtable), layout ? rva(layout->second) : 0u,
+                offset(vtable != 0 ? PlaceCopyAt(owner) : std::nullopt).c_str(),
+                offset(vtable != 0 ? EntryPlaceAt(owner) : std::nullopt).c_str());
+            out += line;
+            if (!layout) continue;
+            for (size_t b = 0; b < layout->first.size(); ++b)
+            {
+                char hex[4];
+                std::snprintf(hex, sizeof(hex), "%02x", layout->first[b]);
+                out += (b % 32 == 0 ? "    " : "") + std::string(hex) + (b % 32 == 31 ? "\n" : "");
+            }
+            out += "\n";
+        }
+        return out;
+    }
+}
+#endif

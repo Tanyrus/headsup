@@ -639,6 +639,14 @@ public:
             Print(m_DrawDump.Start(args.size() > 2 ? args[2] : "", Now(), m_AshitaCore, OwnFolder(kLogsFolder)));
         else if (args[1] == "codedump")
             Print(headsup::WriteCodeDump(OwnFolder(kLogsFolder)));
+        else if (args[1] == "windowowners")
+        {
+            const std::string path = OwnFolder(kLogsFolder) + "\\windowowners.txt";
+            std::ofstream out(path, std::ios::binary | std::ios::trunc);
+            const std::string report = headsup::WindowHook::OwnersReport();
+            out.write(report.data(), static_cast<std::streamsize>(report.size()));
+            Print("windowowners: wrote each open game window's owner to " + path);
+        }
         else if (args[1] == "namedump")
             Print(headsup::ArmNameDump(m_NameHook.Running()));
         else if (args[1] == "stackdump")
@@ -663,6 +671,7 @@ public:
 #ifdef HEADSUP_DEV
             Print("/hu drawdump [seconds | watch | stop]: write every draw call of one frame to logs/headsup after the delay, or watch every frame for name glitches until stopped");
             Print("/hu codedump: write the client's loaded image to logs/headsup");
+            Print("/hu windowowners: write each open game window's owner, its class and its layout's first bytes to logs/headsup");
             Print("/hu namedump: write every call into the game's name routine during one frame to logs/headsup");
             Print("/hu stackdump: write the stack at the character draws of one frame to logs/headsup");
             Print("/hu pointerwatch [stop]: log every change in the mouse pointer and the game's own to logs/headsup until stopped");

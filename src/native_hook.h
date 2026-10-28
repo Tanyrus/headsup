@@ -149,6 +149,12 @@ namespace headsup
         // The windows noted since HeadsUp loaded, by short name, in the order they came.
         std::vector<std::string> SeenWindows() const;
         size_t SeenCount() const;
+#ifdef HEADSUP_DEV
+        // Each window in the game's list now: its short name, record, rectangle, owner, the owner's class and layout
+        // (RVAs) with where HeadsUp reads it keeps its window's place and an entry's corner, and the layout's first
+        // bytes, to find what an owner keeps that a move leaves behind.
+        static std::string OwnersReport();
+#endif
         // Why windows cannot be moved, once, after a Start that could not find the game's move.
         std::string TakeMoveProblem() { return std::exchange(m_MoveProblem, std::string()); }
 
