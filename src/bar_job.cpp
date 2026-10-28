@@ -146,12 +146,17 @@ namespace headsup
                                                 : ""));
         // At the cap the merits always show, as they stand for what is left to the next.
         const std::string said = ExpSaid(s, AtCap(s) ? static_cast<uint8_t>(expText | ExpTextBit(ExpText::ToNext)) : expText);
-        Span exp   = Text(said.empty() ? "EXP" : said);
         w.progress = ExpDone(s);
-        Span& smaller = layout == JobLayout::JobsFirst ? exp : jobs;
-        smaller.tone  = Tone::Dim;
-        w.title       = ListOf(layout == JobLayout::JobsFirst ? jobs : exp);
-        if (layout != JobLayout::ExpOnly) w.subtitle = ListOf(smaller);
+        if (said.empty())
+            w.title = ListOf(jobs); // no EXP text: the jobs alone, on one line
+        else
+        {
+            Span exp      = Text(said);
+            Span& smaller = layout == JobLayout::JobsFirst ? exp : jobs;
+            smaller.tone  = Tone::Dim;
+            w.title       = ListOf(layout == JobLayout::JobsFirst ? jobs : exp);
+            if (layout != JobLayout::ExpOnly) w.subtitle = ListOf(smaller);
+        }
         if (bar == ExpBarPlace::Off) w.progress.reset();
         w.progressBeside = bar == ExpBarPlace::Beside;
         w.hasPopup       = true;
