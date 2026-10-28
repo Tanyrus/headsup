@@ -49,7 +49,7 @@ namespace headsup
         constexpr int kForecastDays = 5, kForecastColumns = 4;
         constexpr int kWorldGuildColumns   = 2; // a shop's hours now, and who and where
         constexpr int kZoneRollColumns     = 3; // a zone, and its chance of the element today and tomorrow
-        constexpr int kTurnInColumns       = 4; // a rank, its item, its points each, and the most a day
+        constexpr int kTurnInColumns       = 6; // a rank, its item and its points, its high quality's, and the most a day
         constexpr uint16_t kGilItem  = 0xFFFF;
 
         Span Percent(int percent)
@@ -916,8 +916,8 @@ namespace headsup
             return ranks;
         }
 
-        // A craft guild's turn-ins today, from Phoenix's site, under a line of their own: each rank's item with its
-        // picture and its high quality in brackets, their points each and the most a day, your rank starred and lit;
+        // A craft guild's turn-ins today, from Phoenix's site, under a line of their own: each rank's item and its high
+        // quality, each with its picture and its points, and the most a day, your rank starred and lit;
         // until the site answers, a line saying so.
         std::vector<PopupRow> TurnIns(const BarState& state, int craft, const std::string& guild)
         {
@@ -936,22 +936,29 @@ namespace headsup
             grid.nested   = true;
             grid.header   = true;
             ScrollsBy(grid, state, "Guilds/" + guild + "/Turn-ins");
-            for (const char* heading : {"Rank", "NQ Item [HQ Item]", "Points", "Max Points"})
+            for (const char* heading : {"Rank", "NQ Item", "Points", "HQ Item", "Points", "Max Points"})
                 grid.cells.push_back(Cell(Text(heading, Tone::Dim)));
-            const auto name = [](const GuildTurnIn& t) { return t.itemName.empty() ? "Item " + std::to_string(t.item) : t.itemName; };
             const auto figure = [](int value) { return Grouped(static_cast<uint64_t>(std::max(value, 0))); };
             for (const RankTurnIn& rank : ranks)
             {
                 const GuildTurnIn& item = *rank.item;
-                const bool yours = state.crafts && (*state.crafts)[static_cast<size_t>(craft)] == item.rank;
                 const GuildTurnIn* high = rank.high;
-                PopupCell named = Cell(Text(item.rankName, yours ? Tone::Normal : Tone::Dim));
-                named.star      = yours;
-                PopupCell what  = Cell(Text(name(item) + (high ? " [" + name(*high) + "]" : ""), yours ? Tone::Heading : Tone::Normal));
-                what.item       = item.item;
-                grid.cells.push_back(std::move(named));
-                grid.cells.push_back(std::move(what));
-                grid.cells.push_back(Cell(Text(figure(item.points) + (high ? " [" + figure(high->points) + "]" : ""))));
+                const bool yours = state.crafts && (*state.crafts)[static_cast<size_t>(craft)] == item.rank;
+                // An item with its picture; a rank without a high quality has its cells empty.
+                const auto named = [&](const GuildTurnIn* t) {
+                    if (t == nullptr) return PopupCell{};
+                    PopupCell cell = Cell(Text(t->itemName.empty() ? "Item " + std::to_string(t->item) : t->itemName,
+                        yours ? Tone::Heading : Tone::Normal));
+                    cell.item = t->item;
+                    return cell;
+                };
+                PopupCell level = Cell(Text(item.rankName, yours ? Tone::Normal : Tone::Dim));
+                level.star      = yours;
+                grid.cells.push_back(std::move(level));
+                grid.cells.push_back(named(&item));
+                grid.cells.push_back(Cell(Text(figure(item.points))));
+                grid.cells.push_back(named(high));
+                grid.cells.push_back(high ? Cell(Text(figure(high->points))) : PopupCell{});
                 grid.cells.push_back(Cell(Text(figure(item.maxPoints) +
                                                    (high && high->maxPoints != item.maxPoints ? " [" + figure(high->maxPoints) + "]" : ""),
                     Tone::Dim)));

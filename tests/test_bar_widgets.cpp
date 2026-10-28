@@ -2303,19 +2303,24 @@ TEST(a_craft_guilds_tab_lists_todays_turn_ins_apart_from_its_shops_with_yours_li
     state.crafts  = CraftRanks{1};
     rows = fishing();
     const PopupRow& grid = rows[3];
-    CHECK(grid.kind == RowKind::Grid && grid.columns == 4 && grid.nested && grid.header && grid.scroll == "Guilds/Fishing/Turn-ins");
-    CHECK_EQ(grid.cells.size(), static_cast<size_t>(4 * 6));
-    CHECK(Joined(grid.cells[0].text) == "Rank" && Joined(grid.cells[1].text) == "NQ Item [HQ Item]" && Joined(grid.cells[2].text) == "Points" &&
-          Joined(grid.cells[3].text) == "Max Points");
-    CHECK(Joined(grid.cells[4].text) == "Amateur" && !grid.cells[4].star && grid.cells[5].item == 16);
-    CHECK(Joined(grid.cells[5].text) == "Flute [Flute +1]" && Joined(grid.cells[6].text) == "12 [14]" &&
-          Joined(grid.cells[7].text) == "1,120");
-    CHECK(Joined(grid.cells[9].text) == "Roasted Corn [Grilled Corn]" && Joined(grid.cells[10].text) == "31 [37]");
-    CHECK(grid.cells[8].star && grid.cells[9].text.front().tone == Tone::Heading); // your rank
-    CHECK(Joined(grid.cells[13].text) == "Darksteel Cuisses [Dst. Cuisses +1]" && Joined(grid.cells[15].text) == "7,400 [7,040]");
-    CHECK(Joined(grid.cells[17].text) == "Item 40" && Joined(grid.cells[18].text) == "90"); // one item, no name from the site
+    CHECK(grid.kind == RowKind::Grid && grid.columns == 6 && grid.nested && grid.header && grid.scroll == "Guilds/Fishing/Turn-ins");
+    CHECK_EQ(grid.cells.size(), static_cast<size_t>(6 * 6));
+    const auto cell = [&](size_t row, size_t column) -> const PopupCell& { return grid.cells[6 * row + column]; };
+    const auto text = [&](size_t row, size_t column) { return Joined(cell(row, column).text); };
+    CHECK(text(0, 0) == "Rank" && text(0, 1) == "NQ Item" && text(0, 2) == "Points" && text(0, 3) == "HQ Item" &&
+          text(0, 4) == "Points" && text(0, 5) == "Max Points");
+    // Each rank's item and its high quality in columns of their own, each with its picture: the +1, or the one worth
+    // more; the most a day once, or both where they differ.
+    CHECK(text(1, 0) == "Amateur" && !cell(1, 0).star && text(1, 1) == "Flute" && cell(1, 1).item == 16 && text(1, 2) == "12" &&
+          text(1, 3) == "Flute +1" && cell(1, 3).item == 17 && text(1, 4) == "14" && text(1, 5) == "1,120");
+    CHECK(text(2, 1) == "Roasted Corn" && text(2, 3) == "Grilled Corn" && text(2, 2) == "31" && text(2, 4) == "37");
+    CHECK(cell(2, 0).star && cell(2, 1).text.front().tone == Tone::Heading && cell(2, 3).text.front().tone == Tone::Heading); // yours
+    CHECK(cell(1, 1).text.front().tone == Tone::Normal);
+    CHECK(text(3, 1) == "Darksteel Cuisses" && text(3, 3) == "Dst. Cuisses +1" && text(3, 5) == "7,400 [7,040]");
+    // One item, no name from the site: no high quality, its cells left empty.
+    CHECK(text(4, 1) == "Item 40" && text(4, 2) == "90" && text(4, 3).empty() && cell(4, 3).item == 0 && text(4, 4).empty());
     // Worth the same and neither a +1, listed high quality first: Phoenix's recipes say which is which.
-    CHECK(Joined(grid.cells[21].text) == "Inferno Sword [Hellfire Sword]" && grid.cells[21].item == 16594);
+    CHECK(text(5, 1) == "Inferno Sword" && cell(5, 1).item == 16594 && text(5, 3) == "Hellfire Sword" && text(5, 4) == "3,488");
     // A guild that takes no turn-ins has none.
     state.pickedTabs["Guilds"] = "Tenshodo";
     const PopupSection guilds = BarPopupContent(BarWidget::World, state, settings).sections.at(0);
