@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <string>
+#include <tuple>
 
 using namespace headsup;
 
@@ -499,28 +500,39 @@ TEST(a_meters_texts_are_measured_in_the_face_they_are_drawn_in)
     }
 }
 
-TEST(a_meters_bar_has_its_middle_on_the_rows_middle_with_its_texts_around_it)
+TEST(a_meters_bar_and_the_texts_over_and_under_it_are_centered_on_the_row_with_its_side_texts_by_it)
 {
     Settings settings;
     const BarLook look = LookOf(BarTheme::PhoenixGold, settings);
-    WidgetContent c;
-    c.shown = true;
-    Meter m;
-    m.done   = 0.25f;
-    m.width  = 100;
-    m.height = 6;
-    m.above  = {Text("12,345 / 20,000 EXP")};
-    m.right  = {Text("61%")};
-    c.meter  = m;
-    const MeterPlace place = PlaceMeter(m, MeterWidths{120.0f, 0.0f, 0.0f, 20.0f}, look.metrics.gap);
-    const std::string rml = WidgetRml(c, look, {}, place);
-    const float barTop = std::round((look.row.height - 6.0f) / 2.0f);
-    const std::string bar = "class=\"mbar\" style=\"left:" + Px(place.barX) + ";top:" + Px(barTop) + ";width:" + Px(100.0f) +
-                            ";height:" + Px(6.0f) + ";\"";
-    CHECK(rml.find(bar) != std::string::npos);
-    CHECK(rml.find("width: 25%") != std::string::npos);
-    // Above ends a gap over the bar's top; right starts a gap after its end.
-    CHECK(rml.find("left:" + Px(place.aboveX) + ";bottom:" + Px(look.row.height - barTop + kMeterTextGap) + ";") != std::string::npos);
-    CHECK(rml.find("class=\"mtext mside\" style=\"left:" + Px(place.barX + 100.0f + look.metrics.gap) + ";\"") != std::string::npos);
-    CHECK(rml.find(">12,345 / 20,000 EXP<") != std::string::npos && rml.find(">61%<") != std::string::npos);
+    // Half a line of text and its gap: how far the bar moves from the row's middle with text on one side of it only.
+    const float half = (static_cast<float>(look.lines.side) + kMeterTextGap) / 2.0f;
+    for (const auto& [above, below, shift] : {std::tuple{true, false, half}, std::tuple{false, true, -half},
+             std::tuple{true, true, 0.0f}, std::tuple{false, false, 0.0f}})
+    {
+        WidgetContent c;
+        c.shown = true;
+        Meter m;
+        m.done   = 0.25f;
+        m.width  = 100;
+        m.height = 6;
+        if (above) m.above = {Text("12,345 / 20,000 EXP")};
+        if (below) m.below = {Text("7,655 to next")};
+        m.right  = {Text("61%")};
+        c.meter  = m;
+        const MeterPlace place = PlaceMeter(m, MeterWidths{above ? 120.0f : 0.0f, below ? 90.0f : 0.0f, 0.0f, 20.0f}, look.metrics.gap);
+        const std::string rml = WidgetRml(c, look, {}, place);
+        const float barTop = std::round((look.row.height - 6.0f) / 2.0f + shift);
+        const std::string bar = "class=\"mbar\" style=\"left:" + Px(place.barX) + ";top:" + Px(barTop) + ";width:" + Px(100.0f) +
+                                ";height:" + Px(6.0f) + ";\"";
+        CHECK(rml.find(bar) != std::string::npos);
+        CHECK(rml.find("width: 25%") != std::string::npos);
+        // Above ends a gap over the bar's top, below starts a gap under its bottom; the right text starts a gap after
+        // its end, moved as the bar is.
+        if (above)
+            CHECK(rml.find("left:" + Px(place.aboveX) + ";bottom:" + Px(look.row.height - barTop + kMeterTextGap) + ";") != std::string::npos);
+        if (below) CHECK(rml.find("left:" + Px(place.belowX) + ";top:" + Px(barTop + 6.0f + kMeterTextGap) + ";") != std::string::npos);
+        CHECK(rml.find("class=\"mtext mside\" style=\"left:" + Px(place.barX + 100.0f + look.metrics.gap) + ";margin-top:" +
+                       Px(barTop - std::round((look.row.height - 6.0f) / 2.0f)) + ";\"") != std::string::npos);
+        CHECK(rml.find(">61%<") != std::string::npos);
+    }
 }

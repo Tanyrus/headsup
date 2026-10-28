@@ -644,7 +644,13 @@ namespace headsup
         {
             const Meter& m   = *content.meter;
             const auto bar   = static_cast<float>(m.width), thick = static_cast<float>(m.height);
-            const float top  = std::round((look.row.height - thick) / 2.0f);
+            // The bar and the texts over and under it centered on the row together: half a line of text and its gap
+            // off the middle with text on one side only. The texts beside it move with it.
+            const float middle = std::round((look.row.height - thick) / 2.0f);
+            const float off    = (static_cast<float>(look.lines.side) + kMeterTextGap) / 2.0f *
+                              static_cast<float>(static_cast<int>(!m.above.empty()) - static_cast<int>(!m.below.empty()));
+            const float top    = std::round((look.row.height - thick) / 2.0f + off);
+            const std::string by = "margin-top:" + Px(top - middle) + ";";
             const float done = std::clamp(m.done, 0.0f, 1.0f) * kPercentWhole;
             const auto text  = [&](const std::vector<Span>& spans, const char* classes, const std::string& place) {
                 return spans.empty() ? std::string()
@@ -655,8 +661,8 @@ namespace headsup
                    ";height:" + Px(thick) + ";\"><div class=\"fill\" style=\"width: " + RcssNumber(done) + "%\"></div></div>";
             rml += text(m.above, "mtext", "left:" + Px(meter.aboveX) + ";bottom:" + Px(look.row.height - top + kMeterTextGap) + ";");
             rml += text(m.below, "mtext", "left:" + Px(meter.belowX) + ";top:" + Px(top + thick + kMeterTextGap) + ";");
-            rml += text(m.left, "mtext mside", "right:" + Px(meter.width - meter.barX + look.metrics.gap) + ";");
-            rml += text(m.right, "mtext mside", "left:" + Px(meter.barX + bar + look.metrics.gap) + ";");
+            rml += text(m.left, "mtext mside", "right:" + Px(meter.width - meter.barX + look.metrics.gap) + ";" + by);
+            rml += text(m.right, "mtext mside", "left:" + Px(meter.barX + bar + look.metrics.gap) + ";" + by);
             return rml + "</div></div>";
         }
         for (const Icon icon : content.icons)
