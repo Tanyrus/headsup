@@ -709,20 +709,35 @@ namespace headsup
             return SdtIcon(kFirstElementSdt + static_cast<int>(*element));
         }
 
+        // Words and the time after them as spans of their own, so only the time moves as it ticks.
+        void AddTime(std::vector<Span>& spans, std::string words, double seconds)
+        {
+            spans.push_back(Text(std::move(words)));
+            spans.push_back(Text(Countdown(seconds)));
+        }
+
         // A ship's line: boarding until it leaves, or when its door opens.
         std::vector<Span> SailingText(const TravelRoute& route, int64_t unixMs)
         {
             const Sailing next = NextSailing(route, unixMs);
-            if (next.boarding) return ListOf(Text("Boarding"), Text(kDot, Tone::Dim), Text("leaves in " + Countdown(next.leaveIn)));
-            return ListOf(Text("Boards in " + Countdown(next.boardIn)));
+            std::vector<Span> spans;
+            if (next.boarding)
+            {
+                spans = ListOf(Text("Boarding"), Text(kDot, Tone::Dim));
+                AddTime(spans, "leaves in ", next.leaveIn);
+            }
+            else
+                AddTime(spans, "Boards in ", next.boardIn);
+            return spans;
         }
 
         std::vector<Span> GuildText(const GuildShop& shop, int64_t unixMs)
         {
             const GuildHours hours = GuildAt(shop, unixMs);
             const char* now        = hours.open ? "Open" : hours.holiday ? "Holiday" : "Closed";
-            return ListOf(Text(now, hours.open ? Tone::Normal : Tone::Dim), Text(kDot, Tone::Dim),
-                Text(std::string(hours.open ? "closes in " : "opens in ") + Countdown(hours.changeIn)));
+            std::vector<Span> spans = ListOf(Text(now, hours.open ? Tone::Normal : Tone::Dim), Text(kDot, Tone::Dim));
+            AddTime(spans, hours.open ? "closes in " : "opens in ", hours.changeIn);
+            return spans;
         }
 
         // The element's next weather in the zone: its likeliest, with the element's chance that day.
@@ -932,11 +947,16 @@ namespace headsup
                 calendar.rows.push_back(std::move(rse));
                 PopupRow coming = Labeled("Next RSE", Text(next.race));
                 coming.cells.back().text.push_back(Text(kDot, Tone::Dim));
-                coming.cells.back().text.push_back(Text("in " + Countdown(now.endsIn)));
+                AddTime(coming.cells.back().text, "in ", now.endsIn);
                 calendar.rows.push_back(std::move(coming));
-                calendar.rows.push_back(Labeled("Full Moon", Text("in " + Countdown(SecondsToDay(state.unixMs, NextMoonDay(today, true))))));
-                calendar.rows.push_back(Labeled("New Moon", Text("in " + Countdown(SecondsToDay(state.unixMs, NextMoonDay(today, false))))));
-                calendar.rows.push_back(Labeled("Conquest Tally", Text("in " + Countdown(SecondsToTally(state.unixMs)))));
+                const auto inTime = [](const char* label, double seconds) {
+                    PopupRow row = Labeled(label, Text("in "));
+                    row.cells.back().text.push_back(Text(Countdown(seconds)));
+                    return row;
+                };
+                calendar.rows.push_back(inTime("Full Moon", SecondsToDay(state.unixMs, NextMoonDay(today, true))));
+                calendar.rows.push_back(inTime("New Moon", SecondsToDay(state.unixMs, NextMoonDay(today, false))));
+                calendar.rows.push_back(inTime("Conquest Tally", SecondsToTally(state.unixMs)));
                 popup.sections.push_back(std::move(calendar));
             }
             return popup;

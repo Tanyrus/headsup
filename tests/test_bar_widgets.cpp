@@ -2,6 +2,7 @@
 #include "bar_server_time.h"
 #include "ph_timers.h"
 #include "labels.h"
+#include "popup_layout.h"
 #include "test.h"
 #include "vanadiel.h"
 #include "weather.h"
@@ -659,6 +660,37 @@ TEST(the_weather_popup_folds_each_element_over_the_zones_that_can_roll_it_today_
     const size_t row = static_cast<size_t>(std::ranges::find(order, top.zone) - order.begin());
     CHECK(row < order.size());
     CHECK_EQ(Joined(grid.cells[3 * (row + 1) + 1].text), shares);
+}
+
+TEST(the_weather_popup_with_every_element_open_keeps_every_zone_on_a_1080_screen)
+{
+    // Every zone of every element, open at once: more than a 1080 px screen holds in one column. Nothing is cut; the
+    // cards go on in more columns.
+    Settings settings;
+    BarState state;
+    state.zone   = 103;
+    state.unixMs = kVanaEpochUnixMs + 777LL * 3456 * 1000;
+    for (int e = 0; e < kElementCount; ++e)
+        state.openFolds.push_back(ElementName(static_cast<Element>(e)));
+    const PopupContent popup = BarPopupContent(BarWidget::Weather, state, settings);
+    const BarMetrics m       = MetricsFor(45, BarShape::Pills);
+    const auto measure       = [](const Span& span, PopupFont font) {
+        const float height = font == PopupFont::Title ? 24.0f : 18.0f;
+        return TextSize{8.0f * static_cast<float>(span.text.size()), height, 0.3f * height, height - 1.0f};
+    };
+    const float room = 1080.0f - 45.0f - 2.0f * m.gap;
+    PopupLayout l    = LayoutPopup(popup, m, BarShape::Pills, false, measure, room);
+    const size_t all = l.pieces.size();
+    CutPopup(l, room, m.popupPadding);
+    CHECK(l.height <= room + 0.01f && l.pieces.size() == all);
+    size_t zones = 0;
+    for (const PopupPiece& piece : l.pieces)
+        for (uint16_t id = 1; const ZoneRecord* zone = ZoneById(id); ++id)
+            zones += piece.span.text == zone->name;
+    size_t expected = 0;
+    for (const PopupRow& row : Section(popup, "By Element")->rows)
+        if (row.kind == RowKind::Grid) expected += row.cells.size() / 3 - 1;
+    CHECK(expected > 0 && zones >= expected);
 }
 
 TEST(a_zone_without_a_calendar_or_weather_hides_the_widget)
@@ -2189,6 +2221,10 @@ TEST(each_kind_of_ship_folds_its_routes_under_the_next_to_leave)
     state.unixMs = kVanaEpochUnixMs + 864LL * 1000 + 100 * 1000; // 100 s into a cycle: its door opened at 28 s
     const std::vector<std::string> boarding = Lines(travel());
     CHECK(std::ranges::find(boarding, std::string("Jeuno to San d'Oria Boarding") + kDot + "leaves in 1:22") != boarding.end());
+    // The time is a span of its own, so only it moves as it ticks.
+    state.unixMs = kEarthsdayTen;
+    for (const PopupRow& row : travel().rows)
+        if (row.nested) CHECK(row.cells.back().text.back().text.find(' ') == std::string::npos);
 }
 
 TEST(each_guild_folds_its_shops_under_how_many_are_open)
