@@ -5,6 +5,7 @@
 #include "function_ref.h"
 
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -30,6 +31,7 @@ namespace headsup
             Tag,        // a tag's frame, under its text
             Card,       // a section's rounded ground, under its heading and rows
             Fold,       // a fold row's arrow: pointing right while closed, down while open
+            Socket,     // the sunken ground under the rows an open fold row holds
         };
         Kind kind = Kind::Text;
         float x = 0.0f, y = 0.0f, width = 0.0f, height = 0.0f; // from the popup's top-left corner
@@ -38,6 +40,7 @@ namespace headsup
         Icon icon      = Icon::AggroNQ; // Icon
         size_t line    = 0;             // in the layout's lines
         bool open      = false;         // Fold
+        bool right     = false;         // Text: drawn against its box's right, as a pair's value is
     };
 
     // Where a fold row is, from the popup's top-left corner: the whole row across its card, to click.
@@ -72,11 +75,12 @@ namespace headsup
 
     // The title, then each section with a heading as a card holding it and its rows; rows without a heading sit
     // under the title, on the panel. A pair's value ends at its card's right edge. When the cards stacked would run
-    // taller than kTwoColumnsAbove popup text sizes, they flow into two columns as even as their order allows. The
-    // pinned mark ("pinned", in the heading tone) sits at the top right when pinned.
+    // taller than kTwoColumnsAbove popup text sizes, they flow into two columns as even as their order allows, and
+    // into more when two would run taller than room, a card too tall for it going on in the next under its heading.
+    // The pinned mark ("pinned", in the heading tone) sits at the top right when pinned.
     constexpr float kTwoColumnsAbove = 24.0f;
     PopupLayout LayoutPopup(const PopupContent& content, const BarMetrics& metrics, BarShape shape, bool pinned,
-                            SpanMeasure measure);
+                            SpanMeasure measure, float room = std::numeric_limits<float>::infinity());
     // A layout taller than height keeps the title and the cards that end padding or more above it, and shrinks to
     // them with its padding under the lowest.
     void CutPopup(PopupLayout& layout, float height, float padding);

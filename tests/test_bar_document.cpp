@@ -222,6 +222,9 @@ TEST(a_popup_is_its_panel_and_each_piece_where_the_layout_put_it)
     title.font = PopupFont::Title;
     PopupPiece value = piece(PopupPiece::Kind::Text, 100.0f, 50.0f, 30.0f, 18.0f);
     value.span = Text("50%", Tone::Weak);
+    PopupPiece time = piece(PopupPiece::Kind::Text, 140.4f, 30.0f, 40.2f, 18.0f);
+    time.span       = Text("5:16");
+    time.right      = true;
     PopupPiece icon = piece(PopupPiece::Kind::Icon, 20.0f, 50.0f, 19.3f, 19.3f);
     icon.icon       = Icon::Link;
     PopupPiece mark = piece(PopupPiece::Kind::ImmuneMark, 30.0f, 60.0f, 12.0f, 12.0f);
@@ -229,7 +232,11 @@ TEST(a_popup_is_its_panel_and_each_piece_where_the_layout_put_it)
     const PopupPiece star = piece(PopupPiece::Kind::Star, 140.0f, 52.0f, 14.9f, 14.9f);
     const PopupPiece rule = piece(PopupPiece::Kind::Rule, 60.0f, 46.0f, 100.0f, 1.0f);
     const PopupPiece tag  = piece(PopupPiece::Kind::Tag, 20.0f, 80.0f, 50.0f, 21.0f);
-    layout.pieces         = {card, title, value, icon, mark, star, rule, tag};
+    const PopupPiece socket = piece(PopupPiece::Kind::Socket, 24.0f, 70.0f, 172.0f, 26.0f);
+    PopupPiece arrow        = piece(PopupPiece::Kind::Fold, 24.0f, 56.0f, 9.4f, 9.4f);
+    arrow.span              = Text("", Tone::Dim);
+    arrow.open              = true;
+    layout.pieces           = {card, title, value, icon, mark, star, rule, tag, socket, arrow, time};
     // The title's line box starts 2 px under where the layout put its line; the text's, at it.
     const PopupFaces faces = {PopupFace{"Marcellus SC", 24, 29, 0, 2.0f}, PopupFace{"Barlow Condensed", 18, 22, 0, 0.0f},
         PopupFace{"Marcellus SC", 15, 18, 0, 0.0f}, PopupFace{"Marcellus SC", 15, 18, 0, 0.0f}};
@@ -240,11 +247,17 @@ TEST(a_popup_is_its_panel_and_each_piece_where_the_layout_put_it)
     CHECK(Has(rml, "<div class=\"p card\" style=\"left:16px;top:40px;width:188px;height:60px;\"></div>"));
     CHECK(Has(rml, "<div class=\"p f0\" style=\"left:16px;top:19px;color:#e4d8bdff;\">Zone &amp; &lt;more&gt;</div>"));
     CHECK(Has(rml, "<div class=\"p f1\" style=\"left:100px;top:50px;color:#66ff66ff;\">50%</div>")); // the weak badge color
+    // A value in its whole box, against its right: from its left's pixel to its right's.
+    CHECK(Has(rml, "<div class=\"p f1\" style=\"left:140px;top:30px;width:41px;text-align:right;color:#e4d8bdff;\">5:16</div>"));
     CHECK(Has(rml, "<img class=\"p\" src=\"hu:icon/4\" style=\"left:20px;top:50px;width:19.3px;height:19.3px;\"/>"));
     CHECK(Has(rml, "<div class=\"p f1 mark\" style=\"left:30px;top:60px;width:12px;height:12px;line-height:12px;color:#ff4040ff;\">x</div>"));
     CHECK(Has(rml, "<img class=\"p\" src=\"hu:star/15\" style=\"left:140px;top:52px;width:15px;height:15px;\"/>"));
     CHECK(Has(rml, "<div class=\"p rule\" style=\"left:60px;top:46px;width:100px;\"></div>"));
     CHECK(Has(rml, "<div class=\"p tag\" style=\"left:20px;top:80px;width:50px;height:21px;border-radius:10.5px;\"></div>"));
+    CHECK(Has(rml, "<div class=\"p socket\" style=\"left:24px;top:70px;width:172px;height:26px;\"></div>"));
+    const std::string arrowTag = "<img class=\"p\" src=\"" + FoldSource(look.PopupColor(arrow.span), 9, true) +
+                                 "\" style=\"left:24px;top:56px;width:9px;height:9px;\"/>";
+    CHECK(Has(rml, arrowTag.c_str()));
     // A pill theme's panel has no outer border.
     const std::string pills = PopupRml(layout, LookOf(BarTheme::UmbraDark, settings), faces);
     CHECK(!Has(pills, "id=\"outer\""));
@@ -260,6 +273,8 @@ TEST(the_popup_document_styles_its_faces_and_boxes_from_the_look)
     CHECK(Has(rml, "pointer-events:none") && Has(rml, "<div id=\"popup\" class=\"hidden\"></div>"));
     CHECK(Has(rml, ".f0{font-family:\"Barlow Condensed\";font-size:24px;line-height:29px;letter-spacing:0px;"));
     CHECK(Has(rml, ".f2{font-family:\"Barlow Condensed\";font-size:15px;line-height:18px;letter-spacing:2px;"));
+    // An open fold's rows sit sunk into the card: darker, its upper edges dark and its lower ones lit.
+    CHECK(Has(rml, ".socket{box-sizing:border-box;border:1px;border-color:#00000059 #ffffff14 #ffffff14 #00000059;"));
     // The panel: one fill top to bottom, the theme's faint edge, 0.28 of the popup's unit rounded.
     CHECK(Has(rml, "#panel{position:absolute;left:0px;top:0px;box-sizing:border-box;border:1px #d2abab33;"
                    "border-radius:12.6px;decorator:vertical-gradient(#180e0eff #180e0eff);}"));

@@ -438,10 +438,12 @@ namespace headsup
         if (!PopupDocumentFor(host, look)) return BarRect{};
         const BarPalette& p = look.palette;
         const BarMetrics& m = look.metrics;
+        // Figures measured at the font's widest digit, so a popup does not change its width as its times tick.
         auto measure = [&](const Span& s, PopupFont f) {
             const TextFace face  = look.FaceOf(f);
             const FaceLine& line = FaceLineOf(host, face.family, WholePixels(face.size));
-            return TextSize{Width(host, s.text, face), line.height, line.inkTop, line.inkBottom, 0.0f};
+            return TextSize{Width(host, SteadyFigures(s.text, WidestDigitOf(host, face)), face), line.height, line.inkTop,
+                line.inkBottom, 0.0f};
         };
         // The ornate panel's outer border and the line under the strip count: the gap is from them. The help bar's
         // popup goes under the help bar's box.
@@ -452,7 +454,7 @@ namespace headsup
         bool fresh            = false;
         const PopupLayout& pl = m_PopupLayout.Get(std::move(key), [&](const PopupKey& k) {
             fresh           = true;
-            PopupLayout cut = LayoutPopup(k.content, m, p.shape, k.pinned, measure);
+            PopupLayout cut = LayoutPopup(k.content, m, p.shape, k.pinned, measure, k.room);
             CutPopup(cut, k.room, m.popupPadding);
             return cut;
         });

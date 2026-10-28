@@ -653,6 +653,24 @@ TEST(a_move_the_bar_may_not_see_closes_a_hovered_popup_and_keeps_a_pinned_one)
     }
 }
 
+// The popup is drawn over Ashita's windows, so inside it the pointer is the popup's even with one under it.
+TEST(the_open_popup_keeps_the_pointer_over_an_ashita_window_under_it)
+{
+    Clicks c;
+    CHECK(!c.Take(WM_MOUSEMOVE, kOnBarY));
+    c.input.SetPopup(BarRect{760.0f, 44.0f, 400.0f, 300.0f});
+    CHECK(!c.Take(WM_MOUSEMOVE, 200.0f, 0, true, true)); // into the popup, over XIUI's window
+    CHECK(c.input.Open() == BarWidget::Target);
+    CHECK(c.Take(WM_LBUTTONDOWN, 200.0f, 0, true, true)); // a press there pins it
+    CHECK(c.Take(WM_LBUTTONUP, 200.0f, 0, true, true));
+    CHECK(c.input.Pinned() == BarWidget::Target);
+    CHECK(c.Take(WM_LBUTTONDOWN, 200.0f, 0, true, true)); // and unpins it
+    CHECK(c.Take(WM_LBUTTONUP, 200.0f, 0, true, true));
+    CHECK(!c.Take(WM_LBUTTONDOWN, 200.0f, 0, true, false, true)); // another plugin blocking it still wins
+    CHECK(!c.Take(WM_MOUSEMOVE, kGameY, 0, true, true)); // out of it over the window: it closes
+    CHECK(!c.input.Open().has_value());
+}
+
 TEST(the_bar_going_off_gives_the_game_every_release)
 {
     Clicks c;

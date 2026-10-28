@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <optional>
 
 namespace headsup
 {
@@ -21,6 +22,7 @@ namespace headsup
         constexpr float kCardGap     = 0.45f; // between cards, and between the columns of them
         constexpr float kMinWidth    = 12.0f; // popupText, so a short popup is not a sliver
         constexpr float kFoldArrow   = 0.6f;  // a fold row's arrow
+        constexpr float kSocketPad   = 0.35f; // above and below the rows in an open fold's socket
 
         std::string Upper(std::string text)
         {
@@ -84,6 +86,7 @@ namespace headsup
                 float y, height; // its row, with half the gap to each neighbour
             };
             std::vector<Fold> folds;
+            std::vector<size_t> sockets; // pieces to widen to the card's inside once its width is known
             bool card = false;
         };
 
@@ -103,10 +106,46 @@ namespace headsup
                     PopupFont::Heading});
                 y += t.height + metrics.rowGap;
             }
+            // Grid rows one after another with as many columns line them up: a grid carried on across rows, or cards.
+            std::vector<std::vector<float>> runColumns(section.rows.size());
+            for (size_t first = 0, last = 0; first < section.rows.size(); first = std::max(last, first + 1))
+            {
+                const PopupRow& head = section.rows[first];
+                last = first;
+                if (head.kind != RowKind::Grid || head.columns <= 0) continue;
+                std::vector<float> widths(static_cast<size_t>(head.columns), 0.0f);
+                for (; last < section.rows.size() && section.rows[last].kind == RowKind::Grid &&
+                       section.rows[last].columns == head.columns;
+                     ++last)
+                    for (size_t i = 0; i < section.rows[last].cells.size(); ++i)
+                        widths[i % widths.size()] =
+                            std::max(widths[i % widths.size()], CellSize(section.rows[last].cells[i], unit, measure).width);
+                for (size_t r = first; r < last; ++r)
+                    runColumns[r] = widths;
+            }
             std::vector<TextSize> cells;
             std::vector<float> columns;
-            for (const PopupRow& row : section.rows)
+            const float socketPad = std::round(unit * kSocketPad);
+            std::optional<size_t> socket; // the open one, for the nested rows now being laid out
+            const auto closeSocket = [&] {
+                if (!socket) return;
+                PopupPiece& ground = b.pieces[*socket];
+                ground.height      = y - metrics.rowGap + socketPad - ground.y;
+                y                  = ground.y + ground.height + metrics.rowGap;
+                b.sockets.push_back(*socket);
+                socket.reset();
+            };
+            for (size_t r = 0; r < section.rows.size(); ++r)
             {
+                const PopupRow& row = section.rows[r];
+                if (!row.nested)
+                    closeSocket();
+                else if (!socket)
+                {
+                    socket = b.pieces.size();
+                    b.pieces.push_back(PopupPiece{PopupPiece::Kind::Socket, b.pad, y, 0.0f, 0.0f, {}});
+                    y += socketPad;
+                }
                 if (row.cells.empty()) continue;
                 const bool grid = row.kind == RowKind::Grid && row.columns > 0;
                 const bool tags = row.kind == RowKind::Tags;
@@ -116,15 +155,12 @@ namespace headsup
                 // A fold row's cells after its arrow, and the rows it holds lined up with them.
                 const float indent = fold || row.nested ? std::round(unit * (kFoldArrow + kIconGap)) : 0.0f;
                 cells.clear();
-                columns.assign(grid ? static_cast<size_t>(row.columns) : 0, 0.0f);
+                columns = grid ? runColumns[r] : std::vector<float>{};
                 float rowWidth = indent;
                 for (size_t i = 0; i < row.cells.size(); ++i)
                 {
                     const TextSize s = cells.emplace_back(CellSize(row.cells[i], unit, measure));
-                    if (grid)
-                        columns[i % columns.size()] = std::max(columns[i % columns.size()], s.width);
-                    else
-                        rowWidth += (tags ? Framed(s, unit) : s).width + (i > 0 ? gap : 0.0f);
+                    if (!grid) rowWidth += (tags ? Framed(s, unit) : s).width + (i > 0 ? gap : 0.0f);
                 }
                 for (const float c : columns)
                     rowWidth += c;
@@ -185,7 +221,12 @@ namespace headsup
                         b.pieces.push_back(PopupPiece{PopupPiece::Kind::Star, cx, cy + cells[i].inkTop, s, s, {}});
                         cx += s;
                     }
-                    if (pair && i == 1) b.values.push_back(Block::Value{first, b.pieces.size(), cx});
+                    if (pair && i == 1)
+                    {
+                        b.values.push_back(Block::Value{first, b.pieces.size(), cx});
+                        for (size_t v = first; v < b.pieces.size(); ++v)
+                            b.pieces[v].right = b.pieces[v].kind == PopupPiece::Kind::Text;
+                    }
                     lineHeight = std::max(lineHeight, size.height);
                     x += grid ? columns[i % columns.size()] + unit * kColumnGap : size.width + gap;
                 }
@@ -193,6 +234,7 @@ namespace headsup
                     b.folds.push_back(Block::Fold{row.fold, top - metrics.rowGap / 2.0f, y + lineHeight - top + metrics.rowGap});
                 y += lineHeight + metrics.rowGap;
             }
+            closeSocket();
             b.width  = contentWidth + 2.0f * b.pad;
             b.height = std::max(y - metrics.rowGap, b.pad) + b.pad;
             return b;
@@ -204,6 +246,8 @@ namespace headsup
             for (const Block::Value& v : b.values)
                 for (size_t i = v.first; i < v.last; ++i)
                     b.pieces[i].x += width - b.pad - v.right;
+            for (const size_t socket : b.sockets)
+                b.pieces[socket].width = width - 2.0f * b.pad;
             if (b.card) l.pieces.push_back(PopupPiece{PopupPiece::Kind::Card, x, y, width, b.height, {}, PopupFont::Text,
                             Icon::AggroNQ, line});
             for (PopupPiece& piece : b.pieces)
@@ -217,10 +261,50 @@ namespace headsup
                 l.folds.push_back(PopupFold{std::move(fold.key), x, y + fold.y, width, fold.height, line});
             l.lines.push_back(PopupLine{y + b.height});
         }
+        // A card that would run taller than tall, cut into parts that fit between its rows, a grid's lines counting as
+        // rows; each part keeps the heading. A row taller than tall alone is a part of its own.
+        std::vector<PopupSection> Fitted(const PopupSection& section, float tall, const BarMetrics& metrics, bool ornate,
+                                         SpanMeasure measure)
+        {
+            if (LayoutSection(section, metrics, ornate, measure).height <= tall) return ListOf(section);
+            std::vector<PopupRow> rows;
+            for (const PopupRow& row : section.rows)
+            {
+                const auto columns = static_cast<size_t>(std::max(row.columns, 0));
+                if (row.kind != RowKind::Grid || columns == 0 || row.cells.size() <= columns)
+                {
+                    rows.push_back(row);
+                    continue;
+                }
+                for (size_t i = 0; i < row.cells.size(); i += columns)
+                {
+                    PopupRow line = row;
+                    line.cells.assign(row.cells.begin() + static_cast<ptrdiff_t>(i),
+                        row.cells.begin() + static_cast<ptrdiff_t>(std::min(i + columns, row.cells.size())));
+                    rows.push_back(std::move(line));
+                }
+            }
+            // A card's height is its empty card's and each row's, a gap before each.
+            const float empty = LayoutSection(PopupSection{section.heading, {}}, metrics, ornate, measure).height;
+            std::vector<PopupSection> parts{PopupSection{section.heading, {}}};
+            float height = empty;
+            for (PopupRow& row : rows)
+            {
+                const float more = metrics.rowGap + LayoutSection(PopupSection{"", ListOf(row)}, metrics, ornate, measure).height;
+                if (!parts.back().rows.empty() && height + more > tall)
+                {
+                    parts.push_back(PopupSection{section.heading, {}});
+                    height = empty;
+                }
+                parts.back().rows.push_back(std::move(row));
+                height += more;
+            }
+            return parts;
+        }
     }
 
     PopupLayout LayoutPopup(const PopupContent& content, const BarMetrics& metrics, BarShape shape, bool pinned,
-                            SpanMeasure measure)
+                            SpanMeasure measure, float room)
     {
         const float unit = metrics.popupText, pad = metrics.popupPadding, cardGap = std::round(unit * kCardGap);
         const bool ornate = shape == BarShape::Ornate;
@@ -255,21 +339,34 @@ namespace headsup
         float top = pad + rowHeight + metrics.rowGap;
 
         // The rows under the title, then the cards.
-        std::vector<Block> loose, cards;
+        std::vector<Block> loose;
         for (const PopupSection& section : content.sections)
-            (section.heading.empty() ? loose : cards).push_back(LayoutSection(section, metrics, ornate, measure));
+            if (section.heading.empty()) loose.push_back(LayoutSection(section, metrics, ornate, measure));
         float width = std::max(unit * kMinWidth, titleWidth);
+        float cardsTop = top;
         for (const Block& b : loose)
+        {
             width = std::max(width, b.width);
+            cardsTop += b.height + metrics.rowGap;
+        }
+        // The most a column of cards may run, with the padding under it: a card taller goes on in another column.
+        const float tall = room - cardsTop - pad;
+        std::vector<Block> cards;
+        for (const PopupSection& section : content.sections)
+            if (!section.heading.empty())
+                for (const PopupSection& part : Fitted(section, tall, metrics, ornate, measure))
+                    cards.push_back(LayoutSection(part, metrics, ornate, measure));
 
-        // One column, or two when one runs tall: the split whose taller column is shortest, in their order.
+        // One column, or two when one runs tall: the split whose taller column is shortest, in their order. When that
+        // runs past the room, as many columns as fill it in order.
         float stacked = 0.0f;
         for (const Block& b : cards)
             stacked += b.height + cardGap;
-        size_t split = cards.size();
+        std::vector<size_t> starts{0}; // each column's first card
         if (cards.size() >= 2 && stacked > unit * kTwoColumnsAbove)
         {
             float best = stacked, left = 0.0f;
+            size_t split = cards.size();
             for (size_t i = 1; i < cards.size(); ++i)
             {
                 left += cards[i - 1].height + cardGap;
@@ -279,33 +376,50 @@ namespace headsup
                     split = i;
                 }
             }
+            if (split < cards.size()) starts.push_back(split);
+            if (best - cardGap > tall)
+            {
+                starts = {0};
+                float column = 0.0f;
+                for (size_t i = 0; i < cards.size(); ++i)
+                {
+                    if (i > starts.back() && column + cards[i].height > tall)
+                    {
+                        starts.push_back(i);
+                        column = 0.0f;
+                    }
+                    column += cards[i].height + cardGap;
+                }
+            }
         }
-        float leftWidth = 0.0f, rightWidth = 0.0f;
+        const auto columnOf = [&](size_t card) {
+            return static_cast<size_t>(std::upper_bound(starts.begin(), starts.end(), card) - starts.begin() - 1);
+        };
+        std::vector<float> columnWidths(starts.size(), 0.0f);
         for (size_t i = 0; i < cards.size(); ++i)
-            (i < split ? leftWidth : rightWidth) = std::max(i < split ? leftWidth : rightWidth, cards[i].width);
-        if (split == cards.size())
-            leftWidth = width = std::max(width, leftWidth);
-        else
-        {
-            const float both = leftWidth + cardGap + rightWidth;
-            if (both < width) leftWidth += width - both; // a wide title widens the left column
-            width = std::max(width, both);
-        }
+            columnWidths[columnOf(i)] = std::max(columnWidths[columnOf(i)], cards[i].width);
+        float all = cardGap * static_cast<float>(columnWidths.size() - 1);
+        for (const float w : columnWidths)
+            all += w;
+        if (all < width) columnWidths.front() += width - all; // a wide title widens the first column
+        width = std::max(width, all);
 
         for (Block& b : loose)
         {
             Place(b, pad, top, width, l.lines.size(), l);
             top += b.height + metrics.rowGap;
         }
-        float y = top, rightY = top;
+        std::vector<float> columnX(starts.size(), pad), columnY(starts.size(), top);
+        for (size_t c = 1; c < starts.size(); ++c)
+            columnX[c] = columnX[c - 1] + columnWidths[c - 1] + cardGap;
         for (size_t i = 0; i < cards.size(); ++i)
         {
-            const bool right = i >= split;
-            float& at        = right ? rightY : y;
-            Place(cards[i], right ? pad + leftWidth + cardGap : pad, at, right ? rightWidth : leftWidth, l.lines.size(), l);
-            at += cards[i].height + cardGap;
+            const size_t c = columnOf(i);
+            Place(cards[i], columnX[c], columnY[c], columnWidths[c], l.lines.size(), l);
+            columnY[c] += cards[i].height + cardGap;
         }
-        const float bottom = std::max(cards.empty() ? top - metrics.rowGap : std::max(y, rightY) - cardGap, l.lines[0].bottom);
+        const float lowest = *std::max_element(columnY.begin(), columnY.end());
+        const float bottom = std::max(cards.empty() ? top - metrics.rowGap : lowest - cardGap, l.lines[0].bottom);
         l.width            = width + 2.0f * pad;
         l.height           = bottom + pad;
         if (pinMark) l.pieces[*pinMark].x = l.width - pad - l.pieces[*pinMark].width;

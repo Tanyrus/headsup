@@ -3,6 +3,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
+#include <set>
 #include <string>
 
 using namespace headsup;
@@ -212,6 +214,13 @@ TEST(a_fold_row_has_its_arrow_and_its_whole_row_to_click_and_the_rows_it_holds_s
         return p.y >= f.y - 0.01f && p.y + p.height <= f.y + f.height + 0.01f;
     };
     CHECK(holds(l.folds[0], label) && !holds(l.folds[0], nested) && holds(l.folds[1], next));
+    // The rows an open fold holds sit in a socket across the card, under its row and clear of the next.
+    const std::vector<const PopupPiece*> sockets = Of(l, PopupPiece::Kind::Socket);
+    CHECK_EQ(sockets.size(), static_cast<size_t>(1));
+    const PopupPiece& socket = *sockets.front();
+    CHECK(Near(socket.x, card.x + std::round(m.popupText * 0.55f)) && Near(socket.x + socket.width, card.x + card.width - (socket.x - card.x)));
+    CHECK(socket.y >= label.y + label.height && socket.y < nested.y && socket.y + socket.height > nested.y + nested.height);
+    CHECK(socket.y + socket.height < next.y);
     // A cut that drops the card drops its folds.
     PopupLayout cut = l;
     CutPopup(cut, card.y - 0.5f, m.popupPadding);
@@ -232,6 +241,8 @@ TEST(a_pairs_value_ends_at_its_cards_right_edge_and_its_label_at_the_left)
     CHECK(gil.x + gil.width < card.x + card.width && gil.x + gil.width > card.x + card.width - m.popupText);
     CHECK(Near(Find(l, "Gil ")->x, Find(l, "Imperial Standing ")->x)); // the labels at their left
     CHECK(standing.x > Find(l, "Imperial Standing ")->x + Find(l, "Imperial Standing ")->width);
+    // A value is drawn against the right of its box, so values that tick stay lined up at their right edge.
+    CHECK(gil.right && standing.right && !Find(l, "Gil ")->right);
 }
 
 TEST(a_tall_popup_flows_its_cards_into_two_columns)
@@ -260,6 +271,48 @@ TEST(a_tall_popup_flows_its_cards_into_two_columns)
     c.sections[1].rows.resize(1);
     const PopupLayout shortOne = LayoutPopup(c, m, BarShape::Pills, false, Fake);
     CHECK(Near(Of(shortOne, PopupPiece::Kind::Card)[0]->x, Of(shortOne, PopupPiece::Kind::Card)[1]->x));
+}
+
+TEST(a_popup_taller_than_its_room_carries_its_cards_on_in_more_columns_and_drops_nothing)
+{
+    const BarMetrics m = MetricsFor(36, BarShape::Pills);
+    PopupContent c;
+    c.title = {{"Weather", Tone::Normal}};
+    c.sections.push_back(PopupSection{"Forecast", {PopupRow{RowKind::Line, 0, {Word("Today")}}}});
+    PopupRow grid{RowKind::Grid, 2, {}};
+    for (int i = 0; i < 60; ++i)
+    {
+        grid.cells.push_back(Word(("Zone " + std::to_string(i)).c_str()));
+        grid.cells.push_back(Word(i % 3 == 0 ? "Snow 50% wide" : "-"));
+    }
+    c.sections.push_back(PopupSection{"By Element", {grid}});
+    const float room = LayoutPopup(c, m, BarShape::Pills, false, Fake).height / 3.0f;
+    const PopupLayout l = LayoutPopup(c, m, BarShape::Pills, false, Fake, room);
+    CHECK(l.height <= room + 0.01f);
+    CHECK(AllInside(l, m));
+    // The grid goes on under its heading in more columns, lined up in each: every zone is there with its chance after
+    // it on its line, and the chances of a column start at one place.
+    size_t headings = 0;
+    for (const PopupPiece& p : l.pieces)
+        headings += p.span.text == "BY ELEMENT";
+    CHECK(headings >= 2);
+    std::map<int, std::set<int>> chanceX; // by the zones' x, in whole pixels
+    for (int i = 0; i < 60; ++i)
+    {
+        const PopupPiece* zone = Find(l, "Zone " + std::to_string(i));
+        CHECK(zone != nullptr);
+        const PopupPiece* chance = nullptr;
+        for (const PopupPiece& p : l.pieces)
+            if (&p != zone && Near(p.y, zone->y) && p.x > zone->x && (chance == nullptr || p.x < chance->x)) chance = &p;
+        CHECK(chance != nullptr && chance->span.text == (i % 3 == 0 ? "Snow 50% wide" : "-"));
+        chanceX[static_cast<int>(std::lround(zone->x))].insert(static_cast<int>(std::lround(chance->x)));
+    }
+    CHECK(chanceX.size() >= 2);
+    for (const auto& [x, at] : chanceX)
+        CHECK_EQ(at.size(), static_cast<size_t>(1));
+    // With room for it whole, it stays one card.
+    const PopupLayout roomy = LayoutPopup(c, m, BarShape::Pills, false, Fake, 10000.0f);
+    CHECK_EQ(Of(roomy, PopupPiece::Kind::Card).size(), static_cast<size_t>(2));
 }
 
 TEST(immune_icons_get_their_mark_and_pinned_shows)

@@ -596,11 +596,14 @@ TEST(the_reroll_note_is_in_earth_minutes_and_left_out_where_the_weather_never_ch
     state.unixMs = kVanaEpochUnixMs;
     state.zone   = 103;
     const PopupContent dunes = BarPopupContent(BarWidget::Weather, state, settings);
-    CHECK(Lines(*Section(dunes, "Forecast")).back() == "Phoenix rolls the weather again every 3 to 30 Earth minutes.");
+    const std::vector<std::string> notes = Lines(*Section(dunes, "Forecast"));
+    CHECK(notes[notes.size() - 2] == "Phoenix rolls the weather again every 3 to 30 Earth minutes.");
+    // Phoenix's UpdateWeather turns a roll of no weather, sunshine or clouds into fog from 2:00 to 7:00 outside towns.
+    CHECK(notes.back() == "From 2:00 to 7:00, outside towns, Phoenix turns sunshine and clouds into fog.");
     state.zone = 37;
     const PopupContent temenos   = BarPopupContent(BarWidget::Weather, state, settings);
     const PopupSection* forecast = Section(temenos, "Forecast");
-    CHECK_EQ(forecast->rows.size(), static_cast<size_t>(1));
+    CHECK_EQ(forecast->rows.size(), static_cast<size_t>(1)); // neither note: Stellar Glare is all it has
     CHECK(Joined(forecast->rows[0].cells[1].text) == "Stellar Glare 100%");
 }
 

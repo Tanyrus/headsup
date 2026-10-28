@@ -127,6 +127,8 @@ namespace headsup
         // The fold rows opened since loading, by their keys, in the order they were opened.
         const std::vector<std::string>& OpenFolds() const { return m_OpenFolds; }
         bool Over(float x, float y) const;
+        // Inside the open popup, which is drawn over Ashita's windows.
+        bool InPopup(float x, float y) const { return Open() && m_Popup.Contains(x, y); }
         // Pins this widget's popup, or none, as a press on it would; a widget not on the bar loses it next frame.
         void Pin(std::optional<PanelWidget> widget)
         {
@@ -165,7 +167,8 @@ namespace headsup
             : m_Input(input)
         {}
         // True when the game must not get the message. buttons: the message's MK_ flags. A press is the bar's only
-        // while it is on, nothing else blocked the message and no Ashita window is under the pointer.
+        // while it is on, nothing else blocked the message and no Ashita window is under the pointer, or the pointer
+        // is in the open popup, which is drawn over them.
         bool Take(uint32_t message, uint32_t buttons, float x, float y, bool barOn, bool overGui, bool blocked);
 
     private:

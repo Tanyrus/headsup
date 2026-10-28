@@ -1287,7 +1287,8 @@ namespace headsup
             PopupCell current = Cell(Text(WeatherName(now)), WeatherIcon(now));
             if (!state.weather) current.text.push_back(Text(" (likely)", Tone::Dim));
             PopupRow grid   = Grid(kForecastColumns, kForecastDays * kForecastColumns);
-            bool oneWeather = true; // on every day
+            bool oneWeather = true;  // on every day
+            bool fogs       = false; // a day can roll a weather fog takes the place of in the small hours
             for (int d = 0; d < kForecastDays; ++d)
             {
                 const int weekday = (t.weekday + d) % kVanaDaysPerWeek;
@@ -1296,6 +1297,9 @@ namespace headsup
                 const std::optional<WeatherOdds> odds = OddsOn(state, t.day + static_cast<uint32_t>(d));
                 const WeatherChances chances = odds ? Chances(*odds) : WeatherChances{};
                 oneWeather = oneWeather && chances.count == 1;
+                for (const WeatherChance& chance : chances)
+                    fogs = fogs || chance.weather == Weather::None || chance.weather == Weather::Sunshine ||
+                           chance.weather == Weather::Clouds;
                 for (int c = 0; c < kForecastColumns - 1; ++c)
                 {
                     if (c >= chances.count)
@@ -1314,6 +1318,9 @@ namespace headsup
             if (!oneWeather)
                 forecast.rows.push_back(
                     LineOf("Phoenix rolls the weather again every 3 to 30 Earth minutes.", Tone::Dim));
+            if (fogs)
+                forecast.rows.push_back(
+                    LineOf("From 2:00 to 7:00, outside towns, Phoenix turns sunshine and clouds into fog.", Tone::Dim));
             popup.sections = ListOf(PopupSection{"", ListOf(Line(std::move(current)))}, std::move(forecast),
                 ByElement(state, t.day));
             break;

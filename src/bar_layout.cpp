@@ -400,7 +400,7 @@ namespace headsup
     bool BarClicks::Take(uint32_t message, uint32_t buttons, float x, float y, bool barOn, bool overGui, bool blocked)
     {
         if (!barOn) m_Left = m_Right = false;
-        const bool barsTurn = barOn && !overGui && !blocked;
+        const bool barsTurn = barOn && !blocked && (!overGui || m_Input.InPopup(x, y));
         switch (message)
         {
         case kMouseMove:

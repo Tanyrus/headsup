@@ -24,6 +24,8 @@ namespace headsup
         constexpr float kGlowSigmaPerWidth = 0.4f;
         constexpr float kSigmaPerRadius    = 0.5f;
         constexpr int kShadowDrop          = 1; // pixels down
+        constexpr uint32_t kSocketFill     = 0x38000000; // an open fold's socket: black over its card
+        constexpr uint32_t kSocketShade    = 0x59000000, kSocketLight = 0x14FFFFFF;
         // The accent's alpha in the target's frame as it breathes, from and to, and in a lit title's glow.
         constexpr uint32_t kBreatheLow = 0x59, kBreatheHigh = 0xCC, kLitGlow = 0x80;
         // How a widget eases into its lit look.
@@ -144,10 +146,13 @@ namespace headsup
                    Px(static_cast<float>(WholePixels(width))) + ";height:" + Px(static_cast<float>(WholePixels(height))) + ";";
         }
 
-        std::string TextAt(const char* classes, float x, float y, uint32_t color, std::string_view text)
+        // width: set against the right of the box from x that wide, in whole pixels; 0 for text from x.
+        std::string TextAt(const char* classes, float x, float y, uint32_t color, std::string_view text, float width = 0.0f)
         {
+            const std::string box =
+                width > 0.0f ? "width:" + Px(std::round(x + width) - std::round(x)) + ";text-align:right;" : std::string();
             return std::string("<div class=\"p ") + classes + "\" style=\"left:" + Px(std::round(x)) + ";top:" +
-                   Px(std::round(y)) + ";color:" + RcssColor(color) + ";\">" + EscapedRml(text) + "</div>";
+                   Px(std::round(y)) + ";" + box + "color:" + RcssColor(color) + ";\">" + EscapedRml(text) + "</div>";
         }
 
         // A panel's fill top to bottom, its edge and its corners.
@@ -519,6 +524,10 @@ namespace headsup
         css += "#panel{position:absolute;left:0px;top:0px;" + (look.skin ? SkinRules(*look.skin) : PanelRules(panel)) + "}";
         css += ".card{" + FlatRules(PopupCard(look), true) + "}";
         css += ".tag{" + FlatRules(PopupTag(look, 0.0f), false) + "}";
+        // Sunk into its card: darker, its upper edges in shadow and its lower ones lit.
+        css += std::string(".socket{box-sizing:border-box;border:1px;border-color:") + RcssColor(kSocketShade) + " " +
+               RcssColor(kSocketLight) + " " + RcssColor(kSocketLight) + " " + RcssColor(kSocketShade) +
+               ";border-radius:" + Px(PopupCard(look).radius / 2.0f) + ";background-color:" + RcssColor(kSocketFill) + ";}";
         css += ".rule{height:1px;decorator:horizontal-gradient(" + RcssColor(look.palette.divider) + " " +
                RcssColor(look.palette.divider & ~kAlphaMask) + ");}";
         css += ".mark{text-align:center;}";
@@ -556,7 +565,7 @@ namespace headsup
             {
             case PopupPiece::Kind::Text:
                 rml += TextAt(face.c_str(), piece.x, std::round(piece.y) + faces[static_cast<size_t>(piece.font)].drop, color,
-                    piece.span.text);
+                    piece.span.text, piece.right ? piece.width : 0.0f);
                 break;
             case PopupPiece::Kind::ImmuneMark:
                 rml += "<div class=\"p " + face + " mark\" style=\"" + BoxAt(piece.x, piece.y, piece.width, piece.height) +
@@ -587,6 +596,9 @@ namespace headsup
                 break;
             case PopupPiece::Kind::Card:
                 rml += "<div class=\"p card\" style=\"" + BoxAt(piece.x, piece.y, piece.width, piece.height) + "\"></div>";
+                break;
+            case PopupPiece::Kind::Socket:
+                rml += "<div class=\"p socket\" style=\"" + BoxAt(piece.x, piece.y, piece.width, piece.height) + "\"></div>";
                 break;
             case PopupPiece::Kind::Tag:
                 rml += "<div class=\"p tag\" style=\"" + BoxAt(piece.x, piece.y, piece.width, piece.height) +
