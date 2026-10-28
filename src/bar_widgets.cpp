@@ -851,7 +851,7 @@ namespace headsup
             {
                 const auto element = static_cast<Element>(e);
                 const std::vector<ZoneRoll> now = ZonesRolling(element, today), next = ZonesRolling(element, today + 1);
-                PopupTab tab{Text(ElementName(element)), {}};
+                PopupTab tab{Colored(ElementName(element), ElementColor(element)), {}};
                 PopupRow count = Labeled("Zones", Text(std::to_string(now.size()) + " today" + kDot + std::to_string(next.size()) + " tomorrow"));
                 count.nested   = true;
                 ScrollsBy(count, state, section.heading + "/" + ElementName(element));

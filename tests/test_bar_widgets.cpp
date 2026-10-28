@@ -622,7 +622,7 @@ TEST(the_weather_popup_has_a_tab_for_each_element_of_the_zones_that_can_roll_it_
     for (int e = 0; e < kElementCount; ++e)
     {
         const auto element = static_cast<Element>(e);
-        CHECK(fire.tabs[e].name == Text(ElementName(element))); // every tab in one color
+        CHECK(fire.tabs[e].name == Colored(ElementName(element), ElementColor(element))); // in its element's color
         // Its first row: how many zones can roll it today, and tomorrow.
         CHECK_EQ(Lines(PopupSection{"", fire.tabs[e].rows}).front(),
             "Zones " + std::to_string(ZonesRolling(element, today).size()) + " today" + kDot +
