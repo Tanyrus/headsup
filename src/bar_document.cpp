@@ -27,6 +27,7 @@ namespace headsup
         constexpr uint32_t kSocketFill     = 0x38000000; // an open fold's socket: black over its card
         constexpr uint32_t kSocketShade    = 0x59000000, kSocketLight = 0x14FFFFFF;
         constexpr uint32_t kLitTab         = 0x40; // the picked tab's fill: its accent at a quarter
+        constexpr uint32_t kScrollTrack    = 0x1AFFFFFF, kScrollThumb = 0x73FFFFFF; // white, faint and less so
         // The accent's alpha in the target's frame as it breathes, from and to, and in a lit title's glow.
         constexpr uint32_t kBreatheLow = 0x59, kBreatheHigh = 0xCC, kLitGlow = 0x80;
         // How a widget eases into its lit look.
@@ -527,6 +528,8 @@ namespace headsup
         css += ".tag{" + FlatRules(PopupTag(look, 0.0f), false) + "}";
         // A card's tabs as tags, the picked one in the accent.
         css += ".tab{" + FlatRules(PopupTag(look, 0.0f), false) + "}";
+        css += ".track{background-color:" + RcssColor(kScrollTrack) + ";}";
+        css += ".thumb{background-color:" + RcssColor(kScrollThumb) + ";}";
         css += ".tab.lit{border-color:" + RcssColor(look.palette.accent) + ";background-color:" +
                RcssColor(Faded(look.palette.accent, kLitTab)) + ";}";
         // Sunk into its card: darker, its upper edges in shadow and its lower ones lit.
@@ -606,6 +609,12 @@ namespace headsup
                 rml += std::string("<div class=\"p tab") + (piece.open ? " lit" : "") + "\" style=\"" +
                        BoxAt(piece.x, piece.y, piece.width, piece.height) + "border-radius:" + Px(piece.height / 2.0f) +
                        ";\"></div>";
+                break;
+            case PopupPiece::Kind::ScrollTrack:
+            case PopupPiece::Kind::ScrollThumb:
+                rml += std::string("<div class=\"p ") + (piece.kind == PopupPiece::Kind::ScrollTrack ? "track" : "thumb") +
+                       "\" style=\"" + BoxAt(piece.x, piece.y, piece.width, piece.height) + "border-radius:" +
+                       Px(piece.width / 2.0f) + ";\"></div>";
                 break;
             case PopupPiece::Kind::Socket:
                 rml += "<div class=\"p socket\" style=\"" + BoxAt(piece.x, piece.y, piece.width, piece.height) + "\"></div>";

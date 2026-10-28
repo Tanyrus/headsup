@@ -376,6 +376,39 @@ TEST(a_socket_longer_than_ten_lines_shows_ten_and_scrolls_under_its_heads)
     CHECK(Find(end, "Zone 29") && !Find(end, "Zone 19") && Find(end, std::string("22 to 31 of 31") + kDot + "scroll for more"));
 }
 
+TEST(a_scrolling_socket_has_a_scrollbar_in_its_right_padding_showing_where_it_is)
+{
+    const BarMetrics m = MetricsFor(36, BarShape::Pills);
+    std::vector<std::pair<float, float>> thumbs; // its top and bottom, from the track's top, as a share of the track
+    for (const size_t scrolled : {0u, 5u, 100u})
+    {
+        const PopupLayout l = LayoutPopup(Zones(scrolled), m, BarShape::Pills, false, Fake);
+        const std::vector<const PopupPiece*> tracks = Of(l, PopupPiece::Kind::ScrollTrack), bars = Of(l, PopupPiece::Kind::ScrollThumb);
+        CHECK(tracks.size() == 1 && bars.size() == 1);
+        const PopupPiece& track = *tracks.front(), &thumb = *bars.front();
+        const PopupPiece& sock  = *Of(l, PopupPiece::Kind::Socket).front();
+        const PopupPiece& name  = *Find(l, "Zone"); // the table's heads, which stay
+        // In the socket's right padding, clear of its rows, from its first row's top to its last's bottom.
+        if (const PopupPiece* value = Find(l, "30 today")) CHECK(track.x >= value->x + value->width);
+        CHECK(track.x + track.width <= sock.x + sock.width);
+        CHECK(Near(track.x + track.width / 2.0f, sock.x + sock.width - (name.x - sock.x) / 2.0f));
+        CHECK(track.y > sock.y && track.y + track.height < sock.y + sock.height);
+        // The thumb in the track, as long as the share of lines shown.
+        CHECK(Near(thumb.x, track.x) && Near(thumb.width, track.width));
+        CHECK(thumb.y >= track.y - 0.01f && thumb.y + thumb.height <= track.y + track.height + 0.01f);
+        CHECK(Near(thumb.height, track.height * 10.0f / 31.0f));
+        thumbs.emplace_back((thumb.y - track.y) / track.height, (thumb.y + thumb.height - track.y) / track.height);
+    }
+    // At the top, five lines down of 21, and at the end.
+    CHECK(Near(thumbs[0].first, 0.0f) && Near(thumbs[2].second, 1.0f));
+    CHECK(Near(thumbs[1].first, (1.0f - 10.0f / 31.0f) * 5.0f / 21.0f));
+    // A socket that shows all its lines has none.
+    PopupContent fits;
+    fits.title = {{"World Info", Tone::Normal}};
+    fits.sections.push_back(Travel(0));
+    CHECK(Of(LayoutPopup(fits, m, BarShape::Pills, false, Fake), PopupPiece::Kind::ScrollTrack).empty());
+}
+
 TEST(a_sockets_rows_keep_as_much_room_on_their_right_as_on_their_left)
 {
     const BarMetrics m = MetricsFor(36, BarShape::Pills);

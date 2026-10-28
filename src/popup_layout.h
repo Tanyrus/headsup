@@ -33,6 +33,8 @@ namespace headsup
             Fold,       // a fold row's arrow: pointing right while closed, down while open
             Socket,     // the sunken ground under the rows an open fold row holds
             Tab,        // a card's tab's chip, under its name; open while picked
+            ScrollTrack, // a scrolling socket's scrollbar, in its right padding
+            ScrollThumb, // and the part of it its shown lines are
         };
         Kind kind = Kind::Text;
         float x = 0.0f, y = 0.0f, width = 0.0f, height = 0.0f; // from the popup's top-left corner

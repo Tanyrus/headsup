@@ -238,7 +238,9 @@ TEST(a_popup_is_its_panel_and_each_piece_where_the_layout_put_it)
     arrow.open              = true;
     PopupPiece tab          = piece(PopupPiece::Kind::Tab, 24.0f, 104.0f, 50.0f, 21.0f);
     tab.open                = true;
-    layout.pieces           = {card, title, value, icon, mark, star, rule, tag, socket, arrow, time, tab};
+    const PopupPiece track  = piece(PopupPiece::Kind::ScrollTrack, 190.0f, 72.0f, 4.0f, 22.0f);
+    const PopupPiece thumb  = piece(PopupPiece::Kind::ScrollThumb, 190.0f, 76.4f, 4.0f, 7.1f);
+    layout.pieces           = {card, title, value, icon, mark, star, rule, tag, socket, arrow, time, tab, track, thumb};
     // The title's line box starts 2 px under where the layout put its line; the text's, at it.
     const PopupFaces faces = {PopupFace{"Marcellus SC", 24, 29, 0, 2.0f}, PopupFace{"Barlow Condensed", 18, 22, 0, 0.0f},
         PopupFace{"Marcellus SC", 15, 18, 0, 0.0f}, PopupFace{"Marcellus SC", 15, 18, 0, 0.0f}};
@@ -257,6 +259,9 @@ TEST(a_popup_is_its_panel_and_each_piece_where_the_layout_put_it)
     CHECK(Has(rml, "<div class=\"p rule\" style=\"left:60px;top:46px;width:100px;\"></div>"));
     CHECK(Has(rml, "<div class=\"p tag\" style=\"left:20px;top:80px;width:50px;height:21px;border-radius:10.5px;\"></div>"));
     CHECK(Has(rml, "<div class=\"p socket\" style=\"left:24px;top:70px;width:172px;height:26px;\"></div>"));
+    // A scrollbar's track and its thumb, both round at their ends.
+    CHECK(Has(rml, "<div class=\"p track\" style=\"left:190px;top:72px;width:4px;height:22px;border-radius:2px;\"></div>"));
+    CHECK(Has(rml, "<div class=\"p thumb\" style=\"left:190px;top:76px;width:4px;height:7px;border-radius:2px;\"></div>"));
     // The picked tab is lit.
     CHECK(Has(rml, "<div class=\"p tab lit\" style=\"left:24px;top:104px;width:50px;height:21px;border-radius:10.5px;\"></div>"));
     const std::string arrowTag = "<img class=\"p\" src=\"" + FoldSource(look.PopupColor(arrow.span), 9, true) +
@@ -280,6 +285,7 @@ TEST(the_popup_document_styles_its_faces_and_boxes_from_the_look)
     // An open fold's rows sit sunk into the card: darker, its upper edges dark and its lower ones lit.
     CHECK(Has(rml, ".socket{box-sizing:border-box;border:1px;border-color:#00000059 #ffffff14 #ffffff14 #00000059;"));
     CHECK(Has(rml, ".tab{") && Has(rml, ".tab.lit{"));
+    CHECK(Has(rml, ".track{") && Has(rml, ".thumb{"));
     // The panel: one fill top to bottom, the theme's faint edge, 0.28 of the popup's unit rounded.
     CHECK(Has(rml, "#panel{position:absolute;left:0px;top:0px;box-sizing:border-box;border:1px #d2abab33;"
                    "border-radius:12.6px;decorator:vertical-gradient(#180e0eff #180e0eff);}"));

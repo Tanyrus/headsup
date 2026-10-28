@@ -26,6 +26,7 @@ namespace headsup
         constexpr size_t kMostSideBySide  = 4; // groups of a tall grid's lines set side by side before a card goes on
         constexpr size_t kSideBySideAbove = 6; // the lines a grid has before it is set in groups
         constexpr size_t kSocketLines     = 10; // the lines a socket shows, the rest scrolling
+        constexpr float kScrollbar        = 0.25f; // a scrollbar's width
 
         std::string Upper(std::string text)
         {
@@ -94,6 +95,12 @@ namespace headsup
             };
             std::vector<Fold> folds;
             std::vector<size_t> sockets; // pieces to widen to the card's inside once its width is known
+            struct Anchor
+            {
+                size_t piece;
+                float fromRight; // its left edge, from the card's right
+            };
+            std::vector<Anchor> anchors; // pieces placed from the card's right once its width is known
             struct Scroll
             {
                 std::string key;
@@ -185,12 +192,24 @@ namespace headsup
                 size_t piece;
                 std::string key;
                 size_t lines = 0, shown = 0, from = 0, at = 0; // its lines, how many show, the first shown, the next
+                float top = 0.0f;                              // its first row's
             };
             std::optional<Socket> socket;
             const auto closeSocket = [&] {
                 if (!socket) return;
                 if (socket->shown < socket->lines)
                 {
+                    // A scrollbar down the right padding beside its rows, its thumb the share of them shown.
+                    const float bar   = std::max(1.0f, std::round(unit * kScrollbar));
+                    const float track = y - metrics.rowGap - socket->top;
+                    const float thumb = track * static_cast<float>(socket->shown) / static_cast<float>(socket->lines);
+                    const float down  = static_cast<float>(socket->from) / static_cast<float>(socket->lines - socket->shown);
+                    const float right = b.pad + (inset + bar) / 2.0f;
+                    b.anchors.push_back(Block::Anchor{b.pieces.size(), right});
+                    b.pieces.push_back(PopupPiece{PopupPiece::Kind::ScrollTrack, 0.0f, socket->top, bar, track, {}});
+                    b.anchors.push_back(Block::Anchor{b.pieces.size(), right});
+                    b.pieces.push_back(
+                        PopupPiece{PopupPiece::Kind::ScrollThumb, 0.0f, socket->top + (track - thumb) * down, bar, thumb, {}});
                     const Span where{std::to_string(socket->from + 1) + " to " + std::to_string(socket->from + socket->shown) +
                                          " of " + std::to_string(socket->lines) + kDot + "scroll for more",
                         Tone::Dim, 0};
@@ -248,6 +267,7 @@ namespace headsup
                     socket->from  = std::min(row.scrolled, socket->lines - socket->shown);
                     b.pieces.push_back(PopupPiece{PopupPiece::Kind::Socket, b.pad, y, 0.0f, 0.0f, {}});
                     y += socketPad;
+                    socket->top = y;
                 }
 
                 const size_t perLine = grid ? columns.size() : row.cells.size();
@@ -334,6 +354,8 @@ namespace headsup
                     b.pieces[i].x += width - b.pad - v.inset - v.right;
             for (const size_t socket : b.sockets)
                 b.pieces[socket].width = width - 2.0f * b.pad;
+            for (const Block::Anchor& anchor : b.anchors)
+                b.pieces[anchor.piece].x = width - anchor.fromRight;
             if (b.card) l.pieces.push_back(PopupPiece{PopupPiece::Kind::Card, x, y, width, b.height, {}, PopupFont::Text,
                             Icon::AggroNQ, line});
             for (PopupPiece& piece : b.pieces)
