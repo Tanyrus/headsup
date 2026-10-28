@@ -948,6 +948,9 @@ namespace headsup
                 case LineStylesRow::Padding:
                     form.SliderInt(label.c_str(), line.padding, kMinLinePadding, kMaxLinePadding, "%d px", n < kPlateLines - 1 ? tip : row.otherTip);
                     break;
+                case LineStylesRow::HorizontalOffset:
+                    form.SliderInt(label.c_str(), line.offset, kMinLineOffset, kMaxLineOffset, "%d px", tip);
+                    break;
                 case LineStylesRow::TextColor: form.ColorPickRow(label.c_str(), line.color, sources, tip); break;
                 case LineStylesRow::ShadowStrength:
                     form.SliderPercent(label.c_str(), line.shadow, kMinShadow, kMaxShadow, tip);

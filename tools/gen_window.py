@@ -144,8 +144,8 @@ PIECES = Pieces(
         'unused-tags': Setting(entity=True, unnamed=True),
         'line-styles': Setting(entity=True, unnamed=True, rows=rows(
             'sync-line-style', 'line-visibility', 'alignment', 'font', 'font-style', 'text-size', 'icon-size', 'padding',
-            'text-color', 'shadow-strength', 'shadow-color', 'glow-strength', 'glow-size', 'glow-color',
-            'disable-glow-in-combat'), row_extra={'padding': 'tipBottomLine'},
+            'horizontal-offset', 'text-color', 'shadow-strength', 'shadow-color', 'glow-strength', 'glow-size',
+            'glow-color', 'disable-glow-in-combat'), row_extra={'padding': 'tipBottomLine'},
             words={'do-not-sync': True, 'sync-with': True, 'uses-style': True}),
         'ornament': Setting(entity=True, unnamed=True, rows=rows('visibility', 'width', 'height', 'color')),
         'no-target': Setting(), 'not-targeted': Setting(), 'is-targeted': Setting(), 'fade-in': Setting(),

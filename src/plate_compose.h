@@ -44,6 +44,7 @@ namespace headsup
         uint8_t style    = 0; // FontStyle bits
         float textSize   = 0.0f, iconSize = 0.0f;
         float padding    = 0.0f;
+        float offset     = 0.0f;
         uint32_t color   = 0;
         float shadow     = 0.0f;
         uint32_t shadowColor = 0;

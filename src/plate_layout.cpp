@@ -99,7 +99,7 @@ namespace headsup
             case Align::Center: place.left = layout.centerX - width / 2.0f; break;
             case Align::Right: place.left = std::max(starts, ends); break;
             }
-            place.left -= Hang(lines[i], true);
+            place.left += lines[i].offset - Hang(lines[i], true);
         }
 
         if (!lines.empty()) layout.lines.back().top = anchor.CenterY() - layout.lines.back().height / 2.0f;
@@ -246,6 +246,7 @@ namespace headsup
         const bool bottom   = line.source == kBottomLine;
         into.padBelow       = !bottom && line.lastRow ? line.look.padding * scale : 0.0f;
         into.padAbove       = bottom && line.row == 0 ? line.look.padding * scale : 0.0f;
+        into.offset         = line.look.offset * scale;
         into.ornamentWidth  = 0.0f;
         into.ornamentHeight = 0.0f;
         into.ornamentUnder  = false;

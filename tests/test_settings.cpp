@@ -1444,6 +1444,7 @@ TEST(every_designer_key_round_trips)
     line.color    = ColorPick{ColorSource::Claim};
     line.shadow   = 40;
     line.padding  = 7;
+    line.offset   = -12;
     line.shadowColor   = ColorPick{ColorSource::Custom, {{0.4f, 0.5f, 0.6f}}};
     line.glow          = 120;
     line.glowSize      = 70;
@@ -2483,10 +2484,14 @@ TEST(a_kinds_lines_and_ornament_are_bounded_and_a_condition_its_page_does_not_of
     LineDesign& mobs   = s.Kind(PlateKind::Mobs).lines[0];
     mobs.padding       = -9;
     mobs.show.when     = ConditionBit(ShowCondition::OwnerIsYou) | ConditionBit(ShowCondition::TooWeak);
+    pets.offset        = kMaxLineOffset + 1;
+    mobs.offset        = kMinLineOffset - 30;
     s.Kind(PlateKind::Npcs).ornament.place = static_cast<OrnamentPlace>(42);
     const Settings bounded = Clamp(s);
     CHECK_EQ(bounded.Kind(PlateKind::Pets).lines[0].padding, kMaxLinePadding);
     CHECK_EQ(bounded.Kind(PlateKind::Mobs).lines[0].padding, kMinLinePadding);
+    CHECK_EQ(bounded.Kind(PlateKind::Pets).lines[0].offset, kMaxLineOffset);
+    CHECK_EQ(bounded.Kind(PlateKind::Mobs).lines[0].offset, kMinLineOffset);
     s.Kind(PlateKind::Mobs).lines[0].padding = -3; // a line may sink into the one under it
     CHECK_EQ(Clamp(s).Kind(PlateKind::Mobs).lines[0].padding, -3);
     // A pet's page asks whose it is and a mob's whether it is too weak, and neither asks the other's.

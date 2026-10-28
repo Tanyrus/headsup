@@ -972,6 +972,19 @@ TEST(a_line_carries_its_padding_and_a_synced_line_the_one_it_borrows)
     CHECK_EQ(plate.lines[2].look.padding, 6.0f);
 }
 
+TEST(a_line_carries_its_offset_and_a_synced_line_the_one_it_borrows)
+{
+    Settings s;
+    KindSettings& mobs = s.Kind(PlateKind::Mobs);
+    mobs.lines[0].offset   = -20;
+    mobs.lines[1].offset   = 15;
+    mobs.lines[2].syncWith = 1;
+    const ComposedPlate plate = ComposePlate(AggressiveMob(), kPlayer, s, kGame);
+    CHECK_EQ(plate.lines[0].look.offset, -20.0f);
+    CHECK_EQ(plate.lines[1].look.offset, 15.0f);
+    CHECK_EQ(plate.lines[2].look.offset, 15.0f);
+}
+
 TEST(a_lines_shadow_at_100_percent_is_one_and_a_half_of_the_mockups)
 {
     Settings s;

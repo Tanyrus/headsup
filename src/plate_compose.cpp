@@ -42,6 +42,7 @@ namespace headsup
             look.textSize    = BasePixels(s, d.textSize);
             look.iconSize    = static_cast<float>(s.baseIconSize) * static_cast<float>(d.iconSize) / kPercent;
             look.padding     = static_cast<float>(d.padding);
+            look.offset      = static_cast<float>(d.offset);
             look.color       = ResolveColor(d.color, state, s.palette, gameArgb);
             look.shadow      = static_cast<float>(d.shadow) / kPercent * kShadowUnit;
             look.shadowColor = ResolveColor(d.shadowColor, state, s.palette, gameArgb);

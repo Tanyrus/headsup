@@ -269,7 +269,7 @@ namespace headsup
         constexpr const char *kTextKey = "Text", *kSyncKey = "Sync", *kAlwaysKey = "Always", *kWhenKey = "When",
                              *kAlignKey = "Align", *kFontKey = "Font", *kStyleKey = "Style", *kBoldKey = "Bold",
                              *kTextSizeKey = "TextSize", *kIconScaleKey = "IconScale", *kIconSizeKey = "IconSize",
-                             *kPaddingKey = "Padding", *kShadowStrengthKey = "ShadowStrength", *kShadowKey = "Shadow",
+                             *kPaddingKey = "Padding", *kOffsetKey = "Offset", *kShadowStrengthKey = "ShadowStrength", *kShadowKey = "Shadow",
                              *kShadowColorKey = "ShadowColor", *kGlowKey = "Glow", *kGlowSizeKey = "GlowSize",
                              *kGlowColorKey = "GlowColor";
         constexpr const char *kVisibilityKey = "Visibility", *kWidthKey = "Width", *kHeightKey = "Height";
@@ -446,6 +446,7 @@ namespace headsup
             line.iconSize = Rebased(store, key(kIconScaleKey), key(kIconSizeKey), line.iconSize,
                 [&](float before) { return before * iconShare; });
             line.padding = LoadInt(store, key(kPaddingKey).c_str(), line.padding);
+            line.offset  = LoadInt(store, key(kOffsetKey).c_str(), line.offset);
             LoadPick(store, key(kColorKey), line.color);
             line.shadow = Rebased(store, key(kShadowStrengthKey), key(kShadowKey), line.shadow, ShadowStrengthOf);
             LoadPick(store, key(kShadowColorKey), line.shadowColor);
@@ -467,6 +468,7 @@ namespace headsup
             StoreFloat(store, key(kTextSizeKey), static_cast<float>(line.textSize));
             StoreFloat(store, key(kIconScaleKey), static_cast<float>(line.iconSize));
             StoreFloat(store, key(kPaddingKey), static_cast<float>(line.padding));
+            StoreFloat(store, key(kOffsetKey), static_cast<float>(line.offset));
             SavePick(store, key(kColorKey), line.color);
             StoreFloat(store, key(kShadowStrengthKey), static_cast<float>(line.shadow));
             SavePick(store, key(kShadowColorKey), line.shadowColor);
@@ -1102,6 +1104,7 @@ namespace headsup
             line.textSize  = std::clamp(Stepped(line.textSize, kPercentStep), kMinSizePercent, kMaxSizePercent);
             line.iconSize  = std::clamp(Stepped(line.iconSize, kPercentStep), kMinSizePercent, kMaxSizePercent);
             line.padding   = std::clamp(line.padding, kMinLinePadding, kMaxLinePadding);
+            line.offset    = std::clamp(line.offset, kMinLineOffset, kMaxLineOffset);
             line.shadow    = std::clamp(Stepped(line.shadow, kPercentStep), kMinShadow, kMaxShadow);
             line.glow      = std::clamp(Stepped(line.glow, kPercentStep), kMinGlow, kMaxGlow);
             line.glowSize  = std::clamp(Stepped(line.glowSize, kPercentStep), kMinGlowSize, kMaxGlowSize);

@@ -131,6 +131,23 @@ TEST(lines_align_against_the_bottom_line)
     CHECK_EQ(w.lines[1].left, 70.0f);
 }
 
+TEST(a_lines_offset_moves_it_from_where_its_alignment_puts_it)
+{
+    // As in lines_align_against_the_bottom_line: the bottom line runs from 70 to 130. Each offset moves its own line
+    // alone, the bottom line's too, and the others still align against where the bottom line would be.
+    std::vector<LineInput> lines{Text({{40.0f, 10.0f}}, Align::Left), Text({{40.0f, 10.0f}}, Align::Right),
+        Text({{60.0f, 10.0f}})};
+    lines[0].offset = 12.0f;
+    lines[1].offset = -7.0f;
+    lines[2].offset = 5.0f;
+    const PlateLayout l = LayoutPlate(Anchor(), lines, 0.0f, 0.0f, 0.5f, 0, 0.0f);
+    CHECK_EQ(l.lines[0].left, 70.0f + 12.0f);
+    CHECK_EQ(l.lines[1].left, 130.0f - 40.0f - 7.0f);
+    CHECK_EQ(l.lines[2].left, 70.0f + 5.0f);
+    CHECK_EQ(l.lines[0].items[0].x, l.lines[0].left);
+    CHECK_EQ(l.lines[2].items[0].x, l.lines[2].left);
+}
+
 TEST(icons_at_a_lines_ends_hang_outside_its_text_which_centers_alone)
 {
     // Centered on the name at 100: a 60 px text, from 70 to 130, with a 16 px icon before it, after it or both.
@@ -332,6 +349,16 @@ TEST(a_row_mixing_plain_and_badged_icons_steps_past_each_by_its_own_width)
     // The last icon's place, its width and its badge's overhang are the row's width: drawn as measured.
     CHECK(Near(IconOffset(4, 2, 16.0f) + 16.0f + 5.6f, IconRunWidth(5, 3, 16.0f)));
     CHECK(Near(IconOffset(2, 0, 24.0f) + 24.0f, IconRunWidth(3, 0, 24.0f)));
+}
+
+TEST(a_measured_lines_offset_grows_with_the_distance_scale)
+{
+    const std::vector<ItemSize> texts{{60.0f, 17.0f}};
+    ComposedLine line = Line({TextItem("Lv 20")}, 13.0f, 16.0f);
+    line.look.offset  = -6.0f;
+    LineInput in;
+    MeasureLine(line, texts, 1.5f, in);
+    CHECK_EQ(in.offset, -9.0f);
 }
 
 TEST(a_broken_lines_padding_is_under_its_last_row_and_the_bottom_lines_over_its_first)

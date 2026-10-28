@@ -616,6 +616,7 @@
               {"key": "text-size", "name": "Text Size", "tip": "A percentage of the base font size set in the Entities/Nameplates section."},
               {"key": "icon-size", "name": "Icon Size", "tip": "A percentage of the icon font size set in the Entities/Nameplates section."},
               {"key": "padding", "name": "Padding", "tip": "Adds extra space between this line and the one below it.", "tipBottomLine": "Adds extra space between this line and the ones above it."},
+              {"key": "horizontal-offset", "name": "Horizontal Offset", "tip": "Moves this line left or right from where its alignment puts it. The other lines stay where they are."},
               {"key": "text-color", "name": "Text Color", "tip": "The color of text on this line. Can be custom, or it can be automatically colored based on the entity's state."},
               {"key": "shadow-strength", "name": "Shadow Strength", "tip": "The strength of a shadow drawn behind the text to make it more readable. If set to 0%, the shadow is disabled."},
               {"key": "shadow-color", "name": "Shadow Color"},
