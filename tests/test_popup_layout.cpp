@@ -408,8 +408,10 @@ TEST(tabs_are_one_width_spread_across_the_card_in_one_row_or_two)
         PopupContent c;
         c.title = {{"World Info", Tone::Normal}};
         PopupSection s{"Guilds", {}};
+        // A row wider than all the tabs side by side, so they have room to spread into.
+        const std::string wide(130, 'w');
         for (const char* name : names)
-            s.tabs.push_back(PopupTab{Text(name), {Labeled("Open", Text("1 of 2"))}});
+            s.tabs.push_back(PopupTab{Text(name), {Labeled("Open", Text("1 of 2")), LineOf(wide)}});
         c.sections.push_back(s);
         return LayoutPopup(c, m, BarShape::Pills, false, Fake);
     };
