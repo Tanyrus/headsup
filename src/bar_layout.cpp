@@ -386,6 +386,11 @@ namespace headsup
             for (const BarFold& fold : m_Folds)
                 if (fold.rect.Contains(x, y))
                 {
+                    if (!fold.tab.empty())
+                    {
+                        m_Tabs[fold.key] = fold.tab;
+                        return true;
+                    }
                     if (const auto open = std::ranges::find(m_OpenFolds, fold.key); open != m_OpenFolds.end())
                         m_OpenFolds.erase(open);
                     else

@@ -472,7 +472,7 @@ namespace headsup
         m_Popup->SetClass(kHiddenClass, hidden);
         m_Popup->SetClass(kOpenClass, !hidden);
         for (const PopupFold& fold : pl.folds)
-            folds.push_back(BarFold{fold.key, BarRect{rect.x + fold.x, rect.y + fold.y, fold.width, fold.height}});
+            folds.push_back(BarFold{fold.key, BarRect{rect.x + fold.x, rect.y + fold.y, fold.width, fold.height}, fold.tab});
         return rect;
     }
 

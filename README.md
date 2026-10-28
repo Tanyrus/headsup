@@ -270,7 +270,7 @@ A bar of widgets across the top of the screen, on by default, with these widgets
 | Widget | Shows | Hover for |
 |---|---|---|
 | Zone | The zone's name, its region and who holds it | The zone's ID and region; in a conquest region, each nation's and the beastmen's share of this week's influence there, the largest first, with a star beside whoever holds it, and the time to the tally |
-| Weather | The weather now, with its element, and today's chance of it | A five-day forecast, starting today, and By Element: how many zones can roll each element today and tomorrow, and which ones, with their chances |
+| Weather | The weather now, with its element, and today's chance of it | A five-day forecast, starting today, and By Element: a tab for each element, with how many zones can roll it today and tomorrow, and which ones, with their chances |
 | Vana'diel | The weekday in its element's color, the time and moon | The date, and when the day and moon change |
 | Job | Your jobs and levels, and the EXP to your next level (your merits at 75), over a bar of it; its Layout can put the EXP first, as the larger line, or show the EXP alone | EXP per hour, the time to level, limit points |
 | EXP | Your EXP and its bar, on its own; Earned, To Next and Percent can each go above, below, left or right of the bar | EXP per hour, the time to level, limit points |
@@ -278,7 +278,7 @@ A bar of widgets across the top of the screen, on by default, with these widgets
 | Signet | The time left on Signet or Sanction, only while one is on | What it gives and whether it works where you are |
 | Distance | How far your target is, in yalms | Nothing |
 | Conquest | How many regions each nation holds, for the nations its Nations filter picks | Which regions each holds, marking the ones your nation holds that you have not run supplies to |
-| World Info | What its Shows picks, with a countdown: the next departure of a ship you pick, when an element's weather can next roll in your zone, a guild's hours, the RSE or the moon | The parts its Popup picks: each kind of ship with the next to leave, each guild with how many of its shops are open, and a calendar of the RSE, the moons and the conquest tally |
+| World Info | What its Shows picks, with a countdown: the next departure of a ship you pick, when an element's weather can next roll in your zone, a guild's hours, the RSE or the moon | The parts its Popup picks: a tab for each kind of ship with its routes, each guild with how many of its shops are open, and a calendar of the RSE, the moons and the conquest tally |
 | Target | A monster's name in its border color, its level and con | Its jobs, weaknesses, resistances, absorbs, immunities, tags, stats, TP moves, spells, spawn, drops at Treasure Hunter 0 and what can be stolen; for an NPC or ??? in Phoenix's NPC data, what it is for, when it appears, what clicking it says and does, its shop, what to trade it, what it pops and gives, the key items it gives and checks for, and its quests, missions and battlefields; for a player you checked, their jobs, master level, linkshell and title, as of your check |
 | Gil | Your gil, or the currency picked in its section | Gil and every currency you have |
 | Bags | Your inventory's used and maximum space | Every bag you have |
@@ -304,9 +304,9 @@ and so on down from there. With Game Help on, the game's own help bar goes under
 help bar has an X and Y offset of its own, in screen pixels, in its card. Unloading HeadsUp puts every open window it moved back where the game put it.
 
 Hover a widget to open its details. Click it to keep them open; click it again to let them close once the pointer leaves
-the widget and its popup. A row with an arrow opens when you click it, to show what is under it, such as a kind of ship's
-routes, a guild's shops or the zones that can roll an element, and closes on the next click. Open rows stay open until
-you reload HeadsUp.
+the widget and its popup. A row with an arrow, such as a guild, opens when you click it to show what is under it, and
+closes on the next click. A card with tabs, such as Travel or By Element, shows the tab you click. A popup keeps its
+width as you do either, and grows down. Open rows and picked tabs stay that way until you reload HeadsUp.
 
 The server only tells you your own zone's weather. By Element goes by Phoenix's weather calendar instead: each zone
 has up to three weathers it can roll each day, with their chances, so a zone listed for Fire today can roll a Fire

@@ -7,6 +7,7 @@
 #include "plate_image.h"
 
 #include <array>
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -102,11 +103,12 @@ namespace headsup
     // widget losing its popup, closes it, and the pointer crossing the gap between them does not. A left press on a
     // widget pins its popup, or unpins it if it was pinned; a left press on the open popup toggles its pin too. While
     // a popup is pinned, hovering another shows that one until the pointer leaves.
-    // A fold row of the open popup, where it was drawn on the screen.
+    // A fold row of the open popup, where it was drawn on the screen, or a tab of one of its cards.
     struct BarFold
     {
         std::string key;
         BarRect rect;
+        std::string tab{}; // a tab's name, key being its card's heading
     };
 
     class BarInput
@@ -126,6 +128,8 @@ namespace headsup
         bool Press(float x, float y, bool left);
         // The fold rows opened since loading, by their keys, in the order they were opened.
         const std::vector<std::string>& OpenFolds() const { return m_OpenFolds; }
+        // The tab picked last in each card since loading, by the card's heading.
+        const std::map<std::string, std::string>& PickedTabs() const { return m_Tabs; }
         bool Over(float x, float y) const;
         // Inside the open popup, which is drawn over Ashita's windows.
         bool InPopup(float x, float y) const { return Open() && m_Popup.Contains(x, y); }
@@ -151,6 +155,7 @@ namespace headsup
         BarRect m_Popup;
         std::vector<BarFold> m_Folds;
         std::vector<std::string> m_OpenFolds;
+        std::map<std::string, std::string> m_Tabs;
         float m_X = kAway, m_Y = kAway;
         std::optional<PanelWidget> m_Under;  // the widget under the pointer
         std::optional<PanelWidget> m_Hover;  // the popup hovering keeps open

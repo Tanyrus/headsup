@@ -608,7 +608,7 @@ TEST(the_reroll_note_is_in_earth_minutes_and_left_out_where_the_weather_never_ch
     CHECK(Joined(forecast->rows[0].cells[1].text) == "Stellar Glare 100%");
 }
 
-TEST(the_weather_popup_folds_each_element_over_the_zones_that_can_roll_it_today_and_tomorrow)
+TEST(the_weather_popup_has_a_tab_for_each_element_of_the_zones_that_can_roll_it_today_and_tomorrow)
 {
     Settings settings;
     BarState state;
@@ -616,24 +616,24 @@ TEST(the_weather_popup_folds_each_element_over_the_zones_that_can_roll_it_today_
     state.unixMs = kVanaEpochUnixMs + 777LL * 3456 * 1000; // day 777
     const uint32_t today = 777;
     const auto byElement = [&] { return *Section(BarPopupContent(BarWidget::Weather, state, settings), "By Element"); };
-    // Closed, a row an element: how many zones can roll it today, and tomorrow.
-    const PopupSection closed = byElement();
-    CHECK_EQ(closed.rows.size(), static_cast<size_t>(kElementCount));
-    const std::vector<std::string> lines = Lines(closed);
+    const PopupSection fire = byElement();
+    CHECK_EQ(fire.tabs.size(), static_cast<size_t>(kElementCount));
+    CHECK(fire.tab == 0);
     for (int e = 0; e < kElementCount; ++e)
     {
         const auto element = static_cast<Element>(e);
-        CHECK(closed.rows[e].fold == ElementName(element) && !closed.rows[e].open);
-        CHECK_EQ(lines[e], std::string(ElementName(element)) + " " + std::to_string(ZonesRolling(element, today).size()) +
-                               " zones today" + kDot + std::to_string(ZonesRolling(element, today + 1).size()) + " tomorrow");
+        CHECK(fire.tabs[e].name.text == ElementName(element) && fire.tabs[e].name.argb == ElementColor(element));
+        // Its first row: how many zones can roll it today, and tomorrow.
+        CHECK_EQ(Lines(PopupSection{"", fire.tabs[e].rows}).front(),
+            "Zones " + std::to_string(ZonesRolling(element, today).size()) + " today" + kDot +
+                std::to_string(ZonesRolling(element, today + 1).size()) + " tomorrow");
     }
-    // Open, a grid of the zones that can roll it either day, today's likeliest first, then tomorrow's.
-    state.openFolds = {"Ice"};
-    const PopupSection open = byElement();
-    const size_t ice = static_cast<size_t>(Element::Ice);
-    CHECK(open.rows[ice].open && open.rows.size() == closed.rows.size() + 1);
-    const PopupRow& grid = open.rows[ice + 1];
-    CHECK(grid.nested && grid.kind == RowKind::Grid && grid.columns == 3);
+    // Then a grid of the zones that can roll it either day, today's likeliest first, then tomorrow's.
+    state.pickedTabs["By Element"] = "Ice";
+    const PopupSection ice = byElement();
+    CHECK_EQ(ice.tab, static_cast<size_t>(Element::Ice));
+    const PopupRow& grid = ice.tabs[ice.tab].rows.back();
+    CHECK(grid.nested && grid.header && grid.kind == RowKind::Grid && grid.columns == 3);
     std::map<uint16_t, std::pair<int, int>> chance; // today's and tomorrow's
     for (const ZoneRoll& roll : ZonesRolling(Element::Ice, today))
         chance[roll.zone].first = roll.percent;
@@ -662,16 +662,17 @@ TEST(the_weather_popup_folds_each_element_over_the_zones_that_can_roll_it_today_
     CHECK_EQ(Joined(grid.cells[3 * (row + 1) + 1].text), shares);
 }
 
-TEST(the_weather_popup_with_every_element_open_keeps_every_zone_on_a_1080_screen)
+TEST(the_weather_popups_longest_element_keeps_every_zone_on_a_1080_screen)
 {
-    // Every zone of every element, open at once: more than a 1080 px screen holds in one column. Nothing is cut; the
-    // cards go on in more columns.
+    // The element that most zones can roll, picked: more than a 1080 px screen holds in one column. Nothing is cut.
     Settings settings;
     BarState state;
     state.zone   = 103;
     state.unixMs = kVanaEpochUnixMs + 777LL * 3456 * 1000;
+    Element most = Element::Fire;
     for (int e = 0; e < kElementCount; ++e)
-        state.openFolds.push_back(ElementName(static_cast<Element>(e)));
+        if (ZonesRolling(static_cast<Element>(e), 777).size() > ZonesRolling(most, 777).size()) most = static_cast<Element>(e);
+    state.pickedTabs["By Element"] = ElementName(most);
     const PopupContent popup = BarPopupContent(BarWidget::Weather, state, settings);
     const BarMetrics m       = MetricsFor(45, BarShape::Pills);
     const auto measure       = [](const Span& span, PopupFont font) {
@@ -683,14 +684,10 @@ TEST(the_weather_popup_with_every_element_open_keeps_every_zone_on_a_1080_screen
     const size_t all = l.pieces.size();
     CutPopup(l, room, m.popupPadding);
     CHECK(l.height <= room + 0.01f && l.pieces.size() == all);
-    size_t zones = 0;
-    for (const PopupPiece& piece : l.pieces)
-        for (uint16_t id = 1; const ZoneRecord* zone = ZoneById(id); ++id)
-            zones += piece.span.text == zone->name;
-    size_t expected = 0;
-    for (const PopupRow& row : Section(popup, "By Element")->rows)
-        if (row.kind == RowKind::Grid) expected += row.cells.size() / 3 - 1;
-    CHECK(expected > 0 && zones >= expected);
+    const PopupSection& section = *Section(popup, "By Element");
+    const PopupRow& grid        = section.tabs[section.tab].rows.back();
+    for (size_t i = 3; i < grid.cells.size(); i += 3)
+        CHECK(std::ranges::any_of(l.pieces, [&](const PopupPiece& p) { return p.span.text == Joined(grid.cells[i].text); }));
 }
 
 TEST(a_zone_without_a_calendar_or_weather_hides_the_widget)
@@ -2181,50 +2178,38 @@ TEST(the_world_info_popup_has_the_parts_you_picked)
     CHECK_EQ(lines[4], "Conquest Tally in " + Countdown(SecondsToTally(kEarthsdayTen)));
 }
 
-TEST(each_kind_of_ship_folds_its_routes_under_the_next_to_leave)
+TEST(each_kind_of_ship_has_a_tab_of_its_routes)
 {
     BarState state;
     state.unixMs = kEarthsdayTen;
     Settings settings = WorldShowing(WorldLine::Departure);
     settings.Widget(BarWidget::World).worldSections = WorldBit(WorldSection::Travel);
     const auto travel = [&] { return BarPopupContent(BarWidget::World, state, settings).sections.at(0); };
-    // Closed, a row a kind, each telling when its next ship leaves.
-    PopupSection closed = travel();
-    CHECK_EQ(closed.heading, "Travel");
+    // A tab a kind, the first picked until another is.
+    const PopupSection first = travel();
+    CHECK_EQ(first.heading, "Travel");
     std::vector<std::string> kinds;
-    for (const PopupRow& row : closed.rows)
-    {
-        CHECK(!row.fold.empty() && !row.open && !row.nested);
-        kinds.push_back(row.fold);
-    }
+    for (const PopupTab& tab : first.tabs)
+        kinds.push_back(tab.name.text);
     CHECK((kinds == std::vector<std::string>{"Airships", "Boats", "Manaclipper", "Barge"}));
-    // The airship that leaves first: every one leaves within a cycle, so the soonest is the least time to leave.
-    double soonest = 1e9;
-    std::string first;
-    for (const TravelRoute& route : TravelRoutes())
-        if (std::string(route.group) == "Airships" && NextSailing(route, state.unixMs).leaveIn < soonest)
-        {
-            soonest = NextSailing(route, state.unixMs).leaveIn;
-            first   = route.name;
-        }
-    const std::vector<std::string> shut = Lines(closed);
-    CHECK_EQ(shut[0].rfind("Airships ", 0), static_cast<size_t>(0));
-    CHECK(shut[0].find(first) != std::string::npos);
-    // Open, its routes follow it, under it.
-    state.openFolds = {"Airships"};
-    const PopupSection open = travel();
-    CHECK(open.rows[0].open && open.rows[1].nested);
-    const std::vector<std::string> routes = Lines(open);
-    CHECK(std::ranges::find(routes, "Jeuno to San d'Oria Boards in 5:16") != routes.end());
+    CHECK(first.tab == 0 && first.rows.empty());
+    // Each tab lists its kind's routes, set in.
     const auto airships = std::ranges::count_if(TravelRoutes(), [](const TravelRoute& r) { return std::string(r.group) == "Airships"; });
-    CHECK_EQ(open.rows.size(), closed.rows.size() + static_cast<size_t>(airships));
+    CHECK_EQ(first.tabs[0].rows.size(), static_cast<size_t>(airships));
+    for (const PopupRow& row : first.tabs[0].rows)
+        CHECK(row.nested);
+    const std::vector<std::string> routes = Lines(PopupSection{"", first.tabs[0].rows});
+    CHECK(std::ranges::find(routes, "Jeuno to San d'Oria Boards in 5:16") != routes.end());
+    // Picking Boats picks its tab.
+    state.pickedTabs["Travel"] = "Boats";
+    CHECK_EQ(travel().tab, static_cast<size_t>(1));
+    state.pickedTabs["Travel"] = "Airships";
     state.unixMs = kVanaEpochUnixMs + 864LL * 1000 + 100 * 1000; // 100 s into a cycle: its door opened at 28 s
-    const std::vector<std::string> boarding = Lines(travel());
+    const std::vector<std::string> boarding = Lines(PopupSection{"", travel().tabs[0].rows});
     CHECK(std::ranges::find(boarding, std::string("Jeuno to San d'Oria Boarding") + kDot + "leaves in 1:22") != boarding.end());
     // The time is a span of its own, so only it moves as it ticks.
-    state.unixMs = kEarthsdayTen;
-    for (const PopupRow& row : travel().rows)
-        if (row.nested) CHECK(row.cells.back().text.back().text.find(' ') == std::string::npos);
+    for (const PopupRow& row : travel().tabs[0].rows)
+        CHECK(row.cells.back().text.back().text.find(' ') == std::string::npos);
 }
 
 TEST(each_guild_folds_its_shops_under_how_many_are_open)
@@ -2248,14 +2233,22 @@ TEST(each_guild_folds_its_shops_under_how_many_are_open)
     }
     const PopupSection closed = guilds();
     CHECK_EQ(closed.heading, "Guilds");
-    CHECK_EQ(closed.rows.size(), names.size());
+    // Each closed guild's shops are there but hidden, so the card is as wide closed as open.
+    std::vector<const PopupRow*> shown;
+    for (const PopupRow& row : closed.rows)
+        if (!row.hidden) shown.push_back(&row);
+        else CHECK(row.nested);
+    CHECK_EQ(shown.size(), names.size());
+    CHECK_EQ(closed.rows.size(), 2 * names.size());
     for (size_t i = 0; i < names.size(); ++i)
-        CHECK(closed.rows[i].fold == names[i] && !closed.rows[i].open);
-    CHECK_EQ(Lines(closed).back(), "Woodworking " + std::to_string(woodworkingOpen) + " of " + std::to_string(woodworking) + " open");
+        CHECK(shown[i]->fold == names[i] && !shown[i]->open);
+    CHECK_EQ(Lines(PopupSection{"", {*shown.back()}}).front(),
+        "Woodworking " + std::to_string(woodworkingOpen) + " of " + std::to_string(woodworking) + " open");
     // Open, its shops follow it: each one's hours, then who and where.
     state.openFolds = {"Woodworking"};
     const PopupSection open = guilds();
-    CHECK(open.rows.back().nested && open.rows.back().kind == RowKind::Grid && open.rows.back().columns == 2);
+    CHECK(open.rows.back().nested && !open.rows.back().hidden && open.rows.back().kind == RowKind::Grid &&
+          open.rows.back().columns == 2);
     const std::vector<PopupCell>& cells = open.rows.back().cells;
     CHECK_EQ(cells.size(), static_cast<size_t>(2 * woodworking));
     const auto at = std::ranges::find_if(cells, [](const PopupCell& c) { return Joined(c.text) == "Chaupire, Northern San d'Oria"; });

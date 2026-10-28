@@ -227,6 +227,104 @@ TEST(a_fold_row_has_its_arrow_and_its_whole_row_to_click_and_the_rows_it_holds_s
     CHECK(cut.folds.empty());
 }
 
+namespace
+{
+    // Travel's tabs: two airship routes, and boats with a long route name and more of them.
+    PopupSection Travel(size_t picked)
+    {
+        PopupSection s{"Travel", {}};
+        PopupTab airships{Text("Airships"), {}};
+        for (const char* route : {"Jeuno to Bastok", "Bastok to Jeuno"})
+            airships.rows.push_back(Labeled(route, Text("Boards in 1:24")));
+        PopupTab boats{Text("Boats"), {}};
+        for (const char* route : {"Selbina to Mhaura, the long way round", "Mhaura to Selbina", "Whitegate to Nashmau",
+                 "Nashmau to Whitegate"})
+            boats.rows.push_back(Labeled(route, Text("Boards in 2:23")));
+        s.tabs = {airships, boats};
+        s.tab  = picked;
+        return s;
+    }
+}
+
+TEST(a_card_with_tabs_shows_the_picked_ones_rows_under_its_tabs_at_one_width)
+{
+    const BarMetrics m = MetricsFor(36, BarShape::Pills);
+    std::vector<float> widths, heights;
+    for (const size_t picked : {0u, 1u})
+    {
+        PopupContent c;
+        c.title = {{"World Info", Tone::Normal}};
+        c.sections.push_back(Travel(picked));
+        const PopupLayout l = LayoutPopup(c, m, BarShape::Pills, false, Fake);
+        CHECK(AllInside(l, m));
+        const std::vector<const PopupPiece*> tabs = Of(l, PopupPiece::Kind::Tab);
+        CHECK_EQ(tabs.size(), static_cast<size_t>(2));
+        CHECK(tabs[picked]->open && !tabs[1 - picked]->open);
+        // Each tab is a place to click, by the card's heading and the tab's name, over its frame.
+        CHECK_EQ(l.folds.size(), static_cast<size_t>(2));
+        for (size_t i = 0; i < 2; ++i)
+            CHECK(l.folds[i].key == "Travel" && l.folds[i].tab == (i == 0 ? "Airships" : "Boats") &&
+                  Near(l.folds[i].x, tabs[i]->x) && Near(l.folds[i].y, tabs[i]->y) && Near(l.folds[i].width, tabs[i]->width));
+        // Only the picked tab's rows, under the tabs.
+        CHECK((Find(l, "Jeuno to Bastok ") != nullptr) == (picked == 0));
+        CHECK((Find(l, "Mhaura to Selbina ") != nullptr) == (picked == 1));
+        const PopupPiece& row = *Find(l, picked == 0 ? "Jeuno to Bastok " : "Mhaura to Selbina ");
+        CHECK(row.y > tabs[0]->y + tabs[0]->height);
+        widths.push_back(Of(l, PopupPiece::Kind::Card).front()->width);
+        heights.push_back(l.height);
+    }
+    // As wide for either tab, the widest; as tall as the picked one's rows.
+    CHECK(Near(widths[0], widths[1]) && heights[1] > heights[0]);
+}
+
+TEST(cards_keep_their_columns_whichever_tab_is_picked)
+{
+    const BarMetrics m = MetricsFor(36, BarShape::Pills);
+    std::vector<std::vector<float>> places;
+    for (const size_t picked : {0u, 1u})
+    {
+        PopupContent c;
+        c.title = {{"World Info", Tone::Normal}};
+        // Short airships and many boats: by their heights alone, the two tabs would split the cards differently.
+        PopupSection travel = Travel(picked);
+        for (int i = 0; i < 12; ++i)
+            travel.tabs[1].rows.push_back(Labeled("Boat " + std::to_string(i), Text("Boards in 2:23")));
+        c.sections.push_back(travel);
+        for (const char* heading : {"One", "Two", "Three"})
+        {
+            PopupSection card{heading, {}};
+            for (int i = 0; i < 5; ++i)
+                card.rows.push_back(Labeled("Row " + std::to_string(i), Text("in 1:00")));
+            c.sections.push_back(card);
+        }
+        std::vector<float> place; // each card's left: its column
+        for (const PopupPiece* card : Of(LayoutPopup(c, m, BarShape::Pills, false, Fake), PopupPiece::Kind::Card))
+            place.push_back(card->x);
+        places.push_back(place);
+    }
+    // The longer tab grows the card down where it is: the cards stay in their columns.
+    CHECK(places[0].size() == 4 && places[0] == places[1]);
+}
+
+TEST(a_hidden_row_widens_its_card_and_is_not_drawn)
+{
+    const BarMetrics m = MetricsFor(36, BarShape::Pills);
+    PopupContent c;
+    c.title = {{"Guilds", Tone::Normal}};
+    PopupRow guild = Labeled("Fishing", Text("2 of 9 open"));
+    guild.fold     = "Fishing";
+    c.sections.push_back(PopupSection{"Guilds", {guild}});
+    const PopupLayout without = LayoutPopup(c, m, BarShape::Pills, false, Fake);
+    PopupRow shops{RowKind::Grid, 1, {Word("Mep Nhapopoluko, Bibiki Bay, and a long way past it")}};
+    shops.nested = true;
+    shops.hidden = true;
+    c.sections[0].rows.push_back(shops);
+    const PopupLayout with = LayoutPopup(c, m, BarShape::Pills, false, Fake);
+    CHECK(with.width > without.width && Near(with.height, without.height));
+    CHECK(Find(with, "Mep Nhapopoluko, Bibiki Bay, and a long way past it") == nullptr);
+    CHECK(Of(with, PopupPiece::Kind::Socket).empty());
+}
+
 TEST(a_pairs_value_ends_at_its_cards_right_edge_and_its_label_at_the_left)
 {
     const BarMetrics m = MetricsFor(36, BarShape::Pills);

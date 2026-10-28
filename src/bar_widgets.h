@@ -19,6 +19,7 @@
 
 #include <array>
 #include <cstdint>
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -77,6 +78,7 @@ namespace headsup
         std::optional<double> cpuPercent;   // of one core; nullopt before two samples
         LinuxXIState linuxxi;
         std::vector<std::string> openFolds; // the popup rows the player opened, by their fold keys
+        std::map<std::string, std::string> pickedTabs; // the tab the player picked in a card, by its heading
     };
 
     // The parts of BarState that the shown widgets and the open popup read, for the plugin to gather only those; it

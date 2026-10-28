@@ -26,6 +26,7 @@ namespace headsup
         constexpr int kShadowDrop          = 1; // pixels down
         constexpr uint32_t kSocketFill     = 0x38000000; // an open fold's socket: black over its card
         constexpr uint32_t kSocketShade    = 0x59000000, kSocketLight = 0x14FFFFFF;
+        constexpr uint32_t kLitTab         = 0x40; // the picked tab's fill: its accent at a quarter
         // The accent's alpha in the target's frame as it breathes, from and to, and in a lit title's glow.
         constexpr uint32_t kBreatheLow = 0x59, kBreatheHigh = 0xCC, kLitGlow = 0x80;
         // How a widget eases into its lit look.
@@ -524,6 +525,10 @@ namespace headsup
         css += "#panel{position:absolute;left:0px;top:0px;" + (look.skin ? SkinRules(*look.skin) : PanelRules(panel)) + "}";
         css += ".card{" + FlatRules(PopupCard(look), true) + "}";
         css += ".tag{" + FlatRules(PopupTag(look, 0.0f), false) + "}";
+        // A card's tabs as tags, the picked one in the accent.
+        css += ".tab{" + FlatRules(PopupTag(look, 0.0f), false) + "}";
+        css += ".tab.lit{border-color:" + RcssColor(look.palette.accent) + ";background-color:" +
+               RcssColor(Faded(look.palette.accent, kLitTab)) + ";}";
         // Sunk into its card: darker, its upper edges in shadow and its lower ones lit.
         css += std::string(".socket{box-sizing:border-box;border:1px;border-color:") + RcssColor(kSocketShade) + " " +
                RcssColor(kSocketLight) + " " + RcssColor(kSocketLight) + " " + RcssColor(kSocketShade) +
@@ -596,6 +601,11 @@ namespace headsup
                 break;
             case PopupPiece::Kind::Card:
                 rml += "<div class=\"p card\" style=\"" + BoxAt(piece.x, piece.y, piece.width, piece.height) + "\"></div>";
+                break;
+            case PopupPiece::Kind::Tab:
+                rml += std::string("<div class=\"p tab") + (piece.open ? " lit" : "") + "\" style=\"" +
+                       BoxAt(piece.x, piece.y, piece.width, piece.height) + "border-radius:" + Px(piece.height / 2.0f) +
+                       ";\"></div>";
                 break;
             case PopupPiece::Kind::Socket:
                 rml += "<div class=\"p socket\" style=\"" + BoxAt(piece.x, piece.y, piece.width, piece.height) + "\"></div>";

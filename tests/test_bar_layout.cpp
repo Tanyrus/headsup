@@ -154,6 +154,14 @@ TEST(a_press_on_a_fold_row_opens_or_closes_it_and_leaves_the_pin_alone)
     CHECK((input.OpenFolds() == std::vector<std::string>{"Ice"}) && !input.Pinned());
     CHECK(input.Press(960.0f, 250.0f, true)); // elsewhere on the popup it pins, as before
     CHECK(input.Pinned() == BarWidget::Target);
+    // A tab picks itself in its card, by the card's heading, and pins nothing.
+    input.Pin(std::nullopt);
+    input.Move(960.0f, 18.0f);
+    input.SetPopup(BarRect{760.0f, 44.0f, 400.0f, 300.0f}, {BarFold{"Travel", BarRect{770.0f, 100.0f, 60.0f, 20.0f}, "Boats"}});
+    CHECK(input.Press(790.0f, 110.0f, true));
+    CHECK(input.PickedTabs().at("Travel") == "Boats" && !input.Pinned());
+    CHECK((input.OpenFolds() == std::vector<std::string>{"Ice"}));
+    input.Pin(BarWidget::Target);
     // With no popup drawn its rows are gone, and what was open stays open for the next time.
     input.SetPopup(BarRect{});
     CHECK(!input.Press(960.0f, 130.0f, true));

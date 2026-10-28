@@ -823,6 +823,15 @@ namespace headsup
             return row;
         }
 
+        // The tab the player picked last in the card, or its first.
+        size_t Picked(const BarState& state, const PopupSection& section)
+        {
+            const auto picked = state.pickedTabs.find(section.heading);
+            if (picked == state.pickedTabs.end()) return 0;
+            const auto tab = std::ranges::find(section.tabs, picked->second, [](const PopupTab& t) { return t.name.text; });
+            return tab == section.tabs.end() ? 0 : static_cast<size_t>(tab - section.tabs.begin());
+        }
+
         // A zone's weathers of an element on a day, likeliest first, after the likeliest one's icon; a dash for none.
         PopupCell RollCell(const ZoneRoll* roll)
         {
@@ -836,8 +845,8 @@ namespace headsup
             return Cell(std::move(text), WeatherIcon(roll->weathers.front().weather));
         }
 
-        // A row for each element: how many zones can roll it today and tomorrow, and open, which ones and how likely,
-        // today's likeliest first, then tomorrow's. The server tells only your own zone's weather.
+        // A tab for each element: how many zones can roll it today and tomorrow, and which ones and how likely, today's
+        // likeliest first, then tomorrow's. The server tells only your own zone's weather.
         PopupSection ByElement(const BarState& state, uint32_t today)
         {
             PopupSection section{"By Element", {}};
@@ -845,11 +854,10 @@ namespace headsup
             {
                 const auto element = static_cast<Element>(e);
                 const std::vector<ZoneRoll> now = ZonesRolling(element, today), next = ZonesRolling(element, today + 1);
-                PopupRow row = FoldRow(state, ElementName(element), Colored(ElementName(element), ElementColor(element)),
-                    Text(std::to_string(now.size()) + " zones today" + kDot + std::to_string(next.size()) + " tomorrow"));
-                const bool open = row.open;
-                section.rows.push_back(std::move(row));
-                if (!open) continue;
+                PopupTab tab{Colored(ElementName(element), ElementColor(element)), {}};
+                PopupRow count = Labeled("Zones", Text(std::to_string(now.size()) + " today" + kDot + std::to_string(next.size()) + " tomorrow"));
+                count.nested   = true;
+                tab.rows.push_back(std::move(count));
                 std::map<uint16_t, std::pair<const ZoneRoll*, const ZoneRoll*>> zones;
                 for (const ZoneRoll& roll : now)
                     zones[roll.zone].first = &roll;
@@ -872,8 +880,10 @@ namespace headsup
                     grid.cells.push_back(RollCell(rolls.first));
                     grid.cells.push_back(RollCell(rolls.second));
                 }
-                section.rows.push_back(std::move(grid));
+                tab.rows.push_back(std::move(grid));
+                section.tabs.push_back(std::move(tab));
             }
+            section.tab = Picked(state, section);
             return section;
         }
 
@@ -884,31 +894,24 @@ namespace headsup
             const auto picked = [&](WorldSection section) { return (o.worldSections & WorldBit(section)) != 0; };
             if (picked(WorldSection::Travel))
             {
-                // A row for each kind of ship, its routes together in the data, telling the next to leave.
+                // A tab for each kind of ship, its routes together in the data.
                 PopupSection travel{"Travel", {}};
                 const std::span<const TravelRoute> routes = TravelRoutes();
                 for (size_t first = 0, last = 0; first < routes.size(); first = last)
                 {
-                    const TravelRoute* soonest = &routes[first];
+                    PopupTab kind{Text(routes[first].group), {}};
                     for (last = first; last < routes.size() && std::string_view(routes[last].group) == routes[first].group; ++last)
-                        if (NextSailing(routes[last], state.unixMs).leaveIn < NextSailing(*soonest, state.unixMs).leaveIn)
-                            soonest = &routes[last];
-                    PopupRow kind = FoldRow(state, routes[first].group, Text(routes[first].group), Text(soonest->name));
-                    kind.cells.back().text.push_back(Text(kDot, Tone::Dim));
-                    for (Span& span : SailingText(*soonest, state.unixMs))
-                        kind.cells.back().text.push_back(std::move(span));
-                    const bool open = kind.open;
-                    travel.rows.push_back(std::move(kind));
-                    for (size_t i = first; open && i < last; ++i)
                     {
-                        std::vector<Span> when = SailingText(routes[i], state.unixMs);
-                        PopupRow row = Labeled(routes[i].name, when.front());
+                        std::vector<Span> when = SailingText(routes[last], state.unixMs);
+                        PopupRow row = Labeled(routes[last].name, when.front());
                         for (size_t s = 1; s < when.size(); ++s)
                             row.cells.back().text.push_back(when[s]);
                         row.nested = true;
-                        travel.rows.push_back(std::move(row));
+                        kind.rows.push_back(std::move(row));
                     }
+                    travel.tabs.push_back(std::move(kind));
                 }
+                travel.tab = Picked(state, travel);
                 popup.sections.push_back(std::move(travel));
             }
             if (picked(WorldSection::Guilds))
@@ -925,9 +928,10 @@ namespace headsup
                         Text(std::to_string(open) + " of " + std::to_string(last - first) + " open"));
                     const bool shown = guild.open;
                     guilds.rows.push_back(std::move(guild));
-                    if (!shown) continue;
+                    // Closed, its shops are there but hidden, so the card is as wide closed as open.
                     PopupRow grid = Grid(kWorldGuildColumns, (last - first) * kWorldGuildColumns);
                     grid.nested   = true;
+                    grid.hidden   = !shown;
                     for (size_t i = first; i < last; ++i)
                     {
                         grid.cells.push_back(Cell(GuildText(shops[i], state.unixMs)));

@@ -32,6 +32,7 @@ namespace headsup
             Card,       // a section's rounded ground, under its heading and rows
             Fold,       // a fold row's arrow: pointing right while closed, down while open
             Socket,     // the sunken ground under the rows an open fold row holds
+            Tab,        // a card's tab's chip, under its name; open while picked
         };
         Kind kind = Kind::Text;
         float x = 0.0f, y = 0.0f, width = 0.0f, height = 0.0f; // from the popup's top-left corner
@@ -43,12 +44,14 @@ namespace headsup
         bool right     = false;         // Text: drawn against its box's right, as a pair's value is
     };
 
-    // Where a fold row is, from the popup's top-left corner: the whole row across its card, to click.
+    // Where a fold row is, from the popup's top-left corner: the whole row across its card, to click; or a tab's chip,
+    // its key the card's heading.
     struct PopupFold
     {
         std::string key;
         float x = 0.0f, y = 0.0f, width = 0.0f, height = 0.0f;
         size_t line = 0;
+        std::string tab{}; // a tab's name; empty for a fold row
     };
 
     // The title, or a section's card: a popup cut short keeps or drops each whole.

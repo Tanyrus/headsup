@@ -104,13 +104,24 @@ namespace headsup
         bool open   = false;
         bool nested = false;
         bool header = false; // Grid: its first line heads its columns, and each group of them set side by side
+        bool hidden = false; // a closed fold's row: as wide as its card is, but not drawn
         bool operator==(const PopupRow&) const = default;
+    };
+
+    // One of a card's tabs: its name on its chip, and the rows it shows while picked.
+    struct PopupTab
+    {
+        Span name;
+        std::vector<PopupRow> rows;
+        bool operator==(const PopupTab&) const = default;
     };
 
     struct PopupSection
     {
         std::string heading; // empty for the rows under the title
         std::vector<PopupRow> rows;
+        std::vector<PopupTab> tabs{}; // under the heading, a click picking one, by the heading
+        size_t tab = 0;               // the picked one, whose rows follow the section's own
         bool operator==(const PopupSection&) const = default;
     };
 

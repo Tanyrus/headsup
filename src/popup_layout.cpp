@@ -85,11 +85,15 @@ namespace headsup
             struct Fold
             {
                 std::string key;
-                float y, height; // its row, with half the gap to each neighbour
+                float y, height;   // its row, with half the gap to each neighbour
+                float x = -1.0f;   // a tab's chip, from the card's left; below 0 for the whole row across the card
+                float width = 0.0f;
+                std::string tab{};
             };
             std::vector<Fold> folds;
             std::vector<size_t> sockets; // pieces to widen to the card's inside once its width is known
-            bool card = false;
+            bool card     = false;
+            float reserve = 0.0f; // its height with its tallest tab and its folds closed, which sets its column
         };
 
         Block LayoutSection(const PopupSection& section, const BarMetrics& metrics, bool ornate, SpanMeasure measure)
@@ -108,20 +112,51 @@ namespace headsup
                     PopupFont::Heading});
                 y += t.height + metrics.rowGap;
             }
-            // Grid rows one after another with as many columns line them up: a grid carried on across rows, or cards.
-            std::vector<std::vector<float>> runColumns(section.rows.size());
-            for (size_t first = 0, last = 0; first < section.rows.size(); first = std::max(last, first + 1))
+            // The section's rows, then its picked tab's.
+            std::vector<PopupRow> rows = section.rows;
+            if (!section.tabs.empty())
             {
-                const PopupRow& head = section.rows[first];
+                const size_t picked = std::min(section.tab, section.tabs.size() - 1);
+                rows.insert(rows.end(), section.tabs[picked].rows.begin(), section.tabs[picked].rows.end());
+                // The card as wide as its widest tab's rows, whichever is picked, its chips wrapping at that.
+                for (const PopupTab& tab : section.tabs)
+                    contentWidth = std::max(contentWidth, LayoutSection(PopupSection{"", tab.rows}, metrics, ornate, measure).width);
+                const float gap = unit * kTagGap;
+                float x = b.pad, lineHeight = 0.0f;
+                for (size_t i = 0; i < section.tabs.size(); ++i)
+                {
+                    const TextSize size   = CellSize(Cell(section.tabs[i].name), unit, measure);
+                    const TextSize framed = Framed(size, unit);
+                    if (x > b.pad && x + framed.width > b.pad + contentWidth)
+                    {
+                        x = b.pad;
+                        y += lineHeight + gap;
+                        lineHeight = 0.0f;
+                    }
+                    PopupPiece chip{PopupPiece::Kind::Tab, x, y, framed.width, framed.height, {}};
+                    chip.open = i == picked;
+                    b.pieces.push_back(std::move(chip));
+                    b.pieces.push_back(PopupPiece{PopupPiece::Kind::Text, x + TagPadX(unit), y + framed.inkTop - size.inkTop,
+                        size.width, size.height, section.tabs[i].name});
+                    b.folds.push_back(Block::Fold{section.heading, y, framed.height, x - b.pad, framed.width, section.tabs[i].name.text});
+                    contentWidth = std::max(contentWidth, x + framed.width - b.pad);
+                    x += framed.width + gap;
+                    lineHeight = std::max(lineHeight, framed.height);
+                }
+                y += lineHeight + metrics.rowGap;
+            }
+            // Grid rows one after another with as many columns line them up: a grid carried on across rows, or cards.
+            std::vector<std::vector<float>> runColumns(rows.size());
+            for (size_t first = 0, last = 0; first < rows.size(); first = std::max(last, first + 1))
+            {
+                const PopupRow& head = rows[first];
                 last = first;
                 if (head.kind != RowKind::Grid || head.columns <= 0) continue;
                 std::vector<float> widths(static_cast<size_t>(head.columns), 0.0f);
-                for (; last < section.rows.size() && section.rows[last].kind == RowKind::Grid &&
-                       section.rows[last].columns == head.columns;
-                     ++last)
-                    for (size_t i = 0; i < section.rows[last].cells.size(); ++i)
+                for (; last < rows.size() && rows[last].kind == RowKind::Grid && rows[last].columns == head.columns; ++last)
+                    for (size_t i = 0; i < rows[last].cells.size(); ++i)
                         widths[i % widths.size()] =
-                            std::max(widths[i % widths.size()], CellSize(section.rows[last].cells[i], unit, measure).width);
+                            std::max(widths[i % widths.size()], CellSize(rows[last].cells[i], unit, measure).width);
                 for (size_t r = first; r < last; ++r)
                     runColumns[r] = widths;
             }
@@ -137,17 +172,10 @@ namespace headsup
                 b.sockets.push_back(*socket);
                 socket.reset();
             };
-            for (size_t r = 0; r < section.rows.size(); ++r)
+            for (size_t r = 0; r < rows.size(); ++r)
             {
-                const PopupRow& row = section.rows[r];
-                if (!row.nested)
-                    closeSocket();
-                else if (!socket)
-                {
-                    socket = b.pieces.size();
-                    b.pieces.push_back(PopupPiece{PopupPiece::Kind::Socket, b.pad, y, 0.0f, 0.0f, {}});
-                    y += socketPad;
-                }
+                const PopupRow& row = rows[r];
+                if (!row.nested && !row.hidden) closeSocket();
                 if (row.cells.empty()) continue;
                 const bool grid = row.kind == RowKind::Grid && row.columns > 0;
                 const bool tags = row.kind == RowKind::Tags;
@@ -168,6 +196,13 @@ namespace headsup
                     rowWidth += c;
                 if (grid) rowWidth += unit * kColumnGap * static_cast<float>(columns.size() - 1);
                 contentWidth = std::max(contentWidth, rowWidth);
+                if (row.hidden) continue;
+                if (row.nested && !socket)
+                {
+                    socket = b.pieces.size();
+                    b.pieces.push_back(PopupPiece{PopupPiece::Kind::Socket, b.pad, y, 0.0f, 0.0f, {}});
+                    y += socketPad;
+                }
 
                 const size_t perLine = grid ? columns.size() : row.cells.size();
                 float lineHeight = 0.0f, x = b.pad + indent;
@@ -260,9 +295,25 @@ namespace headsup
                 l.pieces.push_back(std::move(piece));
             }
             for (Block::Fold& fold : b.folds)
-                l.folds.push_back(PopupFold{std::move(fold.key), x, y + fold.y, width, fold.height, line});
+                l.folds.push_back(PopupFold{std::move(fold.key), fold.x < 0.0f ? x : x + b.pad + fold.x, y + fold.y,
+                    fold.x < 0.0f ? width : fold.width, fold.height, line, std::move(fold.tab)});
             l.lines.push_back(PopupLine{y + b.height});
         }
+        // A card as LayoutSection lays it out, with its reserve: its height with each tab picked in turn and its fold
+        // rows closed, the tallest of them.
+        Block LayoutCard(const PopupSection& section, const BarMetrics& metrics, bool ornate, SpanMeasure measure)
+        {
+            Block b = LayoutSection(section, metrics, ornate, measure);
+            PopupSection closed = section;
+            std::erase_if(closed.rows, [](const PopupRow& row) { return row.nested; });
+            for (size_t tab = 0; tab < std::max<size_t>(section.tabs.size(), 1); ++tab)
+            {
+                closed.tab = tab;
+                b.reserve  = std::max(b.reserve, LayoutSection(closed, metrics, ornate, measure).height);
+            }
+            return b;
+        }
+
         // A grid's lines in groups side by side, down each group before the next, with an empty column between groups;
         // a header line heads each group.
         PopupRow SideBySide(const PopupRow& row, size_t groups)
@@ -301,23 +352,41 @@ namespace headsup
         std::vector<PopupSection> Fitted(const PopupSection& section, float tall, const BarMetrics& metrics, bool ornate,
                                          SpanMeasure measure)
         {
-            if (LayoutSection(section, metrics, ornate, measure).height <= tall) return ListOf(section);
+            // As tall as it can be: with its tallest tab picked, so picking another never sets it differently.
+            const auto tallest = [&](PopupSection variant) {
+                float most = 0.0f;
+                for (size_t tab = 0; tab < std::max<size_t>(variant.tabs.size(), 1); ++tab)
+                {
+                    variant.tab = tab;
+                    most        = std::max(most, LayoutSection(variant, metrics, ornate, measure).height);
+                }
+                return most;
+            };
+            if (tallest(section) <= tall) return ListOf(section);
+            PopupSection wide = section;
             for (size_t groups = 2; groups <= kMostSideBySide; ++groups)
             {
-                PopupSection wide = section;
-                bool set          = false;
-                for (PopupRow& row : wide.rows)
-                {
-                    const auto columns = static_cast<size_t>(std::max(row.columns, 0));
-                    if (row.kind != RowKind::Grid || columns == 0 ||
-                        row.cells.size() <= (kSideBySideAbove + (row.header ? 1 : 0)) * columns)
-                        continue;
-                    row = SideBySide(row, groups);
-                    set = true;
-                }
+                wide     = section;
+                bool set = false;
+                const auto widen = [&](std::vector<PopupRow>& rows) {
+                    for (PopupRow& row : rows)
+                    {
+                        const auto columns = static_cast<size_t>(std::max(row.columns, 0));
+                        if (row.kind != RowKind::Grid || columns == 0 ||
+                            row.cells.size() <= (kSideBySideAbove + (row.header ? 1 : 0)) * columns)
+                            continue;
+                        row = SideBySide(row, groups);
+                        set = true;
+                    }
+                };
+                widen(wide.rows);
+                for (PopupTab& tab : wide.tabs)
+                    widen(tab.rows);
                 if (!set) break;
-                if (LayoutSection(wide, metrics, ornate, measure).height <= tall) return ListOf(wide);
+                if (tallest(wide) <= tall) return ListOf(wide);
             }
+            // A card of tabs stays whole, as wide as it can be set, for the cut to take what is past the room.
+            if (!section.tabs.empty()) return ListOf(wide);
             std::vector<PopupRow> rows;
             for (const PopupRow& row : section.rows)
             {
@@ -406,13 +475,14 @@ namespace headsup
         for (const PopupSection& section : content.sections)
             if (!section.heading.empty())
                 for (const PopupSection& part : Fitted(section, tall, metrics, ornate, measure))
-                    cards.push_back(LayoutSection(part, metrics, ornate, measure));
+                    cards.push_back(LayoutCard(part, metrics, ornate, measure));
 
         // One column, or two when one runs tall: the split whose taller column is shortest, in their order. When that
-        // runs past the room, as many columns as fill it in order.
+        // runs past the room, as many columns as fill it in order. Each card counts as its reserve, so a tab picked or
+        // a fold opened makes it grow down where it is.
         float stacked = 0.0f;
         for (const Block& b : cards)
-            stacked += b.height + cardGap;
+            stacked += b.reserve + cardGap;
         std::vector<size_t> starts{0}; // each column's first card
         if (cards.size() >= 2 && stacked > unit * kTwoColumnsAbove)
         {
@@ -420,7 +490,7 @@ namespace headsup
             size_t split = cards.size();
             for (size_t i = 1; i < cards.size(); ++i)
             {
-                left += cards[i - 1].height + cardGap;
+                left += cards[i - 1].reserve + cardGap;
                 if (const float taller = std::max(left, stacked - left); taller < best)
                 {
                     best  = taller;
@@ -434,12 +504,12 @@ namespace headsup
                 float column = 0.0f;
                 for (size_t i = 0; i < cards.size(); ++i)
                 {
-                    if (i > starts.back() && column + cards[i].height > tall)
+                    if (i > starts.back() && column + cards[i].reserve > tall)
                     {
                         starts.push_back(i);
                         column = 0.0f;
                     }
-                    column += cards[i].height + cardGap;
+                    column += cards[i].reserve + cardGap;
                 }
             }
         }
