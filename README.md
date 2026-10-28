@@ -53,6 +53,11 @@ design by dragging tags into them:
 
 Hover a widget for its popup, and click to keep it open.
 
+<p>
+  <img src="resources/world_info.png" alt="The World Info popup with ships, the calendar, guild hours and today's turn-ins" height="420">
+  <img src="resources/target_popup.png" alt="The Target popup for a Goblin Gambler with its stats, spells, spawn and drops" height="420">
+</p>
+
 | Widget | Shows | Popup |
 |---|---|---|
 | Zone | The zone, its region and who holds it | Each nation's influence there |
