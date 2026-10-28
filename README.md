@@ -278,7 +278,7 @@ A bar of widgets across the top of the screen, on by default, with these widgets
 | Signet | The time left on Signet or Sanction, only while one is on | What it gives and whether it works where you are |
 | Distance | How far your target is, in yalms | Nothing |
 | Conquest | How many regions each nation holds, for the nations its Nations filter picks | Which regions each holds, marking the ones your nation holds that you have not run supplies to |
-| World Info | What its Shows picks, with a countdown: the next departure of a ship you pick, when an element's weather can next roll in your zone, a guild's hours, the RSE or the moon | The parts its Popup picks: a tab for each kind of ship with its routes, each guild with how many of its shops are open, and a calendar of the RSE, the moons and the conquest tally |
+| World Info | What its Shows picks, with a countdown: the next departure of a ship you pick, when an element's weather can next roll in your zone, a guild's hours, the RSE or the moon | The parts its Popup picks: a tab for each kind of ship with its routes, a tab for each guild with its shops' hours, and a calendar of the RSE, the moons and the conquest tally |
 | Target | A monster's name in its border color, its level and con | Its jobs, weaknesses, resistances, absorbs, immunities, tags, stats, TP moves, spells, spawn, drops at Treasure Hunter 0 and what can be stolen; for an NPC or ??? in Phoenix's NPC data, what it is for, when it appears, what clicking it says and does, its shop, what to trade it, what it pops and gives, the key items it gives and checks for, and its quests, missions and battlefields; for a player you checked, their jobs, master level, linkshell and title, as of your check |
 | Gil | Your gil, or the currency picked in its section | Gil and every currency you have |
 | Bags | Your inventory's used and maximum space | Every bag you have |
@@ -304,11 +304,10 @@ and so on down from there. With Game Help on, the game's own help bar goes under
 help bar has an X and Y offset of its own, in screen pixels, in its card. Unloading HeadsUp puts every open window it moved back where the game put it.
 
 Hover a widget to open its details. Click it to keep them open; click it again to let them close once the pointer leaves
-the widget and its popup. A row with an arrow, such as a guild, opens when you click it to show what is under it, and
-closes on the next click. A card with tabs, such as Travel or By Element, shows the tab you click. A popup keeps its
-width as you do either, and grows down. A list longer than 10 lines shows 10 at a time: turn the mouse wheel over it to
-scroll, and a line under it says which you are seeing. Open rows, picked tabs and scrolled lists stay that way until you
-reload HeadsUp.
+the widget and its popup. A card with tabs, such as Travel, Guilds or By Element, shows the tab you click; a guild's
+tab is dim while all its shops are shut. A popup keeps its width as you pick tabs, and grows down. A list longer than 10
+lines shows 10 at a time with a scrollbar beside it: turn the mouse wheel over it, drag the bar, or click its track.
+Picked tabs and scrolled lists stay that way until you reload HeadsUp.
 
 The server only tells you your own zone's weather. By Element goes by Phoenix's weather calendar instead: each zone
 has up to three weathers it can roll each day, with their chances, so a zone listed for Fire today can roll a Fire

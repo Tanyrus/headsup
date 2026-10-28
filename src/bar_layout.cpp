@@ -340,10 +340,10 @@ namespace headsup
         Reevaluate();
     }
 
-    void BarInput::SetPopup(const BarRect& popup, std::vector<BarFold> folds, std::vector<BarScroll> scrolls)
+    void BarInput::SetPopup(const BarRect& popup, std::vector<BarTabChip> chips, std::vector<BarScroll> scrolls)
     {
         m_Popup   = popup;
-        m_Folds   = std::move(folds);
+        m_Chips   = std::move(chips);
         m_Scrolls = std::move(scrolls);
         Reevaluate();
     }
@@ -420,18 +420,10 @@ namespace headsup
                     DragTo(y);
                     return true;
                 }
-            for (const BarFold& fold : m_Folds)
-                if (fold.rect.Contains(x, y))
+            for (const BarTabChip& chip : m_Chips)
+                if (chip.rect.Contains(x, y))
                 {
-                    if (!fold.tab.empty())
-                    {
-                        m_Tabs[fold.key] = fold.tab;
-                        return true;
-                    }
-                    if (const auto open = std::ranges::find(m_OpenFolds, fold.key); open != m_OpenFolds.end())
-                        m_OpenFolds.erase(open);
-                    else
-                        m_OpenFolds.push_back(fold.key);
+                    m_Tabs[chip.key] = chip.tab;
                     return true;
                 }
             m_Pinned = m_Pinned == Open() ? std::nullopt : Open();

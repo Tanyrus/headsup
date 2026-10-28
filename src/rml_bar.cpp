@@ -422,7 +422,7 @@ namespace headsup
 
     BarRect RmlBar::ShowPopup(RmlHost& host, const BarLook& look, const BarState& state,
         const BarLayout& layout, float screenWidth, float screenHeight, const BarInput& input, bool hidden,
-        std::vector<BarFold>& folds, std::vector<BarScroll>& scrolls)
+        std::vector<BarTabChip>& chips, std::vector<BarScroll>& scrolls)
     {
         const std::optional<PanelWidget> open = input.Open();
         const BarRect* anchor               = open ? RectOf(layout, *open) : nullptr;
@@ -471,8 +471,8 @@ namespace headsup
         Set(m_Popup, Rml::PropertyId::Height, m_PopupHeight.value, rect.height);
         m_Popup->SetClass(kHiddenClass, hidden);
         m_Popup->SetClass(kOpenClass, !hidden);
-        for (const PopupFold& fold : pl.folds)
-            folds.push_back(BarFold{fold.key, BarRect{rect.x + fold.x, rect.y + fold.y, fold.width, fold.height}, fold.tab});
+        for (const PopupTabChip& chip : pl.chips)
+            chips.push_back(BarTabChip{chip.key, BarRect{rect.x + chip.x, rect.y + chip.y, chip.width, chip.height}, chip.tab});
         for (const PopupScroll& scroll : pl.scrolls)
             scrolls.push_back(BarScroll{scroll.key, BarRect{rect.x + scroll.x, rect.y + scroll.y, scroll.width, scroll.height},
                 scroll.most, BarRect{rect.x + scroll.grip.x, rect.y + scroll.grip.y, scroll.grip.width, scroll.grip.height},
@@ -530,10 +530,10 @@ namespace headsup
         if (settings.Widget(BarWidget::GameHelp).on)
             m_HelpReach = BarRect{HelpBarLeft(m) + helpX, helpTop, HelpBarWidth(screenWidth), rows.helpBarHeight};
         input.Frame(layout, widgets.hasPopup);
-        std::vector<BarFold> folds;
+        std::vector<BarTabChip> chips;
         std::vector<BarScroll> scrolls;
-        const BarRect popup = ShowPopup(host, look, state, layout, screenWidth, screenHeight, input, hidden, folds, scrolls);
-        input.SetPopup(popup, std::move(folds), std::move(scrolls));
+        const BarRect popup = ShowPopup(host, look, state, layout, screenWidth, screenHeight, input, hidden, chips, scrolls);
+        input.SetPopup(popup, std::move(chips), std::move(scrolls));
         if (m_Visible == hidden)
         {
             m_Visible = !hidden;

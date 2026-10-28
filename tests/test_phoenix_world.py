@@ -99,6 +99,15 @@ class Guilds(unittest.TestCase):
                                  ('Woodworking', 'Dehbi Moshal', 'Al Zahbi', 6, 21, 0),
                                  ('Woodworking', 'Chaupire', "Northern San d'Oria", 6, 21, 0)])
 
+    def test_the_goblins_who_sell_chips_are_left_out(self):
+        shops = GUILD_SHOPS.replace("\n}\n", "\n    ['Gaudylox'] =\n    {\n        hours   = { 11, 22 },\n"
+                                    "        holiday = xi.day.FIRESDAY,\n        stock   = {},\n    },\n}\n")
+        scripts = {**NPC_SCRIPTS, 'Northern_San_dOria/npcs/Gaudylox.lua':
+                   "-- Area: Northern San d'Oria\n--  NPC: Gaudylox\n-- Standard merchant, though he acts like a guild merchant\n"}
+        with tempfile.TemporaryDirectory() as tmp:
+            kept = world.build_guilds(checkout(pathlib.Path(tmp), shops=shops, scripts=scripts))
+        self.assertEqual([row[1] for row in kept], ['Wahraga, Gathweeda', 'Dehbi Moshal', 'Chaupire'])
+
     def test_a_merchant_of_no_kind_it_knows_is_an_error(self):
         scripts = dict(NPC_SCRIPTS)
         scripts['Al_Zahbi/npcs/Dehbi_Moshal.lua'] = '-- Area: Al Zahbi\n--  NPC: Dehbi Moshal\n-- Juggling Guild\n'
@@ -145,5 +154,5 @@ class RealCheckout(unittest.TestCase):
 
     def test_every_guild_shop_has_a_kind(self):
         shops = world.build_guilds(REAL)
-        self.assertEqual(len(shops), 41)  # 43 NPCs, two of them sharing another's shop
+        self.assertEqual(len(shops), 38)  # 43 NPCs, two of them sharing another's shop and three goblins selling chips
         self.assertIn(('Woodworking', 'Chaupire', "Northern San d'Oria", 6, 21, 0), shops)

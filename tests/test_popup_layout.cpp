@@ -180,53 +180,6 @@ TEST(a_starred_cell_has_a_star_after_its_text_from_the_top_of_the_texts_ink)
     CHECK(Near(Find(l, "61%")->x + Find(l, "61%")->width, Find(l, "21%")->x + Find(l, "21%")->width));
 }
 
-TEST(a_fold_row_has_its_arrow_and_its_whole_row_to_click_and_the_rows_it_holds_sit_under_its_label)
-{
-    const BarMetrics m = MetricsFor(36, BarShape::Pills);
-    PopupContent c;
-    c.title = {{"World Info", Tone::Normal}};
-    PopupRow airships = Labeled("Airships", Text("Boards in 1:24"));
-    airships.fold     = "Airships";
-    airships.open     = true;
-    PopupRow route    = Labeled("Jeuno to Bastok", Text("Boards in 1:24"));
-    route.nested      = true;
-    PopupRow boats    = Labeled("Boats", Text("Boards in 2:23"));
-    boats.fold        = "Boats";
-    c.sections.push_back(PopupSection{"Travel", {airships, route, boats}});
-    const PopupLayout l = LayoutPopup(c, m, BarShape::Pills, false, Fake);
-    const std::vector<const PopupPiece*> arrows = Of(l, PopupPiece::Kind::Fold);
-    CHECK_EQ(arrows.size(), static_cast<size_t>(2));
-    CHECK(arrows[0]->open && !arrows[1]->open);
-    CHECK(AllInside(l, m));
-    const PopupPiece& card  = *Of(l, PopupPiece::Kind::Card).front();
-    const PopupPiece& label = *Find(l, "Airships "), &nested = *Find(l, "Jeuno to Bastok "), &next = *Find(l, "Boats ");
-    // The label after its arrow, the arrow centered on its line's ink, and the row it holds under the label.
-    CHECK(label.x >= arrows[0]->x + arrows[0]->width);
-    const TextSize t = Fake(label.span, PopupFont::Text);
-    CHECK(Near(arrows[0]->y + arrows[0]->height / 2.0f, label.y + (t.inkTop + t.inkBottom) / 2.0f));
-    CHECK(Near(nested.x, label.x) && Near(next.x, label.x));
-    // Each fold's place is its row across the card, and holds neither its neighbour's label.
-    CHECK_EQ(l.folds.size(), static_cast<size_t>(2));
-    CHECK(l.folds[0].key == "Airships" && l.folds[1].key == "Boats");
-    for (const PopupFold& fold : l.folds)
-        CHECK(Near(fold.x, card.x) && Near(fold.width, card.width));
-    const auto holds = [](const PopupFold& f, const PopupPiece& p) {
-        return p.y >= f.y - 0.01f && p.y + p.height <= f.y + f.height + 0.01f;
-    };
-    CHECK(holds(l.folds[0], label) && !holds(l.folds[0], nested) && holds(l.folds[1], next));
-    // The rows an open fold holds sit in a socket across the card, under its row and clear of the next.
-    const std::vector<const PopupPiece*> sockets = Of(l, PopupPiece::Kind::Socket);
-    CHECK_EQ(sockets.size(), static_cast<size_t>(1));
-    const PopupPiece& socket = *sockets.front();
-    CHECK(Near(socket.x, card.x + std::round(m.popupText * 0.55f)) && Near(socket.x + socket.width, card.x + card.width - (socket.x - card.x)));
-    CHECK(socket.y >= label.y + label.height && socket.y < nested.y && socket.y + socket.height > nested.y + nested.height);
-    CHECK(socket.y + socket.height < next.y);
-    // A cut that drops the card drops its folds.
-    PopupLayout cut = l;
-    CutPopup(cut, card.y - 0.5f, m.popupPadding);
-    CHECK(cut.folds.empty());
-}
-
 namespace
 {
     // Travel's tabs: two airship routes, and boats with a long route name and more of them.
@@ -261,10 +214,14 @@ TEST(a_card_with_tabs_shows_the_picked_ones_rows_under_its_tabs_at_one_width)
         CHECK_EQ(tabs.size(), static_cast<size_t>(2));
         CHECK(tabs[picked]->open && !tabs[1 - picked]->open);
         // Each tab is a place to click, by the card's heading and the tab's name, over its frame.
-        CHECK_EQ(l.folds.size(), static_cast<size_t>(2));
+        CHECK_EQ(l.chips.size(), static_cast<size_t>(2));
         for (size_t i = 0; i < 2; ++i)
-            CHECK(l.folds[i].key == "Travel" && l.folds[i].tab == (i == 0 ? "Airships" : "Boats") &&
-                  Near(l.folds[i].x, tabs[i]->x) && Near(l.folds[i].y, tabs[i]->y) && Near(l.folds[i].width, tabs[i]->width));
+            CHECK(l.chips[i].key == "Travel" && l.chips[i].tab == (i == 0 ? "Airships" : "Boats") &&
+                  Near(l.chips[i].x, tabs[i]->x) && Near(l.chips[i].y, tabs[i]->y) && Near(l.chips[i].width, tabs[i]->width));
+        // A cut that drops the card drops its tabs.
+        PopupLayout cut = l;
+        CutPopup(cut, Of(l, PopupPiece::Kind::Card).front()->y - 0.5f, m.popupPadding);
+        CHECK(cut.chips.empty());
         // Only the picked tab's rows, under the tabs.
         CHECK((Find(l, "Jeuno to Bastok ") != nullptr) == (picked == 0));
         CHECK((Find(l, "Mhaura to Selbina ") != nullptr) == (picked == 1));
@@ -306,25 +263,6 @@ TEST(cards_keep_their_columns_whichever_tab_is_picked)
     CHECK(places[0].size() == 4 && places[0] == places[1]);
 }
 
-TEST(a_hidden_row_widens_its_card_and_is_not_drawn)
-{
-    const BarMetrics m = MetricsFor(36, BarShape::Pills);
-    PopupContent c;
-    c.title = {{"Guilds", Tone::Normal}};
-    PopupRow guild = Labeled("Fishing", Text("2 of 9 open"));
-    guild.fold     = "Fishing";
-    c.sections.push_back(PopupSection{"Guilds", {guild}});
-    const PopupLayout without = LayoutPopup(c, m, BarShape::Pills, false, Fake);
-    PopupRow shops{RowKind::Grid, 1, {Word("Mep Nhapopoluko, Bibiki Bay, and a long way past it")}};
-    shops.nested = true;
-    shops.hidden = true;
-    c.sections[0].rows.push_back(shops);
-    const PopupLayout with = LayoutPopup(c, m, BarShape::Pills, false, Fake);
-    CHECK(with.width > without.width && Near(with.height, without.height));
-    CHECK(Find(with, "Mep Nhapopoluko, Bibiki Bay, and a long way past it") == nullptr);
-    CHECK(Of(with, PopupPiece::Kind::Socket).empty());
-}
-
 namespace
 {
     // A tab's rows: a count, then a table of 30 zones under its heads.
@@ -357,9 +295,8 @@ TEST(a_socket_longer_than_ten_lines_shows_ten_and_scrolls_under_its_heads)
 {
     const BarMetrics m = MetricsFor(36, BarShape::Pills);
     const PopupLayout top = LayoutPopup(Zones(0), m, BarShape::Pills, false, Fake);
-    // The count and nine zones make ten lines; the table's heads stay; a line says where it is.
+    // The count and nine zones make ten lines; the table's heads stay.
     CHECK(Find(top, "Zones ") && Find(top, "Zone") && Find(top, "Zone 8") && !Find(top, "Zone 9"));
-    CHECK(Find(top, std::string("1 to 10 of 31") + kDot + "scroll for more") != nullptr);
     CHECK_EQ(top.scrolls.size(), static_cast<size_t>(1));
     const PopupScroll& area = top.scrolls.front();
     const PopupPiece& socket = *Of(top, PopupPiece::Kind::Socket).front();
@@ -373,7 +310,7 @@ TEST(a_socket_longer_than_ten_lines_shows_ten_and_scrolls_under_its_heads)
     CHECK(Find(down, "Zone")->y < Find(down, "Zone 4")->y);
     // Past the end, it stops at the last ten.
     const PopupLayout end = LayoutPopup(Zones(100), m, BarShape::Pills, false, Fake);
-    CHECK(Find(end, "Zone 29") && !Find(end, "Zone 19") && Find(end, std::string("22 to 31 of 31") + kDot + "scroll for more"));
+    CHECK(Find(end, "Zone 29") && Find(end, "Zone 20") && !Find(end, "Zone 19"));
 }
 
 TEST(a_scrolling_socket_has_a_scrollbar_in_its_right_padding_showing_where_it_is)

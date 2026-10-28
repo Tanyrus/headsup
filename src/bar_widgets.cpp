@@ -812,17 +812,6 @@ namespace headsup
             return w;
         }
 
-        bool Opened(const BarState& state, const std::string& key) { return std::ranges::find(state.openFolds, key) != state.openFolds.end(); }
-
-        // A row a click opens and closes: its label bright, unlike a pair's.
-        PopupRow FoldRow(const BarState& state, std::string key, Span label, Span value)
-        {
-            PopupRow row = Labeled(std::move(label), std::move(value));
-            row.open     = Opened(state, key);
-            row.fold     = std::move(key);
-            return row;
-        }
-
         // A socket's first row: the key its scrolling is kept by, and how far it is scrolled.
         void ScrollsBy(PopupRow& first, const BarState& state, std::string key)
         {
@@ -926,7 +915,8 @@ namespace headsup
             }
             if (picked(WorldSection::Guilds))
             {
-                // A row for each guild, its shops together in the data, telling how many are open.
+                // A tab for each guild, its shops together in the data, dim while all of them are shut: how many are
+                // open, then each shop's hours, and who and where.
                 PopupSection guilds{"Guilds", {}};
                 const std::span<const GuildShop> shops = GuildShops();
                 for (size_t first = 0, last = 0; first < shops.size(); first = last)
@@ -934,22 +924,22 @@ namespace headsup
                     int open = 0;
                     for (last = first; last < shops.size() && std::string_view(shops[last].guild) == shops[first].guild; ++last)
                         open += GuildAt(shops[last], state.unixMs).open;
-                    PopupRow guild = FoldRow(state, shops[first].guild, Text(shops[first].guild),
-                        Text(std::to_string(open) + " of " + std::to_string(last - first) + " open"));
-                    const bool shown = guild.open;
-                    guilds.rows.push_back(std::move(guild));
-                    // Closed, its shops are there but hidden, so the card is as wide closed as open.
+                    PopupTab guild{Text(shops[first].guild, open > 0 ? Tone::Normal : Tone::Dim), {}};
+                    PopupRow count = Labeled("Open", Text(std::to_string(open) + " of " + std::to_string(last - first)));
+                    count.nested   = true;
+                    ScrollsBy(count, state, guilds.heading + "/" + shops[first].guild);
+                    guild.rows.push_back(std::move(count));
                     PopupRow grid = Grid(kWorldGuildColumns, (last - first) * kWorldGuildColumns);
                     grid.nested   = true;
-                    grid.hidden   = !shown;
-                    ScrollsBy(grid, state, guilds.heading + "/" + shops[first].guild);
                     for (size_t i = first; i < last; ++i)
                     {
                         grid.cells.push_back(Cell(GuildText(shops[i], state.unixMs)));
                         grid.cells.push_back(Cell(Text(std::string(shops[i].shops) + ", " + shops[i].zone, Tone::Dim)));
                     }
-                    guilds.rows.push_back(std::move(grid));
+                    guild.rows.push_back(std::move(grid));
+                    guilds.tabs.push_back(std::move(guild));
                 }
+                guilds.tab = Picked(state, guilds);
                 popup.sections.push_back(std::move(guilds));
             }
             if (picked(WorldSection::Calendar))
@@ -1359,6 +1349,7 @@ namespace headsup
                     LineOf("From 2:00 to 7:00, outside towns, Phoenix turns sunshine and clouds into fog.", Tone::Dim));
             popup.sections = ListOf(PopupSection{"", ListOf(Line(std::move(current)))}, std::move(forecast),
                 ByElement(state, t.day));
+            popup.oneColumn = true;
             break;
         }
         case BarWidget::VanaTime:

@@ -31,8 +31,7 @@ namespace headsup
             Rule,       // an ornate heading's fading line
             Tag,        // a tag's frame, under its text
             Card,       // a section's rounded ground, under its heading and rows
-            Fold,       // a fold row's arrow: pointing right while closed, down while open
-            Socket,     // the sunken ground under the rows an open fold row holds
+            Socket,     // the sunken ground under a tab's rows
             Tab,        // a card's tab's chip, under its name; open while picked
             ScrollTrack, // a scrolling socket's scrollbar, in its right padding
             ScrollThumb, // and the part of it its shown lines are
@@ -43,18 +42,17 @@ namespace headsup
         PopupFont font = PopupFont::Text;
         Icon icon      = Icon::AggroNQ; // Icon
         size_t line    = 0;             // in the layout's lines
-        bool open      = false;         // Fold
+        bool open      = false;         // Tab: picked
         bool right     = false;         // Text: drawn against its box's right, as a pair's value is
     };
 
-    // Where a fold row is, from the popup's top-left corner: the whole row across its card, to click; or a tab's chip,
-    // its key the card's heading.
-    struct PopupFold
+    // Where a card's tab is, from the popup's top-left corner, to click: its key the card's heading.
+    struct PopupTabChip
     {
         std::string key;
         float x = 0.0f, y = 0.0f, width = 0.0f, height = 0.0f;
         size_t line = 0;
-        std::string tab{}; // a tab's name; empty for a fold row
+        std::string tab;
     };
 
     // A socket that shows only some of its lines, from the popup's top-left corner, and how many lines it scrolls.
@@ -79,7 +77,7 @@ namespace headsup
         float width = 0.0f, height = 0.0f;
         std::vector<PopupPiece> pieces; // line by line
         std::vector<PopupLine> lines;   // top to bottom
-        std::vector<PopupFold> folds;
+        std::vector<PopupTabChip> chips;
         std::vector<PopupScroll> scrolls;
     };
 

@@ -134,7 +134,7 @@ TEST(hovering_opens_leaving_closes_and_a_click_pins)
     CHECK(input.Press(5.0f, 30.0f, false)); // a right press on the strip is the bar's too
 }
 
-TEST(a_press_on_a_fold_row_opens_or_closes_it_and_leaves_the_pin_alone)
+TEST(a_press_on_a_tab_picks_it_and_leaves_the_pin_alone)
 {
     const BarLayout l = LayoutBar(1920.0f, kPills, BarShape::Pills, Widths(100, 0, 120, 200, 90, 60, 50), 0.0f);
     std::array<bool, kPanelSlots> popups{};
@@ -142,30 +142,23 @@ TEST(a_press_on_a_fold_row_opens_or_closes_it_and_leaves_the_pin_alone)
     BarInput input;
     input.Frame(l, popups);
     input.Move(960.0f, 18.0f);
-    const BarRect fire{770.0f, 100.0f, 380.0f, 20.0f}, ice{770.0f, 120.0f, 380.0f, 20.0f};
-    input.SetPopup(BarRect{760.0f, 44.0f, 400.0f, 300.0f}, {BarFold{"Fire", fire}, BarFold{"Ice", ice}});
-    input.Move(960.0f, 110.0f);
-    CHECK(input.Press(960.0f, 110.0f, true));
-    CHECK((input.OpenFolds() == std::vector<std::string>{"Fire"}) && !input.Pinned());
-    CHECK(input.Press(960.0f, 130.0f, true));
-    CHECK((input.OpenFolds() == std::vector<std::string>{"Fire", "Ice"}));
-    CHECK(input.Press(960.0f, 110.0f, false)); // a right press opens nothing
-    CHECK(input.Press(960.0f, 110.0f, true));  // a second press closes it
-    CHECK((input.OpenFolds() == std::vector<std::string>{"Ice"}) && !input.Pinned());
+    const BarRect airships{770.0f, 100.0f, 60.0f, 20.0f}, boats{834.0f, 100.0f, 50.0f, 20.0f};
+    input.SetPopup(BarRect{760.0f, 44.0f, 400.0f, 300.0f}, {BarTabChip{"Travel", airships, "Airships"}, BarTabChip{"Travel", boats, "Boats"}});
+    input.Move(850.0f, 110.0f);
+    CHECK(input.Press(850.0f, 110.0f, true));
+    CHECK(input.PickedTabs().at("Travel") == "Boats" && !input.Pinned());
+    CHECK(input.Press(850.0f, 110.0f, true)); // again: still picked
+    CHECK(input.PickedTabs().at("Travel") == "Boats" && !input.Pinned());
+    CHECK(input.Press(800.0f, 110.0f, false)); // a right press picks nothing
+    CHECK(input.PickedTabs().at("Travel") == "Boats");
+    CHECK(input.Press(800.0f, 110.0f, true));
+    CHECK(input.PickedTabs().at("Travel") == "Airships");
     CHECK(input.Press(960.0f, 250.0f, true)); // elsewhere on the popup it pins, as before
     CHECK(input.Pinned() == BarWidget::Target);
-    // A tab picks itself in its card, by the card's heading, and pins nothing.
-    input.Pin(std::nullopt);
-    input.Move(960.0f, 18.0f);
-    input.SetPopup(BarRect{760.0f, 44.0f, 400.0f, 300.0f}, {BarFold{"Travel", BarRect{770.0f, 100.0f, 60.0f, 20.0f}, "Boats"}});
-    CHECK(input.Press(790.0f, 110.0f, true));
-    CHECK(input.PickedTabs().at("Travel") == "Boats" && !input.Pinned());
-    CHECK((input.OpenFolds() == std::vector<std::string>{"Ice"}));
-    input.Pin(BarWidget::Target);
-    // With no popup drawn its rows are gone, and what was open stays open for the next time.
+    // With no popup drawn its tabs are gone, and what was picked stays picked for the next time.
     input.SetPopup(BarRect{});
-    CHECK(!input.Press(960.0f, 130.0f, true));
-    CHECK((input.OpenFolds() == std::vector<std::string>{"Ice"}));
+    CHECK(!input.Press(850.0f, 110.0f, true));
+    CHECK(input.PickedTabs().at("Travel") == "Airships");
 }
 
 TEST(a_cut_help_bar_under_the_strip_opens_and_pins_its_popup_and_takes_only_its_own_presses)

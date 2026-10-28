@@ -40,8 +40,9 @@ BOARDING, LEAVING = 'docked', 'departing'  # the door opens as the ship docks
 # A shop's kind from its script's header, the first word found; the headers name guilds in several ways.
 GUILD_WORDS = [('Goldsmithing', 'Goldsmithing'), ('Smithing', 'Smithing'), ('Woodworking', 'Woodworking'),
                ('Cloth', 'Clothcraft'), ('Leather', 'Leathercraft'), ('Bone', 'Bonecraft'), ('Alchem', 'Alchemy'),
-               ('Cooking', 'Cooking'), ('Fishing', 'Fishing'), ('Tenshodo', 'Tenshodo'), ('Linkshell', 'Linkshell'),
-               ('acts like a guild merchant', 'Chips')]  # the goblins, who sell crystal chips
+               ('Cooking', 'Cooking'), ('Fishing', 'Fishing'), ('Tenshodo', 'Tenshodo'), ('Linkshell', 'Linkshell')]
+# Merchants with guild hours that are no guild, left out: the goblins who sell crystal chips.
+NOT_GUILDS = ['acts like a guild merchant']
 WEEKDAYS = ['FIRESDAY', 'EARTHSDAY', 'WATERSDAY', 'WINDSDAY', 'ICEDAY', 'LIGHTNINGDAY', 'LIGHTSDAY', 'DARKSDAY']
 HEADER_LINES = 8
 
@@ -151,6 +152,8 @@ def build_guilds(server: pathlib.Path) -> list:
         if npc not in scripts:
             raise WorldDataError(f'guild_shops.lua has {npc}, who has no script')
         header = '\n'.join(scripts[npc].read_text(encoding='utf-8').splitlines()[:HEADER_LINES])
+        if any(words.lower() in header.lower() for words in NOT_GUILDS):
+            continue
         area, kind = re.search(r'--\s*Area:\s*(.+)', header), guild_kind(header)
         if not area or not kind:
             raise WorldDataError(f'the script of {npc} names no place or no guild HeadsUp knows')

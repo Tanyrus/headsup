@@ -2220,47 +2220,63 @@ TEST(each_kind_of_ship_has_a_tab_of_its_routes)
         CHECK(row.cells.back().text.back().text.find(' ') == std::string::npos);
 }
 
-TEST(each_guild_folds_its_shops_under_how_many_are_open)
+TEST(each_guild_has_a_tab_of_its_shops_dim_while_all_are_shut)
 {
     BarState state;
     state.unixMs = kEarthsdayTen;
     Settings settings = WorldShowing(WorldLine::Departure);
     settings.Widget(BarWidget::World).worldSections = WorldBit(WorldSection::Guilds);
     const auto guilds = [&] { return BarPopupContent(BarWidget::World, state, settings).sections.at(0); };
-    // A row a guild, in the shops' order, saying how many of its shops are open.
+    // A tab a guild, in the shops' order; no goblins selling chips among them.
     std::vector<std::string> names;
-    int woodworking = 0, woodworkingOpen = 0;
+    std::map<std::string, std::pair<int, int>> open; // each guild's open shops and all its shops
     for (const GuildShop& shop : GuildShops())
     {
         if (names.empty() || names.back() != shop.guild) names.push_back(shop.guild);
-        if (std::string(shop.guild) == "Woodworking")
-        {
-            ++woodworking;
-            woodworkingOpen += GuildAt(shop, state.unixMs).open;
-        }
+        open[shop.guild].first += GuildAt(shop, state.unixMs).open;
+        ++open[shop.guild].second;
     }
-    const PopupSection closed = guilds();
-    CHECK_EQ(closed.heading, "Guilds");
-    // Each closed guild's shops are there but hidden, so the card is as wide closed as open.
-    std::vector<const PopupRow*> shown;
-    for (const PopupRow& row : closed.rows)
-        if (!row.hidden) shown.push_back(&row);
-        else CHECK(row.nested);
-    CHECK_EQ(shown.size(), names.size());
-    CHECK_EQ(closed.rows.size(), 2 * names.size());
+    CHECK(std::ranges::find(names, "Chips") == names.end());
+    const PopupSection section = guilds();
+    CHECK_EQ(section.heading, "Guilds");
+    CHECK_EQ(section.tabs.size(), names.size());
     for (size_t i = 0; i < names.size(); ++i)
-        CHECK(shown[i]->fold == names[i] && !shown[i]->open);
-    CHECK_EQ(Lines(PopupSection{"", {*shown.back()}}).front(),
-        "Woodworking " + std::to_string(woodworkingOpen) + " of " + std::to_string(woodworking) + " open");
-    // Open, its shops follow it: each one's hours, then who and where.
-    state.openFolds = {"Woodworking"};
-    const PopupSection open = guilds();
-    CHECK(open.rows.back().nested && !open.rows.back().hidden && open.rows.back().kind == RowKind::Grid &&
-          open.rows.back().columns == 2);
-    const std::vector<PopupCell>& cells = open.rows.back().cells;
-    CHECK_EQ(cells.size(), static_cast<size_t>(2 * woodworking));
-    const auto at = std::ranges::find_if(cells, [](const PopupCell& c) { return Joined(c.text) == "Chaupire, Northern San d'Oria"; });
-    CHECK(at != cells.end() && (at - cells.begin()) % 2 == 1);
+    {
+        const PopupTab& tab = section.tabs[i];
+        CHECK(tab.name.text == names[i] && (tab.name.tone == Tone::Dim) == (open[names[i]].first == 0));
+        CHECK_EQ(Lines(PopupSection{"", tab.rows}).front(),
+            "Open " + std::to_string(open[names[i]].first) + " of " + std::to_string(open[names[i]].second));
+    }
+    // Each shop's hours, then who and where, set in under the count.
+    state.pickedTabs["Guilds"] = "Woodworking";
+    const PopupSection woodworking = guilds();
+    const PopupRow& grid           = woodworking.tabs[woodworking.tab].rows.back();
+    CHECK(woodworking.tabs[woodworking.tab].name.text == "Woodworking");
+    CHECK(grid.nested && grid.kind == RowKind::Grid && grid.columns == 2);
+    CHECK_EQ(grid.cells.size(), static_cast<size_t>(2 * open["Woodworking"].second));
+    const auto at = std::ranges::find_if(grid.cells, [](const PopupCell& c) { return Joined(c.text) == "Chaupire, Northern San d'Oria"; });
+    CHECK(at != grid.cells.end() && (at - grid.cells.begin()) % 2 == 1);
     // Its hours before it: open until 21:00, 11 Vana'diel hours away, as the panel line says.
     CHECK_EQ(Joined((at - 1)->text), std::string("Open") + kDot + "closes in 26:24");
+}
+
+TEST(the_weather_popup_keeps_its_forecast_and_elements_in_one_column_at_one_width)
+{
+    Settings settings;
+    BarState state;
+    state.zone   = 103;
+    state.unixMs = kVanaEpochUnixMs + 777LL * 3456 * 1000;
+    const PopupContent popup = BarPopupContent(BarWidget::Weather, state, settings);
+    CHECK(popup.oneColumn);
+    const BarMetrics m = MetricsFor(45, BarShape::Pills);
+    const auto measure = [](const Span& span, PopupFont font) {
+        const float height = font == PopupFont::Title ? 24.0f : 18.0f;
+        return TextSize{8.0f * static_cast<float>(span.text.size()), height, 0.3f * height, height - 1.0f};
+    };
+    std::vector<const PopupPiece*> cards;
+    const PopupLayout l = LayoutPopup(popup, m, BarShape::Pills, false, measure, 1000.0f);
+    for (const PopupPiece& p : l.pieces)
+        if (p.kind == PopupPiece::Kind::Card) cards.push_back(&p);
+    CHECK_EQ(cards.size(), static_cast<size_t>(2));
+    CHECK(cards[0]->x == cards[1]->x && cards[0]->width == cards[1]->width && cards[1]->y > cards[0]->y);
 }

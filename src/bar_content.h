@@ -98,13 +98,8 @@ namespace headsup
         RowKind kind = RowKind::Line;
         int columns  = 0; // Grid
         std::vector<PopupCell> cells;
-        // A row a click opens and closes, by this key, with an arrow before it; while open, the nested rows after it
-        // are its own, set in under its first cell.
-        std::string fold{};
-        bool open   = false;
-        bool nested = false;
+        bool nested = false; // set in a socket with the nested rows beside it, as a tab's rows are
         bool header = false; // Grid: its first line heads its columns, and each group of them set side by side
-        bool hidden = false; // a closed fold's row: as wide as its card is, but not drawn
         // A socket's first row: what its scrolling is kept by, and how many of its lines it is scrolled past.
         std::string scroll{};
         size_t scrolled = 0;
@@ -133,6 +128,7 @@ namespace headsup
         std::optional<Icon> icon;
         std::vector<Span> title;
         std::vector<PopupSection> sections;
+        bool oneColumn = false; // its cards down one column, however tall
         bool operator==(const PopupContent&) const = default;
     };
 

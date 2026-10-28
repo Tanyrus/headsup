@@ -233,14 +233,11 @@ TEST(a_popup_is_its_panel_and_each_piece_where_the_layout_put_it)
     const PopupPiece rule = piece(PopupPiece::Kind::Rule, 60.0f, 46.0f, 100.0f, 1.0f);
     const PopupPiece tag  = piece(PopupPiece::Kind::Tag, 20.0f, 80.0f, 50.0f, 21.0f);
     const PopupPiece socket = piece(PopupPiece::Kind::Socket, 24.0f, 70.0f, 172.0f, 26.0f);
-    PopupPiece arrow        = piece(PopupPiece::Kind::Fold, 24.0f, 56.0f, 9.4f, 9.4f);
-    arrow.span              = Text("", Tone::Dim);
-    arrow.open              = true;
     PopupPiece tab          = piece(PopupPiece::Kind::Tab, 24.0f, 104.0f, 50.0f, 21.0f);
     tab.open                = true;
     const PopupPiece track  = piece(PopupPiece::Kind::ScrollTrack, 190.0f, 72.0f, 4.0f, 22.0f);
     const PopupPiece thumb  = piece(PopupPiece::Kind::ScrollThumb, 190.0f, 76.4f, 4.0f, 7.1f);
-    layout.pieces           = {card, title, value, icon, mark, star, rule, tag, socket, arrow, time, tab, track, thumb};
+    layout.pieces           = {card, title, value, icon, mark, star, rule, tag, socket, time, tab, track, thumb};
     // The title's line box starts 2 px under where the layout put its line; the text's, at it.
     const PopupFaces faces = {PopupFace{"Marcellus SC", 24, 29, 0, 2.0f}, PopupFace{"Barlow Condensed", 18, 22, 0, 0.0f},
         PopupFace{"Marcellus SC", 15, 18, 0, 0.0f}, PopupFace{"Marcellus SC", 15, 18, 0, 0.0f}};
@@ -264,9 +261,6 @@ TEST(a_popup_is_its_panel_and_each_piece_where_the_layout_put_it)
     CHECK(Has(rml, "<div class=\"p thumb\" style=\"left:190px;top:76px;width:4px;height:7px;border-radius:2px;\"></div>"));
     // The picked tab is lit.
     CHECK(Has(rml, "<div class=\"p tab lit\" style=\"left:24px;top:104px;width:50px;height:21px;border-radius:10.5px;\"></div>"));
-    const std::string arrowTag = "<img class=\"p\" src=\"" + FoldSource(look.PopupColor(arrow.span), 9, true) +
-                                 "\" style=\"left:24px;top:56px;width:9px;height:9px;\"/>";
-    CHECK(Has(rml, arrowTag.c_str()));
     // A pill theme's panel has no outer border.
     const std::string pills = PopupRml(layout, LookOf(BarTheme::UmbraDark, settings), faces);
     CHECK(!Has(pills, "id=\"outer\""));
@@ -282,7 +276,7 @@ TEST(the_popup_document_styles_its_faces_and_boxes_from_the_look)
     CHECK(Has(rml, "pointer-events:none") && Has(rml, "<div id=\"popup\" class=\"hidden\"></div>"));
     CHECK(Has(rml, ".f0{font-family:\"Barlow Condensed\";font-size:24px;line-height:29px;letter-spacing:0px;"));
     CHECK(Has(rml, ".f2{font-family:\"Barlow Condensed\";font-size:15px;line-height:18px;letter-spacing:2px;"));
-    // An open fold's rows sit sunk into the card: darker, its upper edges dark and its lower ones lit.
+    // A tab's rows sit sunk into the card: darker, its upper edges dark and its lower ones lit.
     CHECK(Has(rml, ".socket{box-sizing:border-box;border:1px;border-color:#00000059 #ffffff14 #ffffff14 #00000059;"));
     CHECK(Has(rml, ".tab{") && Has(rml, ".tab.lit{"));
     CHECK(Has(rml, ".track{") && Has(rml, ".thumb{"));
@@ -300,14 +294,6 @@ TEST(a_star_is_served_in_the_coins_gold)
     const std::optional<Image> star = HostImage("hu:star/15");
     CHECK(star && star->width == 15 && star->height == 15);
     CHECK(star->argb[7 * 15 + 7] == 0xFFE8C35Au); // its middle
-}
-
-TEST(a_fold_arrow_is_served_in_its_color_and_way)
-{
-    CHECK_EQ(FoldSource(0xFFB0A8C0, 9, true), "hu:fold/ffb0a8c0/9/1");
-    const std::optional<Image> down = HostImage(FoldSource(0xFFB0A8C0, 9, true)), right = HostImage(FoldSource(0xFFB0A8C0, 9, false));
-    CHECK(down && right && down->argb == FoldArrow(9, 0xFFB0A8C0, true).argb && right->argb == FoldArrow(9, 0xFFB0A8C0, false).argb);
-    CHECK(!HostImage("hu:fold/ffb0a8c0/9/2"));
 }
 
 TEST(every_theme_eases_breathes_and_pulses_in_its_own_colors)

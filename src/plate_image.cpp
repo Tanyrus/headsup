@@ -601,24 +601,6 @@ namespace headsup
         return image;
     }
 
-    Image FoldArrow(int size, uint32_t color, bool open)
-    {
-        const int s = std::max(1, size);
-        Image image{s, s, std::vector<uint32_t>(static_cast<size_t>(s) * static_cast<size_t>(s), 0)};
-        const float side = static_cast<float>(s), half = side / 2.0f;
-        // Pointing right: its base down the left edge, narrowing evenly to the tip at the right edge's middle.
-        const auto right = [&](float x, float y) { return x >= 0.0f && x <= side && std::fabs(y - half) <= half * (1.0f - x / side); };
-        const auto inside = [&](float x, float y) { return open ? right(y, x) : right(x, y); };
-        for (int y = 0; y < s; ++y)
-            for (int x = 0; x < s; ++x)
-            {
-                Paint paint;
-                paint.Over(Covered(x, y, kPixelSamples, inside), color);
-                image.argb[static_cast<size_t>(y * s + x)] = paint.Color();
-            }
-        return image;
-    }
-
     int WholePixels(float size)
     {
         return std::max(1, static_cast<int>(std::lround(size)));

@@ -103,12 +103,12 @@ namespace headsup
     // widget losing its popup, closes it, and the pointer crossing the gap between them does not. A left press on a
     // widget pins its popup, or unpins it if it was pinned; a left press on the open popup toggles its pin too. While
     // a popup is pinned, hovering another shows that one until the pointer leaves.
-    // A fold row of the open popup, where it was drawn on the screen, or a tab of one of its cards.
-    struct BarFold
+    // A tab of one of the open popup's cards, where it was drawn on the screen: its key the card's heading.
+    struct BarTabChip
     {
         std::string key;
         BarRect rect;
-        std::string tab{}; // a tab's name, key being its card's heading
+        std::string tab;
     };
     // A part of the open popup the wheel scrolls, where it was drawn, and how many lines it scrolls.
     struct BarScroll
@@ -125,8 +125,8 @@ namespace headsup
     public:
         // Each frame: where the widgets are now and which have popups. A pinned widget that is gone loses its pin.
         void Frame(const BarLayout& layout, const std::array<bool, kPanelSlots>& hasPopup);
-        // Where the open popup was drawn, or an empty rectangle, its fold rows and the parts that scroll.
-        void SetPopup(const BarRect& popup, std::vector<BarFold> folds = {}, std::vector<BarScroll> scrolls = {});
+        // Where the open popup was drawn, or an empty rectangle, its cards' tabs and the parts that scroll.
+        void SetPopup(const BarRect& popup, std::vector<BarTabChip> chips = {}, std::vector<BarScroll> scrolls = {});
         // The wheel turned notches toward the player: true when the pointer, where it last moved, is over a part of the
         // popup that scrolls, which then scrolls kLinesPerNotch lines a notch, no further than its ends.
         bool Wheel(int notches);
@@ -143,10 +143,8 @@ namespace headsup
         // Forget the layout, the pointer and any pin, as before the first frame.
         void Reset() { *this = BarInput{}; }
         // True when the press landed on the bar, a widget placed under it or the open popup: the game must not get it.
-        // A left press on a fold row opens or closes it, and pins nothing.
+        // A left press on a tab picks it, and pins nothing.
         bool Press(float x, float y, bool left);
-        // The fold rows opened since loading, by their keys, in the order they were opened.
-        const std::vector<std::string>& OpenFolds() const { return m_OpenFolds; }
         // The tab picked last in each card since loading, by the card's heading.
         const std::map<std::string, std::string>& PickedTabs() const { return m_Tabs; }
         bool Over(float x, float y) const;
@@ -173,8 +171,7 @@ namespace headsup
         BarLayout m_Layout;
         std::array<bool, kPanelSlots> m_HasPopup{};
         BarRect m_Popup;
-        std::vector<BarFold> m_Folds;
-        std::vector<std::string> m_OpenFolds;
+        std::vector<BarTabChip> m_Chips;
         std::map<std::string, std::string> m_Tabs;
         std::vector<BarScroll> m_Scrolls;
         struct Drag

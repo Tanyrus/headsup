@@ -17,14 +17,13 @@ namespace headsup
     namespace
     {
         constexpr std::string_view kIconKind = "icon", kStripKind = "strip", kDiamondKind = "diamond", kCoinKind = "coin",
-                                   kStarKind = "star", kResetKind = "reset", kGameKind = "game",
-                                   kFoldKind = "fold";
+                                   kStarKind = "star", kResetKind = "reset", kGameKind = "game";
         // RmlUi blurs a glow by a Gaussian of this share of its width; the bar's shadow is a CSS blur radius, twice
         // its Gaussian's.
         constexpr float kGlowSigmaPerWidth = 0.4f;
         constexpr float kSigmaPerRadius    = 0.5f;
         constexpr int kShadowDrop          = 1; // pixels down
-        constexpr uint32_t kSocketFill     = 0x38000000; // an open fold's socket: black over its card
+        constexpr uint32_t kSocketFill     = 0x38000000; // a socket: black over its card
         constexpr uint32_t kSocketShade    = 0x59000000, kSocketLight = 0x14FFFFFF;
         constexpr uint32_t kLitTab         = 0x40; // the picked tab's fill: its accent at a quarter
         constexpr uint32_t kScrollTrack    = 0x1AFFFFFF, kScrollThumb = 0x73FFFFFF; // white, faint and less so
@@ -227,12 +226,6 @@ namespace headsup
         return std::string(kHostSource) + std::string(kStarKind) + kSeparator + std::to_string(pixels);
     }
 
-    std::string FoldSource(uint32_t argb, int pixels, bool open)
-    {
-        return std::string(kHostSource) + std::string(kFoldKind) + kSeparator + Hex(argb) + kSeparator +
-               std::to_string(pixels) + kSeparator + (open ? "1" : "0");
-    }
-
     std::string ResetSource(uint32_t argb, int pixels)
     {
         return std::string(kHostSource) + std::string(kResetKind) + kSeparator + Hex(argb) + kSeparator + std::to_string(pixels);
@@ -276,12 +269,6 @@ namespace headsup
             const std::optional<uint32_t> color = number(1, kHexBase), pixels = number(2);
             if (!color || !pixels) return std::nullopt;
             return kind == kDiamondKind ? Diamond(static_cast<int>(*pixels), *color) : ResetArrow(static_cast<int>(*pixels), *color);
-        }
-        if (kind == kFoldKind && parts.size() == 4)
-        {
-            const std::optional<uint32_t> color = number(1, kHexBase), pixels = number(2), open = number(3);
-            if (!color || !pixels || !open || *open > 1) return std::nullopt;
-            return FoldArrow(static_cast<int>(*pixels), *color, *open == 1);
         }
         if ((kind == kCoinKind || kind == kStarKind) && parts.size() == 2)
         {
@@ -588,13 +575,6 @@ namespace headsup
             {
                 const int pixels = WholePixels(piece.width);
                 rml += "<img class=\"p\" src=\"" + StarSource(pixels) + "\" style=\"" + place +
-                       size(static_cast<float>(pixels), static_cast<float>(pixels)) + "\"/>";
-                break;
-            }
-            case PopupPiece::Kind::Fold:
-            {
-                const int pixels = WholePixels(piece.width);
-                rml += "<img class=\"p\" src=\"" + FoldSource(color, pixels, piece.open) + "\" style=\"" + place +
                        size(static_cast<float>(pixels), static_cast<float>(pixels)) + "\"/>";
                 break;
             }

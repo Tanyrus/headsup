@@ -21,8 +21,8 @@ namespace headsup
         constexpr float kCardPad     = 0.55f; // a card's contents from its edges
         constexpr float kCardGap     = 0.45f; // between cards, and between the columns of them
         constexpr float kMinWidth    = 12.0f; // popupText, so a short popup is not a sliver
-        constexpr float kFoldArrow   = 0.6f;  // a fold row's arrow
-        constexpr float kSocketPad   = 0.35f; // above and below the rows in an open fold's socket
+        constexpr float kSocketInset = 0.9f;  // a socket's rows from its left and right edges
+        constexpr float kSocketPad   = 0.35f; // above and below a socket's rows
         constexpr size_t kMostSideBySide  = 4; // groups of a tall grid's lines set side by side before a card goes on
         constexpr size_t kSideBySideAbove = 6; // the lines a grid has before it is set in groups
         constexpr size_t kSocketLines     = 10; // the lines a socket shows, the rest scrolling
@@ -85,15 +85,12 @@ namespace headsup
                 float inset;        // how far in from the card's padding it ends: a socket's room on its right
             };
             std::vector<Value> values;
-            struct Fold
+            struct Chip
             {
-                std::string key;
-                float y, height;   // its row, with half the gap to each neighbour
-                float x = -1.0f;   // a tab's chip, from the card's left; below 0 for the whole row across the card
-                float width = 0.0f;
-                std::string tab{};
+                std::string key, tab;
+                float x, y, width, height; // x from the card's left padding, y from its top
             };
-            std::vector<Fold> folds;
+            std::vector<Chip> chips;
             std::vector<size_t> sockets; // pieces to widen to the card's inside once its width is known
             struct Anchor
             {
@@ -111,7 +108,7 @@ namespace headsup
             };
             std::vector<Scroll> scrolls;
             bool card     = false;
-            float reserve = 0.0f; // its height with its tallest tab and its folds closed, which sets its column
+            float reserve = 0.0f; // its height with its tallest tab picked, which sets its column
         };
 
         Block LayoutSection(const PopupSection& section, const BarMetrics& metrics, bool ornate, SpanMeasure measure)
@@ -156,7 +153,7 @@ namespace headsup
                     b.pieces.push_back(std::move(chip));
                     b.pieces.push_back(PopupPiece{PopupPiece::Kind::Text, x + TagPadX(unit), y + framed.inkTop - size.inkTop,
                         size.width, size.height, section.tabs[i].name});
-                    b.folds.push_back(Block::Fold{section.heading, y, framed.height, x - b.pad, framed.width, section.tabs[i].name.text});
+                    b.chips.push_back(Block::Chip{section.heading, section.tabs[i].name.text, x - b.pad, y, framed.width, framed.height});
                     contentWidth = std::max(contentWidth, x + framed.width - b.pad);
                     x += framed.width + gap;
                     lineHeight = std::max(lineHeight, framed.height);
@@ -180,7 +177,7 @@ namespace headsup
             }
             std::vector<TextSize> cells;
             std::vector<float> columns;
-            const float socketPad = std::round(unit * kSocketPad), inset = std::round(unit * (kFoldArrow + kIconGap));
+            const float socketPad = std::round(unit * kSocketPad), inset = std::round(unit * kSocketInset);
             // A row's lines that scroll: a grid's but for its heads, which stay; any other row is one.
             const auto linesOf = [](const PopupRow& row) -> size_t {
                 if (row.kind != RowKind::Grid || row.columns <= 0) return 1;
@@ -214,13 +211,6 @@ namespace headsup
                     b.anchors.push_back(Block::Anchor{b.pieces.size(), right});
                     b.pieces.push_back(
                         PopupPiece{PopupPiece::Kind::ScrollThumb, 0.0f, socket->top + (track - thumb) * down, bar, thumb, {}});
-                    const Span where{std::to_string(socket->from + 1) + " to " + std::to_string(socket->from + socket->shown) +
-                                         " of " + std::to_string(socket->lines) + kDot + "scroll for more",
-                        Tone::Dim, 0};
-                    const TextSize t = measure(where, PopupFont::Text);
-                    b.pieces.push_back(PopupPiece{PopupPiece::Kind::Text, b.pad + inset, y, t.width, t.height, where});
-                    contentWidth = std::max(contentWidth, 2.0f * inset + t.width);
-                    y += t.height + metrics.rowGap;
                 }
                 PopupPiece& ground = b.pieces[socket->piece];
                 ground.height      = y - metrics.rowGap + socketPad - ground.y;
@@ -243,16 +233,15 @@ namespace headsup
             for (size_t r = 0; r < rows.size(); ++r)
             {
                 const PopupRow& row = rows[r];
-                if (!row.nested && !row.hidden) closeSocket();
+                if (!row.nested) closeSocket();
                 if (row.cells.empty()) continue;
                 const bool grid = row.kind == RowKind::Grid && row.columns > 0;
                 const bool tags = row.kind == RowKind::Tags;
                 const bool pair = row.kind == RowKind::Pair && row.cells.size() == 2;
                 const float gap = unit * (tags ? kTagGap : pair ? kPairGap : kCellGap);
-                const bool fold = !row.fold.empty();
-                // A fold row's cells after its arrow, and the rows it holds lined up with them, as far in from the
+                // A socket's rows as far in from its right as from its left.
                 // socket's right as from its left.
-                const float indent = fold || row.nested ? inset : 0.0f;
+                const float indent = row.nested ? inset : 0.0f;
                 cells.clear();
                 columns = grid ? runColumns[r] : std::vector<float>{};
                 float rowWidth = indent + (row.nested ? inset : 0.0f);
@@ -265,12 +254,11 @@ namespace headsup
                     rowWidth += c;
                 if (grid) rowWidth += unit * kColumnGap * static_cast<float>(columns.size() - 1);
                 contentWidth = std::max(contentWidth, rowWidth);
-                if (row.hidden) continue;
                 if (row.nested && !socket)
                 {
                     socket = Socket{b.pieces.size(), row.scroll};
                     for (size_t n = r; n < rows.size() && rows[n].nested; ++n)
-                        if (!rows[n].hidden) socket->lines += linesOf(rows[n]);
+                        socket->lines += linesOf(rows[n]);
                     socket->shown = std::min(socket->lines, kSocketLines);
                     socket->from  = std::min(row.scrolled, socket->lines - socket->shown);
                     b.pieces.push_back(PopupPiece{PopupPiece::Kind::Socket, b.pad, y, 0.0f, 0.0f, {}});
@@ -280,16 +268,7 @@ namespace headsup
 
                 const size_t perLine = grid ? columns.size() : row.cells.size();
                 float lineHeight = 0.0f, x = b.pad + indent;
-                const float top  = y;
                 bool shown       = showLine(row, grid && row.header);
-                if (fold)
-                {
-                    const float s = unit * kFoldArrow;
-                    PopupPiece arrow{PopupPiece::Kind::Fold, b.pad, y + (cells[0].inkTop + cells[0].inkBottom - s) / 2.0f,
-                        s, s, {Text("", Tone::Dim)}};
-                    arrow.open = row.open;
-                    b.pieces.push_back(std::move(arrow));
-                }
                 for (size_t i = 0; i < row.cells.size(); ++i)
                 {
                     if (i > 0 && i % perLine == 0)
@@ -344,8 +323,6 @@ namespace headsup
                     lineHeight = std::max(lineHeight, size.height);
                     x += grid ? columns[i % columns.size()] + unit * kColumnGap : size.width + gap;
                 }
-                if (fold)
-                    b.folds.push_back(Block::Fold{row.fold, top - metrics.rowGap / 2.0f, y + lineHeight - top + metrics.rowGap});
                 if (shown) y += lineHeight + metrics.rowGap;
             }
             closeSocket();
@@ -373,26 +350,24 @@ namespace headsup
                 piece.line = line;
                 l.pieces.push_back(std::move(piece));
             }
-            for (Block::Fold& fold : b.folds)
-                l.folds.push_back(PopupFold{std::move(fold.key), fold.x < 0.0f ? x : x + b.pad + fold.x, y + fold.y,
-                    fold.x < 0.0f ? width : fold.width, fold.height, line, std::move(fold.tab)});
+            for (Block::Chip& chip : b.chips)
+                l.chips.push_back(PopupTabChip{std::move(chip.key), x + b.pad + chip.x, y + chip.y, chip.width, chip.height, line,
+                    std::move(chip.tab)});
             for (Block::Scroll& scroll : b.scrolls)
                 l.scrolls.push_back(PopupScroll{std::move(scroll.key), x + b.pad, y + scroll.y, width - 2.0f * b.pad,
                     scroll.height, line, scroll.most,
                     BarRect{x + width - b.pad - scroll.grip, y + scroll.trackY, scroll.grip, scroll.track}, scroll.thumb});
             l.lines.push_back(PopupLine{y + b.height});
         }
-        // A card as LayoutSection lays it out, with its reserve: its height with each tab picked in turn and its fold
-        // rows closed, the tallest of them.
+        // A card as LayoutSection lays it out, with its reserve: its height with each tab picked in turn, the tallest.
         Block LayoutCard(const PopupSection& section, const BarMetrics& metrics, bool ornate, SpanMeasure measure)
         {
             Block b = LayoutSection(section, metrics, ornate, measure);
-            PopupSection closed = section;
-            std::erase_if(closed.rows, [](const PopupRow& row) { return row.nested; });
+            PopupSection each = section;
             for (size_t tab = 0; tab < std::max<size_t>(section.tabs.size(), 1); ++tab)
             {
-                closed.tab = tab;
-                b.reserve  = std::max(b.reserve, LayoutSection(closed, metrics, ornate, measure).height);
+                each.tab  = tab;
+                b.reserve = std::max(b.reserve, LayoutSection(each, metrics, ornate, measure).height);
             }
             return b;
         }
@@ -561,13 +536,13 @@ namespace headsup
                     cards.push_back(LayoutCard(part, metrics, ornate, measure));
 
         // One column, or two when one runs tall: the split whose taller column is shortest, in their order. When that
-        // runs past the room, as many columns as fill it in order. Each card counts as its reserve, so a tab picked or
-        // a fold opened makes it grow down where it is.
+        // runs past the room, as many columns as fill it in order. Each card counts as its reserve, so a tab picked
+        // makes it grow down where it is. A popup that asks for one column keeps it.
         float stacked = 0.0f;
         for (const Block& b : cards)
             stacked += b.reserve + cardGap;
         std::vector<size_t> starts{0}; // each column's first card
-        if (cards.size() >= 2 && stacked > unit * kTwoColumnsAbove)
+        if (!content.oneColumn && cards.size() >= 2 && stacked > unit * kTwoColumnsAbove)
         {
             float best = stacked, left = 0.0f;
             size_t split = cards.size();
@@ -641,7 +616,7 @@ namespace headsup
             if (kept[i]) bottom = std::max(bottom, layout.lines[i].bottom);
         }
         std::erase_if(layout.pieces, [&](const PopupPiece& piece) { return !kept[piece.line]; });
-        std::erase_if(layout.folds, [&](const PopupFold& fold) { return !kept[fold.line]; });
+        std::erase_if(layout.chips, [&](const PopupTabChip& chip) { return !kept[chip.line]; });
         std::erase_if(layout.scrolls, [&](const PopupScroll& scroll) { return !kept[scroll.line]; });
         layout.height = bottom + padding;
     }
