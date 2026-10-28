@@ -33,6 +33,7 @@ namespace headsup
             Card,       // a section's rounded ground, under its heading and rows
             Socket,     // the sunken ground under a tab's rows
             Tab,        // a card's tab's chip, under its name; open while picked
+            Item,       // a game item's picture, which the plugin serves
             ScrollTrack, // a scrolling socket's scrollbar, in its right padding
             ScrollThumb, // and the part of it its shown lines are
         };
@@ -44,6 +45,7 @@ namespace headsup
         size_t line    = 0;             // in the layout's lines
         bool open      = false;         // Tab: picked
         bool right     = false;         // Text: drawn against its box's right, as a pair's value is
+        uint16_t item  = 0;             // Item
     };
 
     // Where a card's tab is, from the popup's top-left corner, to click: its key the card's heading.

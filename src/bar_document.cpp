@@ -17,7 +17,8 @@ namespace headsup
     namespace
     {
         constexpr std::string_view kIconKind = "icon", kStripKind = "strip", kDiamondKind = "diamond", kCoinKind = "coin",
-                                   kStarKind = "star", kResetKind = "reset", kGameKind = "game";
+                                   kStarKind = "star", kResetKind = "reset", kGameKind = "game",
+                                   kItemKind = "item";
         // RmlUi blurs a glow by a Gaussian of this share of its width; the bar's shadow is a CSS blur radius, twice
         // its Gaussian's.
         constexpr float kGlowSigmaPerWidth = 0.4f;
@@ -224,6 +225,21 @@ namespace headsup
     std::string StarSource(int pixels)
     {
         return std::string(kHostSource) + std::string(kStarKind) + kSeparator + std::to_string(pixels);
+    }
+
+    std::string ItemSource(uint16_t item)
+    {
+        return std::string(kHostSource) + std::string(kItemKind) + kSeparator + std::to_string(item);
+    }
+
+    std::optional<uint16_t> ItemOfSource(std::string_view name)
+    {
+        if (name.substr(0, kHostSource.size()) != kHostSource) return std::nullopt;
+        const std::vector<std::string_view> parts = Parts(name.substr(kHostSource.size()));
+        if (parts.size() != 2 || parts[0] != kItemKind) return std::nullopt;
+        const std::optional<uint32_t> item = Number(parts[1]);
+        if (!item || *item == 0 || *item > UINT16_MAX) return std::nullopt;
+        return static_cast<uint16_t>(*item);
     }
 
     std::string ResetSource(uint32_t argb, int pixels)
@@ -569,6 +585,10 @@ namespace headsup
                 break;
             case PopupPiece::Kind::Icon:
                 rml += "<img class=\"p\" src=\"" + IconSource(piece.icon) + "\" style=\"" + place + "width:" +
+                       Px(piece.width) + ";height:" + Px(piece.height) + ";\"/>";
+                break;
+            case PopupPiece::Kind::Item:
+                rml += "<img class=\"p\" src=\"" + ItemSource(piece.item) + "\" style=\"" + place + "width:" +
                        Px(piece.width) + ";height:" + Px(piece.height) + ";\"/>";
                 break;
             case PopupPiece::Kind::Star:

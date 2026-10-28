@@ -2262,7 +2262,7 @@ TEST(each_guild_has_a_tab_of_its_shops)
     // Each shop's hours, then who and where, set in under the count.
     state.pickedTabs["Guilds"] = "Woodworking";
     const PopupSection woodworking = guilds();
-    const PopupRow& grid           = woodworking.tabs[woodworking.tab].rows.back();
+    const PopupRow& grid           = woodworking.tabs[woodworking.tab].rows[1]; // after the count, before the turn-ins
     CHECK(woodworking.tabs[woodworking.tab].name.text == "Woodworking");
     CHECK(grid.nested && grid.kind == RowKind::Grid && grid.columns == 2);
     CHECK_EQ(grid.cells.size(), static_cast<size_t>(2 * open["Woodworking"].second));
@@ -2270,6 +2270,43 @@ TEST(each_guild_has_a_tab_of_its_shops)
     CHECK(at != grid.cells.end() && (at - grid.cells.begin()) % 2 == 1);
     // Its hours before it: open until 21:00, 11 Vana'diel hours away, as the panel line says.
     CHECK_EQ(Joined((at - 1)->text), std::string("Open") + kDot + "closes in 26:24");
+}
+
+TEST(a_craft_guilds_tab_lists_todays_turn_ins_under_its_shops_with_yours_lit)
+{
+    BarState state;
+    state.unixMs = kEarthsdayTen;
+    Settings settings = WorldShowing(WorldLine::Departure);
+    settings.Widget(BarWidget::World).worldSections = WorldBit(WorldSection::Guilds);
+    state.pickedTabs["Guilds"] = "Fishing";
+    const auto fishing = [&] {
+        const PopupSection guilds = BarPopupContent(BarWidget::World, state, settings).sections.at(0);
+        return guilds.tabs[guilds.tab];
+    };
+    // Not fetched yet, it says so under the shops.
+    CHECK_EQ(Lines(PopupSection{"", fishing().rows}).back(), "Today's turn-ins come from phoenix-xi.com");
+    state.turnInsFailed = true;
+    CHECK_EQ(Lines(PopupSection{"", fishing().rows}).back(), "phoenix-xi.com did not answer; trying again soon");
+    // Fetched: each rank's item with its picture, its points and the most a day; your rank starred and lit.
+    GuildPatterns today;
+    today.guilds[0] = {GuildTurnIn{0, "Amateur", 4443, "Cobalt Jellyfish", 24, 1200},
+        GuildTurnIn{1, "Recruit", 4403, "Yellow Globe", 60, 1680}, GuildTurnIn{2, "Initiate", 4402, "", 90, 2000}};
+    state.turnIns = &today;
+    state.crafts  = CraftRanks{1};
+    const PopupRow grid = fishing().rows.back();
+    CHECK(grid.kind == RowKind::Grid && grid.columns == 4 && grid.nested && grid.header);
+    CHECK_EQ(grid.cells.size(), static_cast<size_t>(4 * 4));
+    CHECK(Joined(grid.cells[0].text) == "Rank" && Joined(grid.cells[1].text) == "Item" && Joined(grid.cells[2].text) == "Points" &&
+          Joined(grid.cells[3].text) == "A Day");
+    CHECK(Joined(grid.cells[4].text) == "Amateur" && !grid.cells[4].star && grid.cells[5].item == 4443 &&
+          Joined(grid.cells[5].text) == "Cobalt Jellyfish" && Joined(grid.cells[6].text) == "24" && Joined(grid.cells[7].text) == "1,200");
+    CHECK(Joined(grid.cells[8].text) == "Recruit" && grid.cells[8].star && grid.cells[9].text.front().tone == Tone::Heading);
+    CHECK(grid.cells[5].text.front().tone == Tone::Normal);
+    CHECK(Joined(grid.cells[13].text) == "Item 4402" && grid.cells[13].item == 4402); // a name the site does not have
+    // A guild that takes no turn-ins has none.
+    state.pickedTabs["Guilds"] = "Tenshodo";
+    const PopupSection guilds = BarPopupContent(BarWidget::World, state, settings).sections.at(0);
+    CHECK(guilds.tabs[guilds.tab].name.text == "Tenshodo" && guilds.tabs[guilds.tab].rows.size() == 2);
 }
 
 TEST(the_weather_popup_keeps_its_forecast_and_elements_in_one_column_at_one_width)

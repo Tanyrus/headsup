@@ -238,7 +238,9 @@ TEST(a_popup_is_its_panel_and_each_piece_where_the_layout_put_it)
     tab.open                = true;
     const PopupPiece track  = piece(PopupPiece::Kind::ScrollTrack, 190.0f, 72.0f, 4.0f, 22.0f);
     const PopupPiece thumb  = piece(PopupPiece::Kind::ScrollThumb, 190.0f, 76.4f, 4.0f, 7.1f);
-    layout.pieces           = {card, title, value, icon, mark, star, rule, tag, socket, time, tab, track, thumb};
+    PopupPiece item         = piece(PopupPiece::Kind::Item, 120.0f, 104.0f, 19.3f, 19.3f);
+    item.item               = 4443;
+    layout.pieces           = {card, title, value, icon, mark, star, rule, tag, socket, time, tab, track, thumb, item};
     // The title's line box starts 2 px under where the layout put its line; the text's, at it.
     const PopupFaces faces = {PopupFace{"Marcellus SC", 24, 29, 0, 2.0f}, PopupFace{"Barlow Condensed", 18, 22, 0, 0.0f},
         PopupFace{"Marcellus SC", 15, 18, 0, 0.0f}, PopupFace{"Marcellus SC", 15, 18, 0, 0.0f}};
@@ -260,6 +262,7 @@ TEST(a_popup_is_its_panel_and_each_piece_where_the_layout_put_it)
     // A scrollbar's track and its thumb, both round at their ends.
     CHECK(Has(rml, "<div class=\"p track\" style=\"left:190px;top:72px;width:4px;height:22px;border-radius:2px;\"></div>"));
     CHECK(Has(rml, "<div class=\"p thumb\" style=\"left:190px;top:76px;width:4px;height:7px;border-radius:2px;\"></div>"));
+    CHECK(Has(rml, "<img class=\"p\" src=\"hu:item/4443\" style=\"left:120px;top:104px;width:19.3px;height:19.3px;\"/>"));
     // The picked tab is lit.
     CHECK(Has(rml, "<div class=\"p tab lit\" style=\"left:24px;top:104px;width:50px;height:21px;border-radius:10.5px;\"></div>"));
     // A pill theme's panel has no outer border.
@@ -295,6 +298,14 @@ TEST(a_star_is_served_in_the_coins_gold)
     const std::optional<Image> star = HostImage("hu:star/15");
     CHECK(star && star->width == 15 && star->height == 15);
     CHECK(star->argb[7 * 15 + 7] == 0xFFE8C35Au); // its middle
+}
+
+TEST(an_items_picture_is_named_by_its_id_for_the_plugin_to_serve)
+{
+    CHECK_EQ(ItemSource(4443), "hu:item/4443");
+    CHECK(ItemOfSource("hu:item/4443") == 4443);
+    CHECK(!ItemOfSource("hu:item/") && !ItemOfSource("hu:item/70000") && !ItemOfSource("hu:star/15"));
+    CHECK(!HostImage("hu:item/4443")); // the plugin's to make, from the game's resources
 }
 
 TEST(every_theme_eases_breathes_and_pulses_in_its_own_colors)

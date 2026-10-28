@@ -33,7 +33,10 @@
 #include "rml_host.h"
 #include "rml_menu.h"
 #include "search_client.h"
+#include "guild_points.h"
+#include "item_picture.h"
 #include "server_ping.h"
+#include "web_get.h"
 #include "settings.h"
 #include "shot_watch.h"
 #include "tracker.h"
@@ -88,6 +91,8 @@ namespace
     constexpr const char* kNoteLog           = "headsup";  // the log's name in HeadsUp's logs folder, before its time
     constexpr const char* kThemesFolder      = "themes";  // and their saved top panel themes
     constexpr const char* kOutpostsFile      = "outposts.txt"; // every character's supply runs, as overseers told them
+    constexpr const char* kTurnInsFile       = "guild_turnins.txt"; // today's guild point turn-ins, as Phoenix's site gave them
+    constexpr double kTurnInsRetry           = 600.0; // seconds after a fetch that got no answer
     constexpr const char* kSettingsFile      = "settings.ini";
     constexpr const char* kNewFileSuffix     = ".new";          // after the process id: the file while it is written
     constexpr long kMaxSettingsBytes         = 4 * 1024 * 1024; // past this the file is not HeadsUp's to rewrite
@@ -297,6 +302,11 @@ class HeadsUp final : public IPlugin
     std::optional<headsup::PlayOnlineCounts> m_PlayOnlineCounts; // read with the counters
     headsup::ConnectionMeter m_Connection;
     headsup::ServerPing m_Ping;
+    headsup::WebGet m_TurnInFetch;                 // Phoenix's site, for today's guild point turn-ins
+    std::optional<headsup::GuildPatterns> m_TurnIns;
+    std::optional<int64_t> m_TurnInsDay;           // the day in Japan they are for
+    bool m_TurnInsRead = false, m_TurnInsFailed = false;
+    double m_TurnInsRetry = 0.0;                   // the next fetch after one that got no answer
     bool m_PingTried = false; // it redirects the game's import of sendto, so once someone wants the ping
     headsup::FreeSpaceWalk m_SpaceWalk;
     headsup::CpuMeter m_Cpu;
@@ -1814,6 +1824,13 @@ private:
             [this](const std::string& name) {
                 if (std::optional<headsup::Image> piece = headsup::SkinImage(m_WindowSkins, name)) return piece;
                 if (std::optional<headsup::Image> picture = headsup::GamePictureImage(m_PlayOnlineIcons, name)) return picture;
+                // An item's picture, from the game's own resources.
+                if (const std::optional<uint16_t> item = headsup::ItemOfSource(name))
+                {
+                    const IItem* found = g_Resources != nullptr ? g_Resources->GetItemById(*item) : nullptr;
+                    if (found == nullptr) return std::optional<headsup::Image>{};
+                    return headsup::ItemPicture(found->Bitmap, std::min<size_t>(found->ImageSize, sizeof(found->Bitmap)));
+                }
                 return headsup::HostImage(name);
             });
         if (!started) Print("RmlUi did not start: the top panel and the settings window are off until HeadsUp reloads.");
@@ -1850,6 +1867,42 @@ private:
     }
 
     std::string OutpostsPath() { return OwnFolder(kConfigFolder) + "\\" + kOutpostsFile; }
+    std::string TurnInsPath() { return OwnFolder(kConfigFolder) + "\\" + kTurnInsFile; }
+
+    // The saved turn-ins at first, a fetch's answer as it comes, and a fetch when the day in Japan has moved on from
+    // the one kept, never sooner than kTurnInsRetry after one that got no answer.
+    void KeepTurnIns(int64_t unixMs, double now)
+    {
+        if (!std::exchange(m_TurnInsRead, true))
+        {
+            std::ifstream in(TurnInsPath(), std::ios::binary);
+            const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            if (const std::optional<headsup::SavedGuildPatterns> saved = headsup::ReadGuildPatternsFile(text))
+                if (std::optional<headsup::GuildPatterns> read = headsup::ReadGuildPatterns(saved->json))
+                {
+                    m_TurnIns    = std::move(read);
+                    m_TurnInsDay = saved->day;
+                }
+        }
+        if (const std::optional<headsup::WebGet::Answer> answer = m_TurnInFetch.Take())
+        {
+            std::optional<headsup::GuildPatterns> read = answer->ok ? headsup::ReadGuildPatterns(answer->body) : std::nullopt;
+            m_TurnInsFailed = !read;
+            if (read)
+            {
+                m_TurnIns    = std::move(read);
+                m_TurnInsDay = headsup::JstDay(unixMs);
+                std::ofstream out(TurnInsPath(), std::ios::binary | std::ios::trunc);
+                const std::string text = headsup::GuildPatternsFile(*m_TurnInsDay, answer->body);
+                out.write(text.data(), static_cast<std::streamsize>(text.size()));
+                if (!out.good()) Note("could not save the guild turn-ins to " + TurnInsPath() + ".");
+            }
+            else
+                m_TurnInsRetry = now + kTurnInsRetry;
+        }
+        if (headsup::GuildPatternsDue(m_TurnInsDay, unixMs) && !m_TurnInFetch.Busy() && now >= m_TurnInsRetry)
+            m_TurnInFetch.Start(headsup::kGuildPatternsHost, headsup::kGuildPatternsPath);
+    }
 
     headsup::OutpostFile& Outposts()
     {
@@ -2167,6 +2220,14 @@ private:
                 s.earthMinute = local->tm_min;
                 s.earthSecond = local->tm_sec;
             }
+        }
+        // Today's guild point turn-ins while World Info shows: kept for the day in Japan, fetched again after its reset.
+        if (headsup::Shown(m_Settings, headsup::BarWidget::World) && s.unixMs != 0)
+        {
+            KeepTurnIns(s.unixMs, now);
+            s.turnIns       = m_TurnIns && m_TurnInsDay == headsup::JstDay(s.unixMs) ? &*m_TurnIns : nullptr;
+            s.turnInsFailed = m_TurnInsFailed;
+            s.crafts        = m_GameState.Crafts();
         }
         if (needs.zone) s.zone = m_Zone;
         if (needs.frames) s.frames = m_FrameStats.Report();

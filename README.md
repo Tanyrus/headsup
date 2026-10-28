@@ -7,7 +7,9 @@ already sends, apart from three requests the game's own menus make, which the to
 sends when you open Region Info, while the panel's Zone widget is on, and the two it sends when you open the
 Currencies menu, while the Gil widget is on ([Top panel](#top-panel) says when). It never targets anything itself, and
 it checks a monster itself only with Auto-Check switched on, which is off unless you turn it on: it then sends the same
-request `/check` does, for monsters alone and never for a player.
+request `/check` does, for monsters alone and never for a player. While the World Info widget is on, it also asks
+Phoenix's website (api.phoenix-xi.com) once a day for that day's guild point turn-ins, and keeps the answer until the
+day changes in Japan.
 
 ![Goblins, a sheep, a crab and an NM in Valkurm Dunes, each with HeadsUp's nameplate, and the top panel above](resources/headsup.jpg)
 
@@ -278,7 +280,7 @@ A bar of widgets across the top of the screen, on by default, with these widgets
 | Signet | The time left on Signet or Sanction, only while one is on | What it gives and whether it works where you are |
 | Distance | How far your target is, in yalms | Nothing |
 | Conquest | How many regions each nation holds, for the nations its Nations filter picks | Which regions each holds, marking the ones your nation holds that you have not run supplies to |
-| World Info | What its Shows picks, with a countdown: the next departure of a ship you pick, when an element's weather can next roll in your zone, a guild's hours, the RSE or the moon | The parts its Popup picks: a tab for each kind of ship with its routes beside a calendar of the RSE, the moons and the conquest tally, and under them a tab for each guild with its shops' hours |
+| World Info | What its Shows picks, with a countdown: the next departure of a ship you pick, when an element's weather can next roll in your zone, a guild's hours, the RSE or the moon | The parts its Popup picks: a tab for each kind of ship with its routes beside a calendar of the RSE, the moons and the conquest tally, and under them a tab for each guild with its shops' hours and, for a craft guild, today's guild point turn-ins: each rank's item with its picture, its points and the most a day, your rank starred |
 | Target | A monster's name in its border color, its level and con | Its jobs, weaknesses, resistances, absorbs, immunities, tags, stats, TP moves, spells, spawn, drops at Treasure Hunter 0 and what can be stolen; for an NPC or ??? in Phoenix's NPC data, what it is for, when it appears, what clicking it says and does, its shop, what to trade it, what it pops and gives, the key items it gives and checks for, and its quests, missions and battlefields; for a player you checked, their jobs, master level, linkshell and title, as of your check |
 | Gil | Your gil, or the currency picked in its section | Gil and every currency you have |
 | Bags | Your inventory's used and maximum space | Every bag you have |

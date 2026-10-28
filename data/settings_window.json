@@ -874,7 +874,7 @@
         {"name": "Memory", "tip": "The game's memory used, over what is left before it runs out at 4 GB; amber, then red, as it runs low. Hover for the processor, the frames and the LinuxXI plugin's figures."},
         {"name": "EXP", "tip": "Your EXP and its bar, on its own. Hover for EXP per hour."},
         {"name": "Conquest", "tip": "How many regions each nation holds. Hover for which ones."},
-        {"name": "World Info", "tip": "The next ship, a weather, a guild's hours, the RSE or the moon, as you pick. Hover for every ship, the guilds and the calendar."}
+        {"name": "World Info", "tip": "The next ship, a weather, a guild's hours, the RSE or the moon, as you pick. Hover for every ship, the guilds with today's turn-ins from Phoenix's website, and the calendar."}
       ]
     },
     {

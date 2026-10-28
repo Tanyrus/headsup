@@ -79,6 +79,9 @@ namespace headsup
         LinuxXIState linuxxi;
         std::map<std::string, std::string> pickedTabs; // the tab the player picked in a card, by its heading
         std::map<std::string, size_t> scrolled; // lines a part of a popup is scrolled past, by its key
+        const GuildPatterns* turnIns = nullptr; // today's guild point turn-ins, once fetched
+        bool turnInsFailed = false;             // the last fetch got no answer
+        std::optional<CraftRanks> crafts;       // yours, once the server sent them
     };
 
     // The parts of BarState that the shown widgets and the open popup read, for the plugin to gather only those; it

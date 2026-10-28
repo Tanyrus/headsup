@@ -29,6 +29,19 @@ TEST(a_zone_in_names_the_zones_weather)
     CHECK(!ParseZoneInWeather(odd.data(), 0x100).has_value());
 }
 
+TEST(the_skills_packet_holds_each_crafts_rank_in_its_low_bits)
+{
+    // 0x062: two bytes a skill from 0x80; Fishing is skill 48, Cooking 56. A craft's rank is its low 5 bits, its level
+    // above them, and its cap flag the top bit (the SDK's craftskill_t).
+    const auto at = [](int skill) { return static_cast<size_t>(0x80 + 2 * skill); };
+    const std::vector<uint8_t> skills = Packet(0x100, {{at(48), (23 << 5) | 3}, {at(56), (5 << 5) | 1},
+                                                          {at(52), 0x8000 | (100 << 5) | 10}});
+    const std::optional<CraftRanks> ranks = ParseCraftRanks(skills.data(), static_cast<uint32_t>(skills.size()));
+    CHECK(ranks.has_value());
+    CHECK((*ranks)[0] == 3 && (*ranks)[8] == 1 && (*ranks)[4] == 10 && (*ranks)[1] == 0);
+    CHECK(!ParseCraftRanks(skills.data(), static_cast<uint32_t>(at(56) + 1)).has_value()); // too short for Cooking
+}
+
 TEST(a_weather_change_names_the_new_weather)
 {
     const std::vector<uint8_t> change = Packet(0x0C, {{0x08, 14}});

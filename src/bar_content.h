@@ -84,6 +84,7 @@ namespace headsup
         bool immune = false; // the icon carries a × in the immunity color
         std::vector<Span> text;
         bool star = false; // a star after the text: who holds what the cell's row is about
+        uint16_t item = 0; // a game item's picture before the text, in place of an icon
         bool operator==(const PopupCell&) const = default;
     };
 

@@ -462,6 +462,23 @@ TEST(a_popup_is_never_narrower_than_it_is_asked_to_be)
     CHECK(Near(LayoutPopup(c, m, BarShape::Pills, false, Fake, 10000.0f, 10.0f).width, narrow.width));
 }
 
+TEST(a_cell_of_an_item_has_its_picture_before_its_text_as_an_icon_would)
+{
+    const BarMetrics m = MetricsFor(36, BarShape::Pills);
+    PopupContent c;
+    c.title = {{"Guilds", Tone::Normal}};
+    PopupCell jellyfish = Word("Cobalt Jellyfish");
+    jellyfish.item      = 4443;
+    PopupCell icon      = Word("Fire");
+    icon.icon           = Icon::Fire;
+    c.sections.push_back(PopupSection{"Turn-ins", {PopupRow{RowKind::Line, 0, {jellyfish}}, PopupRow{RowKind::Line, 0, {icon}}}});
+    const PopupLayout l = LayoutPopup(c, m, BarShape::Pills, false, Fake);
+    const std::vector<const PopupPiece*> items = Of(l, PopupPiece::Kind::Item), icons = Of(l, PopupPiece::Kind::Icon);
+    CHECK(items.size() == 1 && icons.size() == 1 && items.front()->item == 4443);
+    CHECK(Near(items.front()->width, icons.front()->width) && Near(items.front()->height, icons.front()->height));
+    CHECK(Near(Find(l, "Cobalt Jellyfish")->x, Find(l, "Fire")->x));
+}
+
 TEST(a_pairs_value_ends_at_its_cards_right_edge_and_its_label_at_the_left)
 {
     const BarMetrics m = MetricsFor(36, BarShape::Pills);

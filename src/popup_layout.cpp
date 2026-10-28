@@ -45,12 +45,13 @@ namespace headsup
         TextSize CellSize(const PopupCell& cell, float unit, SpanMeasure measure)
         {
             TextSize size;
-            if (cell.icon) size = TextSize{unit * kCellIcon, unit * kCellIcon, 0.0f, unit * kCellIcon};
-            bool inked = cell.icon.has_value();
+            const bool pictured = cell.icon || cell.item != 0;
+            if (pictured) size = TextSize{unit * kCellIcon, unit * kCellIcon, 0.0f, unit * kCellIcon};
+            bool inked = pictured;
             for (const Span& span : cell.text)
             {
                 const TextSize t = measure(span, PopupFont::Text);
-                size.width += t.width + (cell.icon && &span == &cell.text.front() ? unit * kIconGap : 0.0f);
+                size.width += t.width + (pictured && &span == &cell.text.front() ? unit * kIconGap : 0.0f);
                 size.height    = std::max(size.height, t.height);
                 size.inkTop    = inked ? std::min(size.inkTop, t.inkTop) : t.inkTop;
                 size.inkBottom = inked ? std::max(size.inkBottom, t.inkBottom) : t.inkBottom;
@@ -302,7 +303,15 @@ namespace headsup
                         cy += framed.inkTop - size.inkTop;
                         size = framed;
                     }
-                    if (cell.icon)
+                    if (cell.item != 0)
+                    {
+                        const float s = unit * kCellIcon;
+                        PopupPiece picture{PopupPiece::Kind::Item, cx, cy, s, s, {}};
+                        picture.item = cell.item;
+                        b.pieces.push_back(std::move(picture));
+                        cx += s + (cell.text.empty() ? 0.0f : unit * kIconGap);
+                    }
+                    else if (cell.icon)
                     {
                         const float s = unit * kCellIcon, mark = unit * kMark;
                         b.pieces.push_back(PopupPiece{PopupPiece::Kind::Icon, cx, cy, s, s, {}, PopupFont::Text, *cell.icon});
