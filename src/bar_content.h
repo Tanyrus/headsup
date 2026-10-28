@@ -103,6 +103,7 @@ namespace headsup
         std::string fold{};
         bool open   = false;
         bool nested = false;
+        bool header = false; // Grid: its first line heads its columns, and each group of them set side by side
         bool operator==(const PopupRow&) const = default;
     };
 

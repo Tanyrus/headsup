@@ -863,6 +863,7 @@ namespace headsup
                 });
                 PopupRow grid = Grid(kZoneRollColumns, (order.size() + 1) * kZoneRollColumns);
                 grid.nested   = true;
+                grid.header   = true;
                 for (const char* heading : {"Zone", "Today", "Tomorrow"})
                     grid.cells.push_back(Cell(Text(heading, Tone::Dim)));
                 for (const auto& [zone, rolls] : order)

@@ -273,29 +273,35 @@ TEST(a_tall_popup_flows_its_cards_into_two_columns)
     CHECK(Near(Of(shortOne, PopupPiece::Kind::Card)[0]->x, Of(shortOne, PopupPiece::Kind::Card)[1]->x));
 }
 
-TEST(a_popup_taller_than_its_room_carries_its_cards_on_in_more_columns_and_drops_nothing)
+TEST(a_table_taller_than_the_room_sets_its_lines_side_by_side_in_its_card_and_drops_nothing)
 {
     const BarMetrics m = MetricsFor(36, BarShape::Pills);
     PopupContent c;
     c.title = {{"Weather", Tone::Normal}};
     c.sections.push_back(PopupSection{"Forecast", {PopupRow{RowKind::Line, 0, {Word("Today")}}}});
-    PopupRow grid{RowKind::Grid, 2, {}};
+    PopupRow grid{RowKind::Grid, 2, {Word("Zone"), Word("Today")}};
+    grid.header = true;
     for (int i = 0; i < 60; ++i)
     {
         grid.cells.push_back(Word(("Zone " + std::to_string(i)).c_str()));
         grid.cells.push_back(Word(i % 3 == 0 ? "Snow 50% wide" : "-"));
     }
     c.sections.push_back(PopupSection{"By Element", {grid}});
-    const float room = LayoutPopup(c, m, BarShape::Pills, false, Fake).height / 3.0f;
-    const PopupLayout l = LayoutPopup(c, m, BarShape::Pills, false, Fake, room);
-    CHECK(l.height <= room + 0.01f);
+    const PopupLayout whole = LayoutPopup(c, m, BarShape::Pills, false, Fake);
+    const float room        = whole.height / 3.0f;
+    const PopupLayout l     = LayoutPopup(c, m, BarShape::Pills, false, Fake, room);
+    CHECK(l.height <= room + 0.01f && l.width > whole.width);
     CHECK(AllInside(l, m));
-    // The grid goes on under its heading in more columns, lined up in each: every zone is there with its chance after
-    // it on its line, and the chances of a column start at one place.
-    size_t headings = 0;
+    // Still its own card, once, wider: its lines in groups side by side, each under the table's heads, in order down
+    // each group before the next.
+    CHECK_EQ(Of(l, PopupPiece::Kind::Card).size(), static_cast<size_t>(2));
+    size_t headings = 0, heads = 0;
     for (const PopupPiece& p : l.pieces)
+    {
         headings += p.span.text == "BY ELEMENT";
-    CHECK(headings >= 2);
+        heads += p.span.text == "Zone";
+    }
+    CHECK(headings == 1 && heads >= 2);
     std::map<int, std::set<int>> chanceX; // by the zones' x, in whole pixels
     for (int i = 0; i < 60; ++i)
     {
@@ -306,13 +312,34 @@ TEST(a_popup_taller_than_its_room_carries_its_cards_on_in_more_columns_and_drops
             if (&p != zone && Near(p.y, zone->y) && p.x > zone->x && (chance == nullptr || p.x < chance->x)) chance = &p;
         CHECK(chance != nullptr && chance->span.text == (i % 3 == 0 ? "Snow 50% wide" : "-"));
         chanceX[static_cast<int>(std::lround(zone->x))].insert(static_cast<int>(std::lround(chance->x)));
+        if (i > 0)
+        {
+            const PopupPiece* before = Find(l, "Zone " + std::to_string(i - 1));
+            CHECK(Near(before->x, zone->x) ? before->y < zone->y : before->x < zone->x);
+        }
     }
     CHECK(chanceX.size() >= 2);
     for (const auto& [x, at] : chanceX)
         CHECK_EQ(at.size(), static_cast<size_t>(1));
-    // With room for it whole, it stays one card.
+    // With room for it whole, it stays one group.
     const PopupLayout roomy = LayoutPopup(c, m, BarShape::Pills, false, Fake, 10000.0f);
-    CHECK_EQ(Of(roomy, PopupPiece::Kind::Card).size(), static_cast<size_t>(2));
+    CHECK(Near(roomy.width, whole.width) && Near(roomy.height, whole.height));
+}
+
+TEST(a_card_too_tall_for_the_room_without_a_table_goes_on_in_another_column)
+{
+    const BarMetrics m = MetricsFor(36, BarShape::Pills);
+    PopupContent c;
+    c.title = {{"Gil", Tone::Normal}};
+    PopupSection currencies{"Currencies", {}};
+    for (int i = 0; i < 40; ++i)
+        currencies.rows.push_back(PopupRow{RowKind::Line, 0, {Word(("Currency " + std::to_string(i)).c_str())}});
+    c.sections.push_back(currencies);
+    const float room    = LayoutPopup(c, m, BarShape::Pills, false, Fake).height / 2.5f;
+    const PopupLayout l = LayoutPopup(c, m, BarShape::Pills, false, Fake, room);
+    CHECK(l.height <= room + 0.01f && Of(l, PopupPiece::Kind::Card).size() >= 3);
+    for (int i = 0; i < 40; ++i)
+        CHECK(Find(l, "Currency " + std::to_string(i)) != nullptr);
 }
 
 TEST(immune_icons_get_their_mark_and_pinned_shows)

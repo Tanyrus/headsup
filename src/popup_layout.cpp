@@ -23,6 +23,8 @@ namespace headsup
         constexpr float kMinWidth    = 12.0f; // popupText, so a short popup is not a sliver
         constexpr float kFoldArrow   = 0.6f;  // a fold row's arrow
         constexpr float kSocketPad   = 0.35f; // above and below the rows in an open fold's socket
+        constexpr size_t kMostSideBySide  = 4; // groups of a tall grid's lines set side by side before a card goes on
+        constexpr size_t kSideBySideAbove = 6; // the lines a grid has before it is set in groups
 
         std::string Upper(std::string text)
         {
@@ -261,12 +263,61 @@ namespace headsup
                 l.folds.push_back(PopupFold{std::move(fold.key), x, y + fold.y, width, fold.height, line});
             l.lines.push_back(PopupLine{y + b.height});
         }
-        // A card that would run taller than tall, cut into parts that fit between its rows, a grid's lines counting as
-        // rows; each part keeps the heading. A row taller than tall alone is a part of its own.
+        // A grid's lines in groups side by side, down each group before the next, with an empty column between groups;
+        // a header line heads each group.
+        PopupRow SideBySide(const PopupRow& row, size_t groups)
+        {
+            const auto columns  = static_cast<size_t>(row.columns);
+            const size_t head   = row.header ? columns : 0;
+            const size_t lines  = (row.cells.size() - head + columns - 1) / columns;
+            const size_t down   = (lines + groups - 1) / groups;
+            const size_t across = (lines + down - 1) / down;
+            const auto cellOf   = [&](size_t index) { return index < row.cells.size() ? row.cells[index] : PopupCell{}; };
+            PopupRow out = row;
+            out.cells.clear();
+            out.columns = static_cast<int>(columns * across + across - 1);
+            // One line across the groups: each group's cells from first, or empty past the end, an empty one between.
+            const auto addLine = [&](auto first) {
+                for (size_t group = 0; group < across; ++group)
+                {
+                    const std::optional<size_t> from = first(group);
+                    for (size_t at = 0; at < columns; ++at)
+                        out.cells.push_back(from ? cellOf(*from + at) : PopupCell{});
+                    if (group + 1 < across) out.cells.emplace_back();
+                }
+            };
+            if (row.header) addLine([](size_t) { return std::optional<size_t>(0); });
+            for (size_t step = 0; step < down; ++step)
+                addLine([&](size_t group) {
+                    const size_t line = group * down + step;
+                    return line < lines ? std::optional<size_t>(head + line * columns) : std::nullopt;
+                });
+            return out;
+        }
+
+        // A card that would run taller than tall: its long grids' lines set side by side in it, as few groups as fit;
+        // failing that, cut into parts that fit between its rows, a grid's lines counting as rows, each part keeping
+        // the heading. A row taller than tall alone is a part of its own.
         std::vector<PopupSection> Fitted(const PopupSection& section, float tall, const BarMetrics& metrics, bool ornate,
                                          SpanMeasure measure)
         {
             if (LayoutSection(section, metrics, ornate, measure).height <= tall) return ListOf(section);
+            for (size_t groups = 2; groups <= kMostSideBySide; ++groups)
+            {
+                PopupSection wide = section;
+                bool set          = false;
+                for (PopupRow& row : wide.rows)
+                {
+                    const auto columns = static_cast<size_t>(std::max(row.columns, 0));
+                    if (row.kind != RowKind::Grid || columns == 0 ||
+                        row.cells.size() <= (kSideBySideAbove + (row.header ? 1 : 0)) * columns)
+                        continue;
+                    row = SideBySide(row, groups);
+                    set = true;
+                }
+                if (!set) break;
+                if (LayoutSection(wide, metrics, ornate, measure).height <= tall) return ListOf(wide);
+            }
             std::vector<PopupRow> rows;
             for (const PopupRow& row : section.rows)
             {
