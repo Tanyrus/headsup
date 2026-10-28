@@ -1345,3 +1345,45 @@ TEST(playonline_counts_are_taken_as_the_network_window_shows_them)
     CHECK(PlayOnlineFrom(2, 0) == (PlayOnlineCounts{2, 0}));
     CHECK(PlayOnlineFrom(250, 3) == (PlayOnlineCounts{200, 3})); // the window shows at most 200 messages
 }
+
+namespace
+{
+    // The two calls that draw one character's model, as the client of 2026-10-27 held them: lea ecx,[esp+78h];
+    // push eax; push ecx; push edi; push esi (the actor); lea ecx,[esi+674h]; call 0x2B6E0. A Windows tester's
+    // /hu stackdump of 2026-10-08 found every credited character draw under one of them, the actor just above.
+    constexpr uint32_t kModelDraw = 0x02B6E0, kModelCallA = 0x0CCDC1, kModelCallB = 0x0CCDF5;
+
+    Image ModelClient()
+    {
+        Image image;
+        image.Put(kModelCallA - 14, {0x8D, 0x4C, 0x24, 0x78, 0x50, 0x51, 0x57, 0x56, 0x8D, 0x8E, 0x74, 0x06, 0x00, 0x00,
+                                        0xE8, 0x1A, 0xE9, 0xF5, 0xFF});
+        image.Put(kModelCallB - 14, {0x8D, 0x4C, 0x24, 0x78, 0x50, 0x51, 0x57, 0x56, 0x8D, 0x8E, 0x74, 0x06, 0x00, 0x00,
+                                        0xE8, 0xE6, 0xE8, 0xF5, 0xFF});
+        return image;
+    }
+}
+
+TEST(both_calls_that_draw_a_characters_model_are_found)
+{
+    const ModelDraws found = LocateModelDraws(ModelClient().Text());
+    CHECK(found.problem == LocateProblem::None);
+    CHECK_EQ(found.draw, kModelDraw);
+    CHECK((found.calls == std::vector<uint32_t>{kModelCallA, kModelCallB}));
+}
+
+TEST(model_draw_calls_into_different_routines_are_refused)
+{
+    Image image = ModelClient();
+    image.Put32(kModelCallB + 1, 0x00001000);
+    CHECK(LocateModelDraws(image.Text()).problem == LocateProblem::ModelDrawsDiffer);
+}
+
+TEST(a_call_that_does_not_pass_the_actor_first_is_not_a_model_draw)
+{
+    Image image = ModelClient();
+    image.Put(kModelCallA - 7, {0x57}); // push edi last: the actor no longer the first argument
+    image.Put(kModelCallB - 7, {0x57});
+    CHECK(LocateModelDraws(image.Text()).problem == LocateProblem::NoModelDraws);
+    CHECK(LocateModelDraws(Image{}.Text()).problem == LocateProblem::NoModelDraws);
+}

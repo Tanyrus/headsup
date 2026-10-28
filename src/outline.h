@@ -5,6 +5,7 @@
 #include "tracker.h"
 
 #include <cstdint>
+#include <optional>
 
 namespace headsup
 {
@@ -18,7 +19,9 @@ namespace headsup
 
         // Our own draws come back through the hooks, for the caller to ignore.
         bool Drawing() const { return m_InDraw; }
-        const ActorInfo* CharacterMeshOwner(const Tracker& tracker);
+        // drawing: the actor whose model the game is drawing (0 between models), or nullopt when that is not known and
+        // the stack is searched instead.
+        const ActorInfo* CharacterMeshOwner(const Tracker& tracker, std::optional<uintptr_t> drawing);
         // Marks the mesh in the stencil and draws its border around it, before the game's own draw of the mesh, which
         // the caller lets through. False when there is no stencil to mark.
         bool DrawOutlined(D3DPRIMITIVETYPE type, UINT minIndex, UINT numVertices, UINT startIndex, UINT primCount,

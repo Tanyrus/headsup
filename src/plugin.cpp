@@ -277,6 +277,7 @@ class HeadsUp final : public IPlugin
     std::vector<HANDLE> m_LoadedFonts;
     headsup::NameHook m_NameHook;
     headsup::ArrowHook m_ArrowHook;
+    headsup::ModelHook m_ModelHook;
     headsup::WindowHook m_WindowHook;
     bool m_WindowHookTried = false; // it patches the game's code, so it starts only once someone wants it
     headsup::PointerFix m_PointerFix;
@@ -493,6 +494,7 @@ public:
         g_Resources  = nullptr;
         if (const std::string failure = m_NameHook.Stop(); !failure.empty()) Print(failure + ".");
         if (const std::string failure = m_ArrowHook.Stop(); !failure.empty()) Print(failure + ".");
+        if (const std::string failure = m_ModelHook.Stop(); !failure.empty()) Print(failure + ".");
         if (const std::string failure = m_WindowHook.Stop(); !failure.empty()) Print(failure + ".");
         if (const std::string failure = m_PointerFix.Stop(); !failure.empty()) Print(failure + ".");
         m_Pointer.Stop();
@@ -758,6 +760,7 @@ public:
         }
 #endif
         StartHooks();
+        m_ModelHook.NewFrame();
         m_Outline.NewFrame();
         m_Names.NewFrame();
         if (m_Outline.TakeStencilWarning())
@@ -1041,7 +1044,8 @@ public:
         const bool outlines = m_Settings.enabled && m_Tracker.OutlinedCount() > 0;
         const bool bodies   = headsup::NameplatesOn(m_Settings) && !m_Tracker.Actors().empty(); // labels wait for a drawn body
         if (!outlines && !bodies) return false;
-        const headsup::ActorInfo* owner = m_Outline.CharacterMeshOwner(m_Tracker);
+        const headsup::ActorInfo* owner = m_Outline.CharacterMeshOwner(m_Tracker,
+            m_ModelHook.Running() ? std::optional<uintptr_t>(m_ModelHook.Drawing()) : std::nullopt);
         if (owner == nullptr) return false;
 #ifdef HEADSUP_DEV
         headsup::CaptureStack(owner->index);
@@ -1316,6 +1320,8 @@ private:
             Print("could not hook the game's names: " + failure + ".");
         if (const std::string failure = m_ArrowHook.Start(); !failure.empty())
             Print("could not hook the game's target arrows, so it draws its own and HeadsUp none: " + failure + ".");
+        if (const std::string failure = m_ModelHook.Start(); !failure.empty())
+            Note("could not hook the game's model draws, so outlines guess whose each one is: " + failure + ".");
         if (const std::string failure = m_PointerFix.Start(); !failure.empty())
             Note("could not fix the game's mouse pointer: " + failure + ".");
         ReadGameFont();

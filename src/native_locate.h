@@ -37,6 +37,8 @@ namespace headsup
         NoEntityCaller,
         EntityWrapperChanged,
         NoEntityWrapperCalls,
+        NoModelDraws,
+        ModelDrawsDiffer,
         NoArrowDraws,
         AmbiguousArrowDraws,
         ArrowDrawsDiffer,
@@ -162,6 +164,16 @@ namespace headsup
         uint32_t list = 0;
     };
     WindowDraw LocateWindowDraw(const ImageSection& text);
+
+    // RVAs of the calls that draw one character's model, each a five-byte thiscall whose first argument is the
+    // character's actor, and of the routine they call.
+    struct ModelDraws
+    {
+        LocateProblem problem = LocateProblem::None;
+        std::vector<uint32_t> calls;
+        uint32_t draw = 0;
+    };
+    ModelDraws LocateModelDraws(const ImageSection& text);
     struct WindowMoveSite
     {
         LocateProblem problem = LocateProblem::None;

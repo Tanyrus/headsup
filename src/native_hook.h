@@ -102,6 +102,27 @@ namespace headsup
         std::array<CodePatch, 2> m_Calls; // the target's and the candidate's
     };
 
+    // Sends the game's calls that draw one character's model (native_locate.h) through a gate that notes the actor
+    // until the draw returns, so every draw in between is that character's.
+    class ModelHook
+    {
+    public:
+        ~ModelHook() { Stop(); }
+        // Only at a render boundary, where the game cannot be inside a model draw. Returns why it could not start, or
+        // an empty string.
+        std::string Start();
+        // Puts the game's calls back if they are still HeadsUp's. Returns why it could not, or an empty string.
+        std::string Stop();
+        bool Running() const { return !m_Calls.empty(); }
+        // At Present: no model is being drawn, whatever a draw the game left early kept noted.
+        void NewFrame();
+        // The actor whose model the game is drawing now, or 0 between models.
+        uintptr_t Drawing() const;
+
+    private:
+        std::vector<CodePatch> m_Calls;
+    };
+
     // Skips the game's help bar and connection readout while asked: the draw loop's call to the menu window draw
     // (native_locate.h) goes to HeadsUp, which passes every window but those hidden on to the game.
     // How the game's windows are placed this frame: the panel's band, and the settings for the help's mode.

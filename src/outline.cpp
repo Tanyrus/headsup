@@ -82,10 +82,11 @@ namespace headsup
         return hasStencil;
     }
 
-    const ActorInfo* OutlineRenderer::CharacterMeshOwner(const Tracker& tracker)
+    const ActorInfo* OutlineRenderer::CharacterMeshOwner(const Tracker& tracker, std::optional<uintptr_t> drawing)
     {
         if (m_Device == nullptr || !IsCharacterModelDraw()) return nullptr;
-        return FindOwnerOnStack(tracker);
+        if (!drawing) return FindOwnerOnStack(tracker);
+        return *drawing != 0 ? tracker.Find(static_cast<ActorPtr>(*drawing)) : nullptr;
     }
 
     bool OutlineRenderer::DrawOutlined(D3DPRIMITIVETYPE type, UINT minIndex, UINT numVertices, UINT startIndex, UINT primCount,

@@ -28,6 +28,12 @@ extern "C"
     uintptr_t g_HeadsUpEntityNameDraw = 0;
     void HeadsUpEntityNameGate();
     __attribute__((used)) uint32_t HeadsUpOnName(uint32_t frame);
+    uintptr_t g_HeadsUpModelDraw = 0;
+    uint32_t g_HeadsUpModelDepth = 0;
+    uint32_t g_HeadsUpModelActors[8]  = {};
+    uint32_t g_HeadsUpModelReturns[8] = {};
+    void HeadsUpModelGate();
+    void HeadsUpModelBack();
     uintptr_t g_HeadsUpArrowDraw = 0;
     void HeadsUpArrowGate();
     __attribute__((used)) uint32_t HeadsUpOnArrow(const uint32_t* arguments, uint32_t returnAddress);
@@ -132,6 +138,47 @@ _HeadsUpNameGate:
     .att_syntax prefix
 )");
 
+// In place of the game's calls that draw one character's model, whose first argument is its actor. It notes the actor
+// and swaps the return for HeadsUpModelBack, which forgets it. A model drawn inside another stacks, up to eight deep
+// (the size of the arrays); one deeper goes through unnoted, its draws the next one out's.
+asm(R"(
+    .text
+    .p2align 4
+    .globl _HeadsUpModelGate
+_HeadsUpModelGate:
+    .intel_syntax noprefix
+    push eax
+    mov eax, dword ptr [_g_HeadsUpModelDepth]
+    cmp eax, 8
+    jae .LHeadsUpModelUnnoted
+    push edx
+    mov edx, dword ptr [esp + 8]
+    mov dword ptr [_g_HeadsUpModelReturns + eax*4], edx
+    mov edx, dword ptr [esp + 12]
+    mov dword ptr [_g_HeadsUpModelActors + eax*4], edx
+    inc eax
+    mov dword ptr [_g_HeadsUpModelDepth], eax
+    pop edx
+    pop eax
+    mov dword ptr [esp], offset _HeadsUpModelBack
+    jmp dword ptr [_g_HeadsUpModelDraw]
+.LHeadsUpModelUnnoted:
+    pop eax
+    jmp dword ptr [_g_HeadsUpModelDraw]
+    .globl _HeadsUpModelBack
+_HeadsUpModelBack:
+    sub esp, 4
+    push eax
+    mov eax, dword ptr [_g_HeadsUpModelDepth]
+    dec eax
+    mov dword ptr [_g_HeadsUpModelDepth], eax
+    mov eax, dword ptr [_g_HeadsUpModelReturns + eax*4]
+    mov dword ptr [esp + 4], eax
+    pop eax
+    ret
+    .att_syntax prefix
+)");
+
 // In place of the entity loop's call into the wrapper that draws an entity's name, which takes the actor in ecx and
 // drops it before the routine runs. It goes on to whatever the call went to, the wrapper or another plugin's hook on it.
 asm(R"(
@@ -215,6 +262,8 @@ namespace headsup
 
         static_assert(sizeof(kNameHookBytes) == kBranchLength + 1, "the hook is a jump and one nop");
         static_assert(kArrowArgumentBytes == 32, "the arrow gate's ret 32");
+        static_assert(std::size(g_HeadsUpModelActors) == 8 && std::size(g_HeadsUpModelReturns) == 8,
+            "the model gate's eight deep");
         constexpr uint32_t kArrowColorArgument = 4; // x, y, scale x, scale y, then the color
 
         // Written at Present and read by OnArrow, both on the render thread, so never at once.
@@ -518,6 +567,41 @@ namespace headsup
         if (const std::string failure = PutIn(patches); !failure.empty()) return failure;
         m_Calls = patches;
         return "";
+    }
+
+    std::string ModelHook::Start()
+    {
+        if (Running()) return "";
+        auto* base = reinterpret_cast<uint8_t*>(GetModuleHandleA(kGameModule));
+        if (base == nullptr) return std::string(kGameModule) + " is not loaded";
+        ImageSection text{};
+        if (!FindSection(base, kCodeSection, text)) return kCodeNotRead;
+        const ModelDraws draws = LocateModelDraws(text);
+        if (draws.problem != LocateProblem::None) return Describe(draws.problem);
+        std::vector<CodePatch> calls;
+        for (const uint32_t rva : draws.calls)
+            calls.push_back(Retarget(base + rva, Address(base + rva), Address(&HeadsUpModelGate)));
+        g_HeadsUpModelDraw  = Address(base) + draws.draw;
+        g_HeadsUpModelDepth = 0;
+        if (const std::string failure = PutIn(calls); !failure.empty()) return failure;
+        m_Calls = std::move(calls);
+        return "";
+    }
+
+    std::string ModelHook::Stop()
+    {
+        if (!Running()) return "";
+        const std::vector<CodePatch> calls = std::exchange(m_Calls, {});
+        return KeptLoaded(PutBack(calls,
+            "the game's model draws were changed again after HeadsUp hooked them, so they were left as they are",
+            "the game's model draws could not be put back"));
+    }
+
+    void ModelHook::NewFrame() { g_HeadsUpModelDepth = 0; }
+
+    uintptr_t ModelHook::Drawing() const
+    {
+        return g_HeadsUpModelDepth > 0 ? g_HeadsUpModelActors[g_HeadsUpModelDepth - 1] : 0;
     }
 
     std::string ArrowHook::Stop()

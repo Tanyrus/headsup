@@ -75,6 +75,11 @@ namespace headsup
         constexpr int16_t kWindowLoop[] = {0x8B, 0xCE, 0xE8, -1, -1, -1, -1, 0x8B, 0x44, 0x24, 0x0C, 0x85, 0xC0, 0x75,
             0xC6, 0xFE, 0xC3, 0x80, 0xFB, 0x09, 0x7C, 0xAD};
         constexpr uint32_t kWindowLoopCall = 2;
+        // A character's model drawn: lea ecx,[esp+78h]; push eax; push ecx; push edi; push esi, the actor and so the
+        // first argument; lea ecx,[esi+674h], its model; call the draw.
+        constexpr int16_t kModelDrawCall[] = {0x8D, 0x4C, 0x24, 0x78, 0x50, 0x51, 0x57, 0x56, 0x8D, 0x8E, 0x74, 0x06, 0x00,
+            0x00, 0xE8};
+        constexpr uint32_t kModelDrawCallAt = 14;
         // Before the loop, the list it walks: xor bl,bl; mov ecx,list; call First, within kWindowListReach bytes.
         constexpr int16_t kWindowListMove[] = {0x32, 0xDB, 0xB9, -1, -1, -1, -1, 0xE8};
         constexpr uint32_t kWindowListAddress = 3, kWindowListReach = 0x60;
@@ -334,6 +339,8 @@ namespace headsup
         case LocateProblem::NoEntityCaller: return "the call that draws entities' names was not found";
         case LocateProblem::EntityWrapperChanged: return "the call that draws entities' names is not laid out as HeadsUp expects";
         case LocateProblem::NoEntityWrapperCalls: return "nothing was found to call the game's entity name draw";
+        case LocateProblem::NoModelDraws: return "the calls that draw characters' models were not found";
+        case LocateProblem::ModelDrawsDiffer: return "the calls that draw characters' models go to different routines";
         case LocateProblem::NoArrowDraws: return "the target window's arrow draws were not found";
         case LocateProblem::AmbiguousArrowDraws: return "the target window's arrow draws were found more than once";
         case LocateProblem::ArrowDrawsDiffer: return "the target window's two arrows are not drawn by the same function";
@@ -527,6 +534,22 @@ namespace headsup
             FindAll(kWindowListMove, ImageSection{text.rva + from, text.bytes + from, found.front() - from});
         const uint32_t list = moves.empty() ? 0 : ReadAt<uint32_t>(text.bytes, from + moves.back() + kWindowListAddress);
         return WindowDraw{LocateProblem::None, call, draw, list};
+    }
+
+    ModelDraws LocateModelDraws(const ImageSection& text)
+    {
+        ModelDraws result;
+        for (const uint32_t at : FindAll(kModelDrawCall, text))
+            result.calls.push_back(text.rva + at + kModelDrawCallAt);
+        if (result.calls.empty())
+        {
+            result.problem = LocateProblem::NoModelDraws;
+            return result;
+        }
+        result.draw = CallTarget(result.calls.front(), text);
+        for (const uint32_t call : result.calls)
+            if (CallTarget(call, text) != result.draw) result.problem = LocateProblem::ModelDrawsDiffer;
+        return result;
     }
 
     NetStats LocateNetStats(const ImageSection& text)
