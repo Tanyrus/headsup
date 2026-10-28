@@ -936,7 +936,7 @@ namespace headsup
             grid.nested   = true;
             grid.header   = true;
             ScrollsBy(grid, state, "Guilds/" + guild + "/Turn-ins");
-            for (const char* heading : {"Rank", "Item", "Points", "Max Points"})
+            for (const char* heading : {"Rank", "NQ Item [HQ Item]", "Points", "Max Points"})
                 grid.cells.push_back(Cell(Text(heading, Tone::Dim)));
             const auto name = [](const GuildTurnIn& t) { return t.itemName.empty() ? "Item " + std::to_string(t.item) : t.itemName; };
             const auto figure = [](int value) { return Grouped(static_cast<uint64_t>(std::max(value, 0))); };

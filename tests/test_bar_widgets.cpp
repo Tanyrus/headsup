@@ -2305,7 +2305,7 @@ TEST(a_craft_guilds_tab_lists_todays_turn_ins_apart_from_its_shops_with_yours_li
     const PopupRow& grid = rows[3];
     CHECK(grid.kind == RowKind::Grid && grid.columns == 4 && grid.nested && grid.header && grid.scroll == "Guilds/Fishing/Turn-ins");
     CHECK_EQ(grid.cells.size(), static_cast<size_t>(4 * 6));
-    CHECK(Joined(grid.cells[0].text) == "Rank" && Joined(grid.cells[1].text) == "Item" && Joined(grid.cells[2].text) == "Points" &&
+    CHECK(Joined(grid.cells[0].text) == "Rank" && Joined(grid.cells[1].text) == "NQ Item [HQ Item]" && Joined(grid.cells[2].text) == "Points" &&
           Joined(grid.cells[3].text) == "Max Points");
     CHECK(Joined(grid.cells[4].text) == "Amateur" && !grid.cells[4].star && grid.cells[5].item == 16);
     CHECK(Joined(grid.cells[5].text) == "Flute [Flute +1]" && Joined(grid.cells[6].text) == "12 [14]" &&
