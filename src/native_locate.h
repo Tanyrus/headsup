@@ -233,6 +233,10 @@ namespace headsup
     // middle button, at +0x18): where, from a call to it in the class's layout at at and, after it, an int16 kept at
     // [base + disp8] and the next at the same base 2 further. None for a class that keeps none.
     std::optional<uint32_t> EntryPlaceOffset(std::span<const uint8_t> layout, uintptr_t at, uintptr_t entryRect);
+    // A class built on another lays its base out first: a layout at at that opens with pushes and keeping `this` in a
+    // register (mov esi/edi, ecx), then calls a routine, names that routine, where what the base keeps is laid out (the
+    // Linkshell menu's owner calls the Linkshell item's). None for a layout that starts with anything else.
+    std::optional<uintptr_t> BaseLayout(std::span<const uint8_t> layout, uintptr_t at);
     // An MCD's rectangle in the game's menu resolution: int16 left, top, right and bottom from +0x3A. +0x94 is a move's
     // countdown (MoveUnderWay); +0x99 is set for windows kept in a 640 x 480 space instead; +0x10 is
     // kWindowOpening while the window has no owner to lay out yet.

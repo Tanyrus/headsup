@@ -1013,10 +1013,16 @@ namespace headsup
 
         // Where an owner keeps an entry's top left corner, read off its class's layout as PlaceCopyAt reads the
         // window's place: none for a class that keeps none.
+        // A class built on another (the Linkshell menu on the Linkshell item) keeps it in its base's layout.
         std::optional<uint32_t> EntryPlaceAt(uint32_t owner)
         {
             const auto layout = g_WindowEntryRect != 0 ? OwnerLayout(owner) : std::nullopt;
-            return layout ? EntryPlaceOffset(layout->first, layout->second, g_WindowEntryRect) : std::nullopt;
+            if (!layout) return std::nullopt;
+            if (const std::optional<uint32_t> kept = EntryPlaceOffset(layout->first, layout->second, g_WindowEntryRect)) return kept;
+            const std::optional<uintptr_t> base = BaseLayout(layout->first, layout->second);
+            const auto* code = base ? reinterpret_cast<const uint8_t*>(*base) : nullptr;
+            if (code == nullptr || !Readable(code, kLayoutScanBytes)) return std::nullopt;
+            return EntryPlaceOffset(std::span<const uint8_t>(code, kLayoutScanBytes), *base, g_WindowEntryRect);
         }
 
         // The game's own move. An owner that keeps a copy of its window's place draws from it, and the move leaves it

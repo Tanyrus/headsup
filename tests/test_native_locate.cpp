@@ -1157,6 +1157,22 @@ TEST(an_owners_copy_of_an_entrys_corner_is_found_after_its_layouts_call_for_the_
     CHECK(!EntryPlaceOffset(apart, at, entryRect));
 }
 
+TEST(a_layout_that_starts_with_its_base_classs_layout_names_it)
+{
+    // The Linkshell menu's owner (link13, Set as No. 1 / No. 2 / Drop; the client's 0x1E6510 of 2026-10-27): push esi;
+    // mov esi,ecx; call 0x1E5F90, the Linkshell item's layout, which keeps the first entry's corner.
+    constexpr uintptr_t at = 0x1E6510;
+    const std::vector<uint8_t> link13{0x56, 0x8B, 0xF1, 0xE8, 0x78, 0xFA, 0xFF, 0xFF, 0x8B, 0x0D, 0x20, 0x35, 0x7F, 0x03};
+    CHECK(BaseLayout(link13, at) == std::optional<uintptr_t>(0x1E5F90));
+    // Started with other work, or a call later on: none.
+    const std::vector<uint8_t> work{0x83, 0xEC, 0x08, 0xE8, 0x78, 0xFA, 0xFF, 0xFF};
+    CHECK(!BaseLayout(work, at));
+    std::vector<uint8_t> late = link13;
+    late.insert(late.begin() + 3, {0x8B, 0x46, 0x14, 0x85, 0xC0, 0x74, 0x10, 0x90, 0x90});
+    CHECK(!BaseLayout(late, at));
+    CHECK(!BaseLayout(std::vector<uint8_t>{0x56, 0x8B, 0xF1}, at));
+}
+
 TEST(an_owners_place_copy_is_found_in_its_layouts_call_for_the_windows_rectangle)
 {
     // The client's own bytes (2026-10-13 build): each layout pushes the address of its copy and calls MCD::GetRect.

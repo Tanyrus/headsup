@@ -718,6 +718,21 @@ namespace headsup
         return std::nullopt;
     }
 
+    std::optional<uintptr_t> BaseLayout(std::span<const uint8_t> layout, uintptr_t at)
+    {
+        constexpr uint8_t kPushFirst = 0x50, kPushLast = 0x57, kMov = 0x8B, kEsiEcx = 0xF1, kEdiEcx = 0xF9;
+        constexpr size_t kOpening = 8; // bytes of pushes and the mov before the call
+        size_t i = 0;
+        while (i < layout.size() && i < kOpening && layout[i] >= kPushFirst && layout[i] <= kPushLast)
+            ++i;
+        if (i + 2 > layout.size() || layout[i] != kMov || (layout[i + 1] != kEsiEcx && layout[i + 1] != kEdiEcx)) return std::nullopt;
+        i += 2;
+        if (i + kCallLength > layout.size() || layout[i] != kCallOp) return std::nullopt;
+        int32_t relative = 0;
+        std::memcpy(&relative, layout.data() + i + 1, sizeof(relative));
+        return at + i + kCallLength + static_cast<uintptr_t>(static_cast<intptr_t>(relative));
+    }
+
     std::optional<WindowSpot> MovedEntryPlace(WindowSpot point, const WindowRect& window, int dx, int dy)
     {
         enum Edge { kLeft, kTop, kRight, kBottom };
