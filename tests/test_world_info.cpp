@@ -165,3 +165,10 @@ TEST(the_zones_that_can_roll_an_element_come_likeliest_first_with_their_chance)
     }
     CHECK_EQ(std::strcmp(ElementName(Element::Lightning), "Lightning"), 0);
 }
+
+TEST(the_high_quality_turn_ins_are_phoenixs_recipes_high_qualities)
+{
+    // Hellfire Axe and Sword are what Inferno Axe and Sword make at high quality (sql/synth_recipes.sql).
+    CHECK(HighQualityTurnIn(16713) && HighQualityTurnIn(16928));
+    CHECK(!HighQualityTurnIn(16709) && !HighQualityTurnIn(16594) && !HighQualityTurnIn(0));
+}

@@ -168,7 +168,46 @@ def build_guilds(server: pathlib.Path) -> list:
     return sorted(rows, key=lambda row: (row[0], row[2], row[1]))
 
 
-def write(out: pathlib.Path, routes, shops) -> None:
+# synth_recipes.sql's fields: its Result is the 22nd, its three high qualities the next three.
+RECIPE_RESULT, RECIPE_HIGH = 21, (22, 23, 24)
+# guild_item_points.sql's rows: guild, item, rank, points, the most a day, pattern.
+TURN_IN_FIELDS = 6
+
+
+def build_high_quality(server: pathlib.Path) -> list:
+    """The guild point turn-ins that are another's high quality: of each rank's pair, the one a recipe makes when it
+    makes the other at high quality. A pair no recipe links is an error, as the plugin would have to guess."""
+    high_of = {}
+    recipes = (server / 'sql' / 'synth_recipes.sql').read_text(encoding='utf-8', errors='replace')
+    for values in re.findall(r'^INSERT INTO `synth_recipes` VALUES \((.*?)\);', recipes, flags=re.M):
+        fields = [field.strip() for field in values.split(',')]
+        if len(fields) <= max(RECIPE_HIGH) or not all(fields[i].isdigit() for i in (RECIPE_RESULT, *RECIPE_HIGH)):
+            continue
+        result = int(fields[RECIPE_RESULT])
+        high_of.setdefault(result, set()).update(int(fields[i]) for i in RECIPE_HIGH if int(fields[i]) not in (0, result))
+    turn_ins = (server / 'sql' / 'guild_item_points.sql').read_text(encoding='utf-8')
+    ranks = {}
+    for values in re.findall(r'\(([0-9, ]+)\)', turn_ins.split('INSERT INTO', 1)[-1]):
+        fields = [int(field) for field in values.split(',')]
+        if len(fields) == TURN_IN_FIELDS:
+            guild, item, rank, _, _, pattern = fields
+            ranks.setdefault((guild, pattern, rank), []).append(item)
+    high = set()
+    for (guild, pattern, rank), items in sorted(ranks.items()):
+        if len(items) != 2:
+            continue
+        first, second = items
+        if second in high_of.get(first, ()):
+            high.add(second)
+        elif first in high_of.get(second, ()):
+            high.add(first)
+        else:
+            raise WorldDataError(f'guild {guild} rank {rank} of pattern {pattern} takes {first} and {second}, '
+                                 'which no recipe makes one of at high quality')
+    return sorted(high)
+
+
+def write(out: pathlib.Path, routes, shops, high) -> None:
     out.mkdir(parents=True, exist_ok=True)
     travel = ['group\tname\tevery\tdepartures'] + [
         f'{group}\t{name}\t{every}\t' + ','.join(f'{board}:{leave}' for board, leave in departures)
@@ -176,6 +215,7 @@ def write(out: pathlib.Path, routes, shops) -> None:
     (out / 'phoenix_travel.tsv').write_text('\n'.join(travel) + '\n', encoding='utf-8')
     guilds = ['guild\tshops\tzone\topen\tclose\tholiday'] + ['\t'.join(str(field) for field in row) for row in shops]
     (out / 'phoenix_guilds.tsv').write_text('\n'.join(guilds) + '\n', encoding='utf-8')
+    (out / 'phoenix_turnin_hq.tsv').write_text('\n'.join(['item'] + [str(item) for item in high]) + '\n', encoding='utf-8')
 
 
 def main(argv) -> int:
@@ -184,12 +224,12 @@ def main(argv) -> int:
         return 2
     try:
         server = pathlib.Path(argv[1])
-        routes, shops = build_travel(server), build_guilds(server)
+        routes, shops, high = build_travel(server), build_guilds(server), build_high_quality(server)
     except (OSError, WorldDataError) as error:
         print(f'world: {error}', file=sys.stderr)
         return 1
-    write(pathlib.Path(argv[2]), routes, shops)
-    print(f'world: {len(routes)} routes and {len(shops)} guild shops -> {argv[2]}')
+    write(pathlib.Path(argv[2]), routes, shops, high)
+    print(f'world: {len(routes)} routes, {len(shops)} guild shops and {len(high)} high quality turn-ins -> {argv[2]}')
     return 0
 
 

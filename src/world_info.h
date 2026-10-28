@@ -36,6 +36,8 @@ namespace headsup
     };
     std::span<const TravelRoute> TravelRoutes();
     std::span<const GuildShop> GuildShops();
+    // Whether a guild point turn-in is another's high quality, as Phoenix's recipes make it (tools/phoenix/world.py).
+    bool HighQualityTurnIn(uint16_t item);
 
     // The route's next departure: Earth seconds until it leaves, and until its door opens or, while open, 0.
     struct Sailing

@@ -29,6 +29,8 @@ namespace headsup
 
     std::span<const GuildShop> GuildShops() { return kGuildShops; }
 
+    bool HighQualityTurnIn(uint16_t item) { return std::ranges::binary_search(kHighQualityTurnIns, item); }
+
     Sailing NextSailing(const TravelRoute& route, int64_t unixMs)
     {
         const double every = route.every;

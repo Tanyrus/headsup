@@ -2272,7 +2272,7 @@ TEST(each_guild_has_a_tab_of_its_shops)
     CHECK_EQ(Joined((at - 1)->text), std::string("Open") + kDot + "closes in 26:24");
 }
 
-TEST(a_craft_guilds_tab_lists_todays_turn_ins_under_its_shops_with_yours_lit)
+TEST(a_craft_guilds_tab_lists_todays_turn_ins_apart_from_its_shops_with_yours_lit)
 {
     BarState state;
     state.unixMs = kEarthsdayTen;
@@ -2281,28 +2281,41 @@ TEST(a_craft_guilds_tab_lists_todays_turn_ins_under_its_shops_with_yours_lit)
     state.pickedTabs["Guilds"] = "Fishing";
     const auto fishing = [&] {
         const PopupSection guilds = BarPopupContent(BarWidget::World, state, settings).sections.at(0);
-        return guilds.tabs[guilds.tab];
+        return guilds.tabs[guilds.tab].rows;
     };
-    // Not fetched yet, it says so under the shops.
-    CHECK_EQ(Lines(PopupSection{"", fishing().rows}).back(), "Today's turn-ins come from phoenix-xi.com");
+    // The shops in one socket, the turn-ins under a line of their own in another.
+    std::vector<PopupRow> rows = fishing();
+    CHECK(rows.size() == 4 && rows[0].nested && rows[1].nested && !rows[2].nested && rows[3].nested);
+    CHECK_EQ(Lines(PopupSection{"", {rows[2]}}).front(), "Today's Turn-ins");
+    // Not fetched yet, it says so.
+    CHECK_EQ(Lines(PopupSection{"", {rows[3]}}).front(), "They come from phoenix-xi.com");
     state.turnInsFailed = true;
-    CHECK_EQ(Lines(PopupSection{"", fishing().rows}).back(), "phoenix-xi.com did not answer; trying again soon");
-    // Fetched: each rank's item with its picture, its points and the most a day; your rank starred and lit.
+    CHECK_EQ(Lines(PopupSection{"", {fishing()[3]}}).front(), "phoenix-xi.com did not answer; trying again soon");
+    // A rank's item and its high quality on one row, the high quality in brackets: the +1, or else the one worth more,
+    // or else the second; the most a day once, or both where they differ.
     GuildPatterns today;
-    today.guilds[0] = {GuildTurnIn{0, "Amateur", 4443, "Cobalt Jellyfish", 24, 1200},
-        GuildTurnIn{1, "Recruit", 4403, "Yellow Globe", 60, 1680}, GuildTurnIn{2, "Initiate", 4402, "", 90, 2000}};
+    today.guilds[0] = {GuildTurnIn{0, "Amateur", 17, "Flute +1", 14, 1120}, GuildTurnIn{0, "Amateur", 16, "Flute", 12, 1120},
+        GuildTurnIn{1, "Recruit", 20, "Roasted Corn", 31, 1280}, GuildTurnIn{1, "Recruit", 21, "Grilled Corn", 37, 1280},
+        GuildTurnIn{2, "Initiate", 30, "Darksteel Cuisses", 6500, 7400}, GuildTurnIn{2, "Initiate", 31, "Dst. Cuisses +1", 7150, 7040},
+        GuildTurnIn{3, "Novice", 40, "", 90, 2000}, GuildTurnIn{4, "Apprentice", 16928, "Hellfire Sword", 3488, 7000},
+        GuildTurnIn{4, "Apprentice", 16594, "Inferno Sword", 3488, 7000}};
     state.turnIns = &today;
     state.crafts  = CraftRanks{1};
-    const PopupRow grid = fishing().rows.back();
-    CHECK(grid.kind == RowKind::Grid && grid.columns == 4 && grid.nested && grid.header);
-    CHECK_EQ(grid.cells.size(), static_cast<size_t>(4 * 4));
+    rows = fishing();
+    const PopupRow& grid = rows[3];
+    CHECK(grid.kind == RowKind::Grid && grid.columns == 4 && grid.nested && grid.header && grid.scroll == "Guilds/Fishing/Turn-ins");
+    CHECK_EQ(grid.cells.size(), static_cast<size_t>(4 * 6));
     CHECK(Joined(grid.cells[0].text) == "Rank" && Joined(grid.cells[1].text) == "Item" && Joined(grid.cells[2].text) == "Points" &&
-          Joined(grid.cells[3].text) == "A Day");
-    CHECK(Joined(grid.cells[4].text) == "Amateur" && !grid.cells[4].star && grid.cells[5].item == 4443 &&
-          Joined(grid.cells[5].text) == "Cobalt Jellyfish" && Joined(grid.cells[6].text) == "24" && Joined(grid.cells[7].text) == "1,200");
-    CHECK(Joined(grid.cells[8].text) == "Recruit" && grid.cells[8].star && grid.cells[9].text.front().tone == Tone::Heading);
-    CHECK(grid.cells[5].text.front().tone == Tone::Normal);
-    CHECK(Joined(grid.cells[13].text) == "Item 4402" && grid.cells[13].item == 4402); // a name the site does not have
+          Joined(grid.cells[3].text) == "Max Points");
+    CHECK(Joined(grid.cells[4].text) == "Amateur" && !grid.cells[4].star && grid.cells[5].item == 16);
+    CHECK(Joined(grid.cells[5].text) == "Flute [Flute +1]" && Joined(grid.cells[6].text) == "12 [14]" &&
+          Joined(grid.cells[7].text) == "1,120");
+    CHECK(Joined(grid.cells[9].text) == "Roasted Corn [Grilled Corn]" && Joined(grid.cells[10].text) == "31 [37]");
+    CHECK(grid.cells[8].star && grid.cells[9].text.front().tone == Tone::Heading); // your rank
+    CHECK(Joined(grid.cells[13].text) == "Darksteel Cuisses [Dst. Cuisses +1]" && Joined(grid.cells[15].text) == "7,400 [7,040]");
+    CHECK(Joined(grid.cells[17].text) == "Item 40" && Joined(grid.cells[18].text) == "90"); // one item, no name from the site
+    // Worth the same and neither a +1, listed high quality first: Phoenix's recipes say which is which.
+    CHECK(Joined(grid.cells[21].text) == "Inferno Sword [Hellfire Sword]" && grid.cells[21].item == 16594);
     // A guild that takes no turn-ins has none.
     state.pickedTabs["Guilds"] = "Tenshodo";
     const PopupSection guilds = BarPopupContent(BarWidget::World, state, settings).sections.at(0);

@@ -43,11 +43,20 @@ NPC_SCRIPTS = {
     'Al_Zahbi/npcs/Dehbi_Moshal.lua': '-- Area: Al Zahbi\n--  NPC: Dehbi Moshal\n-- Woodworking Guild\n',
 }
 REAL = pathlib.Path.home() / '.cache' / 'headsup-phoenix' / 'server'
+# Two recipes, each with its high quality in ResultHQ1 (Result is the 22nd field), and the turn-ins: a rank of two
+# items in either order, and a rank of one.
+RECIPES = ("INSERT INTO `synth_recipes` VALUES (1,0,0,0,9,0,0,0,0,0,0,4096,4238,640,0,0,0,0,0,0,0,16709,16713,16713,16713,1,1,1,1,'Inferno Axe',NULL);\n"
+           "INSERT INTO `synth_recipes` VALUES (2,0,0,0,9,0,0,0,0,0,0,4096,4238,640,0,0,0,0,0,0,0,16594,16928,16928,16928,1,1,1,1,'Inferno Sword',NULL);\n")
+TURN_INS = ("INSERT INTO `guild_item_points` VALUES (2,16713,4,380,4880,7),(2,16709,4,349,4880,7),(2,16594,3,3488,7000,6),"
+            "(2,16928,3,3488,7000,6),(0,4443,0,24,1200,7);\n")
 
 
-def checkout(root: pathlib.Path, zones=None, shops: str = GUILD_SHOPS, scripts=None) -> pathlib.Path:
+def checkout(root: pathlib.Path, zones=None, shops: str = GUILD_SHOPS, scripts=None, recipes: str = RECIPES,
+             turn_ins: str = TURN_INS) -> pathlib.Path:
     files = {f'data/zones/{zone}/zone.yaml': text for zone, text in (zones or {'selbina': SELBINA}).items()}
     files['scripts/data/guild_shops.lua'] = shops
+    files['sql/synth_recipes.sql'] = recipes
+    files['sql/guild_item_points.sql'] = turn_ins
     files.update({f'scripts/zones/{path}': text for path, text in (scripts or NPC_SCRIPTS).items()})
     for relative, text in files.items():
         path = root / relative
@@ -132,11 +141,12 @@ class Guilds(unittest.TestCase):
 
 
 class Write(unittest.TestCase):
-    def test_writes_both_files(self):
+    def test_writes_all_three_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = pathlib.Path(tmp) / 'out'
             world.write(out, [('Boats', 'Selbina to Mhaura', 1152, [(961, 2)])],
-                        [('Woodworking', 'Chaupire', "Northern San d'Oria", 6, 21, 0)])
+                        [('Woodworking', 'Chaupire', "Northern San d'Oria", 6, 21, 0)], [16713, 16928])
+            self.assertEqual((out / 'phoenix_turnin_hq.tsv').read_text(encoding='utf-8'), 'item\n16713\n16928\n')
             self.assertEqual((out / 'phoenix_travel.tsv').read_text(encoding='utf-8'),
                              'group\tname\tevery\tdepartures\nBoats\tSelbina to Mhaura\t1152\t961:2\n')
             self.assertEqual((out / 'phoenix_guilds.tsv').read_text(encoding='utf-8'),
@@ -156,3 +166,18 @@ class RealCheckout(unittest.TestCase):
         shops = world.build_guilds(REAL)
         self.assertEqual(len(shops), 38)  # 43 NPCs, two of them sharing another's shop and three goblins selling chips
         self.assertIn(('Woodworking', 'Chaupire', "Northern San d'Oria", 6, 21, 0), shops)
+
+
+class HighQuality(unittest.TestCase):
+    def test_the_high_quality_of_each_pair_of_turn_ins_is_the_one_a_recipe_gives_as_the_others(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            high = world.build_high_quality(checkout(pathlib.Path(tmp)))
+        # Hellfire Axe over Inferno Axe, listed first; Hellfire Sword over Inferno Sword, worth the same.
+        self.assertEqual(high, [16713, 16928])
+
+    def test_a_pair_no_recipe_links_is_an_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = checkout(pathlib.Path(tmp), recipes=RECIPES.splitlines()[0] + '\n')
+            with self.assertRaises(world.WorldDataError) as raised:
+                world.build_high_quality(root)
+        self.assertIn('16594', str(raised.exception))

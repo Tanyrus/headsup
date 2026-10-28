@@ -886,38 +886,78 @@ namespace headsup
             return section;
         }
 
-        // A craft guild's turn-ins today, from Phoenix's site: each rank's item with its picture, its points each and the
-        // most a day, your rank starred and lit; until the site answers, a line saying so.
-        PopupRow TurnIns(const BarState& state, int craft)
+        // A rank's item and its high quality: the one Phoenix's recipes make at high quality, or for one they do not
+        // name, the +1, or else the one worth more, or else the second.
+        struct RankTurnIn
         {
+            const GuildTurnIn* item = nullptr;
+            const GuildTurnIn* high = nullptr;
+        };
+        std::vector<RankTurnIn> ByRank(const std::vector<GuildTurnIn>& turnIns)
+        {
+            const auto plusOne = [](const GuildTurnIn& t) { return t.itemName.ends_with(" +1"); };
+            std::vector<RankTurnIn> ranks;
+            for (const GuildTurnIn& turnIn : turnIns)
+            {
+                const auto same = std::ranges::find_if(ranks, [&](const RankTurnIn& r) { return r.item->rank == turnIn.rank; });
+                if (same == ranks.end())
+                    ranks.push_back(RankTurnIn{&turnIn});
+                else if (same->high == nullptr)
+                {
+                    const bool known = HighQualityTurnIn(turnIn.item) || HighQualityTurnIn(same->item->item);
+                    const bool high  = known ? HighQualityTurnIn(turnIn.item)
+                                             : plusOne(turnIn) || (!plusOne(*same->item) && turnIn.points >= same->item->points);
+                    if (high)
+                        same->high = &turnIn;
+                    else
+                        same->high = std::exchange(same->item, &turnIn);
+                }
+            }
+            return ranks;
+        }
+
+        // A craft guild's turn-ins today, from Phoenix's site, under a line of their own: each rank's item with its
+        // picture and its high quality in brackets, their points each and the most a day, your rank starred and lit;
+        // until the site answers, a line saying so.
+        std::vector<PopupRow> TurnIns(const BarState& state, int craft, const std::string& guild)
+        {
+            std::vector<PopupRow> rows = ListOf(LineOf("Today's Turn-ins", Tone::Heading));
             if (state.turnIns == nullptr)
             {
                 PopupRow waiting = LineOf(state.turnInsFailed ? "phoenix-xi.com did not answer; trying again soon"
-                                                              : "Today's turn-ins come from phoenix-xi.com",
+                                                              : "They come from phoenix-xi.com",
                     Tone::Dim);
                 waiting.nested = true;
-                return waiting;
+                rows.push_back(std::move(waiting));
+                return rows;
             }
-            const std::vector<GuildTurnIn>& turnIns = state.turnIns->guilds[static_cast<size_t>(craft)];
-            PopupRow grid = Grid(kTurnInColumns, (turnIns.size() + 1) * kTurnInColumns);
+            const std::vector<RankTurnIn> ranks = ByRank(state.turnIns->guilds[static_cast<size_t>(craft)]);
+            PopupRow grid = Grid(kTurnInColumns, (ranks.size() + 1) * kTurnInColumns);
             grid.nested   = true;
             grid.header   = true;
-            for (const char* heading : {"Rank", "Item", "Points", "A Day"})
+            ScrollsBy(grid, state, "Guilds/" + guild + "/Turn-ins");
+            for (const char* heading : {"Rank", "Item", "Points", "Max Points"})
                 grid.cells.push_back(Cell(Text(heading, Tone::Dim)));
-            for (const GuildTurnIn& turnIn : turnIns)
+            const auto name = [](const GuildTurnIn& t) { return t.itemName.empty() ? "Item " + std::to_string(t.item) : t.itemName; };
+            const auto figure = [](int value) { return Grouped(static_cast<uint64_t>(std::max(value, 0))); };
+            for (const RankTurnIn& rank : ranks)
             {
-                const bool yours = state.crafts && (*state.crafts)[static_cast<size_t>(craft)] == turnIn.rank;
-                PopupCell rank   = Cell(Text(turnIn.rankName, yours ? Tone::Normal : Tone::Dim));
-                rank.star        = yours;
-                PopupCell item   = Cell(Text(turnIn.itemName.empty() ? "Item " + std::to_string(turnIn.item) : turnIn.itemName,
-                    yours ? Tone::Heading : Tone::Normal));
-                item.item        = turnIn.item;
-                grid.cells.push_back(std::move(rank));
-                grid.cells.push_back(std::move(item));
-                grid.cells.push_back(Cell(Text(Grouped(static_cast<uint64_t>(std::max(turnIn.points, 0))))));
-                grid.cells.push_back(Cell(Text(Grouped(static_cast<uint64_t>(std::max(turnIn.maxPoints, 0))), Tone::Dim)));
+                const GuildTurnIn& item = *rank.item;
+                const bool yours = state.crafts && (*state.crafts)[static_cast<size_t>(craft)] == item.rank;
+                const GuildTurnIn* high = rank.high;
+                PopupCell named = Cell(Text(item.rankName, yours ? Tone::Normal : Tone::Dim));
+                named.star      = yours;
+                PopupCell what  = Cell(Text(name(item) + (high ? " [" + name(*high) + "]" : ""), yours ? Tone::Heading : Tone::Normal));
+                what.item       = item.item;
+                grid.cells.push_back(std::move(named));
+                grid.cells.push_back(std::move(what));
+                grid.cells.push_back(Cell(Text(figure(item.points) + (high ? " [" + figure(high->points) + "]" : ""))));
+                grid.cells.push_back(Cell(Text(figure(item.maxPoints) +
+                                                   (high && high->maxPoints != item.maxPoints ? " [" + figure(high->maxPoints) + "]" : ""),
+                    Tone::Dim)));
             }
-            return grid;
+            rows.push_back(std::move(grid));
+            return rows;
         }
 
         PopupContent WorldPopup(const BarState& state, const WidgetOptions& o)
@@ -996,7 +1036,8 @@ namespace headsup
                     }
                     guild.rows.push_back(std::move(grid));
                     if (const std::optional<int> craft = CraftGuildNamed(shops[first].guild))
-                        guild.rows.push_back(TurnIns(state, *craft));
+                        for (PopupRow& row : TurnIns(state, *craft, shops[first].guild))
+                            guild.rows.push_back(std::move(row));
                     guilds.tabs.push_back(std::move(guild));
                 }
                 guilds.tab = Picked(state, guilds);
