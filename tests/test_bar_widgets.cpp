@@ -622,7 +622,7 @@ TEST(the_weather_popup_has_a_tab_for_each_element_of_the_zones_that_can_roll_it_
     for (int e = 0; e < kElementCount; ++e)
     {
         const auto element = static_cast<Element>(e);
-        CHECK(fire.tabs[e].name.text == ElementName(element) && fire.tabs[e].name.argb == ElementColor(element));
+        CHECK(fire.tabs[e].name == Text(ElementName(element))); // every tab in one color
         // Its first row: how many zones can roll it today, and tomorrow.
         CHECK_EQ(Lines(PopupSection{"", fire.tabs[e].rows}).front(),
             "Zones " + std::to_string(ZonesRolling(element, today).size()) + " today" + kDot +
@@ -2225,7 +2225,7 @@ TEST(each_kind_of_ship_has_a_tab_of_its_routes)
         CHECK(row.cells.back().text.back().text.find(' ') == std::string::npos);
 }
 
-TEST(each_guild_has_a_tab_of_its_shops_dim_while_all_are_shut)
+TEST(each_guild_has_a_tab_of_its_shops)
 {
     BarState state;
     state.unixMs = kEarthsdayTen;
@@ -2248,7 +2248,7 @@ TEST(each_guild_has_a_tab_of_its_shops_dim_while_all_are_shut)
     for (size_t i = 0; i < names.size(); ++i)
     {
         const PopupTab& tab = section.tabs[i];
-        CHECK(tab.name.text == names[i] && (tab.name.tone == Tone::Dim) == (open[names[i]].first == 0));
+        CHECK(tab.name == Text(names[i])); // every tab in one color
         CHECK_EQ(Lines(PopupSection{"", tab.rows}).front(),
             "Open " + std::to_string(open[names[i]].first) + " of " + std::to_string(open[names[i]].second));
     }

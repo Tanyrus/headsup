@@ -134,6 +134,7 @@ namespace headsup
             float popupText = 0.0f;
             BarShape shape  = BarShape::Ornate;
             float room      = 0.0f;
+            float least     = 0.0f;
             bool operator==(const PopupKey&) const = default;
         };
         struct PopupDocumentKey
@@ -217,6 +218,9 @@ namespace headsup
         bool m_PopupMarked    = false; // its markup is the layout's
         Px m_PopupLeft, m_PopupTop, m_PopupWidth, m_PopupHeight;
         Memo<PopupKey, PopupLayout> m_PopupLayout;
+        // The widest the open popup has been since it opened, which it keeps as its text changes with the time.
+        std::optional<PanelWidget> m_WidestFor;
+        float m_Widest = 0.0f;
         PopupFaces m_PopupFaces;
         std::vector<FaceLine> m_FaceLines;
         Memo<FitKey, std::string> m_TitleFit, m_SubtitleFit;

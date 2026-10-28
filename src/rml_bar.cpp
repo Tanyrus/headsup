@@ -426,6 +426,11 @@ namespace headsup
     {
         const std::optional<PanelWidget> open = input.Open();
         const BarRect* anchor               = open ? RectOf(layout, *open) : nullptr;
+        if (open != m_WidestFor)
+        {
+            m_WidestFor = open;
+            m_Widest    = 0.0f;
+        }
         if (anchor == nullptr)
         {
             if (m_Popup != nullptr)
@@ -450,14 +455,15 @@ namespace headsup
         const auto out        = static_cast<float>(OuterPad(PopupPanel(look)));
         const float barBottom = open->kind == BarWidget::GameHelp ? anchor->y + anchor->height : BarBottom(p, m);
         PopupKey key{BarPopupContent(*open, state, look.settings), input.Pinned() == open, m.height, m.popupText,
-            p.shape, PopupRoom(barBottom, screenHeight, m.gap, out)};
+            p.shape, PopupRoom(barBottom, screenHeight, m.gap, out), m_Widest};
         bool fresh            = false;
         const PopupLayout& pl = m_PopupLayout.Get(std::move(key), [&](const PopupKey& k) {
             fresh           = true;
-            PopupLayout cut = LayoutPopup(k.content, m, p.shape, k.pinned, measure, k.room);
+            PopupLayout cut = LayoutPopup(k.content, m, p.shape, k.pinned, measure, k.room, k.least);
             CutPopup(cut, k.room, m.popupPadding);
             return cut;
         });
+        m_Widest = std::max(m_Widest, pl.width);
         const BarRect rect =
             PlacePopup(*anchor, barBottom, pl.width, pl.height, screenWidth, screenHeight, m.gap, out);
         if (fresh || !m_PopupMarked)

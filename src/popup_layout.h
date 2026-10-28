@@ -93,10 +93,11 @@ namespace headsup
     // under the title, on the panel. A pair's value ends at its card's right edge. When the cards stacked would run
     // taller than kTwoColumnsAbove popup text sizes, they flow into two columns as even as their order allows, and
     // into more when two would run taller than room, a card too tall for it going on in the next under its heading.
-    // The pinned mark ("pinned", in the heading tone) sits at the top right when pinned.
+    // The pinned mark ("pinned", in the heading tone) sits at the top right when pinned. It is never narrower than
+    // least, its cards widening to fill it.
     constexpr float kTwoColumnsAbove = 24.0f;
     PopupLayout LayoutPopup(const PopupContent& content, const BarMetrics& metrics, BarShape shape, bool pinned,
-                            SpanMeasure measure, float room = std::numeric_limits<float>::infinity());
+                            SpanMeasure measure, float room = std::numeric_limits<float>::infinity(), float least = 0.0f);
     // A layout taller than height keeps the title and the cards that end padding or more above it, and shrinks to
     // them with its padding under the lowest.
     void CutPopup(PopupLayout& layout, float height, float padding);

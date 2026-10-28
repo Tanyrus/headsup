@@ -401,6 +401,65 @@ TEST(a_card_beside_another_shares_its_row_at_one_width_and_height_and_one_alone_
     CHECK(Near(layouts[0][0]->height, layouts[1][0]->height));
 }
 
+TEST(tabs_are_one_width_spread_across_the_card_in_one_row_or_two)
+{
+    const BarMetrics m = MetricsFor(36, BarShape::Pills);
+    const auto layout = [&](std::vector<const char*> names) {
+        PopupContent c;
+        c.title = {{"World Info", Tone::Normal}};
+        PopupSection s{"Guilds", {}};
+        for (const char* name : names)
+            s.tabs.push_back(PopupTab{Text(name), {Labeled("Open", Text("1 of 2"))}});
+        c.sections.push_back(s);
+        return LayoutPopup(c, m, BarShape::Pills, false, Fake);
+    };
+    // Four fit in one row; eleven go in two, six over five, the card widened for them.
+    for (const std::vector<const char*>& names :
+         {std::vector<const char*>{"Airships", "Boats", "Manaclipper", "Barge"},
+          std::vector<const char*>{"Alchemy", "Bonecraft", "Clothcraft", "Cooking", "Fishing", "Goldsmithing", "Leathercraft",
+              "Linkshell", "Smithing", "Tenshodo", "Woodworking"}})
+    {
+        const PopupLayout l = layout(names);
+        CHECK(AllInside(l, m));
+        const std::vector<const PopupPiece*> chips = Of(l, PopupPiece::Kind::Tab);
+        const PopupPiece& card = *Of(l, PopupPiece::Kind::Card).front();
+        const PopupPiece& name = *Find(l, "GUILDS");
+        const size_t across    = names.size() <= 4 ? names.size() : (names.size() + 1) / 2;
+        CHECK_EQ(chips.size(), names.size());
+        for (size_t i = 0; i < chips.size(); ++i)
+        {
+            const PopupPiece& chip = *chips[i];
+            // One width; each row starts at the card's padding and the first row ends at its other side.
+            CHECK(Near(chip.width, chips[0]->width) && Near(chip.height, chips[0]->height));
+            CHECK(Near(chip.x, chips[i % across]->x) && Near(chip.y, chips[(i / across) * across]->y));
+            if (i % across == 0) CHECK(Near(chip.x, name.x));
+            if (i == across - 1) CHECK(Near(chip.x + chip.width, card.x + card.width - (name.x - card.x)));
+            // Its name in its middle, and the place to click it over it.
+            const PopupPiece& text = *Find(l, names[i]);
+            CHECK(Near(text.x + text.width / 2.0f, chip.x + chip.width / 2.0f));
+            CHECK(Near(l.chips[i].x, chip.x) && Near(l.chips[i].width, chip.width));
+        }
+        CHECK((names.size() <= 4) == Near(chips.back()->y, chips.front()->y));
+    }
+}
+
+TEST(a_popup_is_never_narrower_than_it_is_asked_to_be)
+{
+    const BarMetrics m = MetricsFor(36, BarShape::Pills);
+    PopupContent c;
+    c.title = {{"Gil", Tone::Normal}};
+    c.sections.push_back(PopupSection{"Currencies", {Labeled("Gil", Text("4,751"))}});
+    const PopupLayout narrow = LayoutPopup(c, m, BarShape::Pills, false, Fake);
+    const PopupLayout wide   = LayoutPopup(c, m, BarShape::Pills, false, Fake, 10000.0f, narrow.width + 100.0f);
+    CHECK(Near(wide.width, narrow.width + 100.0f));
+    // Its cards fill it, a value at the right edge of its card.
+    const PopupPiece& card = *Of(wide, PopupPiece::Kind::Card).front();
+    CHECK(Near(card.x + card.width, wide.width - m.popupPadding));
+    CHECK(Find(wide, "4,751")->x + Find(wide, "4,751")->width > card.x + card.width - m.popupText);
+    // Narrower than it needs, it takes what it needs.
+    CHECK(Near(LayoutPopup(c, m, BarShape::Pills, false, Fake, 10000.0f, 10.0f).width, narrow.width));
+}
+
 TEST(a_pairs_value_ends_at_its_cards_right_edge_and_its_label_at_the_left)
 {
     const BarMetrics m = MetricsFor(36, BarShape::Pills);

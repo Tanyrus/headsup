@@ -27,6 +27,7 @@ namespace headsup
         constexpr size_t kSideBySideAbove = 6; // the lines a grid has before it is set in groups
         constexpr size_t kSocketLines     = 10; // the lines a socket shows, the rest scrolling
         constexpr float kScrollbar        = 0.25f; // a scrollbar's width
+        constexpr size_t kMostTabsInRow   = 6;     // a card's tabs share rows of no more than this, evenly
 
         std::string Upper(std::string text)
         {
@@ -88,7 +89,11 @@ namespace headsup
             struct Chip
             {
                 std::string key, tab;
-                float x, y, width, height; // x from the card's left padding, y from its top
+                size_t piece;          // its frame, its name after it
+                size_t column, across; // its place in its row, and how many a row holds
+                float y, height, name; // from the card's top; its name's width
+                float gap;             // between it and the next in its row
+                float left = 0.0f, width = 0.0f; // from the card's left, once spread
             };
             std::vector<Chip> chips;
             std::vector<size_t> sockets; // pieces to widen to the card's inside once its width is known
@@ -137,29 +142,33 @@ namespace headsup
                 // The card as wide as its widest tab's rows, whichever is picked, its chips wrapping at that.
                 for (const PopupTab& tab : section.tabs)
                     contentWidth = std::max(contentWidth, LayoutSection(PopupSection{"", tab.rows}, metrics, ornate, measure).width);
+                // One width, the widest name's, in as few rows as hold them, shared evenly; spread across the card
+                // once its width is known.
                 const float gap = unit * kTagGap;
-                float x = b.pad, lineHeight = 0.0f;
-                for (size_t i = 0; i < section.tabs.size(); ++i)
+                float widest = 0.0f, tall = 0.0f;
+                for (const PopupTab& tab : section.tabs)
+                {
+                    const TextSize framed = Framed(CellSize(Cell(tab.name), unit, measure), unit);
+                    widest = std::max(widest, framed.width);
+                    tall   = std::max(tall, framed.height);
+                }
+                const size_t count = section.tabs.size(), lines = (count + kMostTabsInRow - 1) / kMostTabsInRow;
+                const size_t across = (count + lines - 1) / lines;
+                contentWidth = std::max(contentWidth, static_cast<float>(across) * (widest + gap) - gap);
+                for (size_t i = 0; i < count; ++i)
                 {
                     const TextSize size   = CellSize(Cell(section.tabs[i].name), unit, measure);
                     const TextSize framed = Framed(size, unit);
-                    if (x > b.pad && x + framed.width > b.pad + contentWidth)
-                    {
-                        x = b.pad;
-                        y += lineHeight + gap;
-                        lineHeight = 0.0f;
-                    }
-                    PopupPiece chip{PopupPiece::Kind::Tab, x, y, framed.width, framed.height, {}};
+                    const float top       = y + static_cast<float>(i / across) * (tall + gap);
+                    b.chips.push_back(Block::Chip{section.heading, section.tabs[i].name.text, b.pieces.size(), i % across, across,
+                        top, tall, size.width, gap});
+                    PopupPiece chip{PopupPiece::Kind::Tab, 0.0f, top, widest, tall, {}};
                     chip.open = i == picked;
                     b.pieces.push_back(std::move(chip));
-                    b.pieces.push_back(PopupPiece{PopupPiece::Kind::Text, x + TagPadX(unit), y + framed.inkTop - size.inkTop,
-                        size.width, size.height, section.tabs[i].name});
-                    b.chips.push_back(Block::Chip{section.heading, section.tabs[i].name.text, x - b.pad, y, framed.width, framed.height});
-                    contentWidth = std::max(contentWidth, x + framed.width - b.pad);
-                    x += framed.width + gap;
-                    lineHeight = std::max(lineHeight, framed.height);
+                    b.pieces.push_back(PopupPiece{PopupPiece::Kind::Text, 0.0f, top + framed.inkTop - size.inkTop, size.width,
+                        size.height, section.tabs[i].name});
                 }
-                y += lineHeight + metrics.rowGap;
+                y += static_cast<float>(lines) * (tall + gap) - gap + metrics.rowGap;
             }
             // Grid rows one after another with as many columns line them up: a grid carried on across rows, or cards.
             std::vector<std::vector<float>> runColumns(rows.size());
@@ -342,6 +351,16 @@ namespace headsup
                 b.pieces[socket].width = width - 2.0f * b.pad;
             for (const Block::Anchor& anchor : b.anchors)
                 b.pieces[anchor.piece].x = width - anchor.fromRight;
+            // Each tab as wide as its share of the card's inside, its name in its middle.
+            for (Block::Chip& chip : b.chips)
+            {
+                const float across = static_cast<float>(chip.across);
+                chip.width = (width - 2.0f * b.pad - (across - 1.0f) * chip.gap) / across;
+                chip.left  = b.pad + static_cast<float>(chip.column) * (chip.width + chip.gap);
+                b.pieces[chip.piece].x     = chip.left;
+                b.pieces[chip.piece].width = chip.width;
+                b.pieces[chip.piece + 1].x = chip.left + (chip.width - chip.name) / 2.0f;
+            }
             if (b.card) l.pieces.push_back(PopupPiece{PopupPiece::Kind::Card, x, y, width, b.height, {}, PopupFont::Text,
                             Icon::AggroNQ, line});
             for (PopupPiece& piece : b.pieces)
@@ -352,7 +371,7 @@ namespace headsup
                 l.pieces.push_back(std::move(piece));
             }
             for (Block::Chip& chip : b.chips)
-                l.chips.push_back(PopupTabChip{std::move(chip.key), x + b.pad + chip.x, y + chip.y, chip.width, chip.height, line,
+                l.chips.push_back(PopupTabChip{std::move(chip.key), x + chip.left, y + chip.y, chip.width, chip.height, line,
                     std::move(chip.tab)});
             for (Block::Scroll& scroll : b.scrolls)
                 l.scrolls.push_back(PopupScroll{std::move(scroll.key), x + b.pad, y + scroll.y, width - 2.0f * b.pad,
@@ -484,7 +503,7 @@ namespace headsup
     }
 
     PopupLayout LayoutPopup(const PopupContent& content, const BarMetrics& metrics, BarShape shape, bool pinned,
-                            SpanMeasure measure, float room)
+                            SpanMeasure measure, float room, float least)
     {
         const float unit = metrics.popupText, pad = metrics.popupPadding, cardGap = std::round(unit * kCardGap);
         const bool ornate = shape == BarShape::Ornate;
@@ -522,7 +541,7 @@ namespace headsup
         std::vector<Block> loose;
         for (const PopupSection& section : content.sections)
             if (section.heading.empty()) loose.push_back(LayoutSection(section, metrics, ornate, measure));
-        float width = std::max(unit * kMinWidth, titleWidth);
+        float width = std::max({unit * kMinWidth, titleWidth, least - 2.0f * pad});
         float cardsTop = top;
         for (const Block& b : loose)
         {

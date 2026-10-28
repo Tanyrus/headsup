@@ -851,7 +851,7 @@ namespace headsup
             {
                 const auto element = static_cast<Element>(e);
                 const std::vector<ZoneRoll> now = ZonesRolling(element, today), next = ZonesRolling(element, today + 1);
-                PopupTab tab{Colored(ElementName(element), ElementColor(element)), {}};
+                PopupTab tab{Text(ElementName(element)), {}};
                 PopupRow count = Labeled("Zones", Text(std::to_string(now.size()) + " today" + kDot + std::to_string(next.size()) + " tomorrow"));
                 count.nested   = true;
                 ScrollsBy(count, state, section.heading + "/" + ElementName(element));
@@ -939,8 +939,8 @@ namespace headsup
             }
             if (picked(WorldSection::Guilds))
             {
-                // A tab for each guild, its shops together in the data, dim while all of them are shut: how many are
-                // open, then each shop's hours, and who and where.
+                // A tab for each guild, its shops together in the data: how many are open, then each shop's hours, and
+                // who and where.
                 PopupSection guilds{"Guilds", {}};
                 const std::span<const GuildShop> shops = GuildShops();
                 for (size_t first = 0, last = 0; first < shops.size(); first = last)
@@ -948,7 +948,7 @@ namespace headsup
                     int open = 0;
                     for (last = first; last < shops.size() && std::string_view(shops[last].guild) == shops[first].guild; ++last)
                         open += GuildAt(shops[last], state.unixMs).open;
-                    PopupTab guild{Text(shops[first].guild, open > 0 ? Tone::Normal : Tone::Dim), {}};
+                    PopupTab guild{Text(shops[first].guild), {}};
                     PopupRow count = Labeled("Open", Text(std::to_string(open) + " of " + std::to_string(last - first)));
                     count.nested   = true;
                     ScrollsBy(count, state, guilds.heading + "/" + shops[first].guild);

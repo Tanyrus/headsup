@@ -304,8 +304,7 @@ and so on down from there. With Game Help on, the game's own help bar goes under
 help bar has an X and Y offset of its own, in screen pixels, in its card. Unloading HeadsUp puts every open window it moved back where the game put it.
 
 Hover a widget to open its details. Click it to keep them open; click it again to let them close once the pointer leaves
-the widget and its popup. A card with tabs, such as Travel, Guilds or By Element, shows the tab you click; a guild's
-tab is dim while all its shops are shut. A popup keeps its width as you pick tabs, and grows down. A list longer than 10
+the widget and its popup. A card with tabs, such as Travel, Guilds or By Element, shows the tab you click. A popup keeps its width as you pick tabs, and grows down. A list longer than 10
 lines shows 10 at a time with a scrollbar beside it: turn the mouse wheel over it, drag the bar, or click its track.
 Picked tabs and scrolled lists stay that way until you reload HeadsUp.
 
