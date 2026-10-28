@@ -363,6 +363,44 @@ TEST(a_sockets_rows_keep_as_much_room_on_their_right_as_on_their_left)
             CHECK(p.x + p.width <= sock.x + sock.width - (name.x - sock.x) + 0.01f);
 }
 
+TEST(a_card_beside_another_shares_its_row_at_one_width_and_height_and_one_alone_fills_the_width)
+{
+    const BarMetrics m = MetricsFor(36, BarShape::Pills);
+    std::vector<std::vector<const PopupPiece*>> layouts;
+    std::vector<PopupLayout> keep;
+    for (const size_t picked : {0u, 1u})
+    {
+        PopupContent c;
+        c.title = {{"World Info", Tone::Normal}};
+        c.sections.push_back(Travel(picked));
+        PopupSection calendar{"Calendar", {Labeled("RSE", Text("Mithra")), Labeled("Full Moon", Text("in 2:00:00"))}};
+        calendar.beside = true;
+        c.sections.push_back(calendar);
+        PopupSection guilds{"Guilds", {}};
+        guilds.rows.push_back(Labeled("A guild with a name far longer than the cards above it", Text("Open")));
+        c.sections.push_back(guilds);
+        keep.push_back(LayoutPopup(c, m, BarShape::Pills, false, Fake));
+        CHECK(AllInside(keep.back(), m));
+        layouts.push_back(Of(keep.back(), PopupPiece::Kind::Card));
+    }
+    for (const std::vector<const PopupPiece*>& cards : layouts)
+    {
+        CHECK_EQ(cards.size(), static_cast<size_t>(3));
+        const PopupPiece &travel = *cards[0], &calendar = *cards[1], &guilds = *cards[2];
+        // Travel and Calendar side by side, as wide and as tall as each other.
+        CHECK(Near(travel.y, calendar.y) && calendar.x > travel.x + travel.width);
+        CHECK(Near(travel.width, calendar.width) && Near(travel.height, calendar.height));
+        // Guilds under both, from the first's left to the second's right.
+        CHECK(guilds.y >= travel.y + travel.height && Near(guilds.x, travel.x) &&
+              Near(guilds.x + guilds.width, calendar.x + calendar.width));
+    }
+    // The longer tab picked moves nothing: the row is as tall as its tallest tab either way.
+    for (size_t i = 0; i < 3; ++i)
+        CHECK(Near(layouts[0][i]->x, layouts[1][i]->x) && Near(layouts[0][i]->y, layouts[1][i]->y) &&
+              Near(layouts[0][i]->width, layouts[1][i]->width));
+    CHECK(Near(layouts[0][0]->height, layouts[1][0]->height));
+}
+
 TEST(a_pairs_value_ends_at_its_cards_right_edge_and_its_label_at_the_left)
 {
     const BarMetrics m = MetricsFor(36, BarShape::Pills);

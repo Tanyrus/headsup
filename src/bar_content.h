@@ -120,6 +120,7 @@ namespace headsup
         std::vector<PopupRow> rows;
         std::vector<PopupTab> tabs{}; // under the heading, a click picking one, by the heading
         size_t tab = 0;               // the picked one, whose rows follow the section's own
+        bool beside = false; // in one row with the card before it, the two as wide and as tall as each other
         bool operator==(const PopupSection&) const = default;
     };
 

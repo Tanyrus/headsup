@@ -2173,7 +2173,12 @@ TEST(the_world_info_popup_has_the_parts_you_picked)
             out.push_back(section.heading);
         return out;
     };
-    CHECK((headings() == std::vector<std::string>{"Travel", "Guilds", "Calendar"}));
+    CHECK((headings() == std::vector<std::string>{"Travel", "Calendar", "Guilds"}));
+    // The calendar beside the ships, Guilds under both; without the ships it stands alone.
+    const PopupContent all = BarPopupContent(BarWidget::World, state, settings);
+    CHECK(!all.sections[0].beside && all.sections[1].beside && !all.sections[2].beside);
+    settings.Widget(BarWidget::World).worldSections = WorldBit(WorldSection::Calendar) | WorldBit(WorldSection::Guilds);
+    CHECK(!BarPopupContent(BarWidget::World, state, settings).sections[0].beside);
     settings.Widget(BarWidget::World).worldSections = WorldBit(WorldSection::Calendar);
     CHECK((headings() == std::vector<std::string>{"Calendar"}));
     const PopupContent calendar = BarPopupContent(BarWidget::World, state, settings);

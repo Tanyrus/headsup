@@ -913,6 +913,30 @@ namespace headsup
                 travel.tab = Picked(state, travel);
                 popup.sections.push_back(std::move(travel));
             }
+            if (picked(WorldSection::Calendar))
+            {
+                const Rse now = RseAt(state.unixMs), next = RseAt(state.unixMs, 1);
+                const uint32_t today = VanaAt(state.unixMs).day;
+                PopupSection calendar{"Calendar", {}};
+                calendar.beside = picked(WorldSection::Travel); // the ships and the calendar in one row, Guilds under
+                PopupRow rse = Labeled("RSE", Text(now.race));
+                rse.cells.back().text.push_back(Text(kDot, Tone::Dim));
+                rse.cells.back().text.push_back(Text(now.place));
+                calendar.rows.push_back(std::move(rse));
+                PopupRow coming = Labeled("Next RSE", Text(next.race));
+                coming.cells.back().text.push_back(Text(kDot, Tone::Dim));
+                AddTime(coming.cells.back().text, "in ", now.endsIn);
+                calendar.rows.push_back(std::move(coming));
+                const auto inTime = [](const char* label, double seconds) {
+                    PopupRow row = Labeled(label, Text("in "));
+                    row.cells.back().text.push_back(Text(Countdown(seconds)));
+                    return row;
+                };
+                calendar.rows.push_back(inTime("Full Moon", SecondsToDay(state.unixMs, NextMoonDay(today, true))));
+                calendar.rows.push_back(inTime("New Moon", SecondsToDay(state.unixMs, NextMoonDay(today, false))));
+                calendar.rows.push_back(inTime("Conquest Tally", SecondsToTally(state.unixMs)));
+                popup.sections.push_back(std::move(calendar));
+            }
             if (picked(WorldSection::Guilds))
             {
                 // A tab for each guild, its shops together in the data, dim while all of them are shut: how many are
@@ -941,29 +965,6 @@ namespace headsup
                 }
                 guilds.tab = Picked(state, guilds);
                 popup.sections.push_back(std::move(guilds));
-            }
-            if (picked(WorldSection::Calendar))
-            {
-                const Rse now = RseAt(state.unixMs), next = RseAt(state.unixMs, 1);
-                const uint32_t today = VanaAt(state.unixMs).day;
-                PopupSection calendar{"Calendar", {}};
-                PopupRow rse = Labeled("RSE", Text(now.race));
-                rse.cells.back().text.push_back(Text(kDot, Tone::Dim));
-                rse.cells.back().text.push_back(Text(now.place));
-                calendar.rows.push_back(std::move(rse));
-                PopupRow coming = Labeled("Next RSE", Text(next.race));
-                coming.cells.back().text.push_back(Text(kDot, Tone::Dim));
-                AddTime(coming.cells.back().text, "in ", now.endsIn);
-                calendar.rows.push_back(std::move(coming));
-                const auto inTime = [](const char* label, double seconds) {
-                    PopupRow row = Labeled(label, Text("in "));
-                    row.cells.back().text.push_back(Text(Countdown(seconds)));
-                    return row;
-                };
-                calendar.rows.push_back(inTime("Full Moon", SecondsToDay(state.unixMs, NextMoonDay(today, true))));
-                calendar.rows.push_back(inTime("New Moon", SecondsToDay(state.unixMs, NextMoonDay(today, false))));
-                calendar.rows.push_back(inTime("Conquest Tally", SecondsToTally(state.unixMs)));
-                popup.sections.push_back(std::move(calendar));
             }
             return popup;
         }

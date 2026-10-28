@@ -109,6 +109,7 @@ namespace headsup
             std::vector<Scroll> scrolls;
             bool card     = false;
             float reserve = 0.0f; // its height with its tallest tab picked, which sets its column
+            bool beside   = false; // in one row with the card before it
         };
 
         Block LayoutSection(const PopupSection& section, const BarMetrics& metrics, bool ornate, SpanMeasure measure)
@@ -362,7 +363,8 @@ namespace headsup
         // A card as LayoutSection lays it out, with its reserve: its height with each tab picked in turn, the tallest.
         Block LayoutCard(const PopupSection& section, const BarMetrics& metrics, bool ornate, SpanMeasure measure)
         {
-            Block b = LayoutSection(section, metrics, ornate, measure);
+            Block b  = LayoutSection(section, metrics, ornate, measure);
+            b.beside = section.beside;
             PopupSection each = section;
             for (size_t tab = 0; tab < std::max<size_t>(section.tabs.size(), 1); ++tab)
             {
@@ -535,69 +537,111 @@ namespace headsup
                 for (const PopupSection& part : Fitted(section, tall, metrics, ornate, measure))
                     cards.push_back(LayoutCard(part, metrics, ornate, measure));
 
-        // One column, or two when one runs tall: the split whose taller column is shortest, in their order. When that
-        // runs past the room, as many columns as fill it in order. Each card counts as its reserve, so a tab picked
-        // makes it grow down where it is. A popup that asks for one column keeps it.
-        float stacked = 0.0f;
-        for (const Block& b : cards)
-            stacked += b.reserve + cardGap;
-        std::vector<size_t> starts{0}; // each column's first card
-        if (!content.oneColumn && cards.size() >= 2 && stacked > unit * kTwoColumnsAbove)
+        float lowest = top;
+        if (std::ranges::any_of(cards, [](const Block& b) { return b.beside; }))
         {
-            float best = stacked, left = 0.0f;
-            size_t split = cards.size();
-            for (size_t i = 1; i < cards.size(); ++i)
-            {
-                left += cards[i - 1].reserve + cardGap;
-                if (const float taller = std::max(left, stacked - left); taller < best)
+            // In rows: a card beside the one before shares its row, the two as wide as each other and as tall as the
+            // taller one's tallest tab, so a tab picked moves nothing; a card alone fills the width.
+            float half = 0.0f, whole = 0.0f;
+            for (size_t i = 0; i < cards.size(); ++i)
+                if (i + 1 < cards.size() && cards[i + 1].beside)
                 {
-                    best  = taller;
-                    split = i;
+                    half = std::max({half, cards[i].width, cards[i + 1].width});
+                    ++i;
                 }
-            }
-            if (split < cards.size()) starts.push_back(split);
-            if (best - cardGap > tall)
+                else
+                    whole = std::max(whole, cards[i].width);
+            width = std::max({width, whole, half > 0.0f ? 2.0f * half + cardGap : 0.0f});
+            half  = (width - cardGap) / 2.0f;
+            for (Block& b : loose)
             {
-                starts = {0};
-                float column = 0.0f;
-                for (size_t i = 0; i < cards.size(); ++i)
+                Place(b, pad, top, width, l.lines.size(), l);
+                top += b.height + metrics.rowGap;
+            }
+            float y = top;
+            for (size_t i = 0; i < cards.size(); ++i)
+            {
+                if (i + 1 < cards.size() && cards[i + 1].beside)
                 {
-                    if (i > starts.back() && column + cards[i].reserve > tall)
+                    const float tall = std::max({cards[i].reserve, cards[i + 1].reserve, cards[i].height, cards[i + 1].height});
+                    cards[i].height = cards[i + 1].height = tall;
+                    Place(cards[i], pad, y, half, l.lines.size(), l);
+                    Place(cards[i + 1], pad + half + cardGap, y, half, l.lines.size(), l);
+                    y += tall + cardGap;
+                    ++i;
+                    continue;
+                }
+                Place(cards[i], pad, y, width, l.lines.size(), l);
+                y += cards[i].height + cardGap;
+            }
+            lowest = y;
+        }
+        else
+        {
+            // One column, or two when one runs tall: the split whose taller column is shortest, in their order. When that
+            // runs past the room, as many columns as fill it in order. Each card counts as its reserve, so a tab picked
+            // makes it grow down where it is. A popup that asks for one column keeps it.
+            float stacked = 0.0f;
+            for (const Block& b : cards)
+                stacked += b.reserve + cardGap;
+            std::vector<size_t> starts{0}; // each column's first card
+            if (!content.oneColumn && cards.size() >= 2 && stacked > unit * kTwoColumnsAbove)
+            {
+                float best = stacked, left = 0.0f;
+                size_t split = cards.size();
+                for (size_t i = 1; i < cards.size(); ++i)
+                {
+                    left += cards[i - 1].reserve + cardGap;
+                    if (const float taller = std::max(left, stacked - left); taller < best)
                     {
-                        starts.push_back(i);
-                        column = 0.0f;
+                        best  = taller;
+                        split = i;
                     }
-                    column += cards[i].reserve + cardGap;
+                }
+                if (split < cards.size()) starts.push_back(split);
+                if (best - cardGap > tall)
+                {
+                    starts = {0};
+                    float column = 0.0f;
+                    for (size_t i = 0; i < cards.size(); ++i)
+                    {
+                        if (i > starts.back() && column + cards[i].reserve > tall)
+                        {
+                            starts.push_back(i);
+                            column = 0.0f;
+                        }
+                        column += cards[i].reserve + cardGap;
+                    }
                 }
             }
-        }
-        const auto columnOf = [&](size_t card) {
-            return static_cast<size_t>(std::upper_bound(starts.begin(), starts.end(), card) - starts.begin() - 1);
-        };
-        std::vector<float> columnWidths(starts.size(), 0.0f);
-        for (size_t i = 0; i < cards.size(); ++i)
-            columnWidths[columnOf(i)] = std::max(columnWidths[columnOf(i)], cards[i].width);
-        float all = cardGap * static_cast<float>(columnWidths.size() - 1);
-        for (const float w : columnWidths)
-            all += w;
-        if (all < width) columnWidths.front() += width - all; // a wide title widens the first column
-        width = std::max(width, all);
+            const auto columnOf = [&](size_t card) {
+                return static_cast<size_t>(std::upper_bound(starts.begin(), starts.end(), card) - starts.begin() - 1);
+            };
+            std::vector<float> columnWidths(starts.size(), 0.0f);
+            for (size_t i = 0; i < cards.size(); ++i)
+                columnWidths[columnOf(i)] = std::max(columnWidths[columnOf(i)], cards[i].width);
+            float all = cardGap * static_cast<float>(columnWidths.size() - 1);
+            for (const float w : columnWidths)
+                all += w;
+            if (all < width) columnWidths.front() += width - all; // a wide title widens the first column
+            width = std::max(width, all);
 
-        for (Block& b : loose)
-        {
-            Place(b, pad, top, width, l.lines.size(), l);
-            top += b.height + metrics.rowGap;
+            for (Block& b : loose)
+            {
+                Place(b, pad, top, width, l.lines.size(), l);
+                top += b.height + metrics.rowGap;
+            }
+            std::vector<float> columnX(starts.size(), pad), columnY(starts.size(), top);
+            for (size_t c = 1; c < starts.size(); ++c)
+                columnX[c] = columnX[c - 1] + columnWidths[c - 1] + cardGap;
+            for (size_t i = 0; i < cards.size(); ++i)
+            {
+                const size_t c = columnOf(i);
+                Place(cards[i], columnX[c], columnY[c], columnWidths[c], l.lines.size(), l);
+                columnY[c] += cards[i].height + cardGap;
+            }
+            lowest = *std::max_element(columnY.begin(), columnY.end());
         }
-        std::vector<float> columnX(starts.size(), pad), columnY(starts.size(), top);
-        for (size_t c = 1; c < starts.size(); ++c)
-            columnX[c] = columnX[c - 1] + columnWidths[c - 1] + cardGap;
-        for (size_t i = 0; i < cards.size(); ++i)
-        {
-            const size_t c = columnOf(i);
-            Place(cards[i], columnX[c], columnY[c], columnWidths[c], l.lines.size(), l);
-            columnY[c] += cards[i].height + cardGap;
-        }
-        const float lowest = *std::max_element(columnY.begin(), columnY.end());
         const float bottom = std::max(cards.empty() ? top - metrics.rowGap : lowest - cardGap, l.lines[0].bottom);
         l.width            = width + 2.0f * pad;
         l.height           = bottom + pad;
