@@ -2183,12 +2183,19 @@ TEST(the_world_info_popup_has_the_parts_you_picked)
     CHECK((headings() == std::vector<std::string>{"Calendar"}));
     const PopupContent calendar = BarPopupContent(BarWidget::World, state, settings);
     const std::vector<std::string> lines = Lines(calendar.sections[0]);
-    CHECK_EQ(lines[0], std::string("RSE Hume Female") + kDot + "Gusgen Mines");
-    CHECK_EQ(lines[1], std::string("Next RSE Elvaan Male") + kDot + "in 6:19:12");
-    CHECK_EQ(lines[2], "Full Moon in 35:07:12");
+    // Who, then where and when on the right, the time last and alone.
+    CHECK_EQ(lines[0], "RSE Hume Female Gusgen Mines");
+    CHECK_EQ(lines[1], std::string("Next RSE Elvaan Male ") + RseAt(kEarthsdayTen, 1).place + kDot + "6:19:12");
+    CHECK_EQ(lines[2], "Full Moon 35:07:12");
     // The next new moon is day 88.
-    CHECK_EQ(lines[3], "New Moon in " + Countdown(SecondsToDay(kEarthsdayTen, 88)));
-    CHECK_EQ(lines[4], "Conquest Tally in " + Countdown(SecondsToTally(kEarthsdayTen)));
+    CHECK_EQ(lines[3], "New Moon " + Countdown(SecondsToDay(kEarthsdayTen, 88)));
+    CHECK_EQ(lines[4], "Conquest Tally " + Countdown(SecondsToTally(kEarthsdayTen)));
+    for (const PopupRow& row : calendar.sections[0].rows)
+    {
+        CHECK(row.kind == RowKind::Pair);
+        CHECK(row.cells[0].text.front().tone == Tone::Dim); // the line's name
+    }
+    CHECK_EQ(calendar.sections[0].rows[1].cells[1].text.back().text, "6:19:12");
 }
 
 TEST(each_kind_of_ship_has_a_tab_of_its_routes)

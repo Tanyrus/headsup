@@ -919,22 +919,21 @@ namespace headsup
                 const uint32_t today = VanaAt(state.unixMs).day;
                 PopupSection calendar{"Calendar", {}};
                 calendar.beside = picked(WorldSection::Travel); // the ships and the calendar in one row, Guilds under
-                PopupRow rse = Labeled("RSE", Text(now.race));
-                rse.cells.back().text.push_back(Text(kDot, Tone::Dim));
-                rse.cells.back().text.push_back(Text(now.place));
-                calendar.rows.push_back(std::move(rse));
-                PopupRow coming = Labeled("Next RSE", Text(next.race));
-                coming.cells.back().text.push_back(Text(kDot, Tone::Dim));
-                AddTime(coming.cells.back().text, "in ", now.endsIn);
-                calendar.rows.push_back(std::move(coming));
-                const auto inTime = [](const char* label, double seconds) {
-                    PopupRow row = Labeled(label, Text("in "));
-                    row.cells.back().text.push_back(Text(Countdown(seconds)));
+                // Each line's name and who on the left; where and when on the right, the time last.
+                const auto race = [](const char* label, const Rse& rse) {
+                    PopupRow row = Labeled(label, Text(rse.place));
+                    row.cells.front().text.push_back(Text(std::string(rse.race) + " "));
                     return row;
                 };
-                calendar.rows.push_back(inTime("Full Moon", SecondsToDay(state.unixMs, NextMoonDay(today, true))));
-                calendar.rows.push_back(inTime("New Moon", SecondsToDay(state.unixMs, NextMoonDay(today, false))));
-                calendar.rows.push_back(inTime("Conquest Tally", SecondsToTally(state.unixMs)));
+                calendar.rows.push_back(race("RSE", now));
+                PopupRow coming = race("Next RSE", next);
+                coming.cells.back().text.push_back(Text(kDot, Tone::Dim));
+                coming.cells.back().text.push_back(Text(Countdown(now.endsIn)));
+                calendar.rows.push_back(std::move(coming));
+                const auto until = [](const char* label, double seconds) { return Labeled(label, Text(Countdown(seconds))); };
+                calendar.rows.push_back(until("Full Moon", SecondsToDay(state.unixMs, NextMoonDay(today, true))));
+                calendar.rows.push_back(until("New Moon", SecondsToDay(state.unixMs, NextMoonDay(today, false))));
+                calendar.rows.push_back(until("Conquest Tally", SecondsToTally(state.unixMs)));
                 popup.sections.push_back(std::move(calendar));
             }
             if (picked(WorldSection::Guilds))
