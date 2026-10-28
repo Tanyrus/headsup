@@ -273,7 +273,7 @@ A bar of widgets across the top of the screen, on by default, with these widgets
 | Weather | The weather now, with its element, and today's chance of it | A five-day forecast, starting today, and By Element: a tab for each element, with how many zones can roll it today and tomorrow, and which ones, with their chances |
 | Vana'diel | The weekday in its element's color, the time and moon | The date, and when the day and moon change |
 | Job | Your jobs and levels, and the EXP to your next level (your merits at 75), over a bar of it; its Layout can put the EXP first, as the larger line, or show the EXP alone | EXP per hour, the time to level, limit points |
-| EXP | Your EXP and its bar, on its own; Earned, To Next and Percent can each go above, below, left or right of the bar | EXP per hour, the time to level, limit points |
+| EXP | Your EXP and its bar, on its own; Earned, To Next and Percent can each go above, below, left or right of the bar, the texts above and below lined up with its left end, middle or right end by Text Align | EXP per hour, the time to level, limit points |
 | Party | How many are in your party, with the lowest HP and MP in your zone | Each member's jobs, levels, HP, MP and TP |
 | Signet | The time left on Signet or Sanction, only while one is on | What it gives and whether it works where you are |
 | Distance | How far your target is, in yalms | Nothing |

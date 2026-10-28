@@ -66,6 +66,7 @@ namespace headsup
         ExpPlaces expPlaces  = kDefaultExpPlaces;   // EXP: its texts around its bar
         int expBarWidth      = kDefaultExpBarWidth;
         int expBarHeight     = kDefaultExpBarHeight;
+        Align expAlign       = Align::Center;       // its texts above and below the bar, against it
         JobLayout jobLayout  = JobLayout::JobsFirst;
         bool jobNames        = true;
         bool latency         = false; // Connection: its ping after its rates

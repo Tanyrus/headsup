@@ -2808,6 +2808,7 @@ TEST(the_exp_text_is_kept_apart_for_the_job_and_exp_widgets)
     exp.expPlaces      = {ExpTextPlace::Above, ExpTextPlace::Off, ExpTextPlace::Left};
     exp.expBarWidth    = 250;
     exp.expBarHeight   = 3;
+    exp.expAlign       = Align::Right;
     MapStore store;
     SaveSettings(s, store);
     CHECK_EQ(store.values["expBar"], "under"); // the Job widget's, under its key of before
@@ -2815,14 +2816,18 @@ TEST(the_exp_text_is_kept_apart_for_the_job_and_exp_widgets)
     CHECK(read.Widget(BarWidget::Exp) == s.Widget(BarWidget::Exp));
     CHECK(read.Widget(BarWidget::Job) == s.Widget(BarWidget::Job));
     CHECK_EQ(store.values["barExpEarned"], "above");
+    CHECK_EQ(store.values["barExpAlign"], "right");
+    CHECK(Settings{}.Widget(BarWidget::Exp).expAlign == Align::Center);
     // A size past the slider's ends reads as that end; an unknown place as the default's.
     store.values["barExpBarWidth"]  = "9999";
     store.values["barExpBarHeight"] = "0";
     store.values["barExpPercent"]   = "sideways";
+    store.values["barExpAlign"]     = "diagonal";
     const Settings reread        = LoadSettings(store);
     const WidgetOptions& clamped = reread.Widget(BarWidget::Exp);
     CHECK(clamped.expBarWidth == kMaxExpBarWidth && clamped.expBarHeight == kMinExpBarHeight);
     CHECK(clamped.expPlaces[static_cast<int>(ExpText::Percent)] == kDefaultExpPlaces[static_cast<int>(ExpText::Percent)]);
+    CHECK(clamped.expAlign == Align::Center);
 }
 
 TEST(the_bags_widgets_bag_is_kept_and_one_past_the_last_reads_as_the_inventory)

@@ -207,6 +207,8 @@ namespace headsup
         const char* const kExpPlaceKeys[kExpTextCount] = {"barExpEarned", "barExpToNext", "barExpPercent"};
         const char* const kExpPlaceNames[kExpTextPlaceCount] = {"off", "above", "below", "left", "right"};
         constexpr const char* kExpBarWidthKey = "barExpBarWidth", *kExpBarHeightKey = "barExpBarHeight";
+        constexpr const char* kExpAlignKey = "barExpAlign";
+        const char* const kExpAlignNames[kAlignCount] = {"left", "center", "right"};
         constexpr const char* kJobNamesKey  = "jobNames";
         constexpr const char* kSubtitleKey  = "barSubtitle";
         const char* const kSubtitleNames[kSubtitlePlaceCount] = {"hide", "before", "after"};
@@ -1349,6 +1351,11 @@ namespace headsup
                 }
                 o.expBarWidth  = number(kExpBarWidthKey, o.expBarWidth);
                 o.expBarHeight = number(kExpBarHeightKey, o.expBarHeight);
+                {
+                    const std::string align = text(kExpAlignKey);
+                    for (int a = 0; a < kAlignCount; ++a)
+                        if (align == kExpAlignNames[a]) o.expAlign = static_cast<Align>(a);
+                }
                 break;
             case BarWidget::Connection:
                 o.latency  = flag(kLatencyKey, o.latency);
@@ -1405,6 +1412,7 @@ namespace headsup
                     text(kExpPlaceKeys[t], kExpPlaceNames[static_cast<int>(o.expPlaces[static_cast<size_t>(t)])]);
                 StoreFloat(store, CopyKey(kExpBarWidthKey, w), static_cast<float>(o.expBarWidth));
                 StoreFloat(store, CopyKey(kExpBarHeightKey, w), static_cast<float>(o.expBarHeight));
+                text(kExpAlignKey, kExpAlignNames[static_cast<int>(o.expAlign)]);
                 break;
             case BarWidget::Connection:
                 flag(kLatencyKey, o.latency);

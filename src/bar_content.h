@@ -4,6 +4,7 @@
 #include "figures.h"
 #include "function_ref.h"
 #include "icons.h"
+#include "plate_settings.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -53,6 +54,7 @@ namespace headsup
         float done = 0.0f;
         int width = 0, height = 0; // pixels
         std::vector<Span> above, below, left, right;
+        Align align = Align::Center; // the texts above and below, against the bar
         bool operator==(const Meter&) const = default;
     };
 

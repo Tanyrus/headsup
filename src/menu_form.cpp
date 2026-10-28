@@ -622,6 +622,13 @@ namespace headsup
                         form.Segments(label.c_str(), o.expPlaces[static_cast<size_t>(text)], names.data(), kExpTextPlaceCount, row.tip);
                     }
                     break;
+                case WidgetTabsRow::ExpAlign:
+                    if (kind == BarWidget::Exp)
+                    {
+                        const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(WindowList::Align));
+                        form.Segments(label.c_str(), o.expAlign, names.data(), kAlignCount, row.tip);
+                    }
+                    break;
                 case WidgetTabsRow::BarWidth:
                     if (kind == BarWidget::Exp)
                         form.SliderInt(label.c_str(), o.expBarWidth, kMinExpBarWidth, kMaxExpBarWidth, "%d px", row.tip);

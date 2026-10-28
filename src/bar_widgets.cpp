@@ -1224,7 +1224,7 @@ namespace headsup
         case BarWidget::Job:
             return JobWidget(state.job, o.expBar, o.jobNames, o.jobLayout, o.expText);
         case BarWidget::Exp:
-            return ExpWidget(state.job, o.expPlaces, o.expBarWidth, o.expBarHeight);
+            return ExpWidget(state.job, o.expPlaces, o.expBarWidth, o.expBarHeight, o.expAlign);
         case BarWidget::Conquest:
         {
             w.subtitle = ListOf(Text("Conquest", Tone::Dim));

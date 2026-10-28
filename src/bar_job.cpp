@@ -159,7 +159,7 @@ namespace headsup
         return w;
     }
 
-    WidgetContent ExpWidget(const std::optional<JobReport>& job, const ExpPlaces& places, int width, int height)
+    WidgetContent ExpWidget(const std::optional<JobReport>& job, const ExpPlaces& places, int width, int height, Align align)
     {
         WidgetContent w;
         w.shown = true;
@@ -172,6 +172,7 @@ namespace headsup
         m.done   = ExpDone(job->sample).value_or(0.0f);
         m.width  = width;
         m.height = height;
+        m.align  = align;
         const auto side = [&](ExpTextPlace place, std::vector<Span>& spans) {
             uint8_t parts = 0;
             for (int t = 0; t < kExpTextCount; ++t)

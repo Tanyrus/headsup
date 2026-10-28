@@ -630,9 +630,15 @@ namespace headsup
     {
         const auto bar    = static_cast<float>(meter.width);
         const auto beside = [&](float width) { return width > 0.0f ? width + gap : 0.0f; };
-        const float overhang = std::max({0.0f, (text.above - bar) / 2.0f, (text.below - bar) / 2.0f});
-        const float left = std::max(beside(text.left), overhang), right = std::max(beside(text.right), overhang);
-        return MeterPlace{left + bar + right, left, left + (bar - text.above) / 2.0f, left + (bar - text.below) / 2.0f};
+        // A text above or below wider than the bar runs past it away from the side it lines up with.
+        const float past  = std::max({0.0f, text.above - bar, text.below - bar});
+        const float share = meter.align == Align::Center ? past / 2.0f : past;
+        const float left  = std::max(beside(text.left), meter.align == Align::Left ? 0.0f : share);
+        const float right = std::max(beside(text.right), meter.align == Align::Right ? 0.0f : share);
+        const auto at     = [&](float width) {
+            return meter.align == Align::Left ? left : meter.align == Align::Right ? left + bar - width : left + (bar - width) / 2.0f;
+        };
+        return MeterPlace{left + bar + right, left, at(text.above), at(text.below)};
     }
 
     std::string WidgetRml(const WidgetContent& content, const BarLook& look, const std::vector<float>& columns,

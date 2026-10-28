@@ -485,6 +485,22 @@ TEST(a_meter_is_as_wide_as_its_bar_and_side_texts_with_the_texts_above_and_below
     CHECK(wide.barX == 100.0f && wide.width == 300.0f && wide.aboveX == 0.0f);
 }
 
+TEST(a_meters_texts_above_and_below_line_up_with_its_bars_left_or_right_and_run_past_it_that_way)
+{
+    Meter m;
+    m.width = 100;
+    m.align = Align::Left;
+    // Starting at the bar's left: the 140 above runs 40 past its right, further than right 20 and its gap.
+    const MeterPlace left = PlaceMeter(m, MeterWidths{140.0f, 60.0f, 30.0f, 20.0f}, 4.0f);
+    CHECK(left.barX == 34.0f && left.aboveX == 34.0f && left.belowX == 34.0f);
+    CHECK_EQ(left.width, 34.0f + 140.0f);
+    m.align = Align::Right;
+    // Ending at its right: 40 past its left, further than left 30 and its gap.
+    const MeterPlace right = PlaceMeter(m, MeterWidths{140.0f, 60.0f, 30.0f, 20.0f}, 4.0f);
+    CHECK(right.barX == 40.0f && right.aboveX == 0.0f && right.belowX == 40.0f + 100.0f - 60.0f);
+    CHECK_EQ(right.width, 40.0f + 100.0f + 24.0f);
+}
+
 TEST(a_meters_texts_are_measured_in_the_face_they_are_drawn_in)
 {
     Settings settings;

@@ -493,11 +493,28 @@ TEST(the_text_beside_a_meter_has_its_capitals_on_the_rows_middle)
             const BarMetrics m = MetricsFor(h, shape);
             const BarRow row   = PillRow(m);
             const TextRow t    = FitTextRow(m, FakeInk);
-            CHECK_EQ(t.side, t.twoLines ? t.detail : t.title);
+            CHECK_EQ(t.side, t.twoLines ? t.detail : t.title); // at Auto
             const LineInk side = FakeInk(!t.twoLines, t.side);
             const float above = (t.sideY + side.top) - row.y, below = row.y + row.height - (t.sideY + side.baseline);
             CHECK(std::fabs(above - below) <= 0.01f);
         }
+}
+
+// A meter's texts at a set size are that size while it fits, a pixel a step: no jump where the row goes to one line.
+TEST(a_meters_texts_at_a_set_size_are_that_size)
+{
+    for (const BarShape shape : {BarShape::Pills, BarShape::Ornate})
+    {
+        int last = 0;
+        for (int size = 10; size <= 24; ++size)
+        {
+            const TextRow t = FitTextRow(MetricsFor(45, shape, size), FakeInk);
+            CHECK_EQ(t.side, t.title);
+            if (t.twoLines) CHECK_EQ(t.side, size);
+            CHECK(t.side >= last && t.side <= last + 1 + (last == 0 ? size : 0));
+            last = t.side;
+        }
+    }
 }
 
 TEST(text_shrinks_only_when_its_ink_would_not_fit)

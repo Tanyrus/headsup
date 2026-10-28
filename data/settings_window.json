@@ -414,6 +414,7 @@
                 {"key": "exp-earned", "name": "Earned", "tip": "Where the EXP you have of this level, out of what it takes, goes around the bar. At the level cap it is your limit points."},
                 {"key": "exp-to-next", "name": "To Next", "tip": "Where the EXP left to the next level goes around the bar. At the level cap it is your merits."},
                 {"key": "exp-percent", "name": "Percent", "tip": "Where how much of the level you have, as a percent, goes around the bar."},
+                {"key": "exp-align", "name": "Text Align", "tip": "How the texts above and below the bar line up with it: at its left end, its middle or its right end. A text longer than the bar runs past it the other way. Default is Center."},
                 {"key": "bar-width", "name": "Bar Width", "tip": "How long the bar is."},
                 {"key": "bar-height", "name": "Bar Height", "tip": "How thick the bar is. It stays in the middle of the panel."},
                 {"key": "job-names", "name": "Job Names", "tip": "Off, the levels alone."},
