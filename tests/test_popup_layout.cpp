@@ -325,6 +325,70 @@ TEST(a_hidden_row_widens_its_card_and_is_not_drawn)
     CHECK(Of(with, PopupPiece::Kind::Socket).empty());
 }
 
+namespace
+{
+    // A tab's rows: a count, then a table of 30 zones under its heads.
+    PopupContent Zones(size_t scrolled)
+    {
+        PopupContent c;
+        c.title = {{"Weather", Tone::Normal}};
+        PopupSection s{"By Element", {}};
+        PopupTab dark{Text("Dark"), {}};
+        PopupRow count = Labeled("Zones", Text("30 today"));
+        count.nested   = true;
+        count.scroll   = "By Element/Dark";
+        count.scrolled = scrolled;
+        PopupRow grid{RowKind::Grid, 2, {Word("Zone"), Word("Today")}};
+        grid.header = true;
+        grid.nested = true;
+        for (int i = 0; i < 30; ++i)
+        {
+            grid.cells.push_back(Word(("Zone " + std::to_string(i)).c_str()));
+            grid.cells.push_back(Word("Gloom 50%"));
+        }
+        dark.rows = {count, grid};
+        s.tabs    = {dark};
+        c.sections.push_back(s);
+        return c;
+    }
+}
+
+TEST(a_socket_longer_than_ten_lines_shows_ten_and_scrolls_under_its_heads)
+{
+    const BarMetrics m = MetricsFor(36, BarShape::Pills);
+    const PopupLayout top = LayoutPopup(Zones(0), m, BarShape::Pills, false, Fake);
+    // The count and nine zones make ten lines; the table's heads stay; a line says where it is.
+    CHECK(Find(top, "Zones ") && Find(top, "Zone") && Find(top, "Zone 8") && !Find(top, "Zone 9"));
+    CHECK(Find(top, std::string("1 to 10 of 31") + kDot + "scroll for more") != nullptr);
+    CHECK_EQ(top.scrolls.size(), static_cast<size_t>(1));
+    const PopupScroll& area = top.scrolls.front();
+    const PopupPiece& socket = *Of(top, PopupPiece::Kind::Socket).front();
+    CHECK(area.key == "By Element/Dark" && area.most == 21 && Near(area.x, socket.x) && Near(area.y, socket.y) &&
+          Near(area.width, socket.width) && Near(area.height, socket.height));
+    // Scrolled five lines: the heads stay, the count and the first four zones are gone, as tall as before.
+    const PopupLayout down = LayoutPopup(Zones(5), m, BarShape::Pills, false, Fake);
+    CHECK(Find(down, "Zone") && !Find(down, "Zones ") && !Find(down, "Zone 3") && Find(down, "Zone 4") &&
+          Find(down, "Zone 13") && !Find(down, "Zone 14"));
+    CHECK(Near(down.height, top.height) && Near(down.width, top.width));
+    CHECK(Find(down, "Zone")->y < Find(down, "Zone 4")->y);
+    // Past the end, it stops at the last ten.
+    const PopupLayout end = LayoutPopup(Zones(100), m, BarShape::Pills, false, Fake);
+    CHECK(Find(end, "Zone 29") && !Find(end, "Zone 19") && Find(end, std::string("22 to 31 of 31") + kDot + "scroll for more"));
+}
+
+TEST(a_sockets_rows_keep_as_much_room_on_their_right_as_on_their_left)
+{
+    const BarMetrics m = MetricsFor(36, BarShape::Pills);
+    const PopupLayout l    = LayoutPopup(Zones(0), m, BarShape::Pills, false, Fake);
+    const PopupPiece& sock = *Of(l, PopupPiece::Kind::Socket).front();
+    const PopupPiece& name = *Find(l, "Zones "), &value = *Find(l, "30 today");
+    CHECK(Near(sock.x + sock.width - (value.x + value.width), name.x - sock.x));
+    // And the widest line of the table fits inside the same room.
+    for (const PopupPiece& p : l.pieces)
+        if (p.kind == PopupPiece::Kind::Text && p.y > sock.y && p.y < sock.y + sock.height)
+            CHECK(p.x + p.width <= sock.x + sock.width - (name.x - sock.x) + 0.01f);
+}
+
 TEST(a_pairs_value_ends_at_its_cards_right_edge_and_its_label_at_the_left)
 {
     const BarMetrics m = MetricsFor(36, BarShape::Pills);

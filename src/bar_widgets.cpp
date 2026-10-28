@@ -823,6 +823,14 @@ namespace headsup
             return row;
         }
 
+        // A socket's first row: the key its scrolling is kept by, and how far it is scrolled.
+        void ScrollsBy(PopupRow& first, const BarState& state, std::string key)
+        {
+            const auto scrolled = state.scrolled.find(key);
+            first.scrolled      = scrolled == state.scrolled.end() ? 0 : scrolled->second;
+            first.scroll        = std::move(key);
+        }
+
         // The tab the player picked last in the card, or its first.
         size_t Picked(const BarState& state, const PopupSection& section)
         {
@@ -857,6 +865,7 @@ namespace headsup
                 PopupTab tab{Colored(ElementName(element), ElementColor(element)), {}};
                 PopupRow count = Labeled("Zones", Text(std::to_string(now.size()) + " today" + kDot + std::to_string(next.size()) + " tomorrow"));
                 count.nested   = true;
+                ScrollsBy(count, state, section.heading + "/" + ElementName(element));
                 tab.rows.push_back(std::move(count));
                 std::map<uint16_t, std::pair<const ZoneRoll*, const ZoneRoll*>> zones;
                 for (const ZoneRoll& roll : now)
@@ -909,6 +918,7 @@ namespace headsup
                         row.nested = true;
                         kind.rows.push_back(std::move(row));
                     }
+                    ScrollsBy(kind.rows.front(), state, travel.heading + "/" + kind.name.text);
                     travel.tabs.push_back(std::move(kind));
                 }
                 travel.tab = Picked(state, travel);
@@ -932,6 +942,7 @@ namespace headsup
                     PopupRow grid = Grid(kWorldGuildColumns, (last - first) * kWorldGuildColumns);
                     grid.nested   = true;
                     grid.hidden   = !shown;
+                    ScrollsBy(grid, state, guilds.heading + "/" + shops[first].guild);
                     for (size_t i = first; i < last; ++i)
                     {
                         grid.cells.push_back(Cell(GuildText(shops[i], state.unixMs)));

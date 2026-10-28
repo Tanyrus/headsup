@@ -79,6 +79,7 @@ namespace headsup
         LinuxXIState linuxxi;
         std::vector<std::string> openFolds; // the popup rows the player opened, by their fold keys
         std::map<std::string, std::string> pickedTabs; // the tab the player picked in a card, by its heading
+        std::map<std::string, size_t> scrolled; // lines a part of a popup is scrolled past, by its key
     };
 
     // The parts of BarState that the shown widgets and the open popup read, for the plugin to gather only those; it

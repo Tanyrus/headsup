@@ -662,9 +662,9 @@ TEST(the_weather_popup_has_a_tab_for_each_element_of_the_zones_that_can_roll_it_
     CHECK_EQ(Joined(grid.cells[3 * (row + 1) + 1].text), shares);
 }
 
-TEST(the_weather_popups_longest_element_keeps_every_zone_on_a_1080_screen)
+TEST(the_weather_popups_longest_element_fits_a_1080_screen_and_scrolls_through_its_zones)
 {
-    // The element that most zones can roll, picked: more than a 1080 px screen holds in one column. Nothing is cut.
+    // The element that most zones can roll, picked: its zones scroll in their socket, and nothing is cut.
     Settings settings;
     BarState state;
     state.zone   = 103;
@@ -673,21 +673,29 @@ TEST(the_weather_popups_longest_element_keeps_every_zone_on_a_1080_screen)
     for (int e = 0; e < kElementCount; ++e)
         if (ZonesRolling(static_cast<Element>(e), 777).size() > ZonesRolling(most, 777).size()) most = static_cast<Element>(e);
     state.pickedTabs["By Element"] = ElementName(most);
-    const PopupContent popup = BarPopupContent(BarWidget::Weather, state, settings);
-    const BarMetrics m       = MetricsFor(45, BarShape::Pills);
-    const auto measure       = [](const Span& span, PopupFont font) {
+    const BarMetrics m = MetricsFor(45, BarShape::Pills);
+    const auto measure = [](const Span& span, PopupFont font) {
         const float height = font == PopupFont::Title ? 24.0f : 18.0f;
         return TextSize{8.0f * static_cast<float>(span.text.size()), height, 0.3f * height, height - 1.0f};
     };
     const float room = 1080.0f - 45.0f - 2.0f * m.gap;
-    PopupLayout l    = LayoutPopup(popup, m, BarShape::Pills, false, measure, room);
+    const auto shows = [&](const PopupLayout& l, const std::string& text) {
+        return std::ranges::any_of(l.pieces, [&](const PopupPiece& p) { return p.span.text == text; });
+    };
+    const std::string key = std::string("By Element/") + ElementName(most);
+    PopupLayout l = LayoutPopup(BarPopupContent(BarWidget::Weather, state, settings), m, BarShape::Pills, false, measure, room);
     const size_t all = l.pieces.size();
     CutPopup(l, room, m.popupPadding);
     CHECK(l.height <= room + 0.01f && l.pieces.size() == all);
-    const PopupSection& section = *Section(popup, "By Element");
-    const PopupRow& grid        = section.tabs[section.tab].rows.back();
-    for (size_t i = 3; i < grid.cells.size(); i += 3)
-        CHECK(std::ranges::any_of(l.pieces, [&](const PopupPiece& p) { return p.span.text == Joined(grid.cells[i].text); }));
+    CHECK(l.scrolls.size() == 1 && l.scrolls.front().key == key);
+    // Scrolled to its end, its last zone shows.
+    const PopupContent first = BarPopupContent(BarWidget::Weather, state, settings);
+    const PopupRow& grid     = Section(first, "By Element")->tabs[Section(first, "By Element")->tab].rows.back();
+    const std::string last   = Joined(grid.cells[grid.cells.size() - 3].text);
+    CHECK(!shows(l, last));
+    state.scrolled[key] = l.scrolls.front().most;
+    const PopupLayout end = LayoutPopup(BarPopupContent(BarWidget::Weather, state, settings), m, BarShape::Pills, false, measure, room);
+    CHECK(shows(end, last) && end.height <= room + 0.01f);
 }
 
 TEST(a_zone_without_a_calendar_or_weather_hides_the_widget)

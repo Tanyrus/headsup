@@ -2147,6 +2147,7 @@ private:
         s.shares   = m_GameState.Shares();
         s.openFolds = m_BarInput.OpenFolds();
         s.pickedTabs = m_BarInput.PickedTabs();
+        s.scrolled   = m_BarInput.Scrolled();
         if (needs.conquest)
         {
             // Ashita's nation is 0 for San d'Oria to 2 for Windurst.

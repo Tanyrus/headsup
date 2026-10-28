@@ -110,14 +110,26 @@ namespace headsup
         BarRect rect;
         std::string tab{}; // a tab's name, key being its card's heading
     };
+    // A part of the open popup the wheel scrolls, where it was drawn, and how many lines it scrolls.
+    struct BarScroll
+    {
+        std::string key;
+        BarRect rect;
+        size_t most = 0;
+    };
 
     class BarInput
     {
     public:
         // Each frame: where the widgets are now and which have popups. A pinned widget that is gone loses its pin.
         void Frame(const BarLayout& layout, const std::array<bool, kPanelSlots>& hasPopup);
-        // Where the open popup was drawn, or an empty rectangle, and its fold rows.
-        void SetPopup(const BarRect& popup, std::vector<BarFold> folds = {});
+        // Where the open popup was drawn, or an empty rectangle, its fold rows and the parts that scroll.
+        void SetPopup(const BarRect& popup, std::vector<BarFold> folds = {}, std::vector<BarScroll> scrolls = {});
+        // The wheel turned notches toward the player: true when the pointer, where it last moved, is over a part of the
+        // popup that scrolls, which then scrolls kLinesPerNotch lines a notch, no further than its ends.
+        bool Wheel(int notches);
+        // How many lines each part has been scrolled since loading, by its key.
+        const std::map<std::string, size_t>& Scrolled() const { return m_Scrolled; }
         void Move(float x, float y);
         // The pointer is off the game: over an Ashita window or out of the client area, where no move reports it.
         void Leave();
@@ -149,6 +161,7 @@ namespace headsup
         bool InPopupColumn(float x, float y) const;
 
         static constexpr float kAway = -1.0f; // left of and above everything placed: a pointer off the game
+        static constexpr long kLinesPerNotch = 3;
 
         BarLayout m_Layout;
         std::array<bool, kPanelSlots> m_HasPopup{};
@@ -156,6 +169,8 @@ namespace headsup
         std::vector<BarFold> m_Folds;
         std::vector<std::string> m_OpenFolds;
         std::map<std::string, std::string> m_Tabs;
+        std::vector<BarScroll> m_Scrolls;
+        std::map<std::string, size_t> m_Scrolled;
         float m_X = kAway, m_Y = kAway;
         std::optional<PanelWidget> m_Under;  // the widget under the pointer
         std::optional<PanelWidget> m_Hover;  // the popup hovering keeps open

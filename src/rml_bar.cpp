@@ -422,7 +422,7 @@ namespace headsup
 
     BarRect RmlBar::ShowPopup(RmlHost& host, const BarLook& look, const BarState& state,
         const BarLayout& layout, float screenWidth, float screenHeight, const BarInput& input, bool hidden,
-        std::vector<BarFold>& folds)
+        std::vector<BarFold>& folds, std::vector<BarScroll>& scrolls)
     {
         const std::optional<PanelWidget> open = input.Open();
         const BarRect* anchor               = open ? RectOf(layout, *open) : nullptr;
@@ -473,6 +473,9 @@ namespace headsup
         m_Popup->SetClass(kOpenClass, !hidden);
         for (const PopupFold& fold : pl.folds)
             folds.push_back(BarFold{fold.key, BarRect{rect.x + fold.x, rect.y + fold.y, fold.width, fold.height}, fold.tab});
+        for (const PopupScroll& scroll : pl.scrolls)
+            scrolls.push_back(BarScroll{scroll.key, BarRect{rect.x + scroll.x, rect.y + scroll.y, scroll.width, scroll.height},
+                scroll.most});
         return rect;
     }
 
@@ -527,8 +530,9 @@ namespace headsup
             m_HelpReach = BarRect{HelpBarLeft(m) + helpX, helpTop, HelpBarWidth(screenWidth), rows.helpBarHeight};
         input.Frame(layout, widgets.hasPopup);
         std::vector<BarFold> folds;
-        const BarRect popup = ShowPopup(host, look, state, layout, screenWidth, screenHeight, input, hidden, folds);
-        input.SetPopup(popup, std::move(folds));
+        std::vector<BarScroll> scrolls;
+        const BarRect popup = ShowPopup(host, look, state, layout, screenWidth, screenHeight, input, hidden, folds, scrolls);
+        input.SetPopup(popup, std::move(folds), std::move(scrolls));
         if (m_Visible == hidden)
         {
             m_Visible = !hidden;

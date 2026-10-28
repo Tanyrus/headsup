@@ -105,6 +105,9 @@ namespace headsup
         bool nested = false;
         bool header = false; // Grid: its first line heads its columns, and each group of them set side by side
         bool hidden = false; // a closed fold's row: as wide as its card is, but not drawn
+        // A socket's first row: what its scrolling is kept by, and how many of its lines it is scrolled past.
+        std::string scroll{};
+        size_t scrolled = 0;
         bool operator==(const PopupRow&) const = default;
     };
 

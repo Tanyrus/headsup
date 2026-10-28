@@ -54,6 +54,15 @@ namespace headsup
         std::string tab{}; // a tab's name; empty for a fold row
     };
 
+    // A socket that shows only some of its lines, from the popup's top-left corner, and how many lines it scrolls.
+    struct PopupScroll
+    {
+        std::string key;
+        float x = 0.0f, y = 0.0f, width = 0.0f, height = 0.0f;
+        size_t line = 0;
+        size_t most = 0;
+    };
+
     // The title, or a section's card: a popup cut short keeps or drops each whole.
     struct PopupLine
     {
@@ -66,6 +75,7 @@ namespace headsup
         std::vector<PopupPiece> pieces; // line by line
         std::vector<PopupLine> lines;   // top to bottom
         std::vector<PopupFold> folds;
+        std::vector<PopupScroll> scrolls;
     };
 
     struct TextSize

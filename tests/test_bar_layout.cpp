@@ -679,6 +679,24 @@ TEST(the_open_popup_keeps_the_pointer_over_an_ashita_window_under_it)
     CHECK(!c.input.Open().has_value());
 }
 
+TEST(the_wheel_over_a_popups_scrolling_area_scrolls_it_three_lines_a_notch)
+{
+    Clicks c;
+    CHECK(!c.Take(WM_MOUSEMOVE, kOnBarY));
+    c.input.SetPopup(BarRect{760.0f, 44.0f, 400.0f, 300.0f}, {},
+        {BarScroll{"By Element/Dark", BarRect{770.0f, 150.0f, 380.0f, 120.0f}, 7}});
+    const auto wheel = [&](int notches) {
+        return c.clicks.Take(WM_MOUSEWHEEL, static_cast<uint32_t>(static_cast<uint16_t>(-notches * 120)) << 16, 0.0f, 0.0f,
+            true, false, false);
+    };
+    CHECK(!c.Take(WM_MOUSEMOVE, 200.0f)); // over it, where the game last saw the pointer
+    CHECK(wheel(1) && c.input.Scrolled().at("By Element/Dark") == 3);
+    CHECK(wheel(2) && c.input.Scrolled().at("By Element/Dark") == 7); // no further than its last line
+    CHECK(wheel(-1) && c.input.Scrolled().at("By Element/Dark") == 4);
+    CHECK(!c.Take(WM_MOUSEMOVE, 100.0f)); // the popup, above the area: the game keeps its wheel
+    CHECK(!wheel(1) && c.input.Scrolled().at("By Element/Dark") == 4);
+}
+
 TEST(the_bar_going_off_gives_the_game_every_release)
 {
     Clicks c;

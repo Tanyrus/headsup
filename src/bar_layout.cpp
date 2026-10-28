@@ -1,6 +1,7 @@
 #include "bar_layout.h"
 
 #include "mouse_messages.h"
+#include "rml_pure.h"
 #include "utf16.h"
 
 #include <algorithm>
@@ -339,11 +340,25 @@ namespace headsup
         Reevaluate();
     }
 
-    void BarInput::SetPopup(const BarRect& popup, std::vector<BarFold> folds)
+    void BarInput::SetPopup(const BarRect& popup, std::vector<BarFold> folds, std::vector<BarScroll> scrolls)
     {
-        m_Popup = popup;
-        m_Folds = std::move(folds);
+        m_Popup   = popup;
+        m_Folds   = std::move(folds);
+        m_Scrolls = std::move(scrolls);
         Reevaluate();
+    }
+
+    bool BarInput::Wheel(int notches)
+    {
+        if (!InPopup(m_X, m_Y)) return false;
+        for (const BarScroll& scroll : m_Scrolls)
+            if (scroll.rect.Contains(m_X, m_Y))
+            {
+                const long now = static_cast<long>(std::min(m_Scrolled[scroll.key], scroll.most)) + kLinesPerNotch * notches;
+                m_Scrolled[scroll.key] = static_cast<size_t>(std::clamp(now, 0L, static_cast<long>(scroll.most)));
+                return true;
+            }
+        return false;
     }
 
     void BarInput::Move(float x, float y)
@@ -417,6 +432,10 @@ namespace headsup
             else
                 m_Input.Leave();
             return false;
+        // A wheel message's place is on the screen, not the window: the pointer's last move says where it is.
+        case kMouseWheel:
+            return barOn && !blocked &&
+                   m_Input.Wheel(static_cast<int>(std::lround(WheelNotches(static_cast<int16_t>(buttons >> kWheelShift)))));
         case kLeftUp: return std::exchange(m_Left, false);
         case kRightUp: return std::exchange(m_Right, false);
         // A new press shows the last one ended, even when its release went to another window.

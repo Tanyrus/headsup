@@ -306,7 +306,9 @@ help bar has an X and Y offset of its own, in screen pixels, in its card. Unload
 Hover a widget to open its details. Click it to keep them open; click it again to let them close once the pointer leaves
 the widget and its popup. A row with an arrow, such as a guild, opens when you click it to show what is under it, and
 closes on the next click. A card with tabs, such as Travel or By Element, shows the tab you click. A popup keeps its
-width as you do either, and grows down. Open rows and picked tabs stay that way until you reload HeadsUp.
+width as you do either, and grows down. A list longer than 10 lines shows 10 at a time: turn the mouse wheel over it to
+scroll, and a line under it says which you are seeing. Open rows, picked tabs and scrolled lists stay that way until you
+reload HeadsUp.
 
 The server only tells you your own zone's weather. By Element goes by Phoenix's weather calendar instead: each zone
 has up to three weathers it can roll each day, with their chances, so a zone listed for Fire today can roll a Fire

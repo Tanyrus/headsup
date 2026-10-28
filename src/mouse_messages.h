@@ -8,6 +8,7 @@ namespace headsup
     // its headers.
     constexpr uint32_t kMouseMove = 0x200, kLeftDown = 0x201, kLeftUp = 0x202, kLeftDouble = 0x203, kRightDown = 0x204,
                        kRightUp = 0x205, kRightDouble = 0x206, kMiddleDown = 0x207, kMiddleUp = 0x208,
-                       kMiddleDouble = 0x209, kXButtonDown = 0x20B, kXButtonUp = 0x20C, kXButtonDouble = 0x20D;
+                       kMiddleDouble = 0x209, kMouseWheel = 0x20A, kXButtonDown = 0x20B, kXButtonUp = 0x20C, kXButtonDouble = 0x20D;
     constexpr uint32_t kLeftButton = 0x1, kRightButton = 0x2;
+    constexpr int kWheelShift = 16; // a wheel message's turn is the high word of its wParam
 }
