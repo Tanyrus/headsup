@@ -9,6 +9,8 @@ Currencies menu, while the Gil widget is on ([Top panel](#top-panel) says when).
 it checks a monster itself only with Auto-Check switched on, which is off unless you turn it on: it then sends the same
 request `/check` does, for monsters alone and never for a player.
 
+![Goblins, a sheep, a crab and an NM in Valkurm Dunes, each with HeadsUp's nameplate, and the top panel above](resources/headsup.jpg)
+
 Download `HeadsUp.dll` from the latest release on the [Releases](https://github.com/Tanyrus/headsup/releases) page and
 put it in Ashita's `plugins` folder, in place of any `headsup.dll` from before. Load it with `/load HeadsUp`; `/hu` opens its settings, and `/hu menu <page>`
 opens them at a page, such as `/hu menu entities`, `/hu menu mobs` or `/hu menu toppanel`.
@@ -19,7 +21,7 @@ opens them at a page, such as `/hu menu entities`, `/hu menu mobs` or `/hu menu 
 > Phoenix version it was built from, so a monster changed on the live server since then can show the wrong color,
 > level or icons, a changed zone the wrong name, region or forecast, and a changed title the wrong title.
 
-![Settings window](resources/settings.png)
+![The settings window's Nameplate Design card](resources/settings.png)
 
 ## Settings
 
@@ -198,7 +200,7 @@ The Nameplates card, on the Entities page, sets what every nameplate shares:
   each other rise one over another, while your target's keeps its place. Show Line to Entity, under Stack Names, draws a
   line in the name's color from a risen nameplate down to where it would have stood
 
-![A player's nameplate with their icons and the feather cursor](resources/player_nameplate.png)
+![Your own nameplate with its icons and the feather cursor](resources/player_nameplate.png)
 
 ### Friends and linkshell members
 
@@ -213,7 +215,8 @@ checked them.
 
 The Self page has a Placeholder Timers card. With Respawn Timers on, a countdown appears above your name for each
 lottery placeholder that dies within 50 yalms of you, such as Bigmouth Billy [11A] 3:14, and for each lottery NM, whose
-death brings its placeholder back on the placeholder's own timer; it reads "up" when the placeholder is due. The server
+death brings its placeholder back on the placeholder's own timer; it reads "up" when the placeholder is due, and goes
+after Up Time, 5 minutes by default (0 to 60; at 0 it goes as soon as it is up). The server
 tells only those within 50 yalms of a death, so a kill farther away, even by your party, starts no timer.
 
 ### Target cursor
@@ -262,21 +265,27 @@ resize and over Ashita's windows, and the keys that do not make the game hide it
 
 A bar of widgets across the top of the screen, on by default, with these widgets from left to right in its default layout:
 
+![The top panel with the Weather widget's popup](resources/top_panel.png)
+
 | Widget | Shows | Hover for |
 |---|---|---|
 | Zone | The zone's name, its region and who holds it | The zone's ID and region; in a conquest region, each nation's and the beastmen's share of this week's influence there, the largest first, with a star beside whoever holds it, and the time to the tally |
 | Weather | The weather now, with its element, and today's chance of it | A five-day forecast, starting today |
 | Vana'diel | The weekday in its element's color, the time and moon | The date, and when the day and moon change |
 | Job | Your jobs and levels, and the EXP to your next level (your merits at 75), over a bar of it; its Layout can put the EXP first, as the larger line, or show the EXP alone | EXP per hour, the time to level, limit points |
+| EXP | Your EXP and its bar, on its own; Earned, To Next and Percent can each go above, below, left or right of the bar | EXP per hour, the time to level, limit points |
 | Party | How many are in your party, with the lowest HP and MP in your zone | Each member's jobs, levels, HP, MP and TP |
 | Signet | The time left on Signet or Sanction, only while one is on | What it gives and whether it works where you are |
+| Distance | How far your target is, in yalms | Nothing |
+| Conquest | How many regions each nation holds, for the nations its Nations filter picks | Which regions each holds, marking the ones your nation holds that you have not run supplies to |
+| World Info | What its Shows picks, with a countdown: the next departure of a ship you pick, when an element's weather can next roll in your zone, a guild's hours, the RSE or the moon | The parts its Popup picks: every ship's next departure, when each element's weather can next roll here, every guild shop's hours, and a calendar of the RSE, the moons and the conquest tally |
 | Target | A monster's name in its border color, its level and con | Its jobs, weaknesses, resistances, absorbs, immunities, tags, stats, TP moves, spells, spawn, drops at Treasure Hunter 0 and what can be stolen; for an NPC or ??? in Phoenix's NPC data, what it is for, when it appears, what clicking it says and does, its shop, what to trade it, what it pops and gives, the key items it gives and checks for, and its quests, missions and battlefields; for a player you checked, their jobs, master level, linkshell and title, as of your check |
 | Gil | Your gil, or the currency picked in its section | Gil and every currency you have |
 | Bags | Your inventory's used and maximum space | Every bag you have |
-| Connection | The game's own S and R, bytes sent and received a second; amber when no data arrives, red once the game's meter drops, with the latency if switched on | Latency, the last server data, this session's totals |
+| Connection | The game's own S and R, bytes sent and received a second; amber when no data arrives, red once the game's meter drops, with your ping if switched on, and PlayOnline's envelope and messenger while a message waits | Your ping and its range over recent pings, the last server data, this session's totals and your PlayOnline messages |
+| Memory | The game's memory used, over what is left before it runs out at 4 GB; amber, then red, as it runs low | The processor, the frames and the LinuxXI plugin's figures |
 | FPS | Frames per second | The frame time and the slowest recent frame |
 | Clock | The time on your computer, or in a time zone you pick, with the zone before it; with Server Time on, Japan's time, which Phoenix keeps, on a second line under it | The date there, the server's time, and the time to the daily reset and the conquest tally |
-| Distance | How far your target is, in yalms | Nothing |
 
 Under the bar at the screen's left, Game help has a thin bordered box of its own while the game has help to show, all
 on one line: the open menu's name, a bag's slots beside a bag's name (the inventory's beside Items), then the selected
@@ -318,10 +327,12 @@ weather the game keeps; if HeadsUp cannot find it, it goes by the server's weath
 weather until one comes. While the Gil widget is on, HeadsUp asks the server for your currencies with the two requests
 the game's Currencies menu sends: once after loading, once per zone and each minute while the widget's popup is open.
 
-Game help's bar, Job, Connection, FPS and Distance start on, and Party and Signet start off. The connection's S and R come from the game's own readout, which
+Game help's bar, Job, Connection, FPS and Distance start on, and Party, Signet, EXP, Conquest, World Info and Memory
+start off. The connection's S and R come from the game's own readout, which
 the bar covers and the "Hide Readout" switch stops the game drawing; they show "-" if HeadsUp
-cannot find them in the game's memory. The latency is HeadsUp's own measure, from a packet sent to the server's next
-reply, rounded to a frame.
+cannot find them in the game's memory. The ping is HeadsUp's own: while the Connection widget shows it, HeadsUp pings
+the server the game talks to once a second and shows the middle of the last 15. On Linux, Wine can only ping if your
+system lets everyday users ping, as most do; if yours does not, the ping shows "-".
 
 After each zone change (and after loading) HeadsUp asks the server for the conquest standings, as opening Region Info
 does, while the Zone widget is on, so the zone's owner and the influence in its region show without opening that menu.
@@ -342,9 +353,10 @@ default), a height from 24 to 64 px (45 by default), a text size, One Line, a po
 hides the game's connection readout. The Help Bar card has Game help's switch, "Hide Game Help", the help bar's
 position and whether it has a background.
 
-The Widgets card, at the top of its page, has a tab for each widget, in two rows. A tab holds the widget's options:
-Enabled, its section, its second line and icons where it has them, and its own. Those are Target's details, Gil's
-currency, the Clock's time zone, its Server Time line and its 24-hour and seconds switches, Connection's latency, and
+The Widgets card, at the top of its page, has a tab for each widget, in as many rows as they need. A tab holds the
+widget's options: Enabled, its section, its second line and icons where it has them, and its own. Those are Target's
+details, Gil's currency, the Clock's time zone, its Server Time line and its 24-hour and seconds switches, Connection's
+ping, World Info's Shows (with its ship, element or guild) and Popup, and
 for Job its layout (jobs first, EXP first or EXP only), its EXP bar under or beside the text or off, and its job
 names.
 
