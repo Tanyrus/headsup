@@ -518,6 +518,7 @@
           "key": "reset",
           "name": "Reset",
           "settings": [
+            {"key": "run-setup", "name": "Run Setup", "tip": "Walks you through the main settings again, with a preview of each. It starts from the defaults and saves your settings to a file first, so Cancel can put them back."},
             {
               "key": "reset-all-settings",
               "name": "Reset All Settings",
@@ -977,6 +978,113 @@
         {"name": "Job & Level", "tip": "Shows both the job and level when known. If only level is known, displays 'Level X' where 'X' is the level. If both are known, it displays 'X JOB/SUB'. If neither are known, shows nothing."},
         {"name": "Line Break", "tip": "Puts what follows on a row of its own under the rest of the line, in the line's own style. Press Enter in a line to make one."}
       ]
+    },
+    {
+      "key": "setup-theme",
+      "options": [
+        {"name": "Phoenix Gold", "tip": "Gold on dark, with Phoenix's feather."},
+        {"name": "Umbra Dark", "tip": "Plain and dark."},
+        {"name": "Phoenix Red Ornate", "tip": "Phoenix red with ornate edges."},
+        {"name": "Phoenix Red Pills", "tip": "Phoenix red, each widget in a pill."},
+        {"name": "Aurora", "tip": "Glass with a line of light under it."},
+        {"name": "Game Window", "tip": "The art of the game's own windows, in the Window Type you pick."}
+      ]
+    },
+    {
+      "key": "setup-mob-plates",
+      "options": [
+        {"name": "All Mobs", "tip": "Every mob shows a HeadsUp nameplate."},
+        {"name": "Mobs That Attack", "tip": "Mobs that will attack you, NMs, placeholders and claimed mobs show one. Other mobs show one when you target them."},
+        {"name": "Only Your Target", "tip": "A mob shows a nameplate only while you target it."},
+        {"name": "Game's Names", "tip": "Mobs keep the game's own names."}
+      ]
+    },
+    {
+      "key": "setup-mob-design",
+      "options": [
+        {"name": "Full", "tip": "Detection icons, then the level and con, then the name."},
+        {"name": "Simple", "tip": "The level and con over the name."},
+        {"name": "Name Only", "tip": "Just the name."}
+      ]
+    },
+    {
+      "key": "setup-outlines",
+      "options": [
+        {"name": "Mobs That Attack", "tip": "Outlines mobs that will attack you, NMs and placeholders."},
+        {"name": "Every Mob", "tip": "Outlines every living mob."},
+        {"name": "Only Your Target", "tip": "Outlines a mob only while you target it."},
+        {"name": "None", "tip": "No outlines. You can turn them back on in the settings window."}
+      ]
+    },
+    {
+      "key": "setup-outline-thickness",
+      "options": [
+        {"name": "Thin", "tip": "Half the normal width."},
+        {"name": "Normal", "tip": "The default width."},
+        {"name": "Thick", "tip": "Twice the normal width."}
+      ]
+    },
+    {
+      "key": "setup-cursor",
+      "options": [
+        {"name": "Phoenix Feather", "tip": "Phoenix's feather over your target."},
+        {"name": "Arrow", "tip": "An arrow over your target."},
+        {"name": "Chocobo", "tip": "A chocobo over your target."},
+        {"name": "Game's Cursor", "tip": "Keeps the game's own target arrow."}
+      ]
+    },
+    {
+      "key": "setup-players",
+      "options": [
+        {"name": "HeadsUp's Nameplates", "tip": "Players show HeadsUp nameplates, with their status icons."},
+        {"name": "Game's Names", "tip": "Players keep the game's own names."}
+      ]
+    },
+    {
+      "key": "setup-self",
+      "options": [
+        {"name": "Show", "tip": "Your own nameplate is drawn by HeadsUp."},
+        {"name": "Hide", "tip": "You have no nameplate."},
+        {"name": "Game's Name", "tip": "You keep the game's own name."}
+      ]
+    },
+    {
+      "key": "setup-npcs",
+      "options": [
+        {"name": "HeadsUp's Nameplates", "tip": "NPCs show HeadsUp nameplates."},
+        {"name": "Game's Names", "tip": "NPCs keep the game's own names."}
+      ]
+    },
+    {
+      "key": "setup-pets",
+      "options": [
+        {"name": "When Targeted", "tip": "A pet shows a nameplate while you target it."},
+        {"name": "Always", "tip": "Pets always show a nameplate."},
+        {"name": "Game's Names", "tip": "Pets keep the game's own names."}
+      ]
+    },
+    {
+      "key": "setup-panel",
+      "options": [
+        {"name": "Show the Top Panel", "tip": "The Top Panel runs across the top of the screen."},
+        {"name": "No Top Panel", "tip": "No Top Panel. You can turn it on again in the settings window."}
+      ]
+    },
+    {
+      "key": "setup-pointer",
+      "options": [
+        {"name": "Chocobo", "tip": "A chocobo in place of the game's mouse pointer."},
+        {"name": "Game's Pointer", "tip": "Keeps the game's own mouse pointer."}
+      ]
+    },
+    {
+      "key": "setup-widget-groups",
+      "options": [
+        {"name": "Where You Are", "tip": "The zone, its weather and what is around you."},
+        {"name": "Time", "tip": "Vana'diel's time and yours."},
+        {"name": "You", "tip": "Your job, experience, gil, bags, party and target."},
+        {"name": "System", "tip": "Your frame rate, connection, memory and the game's help line."}
+      ]
     }
   ],
   "words": [
@@ -998,6 +1106,37 @@
     {"key": "or", "name": "or"},
     {"key": "slot-tip", "tip": "These share one place, tried from the left: the first that has something to show is drawn. Drop one on another to change their order, or drag one out."},
     {"key": "reload", "name": "Reload", "tip": "Reads settings_window.json from config/headsup again and builds this window from it, or from the built-in one when there is none."},
-    {"key": "export", "name": "Export", "tip": "Writes the built-in settings_window.json to config/headsup, where it can be edited and read with Reload."}
+    {"key": "export", "name": "Export", "tip": "Writes the built-in settings_window.json to config/headsup, where it can be edited and read with Reload."},
+    {"key": "setup-title", "name": "HeadsUp Setup"},
+    {"key": "setup-step", "name": "Step {count}"},
+    {"key": "setup-start", "name": "Start", "tip": "Starts Setup."},
+    {"key": "setup-skip", "name": "Skip Setup", "tip": "Closes Setup and keeps the defaults. You can run it again any time with /hu setup."},
+    {"key": "setup-back", "name": "Back", "tip": "Goes back a step."},
+    {"key": "setup-next", "name": "Next", "tip": "Goes on to the next step."},
+    {"key": "setup-finish", "name": "Finish", "tip": "Keeps your picks and closes Setup."},
+    {"key": "setup-custom", "name": "Your Own", "tip": "You set these yourself in the settings window. Pick one of the others to replace them."},
+    {"key": "setup-cancel", "name": "Cancel", "tip": "Puts back the settings you had before Setup and closes it."},
+    {"key": "setup-warning", "name": "WARNING", "tip": "Running Setup again puts everything it covers back to the defaults, and changes your settings as you pick. Your settings are saved to {file} first, and Cancel puts them back."},
+    {"key": "setup-step-welcome", "name": "Welcome to HeadsUp", "tip": "HeadsUp outlines mobs by whether they will attack you and draws its own nameplates over the game's. These steps set the main things, with a preview of each. Everything else is in the settings window: type /hu to open it."},
+    {"key": "setup-step-theme", "name": "Theme", "tip": "Pick how the Top Panel looks. The settings window takes on the same look."},
+    {"key": "setup-step-fonts", "name": "Fonts and Sizes", "tip": "Pick the fonts and sizes of the nameplates, the Top Panel and this window."},
+    {"key": "setup-step-mob-nameplates", "name": "Mob Nameplates", "tip": "Pick which mobs show a nameplate, and what it shows."},
+    {"key": "setup-step-outlines", "name": "Outlines", "tip": "Pick which mobs get an outline. Its color tells whether the mob will attack you."},
+    {"key": "setup-step-target-cursor", "name": "Target Cursor", "tip": "Pick the marker drawn over your target."},
+    {"key": "setup-step-others", "name": "Players, NPCs and Pets", "tip": "Pick who shows a HeadsUp nameplate and who keeps the game's own name."},
+    {"key": "setup-step-widgets", "name": "Top Panel Widgets", "tip": "Pick what the Top Panel shows. You can move each widget and change what it shows in the settings window."},
+    {"key": "setup-step-mouse-extras", "name": "Mouse and Extras", "tip": "Pick your mouse pointer, and a few things HeadsUp can do for you."},
+    {"key": "setup-choice-theme", "name": "Top Panel Theme"},
+    {"key": "setup-choice-mob-plates", "name": "Which Mobs"},
+    {"key": "setup-choice-mob-design", "name": "What It Shows"},
+    {"key": "setup-choice-outlines", "name": "Which Mobs"},
+    {"key": "setup-choice-outline-thickness", "name": "Thickness"},
+    {"key": "setup-choice-cursor", "name": "Cursor"},
+    {"key": "setup-choice-players", "name": "Players"},
+    {"key": "setup-choice-self", "name": "Your Own Nameplate"},
+    {"key": "setup-choice-npcs", "name": "NPCs"},
+    {"key": "setup-choice-pets", "name": "Pets"},
+    {"key": "setup-choice-panel", "name": "Top Panel"},
+    {"key": "setup-choice-pointer", "name": "Mouse Pointer"}
   ]
 }

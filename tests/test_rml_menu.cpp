@@ -1880,3 +1880,145 @@ TEST(every_widget_tab_shows_its_whole_name_however_many_copies_there_are)
         CHECK(tabs >= kPlacedWidgetCount);
     }
 }
+
+namespace
+{
+    // The settings window opened on Setup, as a new install or a player running it again opens it.
+    struct SetupWindow : Window
+    {
+        explicit SetupWindow(bool rerun, Settings start = {})
+        {
+            settings = start;
+            menu.StartSetup(settings, rerun);
+            Frames(2);
+        }
+    };
+}
+
+TEST(setup_opens_on_its_welcome_and_start_walks_its_steps_forward_and_back)
+{
+    SetupWindow window(false);
+    CHECK(window.menu.InSetup());
+    CHECK(window.Shows("nav-setup-welcome") && window.Find("nav-setup-welcome")->IsClassSet(kPickedClass));
+    CHECK(window.Shows("setup-preview"));
+    window.Click("setup-welcome-setup-start");
+    CHECK(window.Find("nav-setup-theme")->IsClassSet(kPickedClass));
+    window.Click("setup-theme-setup-next");
+    CHECK(window.Shows("setup-fonts"));
+    window.Click("setup-fonts-setup-back");
+    CHECK(window.Shows("setup-theme"));
+    window.Click("nav-setup-widgets");
+    CHECK(window.Shows("setup-widgets"));
+    CHECK(window.settings == Settings{});
+    CHECK_EQ(window.Said(), "");
+}
+
+TEST(a_setup_steps_list_moves_nowhere_before_it_has_started)
+{
+    SetupWindow window(true);
+    window.Click("nav-setup-widgets");
+    CHECK(window.Find("nav-setup-welcome")->IsClassSet(kPickedClass));
+}
+
+TEST(a_pick_in_setup_changes_the_settings_at_once)
+{
+    SetupWindow window(false);
+    window.Click("setup-welcome-setup-start");
+    window.Click("setup-theme-theme");
+    CHECK(window.Click("setup-theme-theme-o-1"));
+    CHECK(window.settings.barTheme == BarTheme::UmbraDark);
+}
+
+TEST(skipping_setup_puts_back_its_defaults_closes_the_window_and_counts_it_done)
+{
+    SetupWindow window(false);
+    window.Click("setup-welcome-setup-start");
+    window.Click("setup-theme-theme");
+    window.Click("setup-theme-theme-o-4");
+    window.Click("setup-theme-setup-leave");
+    window.Frames(2);
+    CHECK(!window.menu.open && !window.menu.InSetup());
+    Settings expected;
+    expected.setupDone = true;
+    CHECK(window.settings == expected);
+}
+
+TEST(running_setup_again_starts_from_the_defaults_saves_first_and_cancel_puts_back_what_was)
+{
+    Settings mine;
+    mine.barTheme = BarTheme::Aurora;
+    mine.autoCheck = true;
+    mine.setupDone = true;
+    SetupWindow window(true, mine);
+    CHECK(window.settings == mine); // nothing changes before Start
+    CHECK(!window.menu.TakeSetupBackup());
+    window.Click("setup-welcome-setup-start");
+    CHECK(window.menu.TakeSetupBackup());
+    CHECK(window.settings.barTheme == BarTheme::PhoenixGold && !window.settings.autoCheck);
+    window.Click("setup-theme-setup-leave");
+    window.Frames(2);
+    CHECK(window.settings == mine);
+    CHECK(!window.menu.open);
+}
+
+TEST(finishing_setup_keeps_the_picks_and_leaves_the_window_on_its_pages)
+{
+    SetupWindow window(false);
+    window.Click("setup-welcome-setup-start");
+    window.Click("setup-theme-theme");
+    window.Click("setup-theme-theme-o-1");
+    window.Click("nav-setup-mouse-extras");
+    window.Click("setup-mouse-extras-setup-finish");
+    window.Frames(2);
+    CHECK(window.menu.open && !window.menu.InSetup());
+    CHECK(window.settings.barTheme == BarTheme::UmbraDark && window.settings.setupDone);
+    CHECK(window.Shows("entities-nameplates"));
+}
+
+TEST(closing_the_window_during_setup_is_skipping_it)
+{
+    SetupWindow window(false);
+    window.Click("setup-welcome-setup-start");
+    window.Click("setup-theme-theme");
+    window.Click("setup-theme-theme-o-1");
+    window.Click(kMenuCloseId);
+    CHECK(!window.menu.InSetup());
+    CHECK(window.settings.barTheme == BarTheme::PhoenixGold && window.settings.setupDone);
+}
+
+TEST(setups_widgets_step_turns_a_widget_on_and_off)
+{
+    SetupWindow window(false);
+    window.Click("setup-welcome-setup-start");
+    window.Click("nav-setup-widgets");
+    const std::string party = "setup-widgets-setup-widget-" + std::to_string(static_cast<int>(BarWidget::Party));
+    CHECK(window.Shows(party));
+    CHECK(window.Click(party));
+    CHECK(Shown(window.settings, BarWidget::Party));
+}
+
+TEST(run_setup_on_the_config_page_opens_setup_as_a_run_again)
+{
+    Window window;
+    window.Page("configmenu");
+    CHECK(!window.Click("configmenu-reset-run-setup"));
+    CHECK(window.menu.InSetup());
+    CHECK(window.Shows("nav-setup-welcome"));
+}
+
+TEST(every_setup_step_builds_in_every_theme_without_a_complaint)
+{
+    for (int theme = 0; theme < kBarThemeCount; ++theme)
+    {
+        Settings start;
+        start.barTheme = static_cast<BarTheme>(theme);
+        SetupWindow window(false, start);
+        window.Click("setup-welcome-setup-start");
+        for (const SetupPage& page : SetupPages())
+        {
+            window.Click(std::string("nav-setup-") + page.key);
+            CHECK(window.Shows(std::string("setup-") + page.key));
+        }
+        CHECK_EQ(window.Said(), "");
+    }
+}

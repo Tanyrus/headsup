@@ -1,6 +1,7 @@
 #include "cursor_picture.h"
 #include "setup.h"
 #include "test.h"
+#include "window_layout.h"
 
 #include <set>
 #include <string>
@@ -208,4 +209,18 @@ TEST(setup_defaults_change_nothing_of_a_new_install)
     Settings s;
     UseSetupDefaults(s);
     CHECK(s == Settings{});
+}
+
+TEST(each_choice_has_a_name_in_its_list_for_each_option)
+{
+    ForEachChoice([&](const SetupChoice& choice) { CHECK_EQ(kWindowLayout.OptionsOf(choice.list).size(), choice.options.size()); });
+    CHECK_EQ(kWindowLayout.OptionsOf(kSetupWidgetGroupNames).size(), SetupWidgetGroups().size());
+}
+
+TEST(setup_never_counts_itself_done_by_its_defaults)
+{
+    Settings s;
+    s.setupDone = true;
+    UseSetupDefaults(s);
+    CHECK(s.setupDone);
 }

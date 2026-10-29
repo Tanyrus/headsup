@@ -45,6 +45,11 @@ namespace headsup
         void Close();
         // True once after the Debug Report button was pressed: write the /hu debug report.
         bool TakeDebugRequest();
+        // Opens the window on Setup, from the settings as they are: the first time, or again (rerun), which warns.
+        void StartSetup(const Settings& settings, bool rerun);
+        bool InSetup() const { return m_State.setup.has_value(); }
+        // True once after Setup was run again: the settings file is to be copied first.
+        bool TakeSetupBackup();
         bool TakeWatchRequest();
         bool TakeReloadRequest(); // the layout's file is to be read again and the window built anew
         bool TakeExportRequest(); // the built-in layout is to be written out as a file

@@ -23,6 +23,8 @@ namespace headsup
     struct SetupChoice
     {
         const char* key;
+        WindowWord word; // its name and tip
+        WindowList list; // its options' names and tips, in order
         std::span<const SetupOption> options;
         size_t defaultOption; // the one a new install has
     };
@@ -31,6 +33,7 @@ namespace headsup
     {
         SetupStep step;
         const char* key;
+        WindowWord word; // its title, and what it is for as the tip
         std::span<const SetupChoice> choices;
         std::span<const SettingPiece> settings;
     };
@@ -44,8 +47,10 @@ namespace headsup
     struct SetupWidgetGroup
     {
         const char* key;
-        std::span<const BarWidget> widgets;
+        std::span<const BarWidget> widgets; // named as the bar-widgets list names them
     };
+    // The groups' names, in order.
+    constexpr WindowList kSetupWidgetGroupNames = WindowList::SetupWidgetGroups;
     std::span<const SetupWidgetGroup> SetupWidgetGroups();
     // A widget turned off is off, and its copies leave the panel; turned on, its first copy shows.
     void SetWidgetShown(Settings& s, BarWidget widget, bool shown);

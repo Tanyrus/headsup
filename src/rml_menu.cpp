@@ -131,6 +131,15 @@ namespace headsup
     }
 
     bool RmlMenu::TakeDebugRequest() { return std::exchange(m_State.debugRequested, false); }
+    bool RmlMenu::TakeSetupBackup() { return std::exchange(m_State.setupBackup, false); }
+
+    void RmlMenu::StartSetup(const Settings& settings, bool rerun)
+    {
+        m_State.Leave();
+        m_State.setup = SetupRun{SetupStep::Welcome, rerun, false, settings};
+        m_ScrollTo    = 0.0f;
+        open          = true;
+    }
     bool RmlMenu::TakeWatchRequest() { return std::exchange(m_State.watchRequested, false); }
     bool RmlMenu::TakeReloadRequest() { return std::exchange(m_Reload, false); }
     bool RmlMenu::TakeExportRequest() { return std::exchange(m_State.exportRequested, false); }
@@ -575,17 +584,23 @@ namespace headsup
         const std::vector<std::string>& fonts, double version)
     {
         m_Layout = host.layout;
-        if (std::exchange(m_Closed, false)) open = false;
+        bool changed = false;
+        if (std::exchange(m_Closed, false))
+        {
+            open    = false;
+            changed = m_State.setup.has_value();
+            EndSetup(settings, m_State, false);
+            m_State.closeRequested = false;
+        }
         if (!open || host.context == nullptr)
         {
-            bool changed = false;
             if (m_Document != nullptr && m_Visible && host.context != nullptr)
             {
                 // A box that has the keyboard as the window goes gives it up and says what was typed in it, which a
                 // last pass takes with whatever else came this frame: the click on the close button comes after it.
                 if (Rml::Element* focus = host.context->GetFocusElement(); focus != nullptr && focus->GetOwnerDocument() == m_Document)
                     focus->Blur();
-                changed = Pass(std::exchange(m_Events, {}), host, settings, readings, fonts).changed;
+                changed |= Pass(std::exchange(m_Events, {}), host, settings, readings, fonts).changed;
                 m_Document->SetClass("open", false);
                 m_Document->Hide();
                 m_Visible = false;
@@ -665,6 +680,7 @@ namespace headsup
             events.erase(events.begin(), click);
         }
         const Form form = Pass(std::move(events), host, settings, readings, fonts);
+        if (std::exchange(m_State.closeRequested, false)) open = false;
         // A card built anew takes its boxes with it: the one that had the keyboard gets it back, where its caret was.
         std::string typingIn;
         int caret = 0;
@@ -674,7 +690,7 @@ namespace headsup
             input->GetSelection(&caret, nullptr, nullptr);
         }
 
-        const char* title = m_Layout->PageOf(m_State.page).name;
+        const char* title = m_State.setup ? m_Layout->WordOf(WindowWord::SetupTitle).name : m_Layout->PageOf(m_State.page).name;
         if (m_TitleShown != title)
         {
             m_PageTitle->SetInnerRML(EscapedRml(title));

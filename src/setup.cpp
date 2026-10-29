@@ -30,7 +30,7 @@ namespace headsup
         const SetupOption kThemes[]{{"phoenix-gold", Theme<BarTheme::PhoenixGold>}, {"umbra-dark", Theme<BarTheme::UmbraDark>},
             {"phoenix-red-ornate", Theme<BarTheme::PhoenixRedOrnate>}, {"phoenix-red-pills", Theme<BarTheme::PhoenixRedPills>},
             {"aurora", Theme<BarTheme::Aurora>}, {"game-window", Theme<BarTheme::GameWindow>}};
-        const SetupChoice kThemeChoices[]{{"theme", kThemes, 0}};
+        const SetupChoice kThemeChoices[]{{"theme", WindowWord::SetupChoiceTheme, WindowList::SetupTheme, kThemes, 0}};
         const SettingPiece kThemeSettings[]{SettingPiece::WindowType};
 
         const SettingPiece kFontSettings[]{SettingPiece::DefaultFont, SettingPiece::BaseFontSize, SettingPiece::BaseIconSize,
@@ -65,7 +65,7 @@ namespace headsup
         const SetupOption kMobDesigns[]{{"full", [](Settings& s) { MobLines(s, 0, DefaultKind(PlateKind::Mobs).ornament.place); }},
             {"simple", [](Settings& s) { MobLines(s, 1, OrnamentPlace::Disabled); }},
             {"name", [](Settings& s) { MobLines(s, 2, OrnamentPlace::Disabled); }}};
-        const SetupChoice kMobChoices[]{{"mob-plates", kMobPlates, 0}, {"mob-design", kMobDesigns, 0}};
+        const SetupChoice kMobChoices[]{{"mob-plates", WindowWord::SetupChoiceMobPlates, WindowList::SetupMobPlates, kMobPlates, 0}, {"mob-design", WindowWord::SetupChoiceMobDesign, WindowList::SetupMobDesign, kMobDesigns, 0}};
 
         // Outlines on some mob rows: the claim rows follow the row under them, the dead have none.
         void MobOutlines(Settings& s, std::span<const Category> rows, OutlineMode mode)
@@ -91,7 +91,7 @@ namespace headsup
             s.outlineThickness = Percent;
         }
         const SetupOption kThicknesses[]{{"thin", Thickness<50>}, {"normal", Thickness<100>}, {"thick", Thickness<200>}};
-        const SetupChoice kOutlineChoices[]{{"outlines", kOutlines, 0}, {"outline-thickness", kThicknesses, 1}};
+        const SetupChoice kOutlineChoices[]{{"outlines", WindowWord::SetupChoiceOutlines, WindowList::SetupOutlines, kOutlines, 0}, {"outline-thickness", WindowWord::SetupChoiceOutlineThickness, WindowList::SetupOutlineThickness, kThicknesses, 1}};
 
         template <CursorStyle Style>
         void Cursor(Settings& s)
@@ -103,7 +103,7 @@ namespace headsup
         }
         const SetupOption kCursors[]{{"feather", Cursor<CursorStyle::Feather>}, {"arrow", Cursor<CursorStyle::Triangle>},
             {"chocobo", Cursor<CursorStyle::Chocobo>}, {"game", Cursor<CursorStyle::Vanilla>}};
-        const SetupChoice kCursorChoices[]{{"cursor", kCursors, 0}};
+        const SetupChoice kCursorChoices[]{{"cursor", WindowWord::SetupChoiceCursor, WindowList::SetupCursor, kCursors, 0}};
         const SettingPiece kCursorSettings[]{SettingPiece::Color};
 
         template <PlateKind Kind, PlateMode Mode>
@@ -117,10 +117,10 @@ namespace headsup
         const SetupOption kNpcs[]{{"headsup", Plates<PlateKind::Npcs, PlateMode::Shown>}, {"game", Plates<PlateKind::Npcs, PlateMode::Vanilla>}};
         const SetupOption kPets[]{{"targeted", Plates<PlateKind::Pets, PlateMode::WhenTargeted>}, {"shown", Plates<PlateKind::Pets, PlateMode::Shown>},
             {"game", Plates<PlateKind::Pets, PlateMode::Vanilla>}};
-        const SetupChoice kOtherChoices[]{{"players", kPlayers, 0}, {"self", kSelf, 0}, {"npcs", kNpcs, 0}, {"pets", kPets, 0}};
+        const SetupChoice kOtherChoices[]{{"players", WindowWord::SetupChoicePlayers, WindowList::SetupPlayers, kPlayers, 0}, {"self", WindowWord::SetupChoiceSelf, WindowList::SetupSelf, kSelf, 0}, {"npcs", WindowWord::SetupChoiceNpcs, WindowList::SetupNpcs, kNpcs, 0}, {"pets", WindowWord::SetupChoicePets, WindowList::SetupPets, kPets, 0}};
 
         const SetupOption kPanel[]{{"shown", [](Settings& s) { s.showBar = true; }}, {"hidden", [](Settings& s) { s.showBar = false; }}};
-        const SetupChoice kWidgetChoices[]{{"panel", kPanel, 0}};
+        const SetupChoice kWidgetChoices[]{{"panel", WindowWord::SetupChoicePanel, WindowList::SetupPanel, kPanel, 0}};
 
         template <PointerIcon Icon>
         void Pointer(Settings& s)
@@ -129,20 +129,20 @@ namespace headsup
             s.pointerFile.clear();
         }
         const SetupOption kPointers[]{{"chocobo", Pointer<PointerIcon::Chocobo>}, {"game", Pointer<PointerIcon::Vanilla>}};
-        const SetupChoice kMouseChoices[]{{"pointer", kPointers, 1}};
+        const SetupChoice kMouseChoices[]{{"pointer", WindowWord::SetupChoicePointer, WindowList::SetupPointer, kPointers, 1}};
         const SettingPiece kExtraSettings[]{SettingPiece::AutoCheck, SettingPiece::LookUpPlayers, SettingPiece::StackNames,
             SettingPiece::HideDuringConversation};
 
         const SetupPage kPages[]{
-            {SetupStep::Welcome, "welcome", {}, {}},
-            {SetupStep::Theme, "theme", kThemeChoices, kThemeSettings},
-            {SetupStep::Fonts, "fonts", {}, kFontSettings},
-            {SetupStep::MobNameplates, "mob-nameplates", kMobChoices, {}},
-            {SetupStep::Outlines, "outlines", kOutlineChoices, {}},
-            {SetupStep::TargetCursor, "target-cursor", kCursorChoices, kCursorSettings},
-            {SetupStep::Others, "others", kOtherChoices, {}},
-            {SetupStep::Widgets, "widgets", kWidgetChoices, {}},
-            {SetupStep::MouseExtras, "mouse-extras", kMouseChoices, kExtraSettings},
+            {SetupStep::Welcome, "welcome", WindowWord::SetupStepWelcome, {}, {}},
+            {SetupStep::Theme, "theme", WindowWord::SetupStepTheme, kThemeChoices, kThemeSettings},
+            {SetupStep::Fonts, "fonts", WindowWord::SetupStepFonts, {}, kFontSettings},
+            {SetupStep::MobNameplates, "mob-nameplates", WindowWord::SetupStepMobNameplates, kMobChoices, {}},
+            {SetupStep::Outlines, "outlines", WindowWord::SetupStepOutlines, kOutlineChoices, {}},
+            {SetupStep::TargetCursor, "target-cursor", WindowWord::SetupStepTargetCursor, kCursorChoices, kCursorSettings},
+            {SetupStep::Others, "others", WindowWord::SetupStepOthers, kOtherChoices, {}},
+            {SetupStep::Widgets, "widgets", WindowWord::SetupStepWidgets, kWidgetChoices, {}},
+            {SetupStep::MouseExtras, "mouse-extras", WindowWord::SetupStepMouseExtras, kMouseChoices, kExtraSettings},
         };
         static_assert(std::size(kPages) == kSetupSteps);
 

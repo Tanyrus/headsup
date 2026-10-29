@@ -1558,6 +1558,10 @@ namespace headsup
                 form.Fade(false);
                 form.SliderPercent(label.c_str(), s.menuOpacity, kMinMenuOpacity, kMaxOpacity, tip);
                 break;
+            case SettingPiece::RunSetup:
+                form.Fade(false);
+                if (form.Button(label.c_str(), label.c_str(), kResetPill, tip)) c.state.setup = SetupRun{SetupStep::Welcome, true, false, s};
+                break;
             case SettingPiece::ResetAllSettings: ResetAll(c, e); break;
             case SettingPiece::EnableHeadsup:
                 form.Fade(false);
@@ -1694,12 +1698,157 @@ namespace headsup
             default: break;
             }
         }
+
+        // Setup's choice as a dropdown of its options with their tips, Your Own while the settings hold none of them.
+        void SetupChoiceRow(Context& c, const SetupChoice& choice)
+        {
+            const std::span<const LayoutOption> options = c.layout.OptionsOf(choice.list);
+            const std::optional<size_t> held            = PickedOption(choice, c.s);
+            const int was = held ? static_cast<int>(*held) : kNoFontEntry;
+            int picked    = was;
+            const auto name = [&](int i) { return i < 0 ? Words(Word(c, WindowWord::SetupCustom)) : Words(options[static_cast<size_t>(i)].name); };
+            const auto tip  = [&](int i) { return i < 0 ? Words(WordTip(c, WindowWord::SetupCustom)) : Words(options[static_cast<size_t>(i)].tip); };
+            c.form.NumberDropdown(Labeled(Word(c, choice.word), choice.key).c_str(), picked, 0, static_cast<int>(choice.options.size()) - 1, name,
+                WordTip(c, choice.word), 0.0f, tip);
+            if (picked == was || picked < 0) return;
+            choice.options[static_cast<size_t>(picked)].apply(c.s);
+            c.form.changed = true;
+        }
+
+        // The Widgets step: a switch for each widget, in groups.
+        void SetupWidgets(Context& c)
+        {
+            const std::span<const LayoutOption> groups  = c.layout.OptionsOf(kSetupWidgetGroupNames);
+            const std::span<const LayoutOption> widgets = c.layout.OptionsOf(WindowList::BarWidgets);
+            for (size_t g = 0; g < SetupWidgetGroups().size(); ++g)
+            {
+                c.form.Caption(Words(groups[g].name).c_str());
+                for (BarWidget widget : SetupWidgetGroups()[g].widgets)
+                {
+                    const LayoutOption& named = widgets[static_cast<size_t>(widget)];
+                    bool shown = Shown(c.s, widget);
+                    const bool was = shown;
+                    c.form.Switch(Labeled(named.name, "setup-widget-" + std::to_string(static_cast<int>(widget))).c_str(), shown, named.tip);
+                    if (shown == was) continue;
+                    SetWidgetShown(c.s, widget, shown);
+                    c.form.changed = true;
+                }
+            }
+        }
+
+
+        // Setup in place of the pages: its steps in the sidebar, the step open with the preview, its choices and its
+        // settings, and the buttons that move through it.
+        void BuildSetup(Context& c)
+        {
+            Form& form    = c.form;
+            SetupRun& run = *c.state.setup;
+            form.BeginBlock(kSidebarBlock);
+            for (const SetupPage& page : SetupPages())
+            {
+                const std::string id = kNavStart + std::string("setup-") + page.key;
+                if (run.started && form.Clicked(id) && run.step != page.step)
+                {
+                    run.step         = page.step;
+                    form.scrollToTop = true;
+                    c.state.form.popup.clear();
+                }
+                form.Raw("<div class=\"nav\" id=\"" + id + "\">" + EscapedRml(Words(Word(c, page.word))) + "</div>");
+            }
+            for (const SetupPage& page : SetupPages())
+                form.Set(kNavStart + std::string("setup-") + page.key, FormValueKind::Class, kPickedClass, {}, page.step == run.step);
+
+            form.pageKey             = "setup";
+            const SetupPage& page    = SetupPageOf(run.step);
+            const int step           = static_cast<int>(run.step);
+            const bool last          = step + 1 == kSetupSteps;
+            if (!form.BeginCard(Labeled(Word(c, page.word), page.key).c_str(), nullptr, WordTip(c, page.word))) return;
+            form.Note(Filled(Word(c, WindowWord::SetupStep), kCountMark, Formatted("%d of %d", step + 1, kSetupSteps)).c_str());
+            if (run.rerun && !run.started)
+            {
+                form.Note((Words(Word(c, WindowWord::SetupWarning)) + ": " +
+                           Filled(Said(WordTip(c, WindowWord::SetupWarning)), kFileMark, kSetupBackupFile))
+                              .c_str());
+            }
+            form.Raw(std::string("<img class=\"setup-preview\" id=\"setup-preview\" src=\"") + kSetupPicture + "\"/>");
+            for (const SetupChoice& choice : page.choices)
+                SetupChoiceRow(c, choice);
+            for (SettingPiece piece : page.settings)
+                if (const LayoutSetting* setting = c.layout.SettingOf(piece)) DrawSetting(c, *setting);
+            if (run.step == SetupStep::Widgets) SetupWidgets(c);
+
+            form.Fade(false); // a setting drawn above may have faded what follows it
+            form.Line();
+            const auto button = [&](WindowWord word, const char* id, const char* classes) {
+                return form.Button(Labeled(Word(c, word), id).c_str(), id, classes, WordTip(c, word));
+            };
+            if (!run.started)
+            {
+                if (button(WindowWord::SetupStart, "setup-start", kAccentPill))
+                {
+                    if (run.rerun)
+                    {
+                        c.state.setupBackup = true;
+                        UseSetupDefaults(c.s);
+                        form.changed = true;
+                    }
+                    run.started      = true;
+                    run.step         = SetupStep::Theme;
+                    form.scrollToTop = true;
+                }
+            }
+            else
+            {
+                if (step > 0 && button(WindowWord::SetupBack, "setup-back", kRaisedPill))
+                {
+                    run.step         = static_cast<SetupStep>(step - 1);
+                    form.scrollToTop = true;
+                }
+                if (!last && button(WindowWord::SetupNext, "setup-next", kAccentPill))
+                {
+                    run.step         = static_cast<SetupStep>(step + 1);
+                    form.scrollToTop = true;
+                }
+                if (last && button(WindowWord::SetupFinish, "setup-finish", kAccentPill))
+                {
+                    form.EndLine();
+                    form.EndCard();
+                    EndSetup(c.s, c.state, true);
+                    form.changed     = true;
+                    form.scrollToTop = true;
+                    return;
+                }
+            }
+            const bool leave = button(run.rerun ? WindowWord::SetupCancel : WindowWord::SetupSkip, "setup-leave", kRaisedPill);
+            form.EndLine();
+            form.EndCard();
+            if (!leave) return;
+            EndSetup(c.s, c.state, false);
+            form.changed = true;
+        }
+    }
+
+    void EndSetup(Settings& s, MenuFormState& state, bool keep)
+    {
+        if (!state.setup) return;
+        if (!keep) s = state.setup->before;
+        s.setupDone          = true;
+        state.closeRequested = !keep;
+        state.setup.reset();
+        state.page = Page::Entities;
     }
 
     void BuildMenu(Form& form, Settings& s, const MenuReadings& readings, MenuFormState& state,
         const std::vector<std::string>& fonts, const std::vector<std::string>& menuFonts, const WindowLayout& layout)
     {
         form.layout = &layout;
+        if (state.setup)
+        {
+            Context c{form, s, readings, state, fonts, menuFonts, layout, std::nullopt};
+            BuildSetup(c);
+            s = Clamp(s);
+            return;
+        }
         if (KindOfPage(state.page) && !KindPagesShown(s))
         {
             state.Leave();
