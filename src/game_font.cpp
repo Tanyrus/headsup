@@ -30,6 +30,12 @@ namespace headsup
         constexpr size_t kCodeAt             = kInfoHeaderAt + kInfoHeaderBytes;
         constexpr size_t kBlocksAt           = kCodeAt + 12;
         constexpr std::string_view kDxt3Code = "3TXD", kDxt1Code = "1TXD";
+        // A picture of plain pixels has, after the header, a byte a pixel and its palette of 256 colors before them,
+        // or four bytes a pixel, with the rows from the bottom up. One flag has four bytes more before them.
+        constexpr uint8_t kPaletteFlag = 0xB1, kPaletteFlagNoGap = 0x91;
+        constexpr size_t kBitCountAt   = kInfoHeaderAt + 14, kPixelsAt = kCodeAt, kPixelsGap = 4;
+        constexpr uint16_t kPaletteBits = 8, kTrueColorBits = 32;
+        constexpr size_t kPaletteColors = 256;
 
         // Direct3D's blocks: 4 x 4 pixels, the first in the lowest bits. DXT1 is two 565 colors and a 2-bit pick a
         // pixel; DXT3 is 16 alphas of 4 bits before such a block, which then always has four colors.
@@ -372,18 +378,45 @@ namespace headsup
         return static_cast<uint8_t>(std::lround(std::clamp(coverage, 0.0f, 1.0f) * kFullCoverage));
     }
 
+    namespace
+    {
+        // Each chunk in order to stop(chunk), until it says to stop; false when a chunk's size does not fit the file.
+        template <typename Stop>
+        bool WalkChunks(std::span<const uint8_t> dat, Stop stop)
+        {
+            for (size_t at = 0; at + kChunkHeaderBytes <= dat.size();)
+            {
+                const auto word   = ReadAt<uint32_t>(dat.data(), at + kChunkNameBytes);
+                const size_t size = (word >> kChunkSizeShift & kChunkSizeMask) * kChunkSizeUnit;
+                if (size < kChunkHeaderBytes || size > dat.size() - at) return false;
+                const DatChunk chunk{std::string_view(reinterpret_cast<const char*>(dat.data() + at), kChunkNameBytes),
+                    static_cast<uint8_t>(word & kChunkTypeMask), dat.subspan(at + kChunkHeaderBytes, size - kChunkHeaderBytes)};
+                if (stop(chunk)) return true;
+                at += size;
+            }
+            return true;
+        }
+    }
+
     std::optional<std::span<const uint8_t>> FindChunk(std::span<const uint8_t> dat, std::string_view name, uint8_t type)
     {
-        for (size_t at = 0; at + kChunkHeaderBytes <= dat.size();)
-        {
-            const auto word   = ReadAt<uint32_t>(dat.data(), at + kChunkNameBytes);
-            const size_t size = (word >> kChunkSizeShift & kChunkSizeMask) * kChunkSizeUnit;
-            if (size < kChunkHeaderBytes || size > dat.size() - at) return std::nullopt;
-            if ((word & kChunkTypeMask) == type && std::string_view(reinterpret_cast<const char*>(dat.data() + at), kChunkNameBytes) == name)
-                return dat.subspan(at + kChunkHeaderBytes, size - kChunkHeaderBytes);
-            at += size;
-        }
-        return std::nullopt;
+        std::optional<std::span<const uint8_t>> found;
+        WalkChunks(dat, [&](const DatChunk& chunk) {
+            if (chunk.type == type && chunk.name == name) found = chunk.body;
+            return found.has_value();
+        });
+        return found;
+    }
+
+    std::optional<std::vector<DatChunk>> DatChunks(std::span<const uint8_t> dat)
+    {
+        std::vector<DatChunk> chunks;
+        if (!WalkChunks(dat, [&](const DatChunk& chunk) {
+                chunks.push_back(chunk);
+                return false;
+            }))
+            return std::nullopt;
+        return chunks;
     }
 
     Read<FontPicture> ReadFontPicture(std::span<const uint8_t> body)
@@ -402,8 +435,39 @@ namespace headsup
         return {std::move(picture), {}};
     }
 
+    namespace
+    {
+        Read<ColorPicture> ReadPlainPicture(std::span<const uint8_t> body)
+        {
+            if (body.size() < kPixelsAt || ReadAt<uint32_t>(body.data(), kInfoHeaderAt) != kInfoHeaderBytes)
+                return {std::nullopt, "its picture is not one"};
+            const auto width = ReadAt<int32_t>(body.data(), kWidthAt), height = ReadAt<int32_t>(body.data(), kHeightAt);
+            const auto bits  = ReadAt<uint16_t>(body.data(), kBitCountAt);
+            if (width <= 0 || height <= 0 || width > kMaxPictureSide || height > kMaxPictureSide)
+                return {std::nullopt, "its picture is " + std::to_string(width) + " x " + std::to_string(height)};
+            if (bits != kPaletteBits && bits != kTrueColorBits)
+                return {std::nullopt, "its picture has " + std::to_string(bits) + " bits a pixel"};
+            const size_t pixels  = static_cast<size_t>(width) * static_cast<size_t>(height);
+            const size_t palette = bits == kPaletteBits ? kPaletteColors * kBgraBytes : 0;
+            const size_t at      = kPixelsAt + (body[0] == kPaletteFlag ? kPixelsGap : 0);
+            if (body.size() < at + palette + pixels * (bits / 8)) return {std::nullopt, "its picture ends early"};
+            ColorPicture picture{std::string(reinterpret_cast<const char*>(body.data() + kNameAt), kNameBytes), width, height,
+                std::vector<uint8_t>(pixels * kBgraBytes)};
+            for (size_t y = 0; y < static_cast<size_t>(height); ++y)
+                for (size_t x = 0; x < static_cast<size_t>(width); ++x)
+                {
+                    const size_t stored = (static_cast<size_t>(height) - 1 - y) * static_cast<size_t>(width) + x;
+                    const uint8_t* from = bits == kPaletteBits ? body.data() + at + body[at + palette + stored] * kBgraBytes
+                                                               : body.data() + at + stored * kBgraBytes;
+                    std::copy(from, from + kBgraBytes, picture.bgra.begin() + static_cast<std::ptrdiff_t>((y * static_cast<size_t>(width) + x) * kBgraBytes));
+                }
+            return {std::move(picture), {}};
+        }
+    }
+
     Read<ColorPicture> ReadColorPicture(std::span<const uint8_t> body)
     {
+        if (!body.empty() && (body[0] == kPaletteFlag || body[0] == kPaletteFlagNoGap)) return ReadPlainPicture(body);
         Read<PictureHeader> header = ReadPictureHeader(body);
         if (!header.value) return {std::nullopt, std::move(header.failure)};
         const PictureHeader& h = *header.value;
