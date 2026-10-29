@@ -419,7 +419,7 @@ TEST(tabs_are_one_width_spread_across_the_card_in_one_row_or_two)
     for (const std::vector<const char*>& names :
          {std::vector<const char*>{"Airships", "Boats", "Manaclipper", "Barge"},
           std::vector<const char*>{"Alchemy", "Bonecraft", "Clothcraft", "Cooking", "Fishing", "Goldsmithing", "Leathercraft",
-              "Linkshell", "Smithing", "Tenshodo", "Woodworking"}})
+              "Smithing", "Woodworking", "Tenshodo", "Linkshell"}})
     {
         const PopupLayout l = layout(names);
         CHECK(AllInside(l, m));
@@ -431,11 +431,16 @@ TEST(tabs_are_one_width_spread_across_the_card_in_one_row_or_two)
         for (size_t i = 0; i < chips.size(); ++i)
         {
             const PopupPiece& chip = *chips[i];
-            // One width; each row starts at the card's padding and the first row ends at its other side.
+            // One width, a step apart; the first row from the card's padding to its other side, and a shorter row
+            // under it in the card's middle.
+            const size_t first = i - i % across, inRow = std::min(across, names.size() - first);
+            const float step   = chips[1]->x - chips[0]->x;
             CHECK(Near(chip.width, chips[0]->width) && Near(chip.height, chips[0]->height));
-            CHECK(Near(chip.x, chips[i % across]->x) && Near(chip.y, chips[(i / across) * across]->y));
-            if (i % across == 0) CHECK(Near(chip.x, name.x));
+            CHECK(Near(chip.x, chips[first]->x + static_cast<float>(i % across) * step) && Near(chip.y, chips[first]->y));
+            if (i == 0) CHECK(Near(chip.x, name.x));
             if (i == across - 1) CHECK(Near(chip.x + chip.width, card.x + card.width - (name.x - card.x)));
+            if (i == first + inRow - 1)
+                CHECK(Near((chips[first]->x + chip.x + chip.width) / 2.0f, card.x + card.width / 2.0f));
             // Its name in its middle, and the place to click it over it.
             const PopupPiece& text = *Find(l, names[i]);
             CHECK(Near(text.x + text.width / 2.0f, chip.x + chip.width / 2.0f));

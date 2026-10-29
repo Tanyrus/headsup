@@ -92,6 +92,7 @@ namespace headsup
                 std::string key, tab;
                 size_t piece;          // its frame, its name after it
                 size_t column, across; // its place in its row, and how many a row holds
+                size_t inRow;          // how many its own row has, fewer in a short last row
                 float y, height, name; // from the card's top; its name's width
                 float gap;             // between it and the next in its row
                 float left = 0.0f, width = 0.0f; // from the card's left, once spread
@@ -162,7 +163,7 @@ namespace headsup
                     const TextSize framed = Framed(size, unit);
                     const float top       = y + static_cast<float>(i / across) * (tall + gap);
                     b.chips.push_back(Block::Chip{section.heading, section.tabs[i].name.text, b.pieces.size(), i % across, across,
-                        top, tall, size.width, gap});
+                        std::min(across, count - i / across * across), top, tall, size.width, gap});
                     PopupPiece chip{PopupPiece::Kind::Tab, 0.0f, top, widest, tall, {}};
                     chip.open = i == picked;
                     b.pieces.push_back(std::move(chip));
@@ -360,12 +361,14 @@ namespace headsup
                 b.pieces[socket].width = width - 2.0f * b.pad;
             for (const Block::Anchor& anchor : b.anchors)
                 b.pieces[anchor.piece].x = width - anchor.fromRight;
-            // Each tab as wide as its share of the card's inside, its name in its middle.
+            // Each tab as wide as its share of the card's inside, its name in its middle; a short row in the middle.
             for (Block::Chip& chip : b.chips)
             {
                 const float across = static_cast<float>(chip.across);
                 chip.width = (width - 2.0f * b.pad - (across - 1.0f) * chip.gap) / across;
-                chip.left  = b.pad + static_cast<float>(chip.column) * (chip.width + chip.gap);
+                const float step = chip.width + chip.gap;
+                chip.left  = b.pad + static_cast<float>(chip.across - chip.inRow) * step / 2.0f +
+                            static_cast<float>(chip.column) * step;
                 b.pieces[chip.piece].x     = chip.left;
                 b.pieces[chip.piece].width = chip.width;
                 b.pieces[chip.piece + 1].x = chip.left + (chip.width - chip.name) / 2.0f;
