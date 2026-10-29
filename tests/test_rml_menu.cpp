@@ -188,6 +188,15 @@ namespace
             m_Host.context->ProcessMouseButtonUp(kLeftButton, 0);
             return Frames(3) || changed;
         }
+        // Turns the wheel over a control, notches toward you (down the page) or away below 0.
+        void Wheel(const std::string& over, float notches)
+        {
+            const Rml::Vector2f at = Center(over);
+            m_Host.context->ProcessMouseMove(static_cast<int>(at.x), static_cast<int>(at.y), 0);
+            Frames();
+            m_Host.context->ProcessMouseWheel(notches, 0);
+            Frames(2);
+        }
         // Presses the left button on one control and holds it over another, until Release.
         void HoldOver(const std::string& from, const std::string& onto, Rml::Vector2f nudge = {})
         {
@@ -1981,6 +1990,27 @@ TEST(running_setup_again_keeps_your_settings_saves_first_and_cancel_puts_back_wh
     window.Frames(2);
     CHECK(window.settings == mine);
     CHECK(!window.menu.open);
+}
+
+TEST(setups_preview_zooms_by_the_wheel_over_it_and_by_its_slider)
+{
+    SetupWindow window(false);
+    window.Click("setup-buttons-start");
+    window.Frames(30); // past the window's opening
+    CHECK_EQ(window.menu.SetupShown()->zoom, kLeastSetupZoom);
+    Rml::Element* scrolled = window.Find("page");
+    window.PointAt(kSetupPreviewClass); // which scrolls it into view first
+    const float top = scrolled->GetScrollTop();
+    window.Wheel(kSetupPreviewClass, -1.0f);
+    CHECK_EQ(window.menu.SetupShown()->zoom, kLeastSetupZoom + kSetupZoomNotch);
+    CHECK_EQ(scrolled->GetScrollTop(), top); // the page stays where it was
+    window.Wheel(kSetupPreviewClass, 3.0f);
+    CHECK_EQ(window.menu.SetupShown()->zoom, kLeastSetupZoom); // not out past the whole picture
+    for (int i = 0; i < 20; ++i)
+        window.Wheel(kSetupPreviewClass, -1.0f);
+    CHECK_EQ(window.menu.SetupShown()->zoom, kMostSetupZoom);
+    CHECK(window.Shows("setup-theme-zoom"));
+    CHECK(window.settings == Settings{}); // the picture's, not a setting
 }
 
 TEST(finishing_setup_keeps_the_picks_and_leaves_the_window_on_its_pages)

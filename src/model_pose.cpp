@@ -211,13 +211,19 @@ namespace headsup
         return any ? box : ModelBounds{};
     }
 
-    ModelView FramedView(const ModelBounds& box, float yaw, float aspect)
+    ModelView FramedView(const ModelBounds& box, float yaw, float aspect, float zoom, std::optional<Vec3> toward)
     {
-        const Vec3 middle{(box.low.x + box.high.x) / 2, (box.low.y + box.high.y) / 2, (box.low.z + box.high.z) / 2};
+        const Vec3 center{(box.low.x + box.high.x) / 2, (box.low.y + box.high.y) / 2, (box.low.z + box.high.z) / 2};
         const Vec3 half{(box.high.x - box.low.x) / 2, (box.high.y - box.low.y) / 2, (box.high.z - box.low.z) / 2};
         const float radius   = std::max(std::sqrt(half.x * half.x + half.y * half.y + half.z * half.z), kNearest);
         const float across   = 2.0f * std::atan(std::tan(kFieldOfView / 2) * aspect);
-        const float distance = radius / std::sin(std::min(kFieldOfView, across) / 2);
+        const float distance = radius / std::sin(std::min(kFieldOfView, across) / 2) / zoom;
+        // Moved toward the point by all but a zoomth of the way, which leaves the point where the picture had it.
+        const Vec3 to   = toward.value_or(center);
+        const float pull = 1.0f - 1.0f / zoom;
+        const Vec3 middle{center.x + (to.x - center.x) * pull, center.y + (to.y - center.y) * pull, center.z + (to.z - center.z) * pull};
+        const float moved = std::sqrt((middle.x - center.x) * (middle.x - center.x) + (middle.y - center.y) * (middle.y - center.y) +
+                                      (middle.z - center.z) * (middle.z - center.z));
         const Vec3 eye{middle.x + std::sin(yaw) * distance, middle.y, middle.z - std::cos(yaw) * distance};
         const Vec3 up{0, -1, 0};
 
@@ -233,7 +239,7 @@ namespace headsup
         v.m[kM31] = right.z, v.m[kM32] = above.z, v.m[kM33] = forward.z;
         v.m[kM41] = -dot(right, eye), v.m[kM42] = -dot(above, eye), v.m[kM43] = -dot(forward, eye), v.m[kM44] = 1;
 
-        const float nearPlane = std::max(distance - radius * kDepthRoom, kNearest), farPlane = distance + radius * kDepthRoom;
+        const float nearPlane = std::max(distance - radius * kDepthRoom, kNearest), farPlane = distance + moved + radius * kDepthRoom;
         const float tall      = 1.0f / std::tan(kFieldOfView / 2);
         Mat4& p   = out.projection;
         p.m[kM11] = tall / aspect;

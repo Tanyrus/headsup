@@ -1493,7 +1493,8 @@ private:
             [this](uint16_t model, std::string& failure) { return ReadNpcModel(model, failure); },
             [this](const headsup::PlayerLook& look, std::string& failure) { return ReadPlayerModel(look, failure); }};
         WithSavedState([&] {
-            m_SetupPreview.Render(m_Settings, *m_RmlMenu.SetupStepShown(), Now(), name != nullptr ? name : "", OwnLook(), read);
+            const headsup::SetupRun& run = *m_RmlMenu.SetupShown();
+            m_SetupPreview.Render(m_Settings, run.step, run.zoom, Now(), name != nullptr ? name : "", OwnLook(), read);
         });
         if (const std::string failure = m_SetupPreview.TakeFailure(); !failure.empty())
             Print("Setup's preview could not draw the game's models (" + failure + "). The rest of Setup works without it.");
@@ -1791,7 +1792,7 @@ private:
     void DrawOverGui()
     {
         if (m_Device == nullptr || FAILED(m_Device->BeginScene())) return;
-        if (m_Rml.Running() && !m_Screenshot && m_RmlMenu.open && m_RmlMenu.SetupStepShown()) DrawSetupPreview();
+        if (m_Rml.Running() && !m_Screenshot && m_RmlMenu.open && m_RmlMenu.SetupShown() != nullptr) DrawSetupPreview();
         if (m_Rml.Running() && !m_Screenshot) WithQuadStates([&] { m_Rml.RenderOverlay(); });
         m_Device->EndScene();
     }

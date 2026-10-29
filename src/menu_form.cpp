@@ -11,6 +11,7 @@
 #include "pointer_keys.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <initializer_list>
@@ -1742,15 +1743,21 @@ namespace headsup
         // A step's card: where it is in Setup, the warning of a run again, the preview, its choices and its settings.
         void SetupStepCard(Context& c, const SetupPage& page)
         {
-            Form& form          = c.form;
-            const SetupRun& run = *c.state.setup;
+            Form& form    = c.form;
+            SetupRun& run = *c.state.setup;
             const std::string count = Filled(Said(Word(c, WindowWord::SetupStep)), kCountMark, std::to_string(static_cast<int>(run.step) + 1));
             form.Note(Filled(count, kTotalMark, std::to_string(kSetupSteps)).c_str());
             if (run.rerun && !run.started)
                 form.Note((Words(Word(c, WindowWord::SetupWarning)) + ": " +
                            Filled(Said(WordTip(c, WindowWord::SetupWarning)), kFileMark, kSetupBackupFile))
                               .c_str());
-            form.Raw(std::string("<img class=\"") + kSetupPreviewClass + "\" id=\"" + kSetupPreviewClass + "\" src=\"" + kSetupPicture + "\"/>");
+            form.Raw(std::string("<img class=\"") + kSetupPreviewClass + " " + kWheelClass + "\" id=\"" + kSetupPreviewClass + "\" src=\"" +
+                     kSetupPicture + "\"/>");
+            if (const FormEvent* wheel = form.Took(kSetupPreviewClass, kWheelEvent))
+                run.zoom = std::clamp(run.zoom - static_cast<int>(std::lround(std::stof(wheel->value))) * kSetupZoomNotch, kLeastSetupZoom,
+                    kMostSetupZoom);
+            form.SliderPercent(Labeled(Word(c, WindowWord::SetupZoom), "zoom").c_str(), run.zoom, kLeastSetupZoom, kMostSetupZoom,
+                WordTip(c, WindowWord::SetupZoom));
             for (const SetupChoice& choice : page.choices)
                 SetupChoiceRow(c, choice);
             for (const SettingPiece piece : page.settings)

@@ -216,7 +216,7 @@ PIECES = Pieces(
            'default-font': True, 'unused-tags-these': True, 'unused-tags-name': True, 'or': True, 'slot-tip': False,
            'reload': True, 'export': True,
            'setup-title': True, 'setup-step': True, 'setup-start': True, 'setup-skip': True, 'setup-back': True,
-           'setup-next': True, 'setup-finish': True, 'setup-custom': True, 'setup-cancel': True, 'setup-warning': True,
+           'setup-next': True, 'setup-finish': True, 'setup-custom': True, 'setup-zoom': True, 'setup-cancel': True, 'setup-warning': True,
            'setup-step-welcome': True, 'setup-step-theme': True, 'setup-step-fonts': True,
            'setup-step-mob-nameplates': True, 'setup-step-outlines': True, 'setup-step-target-cursor': True,
            'setup-step-others': True, 'setup-step-widgets': True, 'setup-step-mouse-extras': True,

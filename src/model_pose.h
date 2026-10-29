@@ -45,12 +45,13 @@ namespace headsup
     ModelBounds BoundsOf(std::span<const DrawBatch> batches);
 
     // A camera on level with a box's middle, turned yaw radians round it about the game's up (which is -y), as near
-    // as lets the whole box show in a picture aspect times as wide as it is tall. Left-handed, row vectors.
+    // as lets the whole box show in a picture aspect times as wide as it is tall. Left-handed, row vectors. Zoomed, it
+    // comes zoom times nearer, toward a point that keeps its place in the picture.
     struct ModelView
     {
         Mat4 view, projection;
     };
-    ModelView FramedView(const ModelBounds& box, float yaw, float aspect);
+    ModelView FramedView(const ModelBounds& box, float yaw, float aspect, float zoom = 1.0f, std::optional<Vec3> toward = std::nullopt);
 
     // Models stood side by side: their triangles and boxes moved, and the box that holds two.
     void Move(std::vector<DrawBatch>& batches, const Vec3& by);

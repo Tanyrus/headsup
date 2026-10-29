@@ -221,7 +221,7 @@ namespace headsup
         m_Popup      = m_Document->GetElementById(kMenuPopupId);
         m_Tip        = m_Document->GetElementById(kMenuTipId);
         for (const Rml::EventId id : {Rml::EventId::Click, Rml::EventId::Change, Rml::EventId::Dragdrop, Rml::EventId::Dragend,
-                 Rml::EventId::Dragmove, Rml::EventId::Mouseover, Rml::EventId::Mousemove})
+                 Rml::EventId::Dragmove, Rml::EventId::Mouseover, Rml::EventId::Mousemove, Rml::EventId::Mousescroll})
             m_Document->AddEventListener(id, this);
         // On their way down: taking and losing the keyboard do not come back up, and a text box keeps its keys.
         for (const Rml::EventId id : {Rml::EventId::Focus, Rml::EventId::Blur, Rml::EventId::Keydown})
@@ -487,6 +487,13 @@ namespace headsup
                     FocusAt(last, CharacterOf(last->GetValue(), last->GetValue().size()));
             m_Events.push_back(FormEvent{named == m_Popup ? m_State.form.popup + kPopupGround : id, kClickEvent, {}});
             m_Tip->SetClass(kHiddenClass, true);
+            break;
+        case Rml::EventId::Mousescroll:
+            if (named != nullptr && named->IsClassSet(kWheelClass))
+            {
+                m_Events.push_back(FormEvent{id, kWheelEvent, std::to_string(event.GetParameter<float>("wheel_delta_y", 0.0f))});
+                event.StopPropagation();
+            }
             break;
         case Rml::EventId::Change:
             if (AsInput(target) != nullptr)

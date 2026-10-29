@@ -1114,6 +1114,7 @@
     {"key": "setup-back", "name": "Back", "tip": "Goes back a step."},
     {"key": "setup-next", "name": "Next", "tip": "Goes on to the next step."},
     {"key": "setup-finish", "name": "Finish", "tip": "Keeps your picks and closes Setup."},
+    {"key": "setup-zoom", "name": "Zoom", "tip": "Brings the picture nearer to the nameplates. You can also turn the mouse wheel over the picture."},
     {"key": "setup-custom", "name": "Your Own", "tip": "You set these yourself in the settings window. Pick one of the others to replace them."},
     {"key": "setup-cancel", "name": "Cancel", "tip": "Puts back the settings you had before Setup and closes it."},
     {"key": "setup-warning", "name": "WARNING", "tip": "Setup changes your settings as you pick. Your settings are saved to {file} first, and Cancel puts them back."},

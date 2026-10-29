@@ -41,7 +41,7 @@ namespace headsup
         return true;
     }
 
-    bool SetupPreview::Render(const Settings& settings, SetupStep step, double now, const std::string& yourName,
+    bool SetupPreview::Render(const Settings& settings, SetupStep step, int zoom, double now, const std::string& yourName,
         const PlayerLook& yourLook, const Readers& read)
     {
         m_Drawn = false;
@@ -74,9 +74,15 @@ namespace headsup
         ModelBounds box = Moved(placed.front().model->Standing(), placed.front().at);
         for (const Placed& p : placed)
             box = Joined(box, Moved(p.model->Standing(), p.at));
-        box.low.y -= (box.high.y - box.low.y) * kHeadroom; // the game's up is -y
+        const float headroom = (box.high.y - box.low.y) * kHeadroom;
+        // Zoomed toward halfway up the room over the heads, where the plates are, so they stay in the picture as
+        // they grow. The game's up is -y.
+        Vec3 toward = HeadOf(box);
+        toward.y -= headroom / 2.0f;
+        box.low.y -= headroom;
+        const float closer   = static_cast<float>(zoom) / kPercent;
         const float yaw      = kFacingYaw + kSwayYaw * static_cast<float>(std::sin(now * kSwaySpeed));
-        const ModelView view = FramedView(box, yaw, static_cast<float>(kWidth) / static_cast<float>(kHeight));
+        const ModelView view = FramedView(box, yaw, static_cast<float>(kWidth) / static_cast<float>(kHeight), closer, toward);
 
         const SampleScene scene = SetupScene(others, yourName);
         m_Tracker.Update(scene.actors, scene.player, settings, scene.targets);
@@ -90,16 +96,17 @@ namespace headsup
             p.model->Draw(m_Device, p.model->Posed(now, p.at), view, yaw, outline ? &*outline : nullptr, kWidth, kHeight);
         }
 
-        // The plates sit over each model's head where the camera sees it, at the size of a name drawn whole.
-        const PlateScene plates{static_cast<float>(kWidth), static_cast<float>(kHeight), nullptr,
+        // The plates sit over each model's head where the camera sees it, at the size of a name drawn whole. Zoomed,
+        // they are laid out on a screen a zoomth of the picture's size and drawn zoom times as large.
+        const PlateScene plates{static_cast<float>(kWidth) / closer, static_cast<float>(kHeight) / closer, nullptr,
             [&](uint16_t index, bool) -> std::optional<DrawnName> {
                 for (const Placed& p : placed)
                     if (SampleIndex(p.actor) == index)
                         if (const auto head = PointInPicture(view, HeadOf(Moved(p.model->Standing(), p.at)), kWidth, kHeight))
-                            return SampleName(head->x, head->y);
+                            return SampleName(head->x / closer, head->y / closer);
                 return std::nullopt;
             }};
-        m_Plates.Update(m_Tracker, plates, settings, 1.0f, 1.0f, scene.targets, now, SampleIndex(SampleActor::You), {});
+        m_Plates.Update(m_Tracker, plates, settings, closer, closer, scene.targets, now, SampleIndex(SampleActor::You), {});
         m_Plates.Draw(false);
         Opaque();
         m_Drawn = true;

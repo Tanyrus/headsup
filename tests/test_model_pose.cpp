@@ -297,3 +297,29 @@ TEST(a_point_lands_in_the_picture_from_its_top_left_with_the_box_middle_in_the_m
     // Seen from the front, +x is on the picture's left or right; behind the camera is nowhere.
     CHECK(PointInPicture(view, {0, -1, -100}, 640, 320) == std::nullopt);
 }
+
+TEST(a_zoomed_view_keeps_the_point_it_zooms_toward_in_place_and_grows_what_is_round_it)
+{
+    const ModelBounds box{{-1, -2, -1}, {1, 0, 1}};
+    const Vec3 toward = HeadOf(box);
+    for (float yaw : {0.0f, 1.0f, -2.5f})
+    {
+        const ModelView whole = FramedView(box, yaw, 2.0f), zoomed = FramedView(box, yaw, 2.0f, 2.0f, toward);
+        const auto at = Projected(whole, toward.x, toward.y, toward.z), zoomedAt = Projected(zoomed, toward.x, toward.y, toward.z);
+        CHECK(Near(at[0], zoomedAt[0]) && Near(at[1], zoomedAt[1]));
+        // A point under it, across the picture's plane whichever way the camera turns, is twice as far from it.
+        const auto under = Projected(whole, toward.x, toward.y + 0.3f, toward.z);
+        const auto zoomedUnder = Projected(zoomed, toward.x, toward.y + 0.3f, toward.z);
+        CHECK(Near(zoomedUnder[1] - zoomedAt[1], 2.0f * (under[1] - at[1])));
+        // The whole box is still between the near and far planes.
+        for (int corner = 0; corner < 8; ++corner)
+        {
+            const float depth = Projected(zoomed, corner & 1 ? box.high.x : box.low.x, corner & 2 ? box.high.y : box.low.y,
+                corner & 4 ? box.high.z : box.low.z)[2];
+            CHECK(depth > 0.0f && depth < 1.0f);
+        }
+    }
+    // Not zoomed, the point changes nothing.
+    const auto plain = Projected(FramedView(box, 1.0f, 2.0f), 1, -1, 0), toPoint = Projected(FramedView(box, 1.0f, 2.0f, 1.0f, toward), 1, -1, 0);
+    CHECK(Near(plain[0], toPoint[0]) && Near(plain[1], toPoint[1]) && Near(plain[2], toPoint[2]));
+}
