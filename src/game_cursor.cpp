@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <utility>
 
 
 namespace headsup
@@ -48,6 +49,25 @@ namespace headsup
         targets.anchorY    = window.ankY * y;
         targets.subAnchorX = window.subAnkX * x;
         targets.subAnchorY = window.subAnkY * y;
+    }
+
+    bool GamePresses::Keep(uint32_t message, bool kept)
+    {
+        const auto press = [&](bool& got) {
+            got = !kept;
+            return kept;
+        };
+        const auto release = [&](bool& got) { return !std::exchange(got, false); };
+        switch (message)
+        {
+        case kLeftDown: return press(m_Left);
+        case kRightDown: return press(m_Right);
+        case kMiddleDown: return press(m_Middle);
+        case kLeftUp: return release(m_Left);
+        case kRightUp: return release(m_Right);
+        case kMiddleUp: return release(m_Middle);
+        default: return kept;
+        }
     }
 
     bool ClickMessage(uint32_t message)

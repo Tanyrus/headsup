@@ -201,7 +201,10 @@ namespace
         return found != nullptr ? found->Name[0] : nullptr;
     }
 
-    BOOL __stdcall OnMouse(uint32_t message, WPARAM wParam, LPARAM lParam, bool blocked)
+    headsup::GamePresses g_GamePresses; // what the game got of each button, for OnMouse
+
+    // HeadsUp's own answer for a mouse message: true when the game must not get it.
+    bool KeepMouse(uint32_t message, WPARAM wParam, LPARAM lParam, bool blocked)
     {
         const float x = static_cast<float>(static_cast<int16_t>(LOWORD(lParam))) * g_BarScaleX;
         const float y = static_cast<float>(static_cast<int16_t>(HIWORD(lParam))) * g_BarScaleY;
@@ -213,23 +216,28 @@ namespace
                                             g_Gui->GetIO().WantCaptureMouse);
         if (g_BarClicks != nullptr &&
             g_BarClicks->Take(message, static_cast<uint32_t>(wParam), x, y, g_BarOn && !g_BarHidden, overGui, blocked))
-            return TRUE;
-        if (overRml) return TRUE;
+            return true;
+        if (overRml) return true;
         // A window the player hides takes no click, which the game would act on unseen; an Ashita window over it does.
         if (!blocked &&
             headsup::SwallowsClick(message, static_cast<int>(static_cast<float>(static_cast<int16_t>(LOWORD(lParam))) * g_MenuScaleX),
                 static_cast<int>(static_cast<float>(static_cast<int16_t>(HIWORD(lParam))) * g_MenuScaleY),
                 headsup::WindowHook::HiddenRects()) &&
             !(g_Gui != nullptr && g_Gui->GetIO().WantCaptureMouse))
-            return TRUE;
-        if (!g_SyncClicks) return FALSE;
+            return true;
+        if (!g_SyncClicks) return false;
         // The game takes a click where its pointer last was, which is somewhere else after the mouse moved over another
         // window: a mouse move to the click's place goes first.
         if (!blocked && !overGui && g_GameWindow != nullptr && headsup::ClickMessage(message))
             SendMessageA(g_GameWindow, WM_MOUSEMOVE, LOWORD(wParam), lParam);
         // The game hides its pointer for typing until it sees the mouse move, which it never does over an Ashita window.
         if (message == WM_MOUSEMOVE && overGui) headsup::PointerFix::RevealUnderWindow();
-        return FALSE;
+        return false;
+    }
+
+    BOOL __stdcall OnMouse(uint32_t message, WPARAM wParam, LPARAM lParam, bool blocked)
+    {
+        return g_GamePresses.Keep(message, blocked || KeepMouse(message, wParam, lParam, blocked)) ? TRUE : FALSE;
     }
 
     // Ashita's keyboard hook: wParam the virtual key, lParam the message's flags, whose top bit says the key went up.

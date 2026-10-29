@@ -1,5 +1,6 @@
 #include "game_cursor.h"
 #include "boxes.h"
+#include "mouse_messages.h"
 #include "test.h"
 
 using namespace headsup;
@@ -109,4 +110,46 @@ TEST(the_menu_size_falls_back_to_the_back_buffer)
     const MenuSize other = MenuSizeOf(0.0f, 1080.0f, 2560.0f, 1440.0f);
     CHECK_EQ(other.width, 2560.0f);
     CHECK_EQ(other.height, 1080.0f);
+}
+
+TEST(the_game_gets_a_release_only_for_a_press_it_got)
+{
+    GamePresses g;
+    // A press the game got: its release reaches it, even over a popup that would keep it.
+    CHECK(!g.Keep(kLeftDown, false));
+    CHECK(!g.Keep(kLeftUp, true));
+    // A press HeadsUp kept: its release is kept, even where nothing of HeadsUp's is under it.
+    CHECK(g.Keep(kLeftDown, true));
+    CHECK(g.Keep(kLeftUp, false));
+    // A release with no press since loading is kept.
+    CHECK(GamePresses{}.Keep(kRightUp, false));
+}
+
+TEST(a_double_click_the_game_ignores_keeps_the_release_after_it)
+{
+    GamePresses g;
+    CHECK(!g.Keep(kLeftDown, false));
+    CHECK(!g.Keep(kLeftUp, false));
+    CHECK(!g.Keep(kLeftDouble, false)); // passed on, but the game acts on no double-click
+    CHECK(g.Keep(kLeftUp, false));
+    // A press whose release went to another window: the game still holds it, and the next release frees it.
+    CHECK(!g.Keep(kLeftDown, false));
+    CHECK(!g.Keep(kLeftDouble, false));
+    CHECK(!g.Keep(kLeftUp, true));
+}
+
+TEST(each_button_is_paired_on_its_own_and_other_messages_go_as_decided)
+{
+    GamePresses g;
+    CHECK(g.Keep(kLeftDown, true));
+    CHECK(!g.Keep(kRightDown, false));
+    CHECK(!g.Keep(kMiddleDown, false));
+    CHECK(!g.Keep(kRightUp, true));
+    CHECK(g.Keep(kLeftUp, false));
+    CHECK(!g.Keep(kMiddleUp, false));
+    for (const uint32_t other : {kMouseMove, kMouseWheel})
+    {
+        CHECK(g.Keep(other, true));
+        CHECK(!g.Keep(other, false));
+    }
 }
