@@ -48,6 +48,7 @@ namespace headsup
             PlayerLook look{}; // a player's, read again when it changes
         };
         bool Ready(Sample& sample, const std::function<std::optional<ModelFile>(std::string&)>& read);
+        void Opaque();
 
         IDirect3DDevice8* m_Device = nullptr;
         ModelPicture m_Picture;

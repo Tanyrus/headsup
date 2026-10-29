@@ -98,8 +98,36 @@ namespace headsup
             }};
         m_Plates.Update(m_Tracker, plates, settings, 1.0f, 1.0f, scene.targets, now, SampleIndex(SampleActor::You), {});
         m_Plates.Draw(false);
+        Opaque();
         m_Drawn = true;
         return true;
+    }
+
+    void SetupPreview::Opaque()
+    {
+        // What was blended over the background left alphas under one, which would let the game show through the
+        // window: every pixel's alpha alone is set whole.
+        struct Corner
+        {
+            float x, y, z, rhw;
+            D3DCOLOR color;
+        };
+        const auto w = static_cast<float>(kWidth), h = static_cast<float>(kHeight);
+        const Corner corners[]{{0, 0, 0, 1, 0xFFFFFFFF}, {w, 0, 0, 1, 0xFFFFFFFF}, {0, h, 0, 1, 0xFFFFFFFF}, {w, h, 0, 1, 0xFFFFFFFF}};
+        m_Device->SetVertexShader(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
+        m_Device->SetTexture(0, nullptr);
+        m_Device->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
+        m_Device->SetRenderState(D3DRS_STENCILENABLE, FALSE);
+        m_Device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+        m_Device->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
+        m_Device->SetRenderState(D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_ALPHA);
+        m_Device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
+        m_Device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_DIFFUSE);
+        m_Device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1);
+        m_Device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_DIFFUSE);
+        m_Device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, corners, sizeof(Corner));
+        m_Device->SetRenderState(D3DRS_COLORWRITEENABLE,
+            D3DCOLORWRITEENABLE_RED | D3DCOLORWRITEENABLE_GREEN | D3DCOLORWRITEENABLE_BLUE | D3DCOLORWRITEENABLE_ALPHA);
     }
 
     std::optional<RmlRender::LivePicture> SetupPreview::Picture() const
