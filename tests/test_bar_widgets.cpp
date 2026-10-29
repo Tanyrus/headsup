@@ -140,10 +140,10 @@ TEST(no_target_reads_no_target_and_a_player_gets_only_a_name)
     CHECK(BarPopupContent(BarWidget::Target, state, settings).title == (std::vector<Span>{{"No target", Tone::Dim}}));
     ActorInfo player;
     player.kind = EntityKind::Player;
-    std::snprintf(player.name, sizeof(player.name), "%s", "Carrott");
+    std::snprintf(player.name, sizeof(player.name), "%s", "Zinnia");
     state.target          = &player;
     const WidgetContent w = BarWidgetContent(BarWidget::Target, state, settings);
-    CHECK(Joined(w.title) == "Carrott" && w.subtitle.empty() && w.icons.empty() && !w.hasPopup);
+    CHECK(Joined(w.title) == "Zinnia" && w.subtitle.empty() && w.icons.empty() && !w.hasPopup);
     ActorInfo stranger = Goblin(); // a mob the Phoenix data does not have
     stranger.mob       = nullptr;
     stranger.level     = MakeLabel(nullptr, nullptr, 20);
@@ -2041,8 +2041,8 @@ TEST(the_conquest_widget_counts_the_regions_of_the_nations_picked_and_its_popup_
 
 TEST(the_bags_popup_always_lists_storage_and_never_the_temporary_items)
 {
-    // The user's pick: Storage (the Mog House's furniture storage) is listed even with no room yet, dim, and the
-    // Temporary Items bag is not listed.
+    // Storage (the Mog House's furniture storage) is listed even with no room yet, dim, and the Temporary Items bag is
+    // not listed.
     Settings settings;
     BarState state;
     state.bags[0] = BagCount{26, 30};

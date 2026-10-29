@@ -216,7 +216,7 @@ TEST(generally_holds_while_the_entity_is_in_none_of_its_kinds_special_states)
 {
     const LineShow generally{false, ConditionBit(ShowCondition::Generally)};
     const LineShow orTargeted{false, ConditionBit(ShowCondition::Generally) | ConditionBit(ShowCondition::Targeted)};
-    // The user's example, a mob line with Generally and Targeted.
+    // A mob line shown Generally or when Targeted.
     const EntityState mob = Mob(Nature::Aggressive);
     EntityState target    = mob;
     target.target         = TargetState::Targeted;
@@ -228,7 +228,7 @@ TEST(generally_holds_while_the_entity_is_in_none_of_its_kinds_special_states)
     CHECK(!LineShows(orTargeted, weak, false));
     CHECK(!LineShows(generally, target, false));
     CHECK(!LineShows(generally, Mob(Nature::Passive, ClaimState::Yours), false));
-    // Your fight is true of every mob at once, so it says nothing against this one: the user's example holds in combat.
+    // Your fight is true of every mob at once, so it says nothing against this one: the line still shows in combat.
     CHECK(LineShows(generally, Mob(Nature::Passive), true));
     CHECK(LineShows(orTargeted, mob, true) && !LineShows(orTargeted, weak, true));
     // Every mob is unclaimed or claimed and aggressive or passive: those say nothing against it.

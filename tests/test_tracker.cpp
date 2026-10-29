@@ -34,7 +34,7 @@ namespace
     ActorInput Player(ActorPtr actor)
     {
         return ActorInput{.actor = actor, .index = 1052, .serverId = 0x00012345, .kind = EntityKind::Player, .alive = true,
-            .distance = 0.0f, .name = "Carrott"};
+            .distance = 0.0f, .name = "Zinnia"};
     }
 
     ActorInput Npc(ActorPtr actor)
@@ -111,7 +111,7 @@ TEST(players_and_npcs_keep_their_names_without_outlines)
     const ActorInfo* npc    = t.Find(0x1100);
     CHECK(player != nullptr && npc != nullptr);
     CHECK(player->kind == EntityKind::Player && npc->kind == EntityKind::Npc);
-    CHECK(std::string(player->name) == "Carrott");
+    CHECK(std::string(player->name) == "Zinnia");
     CHECK(std::string(npc->name) == "Home Point #1");
     CHECK(!player->outline && !npc->outline);
     CHECK(player->level.text[0] == '\0' && npc->mob == nullptr); // levels and icons come from mob data
@@ -568,7 +568,7 @@ TEST(the_tracker_fills_claims_rows_placeholders_checks_and_dead_mobs)
     dead.index            = 2002;
     ActorInput pet        = Mob(0x6000, kSnipper, "Snipper");
     pet.pet               = true;
-    pet.ownerName         = "Carrott";
+    pet.ownerName         = "Zinnia";
     Tracker t;
     t.Update({friendly, shared, trader, others, checkedMob, worm, dead, pet}, kLevel20, Settings{}, CursorTargets{});
     CHECK(t.Find(0x1000)->state.playerRow == PlayerRow::Friend);
@@ -589,7 +589,7 @@ TEST(the_tracker_fills_claims_rows_placeholders_checks_and_dead_mobs)
     CHECK(!t.Find(0x5000)->state.tooWeak);
     CHECK(t.Find(0x5000)->state.toughness == LabelShade::Unknown);
     CHECK(t.Find(0x6000)->state.pet);
-    CHECK(std::string(t.Find(0x6000)->ownerName) == "Carrott");
+    CHECK(std::string(t.Find(0x6000)->ownerName) == "Zinnia");
 }
 
 TEST(an_outline_follows_its_rows_mode_and_color_pick)

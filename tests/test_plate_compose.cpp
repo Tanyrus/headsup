@@ -645,12 +645,12 @@ TEST(each_kind_composes_from_its_own_design)
     s.Kind(PlateKind::Npcs).lines[2].text    = "npc $name";
     ActorInfo pet = AggressiveMob();
     pet.state.pet = true;
-    std::snprintf(pet.ownerName, sizeof(pet.ownerName), "Carrott");
+    std::snprintf(pet.ownerName, sizeof(pet.ownerName), "Zinnia");
     CHECK(Compose(pet, s).lines.empty()); // a pet's nameplate shows when it is targeted
     pet.state.target = TargetState::Targeted;
     const ComposedPlate pets = Compose(pet, s);
     CHECK_EQ(pets.lines.size(), size_t{1});
-    CHECK_EQ(Rendered(pets.lines[0]), "Young Quadav (Carrott)");
+    CHECK_EQ(Rendered(pets.lines[0]), "Young Quadav (Zinnia)");
     ActorInfo self = PlainPlayer();
     self.state.self = true;
     CHECK_EQ(Rendered(Compose(self, s).lines[0]), "me Chadmage");

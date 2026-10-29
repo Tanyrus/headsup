@@ -165,7 +165,7 @@ TEST(a_timer_is_earned_by_targeting_or_by_being_active_with_it_on_your_screen)
     CHECK(EarnsTimer(true, false, false)); // targeting counts even standing still
     CHECK(EarnsTimer(false, true, true));
     CHECK(!EarnsTimer(false, true, false)); // away from the keyboard
-    // In range and active, but not seen: a party member's claim off your screen earns you nothing (the user, 2026-10-26).
+    // In range and active, but not seen: a party member's claim off your screen earns you nothing.
     CHECK(!EarnsTimer(false, false, true));
 }
 

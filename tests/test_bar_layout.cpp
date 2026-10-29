@@ -441,8 +441,8 @@ TEST(a_row_too_short_for_two_lines_kept_apart_shows_titles_alone_at_full_size)
     }
 }
 
-// The user finds small text hard to read: a detail line under 9 px is not worth drawing, and a taller bar never gets
-// smaller titles, except where it gains room for a detail line under them.
+// Small text is hard to read: a detail line under 9 px is not worth drawing, and a taller bar never gets smaller
+// titles, except where it gains room for a detail line under them.
 TEST(no_line_is_under_9_px_and_a_taller_bar_never_shrinks_the_titles)
 {
     for (const BarShape shape : {BarShape::Pills, BarShape::Ornate})
