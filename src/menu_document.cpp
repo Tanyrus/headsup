@@ -121,8 +121,9 @@ namespace headsup
         css += "div{display:block;}handle{display:block;}";
         css += std::string(".") + kHiddenClass + "{display:none;}";
         // The frame: the title bar moves the window, the corner resizes it.
-        css += "#head{position:absolute;left:" + Em(kGutter) + ";right:" + Em(kGutter + kFrame + 0.5f) + ";top:" +
-               Em(kGutter) + ";height:" + Em(kHeadHeight) + ";}";
+        // It reaches the window's top and left edges, so a grab above or beside the title moves it too.
+        css += "#head{position:absolute;left:0px;right:" + Em(kGutter + kFrame + 0.5f) + ";top:0px;height:" +
+               Em(kHeadHeight) + ";padding:" + Em(kGutter) + " 0px 0px " + Em(kGutter) + ";}";
         css += "#title{display:inline-block;font-family:\"" + look.titleFont + "\";font-size:" + Em(kTitleScale) +
                ";color:" + color(c.heading) + ";font-effect:glow(0px 4px 0px 0px " + color(Faded(c.accent, kGlow)) + ");}";
         css += std::string("#") + kMenuVersionId + "{display:inline-block;margin-left:0.5em;color:" + color(c.muted) + ";}";

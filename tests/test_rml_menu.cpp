@@ -173,9 +173,9 @@ namespace
 
         // Presses the left button on one control and lets it go on another, or that far from the first.
         bool Drag(const std::string& from, const std::string& onto) { return Drag(from, Center(onto) - Center(from)); }
-        bool Drag(const std::string& from, Rml::Vector2f by)
+        bool Drag(const std::string& from, Rml::Vector2f by) { return DragFrom(Center(from), by); }
+        bool DragFrom(Rml::Vector2f start, Rml::Vector2f by)
         {
-            const Rml::Vector2f start = Center(from);
             m_Host.context->ProcessMouseMove(static_cast<int>(start.x), static_cast<int>(start.y), 0);
             bool changed = Frames();
             m_Host.context->ProcessMouseButtonDown(kLeftButton, 0);
@@ -1237,6 +1237,23 @@ TEST(the_window_is_kept_where_it_is_dragged_by_its_title)
     CHECK(std::abs(now.y - was.y - 40.0f) < 0.01f);
     CHECK(window.settings.menuWidth > 0 && window.settings.menuHeight > 0);
     CHECK_EQ(window.settings.menuX, static_cast<int>((test::RmlSession::kWidth - window.settings.menuWidth) / 2) - 120);
+}
+
+TEST(the_window_moves_from_its_very_top_edge_and_corner)
+{
+    Window window;
+    window.Frames(30); // past its opening, which scales it
+    Rml::Element* body = window.Find("title")->GetOwnerDocument();
+    // Just under the top edge over the title, then just inside the top left corner.
+    for (const bool corner : {false, true})
+    {
+        const Rml::Vector2f edge = body->GetAbsoluteOffset(Rml::BoxArea::Border);
+        const Rml::Vector2f was  = window.Center("title");
+        window.DragFrom(corner ? edge + Rml::Vector2f(4.0f, 4.0f) : Rml::Vector2f(was.x, edge.y + 3.0f), Rml::Vector2f(-60.0f, 30.0f));
+        const Rml::Vector2f now = window.Center("title");
+        CHECK(std::abs(now.x - was.x + 60.0f) < 0.01f);
+        CHECK(std::abs(now.y - was.y - 30.0f) < 0.01f);
+    }
 }
 
 TEST(a_narrow_window_cuts_a_rows_label_and_keeps_its_controls_beside_it)
