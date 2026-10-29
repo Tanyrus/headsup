@@ -28,22 +28,15 @@ namespace headsup
         WindowWord word; // its name and tip
         WindowList list; // its options' names and tips, in order
         std::span<const SetupOption> options;
-        size_t defaultOption; // the one a new install has
     };
-    // A setting a step draws with the settings window's own control, and how a run again puts it back.
-    struct SetupSetting
-    {
-        SettingPiece piece;
-        void (*reset)(Settings&);
-    };
-    // A step's choices, drawn as options to pick, then its settings.
+    // A step's choices, drawn as options to pick, then its settings with the settings window's own controls.
     struct SetupPage
     {
         SetupStep step;
         const char* key;
         WindowWord word; // its title, and what it is for as the tip
         std::span<const SetupChoice> choices;
-        std::span<const SetupSetting> settings;
+        std::span<const SettingPiece> settings;
     };
     std::span<const SetupPage> SetupPages();
     const SetupPage& SetupPageOf(SetupStep step);
@@ -70,8 +63,4 @@ namespace headsup
         int year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0;
     };
     std::string SetupBackupName(const SetupTime& at, const std::function<bool(const std::string&)>& taken);
-
-    // What running Setup again starts from: everything its steps set back to how a new install has it, and the rest
-    // of the settings as they were.
-    void UseSetupDefaults(Settings& s);
 }

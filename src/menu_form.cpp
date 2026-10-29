@@ -1753,8 +1753,8 @@ namespace headsup
             form.Raw(std::string("<img class=\"") + kSetupPreviewClass + "\" id=\"" + kSetupPreviewClass + "\" src=\"" + kSetupPicture + "\"/>");
             for (const SetupChoice& choice : page.choices)
                 SetupChoiceRow(c, choice);
-            for (const SetupSetting& own : page.settings)
-                if (const LayoutSetting* setting = c.layout.SettingOf(own.piece)) DrawSetting(c, *setting);
+            for (const SettingPiece piece : page.settings)
+                if (const LayoutSetting* setting = c.layout.SettingOf(piece)) DrawSetting(c, *setting);
             if (run.step == SetupStep::Widgets) SetupWidgets(c);
             form.EndCard();
         }
@@ -1777,12 +1777,7 @@ namespace headsup
             {
                 if (button(WindowWord::SetupStart, "start", kAccentPill))
                 {
-                    if (run.rerun)
-                    {
-                        c.state.setupBackup = true;
-                        UseSetupDefaults(c.s);
-                        form.changed = true;
-                    }
+                    c.state.setupBackup = run.rerun;
                     run.started      = true;
                     run.step         = SetupStep::Theme;
                     form.scrollToTop = true;

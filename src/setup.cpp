@@ -31,20 +31,13 @@ namespace headsup
         const SetupOption kThemes[]{{"phoenix-gold", Theme<BarTheme::PhoenixGold>}, {"umbra-dark", Theme<BarTheme::UmbraDark>},
             {"phoenix-red-ornate", Theme<BarTheme::PhoenixRedOrnate>}, {"phoenix-red-pills", Theme<BarTheme::PhoenixRedPills>},
             {"aurora", Theme<BarTheme::Aurora>}, {"game-window", Theme<BarTheme::GameWindow>}};
-        const SetupChoice kThemeChoices[]{{"theme", WindowWord::SetupChoiceTheme, WindowList::SetupTheme, kThemes, 0}};
-        // A field put back to a new install's.
-        template <auto Field>
-        void Reset(Settings& s)
-        {
-            s.*Field = Settings{}.*Field;
-        }
+        const SetupChoice kThemeChoices[]{{"theme", WindowWord::SetupChoiceTheme, WindowList::SetupTheme, kThemes}};
+        const SettingPiece kThemeSettings[]{SettingPiece::WindowType};
 
-        const SetupSetting kThemeSettings[]{{SettingPiece::WindowType, Reset<&Settings::windowType>}};
-
-        const SetupSetting kFontSettings[]{{SettingPiece::DefaultFont, Reset<&Settings::defaultFont>},
-            {SettingPiece::BaseFontSize, Reset<&Settings::baseSize>}, {SettingPiece::BaseIconSize, Reset<&Settings::baseIconSize>},
-            {SettingPiece::TextFont, Reset<&Settings::barTextFont>}, {SettingPiece::TextSize, Reset<&Settings::barTextSize>},
-            {SettingPiece::Size, Reset<&Settings::menuFontSize>}};
+        const SettingPiece kFontSettings[]{SettingPiece::DefaultFont,
+            SettingPiece::BaseFontSize, SettingPiece::BaseIconSize,
+            SettingPiece::TextFont, SettingPiece::TextSize,
+            SettingPiece::Size};
 
         // The mob rows of what would attack you, notorious monsters and their placeholders, and claimed mobs.
         constexpr Category kAttackRows[]{Category::WillAttack, Category::NmWillAttack, Category::NmWontAttack, Category::Placeholder,
@@ -75,7 +68,7 @@ namespace headsup
         const SetupOption kMobDesigns[]{{"full", [](Settings& s) { MobLines(s, 0, DefaultKind(PlateKind::Mobs).ornament.place); }},
             {"simple", [](Settings& s) { MobLines(s, 1, OrnamentPlace::Disabled); }},
             {"name", [](Settings& s) { MobLines(s, 2, OrnamentPlace::Disabled); }}};
-        const SetupChoice kMobChoices[]{{"mob-plates", WindowWord::SetupChoiceMobPlates, WindowList::SetupMobPlates, kMobPlates, 0}, {"mob-design", WindowWord::SetupChoiceMobDesign, WindowList::SetupMobDesign, kMobDesigns, 0}};
+        const SetupChoice kMobChoices[]{{"mob-plates", WindowWord::SetupChoiceMobPlates, WindowList::SetupMobPlates, kMobPlates}, {"mob-design", WindowWord::SetupChoiceMobDesign, WindowList::SetupMobDesign, kMobDesigns}};
 
         // Outlines on some mob rows: the claim rows follow the row under them, the dead have none.
         void MobOutlines(Settings& s, std::span<const Category> rows, OutlineMode mode)
@@ -101,7 +94,7 @@ namespace headsup
             s.outlineThickness = Percent;
         }
         const SetupOption kThicknesses[]{{"thin", Thickness<50>}, {"normal", Thickness<100>}, {"thick", Thickness<200>}};
-        const SetupChoice kOutlineChoices[]{{"outlines", WindowWord::SetupChoiceOutlines, WindowList::SetupOutlines, kOutlines, 0}, {"outline-thickness", WindowWord::SetupChoiceOutlineThickness, WindowList::SetupOutlineThickness, kThicknesses, 1}};
+        const SetupChoice kOutlineChoices[]{{"outlines", WindowWord::SetupChoiceOutlines, WindowList::SetupOutlines, kOutlines}, {"outline-thickness", WindowWord::SetupChoiceOutlineThickness, WindowList::SetupOutlineThickness, kThicknesses}};
 
         template <CursorStyle Style>
         void Cursor(Settings& s)
@@ -113,8 +106,8 @@ namespace headsup
         }
         const SetupOption kCursors[]{{"feather", Cursor<CursorStyle::Feather>}, {"arrow", Cursor<CursorStyle::Triangle>},
             {"chocobo", Cursor<CursorStyle::Chocobo>}, {"game", Cursor<CursorStyle::Vanilla>}};
-        const SetupChoice kCursorChoices[]{{"cursor", WindowWord::SetupChoiceCursor, WindowList::SetupCursor, kCursors, 0}};
-        const SetupSetting kCursorSettings[]{{SettingPiece::Color, Reset<&Settings::cursorColor>}};
+        const SetupChoice kCursorChoices[]{{"cursor", WindowWord::SetupChoiceCursor, WindowList::SetupCursor, kCursors}};
+        const SettingPiece kCursorSettings[]{SettingPiece::Color};
 
         template <PlateKind Kind, PlateMode Mode>
         void Plates(Settings& s)
@@ -127,10 +120,10 @@ namespace headsup
         const SetupOption kNpcs[]{{"headsup", Plates<PlateKind::Npcs, PlateMode::Shown>}, {"game", Plates<PlateKind::Npcs, PlateMode::Vanilla>}};
         const SetupOption kPets[]{{"targeted", Plates<PlateKind::Pets, PlateMode::WhenTargeted>}, {"shown", Plates<PlateKind::Pets, PlateMode::Shown>},
             {"game", Plates<PlateKind::Pets, PlateMode::Vanilla>}};
-        const SetupChoice kOtherChoices[]{{"players", WindowWord::SetupChoicePlayers, WindowList::SetupPlayers, kPlayers, 0}, {"self", WindowWord::SetupChoiceSelf, WindowList::SetupSelf, kSelf, 0}, {"npcs", WindowWord::SetupChoiceNpcs, WindowList::SetupNpcs, kNpcs, 0}, {"pets", WindowWord::SetupChoicePets, WindowList::SetupPets, kPets, 0}};
+        const SetupChoice kOtherChoices[]{{"players", WindowWord::SetupChoicePlayers, WindowList::SetupPlayers, kPlayers}, {"self", WindowWord::SetupChoiceSelf, WindowList::SetupSelf, kSelf}, {"npcs", WindowWord::SetupChoiceNpcs, WindowList::SetupNpcs, kNpcs}, {"pets", WindowWord::SetupChoicePets, WindowList::SetupPets, kPets}};
 
         const SetupOption kPanel[]{{"shown", [](Settings& s) { s.showBar = true; }}, {"hidden", [](Settings& s) { s.showBar = false; }}};
-        const SetupChoice kWidgetChoices[]{{"panel", WindowWord::SetupChoicePanel, WindowList::SetupPanel, kPanel, 0}};
+        const SetupChoice kWidgetChoices[]{{"panel", WindowWord::SetupChoicePanel, WindowList::SetupPanel, kPanel}};
 
         template <PointerIcon Icon>
         void Pointer(Settings& s)
@@ -139,10 +132,10 @@ namespace headsup
             s.pointerFile.clear();
         }
         const SetupOption kPointers[]{{"chocobo", Pointer<PointerIcon::Chocobo>}, {"game", Pointer<PointerIcon::Vanilla>}};
-        const SetupChoice kMouseChoices[]{{"pointer", WindowWord::SetupChoicePointer, WindowList::SetupPointer, kPointers, 1}};
-        const SetupSetting kExtraSettings[]{{SettingPiece::AutoCheck, Reset<&Settings::autoCheck>},
-            {SettingPiece::LookUpPlayers, Reset<&Settings::lookUpPlayers>}, {SettingPiece::StackNames, Reset<&Settings::stackNames>},
-            {SettingPiece::HideDuringConversation, Reset<&Settings::hideInEvent>}};
+        const SetupChoice kMouseChoices[]{{"pointer", WindowWord::SetupChoicePointer, WindowList::SetupPointer, kPointers}};
+        const SettingPiece kExtraSettings[]{SettingPiece::AutoCheck,
+            SettingPiece::LookUpPlayers, SettingPiece::StackNames,
+            SettingPiece::HideDuringConversation};
 
         const SetupPage kPages[]{
             {SetupStep::Welcome, "welcome", WindowWord::SetupStepWelcome, {}, {}},
@@ -193,20 +186,6 @@ namespace headsup
         s.Widget(PanelWidget{widget}).on = false;
         for (int copy = 1; copy < kMostCopies; ++copy)
             RemoveWidgetCopy(s, PanelWidget{widget, copy});
-    }
-
-    void UseSetupDefaults(Settings& s)
-    {
-        for (const SetupPage& page : kPages)
-        {
-            for (const SetupChoice& choice : page.choices)
-                choice.options[choice.defaultOption].apply(s);
-            for (const SetupSetting& setting : page.settings)
-                setting.reset(s);
-        }
-        const Settings fresh;
-        for (int w = 0; w < kBarWidgetCount; ++w)
-            SetWidgetShown(s, static_cast<BarWidget>(w), Shown(fresh, static_cast<BarWidget>(w)));
     }
 
     std::string SetupBackupName(const SetupTime& at, const std::function<bool(const std::string&)>& taken)

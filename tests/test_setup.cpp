@@ -57,14 +57,14 @@ TEST(each_choice_and_each_of_its_options_has_a_key_of_its_own)
         std::set<std::string> options;
         for (const SetupOption& option : choice.options)
             CHECK(options.insert(option.key).second);
-        CHECK(choice.options.size() >= 2u && choice.defaultOption < choice.options.size());
+        CHECK(choice.options.size() >= 2u);
     });
 }
 
-TEST(a_new_install_holds_each_choices_default_option)
+TEST(a_new_install_holds_one_of_each_choices_options)
 {
     const Settings fresh;
-    ForEachChoice([&](const SetupChoice& choice) { CHECK_EQ(PickedOption(choice, fresh).value_or(99), choice.defaultOption); });
+    ForEachChoice([&](const SetupChoice& choice) { CHECK(PickedOption(choice, fresh).has_value()); });
 }
 
 TEST(an_option_picked_is_the_one_its_choice_holds_whatever_was_picked_before)
@@ -89,7 +89,7 @@ TEST(an_option_leaves_every_other_choice_as_it_was)
             Settings s;
             option.apply(s);
             ForEachChoice([&](const SetupChoice& other) {
-                if (&other != &choice) CHECK_EQ(PickedOption(other, s).value_or(99), other.defaultOption);
+                if (&other != &choice) CHECK(PickedOption(other, s) == PickedOption(other, Settings{}));
             });
         }
     });
@@ -170,59 +170,10 @@ TEST(a_widget_turned_off_takes_its_copies_with_it_and_turned_on_shows_its_first)
     CHECK(Shows(s, PanelWidget{BarWidget::Party}));
 }
 
-TEST(running_setup_again_puts_back_what_its_steps_set_and_keeps_the_rest)
-{
-    Settings s;
-    ForEachChoice([&](const SetupChoice& choice) { choice.options[choice.defaultOption == 0 ? 1 : 0].apply(s); });
-    s.defaultFont  = "Arial";
-    s.baseSize     = 22;
-    s.baseIconSize = 30;
-    s.barTextFont  = "Arial";
-    s.barTextSize  = 18;
-    s.menuFontSize = 24;
-    s.windowType   = 3;
-    s.cursorColor  = {ColorSource::Custom, ColorFromRgb(0x123456)};
-    s.autoCheck = s.lookUpPlayers = s.stackNames = s.hideInEvent = true;
-    SetWidgetShown(s, BarWidget::Zone, false);
-    SetWidgetShown(s, BarWidget::Party, true);
-    // Not Setup's: kept.
-    s.menuX         = 300;
-    s.screenshotKey = 0x7B;
-    s.Kind(PlateKind::Players).lines[kTopLine].text = "$job";
-
-    UseSetupDefaults(s);
-    ForEachChoice([&](const SetupChoice& choice) { CHECK_EQ(PickedOption(choice, s).value_or(99), choice.defaultOption); });
-    const Settings fresh;
-    CHECK(s.defaultFont == fresh.defaultFont && s.baseSize == fresh.baseSize && s.baseIconSize == fresh.baseIconSize);
-    CHECK(s.barTextFont == fresh.barTextFont && s.barTextSize == fresh.barTextSize && s.menuFontSize == fresh.menuFontSize);
-    CHECK(s.windowType == fresh.windowType && s.cursorColor == fresh.cursorColor);
-    CHECK(!s.autoCheck && !s.lookUpPlayers && !s.stackNames && !s.hideInEvent);
-    for (int w = 0; w < kBarWidgetCount; ++w)
-        CHECK_EQ(Shown(s, static_cast<BarWidget>(w)), Shown(fresh, static_cast<BarWidget>(w)));
-    CHECK_EQ(s.menuX, 300);
-    CHECK_EQ(s.screenshotKey, 0x7B);
-    CHECK_EQ(s.Kind(PlateKind::Players).lines[kTopLine].text, std::string("$job"));
-}
-
-TEST(setup_defaults_change_nothing_of_a_new_install)
-{
-    Settings s;
-    UseSetupDefaults(s);
-    CHECK(s == Settings{});
-}
-
 TEST(each_choice_has_a_name_in_its_list_for_each_option)
 {
     ForEachChoice([&](const SetupChoice& choice) { CHECK_EQ(kWindowLayout.OptionsOf(choice.list).size(), choice.options.size()); });
     CHECK_EQ(kWindowLayout.OptionsOf(kSetupWidgetGroupNames).size(), SetupWidgetGroups().size());
-}
-
-TEST(setup_never_counts_itself_done_by_its_defaults)
-{
-    Settings s;
-    s.setupDone = true;
-    UseSetupDefaults(s);
-    CHECK(s.setupDone);
 }
 
 TEST(a_setup_backup_is_named_for_the_second_it_was_made_and_never_takes_anothers_name)

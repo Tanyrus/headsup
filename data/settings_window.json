@@ -518,7 +518,7 @@
           "key": "reset",
           "name": "Reset",
           "settings": [
-            {"key": "run-setup", "name": "Run Setup", "tip": "Walks you through the main settings again, with a preview of each. It starts from the defaults and saves your settings to a file first, so Cancel can put them back."},
+            {"key": "run-setup", "name": "Run Setup", "tip": "Walks you through the main settings again, with a preview of each. It starts from your settings as they are and changes only what you pick. Your settings are saved to a file first, so Cancel can put them back."},
             {
               "key": "reset-all-settings",
               "name": "Reset All Settings",
@@ -1116,7 +1116,7 @@
     {"key": "setup-finish", "name": "Finish", "tip": "Keeps your picks and closes Setup."},
     {"key": "setup-custom", "name": "Your Own", "tip": "You set these yourself in the settings window. Pick one of the others to replace them."},
     {"key": "setup-cancel", "name": "Cancel", "tip": "Puts back the settings you had before Setup and closes it."},
-    {"key": "setup-warning", "name": "WARNING", "tip": "Running Setup again puts everything it covers back to the defaults, and changes your settings as you pick. Your settings are saved to {file} first, and Cancel puts them back."},
+    {"key": "setup-warning", "name": "WARNING", "tip": "Setup changes your settings as you pick. Your settings are saved to {file} first, and Cancel puts them back."},
     {"key": "setup-step-welcome", "name": "Welcome to HeadsUp", "tip": "HeadsUp outlines mobs by whether they will attack you and draws its own nameplates over the game's. These steps set the main things, with a preview of each. Everything else is in the settings window: type /hu to open it."},
     {"key": "setup-step-theme", "name": "Theme", "tip": "Pick how the Top Panel looks. The settings window takes on the same look."},
     {"key": "setup-step-fonts", "name": "Fonts and Sizes", "tip": "Pick the fonts and sizes of the nameplates, the Top Panel and this window."},

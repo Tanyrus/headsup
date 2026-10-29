@@ -1960,18 +1960,23 @@ TEST(skipping_setup_puts_back_its_defaults_closes_the_window_and_counts_it_done)
     CHECK(window.settings == expected);
 }
 
-TEST(running_setup_again_starts_from_the_defaults_saves_first_and_cancel_puts_back_what_was)
+TEST(running_setup_again_keeps_your_settings_saves_first_and_cancel_puts_back_what_was)
 {
     Settings mine;
     mine.barTheme = BarTheme::Aurora;
     mine.autoCheck = true;
     mine.setupDone = true;
     SetupWindow window(true, mine);
-    CHECK(window.settings == mine); // nothing changes before Start
     CHECK(!window.menu.TakeSetupBackup());
     window.Click("setup-buttons-start");
     CHECK(window.menu.TakeSetupBackup());
-    CHECK(window.settings.barTheme == BarTheme::PhoenixGold && !window.settings.autoCheck);
+    CHECK(window.settings == mine);
+    // The theme step shows the theme you have.
+    const std::string aurora(Said(kWindowLayout.OptionsOf(WindowList::SetupTheme)[static_cast<size_t>(BarTheme::Aurora)].name));
+    CHECK(window.Find("setup-theme-theme")->GetInnerRML().find(aurora) != std::string::npos);
+    window.Click("setup-theme-theme");
+    window.Click("setup-theme-theme-o-1");
+    CHECK(window.settings.barTheme == BarTheme::UmbraDark && window.settings.autoCheck);
     window.Click("setup-buttons-leave");
     window.Frames(2);
     CHECK(window.settings == mine);
