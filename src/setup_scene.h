@@ -1,6 +1,7 @@
 #pragma once
 
 #include "game_cursor.h"
+#include "model_file.h"
 #include "name_frame.h"
 #include "player_status.h"
 #include "tracker.h"
@@ -17,7 +18,7 @@ namespace headsup
     constexpr uint32_t kSampleTonberryId    = 17428524;
     constexpr uint16_t kSampleTonberryModel = 0x04B2;
     constexpr uint32_t kSampleShantottoId   = 17756186;
-    constexpr PlayerLook kShantottoLook{6 | 6 << 8, 0x1000, 0x2013, 0x3013, 0x4013, 0x5013, 0x6000, 0x7000, 0};
+    constexpr PlayerLook kShantottoLook{FaceAndRace(6, 6), 0x1000, 0x2013, 0x3013, 0x4013, 0x5013, 0x6000, 0x7000, 0};
     constexpr int kSampleLevel = 55;
     // How far the actors stand from you, near enough to be whole, and how far their names are drawn from, where the
     // distance scale is 100 percent.

@@ -159,6 +159,32 @@ namespace
         out.resize(out.size() + 44, 0x5A);
         return out;
     }
+    Bytes ColorListCommand(const std::vector<std::pair<std::array<uint16_t, 3>, uint32_t>>& triangles)
+    {
+        Bytes out;
+        Put16(out, 0x0043);
+        Put16(out, static_cast<uint16_t>(triangles.size()));
+        for (const auto& [corners, color] : triangles)
+        {
+            for (uint16_t c : corners)
+                Put16(out, c);
+            Put32(out, color);
+        }
+        return out;
+    }
+    // A strip in one color: its first triangle and color, then each corner after.
+    Bytes ColorStripCommand(const std::vector<uint16_t>& corners, uint32_t color)
+    {
+        Bytes out;
+        Put16(out, 0x4353);
+        Put16(out, static_cast<uint16_t>(corners.size() - 2));
+        for (size_t i = 0; i < 3; ++i)
+            Put16(out, corners[i]);
+        Put32(out, color);
+        for (size_t i = 3; i < corners.size(); ++i)
+            Put16(out, corners[i]);
+        return out;
+    }
     Bytes EndCommand()
     {
         Bytes out;
@@ -317,7 +343,7 @@ TEST(a_player_is_drawn_from_their_races_skeleton_and_motions_then_their_face_and
     const auto tables = FindPlayerTables(dll);
     CHECK(tables.has_value());
     PlayerLook look{};
-    look[static_cast<size_t>(LookSlot::Face)]  = 6 | 6 << 8; // face 6, race 6
+    look[static_cast<size_t>(LookSlot::Face)]  = FaceAndRace(6, 6);
     look[static_cast<size_t>(LookSlot::Head)]  = 0x1000;     // the bare head, its slot in the top bits
     look[static_cast<size_t>(LookSlot::Body)]  = 0x2013;
     look[static_cast<size_t>(LookSlot::Hands)] = 0x0013;
@@ -329,7 +355,7 @@ TEST(a_player_is_drawn_from_their_races_skeleton_and_motions_then_their_face_and
     look[static_cast<size_t>(LookSlot::Feet)] = 60; // past the feet's 50 files
     CHECK(!PlayerFileIds(*tables, look));
     look[static_cast<size_t>(LookSlot::Feet)] = 0;
-    look[static_cast<size_t>(LookSlot::Face)] = 6 | 9 << 8;
+    look[static_cast<size_t>(LookSlot::Face)] = FaceAndRace(6, 9);
     CHECK(!PlayerFileIds(*tables, look));
 }
 
@@ -402,10 +428,10 @@ TEST(a_mesh_reads_its_vertices_of_one_and_two_joints_and_their_mirrors)
     CHECK(mesh.mirrored);
     CHECK_EQ(mesh.vertices.size(), 2u);
     const ModelVertex& one = mesh.vertices[0];
-    CHECK(!one.twoJoints && one.joints[0] == 2 && one.mirrorJoints[0] == 3 && one.mirrorAxes[0] == 1);
+    CHECK(!one.twoJoints && one.joints[0] == 2 && one.mirrorJoints[0] == 3 && one.mirrorAxes[0] == MirrorAxis::X);
     CHECK(Near(one.positions[0].z, 3.0f) && Near(one.normal.z, 1.0f) && Near(one.weight, 1.0f));
     const ModelVertex& two = mesh.vertices[1];
-    CHECK(two.twoJoints && two.joints[0] == 4 && two.joints[1] == 6 && two.mirrorJoints[1] == 7 && two.mirrorAxes[1] == 3);
+    CHECK(two.twoJoints && two.joints[0] == 4 && two.joints[1] == 6 && two.mirrorJoints[1] == 7 && two.mirrorAxes[1] == MirrorAxis::Z);
     CHECK(Near(two.positions[0].x, 10) && Near(two.positions[1].x, 20) && Near(two.positions[0].y, 30) && Near(two.positions[1].z, 60));
     CHECK(Near(two.weight, 0.25f));
     CHECK(Near(two.normal.x, 0) && Near(two.normal.y, 1) && Near(two.normal.z, 0));
@@ -634,7 +660,7 @@ TEST(shantotto_is_found_and_stands_as_the_spike_drew_her)
     CHECK_EQ(DatFileOf(tables, 2502).value_or(""), std::string("ROM2\\22\\48.DAT"));
     const auto players = FindPlayerTables(dll);
     CHECK(players.has_value());
-    const PlayerLook shantotto{6 | 6 << 8, 0x1000, 0x2013, 0x3013, 0x4013, 0x5013, 0x6000, 0x7000, 0};
+    const PlayerLook shantotto{0x0606, 0x1000, 0x2013, 0x3013, 0x4013, 0x5013, 0x6000, 0x7000, 0};
     const auto files = PlayerFileIds(*players, shantotto);
     CHECK(files.has_value());
     CHECK(*files == (std::vector<uint32_t>{19776, 19777, 22958, 19816, 20091, 20347, 20603, 20859}));
@@ -662,4 +688,90 @@ TEST(a_model_pictures_alpha_is_doubled_as_the_game_keeps_0x80_as_opaque)
     const std::vector<uint8_t> shown = ShownPixels(picture);
     CHECK(shown == (std::vector<uint8_t>{10, 20, 30, 255, 1, 2, 3, 127}));
     CHECK_EQ(ShownPixels({"", 1, 1, {0, 0, 0, 0x88}})[3], 255); // player pictures go a little past it
+}
+
+TEST(a_mesh_draws_lists_and_strips_in_their_own_colors_without_a_picture)
+{
+    std::vector<float> vertices;
+    for (int i = 0; i < 5; ++i)
+        vertices.insert(vertices.end(), {0, 0, 0, 0, 0, 1});
+    const Bytes commands = TextureCommand("tim     face") + ColorListCommand({{{0, 1, 2}, 0x80112233}}) +
+                           ColorStripCommand({0, 1, 2, 3, 3, 4}, 0x80445566) + EndCommand();
+    const std::vector<std::array<uint16_t, 2>> refs(5, {0, 0});
+    const auto read = ReadModelFile(Chunk("eye_", kMeshChunkType, MeshBody(0, false, {}, 5, 0, refs, vertices, commands)));
+    CHECK(read.value.has_value());
+    const auto& parts = read.value->meshes.at(0).parts;
+    CHECK_EQ(parts.size(), 2u);
+    CHECK(!parts[0].textured && parts[0].picture.empty());
+    CHECK(parts[0].colors == (std::vector<uint32_t>{0x80112233}));
+    // The strip 0 1 2 3 3 4, as a textured one: 0 1 2, then 1 3 2 turned back, and the two with no area left out.
+    const auto& strip = parts[1];
+    CHECK_EQ(strip.triangles.size(), 2u);
+    CHECK(strip.triangles[1].vertices == (std::array<uint16_t, 3>{1, 3, 2}));
+    CHECK(strip.colors == (std::vector<uint32_t>{0x80445566, 0x80445566}));
+}
+
+TEST(a_mesh_naming_a_joint_past_its_list_is_refused)
+{
+    const Bytes body = MeshBody(0x80, false, {17}, 1, 0, {{Ref(1, 0, 0), 0}}, {0, 0, 0, 0, 0, 1}, EndCommand());
+    const auto read = ReadModelFile(Chunk("hand", kMeshChunkType, body));
+    CHECK(!read.value);
+    CHECK(read.failure.find("joint") != std::string::npos);
+}
+
+TEST(a_mesh_drawing_a_vertex_it_does_not_have_is_refused)
+{
+    const Bytes commands = ListCommand({{{{0, 0, 0}, {1, 0, 0}, {7, 0, 0}}}}) + EndCommand();
+    const auto read = ReadModelFile(Chunk("foot", kMeshChunkType, MeshBody(0, false, {}, 2, 0, {{0, 0}, {0, 0}},
+        {0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1}, commands)));
+    CHECK(!read.value);
+    CHECK(read.failure.find("vertex") != std::string::npos);
+}
+
+TEST(a_model_file_whose_chunks_run_past_its_end_is_refused)
+{
+    Bytes dat = Chunk("skel", kSkeletonChunkType, SkeletonBody({{-1, {}, {}}}));
+    dat.resize(dat.size() - 16);
+    const auto read = ReadModelFile(dat);
+    CHECK(!read.value);
+    CHECK(read.failure.find("end") != std::string::npos);
+}
+
+namespace
+{
+    // A picture of plain pixels: the header with its bit count, maybe the four bytes of 0xB1, then its pixels.
+    Bytes PlainPicture(uint8_t flag, int width, int height, uint16_t bits, const Bytes& pixels)
+    {
+        Bytes body = Picture("tim     skin    ", width, height, "    ", {}, flag);
+        body.resize(1 + 16 + 40);
+        body[1 + 16 + 14] = static_cast<uint8_t>(bits);
+        if (flag == 0xB1) body.resize(body.size() + 4, 0);
+        return body + pixels;
+    }
+}
+
+TEST(a_picture_of_four_bytes_a_pixel_reads_its_rows_from_the_bottom)
+{
+    // Two rows of one pixel: the stored first is the bottom one.
+    const Bytes pixels{1, 2, 3, 0x80, 9, 8, 7, 0x40};
+    const auto read = ReadModelFile(Chunk("skin", kPictureChunkType, PlainPicture(0xB1, 1, 2, 32, pixels)));
+    CHECK(read.value.has_value());
+    CHECK(read.value->pictures.at(0).bgra == (Bytes{9, 8, 7, 0x40, 1, 2, 3, 0x80}));
+}
+
+TEST(a_plain_picture_of_flag_0x91_has_no_gap_before_its_pixels)
+{
+    const Bytes pixels{5, 6, 7, 0x80};
+    const auto read = ReadModelFile(Chunk("skin", kPictureChunkType, PlainPicture(0x91, 1, 1, 32, pixels)));
+    CHECK(read.value.has_value());
+    CHECK(read.value->pictures.at(0).bgra == pixels);
+    CHECK(!ReadModelFile(Chunk("skin", kPictureChunkType, PlainPicture(0x91, 1, 1, 16, {1, 2}))).value); // 16 bits: no such picture
+}
+
+// The look's bytes as the server sends them, face then race: "07 03" is face 7 of race 3.
+TEST(a_looks_first_word_is_its_face_then_its_race)
+{
+    CHECK_EQ(FaceAndRace(7, 3), uint16_t{0x0307});
+    CHECK_EQ(FaceOf(0x0307), uint8_t{7});
+    CHECK_EQ(RaceOf(0x0307), uint8_t{3});
 }

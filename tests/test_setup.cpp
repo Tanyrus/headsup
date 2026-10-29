@@ -225,8 +225,15 @@ TEST(setup_never_counts_itself_done_by_its_defaults)
     CHECK(s.setupDone);
 }
 
-TEST(a_setup_backup_is_named_for_the_minute_it_was_made)
+TEST(a_setup_backup_is_named_for_the_second_it_was_made_and_never_takes_anothers_name)
 {
-    CHECK_EQ(SetupBackupName(2026, 10, 29, 15, 30), std::string("settings-before-setup-2026-10-29-1530.ini"));
-    CHECK_EQ(SetupBackupName(2027, 1, 2, 3, 4), std::string("settings-before-setup-2027-01-02-0304.ini"));
+    const SetupTime at{2026, 10, 29, 15, 30, 7};
+    const auto none = [](const std::string&) { return false; };
+    CHECK_EQ(SetupBackupName(at, none), std::string("settings-before-setup-2026-10-29-153007.ini"));
+    CHECK_EQ(SetupBackupName({2027, 1, 2, 3, 4, 5}, none), std::string("settings-before-setup-2027-01-02-030405.ini"));
+    // Two runs in one second: the second takes a number of its own, and the first file is kept.
+    const auto taken = [](const std::string& name) {
+        return name == "settings-before-setup-2026-10-29-153007.ini" || name == "settings-before-setup-2026-10-29-153007-2.ini";
+    };
+    CHECK_EQ(SetupBackupName(at, taken), std::string("settings-before-setup-2026-10-29-153007-3.ini"));
 }

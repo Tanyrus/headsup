@@ -1901,11 +1901,11 @@ TEST(setup_opens_on_its_welcome_and_start_walks_its_steps_forward_and_back)
     CHECK(window.menu.InSetup());
     CHECK(window.Shows("nav-setup-welcome") && window.Find("nav-setup-welcome")->IsClassSet(kPickedClass));
     CHECK(window.Shows("setup-preview"));
-    window.Click("setup-welcome-setup-start");
+    window.Click("setup-buttons-start");
     CHECK(window.Find("nav-setup-theme")->IsClassSet(kPickedClass));
-    window.Click("setup-theme-setup-next");
+    window.Click("setup-buttons-next");
     CHECK(window.Shows("setup-fonts"));
-    window.Click("setup-fonts-setup-back");
+    window.Click("setup-buttons-back");
     CHECK(window.Shows("setup-theme"));
     window.Click("nav-setup-widgets");
     CHECK(window.Shows("setup-widgets"));
@@ -1923,7 +1923,7 @@ TEST(a_setup_steps_list_moves_nowhere_before_it_has_started)
 TEST(a_pick_in_setup_changes_the_settings_at_once)
 {
     SetupWindow window(false);
-    window.Click("setup-welcome-setup-start");
+    window.Click("setup-buttons-start");
     window.Click("setup-theme-theme");
     CHECK(window.Click("setup-theme-theme-o-1"));
     CHECK(window.settings.barTheme == BarTheme::UmbraDark);
@@ -1932,10 +1932,10 @@ TEST(a_pick_in_setup_changes_the_settings_at_once)
 TEST(skipping_setup_puts_back_its_defaults_closes_the_window_and_counts_it_done)
 {
     SetupWindow window(false);
-    window.Click("setup-welcome-setup-start");
+    window.Click("setup-buttons-start");
     window.Click("setup-theme-theme");
     window.Click("setup-theme-theme-o-4");
-    window.Click("setup-theme-setup-leave");
+    window.Click("setup-buttons-leave");
     window.Frames(2);
     CHECK(!window.menu.open && !window.menu.InSetup());
     Settings expected;
@@ -1952,10 +1952,10 @@ TEST(running_setup_again_starts_from_the_defaults_saves_first_and_cancel_puts_ba
     SetupWindow window(true, mine);
     CHECK(window.settings == mine); // nothing changes before Start
     CHECK(!window.menu.TakeSetupBackup());
-    window.Click("setup-welcome-setup-start");
+    window.Click("setup-buttons-start");
     CHECK(window.menu.TakeSetupBackup());
     CHECK(window.settings.barTheme == BarTheme::PhoenixGold && !window.settings.autoCheck);
-    window.Click("setup-theme-setup-leave");
+    window.Click("setup-buttons-leave");
     window.Frames(2);
     CHECK(window.settings == mine);
     CHECK(!window.menu.open);
@@ -1964,11 +1964,11 @@ TEST(running_setup_again_starts_from_the_defaults_saves_first_and_cancel_puts_ba
 TEST(finishing_setup_keeps_the_picks_and_leaves_the_window_on_its_pages)
 {
     SetupWindow window(false);
-    window.Click("setup-welcome-setup-start");
+    window.Click("setup-buttons-start");
     window.Click("setup-theme-theme");
     window.Click("setup-theme-theme-o-1");
     window.Click("nav-setup-mouse-extras");
-    window.Click("setup-mouse-extras-setup-finish");
+    window.Click("setup-buttons-finish");
     window.Frames(2);
     CHECK(window.menu.open && !window.menu.InSetup());
     CHECK(window.settings.barTheme == BarTheme::UmbraDark && window.settings.setupDone);
@@ -1978,7 +1978,7 @@ TEST(finishing_setup_keeps_the_picks_and_leaves_the_window_on_its_pages)
 TEST(closing_the_window_during_setup_is_skipping_it)
 {
     SetupWindow window(false);
-    window.Click("setup-welcome-setup-start");
+    window.Click("setup-buttons-start");
     window.Click("setup-theme-theme");
     window.Click("setup-theme-theme-o-1");
     window.Click(kMenuCloseId);
@@ -1989,7 +1989,7 @@ TEST(closing_the_window_during_setup_is_skipping_it)
 TEST(setups_widgets_step_turns_a_widget_on_and_off)
 {
     SetupWindow window(false);
-    window.Click("setup-welcome-setup-start");
+    window.Click("setup-buttons-start");
     window.Click("nav-setup-widgets");
     const std::string party = "setup-widgets-setup-widget-" + std::to_string(static_cast<int>(BarWidget::Party));
     CHECK(window.Shows(party));
@@ -2013,7 +2013,7 @@ TEST(every_setup_step_builds_in_every_theme_without_a_complaint)
         Settings start;
         start.barTheme = static_cast<BarTheme>(theme);
         SetupWindow window(false, start);
-        window.Click("setup-welcome-setup-start");
+        window.Click("setup-buttons-start");
         for (const SetupPage& page : SetupPages())
         {
             window.Click(std::string("nav-setup-") + page.key);
@@ -2021,4 +2021,29 @@ TEST(every_setup_step_builds_in_every_theme_without_a_complaint)
         }
         CHECK_EQ(window.Said(), "");
     }
+}
+
+TEST(a_folded_setup_step_keeps_its_buttons)
+{
+    SetupWindow window(false);
+    window.Click("setup-welcome-head"); // folds the step's card
+    window.Click("setup-buttons-start");
+    CHECK(window.Find("nav-setup-theme")->IsClassSet(kPickedClass));
+    window.Click("setup-theme-head");
+    window.Click("setup-buttons-next");
+    CHECK(window.Find("nav-setup-fonts")->IsClassSet(kPickedClass));
+}
+
+TEST(a_choice_the_settings_hold_none_of_reads_your_own)
+{
+    Settings mine;
+    mine.outlineThickness = 135; // between Thin, Normal and Thick
+    SetupWindow window(false, mine);
+    window.Click("setup-buttons-start");
+    window.Click("nav-setup-outlines");
+    const std::string shown = window.Find("setup-outlines-outline-thickness")->GetInnerRML();
+    CHECK(shown.find(kWindowLayout.WordOf(WindowWord::SetupCustom).name) != std::string::npos);
+    window.Click("setup-outlines-outline-thickness");
+    window.Click("setup-outlines-outline-thickness-o-2");
+    CHECK_EQ(window.settings.outlineThickness, 200);
 }

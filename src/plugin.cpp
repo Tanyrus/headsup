@@ -1481,7 +1481,7 @@ private:
     {
         IEntity* e       = m_AshitaCore->GetMemoryManager()->GetEntity();
         const uint32_t i = m_SelfIndex;
-        return {static_cast<uint16_t>((e->GetLookHair(i) & 0xFF) | e->GetRace(i) << 8), e->GetLookHead(i), e->GetLookBody(i),
+        return {headsup::FaceAndRace(static_cast<uint8_t>(e->GetLookHair(i)), e->GetRace(i)), e->GetLookHead(i), e->GetLookBody(i),
             e->GetLookHands(i), e->GetLookLegs(i), e->GetLookFeet(i), e->GetLookMain(i), e->GetLookSub(i), e->GetLookRanged(i)};
     }
 
@@ -2245,8 +2245,10 @@ private:
         }
         SYSTEMTIME t{};
         GetLocalTime(&t);
-        const std::string name = headsup::SetupBackupName(t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute);
-        const std::string path = OwnFolder(kConfigFolder) + "\\" + name;
+        const std::string folder = OwnFolder(kConfigFolder) + "\\";
+        const std::string name   = headsup::SetupBackupName({t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond},
+              [&](const std::string& file) { return GetFileAttributesA((folder + file).c_str()) != INVALID_FILE_ATTRIBUTES; });
+        const std::string path = folder + name;
         std::ofstream out(path, std::ios::binary | std::ios::trunc);
         out.write(text.data(), static_cast<std::streamsize>(text.size()));
         if (!out.flush())

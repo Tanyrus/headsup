@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <span>
 #include <string>
@@ -29,14 +30,20 @@ namespace headsup
         std::span<const SetupOption> options;
         size_t defaultOption; // the one a new install has
     };
-    // A step's choices, drawn as options to pick, then its settings, drawn with the settings window's own controls.
+    // A setting a step draws with the settings window's own control, and how a run again puts it back.
+    struct SetupSetting
+    {
+        SettingPiece piece;
+        void (*reset)(Settings&);
+    };
+    // A step's choices, drawn as options to pick, then its settings.
     struct SetupPage
     {
         SetupStep step;
         const char* key;
         WindowWord word; // its title, and what it is for as the tip
         std::span<const SetupChoice> choices;
-        std::span<const SettingPiece> settings;
+        std::span<const SetupSetting> settings;
     };
     std::span<const SetupPage> SetupPages();
     const SetupPage& SetupPageOf(SetupStep step);
@@ -56,9 +63,13 @@ namespace headsup
     // A widget turned off is off, and its copies leave the panel; turned on, its first copy shows.
     void SetWidgetShown(Settings& s, BarWidget widget, bool shown);
 
-    // The file running Setup again copies the settings to first, beside them: named for the moment, so no run writes
-    // over another's.
-    std::string SetupBackupName(int year, int month, int day, int hour, int minute);
+    // The file running Setup again copies the settings to first, beside them: named for the second it was made, with
+    // a number after when taken(name) says that name is already a file, so no run writes over another's.
+    struct SetupTime
+    {
+        int year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0;
+    };
+    std::string SetupBackupName(const SetupTime& at, const std::function<bool(const std::string&)>& taken);
 
     // What running Setup again starts from: everything its steps set back to how a new install has it, and the rest
     // of the settings as they were.

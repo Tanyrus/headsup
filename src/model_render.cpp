@@ -3,6 +3,7 @@
 #include "argb.h"
 #include "gpu.h"
 #include "outline_math.h"
+#include "plate_image.h"
 
 #include <algorithm>
 #include <cmath>
@@ -24,20 +25,12 @@ namespace headsup
             std::memcpy(&out, m.m, sizeof(out));
             return out;
         }
-
-        int PowerOfTwo(int side)
-        {
-            int out = 1;
-            while (out < side)
-                out <<= 1;
-            return out;
-        }
     }
 
     bool ModelPicture::Begin(IDirect3DDevice8* device, int width, int height, uint32_t background)
     {
         if (device == nullptr || width <= 0 || height <= 0) return false;
-        const int side = PowerOfTwo(std::max(width, height));
+        const int side = TextureSide(std::max(width, height));
         if (m_Target == nullptr || m_Side != side)
         {
             Release();

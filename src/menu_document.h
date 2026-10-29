@@ -71,6 +71,7 @@ namespace headsup
     constexpr const char* kMenuTipId       = "tip";
     constexpr const char* kMenuCardClass   = "card";
     constexpr const char* kMenuFootClass   = "foot"; // a block under the cards with no card around it
+    constexpr const char* kSetupPreviewClass = "setup-preview"; // Setup's picture, as wide as its card
     constexpr const char* kMenuTipAttribute = "tip";
 
     // The settings window's document: its frame, the sidebar and page to fill, the popup and the tip, and its style.

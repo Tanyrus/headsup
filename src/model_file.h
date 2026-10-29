@@ -61,6 +61,11 @@ namespace headsup
     // the race (1 to kPlayerRaces) and each piece's model maybe carrying its slot in its top 4 bits. A weapon of model
     // 0 is none. None for a race that is not a player's or a piece past its race's files.
     std::optional<std::vector<uint32_t>> PlayerFileIds(const PlayerTables& tables, const PlayerLook& look);
+    // A look's first word, as the server packs it: the face in its low byte, the race in its high one.
+    constexpr int kRaceShift = 8;
+    constexpr uint16_t FaceAndRace(uint8_t face, uint8_t race) { return static_cast<uint16_t>(race << kRaceShift | face); }
+    constexpr uint8_t FaceOf(uint16_t faceAndRace) { return static_cast<uint8_t>(faceAndRace); }
+    constexpr uint8_t RaceOf(uint16_t faceAndRace) { return static_cast<uint8_t>(faceAndRace >> kRaceShift); }
 
     struct Vec3
     {
@@ -83,10 +88,12 @@ namespace headsup
     // A vertex of a skinned mesh holds itself in the space of each of its one or two joints, already weighted: it is
     // where the first joint puts positions[0] with its place counted weight times, plus where the second puts
     // positions[1] with its place counted the rest. A mirrored mesh draws each vertex again by the mirror joints with
-    // one axis of each position turned around (mirrorAxes: 0 none, 1 x, 2 y, 3 z).
+    // one axis of each position turned around, numbered as the file numbers them.
+    enum class MirrorAxis : uint8_t { None, X, Y, Z };
     struct ModelVertex
     {
-        std::array<uint8_t, 2> joints{}, mirrorJoints{}, mirrorAxes{};
+        std::array<uint8_t, 2> joints{}, mirrorJoints{};
+        std::array<MirrorAxis, 2> mirrorAxes{};
         std::array<Vec3, 2> positions{};
         float weight   = 1.0f; // 1 for a vertex of one joint
         bool twoJoints = false;
@@ -146,7 +153,10 @@ namespace headsup
     constexpr std::string_view kIdleMotions[]{"idl0", "idl1"};
     std::vector<const Motion*> IdleMotions(const ModelFile& model);
 
-    // A model picture's pixels as Direct3D draws them: the game keeps 0x80 as opaque, so its alphas are doubled.
+    // A model's alpha as Direct3D draws it: the game keeps 0x80 as opaque, in its pictures and its colors alike, so
+    // each is doubled.
+    uint8_t ShownAlpha(uint8_t gameAlpha);
+    uint32_t ShownColor(uint32_t gameArgb);
     std::vector<uint8_t> ShownPixels(const ColorPicture& picture);
 
     // The chunk types of a model's file.

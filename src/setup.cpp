@@ -32,10 +32,19 @@ namespace headsup
             {"phoenix-red-ornate", Theme<BarTheme::PhoenixRedOrnate>}, {"phoenix-red-pills", Theme<BarTheme::PhoenixRedPills>},
             {"aurora", Theme<BarTheme::Aurora>}, {"game-window", Theme<BarTheme::GameWindow>}};
         const SetupChoice kThemeChoices[]{{"theme", WindowWord::SetupChoiceTheme, WindowList::SetupTheme, kThemes, 0}};
-        const SettingPiece kThemeSettings[]{SettingPiece::WindowType};
+        // A field put back to a new install's.
+        template <auto Field>
+        void Reset(Settings& s)
+        {
+            s.*Field = Settings{}.*Field;
+        }
 
-        const SettingPiece kFontSettings[]{SettingPiece::DefaultFont, SettingPiece::BaseFontSize, SettingPiece::BaseIconSize,
-            SettingPiece::TextFont, SettingPiece::TextSize, SettingPiece::Size};
+        const SetupSetting kThemeSettings[]{{SettingPiece::WindowType, Reset<&Settings::windowType>}};
+
+        const SetupSetting kFontSettings[]{{SettingPiece::DefaultFont, Reset<&Settings::defaultFont>},
+            {SettingPiece::BaseFontSize, Reset<&Settings::baseSize>}, {SettingPiece::BaseIconSize, Reset<&Settings::baseIconSize>},
+            {SettingPiece::TextFont, Reset<&Settings::barTextFont>}, {SettingPiece::TextSize, Reset<&Settings::barTextSize>},
+            {SettingPiece::Size, Reset<&Settings::menuFontSize>}};
 
         // The mob rows of what would attack you, notorious monsters and their placeholders, and claimed mobs.
         constexpr Category kAttackRows[]{Category::WillAttack, Category::NmWillAttack, Category::NmWontAttack, Category::Placeholder,
@@ -105,7 +114,7 @@ namespace headsup
         const SetupOption kCursors[]{{"feather", Cursor<CursorStyle::Feather>}, {"arrow", Cursor<CursorStyle::Triangle>},
             {"chocobo", Cursor<CursorStyle::Chocobo>}, {"game", Cursor<CursorStyle::Vanilla>}};
         const SetupChoice kCursorChoices[]{{"cursor", WindowWord::SetupChoiceCursor, WindowList::SetupCursor, kCursors, 0}};
-        const SettingPiece kCursorSettings[]{SettingPiece::Color};
+        const SetupSetting kCursorSettings[]{{SettingPiece::Color, Reset<&Settings::cursorColor>}};
 
         template <PlateKind Kind, PlateMode Mode>
         void Plates(Settings& s)
@@ -131,8 +140,9 @@ namespace headsup
         }
         const SetupOption kPointers[]{{"chocobo", Pointer<PointerIcon::Chocobo>}, {"game", Pointer<PointerIcon::Vanilla>}};
         const SetupChoice kMouseChoices[]{{"pointer", WindowWord::SetupChoicePointer, WindowList::SetupPointer, kPointers, 1}};
-        const SettingPiece kExtraSettings[]{SettingPiece::AutoCheck, SettingPiece::LookUpPlayers, SettingPiece::StackNames,
-            SettingPiece::HideDuringConversation};
+        const SetupSetting kExtraSettings[]{{SettingPiece::AutoCheck, Reset<&Settings::autoCheck>},
+            {SettingPiece::LookUpPlayers, Reset<&Settings::lookUpPlayers>}, {SettingPiece::StackNames, Reset<&Settings::stackNames>},
+            {SettingPiece::HideDuringConversation, Reset<&Settings::hideInEvent>}};
 
         const SetupPage kPages[]{
             {SetupStep::Welcome, "welcome", WindowWord::SetupStepWelcome, {}, {}},
@@ -152,6 +162,9 @@ namespace headsup
         constexpr BarWidget kYou[]{BarWidget::Job, BarWidget::Exp, BarWidget::Gil, BarWidget::Bags, BarWidget::Party, BarWidget::Target};
         constexpr BarWidget kSystem[]{BarWidget::Fps, BarWidget::Connection, BarWidget::Memory, BarWidget::GameHelp, BarWidget::Signet};
         const SetupWidgetGroup kWidgetGroups[]{{"where", kWhere}, {"time", kTime}, {"you", kYou}, {"system", kSystem}};
+
+        constexpr const char* kBackupExtension = ".ini";
+        constexpr int kFirstAgain              = 2; // the number a second backup of the same second takes
     }
 
     std::span<const SetupPage> SetupPages() { return kPages; }
@@ -185,29 +198,25 @@ namespace headsup
     void UseSetupDefaults(Settings& s)
     {
         for (const SetupPage& page : kPages)
+        {
             for (const SetupChoice& choice : page.choices)
                 choice.options[choice.defaultOption].apply(s);
+            for (const SetupSetting& setting : page.settings)
+                setting.reset(s);
+        }
         const Settings fresh;
-        s.windowType    = fresh.windowType;
-        s.defaultFont   = fresh.defaultFont;
-        s.baseSize      = fresh.baseSize;
-        s.baseIconSize  = fresh.baseIconSize;
-        s.barTextFont   = fresh.barTextFont;
-        s.barTextSize   = fresh.barTextSize;
-        s.menuFontSize  = fresh.menuFontSize;
-        s.cursorColor   = fresh.cursorColor;
-        s.autoCheck     = fresh.autoCheck;
-        s.lookUpPlayers = fresh.lookUpPlayers;
-        s.stackNames    = fresh.stackNames;
-        s.hideInEvent   = fresh.hideInEvent;
         for (int w = 0; w < kBarWidgetCount; ++w)
             SetWidgetShown(s, static_cast<BarWidget>(w), Shown(fresh, static_cast<BarWidget>(w)));
     }
 
-    std::string SetupBackupName(int year, int month, int day, int hour, int minute)
+    std::string SetupBackupName(const SetupTime& at, const std::function<bool(const std::string&)>& taken)
     {
-        char name[64];
-        std::snprintf(name, sizeof(name), "settings-before-setup-%04d-%02d-%02d-%02d%02d.ini", year, month, day, hour, minute);
+        char stem[64];
+        std::snprintf(stem, sizeof(stem), "settings-before-setup-%04d-%02d-%02d-%02d%02d%02d", at.year, at.month, at.day, at.hour,
+            at.minute, at.second);
+        std::string name = std::string(stem) + kBackupExtension;
+        for (int again = kFirstAgain; taken(name); ++again)
+            name = std::string(stem) + "-" + std::to_string(again) + kBackupExtension;
         return name;
     }
 }

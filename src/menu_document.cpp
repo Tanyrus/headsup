@@ -210,6 +210,7 @@ namespace headsup
         css += ".line.indent{margin-left:" + Em(kGutter) + ";}";
         css += ".gap{flex:1 1 auto;}";
         css += ".note{color:" + color(c.muted) + ";margin-bottom:" + Em(kSpacing) + ";}";
+        css += std::string(".") + kSetupPreviewClass + "{display:block;width:100%;margin-bottom:" + Em(kSpacing) + ";}";
         css += ".row.indent{margin-left:" + Em(kGutter) + ";}";
         css += ".caption{color:" + color(c.muted) + ";" + raised + "}";
         // A column's name over its controls.

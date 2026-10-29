@@ -29,12 +29,10 @@ namespace headsup
         constexpr uint8_t kPiecesStart[]{0xA8, 0x1B, 0x00, 0x00};
         constexpr uint8_t kSkeletonsStart[]{0xA0, 0x1B, 0xA0, 0x1B};
         constexpr size_t kTablesFrom = 0x30000, kTableAlign = 4;
-        constexpr size_t kRunBytes = 8, kSlotBytes = PlayerTables::kRuns * kRunBytes, kRaceBytes = kLookSlots * kSlotBytes;
+        constexpr size_t kRunBytes = 8, kRunCountAt = 4, kSlotBytes = PlayerTables::kRuns * kRunBytes, kRaceBytes = kLookSlots * kSlotBytes;
         constexpr size_t kSkeletonBytes = 2;
         constexpr uint32_t kUpperBodyMotionFile = 1; // after the skeleton's file
         constexpr uint16_t kLookModelMask      = 0x0FFF;
-        constexpr uint16_t kFaceMask           = 0xFF; // a look's first word: the face, then the race
-        constexpr int kRaceShift               = 8;
 
         std::optional<size_t> FindTable(std::span<const uint8_t> dll, std::span<const uint8_t> start, size_t bytes)
         {
@@ -115,7 +113,10 @@ namespace headsup
         // joints (with their count), its vertex counts, its joint references and its vertices.
         constexpr size_t kMeshFlagsAt = 2, kMirroredAt = 4, kCommandsAt = 6, kJointListAt = 12, kJointListCountAt = 16,
                          kVertexCountsAt = 18, kRefsAt = 24, kVerticesAt = 30, kMeshHeaderBytes = 34;
-        constexpr uint8_t kClothFlag = 0x01, kJointListFlag = 0x80;
+        constexpr uint8_t kClothFlag = 0x01, kJointListFlag = 0x80, kMirroredFlag = 1;
+        // A vertex of two joints is each axis's two places side by side (x0 x1 y0 y1 z0 z1), the two weights, and
+        // its normals the same way; only the first joint's normal is drawn.
+        constexpr size_t kPairedFloats = 6;
         constexpr size_t kWordBytes  = 2;
         // A joint reference: the joint, the joint that draws it mirrored and the axis turned round for that.
         constexpr uint16_t kRefJointMask = 0x7F, kRefAxisMask = 3;
@@ -132,6 +133,21 @@ namespace headsup
             kColorStrip  = 0x4353,
         };
         constexpr size_t kMaterialBytes = 44, kPictureNameBytes = 16;
+        constexpr size_t kTriangleCorners = 3, kUvFloats = 2;
+
+        // A strip's triangles, as places in it: each corner after the first two with the two before it, every second
+        // one wound back to face the same way, and those with a vertex twice, which have no area, left out.
+        std::vector<std::array<size_t, 3>> StripTriangles(const std::vector<uint16_t>& vertices)
+        {
+            std::vector<std::array<size_t, 3>> triangles;
+            for (size_t k = 0; k + 2 < vertices.size(); ++k)
+            {
+                const std::array<size_t, 3> at = k % 2 == 0 ? std::array<size_t, 3>{k, k + 1, k + 2} : std::array<size_t, 3>{k, k + 2, k + 1};
+                if (vertices[at[0]] != vertices[at[1]] && vertices[at[1]] != vertices[at[2]] && vertices[at[0]] != vertices[at[2]])
+                    triangles.push_back(at);
+            }
+            return triangles;
+        }
 
         size_t WordsAt(std::span<const uint8_t> body, size_t at) { return ReadAt<uint32_t>(body.data(), at) * kWordBytes; }
 
@@ -145,7 +161,7 @@ namespace headsup
             const uint8_t flags  = body[kMeshFlagsAt];
             const bool cloth     = (flags & kClothFlag) != 0;
             const bool listed    = (flags & kJointListFlag) != 0;
-            mesh.mirrored        = body[kMirroredAt] == 1;
+            mesh.mirrored        = body[kMirroredAt] == kMirroredFlag;
 
             Reader list(body, WordsAt(body, kJointListAt));
             std::vector<uint16_t> jointList(ReadAt<uint16_t>(body.data(), kJointListCountAt));
@@ -168,12 +184,12 @@ namespace headsup
             mesh.vertices.resize(oneJoint + twoJoints);
             Reader refs(body, WordsAt(body, kRefsAt));
             for (ModelVertex& v : mesh.vertices)
-                for (size_t k = 0; k < 2; ++k)
+                for (size_t k = 0; k < v.joints.size(); ++k)
                 {
                     const auto ref     = refs.Take<uint16_t>();
                     v.joints[k]        = joint(ref & kRefJointMask);
                     v.mirrorJoints[k]  = joint(ref >> kRefMirrorShift & kRefJointMask);
-                    v.mirrorAxes[k]    = static_cast<uint8_t>(ref >> kRefAxisShift & kRefAxisMask);
+                    v.mirrorAxes[k]    = static_cast<MirrorAxis>(ref >> kRefAxisShift & kRefAxisMask);
                 }
             Reader in(body, WordsAt(body, kVerticesAt));
             for (size_t i = 0; i < mesh.vertices.size(); ++i)
@@ -186,7 +202,7 @@ namespace headsup
                     continue;
                 }
                 v.twoJoints = true;
-                float p[6];
+                float p[kPairedFloats];
                 for (float& f : p)
                     f = in.Float();
                 v.positions = {Vec3{p[0], p[2], p[4]}, Vec3{p[1], p[3], p[5]}};
@@ -194,7 +210,7 @@ namespace headsup
                 in.Float();
                 if (!cloth)
                 {
-                    float n[6];
+                    float n[kPairedFloats];
                     for (float& f : n)
                         f = in.Float();
                     v.normal = {n[0], n[2], n[4]};
@@ -238,31 +254,29 @@ namespace headsup
                 }
                 case kStrip:
                 {
-                    // Each corner after the first three makes a triangle with the two before it; every second one is
-                    // wound back to face the same way, and those with a corner twice have no area.
+                    // Its first triangle whole, then each corner after it with its place in the picture.
                     const auto n = commands.Take<uint16_t>();
-                    std::vector<std::pair<uint16_t, std::array<float, 2>>> corners(3);
-                    for (auto& c : corners)
-                        c.first = vertex(commands, badVertex);
-                    for (auto& c : corners)
-                        c.second = {commands.Float(), commands.Float()};
+                    std::vector<uint16_t> corners(kTriangleCorners);
+                    std::vector<std::array<float, kUvFloats>> uvs(kTriangleCorners);
+                    for (uint16_t& c : corners)
+                        c = vertex(commands, badVertex);
+                    for (auto& uv : uvs)
+                        uv = {commands.Float(), commands.Float()};
                     for (uint16_t k = 1; k < n && commands.Ok(); ++k)
                     {
-                        const uint16_t index = vertex(commands, badVertex);
-                        corners.push_back({index, {commands.Float(), commands.Float()}});
+                        corners.push_back(vertex(commands, badVertex));
+                        uvs.push_back({commands.Float(), commands.Float()});
                     }
-                    for (size_t k = 0; k + 2 < corners.size(); ++k)
+                    for (const auto& at : StripTriangles(corners))
                     {
-                        const std::array<size_t, 3> at = k % 2 == 0 ? std::array<size_t, 3>{k, k + 1, k + 2} : std::array<size_t, 3>{k, k + 2, k + 1};
                         ModelTriangle triangle;
-                        for (size_t c = 0; c < 3; ++c)
+                        for (size_t c = 0; c < kTriangleCorners; ++c)
                         {
-                            triangle.vertices[c]  = corners[at[c]].first;
-                            triangle.uv[c * 2]     = corners[at[c]].second[0];
-                            triangle.uv[c * 2 + 1] = corners[at[c]].second[1];
+                            triangle.vertices[c]            = corners[at[c]];
+                            triangle.uv[c * kUvFloats]      = uvs[at[c]][0];
+                            triangle.uv[c * kUvFloats + 1]  = uvs[at[c]][1];
                         }
-                        const auto& v = triangle.vertices;
-                        if (v[0] != v[1] && v[1] != v[2] && v[0] != v[2]) part.triangles.push_back(triangle);
+                        part.triangles.push_back(triangle);
                     }
                     break;
                 }
@@ -283,13 +297,19 @@ namespace headsup
                         corners.assign(triangle.vertices.begin(), triangle.vertices.end());
                     }
                     if (command == kColorStrip)
+                    {
+                        // One color for the whole strip, after its first triangle.
                         for (uint16_t k = 1; k < n && commands.Ok(); ++k)
-                        {
                             corners.push_back(vertex(commands, badVertex));
-                            const size_t last = corners.size() - 1;
-                            part.triangles.push_back({{corners[last - 2], corners[last - 1], corners[last]}, {}});
-                            part.colors.push_back(part.colors.front());
+                        const uint32_t color = part.colors.front();
+                        part.triangles.clear();
+                        part.colors.clear();
+                        for (const auto& at : StripTriangles(corners))
+                        {
+                            part.triangles.push_back({{corners[at[0]], corners[at[1]], corners[at[2]]}, {}});
+                            part.colors.push_back(color);
                         }
+                    }
                     break;
                 }
                 default:
@@ -394,7 +414,7 @@ namespace headsup
                 for (size_t run = 0; run < PlayerTables::kRuns; ++run)
                 {
                     const size_t at = *pieces + race * kRaceBytes + slot * kSlotBytes + run * kRunBytes;
-                    tables.pieces[race][slot][run] = {ReadAt<uint32_t>(dll.data(), at), ReadAt<uint32_t>(dll.data(), at + 4)};
+                    tables.pieces[race][slot][run] = {ReadAt<uint32_t>(dll.data(), at), ReadAt<uint32_t>(dll.data(), at + kRunCountAt)};
                 }
             // The skeletons are kept by race number from 0, so race 1's is the second.
             tables.skeletons[race] = ReadAt<uint16_t>(dll.data(), *skeletons + (race + 1) * kSkeletonBytes);
@@ -423,9 +443,9 @@ namespace headsup
 
     std::optional<std::vector<uint32_t>> PlayerFileIds(const PlayerTables& tables, const PlayerLook& look)
     {
-        const int race      = look[0] >> kRaceShift;
+        const int race      = RaceOf(look[static_cast<size_t>(LookSlot::Face)]);
         const auto skeleton = SkeletonFileId(tables, race);
-        const auto face     = PieceFileId(tables, race, LookSlot::Face, static_cast<uint16_t>(look[0] & kFaceMask));
+        const auto face     = PieceFileId(tables, race, LookSlot::Face, FaceOf(look[static_cast<size_t>(LookSlot::Face)]));
         if (!skeleton || !face) return std::nullopt;
         std::vector<uint32_t> files{*skeleton, *skeleton + kUpperBodyMotionFile, *face};
         for (int slot = static_cast<int>(LookSlot::Head); slot < kLookSlots; ++slot)
@@ -508,13 +528,25 @@ namespace headsup
         return idle;
     }
 
+    uint8_t ShownAlpha(uint8_t gameAlpha)
+    {
+        constexpr int kGameOpaque = 0x80, kFull = 255;
+        return static_cast<uint8_t>(std::min(kFull, gameAlpha * kFull / kGameOpaque));
+    }
+
+    uint32_t ShownColor(uint32_t gameArgb)
+    {
+        constexpr int kAlphaShift  = 24;
+        constexpr uint32_t kColors = 0x00FFFFFF;
+        return static_cast<uint32_t>(ShownAlpha(static_cast<uint8_t>(gameArgb >> kAlphaShift))) << kAlphaShift | (gameArgb & kColors);
+    }
+
     std::vector<uint8_t> ShownPixels(const ColorPicture& picture)
     {
         constexpr size_t kAlphaAt = 3, kPixelBytes = 4;
-        constexpr int kOpaque     = 0x80, kFull = 255;
         std::vector<uint8_t> shown = picture.bgra;
         for (size_t at = kAlphaAt; at < shown.size(); at += kPixelBytes)
-            shown[at] = static_cast<uint8_t>(std::min(kFull, shown[at] * kFull / kOpaque));
+            shown[at] = ShownAlpha(shown[at]);
         return shown;
     }
 }

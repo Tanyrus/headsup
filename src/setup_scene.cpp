@@ -6,7 +6,7 @@ namespace headsup
     {
         constexpr const char* kTonberryName  = "Tonberry Cutter";
         constexpr const char* kShantottoName = "Shantotto";
-        constexpr float kBeside              = 2.5f;  // yalms between the actors standing side by side
+        constexpr float kBesideYalms         = 2.5f;  // between the actors standing side by side
         constexpr float kNameWidth = 60.0f, kNameHeight = 12.0f, kNameAboveHead = 4.0f; // pixels of the picture
         constexpr uint32_t kGameNameWhite = 0xFFFFFFFF;
 
@@ -32,10 +32,10 @@ namespace headsup
         scene.targets.target = SampleIndex(SampleActor::Tonberry);
         scene.actors.push_back(Actor(SampleActor::Tonberry, EntityKind::Mob, kSampleTonberryId, kTonberryName, 0.0f));
         if (!others) return scene;
-        ActorInput you = Actor(SampleActor::You, EntityKind::Player, 0, yourName.c_str(), -kBeside);
+        ActorInput you = Actor(SampleActor::You, EntityKind::Player, 0, yourName.c_str(), -kBesideYalms);
         you.self       = true;
         scene.actors.push_back(you);
-        scene.actors.push_back(Actor(SampleActor::Shantotto, EntityKind::Npc, kSampleShantottoId, kShantottoName, kBeside));
+        scene.actors.push_back(Actor(SampleActor::Shantotto, EntityKind::Npc, kSampleShantottoId, kShantottoName, kBesideYalms));
         return scene;
     }
 

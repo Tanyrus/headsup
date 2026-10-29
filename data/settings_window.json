@@ -1108,7 +1108,7 @@
     {"key": "reload", "name": "Reload", "tip": "Reads settings_window.json from config/headsup again and builds this window from it, or from the built-in one when there is none."},
     {"key": "export", "name": "Export", "tip": "Writes the built-in settings_window.json to config/headsup, where it can be edited and read with Reload."},
     {"key": "setup-title", "name": "HeadsUp Setup"},
-    {"key": "setup-step", "name": "Step {count}"},
+    {"key": "setup-step", "name": "Step {count} of {total}"},
     {"key": "setup-start", "name": "Start", "tip": "Starts Setup."},
     {"key": "setup-skip", "name": "Skip Setup", "tip": "Closes Setup and keeps the defaults. You can run it again any time with /hu setup."},
     {"key": "setup-back", "name": "Back", "tip": "Goes back a step."},

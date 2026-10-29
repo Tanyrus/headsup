@@ -1,6 +1,7 @@
 #include "model_pose.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace headsup
@@ -37,13 +38,25 @@ namespace headsup
             return m;
         }
 
+        constexpr int kSide = 4; // a Mat4's rows and columns
+
+        // A row vector by a matrix.
+        std::array<float, kSide> RowTimes(const std::array<float, kSide>& p, const Mat4& m)
+        {
+            std::array<float, kSide> out{};
+            for (int c = 0; c < kSide; ++c)
+                for (int k = 0; k < kSide; ++k)
+                    out[static_cast<size_t>(c)] += p[static_cast<size_t>(k)] * m.m[k * kSide + c];
+            return out;
+        }
+
         Mat4 Times(const Mat4& a, const Mat4& b)
         {
             Mat4 out{};
-            for (int r = 0; r < 4; ++r)
-                for (int c = 0; c < 4; ++c)
-                    for (int k = 0; k < 4; ++k)
-                        out.m[r * 4 + c] += a.m[r * 4 + k] * b.m[k * 4 + c];
+            for (int r = 0; r < kSide; ++r)
+                for (int c = 0; c < kSide; ++c)
+                    for (int k = 0; k < kSide; ++k)
+                        out.m[r * kSide + c] += a.m[r * kSide + k] * b.m[k * kSide + c];
             return out;
         }
 
@@ -60,11 +73,11 @@ namespace headsup
             const float length = std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
             return length > 0.0f ? Vec3{v.x / length, v.y / length, v.z / length} : v;
         }
-        Vec3 TurnedRound(Vec3 v, uint8_t axis)
+        Vec3 TurnedRound(Vec3 v, MirrorAxis axis)
         {
-            if (axis == 1) v.x = -v.x;
-            if (axis == 2) v.y = -v.y;
-            if (axis == 3) v.z = -v.z;
+            if (axis == MirrorAxis::X) v.x = -v.x;
+            if (axis == MirrorAxis::Y) v.y = -v.y;
+            if (axis == MirrorAxis::Z) v.z = -v.z;
             return v;
         }
 
@@ -118,7 +131,7 @@ namespace headsup
             {
                 turn = Times(BlendTurn(*track, at[i]), turn);
                 move = Plus(move, {Blend(*track, kMoveX, at[i]), Blend(*track, kMoveY, at[i]), Blend(*track, kMoveZ, at[i])});
-                // The root keeps its size: the game sizes a whole character by other means.
+                // The root keeps its size, as Xim plays the game's animations.
                 if (joint.parent >= 0) size = {Blend(*track, kSizeX, at[i]), Blend(*track, kSizeY, at[i]), Blend(*track, kSizeZ, at[i])};
             }
             const Mat4 local = Local(turn, move, size);
@@ -155,7 +168,7 @@ namespace headsup
                     for (int k = 0; k < used; ++k)
                         held[i] = held[i] && by[static_cast<size_t>(k)] < joints.size();
                     if (!held[i]) continue;
-                    const auto axis = [&](int k) { return mirror ? v.mirrorAxes[static_cast<size_t>(k)] : uint8_t{0}; };
+                    const auto axis = [&](int k) { return mirror ? v.mirrorAxes[static_cast<size_t>(k)] : MirrorAxis::None; };
                     Vec3 at = Place(TurnedRound(v.positions[0], axis(0)), joints[by[0]], v.weight);
                     if (v.twoJoints) at = Plus(at, Place(TurnedRound(v.positions[1], axis(1)), joints[by[1]], 1.0f - v.weight));
                     const Vec3 normal = Unit(Place(TurnedRound(v.normal, axis(0)), joints[by[0]], 0.0f));
@@ -175,7 +188,7 @@ namespace headsup
                             DrawVertex out = placed[v[c]];
                             out.u          = triangle.uv[c * 2];
                             out.v          = triangle.uv[c * 2 + 1];
-                            if (!part.textured && t < part.colors.size()) out.color = part.colors[t];
+                            if (!part.textured && t < part.colors.size()) out.color = ShownColor(part.colors[t]);
                             batch.vertices.push_back(out);
                         }
                     }
@@ -254,15 +267,7 @@ namespace headsup
 
     std::optional<PicturePoint> PointInPicture(const ModelView& view, const Vec3& point, float width, float height)
     {
-        float clip[4]{};
-        const float in[4]{point.x, point.y, point.z, 1.0f};
-        float eye[4]{};
-        for (int c = 0; c < 4; ++c)
-            for (int k = 0; k < 4; ++k)
-                eye[c] += in[k] * view.view.m[k * 4 + c];
-        for (int c = 0; c < 4; ++c)
-            for (int k = 0; k < 4; ++k)
-                clip[c] += eye[k] * view.projection.m[k * 4 + c];
+        const std::array<float, kSide> clip = RowTimes(RowTimes({point.x, point.y, point.z, 1.0f}, view.view), view.projection);
         if (clip[3] <= 0.0f) return std::nullopt;
         return PicturePoint{(clip[0] / clip[3] + 1.0f) / 2.0f * width, (1.0f - clip[1] / clip[3]) / 2.0f * height};
     }

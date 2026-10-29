@@ -10,7 +10,7 @@ namespace headsup
     namespace
     {
         constexpr uint32_t kBackground = 0xFF20242C;
-        constexpr float kBeside        = 1.3f;  // model units between the scene's models standing side by side
+        constexpr float kBesideUnits   = 1.3f;  // of the models' own space between them standing side by side
         constexpr float kFacingYaw     = 1.5707963f; // radians round the scene to its front: the game's models face +x
         constexpr float kSwayYaw       = 0.35f, kSwaySpeed = 0.4f; // a slow turn back and forth, so its shape shows
         constexpr float kHeadroom      = 0.6f; // of the models' height, framed over them for the plates and the cursor
@@ -68,8 +68,8 @@ namespace headsup
         if (others)
         {
             // Seen from the front, across the picture is z: you on its left, Shantotto on its right.
-            placed.push_back({&m_You.model, SampleActor::You, {0.0f, 0.0f, kBeside}});
-            placed.push_back({&m_Shantotto.model, SampleActor::Shantotto, {0.0f, 0.0f, -kBeside}});
+            placed.push_back({&m_You.model, SampleActor::You, {0.0f, 0.0f, kBesideUnits}});
+            placed.push_back({&m_Shantotto.model, SampleActor::Shantotto, {0.0f, 0.0f, -kBesideUnits}});
         }
         ModelBounds box = Moved(placed.front().model->Standing(), placed.front().at);
         for (const Placed& p : placed)

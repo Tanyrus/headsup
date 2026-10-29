@@ -155,7 +155,7 @@ TEST(a_mirrored_mesh_is_drawn_again_by_its_mirror_joints_turned_round_its_axis)
 {
     ModelVertex flipped = OneJoint(1, {1, 0, 0});
     flipped.mirrorJoints = {0, 0};
-    flipped.mirrorAxes   = {1, 0};
+    flipped.mirrorAxes   = {MirrorAxis::X, MirrorAxis::None};
     ModelMesh mesh;
     mesh.mirrored = true;
     mesh.vertices = {flipped, OneJoint(0, {0, 0, 1}), OneJoint(0, {0, 2, 0})};
@@ -188,13 +188,13 @@ TEST(an_untextured_part_draws_each_triangle_in_its_own_color)
     mesh.vertices = {OneJoint(0, {}), OneJoint(0, {}), OneJoint(0, {})};
     ModelPart part = Part("", {{{0, 1, 2}, {}}, {{2, 1, 0}, {}}});
     part.textured  = false;
-    part.colors    = {0xFF102030, 0xFF405060};
+    part.colors    = {0x80102030, 0x40405060}; // the game's alpha, where 0x80 is opaque
     mesh.parts     = {part};
     const ModelMesh meshes[]{mesh};
     const DrawBatch batch = PosedBatches(meshes, PoseSkeleton(Arm(), {}, 0.0f)).at(0);
     CHECK(batch.picture.empty());
     CHECK_EQ(batch.vertices[0].color, 0xFF102030u);
-    CHECK_EQ(batch.vertices[5].color, 0xFF405060u);
+    CHECK_EQ(batch.vertices[5].color, 0x7F405060u);
 }
 
 TEST(a_vertex_naming_a_joint_the_skeleton_lacks_is_left_out_with_its_triangles)

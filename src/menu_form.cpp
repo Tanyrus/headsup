@@ -26,6 +26,8 @@ namespace headsup
         constexpr const char* kQuietChip   = "btn flat chip";
         constexpr const char* kResetPill   = "btn wash reset-all"; // a card's width, under the cards
         constexpr const char* kNavStart    = "nav-";
+        constexpr const char* kSetupPageKey = "setup", *kSetupButtons = "buttons";
+        constexpr int kNoOption = -1; // a choice whose settings no option holds
         constexpr const char* kWidgetChip  = "chip "; // a tray chip's name in its card, before its widget's number
         constexpr float kAddWindowShare    = 0.8f;    // of a dropdown's width: a group's "+ Add Window"
         constexpr size_t kMaxFindText      = 31;      // letters of a window's name to look for
@@ -1704,7 +1706,7 @@ namespace headsup
         {
             const std::span<const LayoutOption> options = c.layout.OptionsOf(choice.list);
             const std::optional<size_t> held            = PickedOption(choice, c.s);
-            const int was = held ? static_cast<int>(*held) : kNoFontEntry;
+            const int was = held ? static_cast<int>(*held) : kNoOption;
             int picked    = was;
             const auto name = [&](int i) { return i < 0 ? Words(Word(c, WindowWord::SetupCustom)) : Words(options[static_cast<size_t>(i)].name); };
             const auto tip  = [&](int i) { return i < 0 ? Words(WordTip(c, WindowWord::SetupCustom)) : Words(options[static_cast<size_t>(i)].tip); };
@@ -1737,8 +1739,79 @@ namespace headsup
         }
 
 
-        // Setup in place of the pages: its steps in the sidebar, the step open with the preview, its choices and its
-        // settings, and the buttons that move through it.
+        // A step's card: where it is in Setup, the warning of a run again, the preview, its choices and its settings.
+        void SetupStepCard(Context& c, const SetupPage& page)
+        {
+            Form& form          = c.form;
+            const SetupRun& run = *c.state.setup;
+            const std::string count = Filled(Said(Word(c, WindowWord::SetupStep)), kCountMark, std::to_string(static_cast<int>(run.step) + 1));
+            form.Note(Filled(count, kTotalMark, std::to_string(kSetupSteps)).c_str());
+            if (run.rerun && !run.started)
+                form.Note((Words(Word(c, WindowWord::SetupWarning)) + ": " +
+                           Filled(Said(WordTip(c, WindowWord::SetupWarning)), kFileMark, kSetupBackupFile))
+                              .c_str());
+            form.Raw(std::string("<img class=\"") + kSetupPreviewClass + "\" id=\"" + kSetupPreviewClass + "\" src=\"" + kSetupPicture + "\"/>");
+            for (const SetupChoice& choice : page.choices)
+                SetupChoiceRow(c, choice);
+            for (const SetupSetting& own : page.settings)
+                if (const LayoutSetting* setting = c.layout.SettingOf(own.piece)) DrawSetting(c, *setting);
+            if (run.step == SetupStep::Widgets) SetupWidgets(c);
+            form.EndCard();
+        }
+
+        // The buttons that move through Setup, under its card, where folding the card leaves them.
+        void SetupButtons(Context& c)
+        {
+            Form& form      = c.form;
+            SetupRun& run   = *c.state.setup;
+            const int step  = static_cast<int>(run.step);
+            const bool last = step + 1 == kSetupSteps;
+            form.Fade(false); // a setting drawn above may have faded what follows it
+            form.BeginBare(Labeled(Word(c, WindowWord::SetupTitle), kSetupButtons).c_str());
+            form.Line();
+            const auto button = [&](WindowWord word, const char* id, const char* classes) {
+                return form.Button(Labeled(Word(c, word), id).c_str(), id, classes, WordTip(c, word));
+            };
+            bool finished = false, left = false;
+            if (!run.started)
+            {
+                if (button(WindowWord::SetupStart, "start", kAccentPill))
+                {
+                    if (run.rerun)
+                    {
+                        c.state.setupBackup = true;
+                        UseSetupDefaults(c.s);
+                        form.changed = true;
+                    }
+                    run.started      = true;
+                    run.step         = SetupStep::Theme;
+                    form.scrollToTop = true;
+                }
+            }
+            else
+            {
+                if (step > 0 && button(WindowWord::SetupBack, "back", kRaisedPill))
+                {
+                    run.step         = static_cast<SetupStep>(step - 1);
+                    form.scrollToTop = true;
+                }
+                if (!last && button(WindowWord::SetupNext, "next", kAccentPill))
+                {
+                    run.step         = static_cast<SetupStep>(step + 1);
+                    form.scrollToTop = true;
+                }
+                finished = last && button(WindowWord::SetupFinish, "finish", kAccentPill);
+            }
+            left = !finished && button(run.rerun ? WindowWord::SetupCancel : WindowWord::SetupSkip, "leave", kRaisedPill);
+            form.EndLine();
+            form.EndCard();
+            if (!finished && !left) return;
+            EndSetup(c.s, c.state, finished);
+            form.changed     = true;
+            form.scrollToTop = true;
+        }
+
+        // Setup in place of the pages: its steps in the sidebar, then the step open and the buttons under it.
         void BuildSetup(Context& c)
         {
             Form& form    = c.form;
@@ -1758,73 +1831,10 @@ namespace headsup
             for (const SetupPage& page : SetupPages())
                 form.Set(kNavStart + std::string("setup-") + page.key, FormValueKind::Class, kPickedClass, {}, page.step == run.step);
 
-            form.pageKey             = "setup";
-            const SetupPage& page    = SetupPageOf(run.step);
-            const int step           = static_cast<int>(run.step);
-            const bool last          = step + 1 == kSetupSteps;
-            if (!form.BeginCard(Labeled(Word(c, page.word), page.key).c_str(), nullptr, WordTip(c, page.word))) return;
-            form.Note(Filled(Word(c, WindowWord::SetupStep), kCountMark, Formatted("%d of %d", step + 1, kSetupSteps)).c_str());
-            if (run.rerun && !run.started)
-            {
-                form.Note((Words(Word(c, WindowWord::SetupWarning)) + ": " +
-                           Filled(Said(WordTip(c, WindowWord::SetupWarning)), kFileMark, kSetupBackupFile))
-                              .c_str());
-            }
-            form.Raw(std::string("<img class=\"setup-preview\" id=\"setup-preview\" style=\"width: 100%;\" src=\"") + kSetupPicture + "\"/>");
-            for (const SetupChoice& choice : page.choices)
-                SetupChoiceRow(c, choice);
-            for (SettingPiece piece : page.settings)
-                if (const LayoutSetting* setting = c.layout.SettingOf(piece)) DrawSetting(c, *setting);
-            if (run.step == SetupStep::Widgets) SetupWidgets(c);
-
-            form.Fade(false); // a setting drawn above may have faded what follows it
-            form.Line();
-            const auto button = [&](WindowWord word, const char* id, const char* classes) {
-                return form.Button(Labeled(Word(c, word), id).c_str(), id, classes, WordTip(c, word));
-            };
-            if (!run.started)
-            {
-                if (button(WindowWord::SetupStart, "setup-start", kAccentPill))
-                {
-                    if (run.rerun)
-                    {
-                        c.state.setupBackup = true;
-                        UseSetupDefaults(c.s);
-                        form.changed = true;
-                    }
-                    run.started      = true;
-                    run.step         = SetupStep::Theme;
-                    form.scrollToTop = true;
-                }
-            }
-            else
-            {
-                if (step > 0 && button(WindowWord::SetupBack, "setup-back", kRaisedPill))
-                {
-                    run.step         = static_cast<SetupStep>(step - 1);
-                    form.scrollToTop = true;
-                }
-                if (!last && button(WindowWord::SetupNext, "setup-next", kAccentPill))
-                {
-                    run.step         = static_cast<SetupStep>(step + 1);
-                    form.scrollToTop = true;
-                }
-                if (last && button(WindowWord::SetupFinish, "setup-finish", kAccentPill))
-                {
-                    form.EndLine();
-                    form.EndCard();
-                    EndSetup(c.s, c.state, true);
-                    form.changed     = true;
-                    form.scrollToTop = true;
-                    return;
-                }
-            }
-            const bool leave = button(run.rerun ? WindowWord::SetupCancel : WindowWord::SetupSkip, "setup-leave", kRaisedPill);
-            form.EndLine();
-            form.EndCard();
-            if (!leave) return;
-            EndSetup(c.s, c.state, false);
-            form.changed = true;
+            form.pageKey          = kSetupPageKey;
+            const SetupPage& page = SetupPageOf(run.step);
+            if (form.BeginCard(Labeled(Word(c, page.word), page.key).c_str(), nullptr, WordTip(c, page.word))) SetupStepCard(c, page);
+            SetupButtons(c);
         }
     }
 
