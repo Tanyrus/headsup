@@ -16,6 +16,7 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -23,6 +24,15 @@
 
 namespace headsup
 {
+    // What the plates are drawn over: the picture's size, the camera that seats names while it is steady, and the
+    // name the game drew this frame for an entity (picked: it is the sub-target's candidate), none for one it did not.
+    struct PlateScene
+    {
+        float width = 0.0f, height = 0.0f;
+        const Camera* camera = nullptr;
+        std::function<std::optional<DrawnName>(uint16_t index, bool picked)> nameOf;
+    };
+
     class NameplateRenderer
     {
     public:
@@ -48,7 +58,7 @@ namespace headsup
 
         void SetDevice(IDirect3DDevice8* device);
         // toX and toY turn back-buffer pixels into those of the image the nameplates are drawn into.
-        void Update(const Tracker& tracker, const GameNames& names, const NameHook& hook, const Settings& settings, float toX, float toY,
+        void Update(const Tracker& tracker, const PlateScene& scene, const Settings& settings, float toX, float toY,
             const CursorTargets& targets, double now, uint16_t selfIndex, const std::vector<TimerLine>& selfTimers);
         void Clear();
         void ReleasePlates();

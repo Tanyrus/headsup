@@ -1272,7 +1272,13 @@ private:
             return;
         }
         m_Nameplates.SetCoveredTop(g_BarOn && !g_BarHidden ? m_RmlBar.BarBottomNow() : 0.0f);
-        m_Nameplates.Update(m_Tracker, m_Names, m_NameHook, m_Settings, toX, toY, m_CursorTargets, Now(), m_SelfIndex, m_TimerLines);
+        const headsup::PlateScene scene{m_Names.BackBufferWidth(), m_Names.BackBufferHeight(), m_Names.SteadyCamera(),
+            [&](uint16_t index, bool picked) -> std::optional<headsup::DrawnName> {
+                const headsup::NameFrame* frame = m_NameHook.Drawn(index);
+                if (frame == nullptr) return std::nullopt;
+                return headsup::NameFromFrame(*frame, m_Names.TargetScaleX(), m_Names.TargetScaleY(), picked);
+            }};
+        m_Nameplates.Update(m_Tracker, scene, m_Settings, toX, toY, m_CursorTargets, Now(), m_SelfIndex, m_TimerLines);
         m_Nameplates.Draw(depthTest);
         m_PlatesPlaced = true;
     }
