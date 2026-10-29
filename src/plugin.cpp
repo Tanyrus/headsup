@@ -796,12 +796,12 @@ public:
         g_BarHidden = m_UiHidden;
         // Opening Region Info asks the server for the conquest standings; HeadsUp asks the same once per zone-in, and
         // again while the Zone or Conquest popup shows them.
-        const auto standings = [](headsup::BarWidget w) { return w == headsup::BarWidget::Zone || w == headsup::BarWidget::Conquest; };
+        const auto opened = [&](headsup::BarWidget w) { return headsup::PopupShows(m_Settings, m_BarInput.Open(), w); };
         if (m_GameState.ConquestRequestDue(now,
                 g_BarOn &&
                     (headsup::Shown(m_Settings, headsup::BarWidget::Zone) || headsup::Shown(m_Settings, headsup::BarWidget::Conquest)) &&
                     m_AshitaCore->GetMemoryManager()->GetPlayer()->GetIsZoning() == 0,
-                m_BarInput.Open() && standings(m_BarInput.Open()->kind)))
+                opened(headsup::BarWidget::Zone) || opened(headsup::BarWidget::Conquest)))
         {
             auto request = headsup::kConquestRequest; // Ashita takes the bytes as non-const
             m_AshitaCore->GetPacketManager()->AddOutgoingPacket(headsup::kConquestRequestPacket,
@@ -809,7 +809,7 @@ public:
             m_GameState.ConquestRequested(now);
         }
         // Opening the Currencies menu asks for them; HeadsUp asks the same, as for the conquest standings.
-        const bool gilOpen = m_BarInput.Open() && m_BarInput.Open()->kind == headsup::BarWidget::Gil;
+        const bool gilOpen = opened(headsup::BarWidget::Gil);
         if (m_GameState.CurrencyRequestDue(now,
                 g_BarOn && headsup::Shown(m_Settings, headsup::BarWidget::Gil) &&
                     m_AshitaCore->GetMemoryManager()->GetPlayer()->GetIsZoning() == 0,

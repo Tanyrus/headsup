@@ -25,6 +25,7 @@ namespace headsup
     {
         PanelWidget widget;
         BarRect rect;
+        std::optional<PanelWidget> group{}; // the first widget of its pill, when it is not alone (PanelGroups)
     };
 
     struct BarLayout
@@ -80,14 +81,28 @@ namespace headsup
     // neighbour's edge. Pills with diamonds sit a gap, the diamond and a gap apart.
     // spacing: each widget's room more between it and each neighbour, by SlotOf; an ornate diamond stands in the middle
     // of the room it is in.
+    // groups: by SlotOf, the first widget of each one's pill (PanelGroups). The widgets of a pill touch, with no gap,
+    // room or diamond between them, and are placed or dropped together.
     inline constexpr std::array<float, kPanelSlots> kNoSpacing{};
     BarLayout LayoutBar(float screenWidth, const BarMetrics& metrics, BarShape shape,
                         const std::array<float, kPanelSlots>& natural, float targetMinimum,
                         const BarPlacement& placement = DefaultPlacement(),
                         BarSeparators separators = BarSeparators::Theme,
-                        const std::array<float, kPanelSlots>& spacing = kNoSpacing);
+                        const std::array<float, kPanelSlots>& spacing = kNoSpacing,
+                        const std::array<PanelWidget, kPanelSlots>& groups = AloneGroups());
+    // The widget under the point, or for a combined pill its first widget, which names the pill's popup.
     std::optional<PanelWidget> WidgetAt(const BarLayout& layout, float x, float y);
     const BarRect* RectOf(const BarLayout& layout, PanelWidget widget);
+    // The pill a widget names, around every widget of it that was placed; none when none was.
+    std::optional<BarRect> GroupRect(const BarLayout& layout, PanelWidget head);
+    // Whether a placed widget shares its pill with the widget before it and after it, and so draws no edge there.
+    struct PillJoins
+    {
+        bool before = false, after = false;
+    };
+    PillJoins JoinsOf(const BarLayout& layout, PanelWidget widget);
+    // A combined pill has a popup when any of its widgets has one: its first widget's hasPopup says so.
+    void SharePopups(std::array<bool, kPanelSlots>& hasPopup, const std::array<PanelWidget, kPanelSlots>& groups);
     // Under its widget below the bar, moved inward from the screen's sides, its height cut at the bottom: a ring
     // drawn ring pixels around it stays gap from the bar and the screen's edges.
     BarRect PlacePopup(const BarRect& widget, float barHeight, float width, float height, float screenWidth,

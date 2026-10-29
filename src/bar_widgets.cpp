@@ -1102,10 +1102,17 @@ namespace headsup
         return std::nullopt;
     }
 
+    bool PopupShows(const Settings& settings, std::optional<PanelWidget> open, BarWidget widget)
+    {
+        if (!open) return false;
+        if (open->kind == widget) return true;
+        return std::ranges::any_of(Members(Panel(settings), *open), [&](PanelWidget w) { return w.kind == widget; });
+    }
+
     BarNeeds NeedsOf(const Settings& settings, std::optional<PanelWidget> open)
     {
         const auto shown  = [&](BarWidget widget) { return Shown(settings, widget); };
-        const auto opened = [&](BarWidget widget) { return open && open->kind == widget; };
+        const auto opened = [&](BarWidget widget) { return PopupShows(settings, open, widget); };
         BarNeeds needs;
         // A Clock in a zone of its own goes by the time alone, as its server line and its popup's resets do; in the
         // computer's zone, by what Windows makes of the time.
@@ -1355,6 +1362,27 @@ namespace headsup
         return w;
     }
 
+    }
+
+    PopupContent PanelPopupContent(PanelWidget head, const BarState& state, const Settings& settings)
+    {
+        const std::vector<PanelWidget> pill = Members(Panel(settings), head);
+        if (pill.size() <= 1) return BarPopupContent(head, state, settings);
+        PopupContent joined;
+        joined.oneColumn = true;
+        for (const PanelWidget w : pill)
+        {
+            if (!BarWidgetContent(w, state, settings).hasPopup) continue;
+            PopupContent own = BarPopupContent(w, state, settings);
+            if (joined.title.empty())
+                joined.icon = own.icon;
+            else
+                joined.title.push_back(Text(kDot, Tone::Dim));
+            joined.title.insert(joined.title.end(), own.title.begin(), own.title.end());
+            joined.sections.insert(joined.sections.end(), own.sections.begin(), own.sections.end());
+            joined.oneColumn = joined.oneColumn && own.oneColumn;
+        }
+        return joined;
     }
 
     PopupContent BarPopupContent(PanelWidget widget, const BarState& state, const Settings& settings)

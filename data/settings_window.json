@@ -385,6 +385,7 @@
               "rows": [
                 {"key": "enabled", "name": "Enabled"},
                 {"key": "section", "name": "Section"},
+                {"key": "combine", "name": "Combine With", "tip": "Puts another widget right after this one in the same pill, with one popup for both. That widget leaves its own place. Default is None."},
                 {"key": "copies", "name": "Copies", "tip": "Another of this widget on the panel, with settings of its own. You can take a copy off again."},
                 {"key": "second-line", "name": "Second Line"},
                 {"key": "icons", "name": "Icons"},
@@ -423,7 +424,8 @@
               ],
               "words": [
                 {"key": "add-copy", "name": "Add a Copy", "tip": "Puts another of this widget on the panel after it, with its own tab here."},
-                {"key": "remove-copy", "name": "Remove This Copy", "tip": "Takes this copy off the panel. Its settings go with it."}
+                {"key": "remove-copy", "name": "Remove This Copy", "tip": "Takes this copy off the panel. Its settings go with it."},
+                {"key": "combine-none", "name": "None"}
               ]
             }
           ]

@@ -132,3 +132,66 @@ TEST(copies_read_back_by_their_numbers_and_a_number_out_of_range_is_dropped)
         CHECK(!Placed(odd, PanelWidget{BarWidget::Gil, copy}));
     CHECK(PlaceOf(odd, BarWidget::Target).first == static_cast<int>(kCenter));
 }
+
+namespace
+{
+    // Links by slot, from (widget, the one combined with it) pairs.
+    CombineLinks Links(std::initializer_list<std::pair<PanelWidget, PanelWidget>> pairs)
+    {
+        CombineLinks links{};
+        for (const auto& [from, to] : pairs)
+            links[SlotOf(from)] = to;
+        return links;
+    }
+}
+
+TEST(a_combined_widget_leaves_its_place_for_one_right_after_the_widget_it_is_combined_with)
+{
+    BarPlacement p{List{BarWidget::Zone, BarWidget::Weather}, List{BarWidget::Target}, List{BarWidget::Gil, BarWidget::Conquest}};
+    const PanelGroups g = Combine(p, Links({{BarWidget::Zone, BarWidget::Conquest}}));
+    CHECK(In(g.placement, kLeft) == (List{BarWidget::Zone, BarWidget::Conquest, BarWidget::Weather}));
+    CHECK(In(g.placement, kRight) == (List{BarWidget::Gil}));
+    CHECK(g.group[SlotOf(BarWidget::Conquest)] == PanelWidget{BarWidget::Zone});
+    CHECK(g.group[SlotOf(BarWidget::Zone)] == PanelWidget{BarWidget::Zone});
+    CHECK(g.group[SlotOf(BarWidget::Weather)] == PanelWidget{BarWidget::Weather});
+    CHECK(Members(g, BarWidget::Zone) == (List{BarWidget::Zone, BarWidget::Conquest}));
+    CHECK(Members(g, BarWidget::Gil) == (List{BarWidget::Gil}));
+}
+
+TEST(combined_widgets_chain_and_copies_combine_like_any_widget)
+{
+    const PanelWidget world2{BarWidget::World, 1};
+    BarPlacement p{List{BarWidget::Zone, BarWidget::Weather, world2}, List{}, List{BarWidget::Conquest}};
+    const PanelGroups g = Combine(p, Links({{BarWidget::Zone, BarWidget::Conquest}, {BarWidget::Conquest, world2}}));
+    CHECK(In(g.placement, kLeft) == (List{BarWidget::Zone, BarWidget::Conquest, world2, BarWidget::Weather}));
+    CHECK(g.group[SlotOf(world2)] == PanelWidget{BarWidget::Zone});
+}
+
+TEST(a_link_that_would_close_a_ring_or_pull_a_widget_twice_is_dropped)
+{
+    BarPlacement p{List{BarWidget::Zone, BarWidget::Weather, BarWidget::Conquest}, List{}, List{}};
+    // Zone pulls Conquest; Conquest pulling Zone back would leave neither a place.
+    const PanelGroups ring = Combine(p, Links({{BarWidget::Zone, BarWidget::Conquest}, {BarWidget::Conquest, BarWidget::Zone}}));
+    CHECK(In(ring.placement, kLeft) == (List{BarWidget::Zone, BarWidget::Conquest, BarWidget::Weather}));
+    // Weather asks for Conquest too: the lower slot, Zone, has it.
+    const PanelGroups twice = Combine(p, Links({{BarWidget::Weather, BarWidget::Conquest}, {BarWidget::Zone, BarWidget::Conquest}}));
+    CHECK(In(twice.placement, kLeft) == (List{BarWidget::Zone, BarWidget::Conquest, BarWidget::Weather}));
+}
+
+TEST(the_target_an_unplaced_copy_and_a_widget_itself_never_combine)
+{
+    const PanelWidget gil2{BarWidget::Gil, 1};
+    BarPlacement p{List{BarWidget::Zone}, List{BarWidget::Target}, List{BarWidget::Gil}};
+    const PanelGroups g = Combine(p, Links({{BarWidget::Zone, BarWidget::Target}, {BarWidget::Target, BarWidget::Gil},
+                                            {BarWidget::Gil, gil2}, {gil2, BarWidget::Zone}, {BarWidget::Zone, BarWidget::Zone}}));
+    CHECK(g.placement == p);
+    for (int slot = 0; slot < kPanelSlots; ++slot)
+        CHECK(g.group[slot] == WidgetInSlot(slot));
+}
+
+TEST(a_combined_widget_names_its_partner_as_the_settings_file_does)
+{
+    CHECK(PanelWidgetNamed("conquest") == std::optional<PanelWidget>(BarWidget::Conquest));
+    CHECK(PanelWidgetNamed("world:3") == std::optional<PanelWidget>(PanelWidget{BarWidget::World, 2}));
+    CHECK(!PanelWidgetNamed("") && !PanelWidgetNamed("target:2") && !PanelWidgetNamed("nothing"));
+}

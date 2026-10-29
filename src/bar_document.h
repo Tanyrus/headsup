@@ -73,9 +73,14 @@ namespace headsup
     // own under its id. The widgets and dividers carry the hidden class and no place: the plugin shows and places them.
     std::string BarDocument(const BarLook& look, const BarTextPlace& place, const std::vector<WidgetText>& own = {});
     std::string WidgetId(PanelWidget widget);
-    // A widget's padding on each side as its element takes it, for a room from its edge to what it shows: inside a
-    // pill's or a frame's border, or past a plain ornate widget's margin.
-    float SidePadding(const BarLook& look, PanelWidget widget, float room);
+    // A widget's margin and padding on one side as its element takes them, for a room from its edge to what it
+    // shows: inside a pill's or a frame's border, or past a plain ornate widget's margin. A side it shares in a
+    // combined pill has neither there, so all of the room is padding.
+    struct WidgetSide
+    {
+        float margin = 0.0f, padding = 0.0f;
+    };
+    WidgetSide SideOf(const BarLook& look, PanelWidget widget, float room, bool shared);
     std::string DividerId(int divider);
     constexpr int kDividerCount       = kMostPlaced - 1;
     constexpr const char* kStripId    = "strip";
@@ -83,6 +88,10 @@ namespace headsup
     constexpr const char* kHiddenClass = "hidden";
     constexpr const char* kLitClass    = "lit"; // hovered or open, with a popup
     constexpr const char* kBorderlessClass = "borderless"; // the target, its border switched off
+    constexpr const char* kFlatClass       = "flat"; // a pill shown only while lit
+    // Shares its pill with the widget before it, or after it, and has no edge or round corners on that side.
+    constexpr const char* kJoinBeforeClass = "join-before";
+    constexpr const char* kJoinAfterClass  = "join-after";
     // A widget's inner markup: its icons, coin, title and detail lines in their colors, and its progress bar.
     // A meter's texts as wide as they are drawn, and where its parts go across it: its bar after barX, the texts
     // above and below centered on the bar.

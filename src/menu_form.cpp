@@ -441,6 +441,8 @@ namespace headsup
                     break;
                 case WidgetTabsRow::Section:
                 {
+                    // A widget combined into another's pill sits where that one does.
+                    form.Fade(off || Panel(s).group[SlotOf(widget)] != widget);
                     auto [section, index] = PlaceOf(s.barSections, widget);
                     int moved             = section;
                     const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(WindowList::BarSections));
@@ -448,6 +450,22 @@ namespace headsup
                     if (moved != section)
                         form.changed |= MoveWidget(s.barSections, static_cast<BarSection>(section), index,
                             static_cast<BarSection>(moved), s.barSections[moved].size());
+                    break;
+                }
+                case WidgetTabsRow::Combine:
+                {
+                    const std::vector<PanelWidget> choices = CombineChoices(s, widget);
+                    if (choices.empty()) break;
+                    // 0 is None, then each choice from 1.
+                    const auto at = std::ranges::find(choices, o.combine.value_or(widget));
+                    int picked    = at == choices.end() ? 0 : static_cast<int>(at - choices.begin()) + 1;
+                    form.NumberDropdown(label.c_str(), picked, 0, static_cast<int>(choices.size()),
+                        [&](int i) {
+                            return i == 0 ? std::string(Word(c, WindowWord::WidgetTabsCombineNone))
+                                          : CopyName(c, choices[static_cast<size_t>(i - 1)]);
+                        },
+                        row.tip);
+                    o.combine = picked == 0 ? std::nullopt : std::optional<PanelWidget>(choices[static_cast<size_t>(picked - 1)]);
                     break;
                 }
                 case WidgetTabsRow::Copies:

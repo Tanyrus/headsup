@@ -2756,6 +2756,51 @@ TEST(a_copy_keeps_its_own_settings_under_its_own_keys_and_a_file_without_copies_
     CHECK(AddWidgetCopy(s, BarWidget::Gil) == copy && s.Widget(*copy) == NewWidget(*copy));
 }
 
+TEST(a_combined_widget_is_kept_by_its_partners_name_and_loses_a_partner_taken_off_the_panel)
+{
+    Settings s;
+    const std::optional<PanelWidget> copy = AddWidgetCopy(s, BarWidget::Bags);
+    CHECK(copy.has_value());
+    s.Widget(BarWidget::Zone).combine    = PanelWidget{BarWidget::Conquest};
+    s.Widget(BarWidget::Weather).combine = *copy;
+    MapStore store;
+    SaveSettings(s, store);
+    CHECK_EQ(store.values["barZoneCombine"], "conquest");
+    CHECK_EQ(store.values["barWeatherCombine"], "bags:2");
+    CHECK_EQ(store.values["barGilCombine"], "");
+    const Settings read = LoadSettings(store);
+    CHECK(read.Widget(BarWidget::Zone).combine == std::optional<PanelWidget>(BarWidget::Conquest));
+    CHECK(read.Widget(BarWidget::Weather).combine == copy);
+    CHECK(Members(Panel(read), BarWidget::Zone) == (std::vector<PanelWidget>{BarWidget::Zone, BarWidget::Conquest}));
+    store.values["barZoneCombine"] = "nothing";
+    CHECK(!LoadSettings(store).Widget(BarWidget::Zone).combine);
+    // A copy taken off leaves nothing combined with it, so one put back is not.
+    RemoveWidgetCopy(s, *copy);
+    CHECK(!s.Widget(BarWidget::Weather).combine);
+    CHECK(s.Widget(BarWidget::Zone).combine == std::optional<PanelWidget>(BarWidget::Conquest));
+}
+
+TEST(a_widget_combines_with_any_placed_widget_but_the_target_itself_and_ones_taken)
+{
+    Settings s;
+    const auto offers = [&](PanelWidget widget, PanelWidget other) {
+        const std::vector<PanelWidget> choices = CombineChoices(s, widget);
+        return std::ranges::find(choices, other) != choices.end();
+    };
+    // Every other placed widget, in the panel's order.
+    std::vector<PanelWidget> all;
+    for (const std::vector<PanelWidget>& section : s.barSections)
+        for (const PanelWidget w : section)
+            if (w != PanelWidget{BarWidget::Zone} && w.kind != BarWidget::Target) all.push_back(w);
+    CHECK(CombineChoices(s, BarWidget::Zone) == all);
+    CHECK(CombineChoices(s, BarWidget::Target).empty());
+    s.Widget(BarWidget::Zone).combine = PanelWidget{BarWidget::Conquest};
+    CHECK(offers(BarWidget::Zone, BarWidget::Conquest));     // its own pick
+    CHECK(!offers(BarWidget::Weather, BarWidget::Conquest)); // Zone has it
+    CHECK(!offers(BarWidget::Conquest, BarWidget::Zone));    // a ring
+    CHECK(offers(BarWidget::Conquest, BarWidget::Weather));
+}
+
 TEST(a_widgets_spacing_and_padding_are_kept_for_each_copy_and_held_to_their_range)
 {
     Settings s;

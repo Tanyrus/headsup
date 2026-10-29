@@ -185,9 +185,9 @@ PIECES = Pieces(
         'theme-files': Setting(unnamed=True, words={'save-as': True, 'name-hint': True, 'save': True, 'load': True}),
         'hide-game-help': Setting(), 'position': Setting(), 'background': Setting(),
         'widget-tabs': Setting(unnamed=True, rows=rows(
-            'enabled', 'section', 'copies', 'second-line', 'icons', 'spacing', 'padding', 'title-font', 'text-font', 'text-size', 'details', 'border', 'jobs', 'currency', 'bag', 'nations', 'shows', 'ship', 'element', 'guild', 'popup', 'time-zone', 'server-time', '24-hour',
+            'enabled', 'section', 'combine', 'copies', 'second-line', 'icons', 'spacing', 'padding', 'title-font', 'text-font', 'text-size', 'details', 'border', 'jobs', 'currency', 'bag', 'nations', 'shows', 'ship', 'element', 'guild', 'popup', 'time-zone', 'server-time', '24-hour',
             'seconds', 'layout', 'exp-text', 'exp-bar', 'exp-earned', 'exp-to-next', 'exp-percent', 'exp-align', 'bar-width', 'bar-height',
-            'job-names', 'percent', 'latency'), words={'add-copy': True, 'remove-copy': True}),
+            'job-names', 'percent', 'latency'), words={'add-copy': True, 'remove-copy': True, 'combine-none': True}),
         'trays': Setting(unnamed=True), 'reset-layout': Setting(),
         # Mouse Cursor and HeadsUp Config
         'pointer-icon': Setting(options=3, nameless=frozenset({2})), 'pointer-size': Setting(), 'pointer-fix': Setting(), 'keep-pointer': Setting(),

@@ -1189,3 +1189,109 @@ TEST(a_widgets_own_spacing_adds_room_between_it_and_each_neighbour)
         }
     }
 }
+
+namespace
+{
+    // The default panel with Zone combined with Weather, and Bags with Gil.
+    PanelGroups Combined()
+    {
+        CombineLinks links{};
+        links[SlotOf(BarWidget::Zone)] = BarWidget::Weather;
+        links[SlotOf(BarWidget::Bags)] = BarWidget::Gil;
+        const BarPlacement p{std::vector<PanelWidget>{BarWidget::Zone, BarWidget::Weather, BarWidget::VanaTime},
+            std::vector<PanelWidget>{BarWidget::Target},
+            std::vector<PanelWidget>{BarWidget::Gil, BarWidget::Bags, BarWidget::EarthTime}};
+        return Combine(p, links);
+    }
+
+    BarLayout CombinedBar(float screen, BarShape shape, const BarMetrics& m, BarSeparators separators = BarSeparators::Theme,
+                          const std::array<float, kPanelSlots>& spacing = kNoSpacing)
+    {
+        const PanelGroups g = Combined();
+        return LayoutBar(screen, m, shape, Widths(100, 80, 120, 200, 90, 60, 50), 0.0f, g.placement, separators, spacing,
+            g.group);
+    }
+}
+
+TEST(combined_widgets_touch_with_no_gap_or_diamond_between_them)
+{
+    for (const auto& [shape, metrics] : {std::pair{BarShape::Pills, kPills}, std::pair{BarShape::Ornate, kOrnate}})
+        for (const BarSeparators separators : {BarSeparators::Theme, BarSeparators::Diamonds, BarSeparators::None})
+        {
+            std::array<float, kPanelSlots> spacing{};
+            spacing[SlotOf(BarWidget::Zone)] = 10.0f;
+            spacing[SlotOf(BarWidget::Weather)] = 10.0f;
+            const BarLayout l = CombinedBar(1920.0f, shape, metrics, separators, spacing);
+            const BarRect zone = *RectOf(l, BarWidget::Zone), weather = *RectOf(l, BarWidget::Weather);
+            const BarRect bags = *RectOf(l, BarWidget::Bags), gil = *RectOf(l, BarWidget::Gil);
+            CHECK(Near(weather.x, zone.x + zone.width));
+            CHECK(Near(gil.x, bags.x + bags.width)); // Gil pulled after Bags
+            // Between groups, as between any neighbours: here Weather's own room and the gap or diamond.
+            const BarLayout alone = LayoutBar(1920.0f, metrics, shape, Widths(100, 80, 120, 200, 90, 60, 50), 0.0f,
+                DefaultPlacement(), separators, spacing);
+            const float apart = RectOf(alone, BarWidget::VanaTime)->x - RectOf(alone, BarWidget::Weather)->x -
+                                RectOf(alone, BarWidget::Weather)->width;
+            CHECK(Near(RectOf(l, BarWidget::VanaTime)->x, weather.x + weather.width + apart));
+            for (const float divider : l.dividers)
+                CHECK(!Near(divider, weather.x) && !Near(divider, gil.x));
+            if (DiamondsOn(separators, shape)) CHECK_EQ(l.dividers.size(), static_cast<size_t>(2)); // one a side
+        }
+}
+
+TEST(a_combined_pill_that_does_not_fit_goes_whole)
+{
+    // Room on the left for Zone but not Weather beside it: both go, and the right side's Bags and Gil go together.
+    const float g = kPills.gap;
+    const BarLayout left = CombinedBar(g + 100.0f + 40.0f, BarShape::Pills, kPills);
+    CHECK(RectOf(left, BarWidget::Zone) == nullptr && RectOf(left, BarWidget::Weather) == nullptr);
+    const BarLayout right = CombinedBar(g + 50.0f + g + 60.0f + 40.0f, BarShape::Pills, kPills);
+    CHECK(RectOf(right, BarWidget::EarthTime) != nullptr);
+    CHECK(RectOf(right, BarWidget::Bags) == nullptr && RectOf(right, BarWidget::Gil) == nullptr);
+    // The center drops a combined pill whole from its end.
+    CombineLinks links{};
+    links[SlotOf(BarWidget::Weather)] = BarWidget::VanaTime;
+    const BarPlacement p{std::vector<PanelWidget>{}, std::vector<PanelWidget>{BarWidget::Zone, BarWidget::Weather, BarWidget::VanaTime},
+        std::vector<PanelWidget>{}};
+    const PanelGroups cg = Combine(p, links);
+    const BarLayout center = LayoutBar(2.0f * g + 100.0f + g + 80.0f + 60.0f, kPills, BarShape::Pills,
+        Widths(100, 80, 120, 0, 0, 0, 0), 0.0f, cg.placement, BarSeparators::Theme, kNoSpacing, cg.group);
+    CHECK(RectOf(center, BarWidget::Zone) != nullptr);
+    CHECK(RectOf(center, BarWidget::Weather) == nullptr && RectOf(center, BarWidget::VanaTime) == nullptr);
+    CHECK(left.dividers.empty() && right.dividers.empty());
+}
+
+TEST(a_combined_pill_hovers_and_pins_as_one_widget_named_by_its_first)
+{
+    const BarLayout l = CombinedBar(1920.0f, BarShape::Pills, kPills);
+    const BarRect zone = *RectOf(l, BarWidget::Zone), weather = *RectOf(l, BarWidget::Weather);
+    CHECK(WidgetAt(l, weather.x + 5.0f, 18.0f) == std::optional<PanelWidget>(BarWidget::Zone));
+    CHECK(WidgetAt(l, zone.x + 5.0f, 18.0f) == std::optional<PanelWidget>(BarWidget::Zone));
+    const std::optional<BarRect> pill = GroupRect(l, BarWidget::Zone);
+    CHECK(pill && Near(pill->x, zone.x) && Near(pill->width, zone.width + weather.width));
+    CHECK(!GroupRect(l, BarWidget::Weather)); // no pill is named by it
+    // Only Weather has a popup: its pill opens it under Zone's name, and a pin holds while Zone is hidden.
+    std::array<bool, kPanelSlots> popups{};
+    popups[SlotOf(BarWidget::Weather)] = true;
+    SharePopups(popups, Combined().group);
+    CHECK(popups[SlotOf(BarWidget::Zone)]);
+    BarInput input;
+    input.Frame(l, popups);
+    CHECK(input.Press(zone.x + 5.0f, 18.0f, true));
+    CHECK(input.Pinned() == std::optional<PanelWidget>(BarWidget::Zone));
+    const PanelGroups g = Combined();
+    const BarLayout hiddenZone = LayoutBar(1920.0f, kPills, BarShape::Pills, Widths(0, 80, 120, 200, 90, 60, 50), 0.0f,
+        g.placement, BarSeparators::Theme, kNoSpacing, g.group);
+    input.Frame(hiddenZone, popups);
+    CHECK(input.Pinned() == std::optional<PanelWidget>(BarWidget::Zone));
+}
+
+TEST(a_widget_in_a_combined_pill_knows_which_sides_it_shares)
+{
+    const BarLayout l = CombinedBar(1920.0f, BarShape::Pills, kPills);
+    const auto joins = [&](BarWidget w) { const PillJoins j = JoinsOf(l, w); return std::pair{j.before, j.after}; };
+    CHECK(joins(BarWidget::Zone) == std::pair(false, true));
+    CHECK(joins(BarWidget::Weather) == std::pair(true, false));
+    CHECK(joins(BarWidget::VanaTime) == std::pair(false, false));
+    CHECK(joins(BarWidget::Bags) == std::pair(false, true));
+    CHECK(joins(BarWidget::Gil) == std::pair(true, false));
+}

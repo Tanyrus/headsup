@@ -563,3 +563,22 @@ TEST(a_meters_bar_and_the_texts_over_and_under_it_are_centered_on_the_row_with_i
         CHECK(rml.find(">61%<") != std::string::npos);
     }
 }
+
+TEST(a_side_shared_in_a_combined_pill_keeps_its_text_where_it_was_and_draws_no_edge)
+{
+    constexpr float kRoom = 9.0f;
+    for (const BarTheme theme : {BarTheme::PhoenixGold, BarTheme::UmbraDark, BarTheme::Aurora})
+    {
+        const BarLook look = LookOf(theme, Settings{});
+        const std::string css = BarDocument(look, Place(), {});
+        for (const BarWidget kind : {BarWidget::Zone, BarWidget::Gil})
+        {
+            const WidgetSide own = SideOf(look, kind, kRoom, false), shared = SideOf(look, kind, kRoom, true);
+            // A plain ornate widget has no border; a pill has one, which a shared side drops.
+            const float border = look.ornate ? 0.0f : 1.0f;
+            CHECK(std::fabs(own.margin + border + own.padding - kRoom) < 0.01f);
+            CHECK(shared.margin == 0.0f && std::fabs(shared.padding - kRoom) < 0.01f);
+        }
+        CHECK(Has(css, kJoinBeforeClass) && Has(css, kJoinAfterClass));
+    }
+}

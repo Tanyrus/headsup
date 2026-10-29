@@ -301,10 +301,12 @@ namespace headsup
     }
     std::string DividerId(int divider) { return "d-" + std::to_string(divider); }
 
-    float SidePadding(const BarLook& look, PanelWidget widget, float room)
+    WidgetSide SideOf(const BarLook& look, PanelWidget widget, float room, bool shared)
     {
-        const float inside = look.ornate && widget.kind != BarWidget::Target ? DiamondClearance(look.metrics) : kBoxBorder;
-        return std::max(0.0f, room - inside);
+        if (shared) return WidgetSide{0.0f, room};
+        const bool plain = look.ornate && widget.kind != BarWidget::Target;
+        const float margin = plain ? DiamondClearance(look.metrics) : 0.0f;
+        return WidgetSide{margin, std::max(0.0f, room - (plain ? margin : kBoxBorder))};
     }
 
     namespace
@@ -470,6 +472,11 @@ namespace headsup
         css += ".hh{" + FaceRules(look.detailFont, lines.title, place.figures.height) + ShadowEffect(lines.title) + "}";
         const bool glass = look.palette.shape == BarShape::Glass;
         if (glass) css += GlassBarRules(look);
+        // Last, over every shape's own corners and borders.
+        css += shape + " .widget." + kJoinBeforeClass +
+               "{border-left-width:0px;border-top-left-radius:0px;border-bottom-left-radius:0px;}";
+        css += shape + " .widget." + kJoinAfterClass +
+               "{border-right-width:0px;border-top-right-radius:0px;border-bottom-right-radius:0px;}";
 
         std::string rml = "<rml><head><style>" + css + "</style></head><body class=\"" + shape.substr(1) + "\">";
         rml += std::string("<div id=\"") + kStripId + "\"></div>";
@@ -486,7 +493,7 @@ namespace headsup
             // Zone and Earth time show no pill until lit.
             const bool flat = !look.ornate && !boxOf(widget.kind, false);
             rml += std::string("<div class=\"widget hidden") + (widget.kind == BarWidget::Target ? " target" : "") +
-                   (flat ? " flat" : "") + "\" id=\"" + WidgetId(widget) + "\"></div>";
+                   (flat ? std::string(" ") + kFlatClass : "") + "\" id=\"" + WidgetId(widget) + "\"></div>";
         }
         rml += std::string("<div id=\"") + kHelpId + "\"></div>";
         return rml + "</body></rml>";

@@ -196,6 +196,7 @@ namespace headsup
         constexpr const char* kSecondLineSuffix = "Line2";
         constexpr const char* kIconsSuffix      = "Icons";
         constexpr const char* kSpacingSuffix    = "Spacing";
+        constexpr const char* kCombineSuffix    = "Combine";
         constexpr const char* kPaddingSuffix    = "Padding";
         constexpr const char* kTitleFontSuffix  = "TitleFont";
         constexpr const char* kTextFontSuffix   = "TextFont";
@@ -1298,6 +1299,7 @@ namespace headsup
             o.titleFont  = text((widget + kTitleFontSuffix).c_str());
             o.textFont   = text((widget + kTextFontSuffix).c_str());
             o.textSize   = number(widget + kTextSizeSuffix, o.textSize);
+            o.combine    = PanelWidgetNamed(text((widget + kCombineSuffix).c_str()));
             switch (w.kind)
             {
             case BarWidget::Gil:
@@ -1386,6 +1388,7 @@ namespace headsup
             text((widget + kTitleFontSuffix).c_str(), o.titleFont.c_str());
             text((widget + kTextFontSuffix).c_str(), o.textFont.c_str());
             StoreFloat(store, CopyKey(widget + kTextSizeSuffix, w), static_cast<float>(o.textSize));
+            text((widget + kCombineSuffix).c_str(), o.combine ? PanelWidgetName(*o.combine).c_str() : "");
             switch (w.kind)
             {
             case BarWidget::Gil: text(kBarCurrencyKey, kCurrencyTable[o.currency].key); break;
@@ -1467,7 +1470,39 @@ namespace headsup
 
     void RemoveWidgetCopy(Settings& s, PanelWidget widget)
     {
-        if (RemoveCopy(s.barSections, widget)) s.Widget(widget) = NewWidget(widget);
+        if (!RemoveCopy(s.barSections, widget)) return;
+        s.Widget(widget) = NewWidget(widget);
+        for (WidgetOptions& o : s.widgets)
+            if (o.combine == widget) o.combine.reset();
+    }
+
+    std::vector<PanelWidget> CombineChoices(const Settings& s, PanelWidget widget)
+    {
+        std::vector<PanelWidget> choices;
+        if (!Combines(widget.kind)) return choices;
+        const auto taken = [&](PanelWidget other) {
+            for (int slot = 0; slot < kPanelSlots; ++slot)
+                if (WidgetInSlot(slot) != widget && s.widgets[slot].combine == other) return true;
+            return false;
+        };
+        const auto leadsBack = [&](PanelWidget other) {
+            int steps = 0;
+            for (std::optional<PanelWidget> on = other; on && steps <= kPanelSlots; on = s.Widget(*on).combine, ++steps)
+                if (*on == widget) return true;
+            return false;
+        };
+        for (const std::vector<PanelWidget>& section : s.barSections)
+            for (const PanelWidget other : section)
+                if (other != widget && Combines(other.kind) && !taken(other) && !leadsBack(other)) choices.push_back(other);
+        return choices;
+    }
+
+    PanelGroups Panel(const Settings& s)
+    {
+        CombineLinks links{};
+        for (int slot = 0; slot < kPanelSlots; ++slot)
+            links[slot] = s.widgets[slot].combine;
+        return Combine(s.barSections, links);
     }
 
     Settings LoadSettings(SettingsStore& store)

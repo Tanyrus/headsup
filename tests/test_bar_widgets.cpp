@@ -2347,3 +2347,39 @@ TEST(the_weather_popup_keeps_its_forecast_and_elements_in_one_column_at_one_widt
     CHECK_EQ(cards.size(), static_cast<size_t>(2));
     CHECK(cards[0]->x == cards[1]->x && cards[0]->width == cards[1]->width && cards[1]->y > cards[0]->y);
 }
+
+TEST(a_combined_pills_popup_joins_the_titles_and_cards_of_each_widget_shown_with_one)
+{
+    Settings settings;
+    BarState state;
+    settings.Widget(BarWidget::Bags).combine = PanelWidget{BarWidget::Gil};
+    settings.Widget(BarWidget::Gil).combine  = PanelWidget{BarWidget::EarthTime};
+    settings.Widget(BarWidget::EarthTime).on = false; // in the pill, but shown nowhere
+    const PopupContent bags = BarPopupContent(BarWidget::Bags, state, settings);
+    const PopupContent gil  = BarPopupContent(BarWidget::Gil, state, settings);
+    const PopupContent both = PanelPopupContent(BarWidget::Bags, state, settings);
+    std::vector<Span> title = bags.title;
+    title.push_back(Span{kDot, Tone::Dim});
+    title.insert(title.end(), gil.title.begin(), gil.title.end());
+    CHECK(both.title == title);
+    std::vector<PopupSection> sections = bags.sections;
+    sections.insert(sections.end(), gil.sections.begin(), gil.sections.end());
+    CHECK(both.sections == sections);
+    // A widget alone has its own popup.
+    CHECK(PanelPopupContent(BarWidget::VanaTime, state, settings) == BarPopupContent(BarWidget::VanaTime, state, settings));
+    // A combined pill whose first widget is switched off has its partner's popup alone.
+    settings.Widget(BarWidget::Bags).on = false;
+    CHECK(PanelPopupContent(BarWidget::Bags, state, settings) == gil);
+}
+
+TEST(a_combined_pills_open_popup_gathers_what_each_of_its_widgets_needs)
+{
+    Settings settings;
+    settings.Widget(BarWidget::Zone).on       = true;
+    settings.Widget(BarWidget::Conquest).on   = true;
+    settings.Widget(BarWidget::Zone).combine  = PanelWidget{BarWidget::Conquest};
+    settings.Widget(BarWidget::Gil).combine   = PanelWidget{BarWidget::Bags};
+    CHECK(NeedsOf(settings, BarWidget::Zone).conquest);
+    CHECK(NeedsOf(settings, BarWidget::Gil).containers == kContainerCount);
+    CHECK(!NeedsOf(settings, BarWidget::Weather).conquest);
+}

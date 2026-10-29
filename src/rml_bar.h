@@ -86,7 +86,7 @@ namespace headsup
             bool measured = false;
             WidgetContent drawn; // as its markup was made from: the target's is cut to its room
             bool marked = false; // its markup is drawn's
-            Px left, width, padding;
+            Px left, width, marginLeft, marginRight, paddingLeft, paddingRight;
         };
         struct Divider
         {
@@ -110,7 +110,8 @@ namespace headsup
         struct Widgets
         {
             std::array<WidgetContent, kPanelSlots> contents;
-            std::array<bool, kPanelSlots> hasPopup{};
+            std::array<bool, kPanelSlots> hasPopup{}; // a combined pill's first widget's when any of its widgets has one
+            PanelGroups panel;                        // the panel as it is drawn, its widgets combined
             std::array<float, kPanelSlots> spacing{}; // each widget's own room more beside it
             std::array<std::optional<WidgetText>, kPanelSlots> text; // a widget's own, where it has fonts or a size of its own
         };

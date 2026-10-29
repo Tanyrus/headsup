@@ -79,6 +79,7 @@ namespace headsup
         Element worldElement = Element::Fire;        // its weather
         int worldGuild       = 0;                    // its guild shop, by GuildShops
         uint8_t worldSections = kAllWorldSections;   // its popup's parts, by WorldBit
+        std::optional<PanelWidget> combine;          // shown right after it in its pill, with one popup (Combine)
         bool operator==(const WidgetOptions&) const = default;
     };
     // A copy as a new one is: shown, and the first copies as kBarWidgetDefaults has them.
@@ -229,6 +230,11 @@ namespace headsup
     // more. Taking a copy off forgets its settings.
     std::optional<PanelWidget> AddWidgetCopy(Settings& s, BarWidget widget);
     void RemoveWidgetCopy(Settings& s, PanelWidget widget);
+    // The panel as it is drawn, each widget's combine pulling its partner after it.
+    PanelGroups Panel(const Settings& s);
+    // What a widget can be combined with, in the panel's order: every placed widget that combines, but itself, one
+    // another widget has, and one whose own links lead back to it.
+    std::vector<PanelWidget> CombineChoices(const Settings& s, PanelWidget widget);
     // Whether the game's help shows under the panel, for the windows: the panel's help line or the game's own strip.
     HelpMode WindowHelpMode(const Settings& s);
     // Places every view under the band of now (in the game's menu pixels; 0 while the panel is off): band for the

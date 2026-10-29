@@ -39,9 +39,14 @@ namespace headsup
         {
             float between = 0.0f, frameClear = 0.0f;
             const std::array<float, kPanelSlots>* own = nullptr; // each widget's room more
+            const std::array<PanelWidget, kPanelSlots>* groups = nullptr;
+            bool Together(PanelWidget a, PanelWidget b) const { return (*groups)[SlotOf(a)] == (*groups)[SlotOf(b)]; }
             float Frame(PanelWidget w) const { return w.kind == BarWidget::Target ? frameClear : 0.0f; }
             float Room(PanelWidget w) const { return (*own)[SlotOf(w)]; }
-            float Apart(PanelWidget a, PanelWidget b) const { return between + Frame(a) + Frame(b) + Room(a) + Room(b); }
+            float Apart(PanelWidget a, PanelWidget b) const
+            {
+                return Together(a, b) ? 0.0f : between + Frame(a) + Frame(b) + Room(a) + Room(b);
+            }
             // From a's edge: the middle of what is between them, but for a's frame's clear space.
             float Middle(PanelWidget a, PanelWidget b) const { return Frame(a) + (between + Room(a) + Room(b)) / 2.0f; }
         };
@@ -54,7 +59,8 @@ namespace headsup
         };
 
         // Places order one after another from `from` towards `limit` (leftward when limit is less): each widget at its
-        // width, spaced from the last; the first that does not fit goes with every one after it.
+        // width, spaced from the last; the first that does not fit goes with every one after it, and with the widgets
+        // of its pill placed before it.
         Group PlaceGroup(const std::vector<PanelWidget>& order, float from, float limit, const Spacing& spacing,
                          bool diamonds, const std::array<float, kPanelSlots>& widths, const BarRow& pill,
                          float rowY, float rowH)
@@ -68,12 +74,24 @@ namespace headsup
                 if (width <= 0.0f) continue;
                 const bool first = g.widgets.empty();
                 const float gap  = first ? 0.0f : spacing.Apart(g.widgets.back().widget, w);
-                if (width > (limit - at) * dir - gap + kFitSlack) break;
-                if (!first && diamonds)
+                if (width > (limit - at) * dir - gap + kFitSlack)
+                {
+                    for (PanelWidget next = w; !g.widgets.empty() && spacing.Together(g.widgets.back().widget, next);)
+                    {
+                        next = g.widgets.back().widget;
+                        g.widgets.pop_back();
+                        if (!g.widgets.empty() && diamonds && !spacing.Together(g.widgets.back().widget, next))
+                            g.dividers.pop_back();
+                    }
+                    break;
+                }
+                if (!first && diamonds && !spacing.Together(g.widgets.back().widget, w))
                     g.dividers.push_back(at + dir * spacing.Middle(g.widgets.back().widget, w));
                 const float x       = dir > 0.0f ? at + gap : at - gap - width;
                 const bool isTarget = w.kind == BarWidget::Target; // framed on the pill row in every shape
-                g.widgets.push_back({w, BarRect{x, isTarget ? pill.y : rowY, width, isTarget ? pill.height : rowH}});
+                const PanelWidget head = (*spacing.groups)[SlotOf(w)];
+                g.widgets.push_back({w, BarRect{x, isTarget ? pill.y : rowY, width, isTarget ? pill.height : rowH},
+                    head == w ? std::nullopt : std::optional<PanelWidget>(head)});
                 if (isTarget) g.targetWidth = width;
                 at = dir > 0.0f ? x + width : x;
             }
@@ -104,14 +122,16 @@ namespace headsup
     BarLayout LayoutBar(float screenWidth, const BarMetrics& m, BarShape shape,
                         const std::array<float, kPanelSlots>& natural, float targetMinimum,
                         const BarPlacement& placement, BarSeparators separators,
-                        const std::array<float, kPanelSlots>& spacing)
+                        const std::array<float, kPanelSlots>& spacing,
+                        const std::array<PanelWidget, kPanelSlots>& groups)
     {
         const bool ornate   = shape == BarShape::Ornate;
         const bool diamonds = DiamondsOn(separators, shape);
         // Ornate neighbours abut, a diamond on their boundary, the tints keeping clear of it. Pills sit a gap apart; a
         // diamond between them takes its width and a gap on either side.
         const float pillGap = diamonds ? 2.0f * m.gap + static_cast<float>(WholePixels(m.diamond)) : m.gap;
-        const Spacing apart{.between = ornate ? 0.0f : pillGap, .frameClear = ornate ? DiamondClearance(m) : 0.0f, .own = &spacing};
+        const Spacing apart{.between = ornate ? 0.0f : pillGap, .frameClear = ornate ? DiamondClearance(m) : 0.0f, .own = &spacing,
+            .groups = &groups};
         const float edge    = ornate ? m.cap : m.gap; // between a section and the screen's edge
         const BarRow pill   = PillRow(m);
         const float rowY    = ornate ? 0.0f : pill.y;
@@ -162,7 +182,11 @@ namespace headsup
             for (const PanelWidget w : center)
                 if (Width(widths, w) > 0.0f) shown.push_back(w);
             while (!shown.empty() && GroupWidth(shown, widths, apart) > highest - lowest + kFitSlack)
-                shown.pop_back();
+            {
+                const PanelWidget last = shown.back();
+                while (!shown.empty() && apart.Together(shown.back(), last))
+                    shown.pop_back();
+            }
             Group cg;
             if (!shown.empty())
             {
@@ -290,8 +314,45 @@ namespace headsup
     std::optional<PanelWidget> WidgetAt(const BarLayout& layout, float x, float y)
     {
         for (const PlacedWidget& p : layout.widgets)
-            if (p.rect.Contains(x, y)) return p.widget;
+            if (p.rect.Contains(x, y)) return p.group.value_or(p.widget);
         return std::nullopt;
+    }
+
+    std::optional<BarRect> GroupRect(const BarLayout& layout, PanelWidget head)
+    {
+        std::optional<BarRect> around;
+        for (const PlacedWidget& p : layout.widgets)
+        {
+            if (p.group.value_or(p.widget) != head) continue;
+            if (!around)
+            {
+                around = p.rect;
+                continue;
+            }
+            const float left = std::min(around->x, p.rect.x), top = std::min(around->y, p.rect.y);
+            const float right  = std::max(around->x + around->width, p.rect.x + p.rect.width);
+            const float bottom = std::max(around->y + around->height, p.rect.y + p.rect.height);
+            around             = BarRect{left, top, right - left, bottom - top};
+        }
+        return around;
+    }
+
+    PillJoins JoinsOf(const BarLayout& layout, PanelWidget widget)
+    {
+        const auto shares = [](const PlacedWidget& a, const PlacedWidget& b) {
+            return a.group.value_or(a.widget) == b.group.value_or(b.widget);
+        };
+        const std::vector<PlacedWidget>& w = layout.widgets;
+        for (size_t i = 0; i < w.size(); ++i)
+            if (w[i].widget == widget)
+                return PillJoins{i > 0 && shares(w[i - 1], w[i]), i + 1 < w.size() && shares(w[i], w[i + 1])};
+        return {};
+    }
+
+    void SharePopups(std::array<bool, kPanelSlots>& hasPopup, const std::array<PanelWidget, kPanelSlots>& groups)
+    {
+        for (int slot = 0; slot < kPanelSlots; ++slot)
+            if (hasPopup[slot]) hasPopup[SlotOf(groups[slot])] = true;
     }
 
     const BarRect* RectOf(const BarLayout& layout, PanelWidget widget)
@@ -339,7 +400,7 @@ namespace headsup
     {
         m_Layout   = layout;
         m_HasPopup = hasPopup;
-        if (m_Pinned && RectOf(m_Layout, *m_Pinned) == nullptr) m_Pinned.reset();
+        if (m_Pinned && !GroupRect(m_Layout, *m_Pinned)) m_Pinned.reset();
         Reevaluate();
     }
 
