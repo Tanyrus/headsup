@@ -598,8 +598,10 @@ public:
             }
             if (!pinned && args[2] != "off")
                 Print("/hu popup: no widget is named " + args[2] + ".");
+            else if (pinned) // a widget in a combined pill pins the pill's popup, named by its first widget
+                m_BarInput.Pin(headsup::Panel(m_Settings).group[headsup::SlotOf(*pinned)]);
             else
-                m_BarInput.Pin(pinned);
+                m_BarInput.Pin(std::nullopt);
         }
         else if (args[1] == "windowlog")
         {
