@@ -20,13 +20,13 @@ Goldsmithing	Bornahn	Al Zahbi	8	23	4
 Goldsmithing	Visala	Bastok Markets	8	23	4
 Goldsmithing	Yabby Tanmikey	Mhaura	8	23	4
 Leathercraft	Kueh Igunahmori	Southern San d'Oria	3	18	4
-Linkshell	Ilita	Port Bastok	12	20	7
-Linkshell	Khel Pahlhama	Port Windurst	12	20	7
-Linkshell	Paunelie	Southern San d'Oria	12	20	7
 Smithing	Ndego	Al Zahbi	8	23	2
 Smithing	Amulya	Metalworks	8	23	2
 Smithing	Kamilah	Mhaura	8	23	2
 Smithing	Doggomehr	Northern San d'Oria	8	23	2
+Woodworking	Dehbi Moshal	Al Zahbi	6	21	0
+Woodworking	Beugungel	Carpenters' Landing	5	22	0
+Woodworking	Chaupire	Northern San d'Oria	6	21	0
 Tenshodo	Tsutsuroon	Nashmau	1	23	7
 Tenshodo	Achika	Norg	9	23	7
 Tenshodo	Chiyo	Norg	9	23	7
@@ -34,6 +34,6 @@ Tenshodo	Jirokichi	Norg	9	23	7
 Tenshodo	Vuliaie	Norg	9	23	7
 Tenshodo	Jabbar	Port Bastok	1	23	4
 Tenshodo	Silver Owl	Port Bastok	1	23	4
-Woodworking	Dehbi Moshal	Al Zahbi	6	21	0
-Woodworking	Beugungel	Carpenters' Landing	5	22	0
-Woodworking	Chaupire	Northern San d'Oria	6	21	0
+Linkshell	Ilita	Port Bastok	12	20	7
+Linkshell	Khel Pahlhama	Port Windurst	12	20	7
+Linkshell	Paunelie	Southern San d'Oria	12	20	7

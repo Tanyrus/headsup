@@ -117,6 +117,18 @@ class Guilds(unittest.TestCase):
             kept = world.build_guilds(checkout(pathlib.Path(tmp), shops=shops, scripts=scripts))
         self.assertEqual([row[1] for row in kept], ['Wahraga, Gathweeda', 'Dehbi Moshal', 'Chaupire'])
 
+    def test_tenshodo_then_linkshell_come_after_the_craft_guilds(self):
+        shops = GUILD_SHOPS.replace("\n}\n", "\n    ['Achika'] =\n    {\n        hours   = { 1, 23 },\n"
+                                    "        holiday = xi.day.FIRESDAY,\n        stock   = {},\n    },\n"
+                                    "    ['Chimichiri'] =\n    {\n        hours   = { 1, 23 },\n"
+                                    "        holiday = xi.day.FIRESDAY,\n        stock   = {},\n    },\n}\n")
+        scripts = {**NPC_SCRIPTS,
+                   'Lower_Jeuno/npcs/Achika.lua': '-- Area: Lower Jeuno\n--  NPC: Achika\n-- Linkshell merchant\n',
+                   'Norg/npcs/Chimichiri.lua': '-- Area: Norg\n--  NPC: Chimichiri\n-- Tenshodo Merchant\n'}
+        with tempfile.TemporaryDirectory() as tmp:
+            kinds = [row[0] for row in world.build_guilds(checkout(pathlib.Path(tmp), shops=shops, scripts=scripts))]
+        self.assertEqual(kinds, ['Alchemy', 'Woodworking', 'Woodworking', 'Tenshodo', 'Linkshell'])
+
     def test_a_merchant_of_no_kind_it_knows_is_an_error(self):
         scripts = dict(NPC_SCRIPTS)
         scripts['Al_Zahbi/npcs/Dehbi_Moshal.lua'] = '-- Area: Al Zahbi\n--  NPC: Dehbi Moshal\n-- Juggling Guild\n'

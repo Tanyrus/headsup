@@ -41,6 +41,8 @@ BOARDING, LEAVING = 'docked', 'departing'  # the door opens as the ship docks
 GUILD_WORDS = [('Goldsmithing', 'Goldsmithing'), ('Smithing', 'Smithing'), ('Woodworking', 'Woodworking'),
                ('Cloth', 'Clothcraft'), ('Leather', 'Leathercraft'), ('Bone', 'Bonecraft'), ('Alchem', 'Alchemy'),
                ('Cooking', 'Cooking'), ('Fishing', 'Fishing'), ('Tenshodo', 'Tenshodo'), ('Linkshell', 'Linkshell')]
+# Guilds with no guild point turn-ins, after the craft guilds and in this order.
+LAST_GUILDS = ['Tenshodo', 'Linkshell']
 # Merchants with guild hours that are no guild, left out: the goblins who sell crystal chips.
 NOT_GUILDS = ['acts like a guild merchant']
 WEEKDAYS = ['FIRESDAY', 'EARTHSDAY', 'WATERSDAY', 'WINDSDAY', 'ICEDAY', 'LIGHTNINGDAY', 'LIGHTSDAY', 'DARKSDAY']
@@ -165,7 +167,8 @@ def build_guilds(server: pathlib.Path) -> list:
     for npc, (kind, zone, opens, closes, holiday) in shops.items():
         names = ', '.join(name.replace('_', ' ') for name in [npc] + aliases.get(npc, []))
         rows.append((kind, names, zone, opens, closes, holiday))
-    return sorted(rows, key=lambda row: (row[0], row[2], row[1]))
+    last = {kind: place + 1 for place, kind in enumerate(LAST_GUILDS)}
+    return sorted(rows, key=lambda row: (last.get(row[0], 0), row[0], row[2], row[1]))
 
 
 # synth_recipes.sql's fields: its Result is the 22nd, its three high qualities the next three.
