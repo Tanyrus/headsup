@@ -56,7 +56,12 @@ namespace
         image.Put(kRoutine + 0x1D1, {0x33, 0xD2, 0x33, 0xED, 0x33, 0xF6});
         PutTableReads(image, kRoutine, 0x037ED36C, 0x037ED374);
         image.Put(kRoutine + 0x6D7, {0x8D, 0x8C, 0x24, 0x84, 0x00, 0x00, 0x00});
-        image.Put(0x0D08A3, {0xE8, 0x68, 0x59, 0xFB, 0xFF, 0x83, 0xC4, 0x14, 0xC2, 0x14, 0x00}); // a wrapper: returns at once
+        // The wrapper: a check on the actor in ecx, its five arguments passed on, the call, and it returns at once.
+        image.Put(0x0D0880, {0x66, 0x83, 0xB9, 0xB2, 0x00, 0x00, 0x00, 0x00, 0x75, 0x21, 0x8B, 0x44, 0x24, 0x14, 0x8B, 0x4C,
+                                0x24, 0x10, 0x8B, 0x54, 0x24, 0x0C, 0x50, 0x8B, 0x44, 0x24, 0x0C, 0x51, 0x8B, 0x4C, 0x24, 0x0C,
+                                0x52, 0x50, 0x51});
+        image.Put(0x0D08A3, {0xE8, 0x68, 0x59, 0xFB, 0xFF, 0x83, 0xC4, 0x14, 0xC2, 0x14, 0x00});
+        image.Put(0x0D068A, {0x8B, 0xCE, 0xE8, 0xEF, 0x01, 0x00, 0x00}); // the entity loop: mov ecx,esi; call the wrapper
         image.Put(0x17570C, {0xE8, 0xFF, 0x0A, 0xF1, 0xFF, 0x83, 0xC4, 0x14, 0x8B, 0x47, 0x10}); // a loop over world labels
         return image;
     }
@@ -91,6 +96,39 @@ TEST(entity_names_come_through_the_wrapper_that_returns_straight_after)
     // The other caller walks lists of world labels, whose frames hold no actor.
     const NameRoutine found = Locate(ClientImage());
     CHECK_EQ(found.entityCaller, 0x0D08A8u);
+}
+
+TEST(the_entity_loops_call_into_the_wrapper_is_found)
+{
+    // The actor goes into the wrapper in ecx and no further, so it is caught at this call.
+    const NameRoutine found = Locate(ClientImage());
+    CHECK(found.problem == LocateProblem::None);
+    CHECK_EQ(found.wrapper, 0x0D0880u);
+    CHECK((found.wrapperCalls == std::vector<uint32_t>{0x0D068C}));
+}
+
+TEST(a_jump_another_plugin_put_over_the_wrappers_start_leaves_it_found)
+{
+    // xirml 0.20's hook, as it stood in the live client on 2026-10-27.
+    Image image = ClientImage();
+    image.Put(0x0D0880, {0xE9, 0xCB, 0x89, 0x89, 0x73});
+    const NameRoutine found = Locate(image);
+    CHECK(found.problem == LocateProblem::None);
+    CHECK((found.wrapperCalls == std::vector<uint32_t>{0x0D068C}));
+}
+
+TEST(a_wrapper_that_passes_its_arguments_otherwise_is_refused)
+{
+    Image image = ClientImage();
+    image.Put(0x0D0896, {0x90}); // push eax, the fifth argument, gone
+    CHECK(Locate(image).problem == LocateProblem::EntityWrapperChanged);
+}
+
+TEST(a_wrapper_nothing_calls_is_refused)
+{
+    Image image = ClientImage();
+    image.Put(0x0D068C, {0xE8, 0x00, 0x00, 0x00, 0x00});
+    CHECK(Locate(image).problem == LocateProblem::NoEntityWrapperCalls);
 }
 
 TEST(without_that_wrapper_the_routine_is_refused)
@@ -427,6 +465,19 @@ TEST(the_window_draw_call_is_found_by_its_loop_and_checked_by_the_routines_start
     PutWindowLoop(twice, 0x160000);
     CHECK(LocateWindowDraw(twice.Text()).problem == LocateProblem::AmbiguousWindowDraw);
     CHECK(LocateWindowDraw(Image{}.Text()).problem == LocateProblem::NoWindowDraw);
+}
+
+TEST(a_jump_another_plugin_put_over_the_window_draws_start_leaves_it_found)
+{
+    // xirml 0.20's hook over sub esp,24h; push ebx; push ebp, as it stood in the live client on 2026-10-27.
+    Image hooked = WindowClient();
+    hooked.Put(kWindowRoutine, {0xE9, 0xAB, 0xF5, 0x8D, 0x73});
+    const WindowDraw found = LocateWindowDraw(hooked.Text());
+    CHECK(found.problem == LocateProblem::None && found.draw == kWindowRoutine);
+    // A jump into a routine that goes on otherwise is not the window draw.
+    Image other = WindowClient();
+    other.Put(kWindowRoutine, {0xE9, 0xAB, 0xF5, 0x8D, 0x73, 0x55});
+    CHECK(LocateWindowDraw(other.Text()).problem == LocateProblem::WindowDrawChanged);
 }
 
 TEST(the_window_list_is_the_one_the_draw_loop_starts_on)
@@ -1157,6 +1208,22 @@ TEST(an_owners_copy_of_an_entrys_corner_is_found_after_its_layouts_call_for_the_
     CHECK(!EntryPlaceOffset(apart, at, entryRect));
 }
 
+TEST(a_layout_that_starts_with_its_base_classs_layout_names_it)
+{
+    // The Linkshell menu's owner (link13, Set as No. 1 / No. 2 / Drop; the client's 0x1E6510 of 2026-10-27): push esi;
+    // mov esi,ecx; call 0x1E5F90, the Linkshell item's layout, which keeps the first entry's corner.
+    constexpr uintptr_t at = 0x1E6510;
+    const std::vector<uint8_t> link13{0x56, 0x8B, 0xF1, 0xE8, 0x78, 0xFA, 0xFF, 0xFF, 0x8B, 0x0D, 0x20, 0x35, 0x7F, 0x03};
+    CHECK(BaseLayout(link13, at) == std::optional<uintptr_t>(0x1E5F90));
+    // Started with other work, or a call later on: none.
+    const std::vector<uint8_t> work{0x83, 0xEC, 0x08, 0xE8, 0x78, 0xFA, 0xFF, 0xFF};
+    CHECK(!BaseLayout(work, at));
+    std::vector<uint8_t> late = link13;
+    late.insert(late.begin() + 3, {0x8B, 0x46, 0x14, 0x85, 0xC0, 0x74, 0x10, 0x90, 0x90});
+    CHECK(!BaseLayout(late, at));
+    CHECK(!BaseLayout(std::vector<uint8_t>{0x56, 0x8B, 0xF1}, at));
+}
+
 TEST(an_owners_place_copy_is_found_in_its_layouts_call_for_the_windows_rectangle)
 {
     // The client's own bytes (2026-10-13 build): each layout pushes the address of its copy and calls MCD::GetRect.
@@ -1277,4 +1344,46 @@ TEST(playonline_counts_are_taken_as_the_network_window_shows_them)
     // A message and a friend request beside the messenger, nothing beside the envelope (the test server, 2026-10-26).
     CHECK(PlayOnlineFrom(2, 0) == (PlayOnlineCounts{2, 0}));
     CHECK(PlayOnlineFrom(250, 3) == (PlayOnlineCounts{200, 3})); // the window shows at most 200 messages
+}
+
+namespace
+{
+    // The two calls that draw one character's model, as the client of 2026-10-27 held them: lea ecx,[esp+78h];
+    // push eax; push ecx; push edi; push esi (the actor); lea ecx,[esi+674h]; call 0x2B6E0. A Windows tester's
+    // /hu stackdump of 2026-10-08 found every credited character draw under one of them, the actor just above.
+    constexpr uint32_t kModelDraw = 0x02B6E0, kModelCallA = 0x0CCDC1, kModelCallB = 0x0CCDF5;
+
+    Image ModelClient()
+    {
+        Image image;
+        image.Put(kModelCallA - 14, {0x8D, 0x4C, 0x24, 0x78, 0x50, 0x51, 0x57, 0x56, 0x8D, 0x8E, 0x74, 0x06, 0x00, 0x00,
+                                        0xE8, 0x1A, 0xE9, 0xF5, 0xFF});
+        image.Put(kModelCallB - 14, {0x8D, 0x4C, 0x24, 0x78, 0x50, 0x51, 0x57, 0x56, 0x8D, 0x8E, 0x74, 0x06, 0x00, 0x00,
+                                        0xE8, 0xE6, 0xE8, 0xF5, 0xFF});
+        return image;
+    }
+}
+
+TEST(both_calls_that_draw_a_characters_model_are_found)
+{
+    const ModelDraws found = LocateModelDraws(ModelClient().Text());
+    CHECK(found.problem == LocateProblem::None);
+    CHECK_EQ(found.draw, kModelDraw);
+    CHECK((found.calls == std::vector<uint32_t>{kModelCallA, kModelCallB}));
+}
+
+TEST(model_draw_calls_into_different_routines_are_refused)
+{
+    Image image = ModelClient();
+    image.Put32(kModelCallB + 1, 0x00001000);
+    CHECK(LocateModelDraws(image.Text()).problem == LocateProblem::ModelDrawsDiffer);
+}
+
+TEST(a_call_that_does_not_pass_the_actor_first_is_not_a_model_draw)
+{
+    Image image = ModelClient();
+    image.Put(kModelCallA - 7, {0x57}); // push edi last: the actor no longer the first argument
+    image.Put(kModelCallB - 7, {0x57});
+    CHECK(LocateModelDraws(image.Text()).problem == LocateProblem::NoModelDraws);
+    CHECK(LocateModelDraws(Image{}.Text()).problem == LocateProblem::NoModelDraws);
 }

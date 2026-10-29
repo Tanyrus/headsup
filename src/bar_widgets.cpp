@@ -8,11 +8,13 @@
 #include "ph_timers.h"
 #include "titles.h"
 #include "vanadiel.h"
+#include "world_info.h"
 #include "zones.h"
 
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <map>
 #include <span>
 #include <string_view>
 #include <utility>
@@ -45,6 +47,9 @@ namespace headsup
             {kTraitRegain, "Regain"}, {kTraitShadows, "Shadows"}, {kTraitCounter, "Counter"}};
         constexpr int kWholeAbsorb = 100; // percent
         constexpr int kForecastDays = 5, kForecastColumns = 4;
+        constexpr int kWorldGuildColumns   = 2; // a shop's hours now, and who and where
+        constexpr int kZoneRollColumns     = 3; // a zone, and its chance of the element today and tomorrow
+        constexpr int kTurnInColumns       = 6; // a rank, its item and its points, its high quality's, and the most a day
         constexpr uint16_t kGilItem  = 0xFFFF;
 
         Span Percent(int percent)
@@ -705,6 +710,349 @@ namespace headsup
             return SdtIcon(kFirstElementSdt + static_cast<int>(*element));
         }
 
+        // Words and the time after them as spans of their own, so only the time moves as it ticks.
+        void AddTime(std::vector<Span>& spans, std::string words, double seconds)
+        {
+            spans.push_back(Text(std::move(words)));
+            spans.push_back(Text(Countdown(seconds)));
+        }
+
+        // A ship's line: boarding until it leaves, or when its door opens.
+        std::vector<Span> SailingText(const TravelRoute& route, int64_t unixMs)
+        {
+            const Sailing next = NextSailing(route, unixMs);
+            std::vector<Span> spans;
+            if (next.boarding)
+            {
+                spans = ListOf(Text("Boarding"), Text(kDot, Tone::Dim));
+                AddTime(spans, "leaves in ", next.leaveIn);
+            }
+            else
+                AddTime(spans, "Boards in ", next.boardIn);
+            return spans;
+        }
+
+        std::vector<Span> GuildText(const GuildShop& shop, int64_t unixMs)
+        {
+            const GuildHours hours = GuildAt(shop, unixMs);
+            const char* now        = hours.open ? "Open" : hours.holiday ? "Holiday" : "Closed";
+            std::vector<Span> spans = ListOf(Text(now, hours.open ? Tone::Normal : Tone::Dim), Text(kDot, Tone::Dim));
+            AddTime(spans, hours.open ? "closes in " : "opens in ", hours.changeIn);
+            return spans;
+        }
+
+        // The element's next weather in the zone: its likeliest, with the element's chance that day.
+        struct ZoneWeather
+        {
+            std::optional<ElementWeather> next;
+            std::string when;
+        };
+        ZoneWeather WeatherHere(uint16_t zoneId, Element element, int64_t unixMs)
+        {
+            const ZoneRecord* zone = KnownZone(zoneId);
+            const uint32_t today   = VanaAt(unixMs).day;
+            ZoneWeather here{zone ? NextElementWeather(*zone, element, today) : std::nullopt, "Not in this zone"};
+            if (here.next)
+                here.when = here.next->day == today ? "Can roll here now" : "Here in " + Countdown(SecondsToDay(unixMs, here.next->day));
+            return here;
+        }
+
+        WidgetContent WorldWidget(const BarState& state, const WidgetOptions& o)
+        {
+            WidgetContent w;
+            w.shown    = true;
+            w.hasPopup = true;
+            switch (o.worldLine)
+            {
+            case WorldLine::Departure:
+            {
+                const TravelRoute& route = TravelRoutes()[static_cast<size_t>(o.worldRoute)];
+                w.title    = ListOf(Text(route.name));
+                w.subtitle = SailingText(route, state.unixMs);
+                break;
+            }
+            case WorldLine::Weather:
+            {
+                const ZoneWeather here = WeatherHere(state.zone, o.worldElement, state.unixMs);
+                w.title = here.next ? ListOf(Text(std::string(WeatherName(here.next->weather)) + " " +
+                                                  std::to_string(here.next->percent) + "%"))
+                                    : ListOf(Text(std::string(ElementName(o.worldElement)) + " weather"));
+                if (here.next)
+                    if (const std::optional<Icon> icon = WeatherIcon(here.next->weather)) w.icons.push_back(*icon);
+                w.subtitle = ListOf(Text(here.when, Tone::Dim));
+                break;
+            }
+            case WorldLine::Guild:
+            {
+                const GuildShop& shop = GuildShops()[static_cast<size_t>(o.worldGuild)];
+                w.title    = ListOf(Text(shop.guild));
+                w.subtitle = GuildText(shop, state.unixMs);
+                break;
+            }
+            case WorldLine::Rse:
+            {
+                const Rse rse = RseAt(state.unixMs);
+                w.title    = ListOf(Text(rse.race));
+                w.subtitle = ListOf(Text(rse.place), Text(kDot, Tone::Dim), Text("ends in " + Countdown(rse.endsIn)));
+                break;
+            }
+            case WorldLine::Moon:
+            {
+                const VanaTime t     = VanaAt(state.unixMs);
+                const uint32_t full  = NextMoonDay(t.day, true), fresh = NextMoonDay(t.day, false);
+                const bool fullFirst = full < fresh;
+                w.title    = ListOf(Text(std::string(MoonPhaseName(t.moonPercent, t.moonDirection)) + " " +
+                                         std::to_string(t.moonPercent) + "%"));
+                w.subtitle = ListOf(Text(std::string(fullFirst ? "Full" : "New") + " moon in " +
+                                         Countdown(SecondsToDay(state.unixMs, fullFirst ? full : fresh))));
+                break;
+            }
+            }
+            for (Span& span : w.subtitle)
+                span.tone = Tone::Dim;
+            return w;
+        }
+
+        // A socket's first row: the key its scrolling is kept by, and how far it is scrolled.
+        void ScrollsBy(PopupRow& first, const BarState& state, std::string key)
+        {
+            const auto scrolled = state.scrolled.find(key);
+            first.scrolled      = scrolled == state.scrolled.end() ? 0 : scrolled->second;
+            first.scroll        = std::move(key);
+        }
+
+        // The tab the player picked last in the card, or its first.
+        size_t Picked(const BarState& state, const PopupSection& section)
+        {
+            const auto picked = state.pickedTabs.find(section.heading);
+            if (picked == state.pickedTabs.end()) return 0;
+            const auto tab = std::ranges::find(section.tabs, picked->second, [](const PopupTab& t) { return t.name.text; });
+            return tab == section.tabs.end() ? 0 : static_cast<size_t>(tab - section.tabs.begin());
+        }
+
+        // A zone's weathers of an element on a day, likeliest first, after the likeliest one's icon; a dash for none.
+        PopupCell RollCell(const ZoneRoll* roll)
+        {
+            if (roll == nullptr) return Cell(Text("-", Tone::Dim));
+            std::vector<Span> text;
+            for (const WeatherChance& chance : roll->weathers)
+            {
+                if (!text.empty()) text.push_back(Text(kDot, Tone::Dim));
+                text.push_back(Text(std::string(WeatherName(chance.weather)) + " " + std::to_string(chance.percent) + "%"));
+            }
+            return Cell(std::move(text), WeatherIcon(roll->weathers.front().weather));
+        }
+
+        // A tab for each element: how many zones can roll it today and tomorrow, and which ones and how likely, today's
+        // likeliest first, then tomorrow's. The server tells only your own zone's weather.
+        PopupSection ByElement(const BarState& state, uint32_t today)
+        {
+            PopupSection section{"By Element", {}};
+            for (int e = 0; e < kElementCount; ++e)
+            {
+                const auto element = static_cast<Element>(e);
+                const std::vector<ZoneRoll> now = ZonesRolling(element, today), next = ZonesRolling(element, today + 1);
+                PopupTab tab{Colored(ElementName(element), ElementColor(element)), {}};
+                PopupRow count = Labeled("Zones", Text(std::to_string(now.size()) + " today" + kDot + std::to_string(next.size()) + " tomorrow"));
+                count.nested   = true;
+                ScrollsBy(count, state, section.heading + "/" + ElementName(element));
+                tab.rows.push_back(std::move(count));
+                std::map<uint16_t, std::pair<const ZoneRoll*, const ZoneRoll*>> zones;
+                for (const ZoneRoll& roll : now)
+                    zones[roll.zone].first = &roll;
+                for (const ZoneRoll& roll : next)
+                    zones[roll.zone].second = &roll;
+                std::vector<std::pair<uint16_t, std::pair<const ZoneRoll*, const ZoneRoll*>>> order(zones.begin(), zones.end());
+                const auto percent = [](const ZoneRoll* roll) { return roll == nullptr ? 0 : roll->percent; };
+                std::ranges::stable_sort(order, [&](const auto& a, const auto& b) {
+                    return std::pair{percent(a.second.first), percent(a.second.second)} >
+                           std::pair{percent(b.second.first), percent(b.second.second)};
+                });
+                PopupRow grid = Grid(kZoneRollColumns, (order.size() + 1) * kZoneRollColumns);
+                grid.nested   = true;
+                grid.header   = true;
+                for (const char* heading : {"Zone", "Today", "Tomorrow"})
+                    grid.cells.push_back(Cell(Text(heading, Tone::Dim)));
+                for (const auto& [zone, rolls] : order)
+                {
+                    grid.cells.push_back(Cell(Text(ZoneById(zone)->name)));
+                    grid.cells.push_back(RollCell(rolls.first));
+                    grid.cells.push_back(RollCell(rolls.second));
+                }
+                tab.rows.push_back(std::move(grid));
+                section.tabs.push_back(std::move(tab));
+            }
+            section.tab = Picked(state, section);
+            return section;
+        }
+
+        // A rank's item and its high quality: the one Phoenix's recipes make at high quality, or for one they do not
+        // name, the +1, or else the one worth more, or else the second.
+        struct RankTurnIn
+        {
+            const GuildTurnIn* item = nullptr;
+            const GuildTurnIn* high = nullptr;
+        };
+        std::vector<RankTurnIn> ByRank(const std::vector<GuildTurnIn>& turnIns)
+        {
+            const auto plusOne = [](const GuildTurnIn& t) { return t.itemName.ends_with(" +1"); };
+            std::vector<RankTurnIn> ranks;
+            for (const GuildTurnIn& turnIn : turnIns)
+            {
+                const auto same = std::ranges::find_if(ranks, [&](const RankTurnIn& r) { return r.item->rank == turnIn.rank; });
+                if (same == ranks.end())
+                    ranks.push_back(RankTurnIn{&turnIn});
+                else if (same->high == nullptr)
+                {
+                    const bool known = HighQualityTurnIn(turnIn.item) || HighQualityTurnIn(same->item->item);
+                    const bool high  = known ? HighQualityTurnIn(turnIn.item)
+                                             : plusOne(turnIn) || (!plusOne(*same->item) && turnIn.points >= same->item->points);
+                    if (high)
+                        same->high = &turnIn;
+                    else
+                        same->high = std::exchange(same->item, &turnIn);
+                }
+            }
+            return ranks;
+        }
+
+        // A craft guild's turn-ins today, from Phoenix's site, under a line of their own: each rank's item and its high
+        // quality, each with its picture and its points, and the most a day, your rank starred and lit;
+        // until the site answers, a line saying so.
+        std::vector<PopupRow> TurnIns(const BarState& state, int craft, const std::string& guild)
+        {
+            std::vector<PopupRow> rows = ListOf(LineOf("Today's Turn-ins", Tone::Heading));
+            if (state.turnIns == nullptr)
+            {
+                PopupRow waiting = LineOf(state.turnInsFailed ? "phoenix-xi.com did not answer; trying again soon"
+                                                              : "They come from phoenix-xi.com",
+                    Tone::Dim);
+                waiting.nested = true;
+                rows.push_back(std::move(waiting));
+                return rows;
+            }
+            const std::vector<RankTurnIn> ranks = ByRank(state.turnIns->guilds[static_cast<size_t>(craft)]);
+            PopupRow grid = Grid(kTurnInColumns, (ranks.size() + 1) * kTurnInColumns);
+            grid.nested   = true;
+            grid.header   = true;
+            ScrollsBy(grid, state, "Guilds/" + guild + "/Turn-ins");
+            for (const char* heading : {"Rank", "NQ Item", "Points", "HQ Item", "Points", "Max Points"})
+                grid.cells.push_back(Cell(Text(heading, Tone::Dim)));
+            const auto figure = [](int value) { return Grouped(static_cast<uint64_t>(std::max(value, 0))); };
+            for (const RankTurnIn& rank : ranks)
+            {
+                const GuildTurnIn& item = *rank.item;
+                const GuildTurnIn* high = rank.high;
+                const bool yours = state.crafts && (*state.crafts)[static_cast<size_t>(craft)] == item.rank;
+                // An item with its picture; a rank without a high quality has its cells empty.
+                const auto named = [&](const GuildTurnIn* t) {
+                    if (t == nullptr) return PopupCell{};
+                    PopupCell cell = Cell(Text(t->itemName.empty() ? "Item " + std::to_string(t->item) : t->itemName,
+                        yours ? Tone::Heading : Tone::Normal));
+                    cell.item = t->item;
+                    return cell;
+                };
+                PopupCell level = Cell(Text(item.rankName, yours ? Tone::Normal : Tone::Dim));
+                level.star      = yours;
+                grid.cells.push_back(std::move(level));
+                grid.cells.push_back(named(&item));
+                grid.cells.push_back(Cell(Text(figure(item.points))));
+                grid.cells.push_back(named(high));
+                grid.cells.push_back(high ? Cell(Text(figure(high->points))) : PopupCell{});
+                grid.cells.push_back(Cell(Text(figure(item.maxPoints) +
+                                                   (high && high->maxPoints != item.maxPoints ? " [" + figure(high->maxPoints) + "]" : ""),
+                    Tone::Dim)));
+            }
+            rows.push_back(std::move(grid));
+            return rows;
+        }
+
+        PopupContent WorldPopup(const BarState& state, const WidgetOptions& o)
+        {
+            PopupContent popup;
+            popup.title = ListOf(Text("World Info"));
+            const auto picked = [&](WorldSection section) { return (o.worldSections & WorldBit(section)) != 0; };
+            if (picked(WorldSection::Travel))
+            {
+                // A tab for each kind of ship, its routes together in the data.
+                PopupSection travel{"Travel", {}};
+                const std::span<const TravelRoute> routes = TravelRoutes();
+                for (size_t first = 0, last = 0; first < routes.size(); first = last)
+                {
+                    PopupTab kind{Text(routes[first].group), {}};
+                    for (last = first; last < routes.size() && std::string_view(routes[last].group) == routes[first].group; ++last)
+                    {
+                        std::vector<Span> when = SailingText(routes[last], state.unixMs);
+                        PopupRow row = Labeled(routes[last].name, when.front());
+                        for (size_t s = 1; s < when.size(); ++s)
+                            row.cells.back().text.push_back(when[s]);
+                        row.nested = true;
+                        kind.rows.push_back(std::move(row));
+                    }
+                    ScrollsBy(kind.rows.front(), state, travel.heading + "/" + kind.name.text);
+                    travel.tabs.push_back(std::move(kind));
+                }
+                travel.tab = Picked(state, travel);
+                popup.sections.push_back(std::move(travel));
+            }
+            if (picked(WorldSection::Calendar))
+            {
+                const Rse now = RseAt(state.unixMs), next = RseAt(state.unixMs, 1);
+                const uint32_t today = VanaAt(state.unixMs).day;
+                PopupSection calendar{"Calendar", {}};
+                calendar.beside = picked(WorldSection::Travel); // the ships and the calendar in one row, Guilds under
+                // Each line's name and who on the left; where and when on the right, the time last.
+                const auto race = [](const char* label, const Rse& rse) {
+                    PopupRow row = Labeled(label, Text(rse.place));
+                    row.cells.front().text.push_back(Text(std::string(rse.race) + " "));
+                    return row;
+                };
+                calendar.rows.push_back(race("RSE", now));
+                PopupRow coming = race("Next RSE", next);
+                coming.cells.back().text.push_back(Text(kDot, Tone::Dim));
+                coming.cells.back().text.push_back(Text(Countdown(now.endsIn)));
+                calendar.rows.push_back(std::move(coming));
+                const auto until = [](const char* label, double seconds) { return Labeled(label, Text(Countdown(seconds))); };
+                calendar.rows.push_back(until("Full Moon", SecondsToDay(state.unixMs, NextMoonDay(today, true))));
+                calendar.rows.push_back(until("New Moon", SecondsToDay(state.unixMs, NextMoonDay(today, false))));
+                calendar.rows.push_back(until("Conquest Tally", SecondsToTally(state.unixMs)));
+                popup.sections.push_back(std::move(calendar));
+            }
+            if (picked(WorldSection::Guilds))
+            {
+                // A tab for each guild, its shops together in the data: how many are open, then each shop's hours, and
+                // who and where.
+                PopupSection guilds{"Guilds", {}};
+                const std::span<const GuildShop> shops = GuildShops();
+                for (size_t first = 0, last = 0; first < shops.size(); first = last)
+                {
+                    int open = 0;
+                    for (last = first; last < shops.size() && std::string_view(shops[last].guild) == shops[first].guild; ++last)
+                        open += GuildAt(shops[last], state.unixMs).open;
+                    PopupTab guild{Text(shops[first].guild), {}};
+                    PopupRow count = Labeled("Open", Text(std::to_string(open) + " of " + std::to_string(last - first)));
+                    count.nested   = true;
+                    ScrollsBy(count, state, guilds.heading + "/" + shops[first].guild);
+                    guild.rows.push_back(std::move(count));
+                    PopupRow grid = Grid(kWorldGuildColumns, (last - first) * kWorldGuildColumns);
+                    grid.nested   = true;
+                    for (size_t i = first; i < last; ++i)
+                    {
+                        grid.cells.push_back(Cell(GuildText(shops[i], state.unixMs)));
+                        grid.cells.push_back(Cell(Text(std::string(shops[i].shops) + ", " + shops[i].zone, Tone::Dim)));
+                    }
+                    guild.rows.push_back(std::move(grid));
+                    if (const std::optional<int> craft = CraftGuildNamed(shops[first].guild))
+                        for (PopupRow& row : TurnIns(state, *craft, shops[first].guild))
+                            guild.rows.push_back(std::move(row));
+                    guilds.tabs.push_back(std::move(guild));
+                }
+                guilds.tab = Picked(state, guilds);
+                popup.sections.push_back(std::move(guilds));
+            }
+            return popup;
+        }
+
         // Red when full; dim for a bag with no room yet, which is not full.
         Span BagFill(const BagCount& bag)
         {
@@ -754,10 +1102,17 @@ namespace headsup
         return std::nullopt;
     }
 
+    bool PopupShows(const Settings& settings, std::optional<PanelWidget> open, BarWidget widget)
+    {
+        if (!open) return false;
+        if (open->kind == widget) return true;
+        return std::ranges::any_of(Members(Panel(settings), *open), [&](PanelWidget w) { return w.kind == widget; });
+    }
+
     BarNeeds NeedsOf(const Settings& settings, std::optional<PanelWidget> open)
     {
         const auto shown  = [&](BarWidget widget) { return Shown(settings, widget); };
-        const auto opened = [&](BarWidget widget) { return open && open->kind == widget; };
+        const auto opened = [&](BarWidget widget) { return PopupShows(settings, open, widget); };
         BarNeeds needs;
         // A Clock in a zone of its own goes by the time alone, as its server line and its popup's resets do; in the
         // computer's zone, by what Windows makes of the time.
@@ -769,10 +1124,16 @@ namespace headsup
                 (o.clockZone ? zonedClock : localClock) = true;
                 serverClock = serverClock || o.clockServerTime;
             }
+        // World Info reads the zone for a weather on the panel.
+        bool worldWeather = false;
+        for (int copy = 0; copy < kMostCopies; ++copy)
+            if (const PanelWidget world{BarWidget::World, copy}; Shows(settings, world))
+                worldWeather = worldWeather || settings.Widget(world).worldLine == WorldLine::Weather;
         needs.unixTime   = shown(BarWidget::Weather) || shown(BarWidget::VanaTime) || zonedClock || serverClock ||
-                           opened(BarWidget::EarthTime) || opened(BarWidget::Zone); // the Zone popup counts down to the tally
+                           shown(BarWidget::World) || opened(BarWidget::EarthTime) ||
+                           opened(BarWidget::Zone); // the Zone popup counts down to the tally
         needs.localTime  = localClock;
-        needs.zone       = shown(BarWidget::Zone) || shown(BarWidget::Weather) ||
+        needs.zone       = shown(BarWidget::Zone) || shown(BarWidget::Weather) || worldWeather ||
                      opened(BarWidget::Signet); // the popup says where it works
         needs.target     = shown(BarWidget::Target) || shown(BarWidget::Distance);
         needs.gil        = shown(BarWidget::Gil);
@@ -955,7 +1316,7 @@ namespace headsup
         case BarWidget::Job:
             return JobWidget(state.job, o.expBar, o.jobNames, o.jobLayout, o.expText);
         case BarWidget::Exp:
-            return ExpWidget(state.job, o.expPlaces, o.expBarWidth, o.expBarHeight);
+            return ExpWidget(state.job, o.expPlaces, o.expBarWidth, o.expBarHeight, o.expAlign);
         case BarWidget::Conquest:
         {
             w.subtitle = ListOf(Text("Conquest", Tone::Dim));
@@ -995,10 +1356,33 @@ namespace headsup
             break;
         case BarWidget::Memory:
             return MemoryWidget(state.memory);
+        case BarWidget::World:
+            return WorldWidget(state, o);
         }
         return w;
     }
 
+    }
+
+    PopupContent PanelPopupContent(PanelWidget head, const BarState& state, const Settings& settings)
+    {
+        const std::vector<PanelWidget> pill = Members(Panel(settings), head);
+        if (pill.size() <= 1) return BarPopupContent(head, state, settings);
+        PopupContent joined;
+        joined.oneColumn = true;
+        for (const PanelWidget w : pill)
+        {
+            if (!BarWidgetContent(w, state, settings).hasPopup) continue;
+            PopupContent own = BarPopupContent(w, state, settings);
+            if (joined.title.empty())
+                joined.icon = own.icon;
+            else
+                joined.title.push_back(Text(kDot, Tone::Dim));
+            joined.title.insert(joined.title.end(), own.title.begin(), own.title.end());
+            joined.sections.insert(joined.sections.end(), own.sections.begin(), own.sections.end());
+            joined.oneColumn = joined.oneColumn && own.oneColumn;
+        }
+        return joined;
     }
 
     PopupContent BarPopupContent(PanelWidget widget, const BarState& state, const Settings& settings)
@@ -1042,7 +1426,8 @@ namespace headsup
             PopupCell current = Cell(Text(WeatherName(now)), WeatherIcon(now));
             if (!state.weather) current.text.push_back(Text(" (likely)", Tone::Dim));
             PopupRow grid   = Grid(kForecastColumns, kForecastDays * kForecastColumns);
-            bool oneWeather = true; // on every day
+            bool oneWeather = true;  // on every day
+            bool fogs       = false; // a day can roll a weather fog takes the place of in the small hours
             for (int d = 0; d < kForecastDays; ++d)
             {
                 const int weekday = (t.weekday + d) % kVanaDaysPerWeek;
@@ -1051,6 +1436,9 @@ namespace headsup
                 const std::optional<WeatherOdds> odds = OddsOn(state, t.day + static_cast<uint32_t>(d));
                 const WeatherChances chances = odds ? Chances(*odds) : WeatherChances{};
                 oneWeather = oneWeather && chances.count == 1;
+                for (const WeatherChance& chance : chances)
+                    fogs = fogs || chance.weather == Weather::None || chance.weather == Weather::Sunshine ||
+                           chance.weather == Weather::Clouds;
                 for (int c = 0; c < kForecastColumns - 1; ++c)
                 {
                     if (c >= chances.count)
@@ -1069,7 +1457,12 @@ namespace headsup
             if (!oneWeather)
                 forecast.rows.push_back(
                     LineOf("Phoenix rolls the weather again every 3 to 30 Earth minutes.", Tone::Dim));
-            popup.sections = ListOf(PopupSection{"", ListOf(Line(std::move(current)))}, std::move(forecast));
+            if (fogs)
+                forecast.rows.push_back(
+                    LineOf("From 2:00 to 7:00, outside towns, Phoenix turns sunshine and clouds into fog.", Tone::Dim));
+            popup.sections = ListOf(PopupSection{"", ListOf(Line(std::move(current)))}, std::move(forecast),
+                ByElement(state, t.day));
+            popup.oneColumn = true;
             break;
         }
         case BarWidget::VanaTime:
@@ -1180,6 +1573,8 @@ namespace headsup
         case BarWidget::Distance: break;
         case BarWidget::Memory:
             return MemoryPopup(state.memory, state.cpuPercent, state.frames, state.linuxxi);
+        case BarWidget::World:
+            return WorldPopup(state, o);
         }
         return popup;
     }

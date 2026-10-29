@@ -19,6 +19,7 @@
 
 #include <array>
 #include <cstdint>
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -76,6 +77,11 @@ namespace headsup
         std::optional<MemoryReport> memory; // nullopt before the first whole walk of the space
         std::optional<double> cpuPercent;   // of one core; nullopt before two samples
         LinuxXIState linuxxi;
+        std::map<std::string, std::string> pickedTabs; // the tab the player picked in a card, by its heading
+        std::map<std::string, size_t> scrolled; // lines a part of a popup is scrolled past, by its key
+        const GuildPatterns* turnIns = nullptr; // today's guild point turn-ins, once fetched
+        bool turnInsFailed = false;             // the last fetch got no answer
+        std::optional<CraftRanks> crafts;       // yours, once the server sent them
     };
 
     // The parts of BarState that the shown widgets and the open popup read, for the plugin to gather only those; it
@@ -100,12 +106,17 @@ namespace headsup
         int containers = 0; // bags from 0 up to this
     };
     BarNeeds NeedsOf(const Settings& settings, std::optional<PanelWidget> open);
+    // Whether the open popup shows a widget's: its own, or a combined pill's with that widget in it.
+    bool PopupShows(const Settings& settings, std::optional<PanelWidget> open, BarWidget widget);
 
     // Game help is never shown on the bar: it has a bar of its own, under the top bar.
     WidgetContent BarWidgetContent(PanelWidget widget, const BarState& state, const Settings& settings);
     // The used and total slots of the bag the game's caption names, as the Bags widget writes them.
     std::optional<Span> StripBagFill(const BarState& state);
     PopupContent BarPopupContent(PanelWidget widget, const BarState& state, const Settings& settings);
+    // The popup a pill opens, named by its first widget: that widget's, or for a combined pill each of its widgets'
+    // that is shown and has one, their titles joined and their cards one after another.
+    PopupContent PanelPopupContent(PanelWidget head, const BarState& state, const Settings& settings);
     // The element colors of the weekdays and weather, from the spec.
     uint32_t ElementColor(Element element);
 }

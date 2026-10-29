@@ -48,6 +48,20 @@ namespace headsup
         return ReadAt<uint32_t>(data, kZoneInPlayer);
     }
 
+    std::optional<CraftRanks> ParseCraftRanks(const uint8_t* data, uint32_t size)
+    {
+        // Two bytes a skill from 0x80; a craft's rank is the low 5 bits, under its level and cap flag.
+        constexpr uint32_t kSkills = 0x80;
+        constexpr uint16_t kRankBits = 0x1F;
+        const uint32_t end = kSkills + static_cast<uint32_t>(kFirstCraftSkill + kCraftGuilds) * sizeof(uint16_t);
+        if (data == nullptr || size < end) return std::nullopt;
+        CraftRanks ranks{};
+        for (int guild = 0; guild < kCraftGuilds; ++guild)
+            ranks[static_cast<size_t>(guild)] = static_cast<uint8_t>(
+                ReadAt<uint16_t>(data, kSkills + static_cast<uint32_t>(kFirstCraftSkill + guild) * sizeof(uint16_t)) & kRankBits);
+        return ranks;
+    }
+
     std::optional<Weather> ParseWeather(const uint8_t* data, uint32_t size)
     {
         if (data == nullptr || size < kWeatherNumber + sizeof(uint16_t)) return std::nullopt;

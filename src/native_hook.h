@@ -54,7 +54,7 @@ namespace headsup
         std::string Start();
         // Puts the game's bytes back if they are still HeadsUp's. Returns why it could not, or an empty string.
         std::string Stop();
-        bool Running() const { return m_Patch.at != nullptr; }
+        bool Running() const { return !m_Patches.empty(); }
 
         uint32_t ModuleBase() const { return m_ModuleBase; }
         std::span<const uint32_t> CallerReturns() const;
@@ -72,7 +72,7 @@ namespace headsup
         IDirect3DSurface8* SceneDepth() const;
 
     private:
-        CodePatch m_Patch;
+        std::vector<CodePatch> m_Patches; // the jump into the gate, then the calls into the entity wrapper
         uint32_t m_ModuleBase = 0;
     };
 
@@ -100,6 +100,27 @@ namespace headsup
 
     private:
         std::array<CodePatch, 2> m_Calls; // the target's and the candidate's
+    };
+
+    // Sends the game's calls that draw one character's model (native_locate.h) through a gate that notes the actor
+    // until the draw returns, so every draw in between is that character's.
+    class ModelHook
+    {
+    public:
+        ~ModelHook() { Stop(); }
+        // Only at a render boundary, where the game cannot be inside a model draw. Returns why it could not start, or
+        // an empty string.
+        std::string Start();
+        // Puts the game's calls back if they are still HeadsUp's. Returns why it could not, or an empty string.
+        std::string Stop();
+        bool Running() const { return !m_Calls.empty(); }
+        // At Present: no model is being drawn, whatever a draw the game left early kept noted.
+        void NewFrame();
+        // The actor whose model the game is drawing now, or 0 between models.
+        uintptr_t Drawing() const;
+
+    private:
+        std::vector<CodePatch> m_Calls;
     };
 
     // Skips the game's help bar and connection readout while asked: the draw loop's call to the menu window draw
@@ -149,6 +170,12 @@ namespace headsup
         // The windows noted since HeadsUp loaded, by short name, in the order they came.
         std::vector<std::string> SeenWindows() const;
         size_t SeenCount() const;
+#ifdef HEADSUP_DEV
+        // Each window in the game's list now: its short name, record, rectangle, owner, the owner's class and layout
+        // (RVAs) with where HeadsUp reads it keeps its window's place and an entry's corner, and the layout's first
+        // bytes, to find what an owner keeps that a move leaves behind.
+        static std::string OwnersReport();
+#endif
         // Why windows cannot be moved, once, after a Start that could not find the game's move.
         std::string TakeMoveProblem() { return std::exchange(m_MoveProblem, std::string()); }
 

@@ -66,13 +66,20 @@ namespace headsup
         ExpPlaces expPlaces  = kDefaultExpPlaces;   // EXP: its texts around its bar
         int expBarWidth      = kDefaultExpBarWidth;
         int expBarHeight     = kDefaultExpBarHeight;
+        Align expAlign       = Align::Center;       // its texts above and below the bar, against it
         JobLayout jobLayout  = JobLayout::JobsFirst;
         bool jobNames        = true;
-        bool latency         = false; // Connection: its round trip after its rates
+        bool latency         = false; // Connection: its ping after its rates
         bool netMeter        = true;  // and the game's own meter after them
         bool targetDetails   = false; // Target: a mob's icons after its name and its weaknesses after its level
         bool targetBorder    = true;  // and its frame, or its pill's own edge
         bool targetJobs      = true;  // and a player's jobs and levels, as far as they are known
+        WorldLine worldLine  = WorldLine::Departure; // World Info: what it tells on the panel
+        int worldRoute       = 0;                    // its departure, by TravelRoutes
+        Element worldElement = Element::Fire;        // its weather
+        int worldGuild       = 0;                    // its guild shop, by GuildShops
+        uint8_t worldSections = kAllWorldSections;   // its popup's parts, by WorldBit
+        std::optional<PanelWidget> combine;          // shown right after it in its pill, with one popup (Combine)
         bool operator==(const WidgetOptions&) const = default;
     };
     // A copy as a new one is: shown, and the first copies as kBarWidgetDefaults has them.
@@ -106,6 +113,7 @@ namespace headsup
     constexpr int kMaxMenuSide  = 16384; // pixels: more than any screen is across
 
     constexpr int kMaxHelpBarOffset = 4000; // pixels either way
+    constexpr int kMaxUpMinutes = 60, kDefaultUpMinutes = 5; // how long a respawn timer reads "up" before it goes
 
     struct Settings
     {
@@ -192,6 +200,7 @@ namespace headsup
         std::string defaultFont = kDefaultFont;
         int scaleMin = 50, scaleMax = 250; // percent: the distance scale's limits
         int timerPercent = 85;
+        int phUpMinutes  = kDefaultUpMinutes;
         std::array<KindSettings, kPlateKindCount> kinds = DefaultKinds();
         OpacitySettings opacity; // every kind's nameplates
         Palette palette = DefaultPalette();
@@ -221,6 +230,11 @@ namespace headsup
     // more. Taking a copy off forgets its settings.
     std::optional<PanelWidget> AddWidgetCopy(Settings& s, BarWidget widget);
     void RemoveWidgetCopy(Settings& s, PanelWidget widget);
+    // The panel as it is drawn, each widget's combine pulling its partner after it.
+    PanelGroups Panel(const Settings& s);
+    // What a widget can be combined with, in the panel's order: every placed widget that combines, but itself, one
+    // another widget has, and one whose own links lead back to it.
+    std::vector<PanelWidget> CombineChoices(const Settings& s, PanelWidget widget);
     // Whether the game's help shows under the panel, for the windows: the panel's help line or the game's own strip.
     HelpMode WindowHelpMode(const Settings& s);
     // Places every view under the band of now (in the game's menu pixels; 0 while the panel is off): band for the

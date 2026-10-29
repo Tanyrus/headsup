@@ -33,6 +33,10 @@
 #include "rml_host.h"
 #include "rml_menu.h"
 #include "search_client.h"
+#include "guild_points.h"
+#include "item_picture.h"
+#include "server_ping.h"
+#include "web_get.h"
 #include "settings.h"
 #include "shot_watch.h"
 #include "tracker.h"
@@ -87,6 +91,8 @@ namespace
     constexpr const char* kNoteLog           = "headsup";  // the log's name in HeadsUp's logs folder, before its time
     constexpr const char* kThemesFolder      = "themes";  // and their saved top panel themes
     constexpr const char* kOutpostsFile      = "outposts.txt"; // every character's supply runs, as overseers told them
+    constexpr const char* kTurnInsFile       = "guild_turnins.txt"; // today's guild point turn-ins, as Phoenix's site gave them
+    constexpr double kTurnInsRetry           = 600.0; // seconds after a fetch that got no answer
     constexpr const char* kSettingsFile      = "settings.ini";
     constexpr const char* kNewFileSuffix     = ".new";          // after the process id: the file while it is written
     constexpr long kMaxSettingsBytes         = 4 * 1024 * 1024; // past this the file is not HeadsUp's to rewrite
@@ -195,7 +201,10 @@ namespace
         return found != nullptr ? found->Name[0] : nullptr;
     }
 
-    BOOL __stdcall OnMouse(uint32_t message, WPARAM wParam, LPARAM lParam, bool blocked)
+    headsup::GamePresses g_GamePresses; // what the game got of each button, for OnMouse
+
+    // HeadsUp's own answer for a mouse message: true when the game must not get it.
+    bool KeepMouse(uint32_t message, WPARAM wParam, LPARAM lParam, bool blocked)
     {
         const float x = static_cast<float>(static_cast<int16_t>(LOWORD(lParam))) * g_BarScaleX;
         const float y = static_cast<float>(static_cast<int16_t>(HIWORD(lParam))) * g_BarScaleY;
@@ -207,23 +216,28 @@ namespace
                                             g_Gui->GetIO().WantCaptureMouse);
         if (g_BarClicks != nullptr &&
             g_BarClicks->Take(message, static_cast<uint32_t>(wParam), x, y, g_BarOn && !g_BarHidden, overGui, blocked))
-            return TRUE;
-        if (overRml) return TRUE;
+            return true;
+        if (overRml) return true;
         // A window the player hides takes no click, which the game would act on unseen; an Ashita window over it does.
         if (!blocked &&
             headsup::SwallowsClick(message, static_cast<int>(static_cast<float>(static_cast<int16_t>(LOWORD(lParam))) * g_MenuScaleX),
                 static_cast<int>(static_cast<float>(static_cast<int16_t>(HIWORD(lParam))) * g_MenuScaleY),
                 headsup::WindowHook::HiddenRects()) &&
             !(g_Gui != nullptr && g_Gui->GetIO().WantCaptureMouse))
-            return TRUE;
-        if (!g_SyncClicks) return FALSE;
+            return true;
+        if (!g_SyncClicks) return false;
         // The game takes a click where its pointer last was, which is somewhere else after the mouse moved over another
         // window: a mouse move to the click's place goes first.
         if (!blocked && !overGui && g_GameWindow != nullptr && headsup::ClickMessage(message))
             SendMessageA(g_GameWindow, WM_MOUSEMOVE, LOWORD(wParam), lParam);
         // The game hides its pointer for typing until it sees the mouse move, which it never does over an Ashita window.
         if (message == WM_MOUSEMOVE && overGui) headsup::PointerFix::RevealUnderWindow();
-        return FALSE;
+        return false;
+    }
+
+    BOOL __stdcall OnMouse(uint32_t message, WPARAM wParam, LPARAM lParam, bool blocked)
+    {
+        return g_GamePresses.Keep(message, blocked || KeepMouse(message, wParam, lParam, blocked)) ? TRUE : FALSE;
     }
 
     // Ashita's keyboard hook: wParam the virtual key, lParam the message's flags, whose top bit says the key went up.
@@ -271,6 +285,7 @@ class HeadsUp final : public IPlugin
     std::vector<HANDLE> m_LoadedFonts;
     headsup::NameHook m_NameHook;
     headsup::ArrowHook m_ArrowHook;
+    headsup::ModelHook m_ModelHook;
     headsup::WindowHook m_WindowHook;
     bool m_WindowHookTried = false; // it patches the game's code, so it starts only once someone wants it
     headsup::PointerFix m_PointerFix;
@@ -295,6 +310,13 @@ class HeadsUp final : public IPlugin
     bool m_PlayOnlineTried = false; // it scans the client's code, so once
     std::optional<headsup::PlayOnlineCounts> m_PlayOnlineCounts; // read with the counters
     headsup::ConnectionMeter m_Connection;
+    headsup::ServerPing m_Ping;
+    headsup::WebGet m_TurnInFetch;                 // Phoenix's site, for today's guild point turn-ins
+    std::optional<headsup::GuildPatterns> m_TurnIns;
+    std::optional<int64_t> m_TurnInsDay;           // the day in Japan they are for
+    bool m_TurnInsRead = false, m_TurnInsFailed = false;
+    double m_TurnInsRetry = 0.0;                   // the next fetch after one that got no answer
+    bool m_PingTried = false; // it redirects the game's import of sendto, so once someone wants the ping
     headsup::FreeSpaceWalk m_SpaceWalk;
     headsup::CpuMeter m_Cpu;
     std::optional<uint64_t> m_Mapped; // the process's VirtualSize, read with the processor time
@@ -480,9 +502,11 @@ public:
         g_Resources  = nullptr;
         if (const std::string failure = m_NameHook.Stop(); !failure.empty()) Print(failure + ".");
         if (const std::string failure = m_ArrowHook.Stop(); !failure.empty()) Print(failure + ".");
+        if (const std::string failure = m_ModelHook.Stop(); !failure.empty()) Print(failure + ".");
         if (const std::string failure = m_WindowHook.Stop(); !failure.empty()) Print(failure + ".");
         if (const std::string failure = m_PointerFix.Stop(); !failure.empty()) Print(failure + ".");
         m_Pointer.Stop();
+        m_Ping.Stop();
         m_Fonts.Wait();
         m_Search.Stop();
         m_Nameplates.Release();
@@ -582,8 +606,10 @@ public:
             }
             if (!pinned && args[2] != "off")
                 Print("/hu popup: no widget is named " + args[2] + ".");
+            else if (pinned) // a widget in a combined pill pins the pill's popup, named by its first widget
+                m_BarInput.Pin(headsup::Panel(m_Settings).group[headsup::SlotOf(*pinned)]);
             else
-                m_BarInput.Pin(pinned);
+                m_BarInput.Pin(std::nullopt);
         }
         else if (args[1] == "windowlog")
         {
@@ -625,6 +651,14 @@ public:
             Print(m_DrawDump.Start(args.size() > 2 ? args[2] : "", Now(), m_AshitaCore, OwnFolder(kLogsFolder)));
         else if (args[1] == "codedump")
             Print(headsup::WriteCodeDump(OwnFolder(kLogsFolder)));
+        else if (args[1] == "windowowners")
+        {
+            const std::string path = OwnFolder(kLogsFolder) + "\\windowowners.txt";
+            std::ofstream out(path, std::ios::binary | std::ios::trunc);
+            const std::string report = headsup::WindowHook::OwnersReport();
+            out.write(report.data(), static_cast<std::streamsize>(report.size()));
+            Print("windowowners: wrote each open game window's owner to " + path);
+        }
         else if (args[1] == "namedump")
             Print(headsup::ArmNameDump(m_NameHook.Running()));
         else if (args[1] == "stackdump")
@@ -649,6 +683,7 @@ public:
 #ifdef HEADSUP_DEV
             Print("/hu drawdump [seconds | watch | stop]: write every draw call of one frame to logs/headsup after the delay, or watch every frame for name glitches until stopped");
             Print("/hu codedump: write the client's loaded image to logs/headsup");
+            Print("/hu windowowners: write each open game window's owner, its class and its layout's first bytes to logs/headsup");
             Print("/hu namedump: write every call into the game's name routine during one frame to logs/headsup");
             Print("/hu stackdump: write the stack at the character draws of one frame to logs/headsup");
             Print("/hu pointerwatch [stop]: log every change in the mouse pointer and the game's own to logs/headsup until stopped");
@@ -706,7 +741,6 @@ public:
         UNREFERENCED_PARAMETER(modified);
         UNREFERENCED_PARAMETER(sizeChunk);
         UNREFERENCED_PARAMETER(dataChunk);
-        if (!blocked) m_Connection.Sent(Now());
         if (const std::optional<uint32_t> target = headsup::PlayersCheck(id, data, size, injected, blocked))
             m_AutoCheck.PlayerAsked(*target, Now());
         return false;
@@ -736,6 +770,7 @@ public:
         }
 #endif
         StartHooks();
+        m_ModelHook.NewFrame();
         m_Outline.NewFrame();
         m_Names.NewFrame();
         if (m_Outline.TakeStencilWarning())
@@ -771,12 +806,12 @@ public:
         g_BarHidden = m_UiHidden;
         // Opening Region Info asks the server for the conquest standings; HeadsUp asks the same once per zone-in, and
         // again while the Zone or Conquest popup shows them.
-        const auto standings = [](headsup::BarWidget w) { return w == headsup::BarWidget::Zone || w == headsup::BarWidget::Conquest; };
+        const auto opened = [&](headsup::BarWidget w) { return headsup::PopupShows(m_Settings, m_BarInput.Open(), w); };
         if (m_GameState.ConquestRequestDue(now,
                 g_BarOn &&
                     (headsup::Shown(m_Settings, headsup::BarWidget::Zone) || headsup::Shown(m_Settings, headsup::BarWidget::Conquest)) &&
                     m_AshitaCore->GetMemoryManager()->GetPlayer()->GetIsZoning() == 0,
-                m_BarInput.Open() && standings(m_BarInput.Open()->kind)))
+                opened(headsup::BarWidget::Zone) || opened(headsup::BarWidget::Conquest)))
         {
             auto request = headsup::kConquestRequest; // Ashita takes the bytes as non-const
             m_AshitaCore->GetPacketManager()->AddOutgoingPacket(headsup::kConquestRequestPacket,
@@ -784,7 +819,7 @@ public:
             m_GameState.ConquestRequested(now);
         }
         // Opening the Currencies menu asks for them; HeadsUp asks the same, as for the conquest standings.
-        const bool gilOpen = m_BarInput.Open() && m_BarInput.Open()->kind == headsup::BarWidget::Gil;
+        const bool gilOpen = opened(headsup::BarWidget::Gil);
         if (m_GameState.CurrencyRequestDue(now,
                 g_BarOn && headsup::Shown(m_Settings, headsup::BarWidget::Gil) &&
                     m_AshitaCore->GetMemoryManager()->GetPlayer()->GetIsZoning() == 0,
@@ -1019,7 +1054,8 @@ public:
         const bool outlines = m_Settings.enabled && m_Tracker.OutlinedCount() > 0;
         const bool bodies   = headsup::NameplatesOn(m_Settings) && !m_Tracker.Actors().empty(); // labels wait for a drawn body
         if (!outlines && !bodies) return false;
-        const headsup::ActorInfo* owner = m_Outline.CharacterMeshOwner(m_Tracker);
+        const headsup::ActorInfo* owner = m_Outline.CharacterMeshOwner(m_Tracker,
+            m_ModelHook.Running() ? std::optional<uintptr_t>(m_ModelHook.Drawing()) : std::nullopt);
         if (owner == nullptr) return false;
 #ifdef HEADSUP_DEV
         headsup::CaptureStack(owner->index);
@@ -1294,6 +1330,8 @@ private:
             Print("could not hook the game's names: " + failure + ".");
         if (const std::string failure = m_ArrowHook.Start(); !failure.empty())
             Print("could not hook the game's target arrows, so it draws its own and HeadsUp none: " + failure + ".");
+        if (const std::string failure = m_ModelHook.Start(); !failure.empty())
+            Note("could not hook the game's model draws, so outlines guess whose each one is: " + failure + ".");
         if (const std::string failure = m_PointerFix.Start(); !failure.empty())
             Note("could not fix the game's mouse pointer: " + failure + ".");
         ReadGameFont();
@@ -1811,6 +1849,13 @@ private:
             [this](const std::string& name) {
                 if (std::optional<headsup::Image> piece = headsup::SkinImage(m_WindowSkins, name)) return piece;
                 if (std::optional<headsup::Image> picture = headsup::GamePictureImage(m_PlayOnlineIcons, name)) return picture;
+                // An item's picture, from the game's own resources.
+                if (const std::optional<uint16_t> item = headsup::ItemOfSource(name))
+                {
+                    const IItem* found = g_Resources != nullptr ? g_Resources->GetItemById(*item) : nullptr;
+                    if (found == nullptr) return std::optional<headsup::Image>{};
+                    return headsup::ItemPicture(found->Bitmap, std::min<size_t>(found->ImageSize, sizeof(found->Bitmap)));
+                }
                 return headsup::HostImage(name);
             });
         if (!started) Print("RmlUi did not start: the top panel and the settings window are off until HeadsUp reloads.");
@@ -1847,6 +1892,42 @@ private:
     }
 
     std::string OutpostsPath() { return OwnFolder(kConfigFolder) + "\\" + kOutpostsFile; }
+    std::string TurnInsPath() { return OwnFolder(kConfigFolder) + "\\" + kTurnInsFile; }
+
+    // The saved turn-ins at first, a fetch's answer as it comes, and a fetch when the day in Japan has moved on from
+    // the one kept, never sooner than kTurnInsRetry after one that got no answer.
+    void KeepTurnIns(int64_t unixMs, double now)
+    {
+        if (!std::exchange(m_TurnInsRead, true))
+        {
+            std::ifstream in(TurnInsPath(), std::ios::binary);
+            const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            if (const std::optional<headsup::SavedGuildPatterns> saved = headsup::ReadGuildPatternsFile(text))
+                if (std::optional<headsup::GuildPatterns> read = headsup::ReadGuildPatterns(saved->json))
+                {
+                    m_TurnIns    = std::move(read);
+                    m_TurnInsDay = saved->day;
+                }
+        }
+        if (const std::optional<headsup::WebGet::Answer> answer = m_TurnInFetch.Take())
+        {
+            std::optional<headsup::GuildPatterns> read = answer->ok ? headsup::ReadGuildPatterns(answer->body) : std::nullopt;
+            m_TurnInsFailed = !read;
+            if (read)
+            {
+                m_TurnIns    = std::move(read);
+                m_TurnInsDay = headsup::JstDay(unixMs);
+                std::ofstream out(TurnInsPath(), std::ios::binary | std::ios::trunc);
+                const std::string text = headsup::GuildPatternsFile(*m_TurnInsDay, answer->body);
+                out.write(text.data(), static_cast<std::streamsize>(text.size()));
+                if (!out.good()) Note("could not save the guild turn-ins to " + TurnInsPath() + ".");
+            }
+            else
+                m_TurnInsRetry = now + kTurnInsRetry;
+        }
+        if (headsup::GuildPatternsDue(m_TurnInsDay, unixMs) && !m_TurnInFetch.Busy() && now >= m_TurnInsRetry)
+            m_TurnInFetch.Start(headsup::kGuildPatternsHost, headsup::kGuildPatternsPath);
+    }
 
     headsup::OutpostFile& Outposts()
     {
@@ -2142,6 +2223,8 @@ private:
         s.weather = WeatherNow();
         s.owners   = m_GameState.Owners();
         s.shares   = m_GameState.Shares();
+        s.pickedTabs = m_BarInput.PickedTabs();
+        s.scrolled   = m_BarInput.Scrolled();
         if (needs.conquest)
         {
             // Ashita's nation is 0 for San d'Oria to 2 for Windurst.
@@ -2162,6 +2245,14 @@ private:
                 s.earthMinute = local->tm_min;
                 s.earthSecond = local->tm_sec;
             }
+        }
+        // Today's guild point turn-ins while World Info shows: kept for the day in Japan, fetched again after its reset.
+        if (headsup::Shown(m_Settings, headsup::BarWidget::World) && s.unixMs != 0)
+        {
+            KeepTurnIns(s.unixMs, now);
+            s.turnIns       = m_TurnIns && m_TurnInsDay == headsup::JstDay(s.unixMs) ? &*m_TurnIns : nullptr;
+            s.turnInsFailed = m_TurnInsFailed;
+            s.crafts        = m_GameState.Crafts();
         }
         if (needs.zone) s.zone = m_Zone;
         if (needs.frames) s.frames = m_FrameStats.Report();
@@ -2187,6 +2278,14 @@ private:
                 m_PlayOnlineCounts = PlayOnlineNow();
                 m_CountersReadAt   = now;
             }
+            if (!m_PingTried)
+            {
+                m_PingTried = true;
+                if (const std::string failure = m_Ping.Start(); !failure.empty())
+                    Note("the ping is not measured, as HeadsUp " + failure + ".");
+            }
+            for (const double ms : m_Ping.TakeRoundTrips())
+                m_Connection.RoundTrip(ms);
             m_Connection.Frame(now, m_Counters);
             s.connection = m_Connection.Report(now, m_AshitaCore->GetMemoryManager()->GetPlayer()->GetIsZoning() != 0);
             s.connection->playOnline = m_PlayOnlineCounts;
@@ -2550,7 +2649,7 @@ private:
                 m_AshitaCore->GetPacketManager()->AddOutgoingPacket(headsup::kCheckRequestPacket,
                     static_cast<uint32_t>(request.size()), request.data());
             }
-        m_PhTimers.Update(now, aliveMobs);
+        m_PhTimers.Update(now, aliveMobs, m_Settings.phUpMinutes);
         m_Zone = static_cast<uint16_t>(party->GetMemberZone(0));
         m_TimerLines.clear();
         if (m_Settings.phTimers) m_TimerLines = m_PhTimers.Lines(m_Zone, now);

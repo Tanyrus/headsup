@@ -1,6 +1,7 @@
 #include "bar_layout.h"
 
 #include "mouse_messages.h"
+#include "rml_pure.h"
 #include "utf16.h"
 
 #include <algorithm>
@@ -38,9 +39,14 @@ namespace headsup
         {
             float between = 0.0f, frameClear = 0.0f;
             const std::array<float, kPanelSlots>* own = nullptr; // each widget's room more
+            const std::array<PanelWidget, kPanelSlots>* groups = nullptr;
+            bool Together(PanelWidget a, PanelWidget b) const { return (*groups)[SlotOf(a)] == (*groups)[SlotOf(b)]; }
             float Frame(PanelWidget w) const { return w.kind == BarWidget::Target ? frameClear : 0.0f; }
             float Room(PanelWidget w) const { return (*own)[SlotOf(w)]; }
-            float Apart(PanelWidget a, PanelWidget b) const { return between + Frame(a) + Frame(b) + Room(a) + Room(b); }
+            float Apart(PanelWidget a, PanelWidget b) const
+            {
+                return Together(a, b) ? 0.0f : between + Frame(a) + Frame(b) + Room(a) + Room(b);
+            }
             // From a's edge: the middle of what is between them, but for a's frame's clear space.
             float Middle(PanelWidget a, PanelWidget b) const { return Frame(a) + (between + Room(a) + Room(b)) / 2.0f; }
         };
@@ -53,7 +59,8 @@ namespace headsup
         };
 
         // Places order one after another from `from` towards `limit` (leftward when limit is less): each widget at its
-        // width, spaced from the last; the first that does not fit goes with every one after it.
+        // width, spaced from the last; the first that does not fit goes with every one after it, and with the widgets
+        // of its pill placed before it.
         Group PlaceGroup(const std::vector<PanelWidget>& order, float from, float limit, const Spacing& spacing,
                          bool diamonds, const std::array<float, kPanelSlots>& widths, const BarRow& pill,
                          float rowY, float rowH)
@@ -67,12 +74,24 @@ namespace headsup
                 if (width <= 0.0f) continue;
                 const bool first = g.widgets.empty();
                 const float gap  = first ? 0.0f : spacing.Apart(g.widgets.back().widget, w);
-                if (width > (limit - at) * dir - gap + kFitSlack) break;
-                if (!first && diamonds)
+                if (width > (limit - at) * dir - gap + kFitSlack)
+                {
+                    for (PanelWidget next = w; !g.widgets.empty() && spacing.Together(g.widgets.back().widget, next);)
+                    {
+                        next = g.widgets.back().widget;
+                        g.widgets.pop_back();
+                        if (!g.widgets.empty() && diamonds && !spacing.Together(g.widgets.back().widget, next))
+                            g.dividers.pop_back();
+                    }
+                    break;
+                }
+                if (!first && diamonds && !spacing.Together(g.widgets.back().widget, w))
                     g.dividers.push_back(at + dir * spacing.Middle(g.widgets.back().widget, w));
                 const float x       = dir > 0.0f ? at + gap : at - gap - width;
                 const bool isTarget = w.kind == BarWidget::Target; // framed on the pill row in every shape
-                g.widgets.push_back({w, BarRect{x, isTarget ? pill.y : rowY, width, isTarget ? pill.height : rowH}});
+                const PanelWidget head = (*spacing.groups)[SlotOf(w)];
+                g.widgets.push_back({w, BarRect{x, isTarget ? pill.y : rowY, width, isTarget ? pill.height : rowH},
+                    head == w ? std::nullopt : std::optional<PanelWidget>(head)});
                 if (isTarget) g.targetWidth = width;
                 at = dir > 0.0f ? x + width : x;
             }
@@ -103,14 +122,16 @@ namespace headsup
     BarLayout LayoutBar(float screenWidth, const BarMetrics& m, BarShape shape,
                         const std::array<float, kPanelSlots>& natural, float targetMinimum,
                         const BarPlacement& placement, BarSeparators separators,
-                        const std::array<float, kPanelSlots>& spacing)
+                        const std::array<float, kPanelSlots>& spacing,
+                        const std::array<PanelWidget, kPanelSlots>& groups)
     {
         const bool ornate   = shape == BarShape::Ornate;
         const bool diamonds = DiamondsOn(separators, shape);
         // Ornate neighbours abut, a diamond on their boundary, the tints keeping clear of it. Pills sit a gap apart; a
         // diamond between them takes its width and a gap on either side.
         const float pillGap = diamonds ? 2.0f * m.gap + static_cast<float>(WholePixels(m.diamond)) : m.gap;
-        const Spacing apart{.between = ornate ? 0.0f : pillGap, .frameClear = ornate ? DiamondClearance(m) : 0.0f, .own = &spacing};
+        const Spacing apart{.between = ornate ? 0.0f : pillGap, .frameClear = ornate ? DiamondClearance(m) : 0.0f, .own = &spacing,
+            .groups = &groups};
         const float edge    = ornate ? m.cap : m.gap; // between a section and the screen's edge
         const BarRow pill   = PillRow(m);
         const float rowY    = ornate ? 0.0f : pill.y;
@@ -161,7 +182,11 @@ namespace headsup
             for (const PanelWidget w : center)
                 if (Width(widths, w) > 0.0f) shown.push_back(w);
             while (!shown.empty() && GroupWidth(shown, widths, apart) > highest - lowest + kFitSlack)
-                shown.pop_back();
+            {
+                const PanelWidget last = shown.back();
+                while (!shown.empty() && apart.Together(shown.back(), last))
+                    shown.pop_back();
+            }
             Group cg;
             if (!shown.empty())
             {
@@ -263,8 +288,11 @@ namespace headsup
         const float centered = row.y + (row.height - (title.baseline - title.top)) / 2.0f;
         const float lowest   = row.y + row.height - kBorder - margin - (title.bottom - title.top);
         t.aloneY             = std::min(centered, lowest) - title.top;
-        const LineInk side   = t.twoLines ? detail : title;
-        t.side               = t.twoLines ? t.detail : t.title;
+        // A meter's texts at a size the player set are that size, as far as the row lets the title be; at Auto, the
+        // detail line's.
+        const bool asTitle   = m.titleSet || !t.twoLines;
+        const LineInk side   = asTitle ? title : detail;
+        t.side               = asTitle ? t.title : t.detail;
         t.sideY              = row.y + (row.height - (side.baseline - side.top)) / 2.0f - side.top;
         return t;
     }
@@ -286,8 +314,45 @@ namespace headsup
     std::optional<PanelWidget> WidgetAt(const BarLayout& layout, float x, float y)
     {
         for (const PlacedWidget& p : layout.widgets)
-            if (p.rect.Contains(x, y)) return p.widget;
+            if (p.rect.Contains(x, y)) return p.group.value_or(p.widget);
         return std::nullopt;
+    }
+
+    std::optional<BarRect> GroupRect(const BarLayout& layout, PanelWidget head)
+    {
+        std::optional<BarRect> around;
+        for (const PlacedWidget& p : layout.widgets)
+        {
+            if (p.group.value_or(p.widget) != head) continue;
+            if (!around)
+            {
+                around = p.rect;
+                continue;
+            }
+            const float left = std::min(around->x, p.rect.x), top = std::min(around->y, p.rect.y);
+            const float right  = std::max(around->x + around->width, p.rect.x + p.rect.width);
+            const float bottom = std::max(around->y + around->height, p.rect.y + p.rect.height);
+            around             = BarRect{left, top, right - left, bottom - top};
+        }
+        return around;
+    }
+
+    PillJoins JoinsOf(const BarLayout& layout, PanelWidget widget)
+    {
+        const auto shares = [](const PlacedWidget& a, const PlacedWidget& b) {
+            return a.group.value_or(a.widget) == b.group.value_or(b.widget);
+        };
+        const std::vector<PlacedWidget>& w = layout.widgets;
+        for (size_t i = 0; i < w.size(); ++i)
+            if (w[i].widget == widget)
+                return PillJoins{i > 0 && shares(w[i - 1], w[i]), i + 1 < w.size() && shares(w[i], w[i + 1])};
+        return {};
+    }
+
+    void SharePopups(std::array<bool, kPanelSlots>& hasPopup, const std::array<PanelWidget, kPanelSlots>& groups)
+    {
+        for (int slot = 0; slot < kPanelSlots; ++slot)
+            if (hasPopup[slot]) hasPopup[SlotOf(groups[slot])] = true;
     }
 
     const BarRect* RectOf(const BarLayout& layout, PanelWidget widget)
@@ -335,14 +400,40 @@ namespace headsup
     {
         m_Layout   = layout;
         m_HasPopup = hasPopup;
-        if (m_Pinned && RectOf(m_Layout, *m_Pinned) == nullptr) m_Pinned.reset();
+        if (m_Pinned && !GroupRect(m_Layout, *m_Pinned)) m_Pinned.reset();
         Reevaluate();
     }
 
-    void BarInput::SetPopup(const BarRect& popup)
+    void BarInput::SetPopup(const BarRect& popup, std::vector<BarTabChip> chips, std::vector<BarScroll> scrolls)
     {
-        m_Popup = popup;
+        m_Popup   = popup;
+        m_Chips   = std::move(chips);
+        m_Scrolls = std::move(scrolls);
         Reevaluate();
+    }
+
+    void BarInput::DragTo(float y)
+    {
+        if (!m_Drag) return;
+        for (const BarScroll& scroll : m_Scrolls)
+            if (scroll.key == m_Drag->key && scroll.track.height > scroll.thumb)
+            {
+                const float along = (y - m_Drag->grab - scroll.track.y) / (scroll.track.height - scroll.thumb);
+                m_Scrolled[scroll.key] = static_cast<size_t>(std::lround(std::clamp(along, 0.0f, 1.0f) * static_cast<float>(scroll.most)));
+            }
+    }
+
+    bool BarInput::Wheel(int notches)
+    {
+        if (!InPopup(m_X, m_Y)) return false;
+        for (const BarScroll& scroll : m_Scrolls)
+            if (scroll.rect.Contains(m_X, m_Y))
+            {
+                const long now = static_cast<long>(std::min(m_Scrolled[scroll.key], scroll.most)) + kLinesPerNotch * notches;
+                m_Scrolled[scroll.key] = static_cast<size_t>(std::clamp(now, 0L, static_cast<long>(scroll.most)));
+                return true;
+            }
+        return false;
     }
 
     void BarInput::Move(float x, float y)
@@ -381,26 +472,61 @@ namespace headsup
         if (under && m_HasPopup[SlotOf(*under)])
             m_Pinned = m_Pinned == under ? std::nullopt : under;
         else if (!under && Open() && m_Popup.Contains(x, y))
+        {
+            for (const BarScroll& scroll : m_Scrolls)
+                if (scroll.track.Contains(x, y) && scroll.most > 0)
+                {
+                    const size_t now = std::min(m_Scrolled[scroll.key], scroll.most);
+                    const float top  = scroll.track.y + (scroll.track.height - scroll.thumb) * static_cast<float>(now) /
+                                                           static_cast<float>(scroll.most);
+                    const bool held  = y >= top && y < top + scroll.thumb;
+                    m_Drag           = Drag{scroll.key, held ? y - top : scroll.thumb / 2.0f};
+                    DragTo(y);
+                    return true;
+                }
+            for (const BarTabChip& chip : m_Chips)
+                if (chip.rect.Contains(x, y))
+                {
+                    m_Tabs[chip.key] = chip.tab;
+                    return true;
+                }
             m_Pinned = m_Pinned == Open() ? std::nullopt : Open();
+        }
         return true;
     }
 
     bool BarClicks::Take(uint32_t message, uint32_t buttons, float x, float y, bool barOn, bool overGui, bool blocked)
     {
         if (!barOn) m_Left = m_Right = false;
-        const bool barsTurn = barOn && !overGui && !blocked;
+        const bool barsTurn = barOn && !blocked && (!overGui || m_Input.InPopup(x, y));
         switch (message)
         {
         case kMouseMove:
             // A move with a button up is the first news of a release outside the window, which nothing else reports.
             m_Left  = m_Left && (buttons & kLeftButton) != 0;
             m_Right = m_Right && (buttons & kRightButton) != 0;
+            // A drag goes on wherever the pointer goes while the button is held; the game sees none of it.
+            if (m_Input.Dragging())
+            {
+                if ((buttons & kLeftButton) != 0)
+                {
+                    m_Input.DragTo(y);
+                    return true;
+                }
+                m_Input.EndDrag();
+            }
             if (barsTurn)
                 m_Input.Move(x, y);
             else
                 m_Input.Leave();
             return false;
-        case kLeftUp: return std::exchange(m_Left, false);
+        // A wheel message's place is on the screen, not the window: the pointer's last move says where it is.
+        case kMouseWheel:
+            return barOn && !blocked &&
+                   m_Input.Wheel(static_cast<int>(std::lround(WheelNotches(static_cast<int16_t>(buttons >> kWheelShift)))));
+        case kLeftUp:
+            m_Input.EndDrag();
+            return std::exchange(m_Left, false);
         case kRightUp: return std::exchange(m_Right, false);
         // A new press shows the last one ended, even when its release went to another window.
         case kLeftDown:

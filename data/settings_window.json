@@ -385,6 +385,7 @@
               "rows": [
                 {"key": "enabled", "name": "Enabled"},
                 {"key": "section", "name": "Section"},
+                {"key": "combine", "name": "Combine With", "tip": "Puts another widget right after this one in the same pill, with one popup for both. That widget leaves its own place. Default is None."},
                 {"key": "copies", "name": "Copies", "tip": "Another of this widget on the panel, with settings of its own. You can take a copy off again."},
                 {"key": "second-line", "name": "Second Line"},
                 {"key": "icons", "name": "Icons"},
@@ -398,26 +399,33 @@
                 {"key": "border", "name": "Border", "tip": "The frame around your target. Off, it has the same edge as every other widget."},
                 {"key": "currency", "name": "Currency"},
                 {"key": "nations", "name": "Nations", "tip": "Whose regions the widget counts and its popup lists."},
+                {"key": "shows", "name": "Shows", "tip": "What the widget tells on the panel, with a countdown. Add a copy to show another."},
+                {"key": "ship", "name": "Ship", "tip": "The boat or airship whose next departure the widget shows."},
+                {"key": "element", "name": "Element", "tip": "Shows when that element's weather can next roll in the zone you are in, and its chance that day."},
+                {"key": "guild", "name": "Guild", "tip": "The guild shop whose hours the widget shows."},
+                {"key": "popup", "name": "Popup", "tip": "The parts its popup shows when you hover it."},
                 {"key": "bag", "name": "Bag", "tip": "The bag this widget shows on the panel. Hover it for every bag."},
                 {"key": "time-zone", "name": "Time Zone", "tip": "Local is your computer's. Another zone goes before the time, as in PDT 21:07."},
                 {"key": "server-time", "name": "Server Time", "tip": "Japan's time, which the server keeps and the resets go by, as a second line under your own."},
                 {"key": "24-hour", "name": "24-Hour"},
                 {"key": "seconds", "name": "Seconds", "tip": "On your own line."},
                 {"key": "layout", "name": "Layout", "tip": "Which is the larger line, your jobs and levels or your EXP, with the other under it; or the EXP alone."},
-                {"key": "exp-text", "name": "EXP Text", "tip": "What the EXP says. At the level cap it is your limit points, after your merits."},
+                {"key": "exp-text", "name": "EXP Text", "tip": "What the EXP says. At the level cap it is your limit points, after your merits. With none picked, your jobs show alone on one line."},
                 {"key": "exp-bar", "name": "EXP Bar"},
                 {"key": "exp-earned", "name": "Earned", "tip": "Where the EXP you have of this level, out of what it takes, goes around the bar. At the level cap it is your limit points."},
                 {"key": "exp-to-next", "name": "To Next", "tip": "Where the EXP left to the next level goes around the bar. At the level cap it is your merits."},
                 {"key": "exp-percent", "name": "Percent", "tip": "Where how much of the level you have, as a percent, goes around the bar."},
+                {"key": "exp-align", "name": "Text Align", "tip": "How the texts above and below the bar line up with it: at its left end, its middle or its right end. A text longer than the bar runs past it the other way. Default is Center."},
                 {"key": "bar-width", "name": "Bar Width", "tip": "How long the bar is."},
                 {"key": "bar-height", "name": "Bar Height", "tip": "How thick the bar is. It stays in the middle of the panel."},
                 {"key": "job-names", "name": "Job Names", "tip": "Off, the levels alone."},
                 {"key": "percent", "name": "Percent", "tip": "The game's own connection meter after the rates, as its readout shows it: 100% while data comes in, less once it stops."},
-                {"key": "latency", "name": "Latency", "tip": "After the rates, once measured."}
+                {"key": "latency", "name": "Ping", "tip": "Your ping to the server, after the rates. It shows once a few of the server's answers are timed."}
               ],
               "words": [
                 {"key": "add-copy", "name": "Add a Copy", "tip": "Puts another of this widget on the panel after it, with its own tab here."},
-                {"key": "remove-copy", "name": "Remove This Copy", "tip": "Takes this copy off the panel. Its settings go with it."}
+                {"key": "remove-copy", "name": "Remove This Copy", "tip": "Takes this copy off the panel. Its settings go with it."},
+                {"key": "combine-none", "name": "None"}
               ]
             }
           ]
@@ -610,6 +618,7 @@
               {"key": "text-size", "name": "Text Size", "tip": "A percentage of the base font size set in the Entities/Nameplates section."},
               {"key": "icon-size", "name": "Icon Size", "tip": "A percentage of the icon font size set in the Entities/Nameplates section."},
               {"key": "padding", "name": "Padding", "tip": "Adds extra space between this line and the one below it.", "tipBottomLine": "Adds extra space between this line and the ones above it."},
+              {"key": "horizontal-offset", "name": "Horizontal Offset", "tip": "Moves this line left or right from where its alignment puts it. The other lines stay where they are."},
               {"key": "text-color", "name": "Text Color", "tip": "The color of text on this line. Can be custom, or it can be automatically colored based on the entity's state."},
               {"key": "shadow-strength", "name": "Shadow Strength", "tip": "The strength of a shadow drawn behind the text to make it more readable. If set to 0%, the shadow is disabled."},
               {"key": "shadow-color", "name": "Shadow Color"},
@@ -737,8 +746,9 @@
         "description": "Some enemies are placeholders for a notorious monster. When they die, the notorious monster has a chance to spawn. These settings allow you to see a timer for the next possible spawn.",
         "kinds": ["self"],
         "settings": [
-          {"key": "respawn-timers", "name": "Respawn Timer", "tip": "If enabled, it shows a timer until the next possible spawn when an NM or its placeholder dies within 50 yalms of you, if you took part: you targeted it, or you were active (moved or turned in the last 2:30) while it was claimed by your party or on your screen. Phoenix's rule, so standing AFK earns no timers. If the NM or placeholder is up, it reads 'Up'."},
-          {"key": "timer-size", "name": "Timer Size", "tip": "The font size of the timer text, as a multiplier of the base font size set by the Entities/Nameplates section."}
+          {"key": "respawn-timers", "name": "Respawn Timer", "tip": "If enabled, it shows a timer until the next possible spawn when an NM or its placeholder dies within 50 yalms of you, if you took part: you targeted it, or you were active (moved or turned in the last 2:30) while it was on your screen. Phoenix's rule, so standing AFK earns no timers. If the NM or placeholder is up, it reads 'Up'."},
+          {"key": "timer-size", "name": "Timer Size", "tip": "The font size of the timer text, as a multiplier of the base font size set by the Entities/Nameplates section."},
+          {"key": "up-time", "name": "Up Time", "tip": "How long a timer stays, reading 'Up', once the NM or its placeholder can spawn. Then it goes. At 0 it goes as soon as it is up. Default is 5 minutes."}
         ]
       }
     ]
@@ -851,7 +861,7 @@
       "key": "bar-widgets",
       "options": [
         {"name": "Zone", "tip": "The zone, its region and who holds it. Hover for the influence there and the conquest tally."},
-        {"name": "Weather", "tip": "The weather now and today's chance of it. Hover for the forecast."},
+        {"name": "Weather", "tip": "The weather now and today's chance of it. Hover for the forecast, and for the zones that can roll each element today and tomorrow."},
         {"name": "Vana'diel", "tip": "The Vana'diel day, time and moon."},
         {"name": "Target", "tip": "Your target's name, level and con. Hover a mob for its details."},
         {"name": "Gil", "tip": "Gil, or another currency. Hover for every currency."},
@@ -860,13 +870,32 @@
         {"name": "Game Help", "tip": "The game's help text, in a bar of its own under the top panel."},
         {"name": "FPS", "tip": "Frames per second. Hover for frame times."},
         {"name": "Job", "tip": "Jobs, levels and EXP to the next level, with a bar. Hover for EXP per hour."},
-        {"name": "Connection", "tip": "Bytes sent and received each second; amber or red when data stops. Hover for latency."},
+        {"name": "Connection", "tip": "Bytes sent and received each second; amber or red when data stops. Hover for your ping."},
         {"name": "Party", "tip": "Party size and the lowest HP and MP. Hover for each member."},
         {"name": "Signet", "tip": "Time left on Signet or Sanction, while one is on."},
         {"name": "Distance", "tip": "How far your target is, in yalms."},
         {"name": "Memory", "tip": "The game's memory used, over what is left before it runs out at 4 GB; amber, then red, as it runs low. Hover for the processor, the frames and the LinuxXI plugin's figures."},
         {"name": "EXP", "tip": "Your EXP and its bar, on its own. Hover for EXP per hour."},
-        {"name": "Conquest", "tip": "How many regions each nation holds. Hover for which ones."}
+        {"name": "Conquest", "tip": "How many regions each nation holds. Hover for which ones."},
+        {"name": "World Info", "tip": "The next ship, a weather, a guild's hours, the RSE or the moon, as you pick. Hover for every ship, the guilds with today's turn-ins from Phoenix's website, and the calendar."}
+      ]
+    },
+    {
+      "key": "world-line",
+      "options": [
+        {"name": "Next Ship"},
+        {"name": "Weather"},
+        {"name": "Guild Hours"},
+        {"name": "RSE"},
+        {"name": "Moon"}
+      ]
+    },
+    {
+      "key": "world-sections",
+      "options": [
+        {"name": "Travel"},
+        {"name": "Guilds"},
+        {"name": "Calendar"}
       ]
     },
     {

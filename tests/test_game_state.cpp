@@ -128,6 +128,23 @@ TEST(a_zone_in_forgets_other_players_and_everyones_sync_names_the_weather_and_sa
     CHECK(game.ZoneWeather() == Weather::Rain);
 }
 
+TEST(the_craft_ranks_are_the_last_skills_packets_and_go_with_the_character)
+{
+    GameState game;
+    CHECK(!game.Crafts().has_value());
+    std::vector<uint8_t> skills(0x100, 0);
+    const uint16_t fishing = (40 << 5) | 4;
+    std::memcpy(skills.data() + 0x80 + 2 * 48, &fishing, sizeof(fishing));
+    game.Received(0x062, skills.data(), static_cast<uint32_t>(skills.size()));
+    CHECK(game.Crafts().has_value() && (*game.Crafts())[0] == 4);
+    // Zoning keeps them; another character's are not these.
+    Feed(game, ZoneIn(kRain).Put<uint32_t>(0x04, 1001));
+    Feed(game, ZoneIn(kRain).Put<uint32_t>(0x04, 1001));
+    CHECK(game.Crafts().has_value());
+    Feed(game, ZoneIn(kRain).Put<uint32_t>(0x04, 2002));
+    CHECK(!game.Crafts().has_value());
+}
+
 TEST(a_zone_in_without_a_weather_it_names_clears_the_last_zones)
 {
     GameState game;

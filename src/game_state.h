@@ -87,6 +87,8 @@ namespace headsup
         void ConquestRequested(double now);
 
         const CurrencyValues& Currencies() const { return m_Currencies; }
+        // Your craft ranks, from the last skills packet; none before one, or since another character zoned in.
+        const std::optional<CraftRanks>& Crafts() const { return m_Crafts; }
         // Whether HeadsUp should ask for the currencies (kCurrencies1Request and _2) now: as the conquest standings
         // are, once after loading and once per zone-in, and again every kPopupRefresh while refresh (their popup
         // is open). open: the bar runs with the Gil widget on and the game is not zoning.
@@ -107,6 +109,7 @@ namespace headsup
         bool m_ConquestOwed = true;           // loading counts as a zone-in
         std::optional<double> m_ConquestAsked;
         CurrencyValues m_Currencies{}; // kept across zoning, not across characters
+        std::optional<CraftRanks> m_Crafts;
         bool m_CurrenciesOwed = true;
         std::optional<double> m_CurrenciesAsked;
         std::optional<InspectMessage> m_CheckMessage;              // waits for its general part

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "guild_points.h"
+
 #include "weather.h"
 
 #include <array>
@@ -12,6 +14,7 @@ namespace headsup
 {
     constexpr uint16_t kZoneInPacket         = 0x00A; // server to client: entering a zone
     constexpr uint16_t kWeatherPacket        = 0x057; // server to client: the zone's weather changed
+    constexpr uint16_t kSkillsPacket         = 0x062; // server to client: your skills, the crafts' ranks among them
     constexpr uint16_t kConquestPacket       = 0x05E; // server to client: the conquest standings
     // Client to server: GP_CLI_COMMAND_REQCONQUEST, which the game sends when Region Info opens. Phoenix answers with
     // a kConquestPacket and a 0x071 (0x05a_reqconquest.cpp).
@@ -28,6 +31,9 @@ namespace headsup
     std::optional<uint32_t> ParseZoneInPlayer(const uint8_t* data, uint32_t size);
     // Phoenix's s2c 0x057: WeatherNumber at 0x08.
     std::optional<Weather> ParseWeather(const uint8_t* data, uint32_t size);
+    // Your rank in each craft, by guild id (0 Amateur on), from the skills packet.
+    using CraftRanks = std::array<uint8_t, kCraftGuilds>;
+    std::optional<CraftRanks> ParseCraftRanks(const uint8_t* data, uint32_t size);
 
     enum class Nation : uint8_t
     {

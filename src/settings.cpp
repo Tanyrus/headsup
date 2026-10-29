@@ -6,6 +6,7 @@
 #include "game_font.h"
 #include "pointer_keys.h"
 #include "utf16.h"
+#include "world_info.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -69,6 +70,7 @@ namespace headsup
             {"scaleMin", &Settings::scaleMin, kMinSizePercent, kMaxSizePercent, kPercentStep},
             {"scaleMax", &Settings::scaleMax, kMinSizePercent, kMaxSizePercent, kPercentStep},
             {"timerPercent", &Settings::timerPercent, kMinSizePercent, kMaxSizePercent, kPercentStep},
+            {"phUpMinutes", &Settings::phUpMinutes, 0, kMaxUpMinutes},
             {"screenshotKey", &Settings::screenshotKey, 0, UINT8_MAX},
             {"windowType", &Settings::windowType, kFollowGameWindow, kWindowTypes}};
 
@@ -170,6 +172,12 @@ namespace headsup
         constexpr const char* kBarCurrencyKey = "barCurrency";
         constexpr const char* kBarBagKey      = "barBag";
         constexpr const char* kBarNationsKey  = "barNations";
+        constexpr const char* kWorldLineKey     = "barWorldLine";
+        constexpr const char* kWorldRouteKey    = "barWorldRoute";
+        constexpr const char* kWorldElementKey  = "barWorldElement";
+        constexpr const char* kWorldGuildKey    = "barWorldGuild";
+        constexpr const char* kWorldSectionsKey = "barWorldSections";
+        const char* const kWorldLineNames[kWorldLineCount] = {"departure", "weather", "guild", "rse", "moon"};
         constexpr const char* kClockServerTimeKey = "clockServerTime";
         // Server time was a widget of its own, with this switch.
         constexpr const char* kServerTimeWidgetKey = "barServerTime";
@@ -188,6 +196,7 @@ namespace headsup
         constexpr const char* kSecondLineSuffix = "Line2";
         constexpr const char* kIconsSuffix      = "Icons";
         constexpr const char* kSpacingSuffix    = "Spacing";
+        constexpr const char* kCombineSuffix    = "Combine";
         constexpr const char* kPaddingSuffix    = "Padding";
         constexpr const char* kTitleFontSuffix  = "TitleFont";
         constexpr const char* kTextFontSuffix   = "TextFont";
@@ -199,6 +208,8 @@ namespace headsup
         const char* const kExpPlaceKeys[kExpTextCount] = {"barExpEarned", "barExpToNext", "barExpPercent"};
         const char* const kExpPlaceNames[kExpTextPlaceCount] = {"off", "above", "below", "left", "right"};
         constexpr const char* kExpBarWidthKey = "barExpBarWidth", *kExpBarHeightKey = "barExpBarHeight";
+        constexpr const char* kExpAlignKey = "barExpAlign";
+        const char* const kExpAlignNames[kAlignCount] = {"left", "center", "right"};
         constexpr const char* kJobNamesKey  = "jobNames";
         constexpr const char* kSubtitleKey  = "barSubtitle";
         const char* const kSubtitleNames[kSubtitlePlaceCount] = {"hide", "before", "after"};
@@ -213,7 +224,7 @@ namespace headsup
         const char* const kBarSeparatorsNames[kBarSeparatorsCount] = {"theme", "diamonds", "none"};
         const char* const kBarWidgetKeys[] = {"barZone", "barWeather", "barVanaTime", "barTarget", "barGil", "barBags",
             "barEarthTime", "barGameHelp", "barFps", "barJob", "barConnection", "barParty", "barSignet", "barDistance", "barMemory",
-            "barExp", "barConquest"};
+            "barExp", "barConquest", "barWorld"};
         static_assert(std::size(kBarWidgetKeys) == kBarWidgetCount);
         const char* const kBarSectionKeys[] = {"barLeft", "barCenter", "barRight"};
         static_assert(std::size(kBarSectionKeys) == kBarSectionCount);
@@ -259,7 +270,7 @@ namespace headsup
         constexpr const char *kTextKey = "Text", *kSyncKey = "Sync", *kAlwaysKey = "Always", *kWhenKey = "When",
                              *kAlignKey = "Align", *kFontKey = "Font", *kStyleKey = "Style", *kBoldKey = "Bold",
                              *kTextSizeKey = "TextSize", *kIconScaleKey = "IconScale", *kIconSizeKey = "IconSize",
-                             *kPaddingKey = "Padding", *kShadowStrengthKey = "ShadowStrength", *kShadowKey = "Shadow",
+                             *kPaddingKey = "Padding", *kOffsetKey = "Offset", *kShadowStrengthKey = "ShadowStrength", *kShadowKey = "Shadow",
                              *kShadowColorKey = "ShadowColor", *kGlowKey = "Glow", *kGlowSizeKey = "GlowSize",
                              *kGlowColorKey = "GlowColor";
         constexpr const char *kVisibilityKey = "Visibility", *kWidthKey = "Width", *kHeightKey = "Height";
@@ -436,6 +447,7 @@ namespace headsup
             line.iconSize = Rebased(store, key(kIconScaleKey), key(kIconSizeKey), line.iconSize,
                 [&](float before) { return before * iconShare; });
             line.padding = LoadInt(store, key(kPaddingKey).c_str(), line.padding);
+            line.offset  = LoadInt(store, key(kOffsetKey).c_str(), line.offset);
             LoadPick(store, key(kColorKey), line.color);
             line.shadow = Rebased(store, key(kShadowStrengthKey), key(kShadowKey), line.shadow, ShadowStrengthOf);
             LoadPick(store, key(kShadowColorKey), line.shadowColor);
@@ -457,6 +469,7 @@ namespace headsup
             StoreFloat(store, key(kTextSizeKey), static_cast<float>(line.textSize));
             StoreFloat(store, key(kIconScaleKey), static_cast<float>(line.iconSize));
             StoreFloat(store, key(kPaddingKey), static_cast<float>(line.padding));
+            StoreFloat(store, key(kOffsetKey), static_cast<float>(line.offset));
             SavePick(store, key(kColorKey), line.color);
             StoreFloat(store, key(kShadowStrengthKey), static_cast<float>(line.shadow));
             SavePick(store, key(kShadowColorKey), line.shadowColor);
@@ -1092,6 +1105,7 @@ namespace headsup
             line.textSize  = std::clamp(Stepped(line.textSize, kPercentStep), kMinSizePercent, kMaxSizePercent);
             line.iconSize  = std::clamp(Stepped(line.iconSize, kPercentStep), kMinSizePercent, kMaxSizePercent);
             line.padding   = std::clamp(line.padding, kMinLinePadding, kMaxLinePadding);
+            line.offset    = std::clamp(line.offset, kMinLineOffset, kMaxLineOffset);
             line.shadow    = std::clamp(Stepped(line.shadow, kPercentStep), kMinShadow, kMaxShadow);
             line.glow      = std::clamp(Stepped(line.glow, kPercentStep), kMinGlow, kMaxGlow);
             line.glowSize  = std::clamp(Stepped(line.glowSize, kPercentStep), kMinGlowSize, kMaxGlowSize);
@@ -1233,6 +1247,11 @@ namespace headsup
             w.expBarWidth  = std::clamp(w.expBarWidth, kMinExpBarWidth, kMaxExpBarWidth);
             w.expBarHeight = std::clamp(w.expBarHeight, kMinExpBarHeight, kMaxExpBarHeight);
             if (static_cast<int>(w.jobLayout) >= kJobLayoutCount) w.jobLayout = fresh.jobLayout;
+            if (static_cast<int>(w.worldLine) >= kWorldLineCount) w.worldLine = fresh.worldLine;
+            if (w.worldRoute < 0 || w.worldRoute >= static_cast<int>(TravelRoutes().size())) w.worldRoute = fresh.worldRoute;
+            if (w.worldGuild < 0 || w.worldGuild >= static_cast<int>(GuildShops().size())) w.worldGuild = fresh.worldGuild;
+            if (static_cast<int>(w.worldElement) >= kElementCount) w.worldElement = fresh.worldElement;
+            w.worldSections &= kAllWorldSections;
         }
         if (static_cast<int>(s.barSubtitle) >= kSubtitlePlaceCount) s.barSubtitle = d.barSubtitle;
         if (MenuFontNamed(s.menuFont) == nullptr) s.menuFont = d.menuFont;
@@ -1280,6 +1299,7 @@ namespace headsup
             o.titleFont  = text((widget + kTitleFontSuffix).c_str());
             o.textFont   = text((widget + kTextFontSuffix).c_str());
             o.textSize   = number(widget + kTextSizeSuffix, o.textSize);
+            o.combine    = PanelWidgetNamed(text((widget + kCombineSuffix).c_str()));
             switch (w.kind)
             {
             case BarWidget::Gil:
@@ -1289,6 +1309,22 @@ namespace headsup
             case BarWidget::Conquest:
                 o.nations = static_cast<uint8_t>(std::clamp(number(kBarNationsKey, o.nations), 0, static_cast<int>(kAllNations)));
                 break;
+            case BarWidget::World:
+            {
+                const std::string line = text(kWorldLineKey), route = text(kWorldRouteKey), guild = text(kWorldGuildKey);
+                const std::string element = text(kWorldElementKey);
+                for (int l = 0; l < kWorldLineCount; ++l)
+                    if (line == kWorldLineNames[l]) o.worldLine = static_cast<WorldLine>(l);
+                for (size_t r = 0; r < TravelRoutes().size(); ++r)
+                    if (route == TravelRoutes()[r].name) o.worldRoute = static_cast<int>(r);
+                for (size_t g = 0; g < GuildShops().size(); ++g)
+                    if (guild == GuildShops()[g].shops) o.worldGuild = static_cast<int>(g);
+                for (int e = 0; e < kElementCount; ++e)
+                    if (element == ElementName(static_cast<Element>(e))) o.worldElement = static_cast<Element>(e);
+                o.worldSections = static_cast<uint8_t>(
+                    std::clamp(number(kWorldSectionsKey, o.worldSections), 0, static_cast<int>(kAllWorldSections)));
+                break;
+            }
             case BarWidget::EarthTime:
             {
                 const std::string zone = text(kClockZoneKey);
@@ -1320,6 +1356,11 @@ namespace headsup
                 }
                 o.expBarWidth  = number(kExpBarWidthKey, o.expBarWidth);
                 o.expBarHeight = number(kExpBarHeightKey, o.expBarHeight);
+                {
+                    const std::string align = text(kExpAlignKey);
+                    for (int a = 0; a < kAlignCount; ++a)
+                        if (align == kExpAlignNames[a]) o.expAlign = static_cast<Align>(a);
+                }
                 break;
             case BarWidget::Connection:
                 o.latency  = flag(kLatencyKey, o.latency);
@@ -1347,11 +1388,19 @@ namespace headsup
             text((widget + kTitleFontSuffix).c_str(), o.titleFont.c_str());
             text((widget + kTextFontSuffix).c_str(), o.textFont.c_str());
             StoreFloat(store, CopyKey(widget + kTextSizeSuffix, w), static_cast<float>(o.textSize));
+            text((widget + kCombineSuffix).c_str(), o.combine ? PanelWidgetName(*o.combine).c_str() : "");
             switch (w.kind)
             {
             case BarWidget::Gil: text(kBarCurrencyKey, kCurrencyTable[o.currency].key); break;
             case BarWidget::Bags: StoreFloat(store, CopyKey(kBarBagKey, w), static_cast<float>(o.bag)); break;
             case BarWidget::Conquest: StoreFloat(store, CopyKey(kBarNationsKey, w), static_cast<float>(o.nations)); break;
+            case BarWidget::World:
+                text(kWorldLineKey, kWorldLineNames[static_cast<int>(o.worldLine)]);
+                text(kWorldRouteKey, TravelRoutes()[static_cast<size_t>(o.worldRoute)].name);
+                text(kWorldElementKey, ElementName(o.worldElement));
+                text(kWorldGuildKey, GuildShops()[static_cast<size_t>(o.worldGuild)].shops);
+                StoreFloat(store, CopyKey(kWorldSectionsKey, w), static_cast<float>(o.worldSections));
+                break;
             case BarWidget::EarthTime:
                 text(kClockZoneKey, o.clockZone ? kClockZoneNames[static_cast<int>(*o.clockZone)] : kLocalZone);
                 flag(kClock24Key, o.clock24);
@@ -1369,6 +1418,7 @@ namespace headsup
                     text(kExpPlaceKeys[t], kExpPlaceNames[static_cast<int>(o.expPlaces[static_cast<size_t>(t)])]);
                 StoreFloat(store, CopyKey(kExpBarWidthKey, w), static_cast<float>(o.expBarWidth));
                 StoreFloat(store, CopyKey(kExpBarHeightKey, w), static_cast<float>(o.expBarHeight));
+                text(kExpAlignKey, kExpAlignNames[static_cast<int>(o.expAlign)]);
                 break;
             case BarWidget::Connection:
                 flag(kLatencyKey, o.latency);
@@ -1420,7 +1470,39 @@ namespace headsup
 
     void RemoveWidgetCopy(Settings& s, PanelWidget widget)
     {
-        if (RemoveCopy(s.barSections, widget)) s.Widget(widget) = NewWidget(widget);
+        if (!RemoveCopy(s.barSections, widget)) return;
+        s.Widget(widget) = NewWidget(widget);
+        for (WidgetOptions& o : s.widgets)
+            if (o.combine == widget) o.combine.reset();
+    }
+
+    std::vector<PanelWidget> CombineChoices(const Settings& s, PanelWidget widget)
+    {
+        std::vector<PanelWidget> choices;
+        if (!Combines(widget.kind)) return choices;
+        const auto taken = [&](PanelWidget other) {
+            for (int slot = 0; slot < kPanelSlots; ++slot)
+                if (WidgetInSlot(slot) != widget && s.widgets[slot].combine == other) return true;
+            return false;
+        };
+        const auto leadsBack = [&](PanelWidget other) {
+            int steps = 0;
+            for (std::optional<PanelWidget> on = other; on && steps <= kPanelSlots; on = s.Widget(*on).combine, ++steps)
+                if (*on == widget) return true;
+            return false;
+        };
+        for (const std::vector<PanelWidget>& section : s.barSections)
+            for (const PanelWidget other : section)
+                if (other != widget && Combines(other.kind) && !taken(other) && !leadsBack(other)) choices.push_back(other);
+        return choices;
+    }
+
+    PanelGroups Panel(const Settings& s)
+    {
+        CombineLinks links{};
+        for (int slot = 0; slot < kPanelSlots; ++slot)
+            links[slot] = s.widgets[slot].combine;
+        return Combine(s.barSections, links);
     }
 
     Settings LoadSettings(SettingsStore& store)

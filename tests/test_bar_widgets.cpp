@@ -1,14 +1,19 @@
 #include "bar_widgets.h"
+#include "bar_server_time.h"
+#include "ph_timers.h"
 #include "labels.h"
+#include "popup_layout.h"
 #include "test.h"
 #include "vanadiel.h"
 #include "weather.h"
+#include "world_info.h"
 
 #include <cmath>
 
 #include <algorithm>
 #include <cstdio>
 #include <map>
+#include <span>
 #include <string>
 #include <utility>
 
@@ -135,10 +140,10 @@ TEST(no_target_reads_no_target_and_a_player_gets_only_a_name)
     CHECK(BarPopupContent(BarWidget::Target, state, settings).title == (std::vector<Span>{{"No target", Tone::Dim}}));
     ActorInfo player;
     player.kind = EntityKind::Player;
-    std::snprintf(player.name, sizeof(player.name), "%s", "Carrott");
+    std::snprintf(player.name, sizeof(player.name), "%s", "Zinnia");
     state.target          = &player;
     const WidgetContent w = BarWidgetContent(BarWidget::Target, state, settings);
-    CHECK(Joined(w.title) == "Carrott" && w.subtitle.empty() && w.icons.empty() && !w.hasPopup);
+    CHECK(Joined(w.title) == "Zinnia" && w.subtitle.empty() && w.icons.empty() && !w.hasPopup);
     ActorInfo stranger = Goblin(); // a mob the Phoenix data does not have
     stranger.mob       = nullptr;
     stranger.level     = MakeLabel(nullptr, nullptr, 20);
@@ -592,12 +597,105 @@ TEST(the_reroll_note_is_in_earth_minutes_and_left_out_where_the_weather_never_ch
     state.unixMs = kVanaEpochUnixMs;
     state.zone   = 103;
     const PopupContent dunes = BarPopupContent(BarWidget::Weather, state, settings);
-    CHECK(Lines(*Section(dunes, "Forecast")).back() == "Phoenix rolls the weather again every 3 to 30 Earth minutes.");
+    const std::vector<std::string> notes = Lines(*Section(dunes, "Forecast"));
+    CHECK(notes[notes.size() - 2] == "Phoenix rolls the weather again every 3 to 30 Earth minutes.");
+    // Phoenix's UpdateWeather turns a roll of no weather, sunshine or clouds into fog from 2:00 to 7:00 outside towns.
+    CHECK(notes.back() == "From 2:00 to 7:00, outside towns, Phoenix turns sunshine and clouds into fog.");
     state.zone = 37;
     const PopupContent temenos   = BarPopupContent(BarWidget::Weather, state, settings);
     const PopupSection* forecast = Section(temenos, "Forecast");
-    CHECK_EQ(forecast->rows.size(), static_cast<size_t>(1));
+    CHECK_EQ(forecast->rows.size(), static_cast<size_t>(1)); // neither note: Stellar Glare is all it has
     CHECK(Joined(forecast->rows[0].cells[1].text) == "Stellar Glare 100%");
+}
+
+TEST(the_weather_popup_has_a_tab_for_each_element_of_the_zones_that_can_roll_it_today_and_tomorrow)
+{
+    Settings settings;
+    BarState state;
+    state.zone   = 103;
+    state.unixMs = kVanaEpochUnixMs + 777LL * 3456 * 1000; // day 777
+    const uint32_t today = 777;
+    const auto byElement = [&] { return *Section(BarPopupContent(BarWidget::Weather, state, settings), "By Element"); };
+    const PopupSection fire = byElement();
+    CHECK_EQ(fire.tabs.size(), static_cast<size_t>(kElementCount));
+    CHECK(fire.tab == 0);
+    for (int e = 0; e < kElementCount; ++e)
+    {
+        const auto element = static_cast<Element>(e);
+        CHECK(fire.tabs[e].name == Colored(ElementName(element), ElementColor(element))); // in its element's color
+        // Its first row: how many zones can roll it today, and tomorrow.
+        CHECK_EQ(Lines(PopupSection{"", fire.tabs[e].rows}).front(),
+            "Zones " + std::to_string(ZonesRolling(element, today).size()) + " today" + kDot +
+                std::to_string(ZonesRolling(element, today + 1).size()) + " tomorrow");
+    }
+    // Then a grid of the zones that can roll it either day, today's likeliest first, then tomorrow's.
+    state.pickedTabs["By Element"] = "Ice";
+    const PopupSection ice = byElement();
+    CHECK_EQ(ice.tab, static_cast<size_t>(Element::Ice));
+    const PopupRow& grid = ice.tabs[ice.tab].rows.back();
+    CHECK(grid.nested && grid.header && grid.kind == RowKind::Grid && grid.columns == 3);
+    std::map<uint16_t, std::pair<int, int>> chance; // today's and tomorrow's
+    for (const ZoneRoll& roll : ZonesRolling(Element::Ice, today))
+        chance[roll.zone].first = roll.percent;
+    for (const ZoneRoll& roll : ZonesRolling(Element::Ice, today + 1))
+        chance[roll.zone].second = roll.percent;
+    std::vector<uint16_t> order;
+    for (const auto& [zone, odds] : chance)
+        order.push_back(zone);
+    std::ranges::stable_sort(order, [&](uint16_t a, uint16_t b) { return chance[a] > chance[b]; });
+    CHECK_EQ(grid.cells.size(), 3 * (order.size() + 1));
+    CHECK(Joined(grid.cells[0].text) == "Zone" && Joined(grid.cells[1].text) == "Today" &&
+          Joined(grid.cells[2].text) == "Tomorrow");
+    for (size_t i = 0; i < order.size(); ++i)
+    {
+        CHECK_EQ(Joined(grid.cells[3 * (i + 1)].text), ZoneById(order[i])->name);
+        // A day the zone cannot roll it reads as a dash.
+        if (chance[order[i]].second == 0) CHECK_EQ(Joined(grid.cells[3 * (i + 1) + 2].text), "-");
+    }
+    // The first zone's weathers today, each with its share.
+    const ZoneRoll top = ZonesRolling(Element::Ice, today).front();
+    std::string shares;
+    for (const WeatherChance& w : top.weathers)
+        shares += (shares.empty() ? "" : kDot) + std::string(WeatherName(w.weather)) + " " + std::to_string(w.percent) + "%";
+    const size_t row = static_cast<size_t>(std::ranges::find(order, top.zone) - order.begin());
+    CHECK(row < order.size());
+    CHECK_EQ(Joined(grid.cells[3 * (row + 1) + 1].text), shares);
+}
+
+TEST(the_weather_popups_longest_element_fits_a_1080_screen_and_scrolls_through_its_zones)
+{
+    // The element that most zones can roll, picked: its zones scroll in their socket, and nothing is cut.
+    Settings settings;
+    BarState state;
+    state.zone   = 103;
+    state.unixMs = kVanaEpochUnixMs + 777LL * 3456 * 1000;
+    Element most = Element::Fire;
+    for (int e = 0; e < kElementCount; ++e)
+        if (ZonesRolling(static_cast<Element>(e), 777).size() > ZonesRolling(most, 777).size()) most = static_cast<Element>(e);
+    state.pickedTabs["By Element"] = ElementName(most);
+    const BarMetrics m = MetricsFor(45, BarShape::Pills);
+    const auto measure = [](const Span& span, PopupFont font) {
+        const float height = font == PopupFont::Title ? 24.0f : 18.0f;
+        return TextSize{8.0f * static_cast<float>(span.text.size()), height, 0.3f * height, height - 1.0f};
+    };
+    const float room = 1080.0f - 45.0f - 2.0f * m.gap;
+    const auto shows = [&](const PopupLayout& l, const std::string& text) {
+        return std::ranges::any_of(l.pieces, [&](const PopupPiece& p) { return p.span.text == text; });
+    };
+    const std::string key = std::string("By Element/") + ElementName(most);
+    PopupLayout l = LayoutPopup(BarPopupContent(BarWidget::Weather, state, settings), m, BarShape::Pills, false, measure, room);
+    const size_t all = l.pieces.size();
+    CutPopup(l, room, m.popupPadding);
+    CHECK(l.height <= room + 0.01f && l.pieces.size() == all);
+    CHECK(l.scrolls.size() == 1 && l.scrolls.front().key == key);
+    // Scrolled to its end, its last zone shows.
+    const PopupContent first = BarPopupContent(BarWidget::Weather, state, settings);
+    const PopupRow& grid     = Section(first, "By Element")->tabs[Section(first, "By Element")->tab].rows.back();
+    const std::string last   = Joined(grid.cells[grid.cells.size() - 3].text);
+    CHECK(!shows(l, last));
+    state.scrolled[key] = l.scrolls.front().most;
+    const PopupLayout end = LayoutPopup(BarPopupContent(BarWidget::Weather, state, settings), m, BarShape::Pills, false, measure, room);
+    CHECK(shows(end, last) && end.height <= room + 0.01f);
 }
 
 TEST(a_zone_without_a_calendar_or_weather_hides_the_widget)
@@ -1080,7 +1178,7 @@ TEST(the_connection_widget_shows_the_games_rates_on_one_line_and_turns_amber_the
     CHECK(Joined(BarWidgetContent(BarWidget::Connection, state, settings).title) == "S -  R -");
 }
 
-TEST(the_connection_popup_gives_the_rates_latency_last_data_and_session_totals)
+TEST(the_connection_popup_gives_the_rates_ping_last_data_and_session_totals)
 {
     Settings settings;
     BarState state;
@@ -1088,8 +1186,8 @@ TEST(the_connection_popup_gives_the_rates_latency_last_data_and_session_totals)
     const PopupContent p = BarPopupContent(BarWidget::Connection, state, settings);
     CHECK(Joined(p.title) == "Connection" && p.sections.size() == 2);
     // Short lines only: no sentence on where S and R come from (the menu tip says it).
-    CHECK(Lines(p.sections[0]) == (std::vector<std::string>{"Sent 175 B/s", "Received 227 B/s", "Latency 48 ms",
-                                      "40 to 66 ms over recent replies", "Last server data 1s"})); // 0.3 s, rounded up
+    CHECK(Lines(p.sections[0]) == (std::vector<std::string>{"Sent 175 B/s", "Received 227 B/s", "Ping 48 ms",
+                                      "40 to 66 ms over recent pings", "Last server data 1s"})); // 0.3 s, rounded up
     CHECK(p.sections[0].rows[4] == Labeled("Last server data", Text("1s")));
     CHECK(p.sections[1].heading == "This session");
     CHECK(Lines(p.sections[1]) == (std::vector<std::string>{"Sent 1.2 MB", "Received 34.5 KB", "Over 1h 12m"}));
@@ -1466,7 +1564,7 @@ TEST(the_clocks_add_seconds_when_asked)
     CHECK(Joined(BarWidgetContent(BarWidget::EarthTime, state, settings).title) == "09:30:07");
 }
 
-TEST(the_connection_widget_adds_its_latency_when_asked)
+TEST(the_connection_widget_adds_its_ping_when_asked)
 {
     Settings settings;
     BarState state;
@@ -1943,8 +2041,8 @@ TEST(the_conquest_widget_counts_the_regions_of_the_nations_picked_and_its_popup_
 
 TEST(the_bags_popup_always_lists_storage_and_never_the_temporary_items)
 {
-    // The user's pick: Storage (the Mog House's furniture storage) is listed even with no room yet, dim, and the
-    // Temporary Items bag is not listed.
+    // Storage (the Mog House's furniture storage) is listed even with no room yet, dim, and the Temporary Items bag is
+    // not listed.
     Settings settings;
     BarState state;
     state.bags[0] = BagCount{26, 30};
@@ -2007,4 +2105,281 @@ TEST(two_nations_picked_are_one_line_of_two_cells_and_one_is_its_name_over_the_w
     settings.Widget(BarWidget::Conquest).nations = NationBit(Nation::Bastok);
     const WidgetContent one = BarWidgetContent(BarWidget::Conquest, state, settings);
     CHECK(!one.cells && Joined(one.title) == "Bastok 1" && Joined(one.subtitle) == "Conquest");
+}
+
+namespace
+{
+    // Day 9, an Earthsday, at 10:00: 576 s into the airships' 864 s cycle.
+    constexpr int64_t kEarthsdayTen = kVanaEpochUnixMs + (9LL * 3456 + 10 * 144) * 1000;
+    template <typename T>
+    int IndexOf(std::span<const T> items, const char* name, const char* T::*field)
+    {
+        for (size_t i = 0; i < items.size(); ++i)
+            if (std::string(items[i].*field) == name) return static_cast<int>(i);
+        return -1;
+    }
+    Settings WorldShowing(WorldLine line)
+    {
+        Settings settings;
+        WidgetOptions& o = settings.Widget(BarWidget::World);
+        o.on             = true;
+        o.worldLine      = line;
+        o.worldRoute     = IndexOf(TravelRoutes(), "Jeuno to San d'Oria", &TravelRoute::name);
+        o.worldGuild     = IndexOf(GuildShops(), "Chaupire", &GuildShop::shops);
+        o.worldElement   = Element::Water;
+        return settings;
+    }
+}
+
+TEST(the_world_info_widget_tells_what_you_picked_with_its_countdown)
+{
+    BarState state;
+    state.unixMs = kEarthsdayTen;
+    state.zone   = 79; // Caedarva Mire
+    const auto shown = [&](WorldLine line) {
+        const WidgetContent w = BarWidgetContent(BarWidget::World, state, WorldShowing(line));
+        return Joined(w.title) + " / " + Joined(w.subtitle);
+    };
+    // The airship's door opens at 28 s into the next cycle: 864 - 576 + 28 s from now.
+    CHECK_EQ(shown(WorldLine::Departure), "Jeuno to San d'Oria / Boards in 5:16");
+    // Its second line is dim, as every widget's is.
+    for (int line = 0; line < kWorldLineCount; ++line)
+        for (const Span& span : BarWidgetContent(BarWidget::World, state, WorldShowing(static_cast<WorldLine>(line))).subtitle)
+            CHECK(span.tone == Tone::Dim);
+    // Open until 21:00, 11 Vana'diel hours away.
+    CHECK_EQ(shown(WorldLine::Guild), std::string("Woodworking / Open") + kDot + "closes in 26:24");
+    // Week 1: Hume Female in Gusgen Mines, until day 16.
+    CHECK_EQ(shown(WorldLine::Rse), std::string("Hume Female / Gusgen Mines") + kDot + "ends in 6:19:12");
+    // Day 9 is 12% and waxing; full on day 46.
+    CHECK_EQ(shown(WorldLine::Moon), "Waxing Crescent 12% / Full moon in 35:07:12");
+    const std::optional<ElementWeather> rain = NextElementWeather(*ZoneById(79), Element::Water, VanaAt(kEarthsdayTen).day);
+    const std::string when = rain->day == VanaAt(kEarthsdayTen).day ? "Can roll here now"
+                                                                     : "Here in " + Countdown(SecondsToDay(kEarthsdayTen, rain->day));
+    CHECK_EQ(shown(WorldLine::Weather), std::string(WeatherName(rain->weather)) + " " + std::to_string(rain->percent) + "% / " + when);
+    // A zone that never rolls it.
+    state.zone = 100; // West Ronfaure: sunshine and clouds only
+    CHECK_EQ(shown(WorldLine::Weather), "Water weather / Not in this zone");
+}
+
+TEST(the_world_info_popup_has_the_parts_you_picked)
+{
+    BarState state;
+    state.unixMs = kEarthsdayTen;
+    state.zone   = 79;
+    Settings settings = WorldShowing(WorldLine::Departure);
+    const auto headings = [&] {
+        std::vector<std::string> out;
+        for (const PopupSection& section : BarPopupContent(BarWidget::World, state, settings).sections)
+            out.push_back(section.heading);
+        return out;
+    };
+    CHECK((headings() == std::vector<std::string>{"Travel", "Calendar", "Guilds"}));
+    // The calendar beside the ships, Guilds under both; without the ships it stands alone.
+    const PopupContent all = BarPopupContent(BarWidget::World, state, settings);
+    CHECK(!all.sections[0].beside && all.sections[1].beside && !all.sections[2].beside);
+    settings.Widget(BarWidget::World).worldSections = WorldBit(WorldSection::Calendar) | WorldBit(WorldSection::Guilds);
+    CHECK(!BarPopupContent(BarWidget::World, state, settings).sections[0].beside);
+    settings.Widget(BarWidget::World).worldSections = WorldBit(WorldSection::Calendar);
+    CHECK((headings() == std::vector<std::string>{"Calendar"}));
+    const PopupContent calendar = BarPopupContent(BarWidget::World, state, settings);
+    const std::vector<std::string> lines = Lines(calendar.sections[0]);
+    // Who, then where and when on the right, the time last and alone.
+    CHECK_EQ(lines[0], "RSE Hume Female Gusgen Mines");
+    CHECK_EQ(lines[1], std::string("Next RSE Elvaan Male ") + RseAt(kEarthsdayTen, 1).place + kDot + "6:19:12");
+    CHECK_EQ(lines[2], "Full Moon 35:07:12");
+    // The next new moon is day 88.
+    CHECK_EQ(lines[3], "New Moon " + Countdown(SecondsToDay(kEarthsdayTen, 88)));
+    CHECK_EQ(lines[4], "Conquest Tally " + Countdown(SecondsToTally(kEarthsdayTen)));
+    for (const PopupRow& row : calendar.sections[0].rows)
+    {
+        CHECK(row.kind == RowKind::Pair);
+        CHECK(row.cells[0].text.front().tone == Tone::Dim); // the line's name
+    }
+    CHECK_EQ(calendar.sections[0].rows[1].cells[1].text.back().text, "6:19:12");
+}
+
+TEST(each_kind_of_ship_has_a_tab_of_its_routes)
+{
+    BarState state;
+    state.unixMs = kEarthsdayTen;
+    Settings settings = WorldShowing(WorldLine::Departure);
+    settings.Widget(BarWidget::World).worldSections = WorldBit(WorldSection::Travel);
+    const auto travel = [&] { return BarPopupContent(BarWidget::World, state, settings).sections.at(0); };
+    // A tab a kind, the first picked until another is.
+    const PopupSection first = travel();
+    CHECK_EQ(first.heading, "Travel");
+    std::vector<std::string> kinds;
+    for (const PopupTab& tab : first.tabs)
+        kinds.push_back(tab.name.text);
+    CHECK((kinds == std::vector<std::string>{"Airships", "Boats", "Manaclipper", "Barge"}));
+    CHECK(first.tab == 0 && first.rows.empty());
+    // Each tab lists its kind's routes, set in.
+    const auto airships = std::ranges::count_if(TravelRoutes(), [](const TravelRoute& r) { return std::string(r.group) == "Airships"; });
+    CHECK_EQ(first.tabs[0].rows.size(), static_cast<size_t>(airships));
+    for (const PopupRow& row : first.tabs[0].rows)
+        CHECK(row.nested);
+    const std::vector<std::string> routes = Lines(PopupSection{"", first.tabs[0].rows});
+    CHECK(std::ranges::find(routes, "Jeuno to San d'Oria Boards in 5:16") != routes.end());
+    // Picking Boats picks its tab.
+    state.pickedTabs["Travel"] = "Boats";
+    CHECK_EQ(travel().tab, static_cast<size_t>(1));
+    state.pickedTabs["Travel"] = "Airships";
+    state.unixMs = kVanaEpochUnixMs + 864LL * 1000 + 100 * 1000; // 100 s into a cycle: its door opened at 28 s
+    const std::vector<std::string> boarding = Lines(PopupSection{"", travel().tabs[0].rows});
+    CHECK(std::ranges::find(boarding, std::string("Jeuno to San d'Oria Boarding") + kDot + "leaves in 1:22") != boarding.end());
+    // The time is a span of its own, so only it moves as it ticks.
+    for (const PopupRow& row : travel().tabs[0].rows)
+        CHECK(row.cells.back().text.back().text.find(' ') == std::string::npos);
+}
+
+TEST(each_guild_has_a_tab_of_its_shops)
+{
+    BarState state;
+    state.unixMs = kEarthsdayTen;
+    Settings settings = WorldShowing(WorldLine::Departure);
+    settings.Widget(BarWidget::World).worldSections = WorldBit(WorldSection::Guilds);
+    const auto guilds = [&] { return BarPopupContent(BarWidget::World, state, settings).sections.at(0); };
+    // A tab a guild, in the shops' order; no goblins selling chips among them.
+    std::vector<std::string> names;
+    std::map<std::string, std::pair<int, int>> open; // each guild's open shops and all its shops
+    for (const GuildShop& shop : GuildShops())
+    {
+        if (names.empty() || names.back() != shop.guild) names.push_back(shop.guild);
+        open[shop.guild].first += GuildAt(shop, state.unixMs).open;
+        ++open[shop.guild].second;
+    }
+    CHECK(std::ranges::find(names, "Chips") == names.end());
+    const PopupSection section = guilds();
+    CHECK_EQ(section.heading, "Guilds");
+    CHECK_EQ(section.tabs.size(), names.size());
+    for (size_t i = 0; i < names.size(); ++i)
+    {
+        const PopupTab& tab = section.tabs[i];
+        CHECK(tab.name == Text(names[i])); // every tab in one color
+        CHECK_EQ(Lines(PopupSection{"", tab.rows}).front(),
+            "Open " + std::to_string(open[names[i]].first) + " of " + std::to_string(open[names[i]].second));
+    }
+    // Each shop's hours, then who and where, set in under the count.
+    state.pickedTabs["Guilds"] = "Woodworking";
+    const PopupSection woodworking = guilds();
+    const PopupRow& grid           = woodworking.tabs[woodworking.tab].rows[1]; // after the count, before the turn-ins
+    CHECK(woodworking.tabs[woodworking.tab].name.text == "Woodworking");
+    CHECK(grid.nested && grid.kind == RowKind::Grid && grid.columns == 2);
+    CHECK_EQ(grid.cells.size(), static_cast<size_t>(2 * open["Woodworking"].second));
+    const auto at = std::ranges::find_if(grid.cells, [](const PopupCell& c) { return Joined(c.text) == "Chaupire, Northern San d'Oria"; });
+    CHECK(at != grid.cells.end() && (at - grid.cells.begin()) % 2 == 1);
+    // Its hours before it: open until 21:00, 11 Vana'diel hours away, as the panel line says.
+    CHECK_EQ(Joined((at - 1)->text), std::string("Open") + kDot + "closes in 26:24");
+}
+
+TEST(a_craft_guilds_tab_lists_todays_turn_ins_apart_from_its_shops_with_yours_lit)
+{
+    BarState state;
+    state.unixMs = kEarthsdayTen;
+    Settings settings = WorldShowing(WorldLine::Departure);
+    settings.Widget(BarWidget::World).worldSections = WorldBit(WorldSection::Guilds);
+    state.pickedTabs["Guilds"] = "Fishing";
+    const auto fishing = [&] {
+        const PopupSection guilds = BarPopupContent(BarWidget::World, state, settings).sections.at(0);
+        return guilds.tabs[guilds.tab].rows;
+    };
+    // The shops in one socket, the turn-ins under a line of their own in another.
+    std::vector<PopupRow> rows = fishing();
+    CHECK(rows.size() == 4 && rows[0].nested && rows[1].nested && !rows[2].nested && rows[3].nested);
+    CHECK_EQ(Lines(PopupSection{"", {rows[2]}}).front(), "Today's Turn-ins");
+    // Not fetched yet, it says so.
+    CHECK_EQ(Lines(PopupSection{"", {rows[3]}}).front(), "They come from phoenix-xi.com");
+    state.turnInsFailed = true;
+    CHECK_EQ(Lines(PopupSection{"", {fishing()[3]}}).front(), "phoenix-xi.com did not answer; trying again soon");
+    // A rank's item and its high quality on one row, the high quality in brackets: the +1, or else the one worth more,
+    // or else the second; the most a day once, or both where they differ.
+    GuildPatterns today;
+    today.guilds[0] = {GuildTurnIn{0, "Amateur", 17, "Flute +1", 14, 1120}, GuildTurnIn{0, "Amateur", 16, "Flute", 12, 1120},
+        GuildTurnIn{1, "Recruit", 20, "Roasted Corn", 31, 1280}, GuildTurnIn{1, "Recruit", 21, "Grilled Corn", 37, 1280},
+        GuildTurnIn{2, "Initiate", 30, "Darksteel Cuisses", 6500, 7400}, GuildTurnIn{2, "Initiate", 31, "Dst. Cuisses +1", 7150, 7040},
+        GuildTurnIn{3, "Novice", 40, "", 90, 2000}, GuildTurnIn{4, "Apprentice", 16928, "Hellfire Sword", 3488, 7000},
+        GuildTurnIn{4, "Apprentice", 16594, "Inferno Sword", 3488, 7000}};
+    state.turnIns = &today;
+    state.crafts  = CraftRanks{1};
+    rows = fishing();
+    const PopupRow& grid = rows[3];
+    CHECK(grid.kind == RowKind::Grid && grid.columns == 6 && grid.nested && grid.header && grid.scroll == "Guilds/Fishing/Turn-ins");
+    CHECK_EQ(grid.cells.size(), static_cast<size_t>(6 * 6));
+    const auto cell = [&](size_t row, size_t column) -> const PopupCell& { return grid.cells[6 * row + column]; };
+    const auto text = [&](size_t row, size_t column) { return Joined(cell(row, column).text); };
+    CHECK(text(0, 0) == "Rank" && text(0, 1) == "NQ Item" && text(0, 2) == "Points" && text(0, 3) == "HQ Item" &&
+          text(0, 4) == "Points" && text(0, 5) == "Max Points");
+    // Each rank's item and its high quality in columns of their own, each with its picture: the +1, or the one worth
+    // more; the most a day once, or both where they differ.
+    CHECK(text(1, 0) == "Amateur" && !cell(1, 0).star && text(1, 1) == "Flute" && cell(1, 1).item == 16 && text(1, 2) == "12" &&
+          text(1, 3) == "Flute +1" && cell(1, 3).item == 17 && text(1, 4) == "14" && text(1, 5) == "1,120");
+    CHECK(text(2, 1) == "Roasted Corn" && text(2, 3) == "Grilled Corn" && text(2, 2) == "31" && text(2, 4) == "37");
+    CHECK(cell(2, 0).star && cell(2, 1).text.front().tone == Tone::Heading && cell(2, 3).text.front().tone == Tone::Heading); // yours
+    CHECK(cell(1, 1).text.front().tone == Tone::Normal);
+    CHECK(text(3, 1) == "Darksteel Cuisses" && text(3, 3) == "Dst. Cuisses +1" && text(3, 5) == "7,400 [7,040]");
+    // One item, no name from the site: no high quality, its cells left empty.
+    CHECK(text(4, 1) == "Item 40" && text(4, 2) == "90" && text(4, 3).empty() && cell(4, 3).item == 0 && text(4, 4).empty());
+    // Worth the same and neither a +1, listed high quality first: Phoenix's recipes say which is which.
+    CHECK(text(5, 1) == "Inferno Sword" && cell(5, 1).item == 16594 && text(5, 3) == "Hellfire Sword" && text(5, 4) == "3,488");
+    // A guild that takes no turn-ins has none.
+    state.pickedTabs["Guilds"] = "Tenshodo";
+    const PopupSection guilds = BarPopupContent(BarWidget::World, state, settings).sections.at(0);
+    CHECK(guilds.tabs[guilds.tab].name.text == "Tenshodo" && guilds.tabs[guilds.tab].rows.size() == 2);
+}
+
+TEST(the_weather_popup_keeps_its_forecast_and_elements_in_one_column_at_one_width)
+{
+    Settings settings;
+    BarState state;
+    state.zone   = 103;
+    state.unixMs = kVanaEpochUnixMs + 777LL * 3456 * 1000;
+    const PopupContent popup = BarPopupContent(BarWidget::Weather, state, settings);
+    CHECK(popup.oneColumn);
+    const BarMetrics m = MetricsFor(45, BarShape::Pills);
+    const auto measure = [](const Span& span, PopupFont font) {
+        const float height = font == PopupFont::Title ? 24.0f : 18.0f;
+        return TextSize{8.0f * static_cast<float>(span.text.size()), height, 0.3f * height, height - 1.0f};
+    };
+    std::vector<const PopupPiece*> cards;
+    const PopupLayout l = LayoutPopup(popup, m, BarShape::Pills, false, measure, 1000.0f);
+    for (const PopupPiece& p : l.pieces)
+        if (p.kind == PopupPiece::Kind::Card) cards.push_back(&p);
+    CHECK_EQ(cards.size(), static_cast<size_t>(2));
+    CHECK(cards[0]->x == cards[1]->x && cards[0]->width == cards[1]->width && cards[1]->y > cards[0]->y);
+}
+
+TEST(a_combined_pills_popup_joins_the_titles_and_cards_of_each_widget_shown_with_one)
+{
+    Settings settings;
+    BarState state;
+    settings.Widget(BarWidget::Bags).combine = PanelWidget{BarWidget::Gil};
+    settings.Widget(BarWidget::Gil).combine  = PanelWidget{BarWidget::EarthTime};
+    settings.Widget(BarWidget::EarthTime).on = false; // in the pill, but shown nowhere
+    const PopupContent bags = BarPopupContent(BarWidget::Bags, state, settings);
+    const PopupContent gil  = BarPopupContent(BarWidget::Gil, state, settings);
+    const PopupContent both = PanelPopupContent(BarWidget::Bags, state, settings);
+    std::vector<Span> title = bags.title;
+    title.push_back(Span{kDot, Tone::Dim});
+    title.insert(title.end(), gil.title.begin(), gil.title.end());
+    CHECK(both.title == title);
+    std::vector<PopupSection> sections = bags.sections;
+    sections.insert(sections.end(), gil.sections.begin(), gil.sections.end());
+    CHECK(both.sections == sections);
+    // A widget alone has its own popup.
+    CHECK(PanelPopupContent(BarWidget::VanaTime, state, settings) == BarPopupContent(BarWidget::VanaTime, state, settings));
+    // A combined pill whose first widget is switched off has its partner's popup alone.
+    settings.Widget(BarWidget::Bags).on = false;
+    CHECK(PanelPopupContent(BarWidget::Bags, state, settings) == gil);
+}
+
+TEST(a_combined_pills_open_popup_gathers_what_each_of_its_widgets_needs)
+{
+    Settings settings;
+    settings.Widget(BarWidget::Zone).on       = true;
+    settings.Widget(BarWidget::Conquest).on   = true;
+    settings.Widget(BarWidget::Zone).combine  = PanelWidget{BarWidget::Conquest};
+    settings.Widget(BarWidget::Gil).combine   = PanelWidget{BarWidget::Bags};
+    CHECK(NeedsOf(settings, BarWidget::Zone).conquest);
+    CHECK(NeedsOf(settings, BarWidget::Gil).containers == kContainerCount);
+    CHECK(!NeedsOf(settings, BarWidget::Weather).conquest);
 }

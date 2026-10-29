@@ -11,10 +11,10 @@ namespace headsup
     namespace
     {
         const char* const kWidgetNames[] = {"zone", "weather", "vanaTime", "target", "gil", "bags", "earthTime", "gameHelp",
-            "fps", "job", "connection", "party", "signet", "distance", "memory", "exp", "conquest"};
+            "fps", "job", "connection", "party", "signet", "distance", "memory", "exp", "conquest", "world"};
         static_assert(std::size(kWidgetNames) == kBarWidgetCount); // by BarWidget
         constexpr BarWidget kDefaultLeft[]   = {BarWidget::Zone, BarWidget::Weather, BarWidget::VanaTime, BarWidget::Job,
-            BarWidget::Exp, BarWidget::Party, BarWidget::Signet, BarWidget::Distance, BarWidget::Conquest};
+            BarWidget::Exp, BarWidget::Party, BarWidget::Signet, BarWidget::Distance, BarWidget::Conquest, BarWidget::World};
         constexpr BarWidget kDefaultCenter[] = {BarWidget::Target};
         constexpr BarWidget kDefaultRight[]  = {BarWidget::Gil, BarWidget::Bags, BarWidget::Connection, BarWidget::Memory,
             BarWidget::Fps, BarWidget::EarthTime};
@@ -45,6 +45,60 @@ namespace headsup
         {
             return std::vector<PanelWidget>(std::begin(widgets), std::end(widgets));
         }
+    }
+
+    std::optional<PanelWidget> PanelWidgetNamed(const std::string& name) { return WidgetNamed(name); }
+
+    PanelGroups Combine(const BarPlacement& placement, const CombineLinks& links)
+    {
+        std::array<std::optional<PanelWidget>, kPanelSlots> next{};
+        std::array<bool, kPanelSlots> pulled{};
+        for (int slot = 0; slot < kPanelSlots; ++slot)
+        {
+            const PanelWidget from = WidgetInSlot(slot);
+            const std::optional<PanelWidget> to = links[slot];
+            if (!to || *to == from || !Combines(from.kind) || !Combines(to->kind) || !Placed(placement, from) ||
+                !Placed(placement, *to) || pulled[SlotOf(*to)])
+                continue;
+            bool ring = false;
+            for (std::optional<PanelWidget> on = to; on && !ring; on = next[SlotOf(*on)])
+                ring = *on == from;
+            if (ring) continue;
+            next[slot]          = to;
+            pulled[SlotOf(*to)] = true;
+        }
+        PanelGroups groups{{}, AloneGroups()};
+        for (int s = 0; s < kBarSectionCount; ++s)
+            for (const PanelWidget head : placement[s])
+            {
+                if (pulled[SlotOf(head)]) continue;
+                for (std::optional<PanelWidget> on = head; on; on = next[SlotOf(*on)])
+                {
+                    groups.placement[s].push_back(*on);
+                    groups.group[SlotOf(*on)] = head;
+                }
+            }
+        return groups;
+    }
+
+    const std::array<PanelWidget, kPanelSlots>& AloneGroups()
+    {
+        static const std::array<PanelWidget, kPanelSlots> alone = [] {
+            std::array<PanelWidget, kPanelSlots> each{};
+            for (int slot = 0; slot < kPanelSlots; ++slot)
+                each[slot] = WidgetInSlot(slot);
+            return each;
+        }();
+        return alone;
+    }
+
+    std::vector<PanelWidget> Members(const PanelGroups& groups, PanelWidget head)
+    {
+        std::vector<PanelWidget> members;
+        for (const std::vector<PanelWidget>& section : groups.placement)
+            for (const PanelWidget w : section)
+                if (groups.group[SlotOf(w)] == head) members.push_back(w);
+        return members;
     }
 
     const BarPlacement& DefaultPlacement()

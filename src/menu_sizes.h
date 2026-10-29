@@ -36,6 +36,8 @@ namespace headsup
     constexpr float kTabHeight      = 2.0f;
     constexpr float kTabRule        = 0.12f; // the line a strip of tabs stands on
     constexpr float kTabGap         = 0.12f; // between two tabs, and two rows of them: a couple of pixels
+    constexpr float kTabPadding     = 0.6f;  // either side of a name in tabs as wide as their names
+    constexpr int kTabFillGrow      = 1000;  // the last row's filler grows this much faster than its tabs
     constexpr float kTipWidth       = 20.0f;
     constexpr float kHeaderRow      = 2.4f;  // a card's title row
     constexpr float kLineNameWidth  = 6.6f;  // "Middle Line", before its design box

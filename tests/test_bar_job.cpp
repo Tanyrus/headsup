@@ -194,8 +194,13 @@ TEST(the_exp_says_what_it_is_set_to_earned_to_next_and_a_percent_in_that_order)
     CHECK_EQ(title(JobWidget(JobReport{Sample(30, 19999, 20000), std::nullopt}, ExpBarPlace::Under, true,
                  JobLayout::ExpFirst, bits({ExpText::Percent}))),
         "99%");
-    // Nothing picked: the bar's name alone.
-    CHECK_EQ(title(JobWidget(level30, ExpBarPlace::Under, true, JobLayout::ExpFirst, 0)), "EXP");
+    // Nothing picked: the jobs alone, on one line in any layout, the bar still under them.
+    for (const JobLayout layout : {JobLayout::JobsFirst, JobLayout::ExpFirst, JobLayout::ExpOnly})
+    {
+        const WidgetContent w = JobWidget(level30, ExpBarPlace::Under, true, layout, 0);
+        CHECK(w.title.size() == 1 && w.title.front().text == JobWidget(level30, ExpBarPlace::Under, true, JobLayout::JobsFirst).title.front().text);
+        CHECK(w.title.front().tone == Tone::Normal && w.subtitle.empty() && w.progress.has_value());
+    }
 }
 
 TEST(the_exp_widget_is_its_bar_with_each_text_on_the_side_it_is_set_to)

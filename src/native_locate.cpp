@@ -75,11 +75,16 @@ namespace headsup
         constexpr int16_t kWindowLoop[] = {0x8B, 0xCE, 0xE8, -1, -1, -1, -1, 0x8B, 0x44, 0x24, 0x0C, 0x85, 0xC0, 0x75,
             0xC6, 0xFE, 0xC3, 0x80, 0xFB, 0x09, 0x7C, 0xAD};
         constexpr uint32_t kWindowLoopCall = 2;
+        // A character's model drawn: lea ecx,[esp+78h]; push eax; push ecx; push edi; push esi, the actor and so the
+        // first argument; lea ecx,[esi+674h], its model; call the draw.
+        constexpr int16_t kModelDrawCall[] = {0x8D, 0x4C, 0x24, 0x78, 0x50, 0x51, 0x57, 0x56, 0x8D, 0x8E, 0x74, 0x06, 0x00,
+            0x00, 0xE8};
+        constexpr uint32_t kModelDrawCallAt = 14;
         // Before the loop, the list it walks: xor bl,bl; mov ecx,list; call First, within kWindowListReach bytes.
         constexpr int16_t kWindowListMove[] = {0x32, 0xDB, 0xB9, -1, -1, -1, -1, 0xE8};
         constexpr uint32_t kWindowListAddress = 3, kWindowListReach = 0x60;
         // The window draw's first ten bytes: sub esp,24h; push ebx, ebp, esi, edi; mov ebp,ecx; call. hudbegone patches
-        // it from entry+14, so nothing past these is checked.
+        // it from entry+14, so nothing past these is checked, and xirml jumps out over the first five.
         constexpr uint8_t kWindowDrawEntry[] = {0x83, 0xEC, 0x24, 0x53, 0x55, 0x56, 0x57, 0x8B, 0xE9, 0xE8};
         // MCD::MoveTo's start: sub esp,0Ch; mov ax,[esp+14h]; push ebx; push ebp; mov ebp,[esp+18h]; push esi;
         // mov esi,ecx; push edi; xor edi,edi; lea ebx,[esi+14h]; mov [esi+52h],bp; mov ecx,ebx; mov [esi+54h],ax.
@@ -233,6 +238,11 @@ namespace headsup
 
         // add esp,0x14; ret 0x14: the wrapper entities' names are drawn through hands back as soon as the routine does.
         constexpr uint8_t kEntityCallerTail[] = {0x83, 0xC4, 0x14, 0xC2, 0x14, 0x00};
+        // The wrapper from its five arguments, pushed again for the routine, to its call. Its first ten bytes check the
+        // actor and are not compared: xirml puts its jump over them.
+        constexpr uint8_t kEntityWrapperPass[] = {0x8B, 0x44, 0x24, 0x14, 0x8B, 0x4C, 0x24, 0x10, 0x8B, 0x54, 0x24, 0x0C,
+            0x50, 0x8B, 0x44, 0x24, 0x0C, 0x51, 0x8B, 0x4C, 0x24, 0x0C, 0x52, 0x50, 0x51};
+        constexpr uint32_t kEntityWrapperPassAt = 0x0A;
 
         bool Matches(const ImageSection& section, uint32_t offset, const uint8_t* bytes, uint32_t count)
         {
@@ -327,6 +337,10 @@ namespace headsup
         case LocateProblem::UnexpectedExit: return "the name routine does not end as expected";
         case LocateProblem::NoCallers: return "nothing calls the name routine";
         case LocateProblem::NoEntityCaller: return "the call that draws entities' names was not found";
+        case LocateProblem::EntityWrapperChanged: return "the call that draws entities' names is not laid out as HeadsUp expects";
+        case LocateProblem::NoEntityWrapperCalls: return "nothing was found to call the game's entity name draw";
+        case LocateProblem::NoModelDraws: return "the calls that draw characters' models were not found";
+        case LocateProblem::ModelDrawsDiffer: return "the calls that draw characters' models go to different routines";
         case LocateProblem::NoArrowDraws: return "the target window's arrow draws were not found";
         case LocateProblem::AmbiguousArrowDraws: return "the target window's arrow draws were found more than once";
         case LocateProblem::ArrowDrawsDiffer: return "the target window's two arrows are not drawn by the same function";
@@ -413,7 +427,21 @@ namespace headsup
                 result.entityCaller = returnRva;
                 ++wrappers;
             }
-        if (wrappers != 1) result.problem = LocateProblem::NoEntityCaller;
+        if (wrappers != 1)
+        {
+            result.problem = LocateProblem::NoEntityCaller;
+            return result;
+        }
+        const uint32_t pass    = result.entityCaller - kBranchLength - sizeof(kEntityWrapperPass);
+        if (!Matches(text, pass - text.rva, kEntityWrapperPass, sizeof(kEntityWrapperPass)))
+        {
+            result.problem = LocateProblem::EntityWrapperChanged;
+            return result;
+        }
+        result.wrapper = pass - kEntityWrapperPassAt;
+        for (const uint32_t returnRva : ReturnsFromCallsTo(result.wrapper, text))
+            result.wrapperCalls.push_back(returnRva - kBranchLength);
+        if (result.wrapperCalls.empty()) result.problem = LocateProblem::NoEntityWrapperCalls;
         return result;
     }
 
@@ -495,13 +523,33 @@ namespace headsup
         const uint32_t call = text.rva + found.front() + kWindowLoopCall;
         const uint32_t draw = CallTarget(call, text);
         // Below the section, draw - text.rva wraps past its end, which Matches rejects.
-        if (!Matches(text, draw - text.rva, kWindowDrawEntry, sizeof(kWindowDrawEntry)))
+        const uint32_t entry = draw - text.rva;
+        const bool jumpedOver = Matches(text, entry, &kJumpOpcode, 1) &&
+                                Matches(text, entry + kBranchLength, kWindowDrawEntry + kBranchLength,
+                                    sizeof(kWindowDrawEntry) - kBranchLength);
+        if (!jumpedOver && !Matches(text, entry, kWindowDrawEntry, sizeof(kWindowDrawEntry)))
             return WindowDraw{LocateProblem::WindowDrawChanged};
         const uint32_t from = found.front() >= kWindowListReach ? found.front() - kWindowListReach : 0;
         const std::vector<uint32_t> moves =
             FindAll(kWindowListMove, ImageSection{text.rva + from, text.bytes + from, found.front() - from});
         const uint32_t list = moves.empty() ? 0 : ReadAt<uint32_t>(text.bytes, from + moves.back() + kWindowListAddress);
         return WindowDraw{LocateProblem::None, call, draw, list};
+    }
+
+    ModelDraws LocateModelDraws(const ImageSection& text)
+    {
+        ModelDraws result;
+        for (const uint32_t at : FindAll(kModelDrawCall, text))
+            result.calls.push_back(text.rva + at + kModelDrawCallAt);
+        if (result.calls.empty())
+        {
+            result.problem = LocateProblem::NoModelDraws;
+            return result;
+        }
+        result.draw = CallTarget(result.calls.front(), text);
+        for (const uint32_t call : result.calls)
+            if (CallTarget(call, text) != result.draw) result.problem = LocateProblem::ModelDrawsDiffer;
+        return result;
     }
 
     NetStats LocateNetStats(const ImageSection& text)
@@ -716,6 +764,21 @@ namespace headsup
             }
         }
         return std::nullopt;
+    }
+
+    std::optional<uintptr_t> BaseLayout(std::span<const uint8_t> layout, uintptr_t at)
+    {
+        constexpr uint8_t kPushFirst = 0x50, kPushLast = 0x57, kMov = 0x8B, kEsiEcx = 0xF1, kEdiEcx = 0xF9;
+        constexpr size_t kOpening = 8; // bytes of pushes and the mov before the call
+        size_t i = 0;
+        while (i < layout.size() && i < kOpening && layout[i] >= kPushFirst && layout[i] <= kPushLast)
+            ++i;
+        if (i + 2 > layout.size() || layout[i] != kMov || (layout[i + 1] != kEsiEcx && layout[i + 1] != kEdiEcx)) return std::nullopt;
+        i += 2;
+        if (i + kCallLength > layout.size() || layout[i] != kCallOp) return std::nullopt;
+        int32_t relative = 0;
+        std::memcpy(&relative, layout.data() + i + 1, sizeof(relative));
+        return at + i + kCallLength + static_cast<uintptr_t>(static_cast<intptr_t>(relative));
     }
 
     std::optional<WindowSpot> MovedEntryPlace(WindowSpot point, const WindowRect& window, int dx, int dy)

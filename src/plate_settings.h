@@ -117,6 +117,7 @@ namespace headsup
     constexpr int kMinShadow = 0, kMaxShadow = 200;
     constexpr float kShadowUnit = 1.5f; // a shadow strength of 100 percent, in the mockup's shadows
     constexpr int kMinLinePadding = -5, kMaxLinePadding = 10; // pixels
+    constexpr int kMinLineOffset = -50, kMaxLineOffset = 50;  // pixels
     constexpr int kMinOrnamentWidth = 20, kMaxOrnamentWidth = 300;       // pixels
     constexpr int kMinOrnamentThickness = 3, kMaxOrnamentThickness = 24; // pixels
     constexpr size_t kMaxTemplate = 255;                                 // bytes of a line's text
@@ -158,6 +159,7 @@ namespace headsup
         int textSize  = 100;
         int iconSize = 100;
         int padding  = 0; // pixels of extra space under the line; over it for the bottom line, which stays on the name
+        int offset   = 0; // pixels right of where its alignment puts it, left below 0; it moves this line alone
         ColorPick color;
         int shadow = 100;
         ColorPick shadowColor{ColorSource::Custom, ColorFromRgb(0x000000)};

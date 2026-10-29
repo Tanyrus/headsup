@@ -33,8 +33,6 @@ namespace headsup
 
     // The Widgets page's tabs: every widget on the bar, in BarWidget's order, each with its other copies after it.
     std::vector<PanelWidget> WidgetTabs(const BarPlacement& placement);
-    // How many tabs go in a row for count of them in rows rows: the rows as even as they come, the first the fuller.
-    int TabsPerRow(int count, int rows);
 
     // The Clock widget's Time Zone dropdown: the computer's own zone first, as no zone picked, then every ClockZone.
     constexpr int kClockZoneChoices = kClockZoneCount + 1;

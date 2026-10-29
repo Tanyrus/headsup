@@ -670,21 +670,19 @@ namespace headsup
         EndRow();
     }
 
-    int Form::Tabs(const char* id, int picked, const char* const* labels, int count, int perRow)
+    int Form::Tabs(const char* id, int picked, const char* const* labels, int count, bool wrap)
     {
         const std::string base = Id(id);
-        const int columns      = perRow > 0 ? perRow : count;
         int chosen             = picked;
-        Out() += "<div class=\"tabs\" id=\"" + base + "\">";
+        Out() += "<div class=\"tabs\" id=\"" + base + "\"><div class=\"tab-row" + (wrap ? " wrap" : "") + "\">";
         for (int tab = 0; tab < count; ++tab)
         {
             const std::string name = base + kTabIdInfix + std::to_string(tab);
             if (Clicked(name)) chosen = tab;
-            if (tab % columns == 0) Out() += "<div class=\"tab-row\">";
             Out() += "<div class=\"tab\" id=\"" + name + "\">" + EscapedRml(labels[tab]) + "</div>";
-            if (tab % columns == columns - 1 || tab == count - 1) Out() += "</div>";
         }
-        Out() += "<div class=\"tab-rule\"></div></div>";
+        if (wrap) Out() += "<div class=\"tab-fill\"></div>";
+        Out() += "</div><div class=\"tab-rule\"></div></div>";
         for (int tab = 0; tab < count; ++tab)
             Set(base + kTabIdInfix + std::to_string(tab), FormValueKind::Class, kPickedClass, {}, tab == chosen);
         return chosen;

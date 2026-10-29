@@ -144,8 +144,8 @@ PIECES = Pieces(
         'unused-tags': Setting(entity=True, unnamed=True),
         'line-styles': Setting(entity=True, unnamed=True, rows=rows(
             'sync-line-style', 'line-visibility', 'alignment', 'font', 'font-style', 'text-size', 'icon-size', 'padding',
-            'text-color', 'shadow-strength', 'shadow-color', 'glow-strength', 'glow-size', 'glow-color',
-            'disable-glow-in-combat'), row_extra={'padding': 'tipBottomLine'},
+            'horizontal-offset', 'text-color', 'shadow-strength', 'shadow-color', 'glow-strength', 'glow-size',
+            'glow-color', 'disable-glow-in-combat'), row_extra={'padding': 'tipBottomLine'},
             words={'do-not-sync': True, 'sync-with': True, 'uses-style': True}),
         'ornament': Setting(entity=True, unnamed=True, rows=rows('visibility', 'width', 'height', 'color')),
         'no-target': Setting(), 'not-targeted': Setting(), 'is-targeted': Setting(), 'fade-in': Setting(),
@@ -161,7 +161,7 @@ PIECES = Pieces(
         'status-table': Setting(unnamed=True, rows=rows(
             'paralyze', 'bind', 'silence', 'slow', 'poison', 'light-sleep', 'dark-sleep', 'blind', 'stun', 'gravity'),
             words={'weak': True, 'resist': True}),
-        'respawn-timers': Setting(), 'timer-size': Setting(),
+        'respawn-timers': Setting(), 'timer-size': Setting(), 'up-time': Setting(),
         # User Interface
         'key': Setting(), 'hide-game-windows': Setting(),
         'groups': Setting(unnamed=True, words={'note': True, 'help-on': True, 'help-off': True, 'starts-at': True,
@@ -185,9 +185,9 @@ PIECES = Pieces(
         'theme-files': Setting(unnamed=True, words={'save-as': True, 'name-hint': True, 'save': True, 'load': True}),
         'hide-game-help': Setting(), 'position': Setting(), 'background': Setting(),
         'widget-tabs': Setting(unnamed=True, rows=rows(
-            'enabled', 'section', 'copies', 'second-line', 'icons', 'spacing', 'padding', 'title-font', 'text-font', 'text-size', 'details', 'border', 'jobs', 'currency', 'bag', 'nations', 'time-zone', 'server-time', '24-hour',
-            'seconds', 'layout', 'exp-text', 'exp-bar', 'exp-earned', 'exp-to-next', 'exp-percent', 'bar-width', 'bar-height',
-            'job-names', 'percent', 'latency'), words={'add-copy': True, 'remove-copy': True}),
+            'enabled', 'section', 'combine', 'copies', 'second-line', 'icons', 'spacing', 'padding', 'title-font', 'text-font', 'text-size', 'details', 'border', 'jobs', 'currency', 'bag', 'nations', 'shows', 'ship', 'element', 'guild', 'popup', 'time-zone', 'server-time', '24-hour',
+            'seconds', 'layout', 'exp-text', 'exp-bar', 'exp-earned', 'exp-to-next', 'exp-percent', 'exp-align', 'bar-width', 'bar-height',
+            'job-names', 'percent', 'latency'), words={'add-copy': True, 'remove-copy': True, 'combine-none': True}),
         'trays': Setting(unnamed=True), 'reset-layout': Setting(),
         # Mouse Cursor and HeadsUp Config
         'pointer-icon': Setting(options=3, nameless=frozenset({2})), 'pointer-size': Setting(), 'pointer-fix': Setting(), 'keep-pointer': Setting(),
@@ -204,7 +204,7 @@ PIECES = Pieces(
         'plate-mode': List(4), 'outline-mode': List(4, extra={3: 'tipOnClaimRows'}), 'color-source': List(7),
         'show-condition': List(13), 'ornament-place': List(5), 'align': List(3), 'font-style': List(3),
         'smoothness': List(4), 'bar-theme': List(7), 'bar-sections': List(3),
-        'bar-widgets': List(17), 'plate-lines': List(3), 'job-layout': List(3), 'exp-bar': List(3), 'exp-text': List(3), 'exp-place': List(5), 'nations': List(4), 'tags': List(24),
+        'bar-widgets': List(18), 'plate-lines': List(3), 'job-layout': List(3), 'exp-bar': List(3), 'exp-text': List(3), 'exp-place': List(5), 'nations': List(4), 'world-line': List(5), 'world-sections': List(3), 'tags': List(24),
     },
     words={'switched-off': True, 'switch-off': True, 'switch-on': True, 'switched-off-top-panel': True,
            'switched-off-headsup': True, 'key-add': True, 'key-waiting': True, 'always': True, 'never': True, 'conditions': True, 'local': True, 'themes-font': True,

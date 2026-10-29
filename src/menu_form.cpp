@@ -4,6 +4,7 @@
 #include "cursor_picture.h"
 #include "icons.h"
 #include "menu_text.h"
+#include "world_info.h"
 #include "native_locate.h"
 #include "plate_settings.h"
 #include "plate_template.h"
@@ -440,6 +441,8 @@ namespace headsup
                     break;
                 case WidgetTabsRow::Section:
                 {
+                    // A widget combined into another's pill sits where that one does.
+                    form.Fade(off || Panel(s).group[SlotOf(widget)] != widget);
                     auto [section, index] = PlaceOf(s.barSections, widget);
                     int moved             = section;
                     const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(WindowList::BarSections));
@@ -447,6 +450,22 @@ namespace headsup
                     if (moved != section)
                         form.changed |= MoveWidget(s.barSections, static_cast<BarSection>(section), index,
                             static_cast<BarSection>(moved), s.barSections[moved].size());
+                    break;
+                }
+                case WidgetTabsRow::Combine:
+                {
+                    const std::vector<PanelWidget> choices = CombineChoices(s, widget);
+                    if (choices.empty()) break;
+                    // 0 is None, then each choice from 1.
+                    const auto at = std::ranges::find(choices, o.combine.value_or(widget));
+                    int picked    = at == choices.end() ? 0 : static_cast<int>(at - choices.begin()) + 1;
+                    form.NumberDropdown(label.c_str(), picked, 0, static_cast<int>(choices.size()),
+                        [&](int i) {
+                            return i == 0 ? std::string(Word(c, WindowWord::WidgetTabsCombineNone))
+                                          : CopyName(c, choices[static_cast<size_t>(i - 1)]);
+                        },
+                        row.tip);
+                    o.combine = picked == 0 ? std::nullopt : std::optional<PanelWidget>(choices[static_cast<size_t>(picked - 1)]);
                     break;
                 }
                 case WidgetTabsRow::Copies:
@@ -518,6 +537,46 @@ namespace headsup
                         form.Toggles(label.c_str(), o.nations, names.data(), kContenderNations, row.tip);
                     }
                     break;
+                case WidgetTabsRow::Shows:
+                    if (kind == BarWidget::World)
+                    {
+                        const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(WindowList::WorldLine));
+                        int line = static_cast<int>(o.worldLine);
+                        form.NumberDropdown(label.c_str(), line, 0, kWorldLineCount - 1,
+                            [&](int l) { return std::string(names[static_cast<size_t>(l)]); }, row.tip);
+                        o.worldLine = static_cast<WorldLine>(line);
+                    }
+                    break;
+                case WidgetTabsRow::Ship:
+                    if (kind == BarWidget::World && o.worldLine == WorldLine::Departure)
+                        form.NumberDropdown(label.c_str(), o.worldRoute, 0, static_cast<int>(TravelRoutes().size()) - 1,
+                            [](int r) { return std::string(TravelRoutes()[static_cast<size_t>(r)].name); }, row.tip);
+                    break;
+                case WidgetTabsRow::Element:
+                    if (kind == BarWidget::World && o.worldLine == WorldLine::Weather)
+                    {
+                        int element = static_cast<int>(o.worldElement);
+                        form.NumberDropdown(label.c_str(), element, 0, kElementCount - 1,
+                            [](int e) { return std::string(ElementName(static_cast<Element>(e))); }, row.tip);
+                        o.worldElement = static_cast<Element>(element);
+                    }
+                    break;
+                case WidgetTabsRow::Guild:
+                    if (kind == BarWidget::World && o.worldLine == WorldLine::Guild)
+                        form.NumberDropdown(label.c_str(), o.worldGuild, 0, static_cast<int>(GuildShops().size()) - 1,
+                            [](int g) {
+                                const GuildShop& shop = GuildShops()[static_cast<size_t>(g)];
+                                return std::string(shop.guild) + ": " + shop.shops + " (" + shop.zone + ")";
+                            },
+                            row.tip);
+                    break;
+                case WidgetTabsRow::Popup:
+                    if (kind == BarWidget::World)
+                    {
+                        const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(WindowList::WorldSections));
+                        form.Toggles(label.c_str(), o.worldSections, names.data(), kWorldSectionCount, row.tip);
+                    }
+                    break;
                 case WidgetTabsRow::Bag:
                     if (kind == BarWidget::Bags)
                     {
@@ -581,6 +640,13 @@ namespace headsup
                         form.Segments(label.c_str(), o.expPlaces[static_cast<size_t>(text)], names.data(), kExpTextPlaceCount, row.tip);
                     }
                     break;
+                case WidgetTabsRow::ExpAlign:
+                    if (kind == BarWidget::Exp)
+                    {
+                        const std::vector<const char*> names = NamesOf(c.layout.OptionsOf(WindowList::Align));
+                        form.Segments(label.c_str(), o.expAlign, names.data(), kAlignCount, row.tip);
+                    }
+                    break;
                 case WidgetTabsRow::BarWidth:
                     if (kind == BarWidget::Exp)
                         form.SliderInt(label.c_str(), o.expBarWidth, kMinExpBarWidth, kMaxExpBarWidth, "%d px", row.tip);
@@ -617,7 +683,7 @@ namespace headsup
             const auto open = std::ranges::find(tabs, WidgetInSlot(c.state.widget));
             const int count = static_cast<int>(tabs.size());
             const int tab   = form.Tabs("widget", open != tabs.end() ? static_cast<int>(open - tabs.begin()) : 0,
-                labels.data(), count, TabsPerRow(count, (count + kWidgetTabsPerRow - 1) / kWidgetTabsPerRow));
+                labels.data(), count, true);
             c.state.widget  = SlotOf(tabs[static_cast<size_t>(tab)]);
             WidgetOptions(c, e, tabs[static_cast<size_t>(tab)]);
         }
@@ -899,6 +965,9 @@ namespace headsup
                     break;
                 case LineStylesRow::Padding:
                     form.SliderInt(label.c_str(), line.padding, kMinLinePadding, kMaxLinePadding, "%d px", n < kPlateLines - 1 ? tip : row.otherTip);
+                    break;
+                case LineStylesRow::HorizontalOffset:
+                    form.SliderInt(label.c_str(), line.offset, kMinLineOffset, kMaxLineOffset, "%d px", tip);
                     break;
                 case LineStylesRow::TextColor: form.ColorPickRow(label.c_str(), line.color, sources, tip); break;
                 case LineStylesRow::ShadowStrength:
@@ -1282,6 +1351,10 @@ namespace headsup
             case SettingPiece::TimerSize:
                 form.Fade(!on || !s.phTimers);
                 form.SliderPercent(label.c_str(), s.timerPercent, kMinSizePercent, kMaxSizePercent, tip);
+                break;
+            case SettingPiece::UpTime:
+                form.Fade(!on || !s.phTimers);
+                form.SliderInt(label.c_str(), s.phUpMinutes, 0, kMaxUpMinutes, "%d min", tip);
                 break;
             // User Interface
             case SettingPiece::Key:

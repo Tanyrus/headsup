@@ -4,6 +4,7 @@
 #include "figures.h"
 #include "function_ref.h"
 #include "icons.h"
+#include "plate_settings.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -53,6 +54,7 @@ namespace headsup
         float done = 0.0f;
         int width = 0, height = 0; // pixels
         std::vector<Span> above, below, left, right;
+        Align align = Align::Center; // the texts above and below, against the bar
         bool operator==(const Meter&) const = default;
     };
 
@@ -82,6 +84,7 @@ namespace headsup
         bool immune = false; // the icon carries a × in the immunity color
         std::vector<Span> text;
         bool star = false; // a star after the text: who holds what the cell's row is about
+        uint16_t item = 0; // a game item's picture before the text, in place of an icon
         bool operator==(const PopupCell&) const = default;
     };
 
@@ -98,13 +101,29 @@ namespace headsup
         RowKind kind = RowKind::Line;
         int columns  = 0; // Grid
         std::vector<PopupCell> cells;
+        bool nested = false; // set in a socket with the nested rows beside it, as a tab's rows are
+        bool header = false; // Grid: its first line heads its columns, and each group of them set side by side
+        // A socket's first row: what its scrolling is kept by, and how many of its lines it is scrolled past.
+        std::string scroll{};
+        size_t scrolled = 0;
         bool operator==(const PopupRow&) const = default;
+    };
+
+    // One of a card's tabs: its name on its chip, and the rows it shows while picked.
+    struct PopupTab
+    {
+        Span name;
+        std::vector<PopupRow> rows;
+        bool operator==(const PopupTab&) const = default;
     };
 
     struct PopupSection
     {
         std::string heading; // empty for the rows under the title
         std::vector<PopupRow> rows;
+        std::vector<PopupTab> tabs{}; // under the heading, a click picking one, by the heading
+        size_t tab = 0;               // the picked one, whose rows follow the section's own
+        bool beside = false; // in one row with the card before it, the two as wide and as tall as each other
         bool operator==(const PopupSection&) const = default;
     };
 
@@ -113,6 +132,7 @@ namespace headsup
         std::optional<Icon> icon;
         std::vector<Span> title;
         std::vector<PopupSection> sections;
+        bool oneColumn = false; // its cards down one column, however tall
         bool operator==(const PopupContent&) const = default;
     };
 

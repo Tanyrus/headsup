@@ -15,7 +15,7 @@ namespace headsup
     struct NameFrame
     {
         uint32_t caller = 0; // the return address
-        uint32_t actor  = 0;
+        uint32_t actor  = 0; // not in the frame: the name hook adds it
         uint32_t length = 0; // bytes of text
         float x = 0.0f, y = 0.0f, depth = 0.0f, scaleX = 0.0f, scaleY = 0.0f;
         float size = 0.0f; // the share of full size the game asked for

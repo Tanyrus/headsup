@@ -25,9 +25,9 @@ xi.settings.main.USE_ADOULIN_WEAPON_SKILL_CHANGES = false
 -- The level cap: no Limit Break quest past Shattering Stars, and battlefields capped at it.
 xi.settings.main.MAX_LEVEL = 75
 
--- Systems live does not have (the user, 2026-10-16: "Field of valor isn't In Phoenix", "Survival guides aren't", "no
--- mystery box", "Trusts aren't on this server"). Each also turns off the NPCs whose content tag names it: the books,
--- the guides, the Gobbie Mystery Box NPCs (daily_tally) and the trust NPCs.
+-- Systems live does not have: Fields of Valor, survival guides, the Gobbie Mystery Box and trusts. Each also turns
+-- off the NPCs whose content tag names it: the books, the guides, the Gobbie Mystery Box NPCs (daily_tally) and the
+-- trust NPCs.
 xi.settings.main.ENABLE_FIELD_MANUALS  = 0
 xi.settings.main.ENABLE_GROUNDS_TOMES  = 0
 xi.settings.main.ENABLE_SURVIVAL_GUIDE = 0

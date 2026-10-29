@@ -43,6 +43,8 @@ namespace headsup
         // A widget's title: in the detail font at the title's size for a widget of figures, in the title face else.
         TextFace TitleFace(const WidgetContent& content) const;
         TextFace DetailFace() const;
+        // A meter's texts: the detail font at the side line's size, the title's on a row of one line.
+        TextFace MeterFace() const;
         TextFace FaceOf(PopupFont font) const;
         // The icons and coin before a widget's text.
         float Leading(const WidgetContent& content) const;

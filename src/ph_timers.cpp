@@ -42,11 +42,12 @@ namespace headsup
             now - kDefeatMessageSeconds + kDeathToDespawnSeconds + static_cast<double>(mob.respawnSeconds)};
     }
 
-    void PhTimers::Update(double now, const std::vector<uint32_t>& aliveMobs)
+    void PhTimers::Update(double now, const std::vector<uint32_t>& aliveMobs, int upMinutes)
     {
         for (const uint32_t serverId : aliveMobs)
             m_Timers.erase(serverId);
-        std::erase_if(m_Timers, [&](const auto& entry) { return now > entry.second.dueAt + kUpSeconds; });
+        const double up = static_cast<double>(upMinutes) * kSecondsPerMinute;
+        std::erase_if(m_Timers, [&](const auto& entry) { return now > entry.second.dueAt + up; });
     }
 
     std::vector<TimerLine> PhTimers::Lines(uint16_t zone, double now) const

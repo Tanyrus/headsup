@@ -252,8 +252,9 @@ namespace headsup
             const char* tip);
         // An X and a Y to type, side by side.
         void Offset(const char* label, int& x, int& y, int limit, const char* tip);
-        // A strip of equal tabs across the card, perRow to a row when given. Returns the tab clicked, or picked.
-        int Tabs(const char* id, int picked, const char* const* labels, int count, int perRow = 0);
+        // A strip of equal tabs across the card, or with wrap tabs as wide as their names on as many rows as they
+        // need. Returns the tab clicked, or picked.
+        int Tabs(const char* id, int picked, const char* const* labels, int count, bool wrap = false);
         // A muted line inside the card, wrapped at its edge.
         void Note(const char* text);
         // A pill action on a line of its own.

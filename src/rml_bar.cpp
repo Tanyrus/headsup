@@ -268,7 +268,7 @@ namespace headsup
                 shown.columns = c.cells ? CellColumns(c, [&](bool title, const Span& span) {
                     return SteadyWidth(host, {span}, {}, title ? own.TitleFace(c) : own.DetailFace());
                 }) : std::vector<float>{};
-                const auto detail = [&](const std::vector<Span>& spans) { return SteadyWidth(host, spans, {}, own.DetailFace()); };
+                const auto detail = [&](const std::vector<Span>& spans) { return SteadyWidth(host, spans, {}, own.MeterFace()); };
                 shown.meter = c.meter ? PlaceMeter(*c.meter, MeterWidths{detail(c.meter->above), detail(c.meter->below),
                                                                  detail(c.meter->left), detail(c.meter->right)}, m.gap)
                                       : MeterPlace{};
@@ -289,8 +289,10 @@ namespace headsup
             2.0f * targetPadding + targetLook.Leading(target) +
             (target.title.empty() ? 0.0f
                                   : Width(host, Shortest(target.title.front().text, kFewLetters), targetLook.TitleFace()));
+        widgets.panel = Panel(look.settings);
+        SharePopups(widgets.hasPopup, widgets.panel.group);
         const BarLayout layout = LayoutBar(screenWidth, m, look.palette.shape, natural, targetMinimum,
-            look.settings.barSections, look.settings.barSeparators, widgets.spacing);
+            widgets.panel.placement, look.settings.barSeparators, widgets.spacing, widgets.panel.group);
         if (layout.targetWidth > 0.0f && layout.targetWidth < natural[SlotOf(BarWidget::Target)] &&
             !target.title.empty())
         {
@@ -321,19 +323,26 @@ namespace headsup
             const BarRect* rect = RectOf(layout, widget);
             shown.element->SetClass(kHiddenClass, rect == nullptr);
             if (rect == nullptr) continue;
-            // A plain ornate widget keeps the divider's clear space either side as its margin.
-            const float inset = look.ornate && widget.kind != BarWidget::Target ? DiamondClearance(m) : 0.0f;
+            // A plain ornate widget keeps the divider's clear space as its margin, but where it shares its pill.
+            const PillJoins joins = JoinsOf(layout, widget);
+            const WidgetSide before = SideOf(look, widget, shown.padded, joins.before);
+            const WidgetSide after  = SideOf(look, widget, shown.padded, joins.after);
             Set(shown.element, Rml::PropertyId::Left, shown.left.value, rect->x);
-            Set(shown.element, Rml::PropertyId::Width, shown.width.value, rect->width - 2.0f * inset);
-            const float side = SidePadding(look, widget, shown.padded);
-            if (shown.padding.value != side)
-            {
-                shown.padding.value = side;
-                for (const Rml::PropertyId edge : {Rml::PropertyId::PaddingLeft, Rml::PropertyId::PaddingRight})
-                    shown.element->SetProperty(edge, Rml::Property(side, Rml::Unit::PX));
-            }
+            Set(shown.element, Rml::PropertyId::Width, shown.width.value, rect->width - before.margin - after.margin);
+            Set(shown.element, Rml::PropertyId::MarginLeft, shown.marginLeft.value, before.margin);
+            Set(shown.element, Rml::PropertyId::MarginRight, shown.marginRight.value, after.margin);
+            Set(shown.element, Rml::PropertyId::PaddingLeft, shown.paddingLeft.value, before.padding);
+            Set(shown.element, Rml::PropertyId::PaddingRight, shown.paddingRight.value, after.padding);
+            shown.element->SetClass(kJoinBeforeClass, joins.before);
+            shown.element->SetClass(kJoinAfterClass, joins.after);
+            // A pill shown only while lit stays so only when every widget in it does.
+            const PanelWidget head = widgets.panel.group[w];
+            bool flat = !look.ornate;
+            for (const PanelWidget member : Members(widgets.panel, head))
+                flat = flat && !look.BoxOf(member.kind, false);
+            shown.element->SetClass(kFlatClass, flat);
             shown.element->SetClass(kLitClass,
-                widgets.hasPopup[w] && (input.Hovered() == widget || input.Open() == widget));
+                widgets.hasPopup[SlotOf(head)] && (input.Hovered() == head || input.Open() == head));
             shown.element->SetClass(kBorderlessClass, widget.kind == BarWidget::Target && !look.settings.widgets[w].targetBorder);
             const WidgetContent& content = widgets.contents[w];
             if (shown.marked && shown.drawn == content) continue;
@@ -421,10 +430,17 @@ namespace headsup
     }
 
     BarRect RmlBar::ShowPopup(RmlHost& host, const BarLook& look, const BarState& state,
-        const BarLayout& layout, float screenWidth, float screenHeight, const BarInput& input, bool hidden)
+        const BarLayout& layout, float screenWidth, float screenHeight, const BarInput& input, bool hidden,
+        std::vector<BarTabChip>& chips, std::vector<BarScroll>& scrolls)
     {
-        const std::optional<PanelWidget> open = input.Open();
-        const BarRect* anchor               = open ? RectOf(layout, *open) : nullptr;
+        const std::optional<PanelWidget> open  = input.Open();
+        const std::optional<BarRect> pill      = open ? GroupRect(layout, *open) : std::nullopt;
+        const BarRect* anchor                  = pill ? &*pill : nullptr;
+        if (open != m_WidestFor)
+        {
+            m_WidestFor = open;
+            m_Widest    = 0.0f;
+        }
         if (anchor == nullptr)
         {
             if (m_Popup != nullptr)
@@ -437,24 +453,27 @@ namespace headsup
         if (!PopupDocumentFor(host, look)) return BarRect{};
         const BarPalette& p = look.palette;
         const BarMetrics& m = look.metrics;
+        // Figures measured at the font's widest digit, so a popup does not change its width as its times tick.
         auto measure = [&](const Span& s, PopupFont f) {
             const TextFace face  = look.FaceOf(f);
             const FaceLine& line = FaceLineOf(host, face.family, WholePixels(face.size));
-            return TextSize{Width(host, s.text, face), line.height, line.inkTop, line.inkBottom, 0.0f};
+            return TextSize{Width(host, SteadyFigures(s.text, WidestDigitOf(host, face)), face), line.height, line.inkTop,
+                line.inkBottom, 0.0f};
         };
         // The ornate panel's outer border and the line under the strip count: the gap is from them. The help bar's
         // popup goes under the help bar's box.
         const auto out        = static_cast<float>(OuterPad(PopupPanel(look)));
         const float barBottom = open->kind == BarWidget::GameHelp ? anchor->y + anchor->height : BarBottom(p, m);
-        PopupKey key{BarPopupContent(*open, state, look.settings), input.Pinned() == open, m.height, m.popupText,
-            p.shape, PopupRoom(barBottom, screenHeight, m.gap, out)};
+        PopupKey key{PanelPopupContent(*open, state, look.settings), input.Pinned() == open, m.height, m.popupText,
+            p.shape, PopupRoom(barBottom, screenHeight, m.gap, out), m_Widest};
         bool fresh            = false;
         const PopupLayout& pl = m_PopupLayout.Get(std::move(key), [&](const PopupKey& k) {
             fresh           = true;
-            PopupLayout cut = LayoutPopup(k.content, m, p.shape, k.pinned, measure);
+            PopupLayout cut = LayoutPopup(k.content, m, p.shape, k.pinned, measure, k.room, k.least);
             CutPopup(cut, k.room, m.popupPadding);
             return cut;
         });
+        m_Widest = std::max(m_Widest, pl.width);
         const BarRect rect =
             PlacePopup(*anchor, barBottom, pl.width, pl.height, screenWidth, screenHeight, m.gap, out);
         if (fresh || !m_PopupMarked)
@@ -468,6 +487,12 @@ namespace headsup
         Set(m_Popup, Rml::PropertyId::Height, m_PopupHeight.value, rect.height);
         m_Popup->SetClass(kHiddenClass, hidden);
         m_Popup->SetClass(kOpenClass, !hidden);
+        for (const PopupTabChip& chip : pl.chips)
+            chips.push_back(BarTabChip{chip.key, BarRect{rect.x + chip.x, rect.y + chip.y, chip.width, chip.height}, chip.tab});
+        for (const PopupScroll& scroll : pl.scrolls)
+            scrolls.push_back(BarScroll{scroll.key, BarRect{rect.x + scroll.x, rect.y + scroll.y, scroll.width, scroll.height},
+                scroll.most, BarRect{rect.x + scroll.grip.x, rect.y + scroll.grip.y, scroll.grip.width, scroll.grip.height},
+                scroll.thumb});
         return rect;
     }
 
@@ -521,8 +546,10 @@ namespace headsup
         if (settings.Widget(BarWidget::GameHelp).on)
             m_HelpReach = BarRect{HelpBarLeft(m) + helpX, helpTop, HelpBarWidth(screenWidth), rows.helpBarHeight};
         input.Frame(layout, widgets.hasPopup);
-        input.SetPopup(
-            ShowPopup(host, look, state, layout, screenWidth, screenHeight, input, hidden));
+        std::vector<BarTabChip> chips;
+        std::vector<BarScroll> scrolls;
+        const BarRect popup = ShowPopup(host, look, state, layout, screenWidth, screenHeight, input, hidden, chips, scrolls);
+        input.SetPopup(popup, std::move(chips), std::move(scrolls));
         if (m_Visible == hidden)
         {
             m_Visible = !hidden;

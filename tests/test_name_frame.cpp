@@ -43,7 +43,7 @@ namespace
 
 TEST(a_frame_is_read_at_the_routines_offsets)
 {
-    // The words of the frame the hook captured for the player Carrott (/hu namedump, 2026-10-07). The /hu drawdump taken
+    // The words of the frame the hook captured for a player (/hu namedump, 2026-10-07). The /hu drawdump taken
     // with nobody moving put the game's letters, in back-buffer pixels (2/3 of the scene's), centered with the
     // linkshell icon at x 1279.7, topped at y 656.9 and at depth 0.98281.
     std::vector<uint8_t> bytes(kNameFrameBytes, 0);
@@ -65,7 +65,9 @@ TEST(a_frame_is_read_at_the_routines_offsets)
 
     const NameFrame frame = ReadNameFrame(bytes.data());
     CHECK_EQ(frame.caller, 0x035908A8u);
-    CHECK_EQ(frame.actor, 0x3116EA10u);
+    // The player's actor was in the routine's first locals, but only left there by calls before it: the routine never sets
+    // them, and xirml's hook on the wrapper leaves its own words there.
+    CHECK_EQ(frame.actor, 0u);
     CHECK_EQ(frame.length, 9u);
     CHECK(std::fabs(frame.x / 1.5f - 1279.7f) < 0.1f);
     CHECK(std::fabs(frame.y / 1.5f - 656.9f) < 0.1f);
@@ -162,17 +164,17 @@ namespace
 
 TEST(a_drawn_name_sits_where_the_games_letters_were)
 {
-    // Carrott's frame from /hu namedump; the /hu drawdump of the same still scene measured the game's letters at
+    // That player's frame from /hu namedump; the /hu drawdump of the same still scene measured the game's letters at
     // (1186.9,656.9)-(1456.9,688.5), and the whole name with its linkshell icon from x 1102.5 to 1456.9, white.
-    NameFrame carrott;
-    carrott.x      = 1919.5011f;
-    carrott.y      = 985.3241f;
-    carrott.depth  = 0.982814f;
-    carrott.scaleX = 8.4375f;
-    carrott.scaleY = 4.74609375f;
-    carrott.color  = 0xC0808080;
+    NameFrame captured;
+    captured.x      = 1919.5011f;
+    captured.y      = 985.3241f;
+    captured.depth  = 0.982814f;
+    captured.scaleX = 8.4375f;
+    captured.scaleY = 4.74609375f;
+    captured.color  = 0xC0808080;
 
-    const DrawnName name = NameFromFrame(carrott, kToBackBuffer, kToBackBuffer);
+    const DrawnName name = NameFromFrame(captured, kToBackBuffer, kToBackBuffer);
     CHECK(name.box.valid);
     CHECK(Near(name.box.CenterX(), (1102.5f + 1456.9f) / 2.0f, 0.1f));
     CHECK(Near(name.box.minY, 656.9f, 0.1f));
@@ -202,7 +204,7 @@ TEST(a_drawn_name_keeps_the_games_color_for_it)
 
 TEST(the_games_name_size_follows_from_its_depth)
 {
-    // Names in name and draw dumps, by depth: Carrott's frame above asked for 75 eightieths, Lombaria's letters were
+    // Names in name and draw dumps, by depth: the frame above asked for 75 eightieths, Lombaria's letters were
     // half of full size, a Fernfelling Chapuli 30 yalms off 17 eightieths (7.2 of 33.75 pixels), your own name full.
     CHECK_EQ(NameSizeAtDepth(0.982814f), 0.9375f);
     CHECK_EQ(NameSizeAtDepth(0.991222f), 0.5f);

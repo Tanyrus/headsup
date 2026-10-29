@@ -1,0 +1,22 @@
+group	name	every	departures
+Airships	Bastok to Jeuno	864	31:178
+Airships	Jeuno to Bastok	864	460:614
+Airships	Jeuno to Kazham	864	695:816
+Airships	Jeuno to San d'Oria	864	28:182
+Airships	Jeuno to Windurst	864	244:398
+Airships	Kazham to Jeuno	864	258:393
+Airships	San d'Oria to Jeuno	864	457:612
+Airships	Windurst to Jeuno	864	690:833
+Boats	Mhaura to Selbina	1152	961:2
+Boats	Mhaura to Whitegate	1152	385:578
+Boats	Nashmau to Whitegate	1152	720:2
+Boats	Selbina to Mhaura	1152	961:2
+Boats	Whitegate to Mhaura	1152	386:578
+Boats	Whitegate to Nashmau	1152	722:2
+Manaclipper	Bibiki Bay to Purgonorgo Isle	1728	715:798
+Manaclipper	Bibiki Bay tour	1728	43:120
+Manaclipper	Purgonorgo Isle to Bibiki Bay	1728	1254:1338
+Barge	Central to South Landing	3456	678:752,2790:2864
+Barge	North to Central Landing	3456	2415:2514
+Barge	South to Central Landing	3456	38:129
+Barge	South to North Landing	3456	1382:1472

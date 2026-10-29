@@ -12,8 +12,7 @@
 namespace headsup
 {
     constexpr double kQuietSeconds     = 2.0;  // server silence the bar shows in amber
-    constexpr double kLongestRoundTrip = 3.0;  // seconds: a later reply answered a send whose own reply was lost
-    constexpr size_t kRoundTrips       = 15;   // the replies latency is taken over
+    constexpr size_t kRoundTrips       = 15;   // the pings latency is taken over
     constexpr size_t kLeastRoundTrips  = 3;    // before it is shown
     constexpr double kLongestFrame     = 1.0;  // seconds: a longer step between fed frames counts nothing to the totals
     constexpr double kCounterSampling  = 0.25; // seconds between reads of the game's counters, which change every 3 s
@@ -45,23 +44,20 @@ namespace headsup
     // Normal while zoning.
     LinkState StateOf(const ConnectionReport& report);
 
-    // What HeadsUp measures of the connection itself. Phoenix's map server answers each client datagram at once
-    // (map_networking.cpp), so the time from a send to the next packet received in a later frame is about one round
-    // trip, rounded to frame time.
+    // What HeadsUp measures of the connection itself.
     class ConnectionMeter
     {
     public:
-        // Each packet the game sends or receives, at now (seconds), in the order the game handles them.
-        void Sent(double now);
+        // Each packet the game receives, at now (seconds).
         void Received(double now);
+        // Each ping's round trip, in milliseconds.
+        void RoundTrip(double ms);
         // Each frame, with the game's counters when they could be read. Fed only while the bar runs with Connection
         // shown, so a step longer than kLongestFrame is time away (a logout, the widget off) and is not counted.
         void Frame(double now, const std::optional<NetCounters>& counters);
         ConnectionReport Report(double now, bool zoning) const;
 
     private:
-        std::optional<double> m_Pending; // the first send since the last reply
-        bool m_PendingSeen = false;      // a frame ended since it
         std::optional<double> m_LastReceived;
         std::optional<double> m_LastFrame;
         std::optional<NetCounters> m_Counters;

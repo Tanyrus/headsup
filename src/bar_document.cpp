@@ -17,12 +17,17 @@ namespace headsup
     namespace
     {
         constexpr std::string_view kIconKind = "icon", kStripKind = "strip", kDiamondKind = "diamond", kCoinKind = "coin",
-                                   kStarKind = "star", kResetKind = "reset", kGameKind = "game";
+                                   kStarKind = "star", kResetKind = "reset", kGameKind = "game",
+                                   kItemKind = "item";
         // RmlUi blurs a glow by a Gaussian of this share of its width; the bar's shadow is a CSS blur radius, twice
         // its Gaussian's.
         constexpr float kGlowSigmaPerWidth = 0.4f;
         constexpr float kSigmaPerRadius    = 0.5f;
         constexpr int kShadowDrop          = 1; // pixels down
+        constexpr uint32_t kSocketFill     = 0x38000000; // a socket: black over its card
+        constexpr uint32_t kSocketShade    = 0x59000000, kSocketLight = 0x14FFFFFF;
+        constexpr uint32_t kLitTab         = 0x40; // the picked tab's fill: its accent at a quarter
+        constexpr uint32_t kScrollTrack    = 0x1AFFFFFF, kScrollThumb = 0x73FFFFFF; // white, faint and less so
         // The accent's alpha in the target's frame as it breathes, from and to, and in a lit title's glow.
         constexpr uint32_t kBreatheLow = 0x59, kBreatheHigh = 0xCC, kLitGlow = 0x80;
         // How a widget eases into its lit look.
@@ -143,10 +148,13 @@ namespace headsup
                    Px(static_cast<float>(WholePixels(width))) + ";height:" + Px(static_cast<float>(WholePixels(height))) + ";";
         }
 
-        std::string TextAt(const char* classes, float x, float y, uint32_t color, std::string_view text)
+        // width: set against the right of the box from x that wide, in whole pixels; 0 for text from x.
+        std::string TextAt(const char* classes, float x, float y, uint32_t color, std::string_view text, float width = 0.0f)
         {
+            const std::string box =
+                width > 0.0f ? "width:" + Px(std::round(x + width) - std::round(x)) + ";text-align:right;" : std::string();
             return std::string("<div class=\"p ") + classes + "\" style=\"left:" + Px(std::round(x)) + ";top:" +
-                   Px(std::round(y)) + ";color:" + RcssColor(color) + ";\">" + EscapedRml(text) + "</div>";
+                   Px(std::round(y)) + ";" + box + "color:" + RcssColor(color) + ";\">" + EscapedRml(text) + "</div>";
         }
 
         // A panel's fill top to bottom, its edge and its corners.
@@ -219,6 +227,21 @@ namespace headsup
         return std::string(kHostSource) + std::string(kStarKind) + kSeparator + std::to_string(pixels);
     }
 
+    std::string ItemSource(uint16_t item)
+    {
+        return std::string(kHostSource) + std::string(kItemKind) + kSeparator + std::to_string(item);
+    }
+
+    std::optional<uint16_t> ItemOfSource(std::string_view name)
+    {
+        if (name.substr(0, kHostSource.size()) != kHostSource) return std::nullopt;
+        const std::vector<std::string_view> parts = Parts(name.substr(kHostSource.size()));
+        if (parts.size() != 2 || parts[0] != kItemKind) return std::nullopt;
+        const std::optional<uint32_t> item = Number(parts[1]);
+        if (!item || *item == 0 || *item > UINT16_MAX) return std::nullopt;
+        return static_cast<uint16_t>(*item);
+    }
+
     std::string ResetSource(uint32_t argb, int pixels)
     {
         return std::string(kHostSource) + std::string(kResetKind) + kSeparator + Hex(argb) + kSeparator + std::to_string(pixels);
@@ -278,10 +301,12 @@ namespace headsup
     }
     std::string DividerId(int divider) { return "d-" + std::to_string(divider); }
 
-    float SidePadding(const BarLook& look, PanelWidget widget, float room)
+    WidgetSide SideOf(const BarLook& look, PanelWidget widget, float room, bool shared)
     {
-        const float inside = look.ornate && widget.kind != BarWidget::Target ? DiamondClearance(look.metrics) : kBoxBorder;
-        return std::max(0.0f, room - inside);
+        if (shared) return WidgetSide{0.0f, room};
+        const bool plain = look.ornate && widget.kind != BarWidget::Target;
+        const float margin = plain ? DiamondClearance(look.metrics) : 0.0f;
+        return WidgetSide{margin, std::max(0.0f, room - (plain ? margin : kBoxBorder))};
     }
 
     namespace
@@ -447,6 +472,11 @@ namespace headsup
         css += ".hh{" + FaceRules(look.detailFont, lines.title, place.figures.height) + ShadowEffect(lines.title) + "}";
         const bool glass = look.palette.shape == BarShape::Glass;
         if (glass) css += GlassBarRules(look);
+        // Last, over every shape's own corners and borders.
+        css += shape + " .widget." + kJoinBeforeClass +
+               "{border-left-width:0px;border-top-left-radius:0px;border-bottom-left-radius:0px;}";
+        css += shape + " .widget." + kJoinAfterClass +
+               "{border-right-width:0px;border-top-right-radius:0px;border-bottom-right-radius:0px;}";
 
         std::string rml = "<rml><head><style>" + css + "</style></head><body class=\"" + shape.substr(1) + "\">";
         rml += std::string("<div id=\"") + kStripId + "\"></div>";
@@ -463,7 +493,7 @@ namespace headsup
             // Zone and Earth time show no pill until lit.
             const bool flat = !look.ornate && !boxOf(widget.kind, false);
             rml += std::string("<div class=\"widget hidden") + (widget.kind == BarWidget::Target ? " target" : "") +
-                   (flat ? " flat" : "") + "\" id=\"" + WidgetId(widget) + "\"></div>";
+                   (flat ? std::string(" ") + kFlatClass : "") + "\" id=\"" + WidgetId(widget) + "\"></div>";
         }
         rml += std::string("<div id=\"") + kHelpId + "\"></div>";
         return rml + "</body></rml>";
@@ -506,6 +536,16 @@ namespace headsup
         css += "#panel{position:absolute;left:0px;top:0px;" + (look.skin ? SkinRules(*look.skin) : PanelRules(panel)) + "}";
         css += ".card{" + FlatRules(PopupCard(look), true) + "}";
         css += ".tag{" + FlatRules(PopupTag(look, 0.0f), false) + "}";
+        // A card's tabs as tags, the picked one in the accent.
+        css += ".tab{" + FlatRules(PopupTag(look, 0.0f), false) + "}";
+        css += ".track{background-color:" + RcssColor(kScrollTrack) + ";}";
+        css += ".thumb{background-color:" + RcssColor(kScrollThumb) + ";}";
+        css += ".tab.lit{border-color:" + RcssColor(look.palette.accent) + ";background-color:" +
+               RcssColor(Faded(look.palette.accent, kLitTab)) + ";}";
+        // Sunk into its card: darker, its upper edges in shadow and its lower ones lit.
+        css += std::string(".socket{box-sizing:border-box;border:1px;border-color:") + RcssColor(kSocketShade) + " " +
+               RcssColor(kSocketLight) + " " + RcssColor(kSocketLight) + " " + RcssColor(kSocketShade) +
+               ";border-radius:" + Px(PopupCard(look).radius / 2.0f) + ";background-color:" + RcssColor(kSocketFill) + ";}";
         css += ".rule{height:1px;decorator:horizontal-gradient(" + RcssColor(look.palette.divider) + " " +
                RcssColor(look.palette.divider & ~kAlphaMask) + ");}";
         css += ".mark{text-align:center;}";
@@ -543,7 +583,7 @@ namespace headsup
             {
             case PopupPiece::Kind::Text:
                 rml += TextAt(face.c_str(), piece.x, std::round(piece.y) + faces[static_cast<size_t>(piece.font)].drop, color,
-                    piece.span.text);
+                    piece.span.text, piece.right ? piece.width : 0.0f);
                 break;
             case PopupPiece::Kind::ImmuneMark:
                 rml += "<div class=\"p " + face + " mark\" style=\"" + BoxAt(piece.x, piece.y, piece.width, piece.height) +
@@ -552,6 +592,10 @@ namespace headsup
                 break;
             case PopupPiece::Kind::Icon:
                 rml += "<img class=\"p\" src=\"" + IconSource(piece.icon) + "\" style=\"" + place + "width:" +
+                       Px(piece.width) + ";height:" + Px(piece.height) + ";\"/>";
+                break;
+            case PopupPiece::Kind::Item:
+                rml += "<img class=\"p\" src=\"" + ItemSource(piece.item) + "\" style=\"" + place + "width:" +
                        Px(piece.width) + ";height:" + Px(piece.height) + ";\"/>";
                 break;
             case PopupPiece::Kind::Star:
@@ -567,6 +611,20 @@ namespace headsup
                 break;
             case PopupPiece::Kind::Card:
                 rml += "<div class=\"p card\" style=\"" + BoxAt(piece.x, piece.y, piece.width, piece.height) + "\"></div>";
+                break;
+            case PopupPiece::Kind::Tab:
+                rml += std::string("<div class=\"p tab") + (piece.open ? " lit" : "") + "\" style=\"" +
+                       BoxAt(piece.x, piece.y, piece.width, piece.height) + "border-radius:" + Px(piece.height / 2.0f) +
+                       ";\"></div>";
+                break;
+            case PopupPiece::Kind::ScrollTrack:
+            case PopupPiece::Kind::ScrollThumb:
+                rml += std::string("<div class=\"p ") + (piece.kind == PopupPiece::Kind::ScrollTrack ? "track" : "thumb") +
+                       "\" style=\"" + BoxAt(piece.x, piece.y, piece.width, piece.height) + "border-radius:" +
+                       Px(piece.width / 2.0f) + ";\"></div>";
+                break;
+            case PopupPiece::Kind::Socket:
+                rml += "<div class=\"p socket\" style=\"" + BoxAt(piece.x, piece.y, piece.width, piece.height) + "\"></div>";
                 break;
             case PopupPiece::Kind::Tag:
                 rml += "<div class=\"p tag\" style=\"" + BoxAt(piece.x, piece.y, piece.width, piece.height) +
@@ -599,9 +657,15 @@ namespace headsup
     {
         const auto bar    = static_cast<float>(meter.width);
         const auto beside = [&](float width) { return width > 0.0f ? width + gap : 0.0f; };
-        const float overhang = std::max({0.0f, (text.above - bar) / 2.0f, (text.below - bar) / 2.0f});
-        const float left = std::max(beside(text.left), overhang), right = std::max(beside(text.right), overhang);
-        return MeterPlace{left + bar + right, left, left + (bar - text.above) / 2.0f, left + (bar - text.below) / 2.0f};
+        // A text above or below wider than the bar runs past it away from the side it lines up with.
+        const float past  = std::max({0.0f, text.above - bar, text.below - bar});
+        const float share = meter.align == Align::Center ? past / 2.0f : past;
+        const float left  = std::max(beside(text.left), meter.align == Align::Left ? 0.0f : share);
+        const float right = std::max(beside(text.right), meter.align == Align::Right ? 0.0f : share);
+        const auto at     = [&](float width) {
+            return meter.align == Align::Left ? left : meter.align == Align::Right ? left + bar - width : left + (bar - width) / 2.0f;
+        };
+        return MeterPlace{left + bar + right, left, at(text.above), at(text.below)};
     }
 
     std::string WidgetRml(const WidgetContent& content, const BarLook& look, const std::vector<float>& columns,
@@ -613,7 +677,13 @@ namespace headsup
         {
             const Meter& m   = *content.meter;
             const auto bar   = static_cast<float>(m.width), thick = static_cast<float>(m.height);
-            const float top  = std::round((look.row.height - thick) / 2.0f);
+            // The bar and the texts over and under it centered on the row together: half a line of text and its gap
+            // off the middle with text on one side only. The texts beside it move with it.
+            const float middle = std::round((look.row.height - thick) / 2.0f);
+            const float off    = (static_cast<float>(look.lines.side) + kMeterTextGap) / 2.0f *
+                              static_cast<float>(static_cast<int>(!m.above.empty()) - static_cast<int>(!m.below.empty()));
+            const float top    = std::round((look.row.height - thick) / 2.0f + off);
+            const std::string by = "margin-top:" + Px(top - middle) + ";";
             const float done = std::clamp(m.done, 0.0f, 1.0f) * kPercentWhole;
             const auto text  = [&](const std::vector<Span>& spans, const char* classes, const std::string& place) {
                 return spans.empty() ? std::string()
@@ -624,8 +694,8 @@ namespace headsup
                    ";height:" + Px(thick) + ";\"><div class=\"fill\" style=\"width: " + RcssNumber(done) + "%\"></div></div>";
             rml += text(m.above, "mtext", "left:" + Px(meter.aboveX) + ";bottom:" + Px(look.row.height - top + kMeterTextGap) + ";");
             rml += text(m.below, "mtext", "left:" + Px(meter.belowX) + ";top:" + Px(top + thick + kMeterTextGap) + ";");
-            rml += text(m.left, "mtext mside", "right:" + Px(meter.width - meter.barX + look.metrics.gap) + ";");
-            rml += text(m.right, "mtext mside", "left:" + Px(meter.barX + bar + look.metrics.gap) + ";");
+            rml += text(m.left, "mtext mside", "right:" + Px(meter.width - meter.barX + look.metrics.gap) + ";" + by);
+            rml += text(m.right, "mtext mside", "left:" + Px(meter.barX + bar + look.metrics.gap) + ";" + by);
             return rml + "</div></div>";
         }
         for (const Icon icon : content.icons)

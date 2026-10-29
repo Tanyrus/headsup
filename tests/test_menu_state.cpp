@@ -274,11 +274,6 @@ TEST(the_widgets_page_has_a_tab_for_every_widget_on_the_bar_in_rows_as_even_as_t
         const auto widget = static_cast<BarWidget>(w);
         CHECK_EQ(std::ranges::count(tabs, widget), OnTheBar(widget) ? 1 : 0); // Game help has a card of its own
     }
-    CHECK(tabs.front() == BarWidget::Zone && tabs.back() == BarWidget::Conquest);
-    CHECK_EQ(TabsPerRow(14, 2), 7);
-    CHECK_EQ(TabsPerRow(13, 2), 7); // an odd one out goes in the first row
-    CHECK_EQ(TabsPerRow(3, 1), 3);
-    CHECK_EQ(TabsPerRow(2, 3), 1); // more rows than tabs: one each
-    CHECK_EQ(TabsPerRow(0, 2), 1); // never none, which a row's width is divided by
+    CHECK(tabs.front() == BarWidget::Zone && tabs.back() == BarWidget::World);
 }
 

@@ -56,6 +56,20 @@ namespace headsup
     // A mouse button pressed or double-clicked: before the game takes it, its pointer is moved to where the click is.
     bool ClickMessage(uint32_t message);
 
+    // The game flips a button's held state at each release it gets (FFXiMain 0x1249E0 xors the left one's), so a
+    // release whose press it never got leaves the button held: with the left one, the mouse turns the camera. Each
+    // release goes to the game only when its press did, whatever is under the pointer by then. The game acts on no
+    // double-click message, so a double-click is no press of its own and the release after one is kept.
+    class GamePresses
+    {
+    public:
+        // kept: HeadsUp's own answer for the message. True when the game must not get it.
+        bool Keep(uint32_t message, bool kept);
+
+    private:
+        bool m_Left = false, m_Right = false, m_Middle = false; // the game got the press and not yet its release
+    };
+
     struct CursorName
     {
         uint16_t index;

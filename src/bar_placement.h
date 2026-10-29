@@ -53,4 +53,26 @@ namespace headsup
     // the last; at counts the section as it was before the move. False, with nothing changed, for an index or a
     // position out of range or a drop where the widget already is.
     bool MoveWidget(BarPlacement& placement, BarSection from, size_t index, BarSection to, size_t at);
+
+    // A copy by its name in the settings file, as PanelWidgetName gives it; none for an unknown name.
+    std::optional<PanelWidget> PanelWidgetNamed(const std::string& name);
+
+    // By SlotOf: the widget the player combined with each one, shown right after it in one pill with one popup.
+    using CombineLinks = std::array<std::optional<PanelWidget>, kPanelSlots>;
+    // The target keeps a frame of its own and game help a bar of its own: neither combines.
+    constexpr bool Combines(BarWidget widget) { return OnTheBar(widget) && widget != BarWidget::Target; }
+    // The panel as it is drawn: a widget combined with another pulls that one from its own place to just after it,
+    // and that one pulls what it is combined with in turn. A link counts between two placed widgets that combine,
+    // when no lower slot pulled its widget already and it closes no ring. group: by SlotOf, the first widget of the
+    // pill each one is in, itself when it is alone.
+    struct PanelGroups
+    {
+        BarPlacement placement;
+        std::array<PanelWidget, kPanelSlots> group;
+    };
+    PanelGroups Combine(const BarPlacement& placement, const CombineLinks& links);
+    // Every widget alone in its pill, as a panel without links has them.
+    const std::array<PanelWidget, kPanelSlots>& AloneGroups();
+    // The widgets in head's pill, in the panel's order.
+    std::vector<PanelWidget> Members(const PanelGroups& groups, PanelWidget head);
 }

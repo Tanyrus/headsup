@@ -645,12 +645,12 @@ TEST(each_kind_composes_from_its_own_design)
     s.Kind(PlateKind::Npcs).lines[2].text    = "npc $name";
     ActorInfo pet = AggressiveMob();
     pet.state.pet = true;
-    std::snprintf(pet.ownerName, sizeof(pet.ownerName), "Carrott");
+    std::snprintf(pet.ownerName, sizeof(pet.ownerName), "Zinnia");
     CHECK(Compose(pet, s).lines.empty()); // a pet's nameplate shows when it is targeted
     pet.state.target = TargetState::Targeted;
     const ComposedPlate pets = Compose(pet, s);
     CHECK_EQ(pets.lines.size(), size_t{1});
-    CHECK_EQ(Rendered(pets.lines[0]), "Young Quadav (Carrott)");
+    CHECK_EQ(Rendered(pets.lines[0]), "Young Quadav (Zinnia)");
     ActorInfo self = PlainPlayer();
     self.state.self = true;
     CHECK_EQ(Rendered(Compose(self, s).lines[0]), "me Chadmage");
@@ -972,6 +972,19 @@ TEST(a_line_carries_its_padding_and_a_synced_line_the_one_it_borrows)
     CHECK_EQ(plate.lines[2].look.padding, 6.0f);
 }
 
+TEST(a_line_carries_its_offset_and_a_synced_line_the_one_it_borrows)
+{
+    Settings s;
+    KindSettings& mobs = s.Kind(PlateKind::Mobs);
+    mobs.lines[0].offset   = -20;
+    mobs.lines[1].offset   = 15;
+    mobs.lines[2].syncWith = 1;
+    const ComposedPlate plate = ComposePlate(AggressiveMob(), kPlayer, s, kGame);
+    CHECK_EQ(plate.lines[0].look.offset, -20.0f);
+    CHECK_EQ(plate.lines[1].look.offset, 15.0f);
+    CHECK_EQ(plate.lines[2].look.offset, 15.0f);
+}
+
 TEST(a_lines_shadow_at_100_percent_is_one_and_a_half_of_the_mockups)
 {
     Settings s;
@@ -1145,6 +1158,17 @@ TEST(a_gms_icon_is_on_every_plate_of_theirs_where_the_design_puts_it_or_before_t
     const ComposedPlate plain = Compose(PlayerWith(gm), s);
     CHECK_EQ(Rendered(plain.lines.back()), "[1] Chadmage");
     CHECK((IconsOn(plain) == std::vector<Icon>{Icon::Gm}));
+    // Icons before the name take it into their run, spaced as if the design had it after them.
+    PlayerStatus pearl = gm;
+    pearl.linkshell    = true;
+    for (const auto& [without, with] : {std::pair{"$linkshell$name", "$linkshell$gm$name"}, {"$linkshell $name", "$linkshell$gm $name"}})
+    {
+        players.lines[2].text = without;
+        const std::string forced = Rendered(Compose(PlayerWith(pearl), s).lines.back());
+        players.lines[2].text = with;
+        CHECK_EQ(forced, Rendered(Compose(PlayerWith(pearl), s).lines.back()));
+    }
+    players.lines[2].text = "$name";
     // On a line that does not show now: before the name all the same.
     players.lines[0].text = "$gm";
     players.lines[0].show = LineShow{false, 0};

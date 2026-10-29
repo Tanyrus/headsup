@@ -35,6 +35,10 @@ namespace headsup
         UnexpectedExit,
         NoCallers,
         NoEntityCaller,
+        EntityWrapperChanged,
+        NoEntityWrapperCalls,
+        NoModelDraws,
+        ModelDrawsDiffer,
         NoArrowDraws,
         AmbiguousArrowDraws,
         ArrowDrawsDiffer,
@@ -84,6 +88,8 @@ namespace headsup
         uint32_t entry = 0, hook = 0, resume = 0, exit = 0;
         std::vector<uint32_t> callerReturns;
         uint32_t entityCaller = 0; // the one of those that entities' names come back to
+        uint32_t wrapper = 0;               // the wrapper that one is in, which takes the actor in ecx
+        std::vector<uint32_t> wrapperCalls; // the calls into it
     };
 
     // Found by the two icon tables it reads (from .rdata, which is in the file) rather than by its own bytes, so it
@@ -158,6 +164,16 @@ namespace headsup
         uint32_t list = 0;
     };
     WindowDraw LocateWindowDraw(const ImageSection& text);
+
+    // RVAs of the calls that draw one character's model, each a five-byte thiscall whose first argument is the
+    // character's actor, and of the routine they call.
+    struct ModelDraws
+    {
+        LocateProblem problem = LocateProblem::None;
+        std::vector<uint32_t> calls;
+        uint32_t draw = 0;
+    };
+    ModelDraws LocateModelDraws(const ImageSection& text);
     struct WindowMoveSite
     {
         LocateProblem problem = LocateProblem::None;
@@ -233,6 +249,10 @@ namespace headsup
     // middle button, at +0x18): where, from a call to it in the class's layout at at and, after it, an int16 kept at
     // [base + disp8] and the next at the same base 2 further. None for a class that keeps none.
     std::optional<uint32_t> EntryPlaceOffset(std::span<const uint8_t> layout, uintptr_t at, uintptr_t entryRect);
+    // A class built on another lays its base out first: a layout at at that opens with pushes and keeping `this` in a
+    // register (mov esi/edi, ecx), then calls a routine, names that routine, where what the base keeps is laid out (the
+    // Linkshell menu's owner calls the Linkshell item's). None for a layout that starts with anything else.
+    std::optional<uintptr_t> BaseLayout(std::span<const uint8_t> layout, uintptr_t at);
     // An MCD's rectangle in the game's menu resolution: int16 left, top, right and bottom from +0x3A. +0x94 is a move's
     // countdown (MoveUnderWay); +0x99 is set for windows kept in a 640 x 480 space instead; +0x10 is
     // kWindowOpening while the window has no owner to lay out yet.

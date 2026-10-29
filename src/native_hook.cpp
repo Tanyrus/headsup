@@ -24,7 +24,16 @@ extern "C"
     uintptr_t g_HeadsUpNameResume = 0;
     uintptr_t g_HeadsUpNameExit   = 0;
     void HeadsUpNameGate();
+    uint32_t g_HeadsUpNameActor        = 0;
+    uintptr_t g_HeadsUpEntityNameDraw = 0;
+    void HeadsUpEntityNameGate();
     __attribute__((used)) uint32_t HeadsUpOnName(uint32_t frame);
+    uintptr_t g_HeadsUpModelDraw = 0;
+    uint32_t g_HeadsUpModelDepth = 0;
+    uint32_t g_HeadsUpModelActors[8]  = {};
+    uint32_t g_HeadsUpModelReturns[8] = {};
+    void HeadsUpModelGate();
+    void HeadsUpModelBack();
     uintptr_t g_HeadsUpArrowDraw = 0;
     void HeadsUpArrowGate();
     __attribute__((used)) uint32_t HeadsUpOnArrow(const uint32_t* arguments, uint32_t returnAddress);
@@ -129,6 +138,60 @@ _HeadsUpNameGate:
     .att_syntax prefix
 )");
 
+// In place of the game's calls that draw one character's model, whose first argument is its actor. It notes the actor
+// and swaps the return for HeadsUpModelBack, which forgets it. A model drawn inside another stacks, up to eight deep
+// (the size of the arrays); one deeper goes through unnoted, its draws the next one out's.
+asm(R"(
+    .text
+    .p2align 4
+    .globl _HeadsUpModelGate
+_HeadsUpModelGate:
+    .intel_syntax noprefix
+    push eax
+    mov eax, dword ptr [_g_HeadsUpModelDepth]
+    cmp eax, 8
+    jae .LHeadsUpModelUnnoted
+    push edx
+    mov edx, dword ptr [esp + 8]
+    mov dword ptr [_g_HeadsUpModelReturns + eax*4], edx
+    mov edx, dword ptr [esp + 12]
+    mov dword ptr [_g_HeadsUpModelActors + eax*4], edx
+    inc eax
+    mov dword ptr [_g_HeadsUpModelDepth], eax
+    pop edx
+    pop eax
+    mov dword ptr [esp], offset _HeadsUpModelBack
+    jmp dword ptr [_g_HeadsUpModelDraw]
+.LHeadsUpModelUnnoted:
+    pop eax
+    jmp dword ptr [_g_HeadsUpModelDraw]
+    .globl _HeadsUpModelBack
+_HeadsUpModelBack:
+    sub esp, 4
+    push eax
+    mov eax, dword ptr [_g_HeadsUpModelDepth]
+    dec eax
+    mov dword ptr [_g_HeadsUpModelDepth], eax
+    mov eax, dword ptr [_g_HeadsUpModelReturns + eax*4]
+    mov dword ptr [esp + 4], eax
+    pop eax
+    ret
+    .att_syntax prefix
+)");
+
+// In place of the entity loop's call into the wrapper that draws an entity's name, which takes the actor in ecx and
+// drops it before the routine runs. It goes on to whatever the call went to, the wrapper or another plugin's hook on it.
+asm(R"(
+    .text
+    .p2align 4
+    .globl _HeadsUpEntityNameGate
+_HeadsUpEntityNameGate:
+    .intel_syntax noprefix
+    mov dword ptr [_g_HeadsUpNameActor], ecx
+    jmp dword ptr [_g_HeadsUpEntityNameDraw]
+    .att_syntax prefix
+)");
+
 // Called in place of the shape draw, a thiscall: ecx is the arrow's shape and the stack holds the return address, then
 // the eight arguments. A call boundary, so the x87 stack is empty. On 0 it jumps on to the shape draw with all of that
 // as it was; otherwise it returns and pops the arguments as the shape draw would (kArrowArgumentBytes).
@@ -199,6 +262,8 @@ namespace headsup
 
         static_assert(sizeof(kNameHookBytes) == kBranchLength + 1, "the hook is a jump and one nop");
         static_assert(kArrowArgumentBytes == 32, "the arrow gate's ret 32");
+        static_assert(std::size(g_HeadsUpModelActors) == 8 && std::size(g_HeadsUpModelReturns) == 8,
+            "the model gate's eight deep");
         constexpr uint32_t kArrowColorArgument = 4; // x, y, scale x, scale y, then the color
 
         // Written at Present and read by OnArrow, both on the render thread, so never at once.
@@ -451,11 +516,18 @@ namespace headsup
         g_EntityCaller      = moduleBase + routine.entityCaller;
         g_HeadsUpNameResume = moduleBase + routine.resume;
         g_HeadsUpNameExit   = moduleBase + routine.exit;
+        g_HeadsUpNameActor  = 0;
+        g_HeadsUpEntityNameDraw = moduleBase + routine.wrapper;
 
-        CodePatch jump = Instruction(site, sizeof(kNameHookBytes), kJumpOpcode,
-            BranchOperand(Address(site), Address(&HeadsUpNameGate)));
-        if (const std::string failure = PutIn({&jump, 1}); !failure.empty()) return failure;
-        m_Patch      = jump;
+        std::vector<CodePatch> patches = {Instruction(site, sizeof(kNameHookBytes), kJumpOpcode,
+            BranchOperand(Address(site), Address(&HeadsUpNameGate)))};
+        for (const uint32_t rva : routine.wrapperCalls)
+        {
+            uint8_t* call = const_cast<uint8_t*>(base) + rva;
+            patches.push_back(Retarget(call, Address(call), Address(&HeadsUpEntityNameGate)));
+        }
+        if (const std::string failure = PutIn(patches); !failure.empty()) return failure;
+        m_Patches    = std::move(patches);
         m_ModuleBase = moduleBase;
         return "";
     }
@@ -463,10 +535,10 @@ namespace headsup
     std::string NameHook::Stop()
     {
         if (!Running()) return "";
-        const CodePatch jump = std::exchange(m_Patch, {});
+        const std::vector<CodePatch> patches = std::exchange(m_Patches, {});
         g_Owners.clear(); // the gate then resumes the routine for every name
         g_HideNames = false;
-        return KeptLoaded(PutBack({&jump, 1},
+        return KeptLoaded(PutBack(patches,
             "the game's name routine was changed again after HeadsUp hooked it, so it was left as it is",
             "the game's name routine could not be put back"));
     }
@@ -495,6 +567,41 @@ namespace headsup
         if (const std::string failure = PutIn(patches); !failure.empty()) return failure;
         m_Calls = patches;
         return "";
+    }
+
+    std::string ModelHook::Start()
+    {
+        if (Running()) return "";
+        auto* base = reinterpret_cast<uint8_t*>(GetModuleHandleA(kGameModule));
+        if (base == nullptr) return std::string(kGameModule) + " is not loaded";
+        ImageSection text{};
+        if (!FindSection(base, kCodeSection, text)) return kCodeNotRead;
+        const ModelDraws draws = LocateModelDraws(text);
+        if (draws.problem != LocateProblem::None) return Describe(draws.problem);
+        std::vector<CodePatch> calls;
+        for (const uint32_t rva : draws.calls)
+            calls.push_back(Retarget(base + rva, Address(base + rva), Address(&HeadsUpModelGate)));
+        g_HeadsUpModelDraw  = Address(base) + draws.draw;
+        g_HeadsUpModelDepth = 0;
+        if (const std::string failure = PutIn(calls); !failure.empty()) return failure;
+        m_Calls = std::move(calls);
+        return "";
+    }
+
+    std::string ModelHook::Stop()
+    {
+        if (!Running()) return "";
+        const std::vector<CodePatch> calls = std::exchange(m_Calls, {});
+        return KeptLoaded(PutBack(calls,
+            "the game's model draws were changed again after HeadsUp hooked them, so they were left as they are",
+            "the game's model draws could not be put back"));
+    }
+
+    void ModelHook::NewFrame() { g_HeadsUpModelDepth = 0; }
+
+    uintptr_t ModelHook::Drawing() const
+    {
+        return g_HeadsUpModelDepth > 0 ? g_HeadsUpModelActors[g_HeadsUpModelDepth - 1] : 0;
     }
 
     std::string ArrowHook::Stop()
@@ -1013,10 +1120,16 @@ namespace headsup
 
         // Where an owner keeps an entry's top left corner, read off its class's layout as PlaceCopyAt reads the
         // window's place: none for a class that keeps none.
+        // A class built on another (the Linkshell menu on the Linkshell item) keeps it in its base's layout.
         std::optional<uint32_t> EntryPlaceAt(uint32_t owner)
         {
             const auto layout = g_WindowEntryRect != 0 ? OwnerLayout(owner) : std::nullopt;
-            return layout ? EntryPlaceOffset(layout->first, layout->second, g_WindowEntryRect) : std::nullopt;
+            if (!layout) return std::nullopt;
+            if (const std::optional<uint32_t> kept = EntryPlaceOffset(layout->first, layout->second, g_WindowEntryRect)) return kept;
+            const std::optional<uintptr_t> base = BaseLayout(layout->first, layout->second);
+            const auto* code = base ? reinterpret_cast<const uint8_t*>(*base) : nullptr;
+            if (code == nullptr || !Readable(code, kLayoutScanBytes)) return std::nullopt;
+            return EntryPlaceOffset(std::span<const uint8_t>(code, kLayoutScanBytes), *base, g_WindowEntryRect);
         }
 
         // The game's own move. An owner that keeps a copy of its window's place draws from it, and the move leaves it
@@ -1312,13 +1425,14 @@ extern "C" uint32_t HeadsUpOnName(uint32_t frame)
 {
     using namespace headsup;
     const auto* bytes          = reinterpret_cast<const uint8_t*>(frame);
-    const NameFrame name       = ReadNameFrame(bytes);
+    NameFrame name             = ReadNameFrame(bytes);
     const bool fromRoutine = FromNameRoutine(name, g_CallerReturns);
     const auto* text       = fromRoutine ? reinterpret_cast<const uint8_t*>(name.text) : nullptr;
+    // The other caller draws world labels, which have no actor.
+    if (name.caller == g_EntityCaller) name.actor = g_HeadsUpNameActor;
 #ifdef HEADSUP_DEV
-    CaptureNameCall(bytes, text, name.length);
+    CaptureNameCall(bytes, name.actor, text, name.length);
 #endif
-    // The other caller draws world labels, whose frames hold no actor: whatever is there is stale.
     if (!fromRoutine || name.caller != g_EntityCaller || !Placeable(name) || !SingleLine(text, name.length)) return 0;
     const NameOwner* owner = FindOwner(name.actor);
     if (owner == nullptr) return 0;
@@ -1374,3 +1488,44 @@ extern "C" void HeadsUpOnBuilt(uint32_t mcd)
     PlaceFrame(false, &built);
     MoveBuilt(mcd, built.key);
 }
+
+#ifdef HEADSUP_DEV
+namespace headsup
+{
+    std::string WindowHook::OwnersReport()
+    {
+        if (g_WindowList == 0) return "the game's list of open windows was not found\n";
+        std::array<OpenWindow, kMaxWindowKeys> windows{};
+        const size_t count = ReadWindowList(g_WindowList, kProcessMemory, windows);
+        const auto base    = reinterpret_cast<uint32_t>(GetModuleHandleA(kGameModule));
+        const auto rva     = [&](uint32_t at) { return at >= base ? at - base : 0u; };
+        const auto offset  = [](std::optional<uint32_t> at) { return at ? std::to_string(*at) : std::string("none"); };
+        std::string out;
+        for (size_t i = 0; i < count; ++i)
+        {
+            const OpenWindow& w  = windows[i];
+            const auto* record   = reinterpret_cast<const uint8_t*>(w.mcd + kMcdOwner);
+            const uint32_t owner = Readable(record, sizeof(uint32_t)) ? ReadAt<uint32_t>(record, 0) : 0;
+            const auto* object   = reinterpret_cast<const uint8_t*>(owner);
+            const uint32_t vtable = owner != 0 && Readable(object, sizeof(uint32_t)) ? ReadAt<uint32_t>(object, 0) : 0;
+            const auto layout     = vtable != 0 ? OwnerLayout(owner) : std::nullopt;
+            char line[256];
+            std::snprintf(line, sizeof(line), "%.*s mcd %08X rect %d,%d,%d,%d%s owner %08X class %06X layout %06X place %s entry %s\n",
+                static_cast<int>(kWindowKeyLength), w.key.data(), w.mcd, w.left, w.top, w.right, w.bottom,
+                w.hidden ? " hidden" : "", owner, rva(vtable), layout ? rva(layout->second) : 0u,
+                offset(vtable != 0 ? PlaceCopyAt(owner) : std::nullopt).c_str(),
+                offset(vtable != 0 ? EntryPlaceAt(owner) : std::nullopt).c_str());
+            out += line;
+            if (!layout) continue;
+            for (size_t b = 0; b < layout->first.size(); ++b)
+            {
+                char hex[4];
+                std::snprintf(hex, sizeof(hex), "%02x", layout->first[b]);
+                out += (b % 32 == 0 ? "    " : "") + std::string(hex) + (b % 32 == 31 ? "\n" : "");
+            }
+            out += "\n";
+        }
+        return out;
+    }
+}
+#endif

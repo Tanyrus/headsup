@@ -86,7 +86,7 @@ namespace headsup
             bool measured = false;
             WidgetContent drawn; // as its markup was made from: the target's is cut to its room
             bool marked = false; // its markup is drawn's
-            Px left, width, padding;
+            Px left, width, marginLeft, marginRight, paddingLeft, paddingRight;
         };
         struct Divider
         {
@@ -110,7 +110,8 @@ namespace headsup
         struct Widgets
         {
             std::array<WidgetContent, kPanelSlots> contents;
-            std::array<bool, kPanelSlots> hasPopup{};
+            std::array<bool, kPanelSlots> hasPopup{}; // a combined pill's first widget's when any of its widgets has one
+            PanelGroups panel;                        // the panel as it is drawn, its widgets combined
             std::array<float, kPanelSlots> spacing{}; // each widget's own room more beside it
             std::array<std::optional<WidgetText>, kPanelSlots> text; // a widget's own, where it has fonts or a size of its own
         };
@@ -134,6 +135,7 @@ namespace headsup
             float popupText = 0.0f;
             BarShape shape  = BarShape::Ornate;
             float room      = 0.0f;
+            float least     = 0.0f;
             bool operator==(const PopupKey&) const = default;
         };
         struct PopupDocumentKey
@@ -179,8 +181,10 @@ namespace headsup
         BarRect ShowHelpBar(RmlHost& host, const BarLook& look, const Rows& rows, const BarState& state, float top,
             float offsetX, float screenWidth, bool& cut);
         // The open popup in the host's overlay, and where it went (an empty rectangle for none).
+        // Places the open popup, and adds its cards' tabs and the parts that scroll at their places on the screen.
         BarRect ShowPopup(RmlHost& host, const BarLook& look, const BarState& state,
-            const BarLayout& layout, float screenWidth, float screenHeight, const BarInput& input, bool hidden);
+            const BarLayout& layout, float screenWidth, float screenHeight, const BarInput& input, bool hidden,
+            std::vector<BarTabChip>& chips, std::vector<BarScroll>& scrolls);
         bool PopupDocumentFor(RmlHost& host, const BarLook& look);
         void ClosePopup();
         const FaceLine& FaceLineOf(RmlHost& host, const char* family, int pixels);
@@ -215,6 +219,9 @@ namespace headsup
         bool m_PopupMarked    = false; // its markup is the layout's
         Px m_PopupLeft, m_PopupTop, m_PopupWidth, m_PopupHeight;
         Memo<PopupKey, PopupLayout> m_PopupLayout;
+        // The widest the open popup has been since it opened, which it keeps as its text changes with the time.
+        std::optional<PanelWidget> m_WidestFor;
+        float m_Widest = 0.0f;
         PopupFaces m_PopupFaces;
         std::vector<FaceLine> m_FaceLines;
         Memo<FitKey, std::string> m_TitleFit, m_SubtitleFit;

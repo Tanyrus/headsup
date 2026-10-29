@@ -11,39 +11,20 @@ namespace
     bool Near(double a, double b) { return std::fabs(a - b) < 1e-6; }
 }
 
-TEST(a_reply_is_timed_from_the_first_send_to_the_next_packet_in_a_later_frame)
+TEST(latency_is_the_median_of_recent_round_trips)
 {
     ConnectionMeter m;
-    for (int i = 0; i < 3; ++i)
-    {
-        const double t = i;
-        m.Sent(t);
-        m.Sent(t + 0.001);      // more of the same chunk
-        m.Received(t + 0.002);  // in the same frame: it answered an earlier send
-        m.Frame(t + 0.033, std::nullopt);
-        m.Received(t + 0.05 + 0.01 * i); // the reply: 50, 60 and 70 ms
-        m.Received(t + 0.051 + 0.01 * i); // the rest of its chunk
-        m.Frame(t + 0.1, std::nullopt);
-    }
-    const ConnectionReport r = m.Report(3.0, false);
+    for (const double ms : {70.0, 50.0})
+        m.RoundTrip(ms);
+    CHECK(!m.Report(1.0, false).latency.has_value()); // waits for three
+    m.RoundTrip(60.0);
+    const ConnectionReport r = m.Report(1.0, false);
     CHECK(r.latency.has_value());
     CHECK(Near(r.latency->medianMs, 60.0) && Near(r.latency->lowestMs, 50.0) && Near(r.latency->highestMs, 70.0));
-}
-
-TEST(latency_waits_for_three_replies_and_drops_one_later_than_three_seconds)
-{
-    ConnectionMeter m;
-    m.Sent(0.0);
-    m.Frame(0.033, std::nullopt);
-    m.Received(0.05);
-    m.Sent(1.0);
-    m.Frame(1.033, std::nullopt);
-    m.Received(1.05);
-    CHECK(!m.Report(1.1, false).latency.has_value());
-    m.Sent(2.0);
-    m.Frame(2.033, std::nullopt);
-    m.Received(5.5); // its reply was lost: this answered a later send
-    CHECK(!m.Report(5.6, false).latency.has_value());
+    // Only the last 15 count: once 15 more come, the first three are gone.
+    for (size_t i = 0; i < kRoundTrips; ++i)
+        m.RoundTrip(200.0);
+    CHECK(Near(m.Report(1.0, false).latency->lowestMs, 200.0));
 }
 
 TEST(silence_counts_from_the_last_packet_received)

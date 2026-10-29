@@ -34,6 +34,7 @@ namespace headsup
         float textSize = 0.0f;                 // its letters' size
         float leastHeight    = 0.0f; // one of its icons' height: a line of text is as tall as one with an icon
         float padBelow = 0.0f, padAbove = 0.0f;
+        float offset   = 0.0f; // right of where its alignment puts it
         int firstText = -1, lastText = -1; // its first and last text item; icons outside them hang past the text
         float ornamentWidth  = 0.0f;
         float ornamentHeight = 0.0f;

@@ -40,9 +40,13 @@ namespace headsup
                 {
                     m_ConquestBytes.clear();
                     m_Currencies = CurrencyValues{};
+                    m_Crafts.reset();
                 }
                 m_Player = *player;
             }
+            break;
+        case kSkillsPacket:
+            if (const auto crafts = ParseCraftRanks(data, size)) m_Crafts = *crafts;
             break;
         case kWeatherPacket:
             if (const auto weather = ParseWeather(data, size)) m_Weather = *weather;

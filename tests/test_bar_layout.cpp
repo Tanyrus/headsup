@@ -134,6 +134,33 @@ TEST(hovering_opens_leaving_closes_and_a_click_pins)
     CHECK(input.Press(5.0f, 30.0f, false)); // a right press on the strip is the bar's too
 }
 
+TEST(a_press_on_a_tab_picks_it_and_leaves_the_pin_alone)
+{
+    const BarLayout l = LayoutBar(1920.0f, kPills, BarShape::Pills, Widths(100, 0, 120, 200, 90, 60, 50), 0.0f);
+    std::array<bool, kPanelSlots> popups{};
+    popups[SlotOf(BarWidget::Target)] = true;
+    BarInput input;
+    input.Frame(l, popups);
+    input.Move(960.0f, 18.0f);
+    const BarRect airships{770.0f, 100.0f, 60.0f, 20.0f}, boats{834.0f, 100.0f, 50.0f, 20.0f};
+    input.SetPopup(BarRect{760.0f, 44.0f, 400.0f, 300.0f}, {BarTabChip{"Travel", airships, "Airships"}, BarTabChip{"Travel", boats, "Boats"}});
+    input.Move(850.0f, 110.0f);
+    CHECK(input.Press(850.0f, 110.0f, true));
+    CHECK(input.PickedTabs().at("Travel") == "Boats" && !input.Pinned());
+    CHECK(input.Press(850.0f, 110.0f, true)); // again: still picked
+    CHECK(input.PickedTabs().at("Travel") == "Boats" && !input.Pinned());
+    CHECK(input.Press(800.0f, 110.0f, false)); // a right press picks nothing
+    CHECK(input.PickedTabs().at("Travel") == "Boats");
+    CHECK(input.Press(800.0f, 110.0f, true));
+    CHECK(input.PickedTabs().at("Travel") == "Airships");
+    CHECK(input.Press(960.0f, 250.0f, true)); // elsewhere on the popup it pins, as before
+    CHECK(input.Pinned() == BarWidget::Target);
+    // With no popup drawn its tabs are gone, and what was picked stays picked for the next time.
+    input.SetPopup(BarRect{});
+    CHECK(!input.Press(850.0f, 110.0f, true));
+    CHECK(input.PickedTabs().at("Travel") == "Airships");
+}
+
 TEST(a_cut_help_bar_under_the_strip_opens_and_pins_its_popup_and_takes_only_its_own_presses)
 {
     // The renderer places Game help's own bar under the strip when its text was cut.
@@ -414,8 +441,8 @@ TEST(a_row_too_short_for_two_lines_kept_apart_shows_titles_alone_at_full_size)
     }
 }
 
-// The user finds small text hard to read: a detail line under 9 px is not worth drawing, and a taller bar never gets
-// smaller titles, except where it gains room for a detail line under them.
+// Small text is hard to read: a detail line under 9 px is not worth drawing, and a taller bar never gets smaller
+// titles, except where it gains room for a detail line under them.
 TEST(no_line_is_under_9_px_and_a_taller_bar_never_shrinks_the_titles)
 {
     for (const BarShape shape : {BarShape::Pills, BarShape::Ornate})
@@ -466,11 +493,28 @@ TEST(the_text_beside_a_meter_has_its_capitals_on_the_rows_middle)
             const BarMetrics m = MetricsFor(h, shape);
             const BarRow row   = PillRow(m);
             const TextRow t    = FitTextRow(m, FakeInk);
-            CHECK_EQ(t.side, t.twoLines ? t.detail : t.title);
+            CHECK_EQ(t.side, t.twoLines ? t.detail : t.title); // at Auto
             const LineInk side = FakeInk(!t.twoLines, t.side);
             const float above = (t.sideY + side.top) - row.y, below = row.y + row.height - (t.sideY + side.baseline);
             CHECK(std::fabs(above - below) <= 0.01f);
         }
+}
+
+// A meter's texts at a set size are that size while it fits, a pixel a step: no jump where the row goes to one line.
+TEST(a_meters_texts_at_a_set_size_are_that_size)
+{
+    for (const BarShape shape : {BarShape::Pills, BarShape::Ornate})
+    {
+        int last = 0;
+        for (int size = 10; size <= 24; ++size)
+        {
+            const TextRow t = FitTextRow(MetricsFor(45, shape, size), FakeInk);
+            CHECK_EQ(t.side, t.title);
+            if (t.twoLines) CHECK_EQ(t.side, size);
+            CHECK(t.side >= last && t.side <= last + 1 + (last == 0 ? size : 0));
+            last = t.side;
+        }
+    }
 }
 
 TEST(text_shrinks_only_when_its_ink_would_not_fit)
@@ -625,6 +669,72 @@ TEST(a_move_the_bar_may_not_see_closes_a_hovered_popup_and_keeps_a_pinned_one)
         CHECK(!c.Take(WM_MOUSEMOVE, kOnBarY, 0, true, overGui, !overGui));
         CHECK(c.input.Open() == BarWidget::Target && !c.input.Hovered().has_value());
     }
+}
+
+// The popup is drawn over Ashita's windows, so inside it the pointer is the popup's even with one under it.
+TEST(the_open_popup_keeps_the_pointer_over_an_ashita_window_under_it)
+{
+    Clicks c;
+    CHECK(!c.Take(WM_MOUSEMOVE, kOnBarY));
+    c.input.SetPopup(BarRect{760.0f, 44.0f, 400.0f, 300.0f});
+    CHECK(!c.Take(WM_MOUSEMOVE, 200.0f, 0, true, true)); // into the popup, over XIUI's window
+    CHECK(c.input.Open() == BarWidget::Target);
+    CHECK(c.Take(WM_LBUTTONDOWN, 200.0f, 0, true, true)); // a press there pins it
+    CHECK(c.Take(WM_LBUTTONUP, 200.0f, 0, true, true));
+    CHECK(c.input.Pinned() == BarWidget::Target);
+    CHECK(c.Take(WM_LBUTTONDOWN, 200.0f, 0, true, true)); // and unpins it
+    CHECK(c.Take(WM_LBUTTONUP, 200.0f, 0, true, true));
+    CHECK(!c.Take(WM_LBUTTONDOWN, 200.0f, 0, true, false, true)); // another plugin blocking it still wins
+    CHECK(!c.Take(WM_MOUSEMOVE, kGameY, 0, true, true)); // out of it over the window: it closes
+    CHECK(!c.input.Open().has_value());
+}
+
+TEST(the_wheel_over_a_popups_scrolling_area_scrolls_it_three_lines_a_notch)
+{
+    Clicks c;
+    CHECK(!c.Take(WM_MOUSEMOVE, kOnBarY));
+    c.input.SetPopup(BarRect{760.0f, 44.0f, 400.0f, 300.0f}, {},
+        {BarScroll{"By Element/Dark", BarRect{770.0f, 150.0f, 380.0f, 120.0f}, 7, BarRect{1140.0f, 155.0f, 10.0f, 110.0f}, 30.0f}});
+    const auto wheel = [&](int notches) {
+        return c.clicks.Take(WM_MOUSEWHEEL, static_cast<uint32_t>(static_cast<uint16_t>(-notches * 120)) << 16, 0.0f, 0.0f,
+            true, false, false);
+    };
+    CHECK(!c.Take(WM_MOUSEMOVE, 200.0f)); // over it, where the game last saw the pointer
+    CHECK(wheel(1) && c.input.Scrolled().at("By Element/Dark") == 3);
+    CHECK(wheel(2) && c.input.Scrolled().at("By Element/Dark") == 7); // no further than its last line
+    CHECK(wheel(-1) && c.input.Scrolled().at("By Element/Dark") == 4);
+    CHECK(!c.Take(WM_MOUSEMOVE, 100.0f)); // the popup, above the area: the game keeps its wheel
+    CHECK(!wheel(1) && c.input.Scrolled().at("By Element/Dark") == 4);
+}
+
+TEST(the_scrollbar_drags_its_thumb_and_a_press_on_its_track_jumps_there)
+{
+    Clicks c;
+    CHECK(!c.Take(WM_MOUSEMOVE, kOnBarY));
+    // The track runs 100 to 300 down the grip at x 950 to 970; its thumb is 50 tall; 30 lines to scroll.
+    const auto popup = [&] {
+        c.input.SetPopup(BarRect{760.0f, 44.0f, 400.0f, 300.0f}, {},
+            {BarScroll{"By Element/Dark", BarRect{770.0f, 90.0f, 380.0f, 220.0f}, 30, BarRect{950.0f, 100.0f, 20.0f, 200.0f}, 50.0f}});
+    };
+    popup();
+    const auto scrolled = [&] { return c.input.Scrolled().count("By Element/Dark") ? c.input.Scrolled().at("By Element/Dark") : 0; };
+    CHECK(!c.Take(WM_MOUSEMOVE, 125.0f));
+    CHECK(c.Take(WM_LBUTTONDOWN, 125.0f)); // the thumb's middle
+    CHECK(c.Take(WM_MOUSEMOVE, 200.0f, MK_LBUTTON)); // its top to 175: halfway down the 150 it moves
+    CHECK_EQ(scrolled(), static_cast<size_t>(15));
+    popup();
+    CHECK(c.Take(WM_MOUSEMOVE, 600.0f, MK_LBUTTON)); // far below the popup: it stops at the end and keeps the drag
+    CHECK_EQ(scrolled(), static_cast<size_t>(30));
+    CHECK(c.Take(WM_LBUTTONUP, 600.0f));
+    CHECK(!c.input.Pinned().has_value());
+    CHECK(!c.Take(WM_MOUSEMOVE, 125.0f)); // let go: moving does nothing
+    CHECK_EQ(scrolled(), static_cast<size_t>(30));
+    popup();
+    // A press on the track above the thumb centers it there: 110 puts its top above the track, so the start.
+    CHECK(c.Take(WM_LBUTTONDOWN, 110.0f));
+    CHECK_EQ(scrolled(), static_cast<size_t>(0));
+    CHECK(c.Take(WM_LBUTTONUP, 110.0f));
+    CHECK(!c.input.Pinned().has_value());
 }
 
 TEST(the_bar_going_off_gives_the_game_every_release)
@@ -1078,4 +1188,110 @@ TEST(a_widgets_own_spacing_adds_room_between_it_and_each_neighbour)
             CHECK(Near(spaced.dividers[0], zone.x + zone.width + 5.0f));
         }
     }
+}
+
+namespace
+{
+    // The default panel with Zone combined with Weather, and Bags with Gil.
+    PanelGroups Combined()
+    {
+        CombineLinks links{};
+        links[SlotOf(BarWidget::Zone)] = BarWidget::Weather;
+        links[SlotOf(BarWidget::Bags)] = BarWidget::Gil;
+        const BarPlacement p{std::vector<PanelWidget>{BarWidget::Zone, BarWidget::Weather, BarWidget::VanaTime},
+            std::vector<PanelWidget>{BarWidget::Target},
+            std::vector<PanelWidget>{BarWidget::Gil, BarWidget::Bags, BarWidget::EarthTime}};
+        return Combine(p, links);
+    }
+
+    BarLayout CombinedBar(float screen, BarShape shape, const BarMetrics& m, BarSeparators separators = BarSeparators::Theme,
+                          const std::array<float, kPanelSlots>& spacing = kNoSpacing)
+    {
+        const PanelGroups g = Combined();
+        return LayoutBar(screen, m, shape, Widths(100, 80, 120, 200, 90, 60, 50), 0.0f, g.placement, separators, spacing,
+            g.group);
+    }
+}
+
+TEST(combined_widgets_touch_with_no_gap_or_diamond_between_them)
+{
+    for (const auto& [shape, metrics] : {std::pair{BarShape::Pills, kPills}, std::pair{BarShape::Ornate, kOrnate}})
+        for (const BarSeparators separators : {BarSeparators::Theme, BarSeparators::Diamonds, BarSeparators::None})
+        {
+            std::array<float, kPanelSlots> spacing{};
+            spacing[SlotOf(BarWidget::Zone)] = 10.0f;
+            spacing[SlotOf(BarWidget::Weather)] = 10.0f;
+            const BarLayout l = CombinedBar(1920.0f, shape, metrics, separators, spacing);
+            const BarRect zone = *RectOf(l, BarWidget::Zone), weather = *RectOf(l, BarWidget::Weather);
+            const BarRect bags = *RectOf(l, BarWidget::Bags), gil = *RectOf(l, BarWidget::Gil);
+            CHECK(Near(weather.x, zone.x + zone.width));
+            CHECK(Near(gil.x, bags.x + bags.width)); // Gil pulled after Bags
+            // Between groups, as between any neighbours: here Weather's own room and the gap or diamond.
+            const BarLayout alone = LayoutBar(1920.0f, metrics, shape, Widths(100, 80, 120, 200, 90, 60, 50), 0.0f,
+                DefaultPlacement(), separators, spacing);
+            const float apart = RectOf(alone, BarWidget::VanaTime)->x - RectOf(alone, BarWidget::Weather)->x -
+                                RectOf(alone, BarWidget::Weather)->width;
+            CHECK(Near(RectOf(l, BarWidget::VanaTime)->x, weather.x + weather.width + apart));
+            for (const float divider : l.dividers)
+                CHECK(!Near(divider, weather.x) && !Near(divider, gil.x));
+            if (DiamondsOn(separators, shape)) CHECK_EQ(l.dividers.size(), static_cast<size_t>(2)); // one a side
+        }
+}
+
+TEST(a_combined_pill_that_does_not_fit_goes_whole)
+{
+    // Room on the left for Zone but not Weather beside it: both go, and the right side's Bags and Gil go together.
+    const float g = kPills.gap;
+    const BarLayout left = CombinedBar(g + 100.0f + 40.0f, BarShape::Pills, kPills);
+    CHECK(RectOf(left, BarWidget::Zone) == nullptr && RectOf(left, BarWidget::Weather) == nullptr);
+    const BarLayout right = CombinedBar(g + 50.0f + g + 60.0f + 40.0f, BarShape::Pills, kPills);
+    CHECK(RectOf(right, BarWidget::EarthTime) != nullptr);
+    CHECK(RectOf(right, BarWidget::Bags) == nullptr && RectOf(right, BarWidget::Gil) == nullptr);
+    // The center drops a combined pill whole from its end.
+    CombineLinks links{};
+    links[SlotOf(BarWidget::Weather)] = BarWidget::VanaTime;
+    const BarPlacement p{std::vector<PanelWidget>{}, std::vector<PanelWidget>{BarWidget::Zone, BarWidget::Weather, BarWidget::VanaTime},
+        std::vector<PanelWidget>{}};
+    const PanelGroups cg = Combine(p, links);
+    const BarLayout center = LayoutBar(2.0f * g + 100.0f + g + 80.0f + 60.0f, kPills, BarShape::Pills,
+        Widths(100, 80, 120, 0, 0, 0, 0), 0.0f, cg.placement, BarSeparators::Theme, kNoSpacing, cg.group);
+    CHECK(RectOf(center, BarWidget::Zone) != nullptr);
+    CHECK(RectOf(center, BarWidget::Weather) == nullptr && RectOf(center, BarWidget::VanaTime) == nullptr);
+    CHECK(left.dividers.empty() && right.dividers.empty());
+}
+
+TEST(a_combined_pill_hovers_and_pins_as_one_widget_named_by_its_first)
+{
+    const BarLayout l = CombinedBar(1920.0f, BarShape::Pills, kPills);
+    const BarRect zone = *RectOf(l, BarWidget::Zone), weather = *RectOf(l, BarWidget::Weather);
+    CHECK(WidgetAt(l, weather.x + 5.0f, 18.0f) == std::optional<PanelWidget>(BarWidget::Zone));
+    CHECK(WidgetAt(l, zone.x + 5.0f, 18.0f) == std::optional<PanelWidget>(BarWidget::Zone));
+    const std::optional<BarRect> pill = GroupRect(l, BarWidget::Zone);
+    CHECK(pill && Near(pill->x, zone.x) && Near(pill->width, zone.width + weather.width));
+    CHECK(!GroupRect(l, BarWidget::Weather)); // no pill is named by it
+    // Only Weather has a popup: its pill opens it under Zone's name, and a pin holds while Zone is hidden.
+    std::array<bool, kPanelSlots> popups{};
+    popups[SlotOf(BarWidget::Weather)] = true;
+    SharePopups(popups, Combined().group);
+    CHECK(popups[SlotOf(BarWidget::Zone)]);
+    BarInput input;
+    input.Frame(l, popups);
+    CHECK(input.Press(zone.x + 5.0f, 18.0f, true));
+    CHECK(input.Pinned() == std::optional<PanelWidget>(BarWidget::Zone));
+    const PanelGroups g = Combined();
+    const BarLayout hiddenZone = LayoutBar(1920.0f, kPills, BarShape::Pills, Widths(0, 80, 120, 200, 90, 60, 50), 0.0f,
+        g.placement, BarSeparators::Theme, kNoSpacing, g.group);
+    input.Frame(hiddenZone, popups);
+    CHECK(input.Pinned() == std::optional<PanelWidget>(BarWidget::Zone));
+}
+
+TEST(a_widget_in_a_combined_pill_knows_which_sides_it_shares)
+{
+    const BarLayout l = CombinedBar(1920.0f, BarShape::Pills, kPills);
+    const auto joins = [&](BarWidget w) { const PillJoins j = JoinsOf(l, w); return std::pair{j.before, j.after}; };
+    CHECK(joins(BarWidget::Zone) == std::pair(false, true));
+    CHECK(joins(BarWidget::Weather) == std::pair(true, false));
+    CHECK(joins(BarWidget::VanaTime) == std::pair(false, false));
+    CHECK(joins(BarWidget::Bags) == std::pair(false, true));
+    CHECK(joins(BarWidget::Gil) == std::pair(true, false));
 }

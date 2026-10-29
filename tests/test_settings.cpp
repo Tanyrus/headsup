@@ -1,6 +1,7 @@
 #include "game_font.h"
 #include "pointer_keys.h"
 #include "settings.h"
+#include "world_info.h"
 #include "release_file.h"
 #include "test.h"
 
@@ -290,6 +291,7 @@ barDistance=false
 barMemory=true
 barExp=true
 barConquest=true
+barWorld=true
 barZoneLine2=true
 barZoneIcons=true
 barWeatherLine2=true
@@ -339,7 +341,7 @@ untargetedOpacity=40.0000
 clockSeconds=true
 serverSeconds=true
 barLatency=true
-barLeft=zone weather vanaTime job exp party signet distance conquest
+barLeft=zone weather vanaTime job exp party signet distance conquest world
 barCenter=
 barRight=target gil bags connection memory fps earthTime
 hideHelpBar=true
@@ -697,6 +699,20 @@ TEST(a_file_from_before_hide_during_conversation_keeps_plates_in_conversations)
     MapStore file = ReleaseFile();
     CHECK(!LoadSettings(file).hideInEvent);
     CHECK(!LoadSettings(file).debugMode); // nor had it a debug mode
+}
+
+TEST(a_timers_up_time_is_saved_and_clamped)
+{
+    CHECK_EQ(Settings{}.phUpMinutes, kDefaultUpMinutes);
+    Settings s;
+    s.phUpMinutes = 12;
+    MapStore file;
+    SaveSettings(s, file);
+    CHECK_EQ(LoadSettings(file).phUpMinutes, 12);
+    s.phUpMinutes = 999;
+    CHECK_EQ(Clamp(s).phUpMinutes, kMaxUpMinutes);
+    s.phUpMinutes = -3;
+    CHECK_EQ(Clamp(s).phUpMinutes, 0);
 }
 
 TEST(called_for_help_has_its_own_color_orange_until_one_is_saved)
@@ -1095,7 +1111,7 @@ TEST(each_theme_and_bar_widget_has_its_own_key)
     }
     const char* const widgetKeys[] = {"barZone", "barWeather", "barVanaTime", "barTarget", "barGil", "barBags",
         "barEarthTime", "barGameHelp", "barFps", "barJob", "barConnection", "barParty", "barSignet", "barDistance", "barMemory",
-        "barExp", "barConquest"}; // in BarWidget's order
+        "barExp", "barConquest", "barWorld"}; // in BarWidget's order
     static_assert(std::size(widgetKeys) == kBarWidgetCount);
     for (int w = 0; w < kBarWidgetCount; ++w)
     {
@@ -1428,6 +1444,7 @@ TEST(every_designer_key_round_trips)
     line.color    = ColorPick{ColorSource::Claim};
     line.shadow   = 40;
     line.padding  = 7;
+    line.offset   = -12;
     line.shadowColor   = ColorPick{ColorSource::Custom, {{0.4f, 0.5f, 0.6f}}};
     line.glow          = 120;
     line.glowSize      = 70;
@@ -2467,10 +2484,14 @@ TEST(a_kinds_lines_and_ornament_are_bounded_and_a_condition_its_page_does_not_of
     LineDesign& mobs   = s.Kind(PlateKind::Mobs).lines[0];
     mobs.padding       = -9;
     mobs.show.when     = ConditionBit(ShowCondition::OwnerIsYou) | ConditionBit(ShowCondition::TooWeak);
+    pets.offset        = kMaxLineOffset + 1;
+    mobs.offset        = kMinLineOffset - 30;
     s.Kind(PlateKind::Npcs).ornament.place = static_cast<OrnamentPlace>(42);
     const Settings bounded = Clamp(s);
     CHECK_EQ(bounded.Kind(PlateKind::Pets).lines[0].padding, kMaxLinePadding);
     CHECK_EQ(bounded.Kind(PlateKind::Mobs).lines[0].padding, kMinLinePadding);
+    CHECK_EQ(bounded.Kind(PlateKind::Pets).lines[0].offset, kMaxLineOffset);
+    CHECK_EQ(bounded.Kind(PlateKind::Mobs).lines[0].offset, kMinLineOffset);
     s.Kind(PlateKind::Mobs).lines[0].padding = -3; // a line may sink into the one under it
     CHECK_EQ(Clamp(s).Kind(PlateKind::Mobs).lines[0].padding, -3);
     // A pet's page asks whose it is and a mob's whether it is too weak, and neither asks the other's.
@@ -2735,6 +2756,51 @@ TEST(a_copy_keeps_its_own_settings_under_its_own_keys_and_a_file_without_copies_
     CHECK(AddWidgetCopy(s, BarWidget::Gil) == copy && s.Widget(*copy) == NewWidget(*copy));
 }
 
+TEST(a_combined_widget_is_kept_by_its_partners_name_and_loses_a_partner_taken_off_the_panel)
+{
+    Settings s;
+    const std::optional<PanelWidget> copy = AddWidgetCopy(s, BarWidget::Bags);
+    CHECK(copy.has_value());
+    s.Widget(BarWidget::Zone).combine    = PanelWidget{BarWidget::Conquest};
+    s.Widget(BarWidget::Weather).combine = *copy;
+    MapStore store;
+    SaveSettings(s, store);
+    CHECK_EQ(store.values["barZoneCombine"], "conquest");
+    CHECK_EQ(store.values["barWeatherCombine"], "bags:2");
+    CHECK_EQ(store.values["barGilCombine"], "");
+    const Settings read = LoadSettings(store);
+    CHECK(read.Widget(BarWidget::Zone).combine == std::optional<PanelWidget>(BarWidget::Conquest));
+    CHECK(read.Widget(BarWidget::Weather).combine == copy);
+    CHECK(Members(Panel(read), BarWidget::Zone) == (std::vector<PanelWidget>{BarWidget::Zone, BarWidget::Conquest}));
+    store.values["barZoneCombine"] = "nothing";
+    CHECK(!LoadSettings(store).Widget(BarWidget::Zone).combine);
+    // A copy taken off leaves nothing combined with it, so one put back is not.
+    RemoveWidgetCopy(s, *copy);
+    CHECK(!s.Widget(BarWidget::Weather).combine);
+    CHECK(s.Widget(BarWidget::Zone).combine == std::optional<PanelWidget>(BarWidget::Conquest));
+}
+
+TEST(a_widget_combines_with_any_placed_widget_but_the_target_itself_and_ones_taken)
+{
+    Settings s;
+    const auto offers = [&](PanelWidget widget, PanelWidget other) {
+        const std::vector<PanelWidget> choices = CombineChoices(s, widget);
+        return std::ranges::find(choices, other) != choices.end();
+    };
+    // Every other placed widget, in the panel's order.
+    std::vector<PanelWidget> all;
+    for (const std::vector<PanelWidget>& section : s.barSections)
+        for (const PanelWidget w : section)
+            if (w != PanelWidget{BarWidget::Zone} && w.kind != BarWidget::Target) all.push_back(w);
+    CHECK(CombineChoices(s, BarWidget::Zone) == all);
+    CHECK(CombineChoices(s, BarWidget::Target).empty());
+    s.Widget(BarWidget::Zone).combine = PanelWidget{BarWidget::Conquest};
+    CHECK(offers(BarWidget::Zone, BarWidget::Conquest));     // its own pick
+    CHECK(!offers(BarWidget::Weather, BarWidget::Conquest)); // Zone has it
+    CHECK(!offers(BarWidget::Conquest, BarWidget::Zone));    // a ring
+    CHECK(offers(BarWidget::Conquest, BarWidget::Weather));
+}
+
 TEST(a_widgets_spacing_and_padding_are_kept_for_each_copy_and_held_to_their_range)
 {
     Settings s;
@@ -2792,6 +2858,7 @@ TEST(the_exp_text_is_kept_apart_for_the_job_and_exp_widgets)
     exp.expPlaces      = {ExpTextPlace::Above, ExpTextPlace::Off, ExpTextPlace::Left};
     exp.expBarWidth    = 250;
     exp.expBarHeight   = 3;
+    exp.expAlign       = Align::Right;
     MapStore store;
     SaveSettings(s, store);
     CHECK_EQ(store.values["expBar"], "under"); // the Job widget's, under its key of before
@@ -2799,14 +2866,18 @@ TEST(the_exp_text_is_kept_apart_for_the_job_and_exp_widgets)
     CHECK(read.Widget(BarWidget::Exp) == s.Widget(BarWidget::Exp));
     CHECK(read.Widget(BarWidget::Job) == s.Widget(BarWidget::Job));
     CHECK_EQ(store.values["barExpEarned"], "above");
+    CHECK_EQ(store.values["barExpAlign"], "right");
+    CHECK(Settings{}.Widget(BarWidget::Exp).expAlign == Align::Center);
     // A size past the slider's ends reads as that end; an unknown place as the default's.
     store.values["barExpBarWidth"]  = "9999";
     store.values["barExpBarHeight"] = "0";
     store.values["barExpPercent"]   = "sideways";
+    store.values["barExpAlign"]     = "diagonal";
     const Settings reread        = LoadSettings(store);
     const WidgetOptions& clamped = reread.Widget(BarWidget::Exp);
     CHECK(clamped.expBarWidth == kMaxExpBarWidth && clamped.expBarHeight == kMinExpBarHeight);
     CHECK(clamped.expPlaces[static_cast<int>(ExpText::Percent)] == kDefaultExpPlaces[static_cast<int>(ExpText::Percent)]);
+    CHECK(clamped.expAlign == Align::Center);
 }
 
 TEST(the_bags_widgets_bag_is_kept_and_one_past_the_last_reads_as_the_inventory)
@@ -2818,4 +2889,34 @@ TEST(the_bags_widgets_bag_is_kept_and_one_past_the_last_reads_as_the_inventory)
     CHECK_EQ(LoadSettings(store).Widget(BarWidget::Bags).bag, 5);
     store.values["barBag"] = std::to_string(kContainerCount);
     CHECK_EQ(LoadSettings(store).Widget(BarWidget::Bags).bag, 0);
+}
+
+TEST(the_world_info_widget_keeps_its_picks_by_name)
+{
+    Settings s;
+    WidgetOptions& world = s.Widget(BarWidget::World);
+    CHECK(!world.on && world.worldLine == WorldLine::Departure && world.worldSections == kAllWorldSections);
+    world.on            = true;
+    world.worldLine     = WorldLine::Guild;
+    world.worldRoute    = 3;
+    world.worldElement  = Element::Lightning;
+    world.worldGuild    = 5;
+    world.worldSections = WorldBit(WorldSection::Travel) | WorldBit(WorldSection::Calendar);
+    MapStore store;
+    SaveSettings(s, store);
+    CHECK(LoadSettings(store).Widget(BarWidget::World) == world);
+    // Its picks are saved by what players read, so a refresh that adds a route keeps the one picked.
+    CHECK_EQ(store.values["barWorldRoute"], TravelRoutes()[3].name);
+    CHECK_EQ(store.values["barWorldGuild"], GuildShops()[5].shops);
+    CHECK_EQ(store.values["barWorldElement"], "Lightning");
+    CHECK_EQ(store.values["barWorldLine"], "guild");
+    // A name no longer in the data leaves the default.
+    store.values["barWorldRoute"] = "Jeuno to Mars";
+    CHECK_EQ(LoadSettings(store).Widget(BarWidget::World).worldRoute, 0);
+    // The window relies on Clamp to keep its picks inside the tables.
+    world.worldRoute = 999;
+    world.worldGuild = -1;
+    const Settings bounded       = Clamp(s);
+    const WidgetOptions& clamped = bounded.Widget(BarWidget::World);
+    CHECK(clamped.worldRoute == 0 && clamped.worldGuild == 0);
 }
