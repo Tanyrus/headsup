@@ -46,6 +46,7 @@
 #include "memory_query.h"
 #include "model_file.h"
 #include "model_render.h"
+#include "setup.h"
 #ifdef HEADSUP_DEV
 #include "codedump.h"
 #include "drawdump.h"
@@ -385,6 +386,7 @@ class HeadsUp final : public IPlugin
     bool m_QuadStatesTried = false;
     IDirect3DDevice8* m_Device = nullptr;
     headsup::ModelRenderer m_ModelView;
+    bool m_OfferSetup = false; // the settings file was missing at load: Setup opens once the player is in game
     double m_ModelShownAt = 0.0;
     headsup::CursorTargets m_CursorTargets;
     float m_MenuWidth   = 0.0f;
@@ -589,6 +591,8 @@ public:
             SetScreenshot(!m_Screenshot);
         else if (args[1] == "debug")
             m_DebugPending = true;
+        else if (args[1] == "setup")
+            m_RmlMenu.StartSetup(m_Settings, true);
         else if (args[1] == "rml")
         {
             if (!m_Rml.Running())
@@ -684,6 +688,7 @@ public:
             Print("/hu on | /hu off: turn all of HeadsUp (outlines, nameplates, the top panel and the rest) on or off");
             Print("/hu screenshot: hide every name, HeadsUp's bar and menu and every addon window until it is run again; bind it with /bind");
             Print("/hu debug: write what every outline and nameplate show to logs/headsup");
+            Print("/hu setup: walk through the main settings again, with a preview of each");
             Print("/hu menu <page>: open the settings at a page, such as entities, mobs or toppanel");
             Print("/hu popup <widget> | off: pin a widget's popup open, such as zone or vanatime");
             Print("/hu windowlog [stop]: write which game windows are open, as it changes, to logs/headsup/windows.log");
@@ -932,6 +937,12 @@ public:
         g_SyncClicks = m_Settings.enabled && m_Settings.fixPointer;
         if (m_Rml.Running())
         {
+            if (m_OfferSetup && loginStatus == headsup::kLoginInGame && !m_Player.inEvent &&
+                m_AshitaCore->GetMemoryManager()->GetPlayer()->GetIsZoning() == 0)
+            {
+                m_OfferSetup = false;
+                if (!m_Settings.setupDone) m_RmlMenu.StartSetup(m_Settings, false);
+            }
             const headsup::NameStats names = m_NameHook.Stats();
             if (m_RmlMenu.open) m_WindowPlaces = m_WindowHook.Places();
             const headsup::MenuReadings readings{
@@ -973,6 +984,7 @@ public:
                 SayGameFontFailure();
             }
             if (m_RmlMenu.TakeDebugRequest()) m_DebugPending = true;
+            if (m_RmlMenu.TakeSetupBackup()) BackUpSettings();
 #ifdef HEADSUP_DEV
             if (m_RmlMenu.TakeWatchRequest())
             {
@@ -2171,7 +2183,8 @@ private:
         // Ashita keeps a loaded file's values after the plugin unloads: without this, a file deleted since would load
         // as it was. A missing file is fine: every value keeps its default.
         config->Delete(kConfigAlias);
-        if (!config->Load(kConfigAlias, SettingsPath().c_str()) && GetFileAttributesA(file.c_str()) != INVALID_FILE_ATTRIBUTES)
+        m_OfferSetup = GetFileAttributesA(file.c_str()) == INVALID_FILE_ATTRIBUTES;
+        if (!config->Load(kConfigAlias, SettingsPath().c_str()) && !m_OfferSetup)
             Print("could not read " + file + "; using the defaults, which a change in the menu will write into that file");
         m_Settings = m_SavedKeys.Load();
         if (m_SavedKeys.Outdated()) m_SettingsChangedAt = Now();
@@ -2218,6 +2231,29 @@ private:
             return true;
         DeleteFileA(fresh.c_str());
         return false;
+    }
+
+    // Before Setup runs again: the settings file copied beside it, named for now.
+    void BackUpSettings()
+    {
+        std::string text;
+        if (!ReadSettingsFile(text) || text.empty())
+        {
+            Print("Setup could not save your settings first: HeadsUp could not read " + SettingsFile() + ". Cancel still puts them back while the game runs.");
+            return;
+        }
+        SYSTEMTIME t{};
+        GetLocalTime(&t);
+        const std::string name = headsup::SetupBackupName(t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute);
+        const std::string path = OwnFolder(kConfigFolder) + "\\" + name;
+        std::ofstream out(path, std::ios::binary | std::ios::trunc);
+        out.write(text.data(), static_cast<std::streamsize>(text.size()));
+        if (!out.flush())
+        {
+            Print("Setup could not save your settings to " + path + ". Cancel still puts them back while the game runs.");
+            return;
+        }
+        Print("Your settings were saved to " + name + " in config/headsup. To put them back later, unload HeadsUp and copy it over " + SettingsName() + ".");
     }
 
     void SaveSettings()

@@ -3,6 +3,7 @@
 #include "cursor_picture.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <iterator>
 
 namespace headsup
@@ -201,5 +202,12 @@ namespace headsup
         s.hideInEvent   = fresh.hideInEvent;
         for (int w = 0; w < kBarWidgetCount; ++w)
             SetWidgetShown(s, static_cast<BarWidget>(w), Shown(fresh, static_cast<BarWidget>(w)));
+    }
+
+    std::string SetupBackupName(int year, int month, int day, int hour, int minute)
+    {
+        char name[64];
+        std::snprintf(name, sizeof(name), "settings-before-setup-%04d-%02d-%02d-%02d%02d.ini", year, month, day, hour, minute);
+        return name;
     }
 }

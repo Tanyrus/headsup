@@ -224,3 +224,9 @@ TEST(setup_never_counts_itself_done_by_its_defaults)
     UseSetupDefaults(s);
     CHECK(s.setupDone);
 }
+
+TEST(a_setup_backup_is_named_for_the_minute_it_was_made)
+{
+    CHECK_EQ(SetupBackupName(2026, 10, 29, 15, 30), std::string("settings-before-setup-2026-10-29-1530.ini"));
+    CHECK_EQ(SetupBackupName(2027, 1, 2, 3, 4), std::string("settings-before-setup-2027-01-02-0304.ini"));
+}

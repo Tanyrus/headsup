@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string>
 
 namespace headsup
 {
@@ -54,6 +55,10 @@ namespace headsup
     std::span<const SetupWidgetGroup> SetupWidgetGroups();
     // A widget turned off is off, and its copies leave the panel; turned on, its first copy shows.
     void SetWidgetShown(Settings& s, BarWidget widget, bool shown);
+
+    // The file running Setup again copies the settings to first, beside them: named for the moment, so no run writes
+    // over another's.
+    std::string SetupBackupName(int year, int month, int day, int hour, int minute);
 
     // What running Setup again starts from: everything its steps set back to how a new install has it, and the rest
     // of the settings as they were.
