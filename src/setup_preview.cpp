@@ -11,8 +11,9 @@ namespace headsup
     {
         constexpr uint32_t kBackground = 0xFF20242C;
         constexpr float kBeside        = 1.3f;  // model units between the scene's models standing side by side
-        constexpr float kFacingYaw     = 0.0f;  // radians the camera turns round the scene from its front
+        constexpr float kFacingYaw     = 1.5707963f; // radians round the scene to its front: the game's models face +x
         constexpr float kSwayYaw       = 0.35f, kSwaySpeed = 0.4f; // a slow turn back and forth, so its shape shows
+        constexpr float kHeadroom      = 0.6f; // of the models' height, framed over them for the plates and the cursor
     }
 
     void SetupPreview::SetDevice(IDirect3DDevice8* device)
@@ -66,12 +67,14 @@ namespace headsup
         std::vector<Placed> placed{{&m_Tonberry.model, SampleActor::Tonberry, {}}};
         if (others)
         {
-            placed.push_back({&m_You.model, SampleActor::You, {-kBeside, 0.0f, 0.0f}});
-            placed.push_back({&m_Shantotto.model, SampleActor::Shantotto, {kBeside, 0.0f, 0.0f}});
+            // Seen from the front, across the picture is z: you on its left, Shantotto on its right.
+            placed.push_back({&m_You.model, SampleActor::You, {0.0f, 0.0f, kBeside}});
+            placed.push_back({&m_Shantotto.model, SampleActor::Shantotto, {0.0f, 0.0f, -kBeside}});
         }
         ModelBounds box = Moved(placed.front().model->Standing(), placed.front().at);
         for (const Placed& p : placed)
             box = Joined(box, Moved(p.model->Standing(), p.at));
+        box.low.y -= (box.high.y - box.low.y) * kHeadroom; // the game's up is -y
         const float yaw      = kFacingYaw + kSwayYaw * static_cast<float>(std::sin(now * kSwaySpeed));
         const ModelView view = FramedView(box, yaw, static_cast<float>(kWidth) / static_cast<float>(kHeight));
 
