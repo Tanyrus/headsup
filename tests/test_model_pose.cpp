@@ -267,3 +267,33 @@ TEST(the_box_of_posed_batches_holds_every_corner)
     CHECK(Near(box.low.x, -1) && Near(box.low.y, -2) && Near(box.low.z, -4));
     CHECK(Near(box.high.x, 1) && Near(box.high.y, 5) && Near(box.high.z, 3));
 }
+
+TEST(models_stood_aside_move_with_their_boxes_and_two_boxes_join)
+{
+    std::vector<DrawBatch> batches(1);
+    batches[0].vertices = {{1, -2, 3}};
+    Move(batches, {10, 0, -1});
+    CHECK(At(batches[0].vertices[0], 11, -2, 2));
+    const ModelBounds moved = Moved({{-1, -2, -1}, {1, 0, 1}}, {5, 0, 0});
+    CHECK(Near(moved.low.x, 4) && Near(moved.high.x, 6) && Near(moved.low.y, -2));
+    const ModelBounds both = Joined(moved, {{-1, -3, -1}, {1, 0, 2}});
+    CHECK(Near(both.low.x, -1) && Near(both.high.x, 6) && Near(both.low.y, -3) && Near(both.high.z, 2));
+}
+
+TEST(a_models_head_is_the_top_of_its_box_over_its_middle)
+{
+    const Vec3 head = HeadOf({{-1, -2, 0}, {3, 0, 4}});
+    CHECK(Near(head.x, 1) && Near(head.y, -2) && Near(head.z, 2));
+}
+
+TEST(a_point_lands_in_the_picture_from_its_top_left_with_the_box_middle_in_the_middle)
+{
+    const ModelBounds box{{-1, -2, -1}, {1, 0, 1}};
+    const ModelView view = FramedView(box, 0.0f, 2.0f);
+    const auto middle    = PointInPicture(view, {0, -1, 0}, 640, 320);
+    CHECK(middle.has_value() && Near(middle->x, 320) && Near(middle->y, 160));
+    const auto head = PointInPicture(view, HeadOf(box), 640, 320);
+    CHECK(head.has_value() && head->y < 160 && head->y > 0);
+    // Seen from the front, +x is on the picture's left or right; behind the camera is nowhere.
+    CHECK(PointInPicture(view, {0, -1, -100}, 640, 320) == std::nullopt);
+}

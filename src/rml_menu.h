@@ -48,6 +48,7 @@ namespace headsup
         // Opens the window on Setup, from the settings as they are: the first time, or again (rerun), which warns.
         void StartSetup(const Settings& settings, bool rerun);
         bool InSetup() const { return m_State.setup.has_value(); }
+        std::optional<SetupStep> SetupStepShown() const { return m_State.setup ? std::optional(m_State.setup->step) : std::nullopt; }
         // True once after Setup was run again: the settings file is to be copied first.
         bool TakeSetupBackup();
         bool TakeWatchRequest();

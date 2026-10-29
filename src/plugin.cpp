@@ -45,7 +45,7 @@
 #include "linuxxi_report.h"
 #include "memory_query.h"
 #include "model_file.h"
-#include "model_render.h"
+#include "setup_preview.h"
 #include "setup.h"
 #ifdef HEADSUP_DEV
 #include "codedump.h"
@@ -385,9 +385,11 @@ class HeadsUp final : public IPlugin
     std::optional<DWORD> m_QuadStates; // the bar's (RecordQuadStates), freed at unload
     bool m_QuadStatesTried = false;
     IDirect3DDevice8* m_Device = nullptr;
-    headsup::ModelRenderer m_ModelView;
+    headsup::SetupPreview m_SetupPreview;
+    // The game's tables of where its files are and of players' models, read when Setup's preview first wants a model.
+    std::optional<headsup::FileTables> m_FileTables;
+    std::optional<headsup::PlayerTables> m_PlayerTables;
     bool m_OfferSetup = false; // the settings file was missing at load: Setup opens once the player is in game
-    double m_ModelShownAt = 0.0;
     headsup::CursorTargets m_CursorTargets;
     float m_MenuWidth   = 0.0f;
     // The windows the hook moves, as last given it (none until the first frame), and those it has seen.
@@ -516,7 +518,7 @@ public:
         m_Fonts.Wait();
         m_Search.Stop();
         m_Nameplates.Release();
-        m_ModelView.Release();
+        m_SetupPreview.Release();
         UnhookPresent();
         UnhookReset();
         g_Plugin = nullptr;
@@ -543,6 +545,7 @@ public:
         m_Outline.SetDevice(device);
         m_Names.SetDevice(device);
         m_Nameplates.SetDevice(device);
+        m_SetupPreview.SetDevice(device);
         m_NameHook.SetDevice(device);
         return true;
     }
@@ -660,8 +663,6 @@ public:
             Print(m_DrawDump.Start(args.size() > 2 ? args[2] : "", Now(), m_AshitaCore, OwnFolder(kLogsFolder)));
         else if (args[1] == "codedump")
             Print(headsup::WriteCodeDump(OwnFolder(kLogsFolder)));
-        else if (args[1] == "model")
-            Print(ShowModel(args.size() > 2 ? args[2] : ""));
         else if (args[1] == "windowowners")
         {
             const std::string path = OwnFolder(kLogsFolder) + "\\windowowners.txt";
@@ -695,7 +696,6 @@ public:
 #ifdef HEADSUP_DEV
             Print("/hu drawdump [seconds | watch | stop]: write every draw call of one frame to logs/headsup after the delay, or watch every frame for name glitches until stopped");
             Print("/hu codedump: write the client's loaded image to logs/headsup");
-            Print("/hu model tonberry | shantotto | me | off: draw a game model, turning, at the screen's top left");
             Print("/hu windowowners: write each open game window's owner, its class and its layout's first bytes to logs/headsup");
             Print("/hu namedump: write every call into the game's name routine during one frame to logs/headsup");
             Print("/hu stackdump: write the stack at the character draws of one frame to logs/headsup");
@@ -1406,6 +1406,99 @@ private:
         return std::nullopt;
     }
 
+    // A model of the game's, read from its files through its tables of where they are. None, saying why, when it
+    // cannot be.
+    std::optional<headsup::ModelFile> ReadModelFiles(const std::vector<uint32_t>& files, std::string& failure)
+    {
+        headsup::ModelFile model;
+        for (uint32_t id : files)
+        {
+            const auto file = headsup::DatFileOf(*m_FileTables, id);
+            if (!file)
+            {
+                failure = "the game's tables have no file " + std::to_string(id);
+                return std::nullopt;
+            }
+            const auto bytes = GameFileBytes(*file, failure);
+            if (!bytes) return std::nullopt;
+            headsup::Read<headsup::ModelFile> read = headsup::ReadModelFile(*bytes);
+            if (!read.value)
+            {
+                failure += read.failure;
+                return std::nullopt;
+            }
+            headsup::AddModelFile(model, std::move(*read.value));
+        }
+        return model;
+    }
+
+    bool ReadFileTables(std::string& failure)
+    {
+        if (m_FileTables) return true;
+        headsup::FileTables tables;
+        for (int folder = 1; folder <= headsup::kRomFolders; ++folder)
+        {
+            auto vtable = GameFileBytes(headsup::VTableFile(folder), failure);
+            auto ftable = GameFileBytes(headsup::FTableFile(folder), failure);
+            if (!vtable || !ftable) return false;
+            tables[static_cast<size_t>(folder - 1)] = {std::move(*vtable), std::move(*ftable)};
+        }
+        m_FileTables = std::move(tables);
+        return true;
+    }
+
+    std::optional<headsup::ModelFile> ReadNpcModel(uint16_t model, std::string& failure)
+    {
+        if (!ReadFileTables(failure)) return std::nullopt;
+        return ReadModelFiles({headsup::NpcModelFileId(model)}, failure);
+    }
+
+    std::optional<headsup::ModelFile> ReadPlayerModel(const headsup::PlayerLook& look, std::string& failure)
+    {
+        if (!ReadFileTables(failure)) return std::nullopt;
+        if (!m_PlayerTables)
+        {
+            const auto dll = GameFileBytes(headsup::kGameModule, failure);
+            if (!dll) return std::nullopt;
+            m_PlayerTables = headsup::FindPlayerTables(*dll);
+            if (!m_PlayerTables)
+            {
+                failure = "the game's tables of player models were not found in " + std::string(headsup::kGameModule);
+                return std::nullopt;
+            }
+        }
+        const auto files = headsup::PlayerFileIds(*m_PlayerTables, look);
+        if (!files)
+        {
+            failure = "the files of a look were not found";
+            return std::nullopt;
+        }
+        return ReadModelFiles(*files, failure);
+    }
+
+    // Your look as the game has it now, for Setup's preview to draw you.
+    headsup::PlayerLook OwnLook()
+    {
+        IEntity* e       = m_AshitaCore->GetMemoryManager()->GetEntity();
+        const uint32_t i = m_SelfIndex;
+        return {static_cast<uint16_t>((e->GetLookHair(i) & 0xFF) | e->GetRace(i) << 8), e->GetLookHead(i), e->GetLookBody(i),
+            e->GetLookHands(i), e->GetLookLegs(i), e->GetLookFeet(i), e->GetLookMain(i), e->GetLookSub(i), e->GetLookRanged(i)};
+    }
+
+    // Setup's preview drawn for the step open, before the window that shows it.
+    void DrawSetupPreview()
+    {
+        const char* name = m_AshitaCore->GetMemoryManager()->GetEntity()->GetName(m_SelfIndex);
+        const headsup::SetupPreview::Readers read{
+            [this](uint16_t model, std::string& failure) { return ReadNpcModel(model, failure); },
+            [this](const headsup::PlayerLook& look, std::string& failure) { return ReadPlayerModel(look, failure); }};
+        WithSavedState([&] {
+            m_SetupPreview.Render(m_Settings, *m_RmlMenu.SetupStepShown(), Now(), name != nullptr ? name : "", OwnLook(), read);
+        });
+        if (const std::string failure = m_SetupPreview.TakeFailure(); !failure.empty())
+            Print("Setup's preview could not draw the game's models (" + failure + "). The rest of Setup works without it.");
+    }
+
     // The font the game writes its names in and the pearl it draws before them.
     void ReadGameFont()
     {
@@ -1431,6 +1524,7 @@ private:
             return;
         }
         m_GameFontFailure.clear();
+        m_SetupPreview.Plates().SetGameFont(font.value);
         m_Nameplates.SetGameFont(std::move(font.value));
     }
 
@@ -1473,8 +1567,10 @@ private:
     {
         if (!m_GamePearl || m_PearlOutlineDrawn == m_Settings.pearlOutline) return;
         m_PearlOutlineDrawn = m_Settings.pearlOutline;
-        m_Nameplates.SetGamePearl(
-            headsup::GameLitPearl(*m_GamePearl, headsup::IconImage(headsup::Icon::Linkshell), m_Settings.pearlOutline));
+        std::vector<unsigned char> lit =
+            headsup::GameLitPearl(*m_GamePearl, headsup::IconImage(headsup::Icon::Linkshell), m_Settings.pearlOutline);
+        m_SetupPreview.Plates().SetGamePearl(lit);
+        m_Nameplates.SetGamePearl(std::move(lit));
     }
 
     // Once, when a nameplate is set in the game's font and it could not be read.
@@ -1486,109 +1582,6 @@ private:
     }
 
 #ifdef HEADSUP_DEV
-    static constexpr uint16_t kTonberryCutterModel = 0x04B2;
-    static constexpr int kModelViewSide = 480, kModelViewAt = 40;
-    static constexpr double kModelTurn  = 0.6; // radians a second
-
-    // A model of the game's, read from its files: a Tonberry Cutter, Shantotto, or the player as they look now.
-    std::optional<headsup::ModelFile> ReadGameModel(const std::string& which, std::string& failure)
-    {
-        headsup::FileTables tables;
-        for (int folder = 1; folder <= headsup::kRomFolders; ++folder)
-        {
-            auto vtable = GameFileBytes(headsup::VTableFile(folder), failure);
-            auto ftable = GameFileBytes(headsup::FTableFile(folder), failure);
-            if (!vtable || !ftable) return std::nullopt;
-            tables[static_cast<size_t>(folder - 1)] = {std::move(*vtable), std::move(*ftable)};
-        }
-        std::vector<uint32_t> files;
-        if (which == "tonberry")
-            files = {headsup::NpcModelFileId(kTonberryCutterModel)};
-        else if (which == "shantotto" || which == "me")
-        {
-            const auto dll = GameFileBytes(headsup::kGameModule, failure);
-            if (!dll) return std::nullopt;
-            const auto players = headsup::FindPlayerTables(*dll);
-            if (!players)
-            {
-                failure = "the game's tables of player models were not found in " + std::string(headsup::kGameModule);
-                return std::nullopt;
-            }
-            headsup::PlayerLook look{6 | 6 << 8, 0x1000, 0x2013, 0x3013, 0x4013, 0x5013, 0x6000, 0x7000, 0};
-            if (which == "me")
-            {
-                IEntity* entity  = m_AshitaCore->GetMemoryManager()->GetEntity();
-                const uint32_t i = m_SelfIndex;
-                look = {static_cast<uint16_t>((entity->GetLookHair(i) & 0xFF) | entity->GetRace(i) << 8), entity->GetLookHead(i),
-                    entity->GetLookBody(i), entity->GetLookHands(i), entity->GetLookLegs(i), entity->GetLookFeet(i), entity->GetLookMain(i),
-                    entity->GetLookSub(i), entity->GetLookRanged(i)};
-            }
-            const auto ids = headsup::PlayerFileIds(*players, look);
-            if (!ids)
-            {
-                failure = "the files of that look were not found";
-                return std::nullopt;
-            }
-            files = *ids;
-        }
-        else
-        {
-            failure = "no model is named " + which;
-            return std::nullopt;
-        }
-        headsup::ModelFile model;
-        for (uint32_t id : files)
-        {
-            const auto file = headsup::DatFileOf(tables, id);
-            if (!file)
-            {
-                failure = "the game's tables have no file " + std::to_string(id);
-                return std::nullopt;
-            }
-            const auto bytes = GameFileBytes(*file, failure);
-            if (!bytes) return std::nullopt;
-            headsup::Read<headsup::ModelFile> read = headsup::ReadModelFile(*bytes);
-            if (!read.value)
-            {
-                failure += read.failure;
-                return std::nullopt;
-            }
-            headsup::AddModelFile(model, std::move(*read.value));
-        }
-        return model;
-    }
-
-    std::string ShowModel(const std::string& which)
-    {
-        if (which == "off")
-        {
-            m_ModelView.Release();
-            return "model: off";
-        }
-        std::string failure;
-        std::optional<headsup::ModelFile> model = ReadGameModel(which, failure);
-        if (!model) return "model: " + failure;
-        const size_t meshes = model->meshes.size(), joints = model->skeleton.size();
-        if (m_Device == nullptr || !m_ModelView.Load(m_Device, std::move(*model))) return "model: Direct3D could not make its pictures";
-        m_ModelShownAt = Now();
-        return "model: " + which + ", " + std::to_string(meshes) + " meshes on " + std::to_string(joints) + " joints";
-    }
-
-    // The model /hu model shows, drawn into its picture and that laid at the screen's top left.
-    void DrawModelView()
-    {
-        const double seconds = Now() - m_ModelShownAt;
-        bool drawn           = false;
-        WithSavedState([&] { drawn = m_ModelView.Render(m_Device, seconds, static_cast<float>(seconds * kModelTurn), kModelViewSide, kModelViewSide); });
-        if (!drawn) return;
-        WithQuadStates([&] {
-            headsup::SetQuadStates(m_Device, false);
-            const auto side = static_cast<float>(kModelViewSide), at = static_cast<float>(kModelViewAt);
-            headsup::DrawQuad(m_Device, {m_ModelView.Picture(), at, at, side, side, 0.0f, m_ModelView.PictureU(), m_ModelView.PictureV(), 0.0f, 0xFFFFFFFF}, false);
-            m_Device->SetTexture(0, nullptr);
-        });
-    }
-
     void WriteStackDump()
     {
         std::string path;
@@ -1791,17 +1784,15 @@ private:
     void BeforeReset()
     {
         m_Rml.ReleaseLayers();
-        m_ModelView.ReleaseTarget();
+        m_SetupPreview.ReleaseTarget();
     }
 
     // RmlUi's overlay (the popups and the settings window), over every ImGui window: in a scene of its own.
     void DrawOverGui()
     {
         if (m_Device == nullptr || FAILED(m_Device->BeginScene())) return;
+        if (m_Rml.Running() && !m_Screenshot && m_RmlMenu.open && m_RmlMenu.SetupStepShown()) DrawSetupPreview();
         if (m_Rml.Running() && !m_Screenshot) WithQuadStates([&] { m_Rml.RenderOverlay(); });
-#ifdef HEADSUP_DEV
-        if (m_ModelView.Loaded() && !m_Screenshot) DrawModelView();
-#endif
         m_Device->EndScene();
     }
 
@@ -1995,6 +1986,9 @@ private:
                 return headsup::HostImage(name);
             });
         if (!started) Print("RmlUi did not start: the top panel and the settings window are off until HeadsUp reloads.");
+        else
+            m_Rml.SetLivePicture(headsup::kSetupPicture, headsup::SetupPreview::kWidth, headsup::SetupPreview::kHeight,
+                [this] { return m_SetupPreview.Picture(); });
     }
 
 
@@ -2150,6 +2144,7 @@ private:
         m_CursorFileRead = m_Settings.cursorFile;
         std::optional<headsup::Image> picture = headsup::CursorFilePicture(CursorFileFrames(m_Settings.cursorFile));
         if (!picture) Note("could not read the cursor " + m_Settings.cursorFile + " in " + CursorsFolder() + "; the feather stands in for it");
+        m_SetupPreview.Plates().SetCursorFile(picture);
         m_Nameplates.SetCursorFile(std::move(picture));
     }
 

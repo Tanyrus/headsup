@@ -4,6 +4,7 @@
 #include "outline_math.h"
 
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -50,4 +51,18 @@ namespace headsup
         Mat4 view, projection;
     };
     ModelView FramedView(const ModelBounds& box, float yaw, float aspect);
+
+    // Models stood side by side: their triangles and boxes moved, and the box that holds two.
+    void Move(std::vector<DrawBatch>& batches, const Vec3& by);
+    ModelBounds Moved(const ModelBounds& box, const Vec3& by);
+    ModelBounds Joined(const ModelBounds& a, const ModelBounds& b);
+    // The top of a box's middle, where a name goes over a model: the game's up is -y.
+    Vec3 HeadOf(const ModelBounds& box);
+    // Where a point lands in a picture width by height seen through a view, in pixels from its top left; none for a
+    // point behind the camera.
+    struct PicturePoint
+    {
+        float x = 0.0f, y = 0.0f;
+    };
+    std::optional<PicturePoint> PointInPicture(const ModelView& view, const Vec3& point, float width, float height);
 }

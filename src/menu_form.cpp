@@ -1770,7 +1770,7 @@ namespace headsup
                            Filled(Said(WordTip(c, WindowWord::SetupWarning)), kFileMark, kSetupBackupFile))
                               .c_str());
             }
-            form.Raw(std::string("<img class=\"setup-preview\" id=\"setup-preview\" src=\"") + kSetupPicture + "\"/>");
+            form.Raw(std::string("<img class=\"setup-preview\" id=\"setup-preview\" style=\"width: 100%;\" src=\"") + kSetupPicture + "\"/>");
             for (const SetupChoice& choice : page.choices)
                 SetupChoiceRow(c, choice);
             for (SettingPiece piece : page.settings)

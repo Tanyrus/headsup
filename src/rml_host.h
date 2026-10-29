@@ -26,6 +26,10 @@ namespace headsup
         bool Start(IDirect3DDevice8* device, int width, int height, std::function<void(const std::string&)> warn,
             RmlRender::ImageSource images);
         void Stop();
+        void SetLivePicture(std::string name, int width, int height, RmlRender::LiveSource source)
+        {
+            m_Render.SetLivePicture(std::move(name), width, height, std::move(source));
+        }
         bool Running() const { return m_Overlay != nullptr; }
         // The back buffer's size, when it changes.
         void Resize(int width, int height);

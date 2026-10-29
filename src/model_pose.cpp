@@ -230,4 +230,40 @@ namespace headsup
         p.m[kM43] = -nearPlane * farPlane / (farPlane - nearPlane);
         return out;
     }
+
+    void Move(std::vector<DrawBatch>& batches, const Vec3& by)
+    {
+        for (DrawBatch& batch : batches)
+            for (DrawVertex& v : batch.vertices)
+            {
+                v.x += by.x;
+                v.y += by.y;
+                v.z += by.z;
+            }
+    }
+
+    ModelBounds Moved(const ModelBounds& box, const Vec3& by) { return {Plus(box.low, by), Plus(box.high, by)}; }
+
+    ModelBounds Joined(const ModelBounds& a, const ModelBounds& b)
+    {
+        return {{std::min(a.low.x, b.low.x), std::min(a.low.y, b.low.y), std::min(a.low.z, b.low.z)},
+            {std::max(a.high.x, b.high.x), std::max(a.high.y, b.high.y), std::max(a.high.z, b.high.z)}};
+    }
+
+    Vec3 HeadOf(const ModelBounds& box) { return {(box.low.x + box.high.x) / 2, box.low.y, (box.low.z + box.high.z) / 2}; }
+
+    std::optional<PicturePoint> PointInPicture(const ModelView& view, const Vec3& point, float width, float height)
+    {
+        float clip[4]{};
+        const float in[4]{point.x, point.y, point.z, 1.0f};
+        float eye[4]{};
+        for (int c = 0; c < 4; ++c)
+            for (int k = 0; k < 4; ++k)
+                eye[c] += in[k] * view.view.m[k * 4 + c];
+        for (int c = 0; c < 4; ++c)
+            for (int k = 0; k < 4; ++k)
+                clip[c] += eye[k] * view.projection.m[k * 4 + c];
+        if (clip[3] <= 0.0f) return std::nullopt;
+        return PicturePoint{(clip[0] / clip[3] + 1.0f) / 2.0f * width, (1.0f - clip[1] / clip[3]) / 2.0f * height};
+    }
 }
