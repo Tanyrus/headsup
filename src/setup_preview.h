@@ -52,7 +52,7 @@ namespace headsup
 
         IDirect3DDevice8* m_Device = nullptr;
         ModelPicture m_Picture;
-        Sample m_Tonberry, m_You, m_Shantotto;
+        Sample m_Tonberry, m_You, m_Shantotto, m_Adventurer;
         NameplateRenderer m_Plates;
         Tracker m_Tracker;
         bool m_Drawn = false; // the picture holds a scene

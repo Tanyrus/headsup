@@ -55,7 +55,8 @@ namespace headsup
         }
         const bool ready = Ready(m_Tonberry, [&](std::string& f) { return read.npc(kSampleTonberryModel, f); }) &&
                            (!others || (Ready(m_You, [&](std::string& f) { return read.player(yourLook, f); }) &&
-                                           Ready(m_Shantotto, [&](std::string& f) { return read.player(kShantottoLook, f); })));
+                                           Ready(m_Shantotto, [&](std::string& f) { return read.player(kShantottoLook, f); }) &&
+                                           Ready(m_Adventurer, [&](std::string& f) { return read.player(kAdventurerLook, f); })));
         if (!ready || !m_Picture.Begin(m_Device, kWidth, kHeight, kBackground)) return false;
 
         struct Placed
@@ -67,8 +68,9 @@ namespace headsup
         std::vector<Placed> placed{{&m_Tonberry.model, SampleActor::Tonberry, {}}};
         if (others)
         {
-            // Seen from the front, across the picture is z: you on its left, Shantotto on its right.
+            // Seen from the front, across the picture is z: you and the adventurer on its left, Shantotto on its right.
             placed.push_back({&m_You.model, SampleActor::You, {0.0f, 0.0f, kBesideUnits}});
+            placed.push_back({&m_Adventurer.model, SampleActor::Adventurer, {0.0f, 0.0f, 2.0f * kBesideUnits}});
             placed.push_back({&m_Shantotto.model, SampleActor::Shantotto, {0.0f, 0.0f, -kBesideUnits}});
         }
         ModelBounds box = Moved(placed.front().model->Standing(), placed.front().at);
@@ -103,10 +105,11 @@ namespace headsup
                 for (const Placed& p : placed)
                     if (SampleIndex(p.actor) == index)
                         if (const auto head = PointInPicture(view, HeadOf(Moved(p.model->Standing(), p.at)), kWidth, kHeight))
-                            return SampleName(head->x / closer, head->y / closer);
+                            return SampleName(p.actor, head->x / closer, head->y / closer);
                 return std::nullopt;
             }};
-        m_Plates.Update(m_Tracker, plates, settings, closer, closer, scene.targets, now, SampleIndex(SampleActor::You), {});
+        m_Plates.Update(m_Tracker, plates, WithGameNames(settings, m_Tracker, scene.player), closer, closer, scene.targets, now,
+            SampleIndex(SampleActor::You), {});
         m_Plates.Draw(false);
         Opaque();
         m_Drawn = true;
@@ -149,7 +152,7 @@ namespace headsup
     void SetupPreview::Release()
     {
         m_Picture.Release();
-        for (Sample* sample : {&m_Tonberry, &m_You, &m_Shantotto})
+        for (Sample* sample : {&m_Tonberry, &m_You, &m_Shantotto, &m_Adventurer})
         {
             sample->model.Release();
             sample->tried = false;
