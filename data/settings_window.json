@@ -1049,6 +1049,22 @@
       ]
     },
     {
+      "key": "setup-player-icons",
+      "options": [
+        {"name": "Left of the Name", "tip": "The icons sit on the name's line, before the name. This is the default."},
+        {"name": "Right of the Name", "tip": "The icons sit on the name's line, after the name."},
+        {"name": "Above the Name", "tip": "The icons get a line of their own, just above the name."}
+      ]
+    },
+    {
+      "key": "setup-line-kinds",
+      "options": [
+        {"name": "Mobs"},
+        {"name": "Players"},
+        {"name": "You"}
+      ]
+    },
+    {
       "key": "setup-npcs",
       "options": [
         {"name": "HeadsUp's Nameplates", "tip": "NPCs show HeadsUp nameplates."},
@@ -1125,6 +1141,7 @@
     {"key": "setup-step-outlines", "name": "Outlines", "tip": "Pick which mobs get an outline. Its color tells whether the mob will attack you."},
     {"key": "setup-step-target-cursor", "name": "Target Cursor", "tip": "Pick the marker drawn over your target."},
     {"key": "setup-step-others", "name": "Players, NPCs and Pets", "tip": "Pick who shows a HeadsUp nameplate and who keeps the game's own name."},
+    {"key": "setup-step-plate-lines", "name": "Nameplate Lines", "tip": "Pick where a player's icons go, and move each line of a nameplate up, down, left or right."},
     {"key": "setup-step-widgets", "name": "Top Panel Widgets", "tip": "Pick what the Top Panel shows. You can move each widget and change what it shows in the settings window."},
     {"key": "setup-step-mouse-extras", "name": "Mouse and Extras", "tip": "Pick your mouse pointer, and a few things HeadsUp can do for you."},
     {"key": "setup-choice-theme", "name": "Top Panel Theme"},
@@ -1135,6 +1152,7 @@
     {"key": "setup-choice-cursor", "name": "Cursor"},
     {"key": "setup-choice-players", "name": "Players"},
     {"key": "setup-choice-self", "name": "Your Own Nameplate"},
+    {"key": "setup-choice-player-icons", "name": "Player Icons"},
     {"key": "setup-choice-npcs", "name": "NPCs"},
     {"key": "setup-choice-pets", "name": "Pets"},
     {"key": "setup-choice-panel", "name": "Top Panel"},

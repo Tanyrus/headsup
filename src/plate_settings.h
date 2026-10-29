@@ -217,6 +217,8 @@ namespace headsup
     std::array<KindSettings, kPlateKindCount> DefaultKinds();
     // Two lines of the design trade places, text and style, and a line that syncs with either still syncs with it.
     void SwapLines(KindSettings& kind, int a, int b);
+    // The line whose style a line shows, following its chain of syncs; a cycle leaves the line its own style.
+    int StyleLineOf(const KindSettings& kind, int line);
 
     int RowCountOf(PlateKind kind);                // 9, 4, 1, 1, 4
     const char* RowKey(PlateKind kind, int row);   // "aggressive", "partyMember", "self", ...: settings keys

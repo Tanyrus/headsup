@@ -188,3 +188,52 @@ TEST(a_setup_backup_is_named_for_the_second_it_was_made_and_never_takes_anothers
     };
     CHECK_EQ(SetupBackupName(at, taken), std::string("settings-before-setup-2026-10-29-153007-3.ini"));
 }
+
+namespace
+{
+    const SetupChoice& PlayerIconsChoice()
+    {
+        for (const SetupChoice& choice : SetupPageOf(SetupStep::PlateLines).choices)
+            if (std::string(choice.key) == "player-icons") return choice;
+        throw test::Failure{"no player-icons choice"};
+    }
+    // The player icons' tags, as a new install's player name line has them before the name.
+    std::string Icons()
+    {
+        const std::string line = Settings{}.Kind(PlateKind::Players).lines[kBottomLine].text;
+        return line.substr(0, line.size() - std::string(kTagName).size());
+    }
+}
+
+TEST(player_icons_go_left_or_right_of_the_name_or_on_the_line_above_it_for_players_and_you)
+{
+    const SetupChoice& choice = PlayerIconsChoice();
+    Settings s;
+    CHECK_EQ(PickedOption(choice, s).value_or(99), 0u); // left of the name, as a new install has them
+    choice.options[1].apply(s);
+    for (PlateKind kind : {PlateKind::Players, PlateKind::Self})
+    {
+        CHECK_EQ(s.Kind(kind).lines[kBottomLine].text, std::string(kTagName) + Icons());
+        CHECK(s.Kind(kind).lines[kMiddleLine].text.empty());
+    }
+    choice.options[2].apply(s);
+    for (PlateKind kind : {PlateKind::Players, PlateKind::Self})
+    {
+        CHECK_EQ(s.Kind(kind).lines[kBottomLine].text, std::string(kTagName));
+        CHECK_EQ(s.Kind(kind).lines[kMiddleLine].text, Icons());
+    }
+    // Back beside the name, the line above is left empty again.
+    choice.options[0].apply(s);
+    CHECK(s.Kind(PlateKind::Players) == Settings{}.Kind(PlateKind::Players));
+    CHECK(s.Kind(PlateKind::Self) == Settings{}.Kind(PlateKind::Self));
+}
+
+TEST(player_icons_beside_the_name_keep_a_line_above_of_the_players_own)
+{
+    const SetupChoice& choice = PlayerIconsChoice();
+    Settings s;
+    s.Kind(PlateKind::Players).lines[kMiddleLine].text = "$job";
+    choice.options[1].apply(s);
+    CHECK_EQ(s.Kind(PlateKind::Players).lines[kMiddleLine].text, std::string("$job"));
+    CHECK_EQ(PickedOption(choice, s).value_or(99), 1u);
+}

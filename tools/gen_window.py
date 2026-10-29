@@ -208,7 +208,7 @@ PIECES = Pieces(
         'bar-widgets': List(18), 'plate-lines': List(3), 'job-layout': List(3), 'exp-bar': List(3), 'exp-text': List(3), 'exp-place': List(5), 'nations': List(4), 'world-line': List(5), 'world-sections': List(3), 'tags': List(24),
         'setup-theme': List(6), 'setup-mob-plates': List(4), 'setup-mob-design': List(3), 'setup-outlines': List(4),
         'setup-outline-thickness': List(3), 'setup-cursor': List(4), 'setup-players': List(2), 'setup-self': List(3),
-        'setup-npcs': List(2), 'setup-pets': List(3), 'setup-panel': List(2), 'setup-pointer': List(2),
+        'setup-player-icons': List(3), 'setup-line-kinds': List(3), 'setup-npcs': List(2), 'setup-pets': List(3), 'setup-panel': List(2), 'setup-pointer': List(2),
         'setup-widget-groups': List(4),
     },
     words={'switched-off': True, 'switch-off': True, 'switch-on': True, 'switched-off-top-panel': True,
@@ -219,10 +219,10 @@ PIECES = Pieces(
            'setup-next': True, 'setup-finish': True, 'setup-custom': True, 'setup-zoom': True, 'setup-cancel': True, 'setup-warning': True,
            'setup-step-welcome': True, 'setup-step-theme': True, 'setup-step-fonts': True,
            'setup-step-mob-nameplates': True, 'setup-step-outlines': True, 'setup-step-target-cursor': True,
-           'setup-step-others': True, 'setup-step-widgets': True, 'setup-step-mouse-extras': True,
+           'setup-step-others': True, 'setup-step-plate-lines': True, 'setup-step-widgets': True, 'setup-step-mouse-extras': True,
            'setup-choice-theme': True, 'setup-choice-mob-plates': True, 'setup-choice-mob-design': True,
            'setup-choice-outlines': True, 'setup-choice-outline-thickness': True, 'setup-choice-cursor': True,
-           'setup-choice-players': True, 'setup-choice-self': True, 'setup-choice-npcs': True, 'setup-choice-pets': True,
+           'setup-choice-players': True, 'setup-choice-self': True, 'setup-choice-player-icons': True, 'setup-choice-npcs': True, 'setup-choice-pets': True,
            'setup-choice-panel': True, 'setup-choice-pointer': True},
 )
 

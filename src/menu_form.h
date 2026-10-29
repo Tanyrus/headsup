@@ -59,6 +59,7 @@ namespace headsup
         bool started   = false;
         Settings before;
         int zoom = kLeastSetupZoom;
+        int lineKind = 0, line = 0; // the Lines step's tabs: into kSetupLineKinds, and the line
     };
 
     // The settings file a run of Setup again copies the settings to first, named for when, and the picture Setup

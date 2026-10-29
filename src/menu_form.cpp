@@ -902,6 +902,22 @@ namespace headsup
             form.EndLine();
         }
 
+        // A line's place: how far it stands off the next line, and across. False for any other row.
+        bool LinePlaceRow(Form& form, const LayoutRow& row, PlateKind kind, int n, const std::string& label, LineDesign& line)
+        {
+            switch (static_cast<LineStylesRow>(row.row))
+            {
+            case LineStylesRow::Padding:
+                form.SliderInt(label.c_str(), line.padding, kMinLinePadding, kMaxLinePadding, "%d px",
+                    n < kPlateLines - 1 ? TipOf(row, kind) : row.otherTip);
+                return true;
+            case LineStylesRow::HorizontalOffset:
+                form.SliderInt(label.c_str(), line.offset, kMinLineOffset, kMaxLineOffset, "%d px", TipOf(row, kind));
+                return true;
+            default: return false;
+            }
+        }
+
         // Every tab shows the same rows; a synced line's tab alone shows only its Sync row and what it uses.
         void LineStyles(Context& c, const LayoutSetting& e)
         {
@@ -967,11 +983,7 @@ namespace headsup
                     form.SliderPercent(label.c_str(), line.iconSize, kMinSizePercent, kMaxSizePercent, tip);
                     break;
                 case LineStylesRow::Padding:
-                    form.SliderInt(label.c_str(), line.padding, kMinLinePadding, kMaxLinePadding, "%d px", n < kPlateLines - 1 ? tip : row.otherTip);
-                    break;
-                case LineStylesRow::HorizontalOffset:
-                    form.SliderInt(label.c_str(), line.offset, kMinLineOffset, kMaxLineOffset, "%d px", tip);
-                    break;
+                case LineStylesRow::HorizontalOffset: LinePlaceRow(form, row, kind, n, label, line); break;
                 case LineStylesRow::TextColor: form.ColorPickRow(label.c_str(), line.color, sources, tip); break;
                 case LineStylesRow::ShadowStrength:
                     form.SliderPercent(label.c_str(), line.shadow, kMinShadow, kMaxShadow, tip);
@@ -1718,6 +1730,28 @@ namespace headsup
             c.form.changed = true;
         }
 
+        // The Lines step's places: a kind's tab and a line's, then where that line stands, which a line synced to
+        // another's style takes from that line.
+        void SetupLines(Context& c, SetupRun& run)
+        {
+            Form& form                  = c.form;
+            const LayoutSetting* styles = c.layout.SettingOf(SettingPiece::LineStyles);
+            if (styles == nullptr) return;
+            const std::vector<const char*> kinds = NamesOf(c.layout.OptionsOf(kSetupLineKindNames));
+            run.lineKind = form.Tabs("line kind", run.lineKind, kinds.data(), static_cast<int>(kinds.size()));
+            const auto lines = c.layout.OptionsOf(WindowList::PlateLines);
+            const std::vector<const char*> lineNames = NamesOf(lines);
+            run.line = form.Tabs("line", run.line, lineNames.data(), kPlateLines);
+            const PlateKind kind = kSetupLineKinds[run.lineKind];
+            KindSettings& k      = c.s.Kind(kind);
+            const int styled     = StyleLineOf(k, run.line);
+            if (styled != run.line)
+                form.Note(Filled(Said(Word(c, WindowWord::LineStylesUsesStyle)), kLineMark, Said(lines[static_cast<size_t>(styled)].name)).c_str());
+            const std::string scope = std::string(" ") + KindKey(kind) + std::to_string(styled);
+            for (const LayoutRow& row : c.layout.RowsOf(*styles))
+                LinePlaceRow(form, row, kind, styled, Labeled(NameOf(row, kind), row.key, scope), k.lines[styled]);
+        }
+
         // The Widgets step: a switch for each widget, in groups.
         void SetupWidgets(Context& c)
         {
@@ -1762,6 +1796,7 @@ namespace headsup
                 SetupChoiceRow(c, choice);
             for (const SettingPiece piece : page.settings)
                 if (const LayoutSetting* setting = c.layout.SettingOf(piece)) DrawSetting(c, *setting);
+            if (run.step == SetupStep::PlateLines) SetupLines(c, run);
             if (run.step == SetupStep::Widgets) SetupWidgets(c);
             form.EndCard();
         }

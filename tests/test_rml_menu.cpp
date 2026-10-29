@@ -2099,3 +2099,34 @@ TEST(a_choice_the_settings_hold_none_of_reads_your_own)
     window.Click("setup-outlines-outline-thickness-o-2");
     CHECK_EQ(window.settings.outlineThickness, 200);
 }
+
+TEST(setups_lines_step_moves_one_line_of_a_kinds_nameplate_up_and_across)
+{
+    SetupWindow window(false);
+    window.Click("setup-buttons-start");
+    window.Click("nav-setup-plate-lines");
+    window.Click("setup-plate-lines-line-kind-t-1"); // players
+    window.Click("setup-plate-lines-line-t-1");      // the middle line
+    window.Drag("setup-plate-lines-padding-players1", Rml::Vector2f(80.0f, 0.0f));
+    window.Drag("setup-plate-lines-horizontal-offset-players1", Rml::Vector2f(80.0f, 0.0f));
+    const KindSettings& players = window.settings.Kind(PlateKind::Players);
+    CHECK(players.lines[kMiddleLine].padding > 0 && players.lines[kMiddleLine].offset > 0);
+    KindSettings expected = Settings{}.Kind(PlateKind::Players);
+    expected.lines[kMiddleLine].padding = players.lines[kMiddleLine].padding;
+    expected.lines[kMiddleLine].offset  = players.lines[kMiddleLine].offset;
+    CHECK(players == expected);
+    CHECK(window.settings.Kind(PlateKind::Mobs) == Settings{}.Kind(PlateKind::Mobs));
+    CHECK_EQ(window.Said(), "");
+}
+
+TEST(setups_lines_step_moves_the_line_a_synced_line_takes_its_style_from)
+{
+    Settings start;
+    start.Kind(PlateKind::Mobs).lines[kTopLine].syncWith = kMiddleLine;
+    SetupWindow window(false, start);
+    window.Click("setup-buttons-start");
+    window.Click("nav-setup-plate-lines");
+    window.Drag("setup-plate-lines-padding-mobs1", Rml::Vector2f(80.0f, 0.0f));
+    CHECK(window.settings.Kind(PlateKind::Mobs).lines[kMiddleLine].padding > 0);
+    CHECK_EQ(window.settings.Kind(PlateKind::Mobs).lines[kTopLine].padding, 0);
+}

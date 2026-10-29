@@ -13,7 +13,7 @@
 namespace headsup
 {
     // The steps of the Setup window, in order.
-    enum class SetupStep : uint8_t { Welcome, Theme, Fonts, MobNameplates, Outlines, TargetCursor, Others, Widgets, MouseExtras };
+    enum class SetupStep : uint8_t { Welcome, Theme, Fonts, MobNameplates, Outlines, TargetCursor, Others, PlateLines, Widgets, MouseExtras };
     constexpr int kSetupSteps = static_cast<int>(SetupStep::MouseExtras) + 1;
 
     // An option sets every field of its choice, whatever they were, so picking it twice changes nothing more.
@@ -43,6 +43,10 @@ namespace headsup
 
     // The option the settings hold, or none when the player set the choice's fields some other way.
     std::optional<size_t> PickedOption(const SetupChoice& choice, const Settings& s);
+
+    // The kinds whose plates' lines the Lines step moves, named in order by kSetupLineKindNames.
+    constexpr PlateKind kSetupLineKinds[]{PlateKind::Mobs, PlateKind::Players, PlateKind::Self};
+    constexpr WindowList kSetupLineKindNames = WindowList::SetupLineKinds;
 
     // The Widgets step's on and off for each widget, in groups.
     struct SetupWidgetGroup

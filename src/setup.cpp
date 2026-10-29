@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <iterator>
+#include <string_view>
 
 namespace headsup
 {
@@ -122,6 +123,28 @@ namespace headsup
             {"game", Plates<PlateKind::Pets, PlateMode::Vanilla>}};
         const SetupChoice kOtherChoices[]{{"players", WindowWord::SetupChoicePlayers, WindowList::SetupPlayers, kPlayers}, {"self", WindowWord::SetupChoiceSelf, WindowList::SetupSelf, kSelf}, {"npcs", WindowWord::SetupChoiceNpcs, WindowList::SetupNpcs, kNpcs}, {"pets", WindowWord::SetupChoicePets, WindowList::SetupPets, kPets}};
 
+        // The player icons' tags, which a new install's player name line has before the name.
+        constexpr std::string_view kPlayerName = kTagPlayerName;
+        static_assert(kPlayerName.ends_with(kTagName));
+        constexpr std::string_view kPlayerIcons = kPlayerName.substr(0, kPlayerName.size() - std::string_view(kTagName).size());
+        // Yours and other players' name lines, with the icons in it or on the line above; that line is emptied of
+        // them when they go back beside the name, and kept when it holds something else.
+        void PlayerIcons(Settings& s, const std::string& name, bool above)
+        {
+            for (PlateKind kind : {PlateKind::Players, PlateKind::Self})
+            {
+                KindSettings& k = KindOf(s, kind);
+                k.lines[kBottomLine].text = name;
+                if (above) k.lines[kMiddleLine].text = kPlayerIcons;
+                else if (k.lines[kMiddleLine].text == kPlayerIcons) k.lines[kMiddleLine].text.clear();
+            }
+        }
+        const SetupOption kPlayerIconPlaces[]{
+            {"left", [](Settings& s) { PlayerIcons(s, std::string(kPlayerIcons) + kTagName, false); }},
+            {"right", [](Settings& s) { PlayerIcons(s, kTagName + std::string(kPlayerIcons), false); }},
+            {"above", [](Settings& s) { PlayerIcons(s, kTagName, true); }}};
+        const SetupChoice kLineChoices[]{{"player-icons", WindowWord::SetupChoicePlayerIcons, WindowList::SetupPlayerIcons, kPlayerIconPlaces}};
+
         const SetupOption kPanel[]{{"shown", [](Settings& s) { s.showBar = true; }}, {"hidden", [](Settings& s) { s.showBar = false; }}};
         const SetupChoice kWidgetChoices[]{{"panel", WindowWord::SetupChoicePanel, WindowList::SetupPanel, kPanel}};
 
@@ -145,6 +168,7 @@ namespace headsup
             {SetupStep::Outlines, "outlines", WindowWord::SetupStepOutlines, kOutlineChoices, {}},
             {SetupStep::TargetCursor, "target-cursor", WindowWord::SetupStepTargetCursor, kCursorChoices, kCursorSettings},
             {SetupStep::Others, "others", WindowWord::SetupStepOthers, kOtherChoices, {}},
+            {SetupStep::PlateLines, "plate-lines", WindowWord::SetupStepPlateLines, kLineChoices, {}},
             {SetupStep::Widgets, "widgets", WindowWord::SetupStepWidgets, kWidgetChoices, {}},
             {SetupStep::MouseExtras, "mouse-extras", WindowWord::SetupStepMouseExtras, kMouseChoices, kExtraSettings},
         };

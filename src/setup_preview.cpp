@@ -46,7 +46,7 @@ namespace headsup
     {
         m_Drawn = false;
         if (m_Device == nullptr) return false;
-        const bool others = step == SetupStep::Others;
+        const bool others = step == SetupStep::Others || step == SetupStep::PlateLines;
         if (others && m_You.look != yourLook)
         {
             m_You.model.Release();
