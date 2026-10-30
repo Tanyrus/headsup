@@ -125,6 +125,7 @@ namespace headsup
         std::unordered_map<std::string, std::string> m_FocusValue; // a text box's text as it took the keyboard
         std::vector<FormEvent> m_Events; // since the last pass
         FormEvent m_HeldOver;            // the drag held, as last told
+        Rml::Vector2f m_PanAt;           // where the pointer was at the last move of a pan
         MenuFormState m_State;
         std::optional<float> m_ScrollTo;
         bool m_Closed = false; // its close button was clicked

@@ -28,11 +28,11 @@ namespace headsup
         void SetDevice(IDirect3DDevice8* device);
         // The scene's own nameplates, which take the game's font, the pearl and a cursor file as the world's do.
         NameplateRenderer& Plates() { return m_Plates; }
-        // The scene of a step at now drawn into the picture, zoom percent near: you as yourName and yourLook have you.
-        // Changes the render target and states: the caller saves and puts back the game's. False while a model could
-        // not be read or drawn.
-        bool Render(const Settings& settings, SetupStep step, int zoom, double now, const std::string& yourName,
-            const PlayerLook& yourLook, const Readers& read);
+        // The scene of a step at now drawn into the picture, zoom percent near and moved across and down by shares of
+        // the picture: you as yourName and yourLook have you. Changes the render target and states: the caller saves
+        // and puts back the game's. False while a model could not be read or drawn.
+        bool Render(const Settings& settings, SetupStep step, int zoom, float across, float down, double now,
+            const std::string& yourName, const PlayerLook& yourLook, const Readers& read);
         std::optional<RmlRender::LivePicture> Picture() const;
         // Why a model could not be read or drawn, once.
         std::string TakeFailure() { return std::exchange(m_Failure, {}); }

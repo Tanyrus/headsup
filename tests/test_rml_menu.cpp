@@ -2130,3 +2130,34 @@ TEST(setups_lines_step_moves_the_line_a_synced_line_takes_its_style_from)
     CHECK(window.settings.Kind(PlateKind::Mobs).lines[kMiddleLine].padding > 0);
     CHECK_EQ(window.settings.Kind(PlateKind::Mobs).lines[kTopLine].padding, 0);
 }
+
+TEST(setups_welcome_fits_the_window_at_its_default_size_without_scrolling)
+{
+    SetupWindow window(false);
+    window.Frames(30); // past the window's opening
+    Rml::Element* page = window.Find("page");
+    CHECK(page->GetScrollHeight() <= page->GetClientHeight() + 0.5f);
+}
+
+TEST(dragging_setups_preview_pans_it_as_far_as_its_zoom_leaves_room)
+{
+    SetupWindow window(false);
+    window.Click("setup-buttons-start");
+    window.Frames(30); // past the window's opening
+    window.Drag(kSetupPreviewClass, Rml::Vector2f(60.0f, 30.0f));
+    const SetupRun& run = *window.menu.SetupShown();
+    CHECK_EQ(run.panX, 0.0f); // the whole scene shows: nowhere to move it
+    CHECK_EQ(run.panY, 0.0f);
+    for (int i = 0; i < 4; ++i)
+        window.Wheel(kSetupPreviewClass, -1.0f); // 200 percent
+    const float wide = window.Find(kSetupPreviewClass)->GetBox().GetSize(Rml::BoxArea::Content).x;
+    window.Drag(kSetupPreviewClass, Rml::Vector2f(wide * 0.2f, 0.0f));
+    CHECK(std::abs(run.panX - 0.2f) < 0.02f && std::abs(run.panY) < 0.02f);
+    window.Drag(kSetupPreviewClass, Rml::Vector2f(-wide * 0.9f, 0.0f));
+    CHECK(std::abs(run.panX + 0.5f) < 0.001f); // half the picture each way at twice as near
+    // Zoomed back out, it comes back within what is left.
+    for (int i = 0; i < 4; ++i)
+        window.Wheel(kSetupPreviewClass, 1.0f);
+    CHECK_EQ(run.panX, 0.0f);
+    CHECK(window.settings == Settings{});
+}

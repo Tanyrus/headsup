@@ -323,3 +323,17 @@ TEST(a_zoomed_view_keeps_the_point_it_zooms_toward_in_place_and_grows_what_is_ro
     const auto plain = Projected(FramedView(box, 1.0f, 2.0f), 1, -1, 0), toPoint = Projected(FramedView(box, 1.0f, 2.0f, 1.0f, toward), 1, -1, 0);
     CHECK(Near(plain[0], toPoint[0]) && Near(plain[1], toPoint[1]) && Near(plain[2], toPoint[2]));
 }
+
+TEST(a_panned_view_moves_every_point_by_the_same_share_of_the_picture)
+{
+    const ModelBounds box{{-1, -2, -1}, {1, 0, 1}};
+    const ModelView still = FramedView(box, 0.5f, 2.0f, 2.0f, HeadOf(box));
+    ModelView moved       = still;
+    Pan(moved, 0.25f, -0.1f); // right a quarter of the width, up a tenth of the height
+    for (const Vec3& point : {Vec3{0, -1, 0}, Vec3{1, -2, -1}, Vec3{-1, 0, 1}})
+    {
+        const auto was = PointInPicture(still, point, 640, 360), now = PointInPicture(moved, point, 640, 360);
+        CHECK(was && now);
+        CHECK(Near(now->x - was->x, 160.0f) && Near(now->y - was->y, -36.0f));
+    }
+}

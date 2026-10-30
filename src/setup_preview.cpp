@@ -41,8 +41,8 @@ namespace headsup
         return true;
     }
 
-    bool SetupPreview::Render(const Settings& settings, SetupStep step, int zoom, double now, const std::string& yourName,
-        const PlayerLook& yourLook, const Readers& read)
+    bool SetupPreview::Render(const Settings& settings, SetupStep step, int zoom, float across, float down, double now,
+        const std::string& yourName, const PlayerLook& yourLook, const Readers& read)
     {
         m_Drawn = false;
         if (m_Device == nullptr) return false;
@@ -84,7 +84,8 @@ namespace headsup
         box.low.y -= headroom;
         const float closer   = static_cast<float>(zoom) / kPercent;
         const float yaw      = kFacingYaw + kSwayYaw * static_cast<float>(std::sin(now * kSwaySpeed));
-        const ModelView view = FramedView(box, yaw, static_cast<float>(kWidth) / static_cast<float>(kHeight), closer, toward);
+        ModelView view = FramedView(box, yaw, static_cast<float>(kWidth) / static_cast<float>(kHeight), closer, toward);
+        Pan(view, across, down);
 
         const SampleScene scene = SetupScene(others, yourName);
         m_Tracker.Update(scene.actors, scene.player, settings, scene.targets);

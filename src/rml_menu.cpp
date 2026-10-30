@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
 #include <utility>
 
 namespace headsup
@@ -221,7 +222,8 @@ namespace headsup
         m_Popup      = m_Document->GetElementById(kMenuPopupId);
         m_Tip        = m_Document->GetElementById(kMenuTipId);
         for (const Rml::EventId id : {Rml::EventId::Click, Rml::EventId::Change, Rml::EventId::Dragdrop, Rml::EventId::Dragend,
-                 Rml::EventId::Dragmove, Rml::EventId::Mouseover, Rml::EventId::Mousemove, Rml::EventId::Mousescroll})
+                 Rml::EventId::Dragmove, Rml::EventId::Mouseover, Rml::EventId::Mousemove, Rml::EventId::Mousescroll,
+                 Rml::EventId::Dragstart, Rml::EventId::Drag})
             m_Document->AddEventListener(id, this);
         // On their way down: taking and losing the keyboard do not come back up, and a text box keeps its keys.
         for (const Rml::EventId id : {Rml::EventId::Focus, Rml::EventId::Blur, Rml::EventId::Keydown})
@@ -537,6 +539,29 @@ namespace headsup
                     input->Blur();
             }
             break;
+        case Rml::EventId::Dragstart:
+            if (named != nullptr && named->IsClassSet(kPanClass))
+                m_PanAt = {event.GetParameter<float>("mouse_x", 0.0f), event.GetParameter<float>("mouse_y", 0.0f)};
+            break;
+        case Rml::EventId::Drag:
+            if (named != nullptr && named->IsClassSet(kPanClass))
+            {
+                const Rml::Vector2f at{event.GetParameter<float>("mouse_x", 0.0f), event.GetParameter<float>("mouse_y", 0.0f)};
+                const Rml::Vector2f size = named->GetBox().GetSize(Rml::BoxArea::Content);
+                if (size.x <= 0.0f || size.y <= 0.0f) break;
+                Rml::Vector2f by = (at - m_PanAt) / size;
+                m_PanAt          = at;
+                // One event a pass, holding every move since the last.
+                if (!m_Events.empty() && m_Events.back().id == id && m_Events.back().type == kPanEvent)
+                {
+                    float across = 0.0f, down = 0.0f;
+                    std::sscanf(m_Events.back().value.c_str(), "%f %f", &across, &down);
+                    by += Rml::Vector2f(across, down);
+                    m_Events.pop_back();
+                }
+                m_Events.push_back(FormEvent{id, kPanEvent, std::to_string(by.x) + " " + std::to_string(by.y)});
+            }
+            break;
         case Rml::EventId::Dragdrop:
             if (auto* dragged = static_cast<Rml::Element*>(event.GetParameter<void*>("drag_element", nullptr));
                 dragged != nullptr && !LetGoOn(dragged, event))
@@ -546,7 +571,7 @@ namespace headsup
         {
             // Sent to what the drag is held over: told again only when that changes.
             auto* dragged = static_cast<Rml::Element*>(event.GetParameter<void*>("drag_element", nullptr));
-            if (dragged == nullptr) break;
+            if (dragged == nullptr || dragged->IsClassSet(kPanClass)) break;
             FormEvent held = DropOn(target, dragged, kDragOverEvent, event);
             if (LetGoOn(dragged, event)) held.id.clear();
             if (held.id == m_HeldOver.id && held.at == m_HeldOver.at) break;
@@ -555,6 +580,7 @@ namespace headsup
             break;
         }
         case Rml::EventId::Dragend:
+            if (target->IsClassSet(kPanClass)) break;
             if (!LetGoOn(target, event)) m_Events.push_back(FormEvent{id, kDragEndEvent, {}, {}});
             m_HeldOver = FormEvent{};
             m_Events.push_back(FormEvent{{}, kDragOverEvent, {}, {}});

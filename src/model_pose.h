@@ -53,6 +53,9 @@ namespace headsup
     };
     ModelView FramedView(const ModelBounds& box, float yaw, float aspect, float zoom = 1.0f, std::optional<Vec3> toward = std::nullopt);
 
+    // The picture moved across and down by shares of its width and height, as a drag moves it.
+    void Pan(ModelView& view, float across, float down);
+
     // Models stood side by side: their triangles and boxes moved, and the box that holds two.
     void Move(std::vector<DrawBatch>& batches, const Vec3& by);
     ModelBounds Moved(const ModelBounds& box, const Vec3& by);

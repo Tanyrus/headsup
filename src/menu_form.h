@@ -59,6 +59,7 @@ namespace headsup
         bool started   = false;
         Settings before;
         int zoom = kLeastSetupZoom;
+        float panX = 0.0f, panY = 0.0f; // shares of the picture it is dragged across and down, as far as the zoom leaves room
         int lineKind = 0, line = 0; // the Lines step's tabs: into kSetupLineKinds, and the line
     };
 

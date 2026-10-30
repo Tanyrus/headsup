@@ -1494,7 +1494,7 @@ private:
             [this](const headsup::PlayerLook& look, std::string& failure) { return ReadPlayerModel(look, failure); }};
         WithSavedState([&] {
             const headsup::SetupRun& run = *m_RmlMenu.SetupShown();
-            m_SetupPreview.Render(m_Settings, run.step, run.zoom, Now(), name != nullptr ? name : "", OwnLook(), read);
+            m_SetupPreview.Render(m_Settings, run.step, run.zoom, run.panX, run.panY, Now(), name != nullptr ? name : "", OwnLook(), read);
         });
         if (const std::string failure = m_SetupPreview.TakeFailure(); !failure.empty())
             Print("Setup's preview could not draw the game's models (" + failure + "). The rest of Setup works without it.");

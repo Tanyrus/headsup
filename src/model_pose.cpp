@@ -250,6 +250,14 @@ namespace headsup
         return out;
     }
 
+    void Pan(ModelView& view, float across, float down)
+    {
+        // Clip x and y gain the view depth (clip w) times these, which moves every point the same in the picture,
+        // whose sides are -1 to 1 with up positive.
+        view.projection.m[kM31] += 2.0f * across;
+        view.projection.m[kM32] -= 2.0f * down;
+    }
+
     void Move(std::vector<DrawBatch>& batches, const Vec3& by)
     {
         for (DrawBatch& batch : batches)

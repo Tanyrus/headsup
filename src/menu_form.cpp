@@ -1774,24 +1774,33 @@ namespace headsup
         }
 
 
-        // A step's card: where it is in Setup, the warning of a run again, the preview, its choices and its settings.
+        // A step's card: the warning of a run again, the preview, its choices and its settings.
         void SetupStepCard(Context& c, const SetupPage& page)
         {
             Form& form    = c.form;
             SetupRun& run = *c.state.setup;
-            const std::string count = Filled(Said(Word(c, WindowWord::SetupStep)), kCountMark, std::to_string(static_cast<int>(run.step) + 1));
-            form.Note(Filled(count, kTotalMark, std::to_string(kSetupSteps)).c_str());
             if (run.rerun && !run.started)
                 form.Note((Words(Word(c, WindowWord::SetupWarning)) + ": " +
                            Filled(Said(WordTip(c, WindowWord::SetupWarning)), kFileMark, kSetupBackupFile))
                               .c_str());
-            form.Raw(std::string("<img class=\"") + kSetupPreviewClass + " " + kWheelClass + "\" id=\"" + kSetupPreviewClass + "\" src=\"" +
-                     kSetupPicture + "\"/>");
+            form.Raw(std::string("<img class=\"") + kSetupPreviewClass + " " + kWheelClass + " " + kPanClass + "\" id=\"" +
+                     kSetupPreviewClass + "\" src=\"" + kSetupPicture + "\"/>");
             if (const FormEvent* wheel = form.Took(kSetupPreviewClass, kWheelEvent))
                 run.zoom = std::clamp(run.zoom - static_cast<int>(std::lround(std::stof(wheel->value))) * kSetupZoomNotch, kLeastSetupZoom,
                     kMostSetupZoom);
             form.SliderPercent(Labeled(Word(c, WindowWord::SetupZoom), "zoom").c_str(), run.zoom, kLeastSetupZoom, kMostSetupZoom,
                 WordTip(c, WindowWord::SetupZoom));
+            if (const FormEvent* pan = form.Took(kSetupPreviewClass, kPanEvent))
+            {
+                float across = 0.0f, down = 0.0f;
+                std::sscanf(pan->value.c_str(), "%f %f", &across, &down);
+                run.panX += across;
+                run.panY += down;
+            }
+            // Zoomed z times, the picture can go (z - 1) / 2 of itself each way before the scene's edge comes in.
+            const float room = (static_cast<float>(run.zoom) / static_cast<float>(kLeastSetupZoom) - 1.0f) / 2.0f;
+            run.panX         = std::clamp(run.panX, -room, room);
+            run.panY         = std::clamp(run.panY, -room, room);
             for (const SetupChoice& choice : page.choices)
                 SetupChoiceRow(c, choice);
             for (const SettingPiece piece : page.settings)
@@ -1801,7 +1810,7 @@ namespace headsup
             form.EndCard();
         }
 
-        // The buttons that move through Setup, under its card, where folding the card leaves them.
+        // Where Setup is and the buttons that move through it, under its card, where folding the card leaves them.
         void SetupButtons(Context& c)
         {
             Form& form      = c.form;
@@ -1814,6 +1823,8 @@ namespace headsup
             const auto button = [&](WindowWord word, const char* id, const char* classes) {
                 return form.Button(Labeled(Word(c, word), id).c_str(), id, classes, WordTip(c, word));
             };
+            const std::string count = Filled(Said(Word(c, WindowWord::SetupStep)), kCountMark, std::to_string(step + 1));
+            form.Caption(Filled(count, kTotalMark, std::to_string(kSetupSteps)).c_str());
             bool finished = false, left = false;
             if (!run.started)
             {
