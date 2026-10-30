@@ -77,6 +77,8 @@ namespace headsup
         const std::vector<Shown>& LastShown() const { return m_Shown; }
         // How much of the screen's top the top panel covers, in back-buffer pixels: cursors stay below it.
         void SetCoveredTop(float pixels) { m_CoveredTop = pixels; }
+        // Whether a cursor is kept whole on screen, as the world's are; a picture's go out of it with their plates.
+        void SetCursorsKeptOnScreen(bool kept) { m_KeepCursors = kept; }
         // The picture a cursor of the File style draws, or none for a file that could not be read.
         void SetCursorFile(std::optional<Image> picture);
         // The game's own font, for the text set in it; every plate is drawn again with it.
@@ -174,6 +176,7 @@ namespace headsup
         std::optional<Image> m_CursorFile; // the File style's picture; none while it is not read
         int m_CursorFileSerial = 0;
         float m_CoveredTop     = 0.0f;
+        bool m_KeepCursors     = true;
         bool Upload(PlateTexture& t, const Image& image, TextureKey key);
         // Marks t as holding this key with nothing to draw: its image fits no texture at the smallest height either.
         static void LeaveOut(PlateTexture& t, TextureKey key);

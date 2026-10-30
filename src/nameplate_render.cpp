@@ -619,8 +619,10 @@ namespace headsup
                     const float fit = FitOf(cursorShown, p.cursor.raster);
                     float top       = layout.cursor.y + CursorBob(now, cursorBox.height, settings.cursorFloat);
                     auto addCursor  = [&](const PlateTexture& cursor) {
-                        const CursorSpot kept = KeepOnScreen(CursorSpot{layout.cursor.x, top}, cursorBox.width, cursorBox.height,
-                            screenWidth, screenHeight, m_CoveredTop);
+                        const CursorSpot spot{layout.cursor.x, top};
+                        const CursorSpot kept = m_KeepCursors ? KeepOnScreen(spot, cursorBox.width, cursorBox.height, screenWidth,
+                                                                    screenHeight, m_CoveredTop)
+                                                              : spot;
                         addSquare(cursorQuads, cursor, kept.x, kept.y, fit, 0.0f);
                     };
                     // The cursor is no part of the nameplate: it stays whole however faint the plate is.
@@ -678,8 +680,10 @@ namespace headsup
             for (size_t q = s.cursors; q < s.cursorsEnd; ++q)
             {
                 GpuQuad& cursor = cursorQuads[q].gpu;
-                cursor.y = KeepOnScreen(CursorSpot{cursor.x, cursor.y - up}, cursor.width, cursor.height, screenWidth * toX,
-                    screenHeight * toY, m_CoveredTop * toY).y;
+                cursor.y -= up;
+                if (m_KeepCursors)
+                    cursor.y = KeepOnScreen(CursorSpot{cursor.x, cursor.y}, cursor.width, cursor.height, screenWidth * toX,
+                        screenHeight * toY, m_CoveredTop * toY).y;
             }
             // Drawn after the plate it belongs to, in the plate's rank and at its depth.
             if (const std::optional<PlateBox> line = StackLeader(s.centerX, s.box.bottom, p.rise, kStackLineWidth);

@@ -20,6 +20,7 @@ namespace headsup
     {
         m_Device = device;
         m_Plates.SetDevice(device);
+        m_Plates.SetCursorsKeptOnScreen(false);
     }
 
     bool SetupPreview::Ready(Sample& sample, const std::function<std::optional<ModelFile>(std::string&)>& read)
