@@ -1,5 +1,7 @@
 /build/
 /src/generated/
+/third_party/ashita-sdk/
+/third_party/.ashita-sdk.*/
 __pycache__/
 .vscode/
 .idea/

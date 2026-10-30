@@ -12,7 +12,7 @@ HeadsUp is free software under the GNU General Public License, version 3 or late
   tables in `FFXiMain.dll`, skeletons, meshes, pictures and animations) follows Xim by Asura.Aamace (GPL-3.0,
   https://xim.pages.dev) and Vanalytics by Soverance (MIT, https://github.com/Soverance/Vanalytics), checked against
   the game's own files.
-- **Ashita SDK:** `third_party/ashita-sdk`, AshitaXI/Ashita-v4beta at commit 4171c74 (LGPL-3.0), with the
-  DirectX 8 SDK headers it ships.
+- **Ashita SDK:** AshitaXI/Ashita-v4beta at commit 4171c74 (LGPL-3.0), with the DirectX 8 SDK headers it ships,
+  fetched into `third_party/ashita-sdk` by `tools/ashita-sdk/fetch.sh` when HeadsUp is built.
 - **Fonts:** Montserrat, Marcellus SC, Cinzel, Cormorant SC and Barlow Condensed, bundled in `third_party/fonts` under
   the SIL Open Font License 1.1 (their notices ship beside them).

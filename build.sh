@@ -108,6 +108,8 @@ for target in linux mingw; do
     fi
 done
 
+"$ROOT/tools/ashita-sdk/fetch.sh"
+
 case "${1:-install}" in
     test) generate; unit_tests ;;
     plugin) generate; unit_tests; abi_check; plugin ;;
