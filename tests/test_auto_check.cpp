@@ -43,6 +43,11 @@ namespace
     // And for an answer the server would not gauge.
     const std::string kCheckerUngauged = kCheckerStart + "\x1E\x51(Lv. \x1E\x52???\x1E\x01\x1E\x51)\x1E\x01 "
                                          "\x1E\x05Impossible to gauge!\x1E\x01";
+    // The simplelog addon's lines for the same answers, built as its packethandlers.lua builds them: the mob in its
+    // mob color, the con as "to be level" in color 1, and the defense remark after a line break.
+    const std::string kSimplelogLine = "The \x1F\x45Land Crab\x1E\x01 seems \x1E\x01to be level 5 (TW)\x1E\x01.\x07"
+                                       "It seems to have high defense.";
+    const std::string kSimplelogUngauged = "The \x1F\x45Land Crab\x1E\x01's strength is impossible to gauge!";
 }
 
 // What the client sent for /check on a Land Crab (index 3) and what Phoenix answered, as captured on the test
@@ -248,4 +253,24 @@ TEST(the_checker_addons_line_for_a_check_headsup_made_is_kept_out_too)
     AutoCheck lost;
     CHECK(lost.Due(mobs, 10.0).has_value());
     CHECK(!lost.OwnReport(kCheckerLine, 10.0 + kOwnAnswerWait + 1.0));
+}
+
+TEST(the_simplelog_addons_line_for_a_check_headsup_made_is_kept_out_too)
+{
+    // simplelog writes its own line from the answer as it came, before HeadsUp keeps the answer from the game.
+    const std::vector<CheckCandidate> mobs{Mob(kCrab, 5.0f)};
+    AutoCheck checks;
+    CHECK(!checks.OwnReport(kSimplelogLine, 9.0)); // nothing asked: a line like any other
+    CHECK(checks.Due(mobs, 10.0).has_value());
+    CHECK(checks.OwnReport(kSimplelogLine, 10.2));
+    CHECK(checks.OwnReport(kSimplelogUngauged, 10.2));
+    CHECK(!checks.OwnReport("The \x1F\x45Land Crab\x1E\x01 hits Tabby for 5 points of damage.", 10.2));
+    std::string worm = kSimplelogLine;
+    worm.replace(worm.find("Land Crab"), 9, "Carrion Worm");
+    CHECK(!checks.OwnReport(worm, 10.2));
+    // The player's own check is theirs to read.
+    AutoCheck theirs;
+    CHECK(theirs.Due(mobs, 10.0).has_value());
+    theirs.PlayerAsked(kWorm, 10.1);
+    CHECK(!theirs.OwnReport(kSimplelogLine, 10.2));
 }

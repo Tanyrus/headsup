@@ -12,8 +12,20 @@ namespace headsup
         // in 4-byte words in its high 7.
         constexpr uint8_t kRequestHeader[] = {0xDD, 0x08};
         constexpr size_t kRequestServerId = 0x04, kRequestIndex = 0x08;
-        // What every line of the checker addon's holds: its name in the line's header, and the level it reports.
-        constexpr std::string_view kCheckerAddon = "checker", kCheckerLevel = "Lv. ";
+        // What an addon's report of a check's answer holds, both parts: the checker addon's name in the line's header
+        // and the level it reports, or simplelog's words for a con and for an answer the server would not gauge.
+        struct ReportMarks
+        {
+            std::string_view first, second;
+        };
+        constexpr ReportMarks kReports[] = {{"checker", "Lv. "}, {" seems ", "to be level "}, {"'s strength is impossible to gauge!", ""}};
+
+        bool IsReport(std::string_view line)
+        {
+            for (const ReportMarks& marks : kReports)
+                if (line.find(marks.first) != std::string_view::npos && line.find(marks.second) != std::string_view::npos) return true;
+            return false;
+        }
 
         // A mob by more than the kind the client's flags gave it: the server tells a player who examined them.
         bool IsZoneMob(const CheckCandidate& entity)
@@ -85,7 +97,7 @@ namespace headsup
 
     bool AutoCheck::OwnReport(std::string_view line, double now) const
     {
-        if (line.find(kCheckerAddon) == std::string_view::npos || line.find(kCheckerLevel) == std::string_view::npos) return false;
+        if (!IsReport(line)) return false;
         // The player's own check of anything is theirs to read, whichever mob the line names.
         for (const auto& [id, at] : m_PlayerAsked)
             if (now - at <= kOwnAnswerWait) return false;

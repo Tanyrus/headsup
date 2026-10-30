@@ -705,7 +705,7 @@ public:
         }
     }
 
-    // The only chat line HeadsUp keeps out: the checker addon's report of a check HeadsUp made by itself.
+    // The only chat lines HeadsUp keeps out: the checker and simplelog addons' reports of a check HeadsUp made by itself.
     bool HandleIncomingText(int32_t mode, bool indent, const char* message, int32_t* modifiedMode, bool* modifiedIndent,
         char* modifiedMessage, bool injected, bool blocked) override
     {

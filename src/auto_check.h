@@ -31,7 +31,7 @@ namespace headsup
     constexpr double kAutoCheckGap  = 0.5;  // seconds between two of HeadsUp's own checks
     constexpr double kOwnAnswerWait = 5.0;  // seconds an answer may take and still be the one HeadsUp asked for
     constexpr double kAskAgain      = 60.0; // seconds before a mob that never answered is asked about again
-    constexpr double kReportWait    = 0.5;  // seconds after an answer in which the checker addon's line of it comes
+    constexpr double kReportWait    = 0.5;  // seconds after an answer in which an addon's line of it comes
 
     // Whether HeadsUp may check anything now: with the setting on, in a zone, and out of any event, during which
     // the server takes no check.
@@ -68,8 +68,8 @@ namespace headsup
         // An answer came. True when HeadsUp asked for it and the player did not, so that nobody waits to read it
         // in the chat log.
         bool TakeAnswer(const CheckAnswer& answer, double now);
-        // Whether a chat line is the checker addon's report of a check HeadsUp made. The addon reads each answer as
-        // it came, whoever asked and whatever blocked it, so keeping the answer from the game keeps no line out.
+        // Whether a chat line is the checker or simplelog addon's report of a check HeadsUp made. They read each
+        // answer before HeadsUp keeps it from the game, so keeping the answer out keeps no line out.
         bool OwnReport(std::string_view line, double now) const;
         // The mob was seen dead: what comes back is another spawn.
         void Forget(uint32_t serverId);
