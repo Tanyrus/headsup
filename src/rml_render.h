@@ -25,6 +25,15 @@ namespace headsup
 
         void SetDevice(IDirect3DDevice8* device) { m_Device = device; }
         void SetImageSource(ImageSource source) { m_Images = std::move(source); }
+        // A picture drawn anew each frame by its owner, named as a hu: source: the texture as it stands when RmlUi
+        // draws it and the share of it the picture fills, or none, which draws nothing; laid out width by height.
+        struct LivePicture
+        {
+            IDirect3DTexture8* texture = nullptr;
+            float u = 1.0f, v = 1.0f;
+        };
+        using LiveSource = std::function<std::optional<LivePicture>()>;
+        void SetLivePicture(std::string name, int width, int height, LiveSource source);
         // Around a context's Render: the quad states with premultiplied blending and the full viewport, the game's
         // viewport put back after.
         void Begin(int width, int height);
@@ -76,6 +85,7 @@ namespace headsup
             IDirect3DTexture8* texture = nullptr;
             float u = 0.0f, v = 0.0f; // the image's share of the padded texture
             bool repeats = false;     // unpadded, and drawn wrapping where RmlUi repeats it
+            bool live    = false;     // the live picture's, whose texture is its owner's and asked for at each draw
         };
 
         struct Layer
@@ -96,6 +106,9 @@ namespace headsup
 
         IDirect3DDevice8* m_Device = nullptr;
         ImageSource m_Images;
+        std::string m_LiveName;
+        int m_LiveWidth = 0, m_LiveHeight = 0;
+        LiveSource m_Live;
         int m_Width = 0, m_Height = 0;
         bool m_Scissor = false;
         Rml::Rectanglei m_Region;

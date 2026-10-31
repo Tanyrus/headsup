@@ -45,6 +45,12 @@ namespace headsup
         void Close();
         // True once after the Debug Report button was pressed: write the /hu debug report.
         bool TakeDebugRequest();
+        // Opens the window on Setup, from the settings as they are: the first time, or again (rerun), which warns.
+        void StartSetup(const Settings& settings, bool rerun);
+        bool InSetup() const { return m_State.setup.has_value(); }
+        const SetupRun* SetupShown() const { return m_State.setup ? &*m_State.setup : nullptr; }
+        // True once after Setup was run again: the settings file is to be copied first.
+        bool TakeSetupBackup();
         bool TakeWatchRequest();
         bool TakeReloadRequest(); // the layout's file is to be read again and the window built anew
         bool TakeExportRequest(); // the built-in layout is to be written out as a file
@@ -119,6 +125,7 @@ namespace headsup
         std::unordered_map<std::string, std::string> m_FocusValue; // a text box's text as it took the keyboard
         std::vector<FormEvent> m_Events; // since the last pass
         FormEvent m_HeldOver;            // the drag held, as last told
+        Rml::Vector2f m_PanAt;           // where the pointer was at the last move of a pan
         MenuFormState m_State;
         std::optional<float> m_ScrollTo;
         bool m_Closed = false; // its close button was clicked

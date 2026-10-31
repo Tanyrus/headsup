@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
 #include <utility>
 
 namespace headsup
@@ -131,6 +132,15 @@ namespace headsup
     }
 
     bool RmlMenu::TakeDebugRequest() { return std::exchange(m_State.debugRequested, false); }
+    bool RmlMenu::TakeSetupBackup() { return std::exchange(m_State.setupBackup, false); }
+
+    void RmlMenu::StartSetup(const Settings& settings, bool rerun)
+    {
+        m_State.Leave();
+        m_State.setup = SetupRun{SetupStep::Welcome, rerun, false, settings};
+        m_ScrollTo    = 0.0f;
+        open          = true;
+    }
     bool RmlMenu::TakeWatchRequest() { return std::exchange(m_State.watchRequested, false); }
     bool RmlMenu::TakeReloadRequest() { return std::exchange(m_Reload, false); }
     bool RmlMenu::TakeExportRequest() { return std::exchange(m_State.exportRequested, false); }
@@ -212,7 +222,8 @@ namespace headsup
         m_Popup      = m_Document->GetElementById(kMenuPopupId);
         m_Tip        = m_Document->GetElementById(kMenuTipId);
         for (const Rml::EventId id : {Rml::EventId::Click, Rml::EventId::Change, Rml::EventId::Dragdrop, Rml::EventId::Dragend,
-                 Rml::EventId::Dragmove, Rml::EventId::Mouseover, Rml::EventId::Mousemove})
+                 Rml::EventId::Dragmove, Rml::EventId::Mouseover, Rml::EventId::Mousemove, Rml::EventId::Mousescroll,
+                 Rml::EventId::Dragstart, Rml::EventId::Drag})
             m_Document->AddEventListener(id, this);
         // On their way down: taking and losing the keyboard do not come back up, and a text box keeps its keys.
         for (const Rml::EventId id : {Rml::EventId::Focus, Rml::EventId::Blur, Rml::EventId::Keydown})
@@ -479,6 +490,13 @@ namespace headsup
             m_Events.push_back(FormEvent{named == m_Popup ? m_State.form.popup + kPopupGround : id, kClickEvent, {}});
             m_Tip->SetClass(kHiddenClass, true);
             break;
+        case Rml::EventId::Mousescroll:
+            if (named != nullptr && named->IsClassSet(kWheelClass))
+            {
+                m_Events.push_back(FormEvent{id, kWheelEvent, std::to_string(event.GetParameter<float>("wheel_delta_y", 0.0f))});
+                event.StopPropagation();
+            }
+            break;
         case Rml::EventId::Change:
             if (AsInput(target) != nullptr)
                 m_Events.push_back(FormEvent{id, kChangeEvent, event.GetParameter<Rml::String>("value", "")});
@@ -521,6 +539,29 @@ namespace headsup
                     input->Blur();
             }
             break;
+        case Rml::EventId::Dragstart:
+            if (named != nullptr && named->IsClassSet(kPanClass))
+                m_PanAt = {event.GetParameter<float>("mouse_x", 0.0f), event.GetParameter<float>("mouse_y", 0.0f)};
+            break;
+        case Rml::EventId::Drag:
+            if (named != nullptr && named->IsClassSet(kPanClass))
+            {
+                const Rml::Vector2f at{event.GetParameter<float>("mouse_x", 0.0f), event.GetParameter<float>("mouse_y", 0.0f)};
+                const Rml::Vector2f size = named->GetBox().GetSize(Rml::BoxArea::Content);
+                if (size.x <= 0.0f || size.y <= 0.0f) break;
+                Rml::Vector2f by = (at - m_PanAt) / size;
+                m_PanAt          = at;
+                // One event a pass, holding every move since the last.
+                if (!m_Events.empty() && m_Events.back().id == id && m_Events.back().type == kPanEvent)
+                {
+                    float across = 0.0f, down = 0.0f;
+                    std::sscanf(m_Events.back().value.c_str(), "%f %f", &across, &down);
+                    by += Rml::Vector2f(across, down);
+                    m_Events.pop_back();
+                }
+                m_Events.push_back(FormEvent{id, kPanEvent, std::to_string(by.x) + " " + std::to_string(by.y)});
+            }
+            break;
         case Rml::EventId::Dragdrop:
             if (auto* dragged = static_cast<Rml::Element*>(event.GetParameter<void*>("drag_element", nullptr));
                 dragged != nullptr && !LetGoOn(dragged, event))
@@ -530,7 +571,7 @@ namespace headsup
         {
             // Sent to what the drag is held over: told again only when that changes.
             auto* dragged = static_cast<Rml::Element*>(event.GetParameter<void*>("drag_element", nullptr));
-            if (dragged == nullptr) break;
+            if (dragged == nullptr || dragged->IsClassSet(kPanClass)) break;
             FormEvent held = DropOn(target, dragged, kDragOverEvent, event);
             if (LetGoOn(dragged, event)) held.id.clear();
             if (held.id == m_HeldOver.id && held.at == m_HeldOver.at) break;
@@ -539,6 +580,7 @@ namespace headsup
             break;
         }
         case Rml::EventId::Dragend:
+            if (target->IsClassSet(kPanClass)) break;
             if (!LetGoOn(target, event)) m_Events.push_back(FormEvent{id, kDragEndEvent, {}, {}});
             m_HeldOver = FormEvent{};
             m_Events.push_back(FormEvent{{}, kDragOverEvent, {}, {}});
@@ -575,17 +617,23 @@ namespace headsup
         const std::vector<std::string>& fonts, double version)
     {
         m_Layout = host.layout;
-        if (std::exchange(m_Closed, false)) open = false;
+        bool changed = false;
+        if (std::exchange(m_Closed, false))
+        {
+            open    = false;
+            changed = m_State.setup.has_value();
+            EndSetup(settings, m_State, false);
+            m_State.closeRequested = false;
+        }
         if (!open || host.context == nullptr)
         {
-            bool changed = false;
             if (m_Document != nullptr && m_Visible && host.context != nullptr)
             {
                 // A box that has the keyboard as the window goes gives it up and says what was typed in it, which a
                 // last pass takes with whatever else came this frame: the click on the close button comes after it.
                 if (Rml::Element* focus = host.context->GetFocusElement(); focus != nullptr && focus->GetOwnerDocument() == m_Document)
                     focus->Blur();
-                changed = Pass(std::exchange(m_Events, {}), host, settings, readings, fonts).changed;
+                changed |= Pass(std::exchange(m_Events, {}), host, settings, readings, fonts).changed;
                 m_Document->SetClass("open", false);
                 m_Document->Hide();
                 m_Visible = false;
@@ -665,6 +713,7 @@ namespace headsup
             events.erase(events.begin(), click);
         }
         const Form form = Pass(std::move(events), host, settings, readings, fonts);
+        if (std::exchange(m_State.closeRequested, false)) open = false;
         // A card built anew takes its boxes with it: the one that had the keyboard gets it back, where its caret was.
         std::string typingIn;
         int caret = 0;
@@ -674,7 +723,7 @@ namespace headsup
             input->GetSelection(&caret, nullptr, nullptr);
         }
 
-        const char* title = m_Layout->PageOf(m_State.page).name;
+        const char* title = m_State.setup ? m_Layout->WordOf(WindowWord::SetupTitle).name : m_Layout->PageOf(m_State.page).name;
         if (m_TitleShown != title)
         {
             m_PageTitle->SetInnerRML(EscapedRml(title));

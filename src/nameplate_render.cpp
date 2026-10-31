@@ -297,7 +297,7 @@ namespace headsup
         return true;
     }
 
-    void NameplateRenderer::Update(const Tracker& tracker, const GameNames& names, const NameHook& hook, const Settings& settings, float toX,
+    void NameplateRenderer::Update(const Tracker& tracker, const PlateScene& scene, const Settings& settings, float toX,
         float toY, const CursorTargets& targets, double now, uint16_t selfIndex, const std::vector<TimerLine>& selfTimers)
     {
         ++m_Frame;
@@ -306,8 +306,8 @@ namespace headsup
         m_CursorNames.clear();
         // m_Shown's entries are filled in place, so their lines' text keeps its room from frame to frame.
         size_t shownCount        = 0;
-        const float screenWidth  = names.BackBufferWidth();
-        const float screenHeight = names.BackBufferHeight();
+        const float screenWidth  = scene.width;
+        const float screenHeight = scene.height;
         // Cursors are drawn after every nameplate, so another name never covers one.
         std::vector<Quad> cursorQuads;
         int rank        = kPlainRank; // of the plate whose quads are being added
@@ -334,10 +334,10 @@ namespace headsup
         // Every plate but yours is sized by how far its owner is from you, with the camera's own distance behind you
         // added: unlike the game's name size, that changes smoothly as you walk and not at all as the camera turns.
         const ActorInfo* you     = tracker.FindIndex(selfIndex);
-        const NameFrame* ownName = hook.Drawn(selfIndex);
-        const float ownDepth     = ownName != nullptr ? NameFromFrame(*ownName, names.TargetScaleX(), names.TargetScaleY()).depth : 0.0f;
+        const std::optional<DrawnName> ownName = scene.nameOf(selfIndex, false);
+        const float ownDepth                   = ownName ? ownName->depth : 0.0f;
         const std::optional<float> cameraBack =
-            you != nullptr ? CameraBehind(ownDepth, names.SteadyCamera(), you->feet) : std::nullopt;
+            you != nullptr ? CameraBehind(ownDepth, scene.camera, you->feet) : std::nullopt;
         const float minScale        = static_cast<float>(settings.scaleMin) / kPercent;
         const float maxScale        = static_cast<float>(settings.scaleMax) / kPercent;
         const LineLook timerLook    = TimerLook(settings);
@@ -364,12 +364,11 @@ namespace headsup
             {
                 const ActorInfo* info = tracker.Find(actor);
                 if (info == nullptr) continue;
-                const NameFrame* frame = hook.Drawn(info->index);
-                if (frame == nullptr) continue;
-                const DrawnName gameName =
-                    NameFromFrame(*frame, names.TargetScaleX(), names.TargetScaleY(), info->index == targets.subTarget);
+                const std::optional<DrawnName> drawn = scene.nameOf(info->index, info->index == targets.subTarget);
+                if (!drawn) continue;
+                const DrawnName& gameName = *drawn;
                 // Checked where our name goes: a seated player's head can be in view with the game's name above the screen.
-                ScreenBox anchor = PlaceName(gameName.box, names.SteadyCamera(), info->feet, info->pose);
+                ScreenBox anchor = PlaceName(gameName.box, scene.camera, info->feet, info->pose);
                 if (!NameOnScreen(anchor, screenWidth, screenHeight)) continue;
                 // The game drawing the name this frame is all a plate's lines wait for.
                 ComposedPlate composed = ComposePlate(*info, tracker.Player(), settings, gameName.color);
@@ -620,8 +619,10 @@ namespace headsup
                     const float fit = FitOf(cursorShown, p.cursor.raster);
                     float top       = layout.cursor.y + CursorBob(now, cursorBox.height, settings.cursorFloat);
                     auto addCursor  = [&](const PlateTexture& cursor) {
-                        const CursorSpot kept = KeepOnScreen(CursorSpot{layout.cursor.x, top}, cursorBox.width, cursorBox.height,
-                            screenWidth, screenHeight, m_CoveredTop);
+                        const CursorSpot spot{layout.cursor.x, top};
+                        const CursorSpot kept = m_KeepCursors ? KeepOnScreen(spot, cursorBox.width, cursorBox.height, screenWidth,
+                                                                    screenHeight, m_CoveredTop)
+                                                              : spot;
                         addSquare(cursorQuads, cursor, kept.x, kept.y, fit, 0.0f);
                     };
                     // The cursor is no part of the nameplate: it stays whole however faint the plate is.
@@ -679,8 +680,10 @@ namespace headsup
             for (size_t q = s.cursors; q < s.cursorsEnd; ++q)
             {
                 GpuQuad& cursor = cursorQuads[q].gpu;
-                cursor.y = KeepOnScreen(CursorSpot{cursor.x, cursor.y - up}, cursor.width, cursor.height, screenWidth * toX,
-                    screenHeight * toY, m_CoveredTop * toY).y;
+                cursor.y -= up;
+                if (m_KeepCursors)
+                    cursor.y = KeepOnScreen(CursorSpot{cursor.x, cursor.y}, cursor.width, cursor.height, screenWidth * toX,
+                        screenHeight * toY, m_CoveredTop * toY).y;
             }
             // Drawn after the plate it belongs to, in the plate's rank and at its depth.
             if (const std::optional<PlateBox> line = StackLeader(s.centerX, s.box.bottom, p.rise, kStackLineWidth);

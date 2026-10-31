@@ -42,6 +42,7 @@ namespace headsup
     float NameSizeAtDepth(float depth);
     // A name's yalms from the camera, which its depth gives; NaN for a depth outside 0 to 1.
     float YalmsAtDepth(float depth);
+    float DepthAtYalms(float yalms);
     // toBackBuffer: back-buffer pixels per pixel of the image the game draws names into. The candidate of a sub-target
     // pick comes at full size, grown down from the same top: picked gives it the height its depth would, so its plate
     // stays where it was.

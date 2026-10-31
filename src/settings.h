@@ -183,6 +183,7 @@ namespace headsup
         bool stackNames        = false; // names HeadsUp draws that would cover each other rise over one another
         bool stackLine         = true;  // and a risen one has a line down to where it stood
         bool hideInEvent       = false; // no nameplate, HeadsUp's or the game's, while you are in a conversation
+        bool setupDone         = false; // Setup was finished, skipped or closed, and opens by itself no more
         bool debugMode         = false; // the HeadsUp Config page shows its readings and reports
         bool logging           = false; // with debugMode, notes go to a log of their own
         Color weakBadgeColor   = {{0.40f, 1.00f, 0.40f}};

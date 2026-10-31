@@ -3,6 +3,7 @@
 #include "form.h"
 #include "menu_state.h"
 #include "settings.h"
+#include "setup.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -46,6 +47,27 @@ namespace headsup
         bool all = false;
     };
 
+    // Setup while the window shows it: the step open, whether it is a run after the first (which warns, then starts
+    // from the defaults), whether it has started, and the settings as they were when it opened, which Skip and
+    // Cancel put back.
+    // How near the preview is, in percent: the whole scene, and each notch of the wheel over it.
+    constexpr int kLeastSetupZoom = 100, kMostSetupZoom = 300, kSetupZoomNotch = 25;
+    struct SetupRun
+    {
+        SetupStep step = SetupStep::Welcome;
+        bool rerun     = false;
+        bool started   = false;
+        Settings before;
+        int zoom = kLeastSetupZoom;
+        float panX = 0.0f, panY = 0.0f; // shares of the picture it is dragged across and down, as far as the zoom leaves room
+        int lineKind = 0, line = 0; // the Lines step's tabs: into kSetupLineKinds, and the line
+    };
+
+    // The settings file a run of Setup again copies the settings to first, named for when, and the picture Setup
+    // shows its preview in.
+    constexpr const char* kSetupBackupFile = "settings-before-setup-<date>-<time>.ini";
+    constexpr const char* kSetupPicture    = "hu:setup/scene";
+
     // What the settings window keeps between passes that is no setting.
     struct MenuFormState
     {
@@ -66,6 +88,9 @@ namespace headsup
         WindowFilter windows;
         std::optional<HelpMode> shiftsFor; // the Window Groups card's mode shown; none for the one the help is in
         DesignEditor design;
+        std::optional<SetupRun> setup; // Setup is shown in place of the pages
+        bool setupBackup    = false;   // a run again started: the settings file is to be copied first
+        bool closeRequested = false;   // Setup was skipped or cancelled, and the window closes
 
         // What a page was in the middle of is dropped when it is left, by another page or by the window closing: a
         // row waiting for a key would take one pressed for the game, and a reset asked once would wait armed.
@@ -77,6 +102,10 @@ namespace headsup
             shotKeyCapture = {};
         }
     };
+
+    // Setup ended, never to open by itself again: Finish keeps the picks, and Skip, Cancel or the window's close
+    // button put back the settings it opened with and close the window.
+    void EndSetup(Settings& s, MenuFormState& state, bool keep);
 
     // One pass of the window: the sidebar, then the open page's cards, as the layout orders and words them. fonts:
     // FontChoices, for the nameplates' and the bar's fonts. menuFonts: the fonts the window itself can be set in.

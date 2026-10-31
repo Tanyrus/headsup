@@ -21,18 +21,7 @@ namespace headsup
         constexpr const char* kJobJoin = "/";
         constexpr const char* kLevelWord = "Level "; // before a player's level known without their job
 
-        // Follows a chain of syncs to the line whose look is shown; a cycle leaves the line its own style.
-        const LineDesign& StyleLine(const KindSettings& kind, int line)
-        {
-            int at = line;
-            for (int hop = 0; hop < kPlateLines; ++hop)
-            {
-                const int other = kind.lines[at].syncWith;
-                if (other < 0 || other >= kPlateLines || other == at) return kind.lines[at];
-                at = other;
-            }
-            return kind.lines[line];
-        }
+        const LineDesign& StyleLine(const KindSettings& kind, int line) { return kind.lines[StyleLineOf(kind, line)]; }
 
         LineLook LookOf(const LineDesign& d, const EntityState& state, const Settings& s, uint32_t gameArgb)
         {

@@ -41,6 +41,9 @@ namespace headsup
     constexpr const char* kClickEvent  = "click";
     constexpr const char* kChangeEvent = "change"; // a slider moved, a text box typed in
     constexpr const char* kCommitEvent = "commit"; // a text box left by Enter or a click elsewhere, its text changed
+    constexpr const char* kWheelEvent  = "wheel";  // the wheel turned over an element of kWheelClass: notches, toward you above 0
+    // An element of kPanClass dragged: across and down, shares of its size, a space apart, summed since the last pass.
+    constexpr const char* kPanEvent    = "pan";
     constexpr const char* kCaretEvent  = "caret"; // a text box's caret as it loses the keyboard
     constexpr const char* kDropEvent   = "drop";
     // After the open control's id: a click on its popup that is on none of the popup's parts, which is neither a
@@ -69,6 +72,8 @@ namespace headsup
     constexpr const char* kCardCheck    = "check card-on"; // a card title's switch
     constexpr const char* kWordedCheck  = "check worded";  // a toggle among a row's controls that says its state
     constexpr const char* kPickedClass  = "picked";  // the chosen one of a row of choices
+    constexpr const char* kWheelClass   = "wheel";   // takes the wheel turned over it, which then scrolls nothing
+    constexpr const char* kPanClass     = "pan";     // a drag across it moves what it shows
     constexpr const char* kLineBoxClass = "linebox"; // a design line's box
     constexpr const char* kRunClass     = "run";     // a stretch of text in it
     constexpr const char* kTypingClass  = "typing";  // on a box while one of its stretches has the keyboard

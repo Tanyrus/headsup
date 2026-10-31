@@ -11,6 +11,7 @@
 #include "pointer_keys.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <initializer_list>
@@ -26,6 +27,8 @@ namespace headsup
         constexpr const char* kQuietChip   = "btn flat chip";
         constexpr const char* kResetPill   = "btn wash reset-all"; // a card's width, under the cards
         constexpr const char* kNavStart    = "nav-";
+        constexpr const char* kSetupPageKey = "setup", *kSetupButtons = "buttons";
+        constexpr int kNoOption = -1; // a choice whose settings no option holds
         constexpr const char* kWidgetChip  = "chip "; // a tray chip's name in its card, before its widget's number
         constexpr float kAddWindowShare    = 0.8f;    // of a dropdown's width: a group's "+ Add Window"
         constexpr size_t kMaxFindText      = 31;      // letters of a window's name to look for
@@ -899,6 +902,22 @@ namespace headsup
             form.EndLine();
         }
 
+        // A line's place: how far it stands off the next line, and across. False for any other row.
+        bool LinePlaceRow(Form& form, const LayoutRow& row, PlateKind kind, int n, const std::string& label, LineDesign& line)
+        {
+            switch (static_cast<LineStylesRow>(row.row))
+            {
+            case LineStylesRow::Padding:
+                form.SliderInt(label.c_str(), line.padding, kMinLinePadding, kMaxLinePadding, "%d px",
+                    n < kPlateLines - 1 ? TipOf(row, kind) : row.otherTip);
+                return true;
+            case LineStylesRow::HorizontalOffset:
+                form.SliderInt(label.c_str(), line.offset, kMinLineOffset, kMaxLineOffset, "%d px", TipOf(row, kind));
+                return true;
+            default: return false;
+            }
+        }
+
         // Every tab shows the same rows; a synced line's tab alone shows only its Sync row and what it uses.
         void LineStyles(Context& c, const LayoutSetting& e)
         {
@@ -964,11 +983,7 @@ namespace headsup
                     form.SliderPercent(label.c_str(), line.iconSize, kMinSizePercent, kMaxSizePercent, tip);
                     break;
                 case LineStylesRow::Padding:
-                    form.SliderInt(label.c_str(), line.padding, kMinLinePadding, kMaxLinePadding, "%d px", n < kPlateLines - 1 ? tip : row.otherTip);
-                    break;
-                case LineStylesRow::HorizontalOffset:
-                    form.SliderInt(label.c_str(), line.offset, kMinLineOffset, kMaxLineOffset, "%d px", tip);
-                    break;
+                case LineStylesRow::HorizontalOffset: LinePlaceRow(form, row, kind, n, label, line); break;
                 case LineStylesRow::TextColor: form.ColorPickRow(label.c_str(), line.color, sources, tip); break;
                 case LineStylesRow::ShadowStrength:
                     form.SliderPercent(label.c_str(), line.shadow, kMinShadow, kMaxShadow, tip);
@@ -1558,6 +1573,10 @@ namespace headsup
                 form.Fade(false);
                 form.SliderPercent(label.c_str(), s.menuOpacity, kMinMenuOpacity, kMaxOpacity, tip);
                 break;
+            case SettingPiece::RunSetup:
+                form.Fade(false);
+                if (form.Button(label.c_str(), label.c_str(), kResetPill, tip)) c.state.setup = SetupRun{SetupStep::Welcome, true, false, s};
+                break;
             case SettingPiece::ResetAllSettings: ResetAll(c, e); break;
             case SettingPiece::EnableHeadsup:
                 form.Fade(false);
@@ -1694,12 +1713,200 @@ namespace headsup
             default: break;
             }
         }
+
+        // Setup's choice as a dropdown of its options with their tips, Your Own while the settings hold none of them.
+        void SetupChoiceRow(Context& c, const SetupChoice& choice)
+        {
+            const std::span<const LayoutOption> options = c.layout.OptionsOf(choice.list);
+            const std::optional<size_t> held            = PickedOption(choice, c.s);
+            const int was = held ? static_cast<int>(*held) : kNoOption;
+            int picked    = was;
+            const auto name = [&](int i) { return i < 0 ? Words(Word(c, WindowWord::SetupCustom)) : Words(options[static_cast<size_t>(i)].name); };
+            const auto tip  = [&](int i) { return i < 0 ? Words(WordTip(c, WindowWord::SetupCustom)) : Words(options[static_cast<size_t>(i)].tip); };
+            c.form.NumberDropdown(Labeled(Word(c, choice.word), choice.key).c_str(), picked, 0, static_cast<int>(choice.options.size()) - 1, name,
+                WordTip(c, choice.word), 0.0f, tip);
+            if (picked == was || picked < 0) return;
+            choice.options[static_cast<size_t>(picked)].apply(c.s);
+            c.form.changed = true;
+        }
+
+        // The Lines step's places: a kind's tab and a line's, then where that line stands, which a line synced to
+        // another's style takes from that line.
+        void SetupLines(Context& c, SetupRun& run)
+        {
+            Form& form                  = c.form;
+            const LayoutSetting* styles = c.layout.SettingOf(SettingPiece::LineStyles);
+            if (styles == nullptr) return;
+            const std::vector<const char*> kinds = NamesOf(c.layout.OptionsOf(kSetupLineKindNames));
+            run.lineKind = form.Tabs("line kind", run.lineKind, kinds.data(), static_cast<int>(kinds.size()));
+            const auto lines = c.layout.OptionsOf(WindowList::PlateLines);
+            const std::vector<const char*> lineNames = NamesOf(lines);
+            run.line = form.Tabs("line", run.line, lineNames.data(), kPlateLines);
+            const PlateKind kind = kSetupLineKinds[run.lineKind];
+            KindSettings& k      = c.s.Kind(kind);
+            const int styled     = StyleLineOf(k, run.line);
+            if (styled != run.line)
+                form.Note(Filled(Said(Word(c, WindowWord::LineStylesUsesStyle)), kLineMark, Said(lines[static_cast<size_t>(styled)].name)).c_str());
+            const std::string scope = std::string(" ") + KindKey(kind) + std::to_string(styled);
+            for (const LayoutRow& row : c.layout.RowsOf(*styles))
+                LinePlaceRow(form, row, kind, styled, Labeled(NameOf(row, kind), row.key, scope), k.lines[styled]);
+        }
+
+        // The Widgets step: a switch for each widget, in groups.
+        void SetupWidgets(Context& c)
+        {
+            const std::span<const LayoutOption> groups  = c.layout.OptionsOf(kSetupWidgetGroupNames);
+            const std::span<const LayoutOption> widgets = c.layout.OptionsOf(WindowList::BarWidgets);
+            for (size_t g = 0; g < SetupWidgetGroups().size(); ++g)
+            {
+                c.form.Caption(Words(groups[g].name).c_str());
+                for (BarWidget widget : SetupWidgetGroups()[g].widgets)
+                {
+                    const LayoutOption& named = widgets[static_cast<size_t>(widget)];
+                    bool shown = Shown(c.s, widget);
+                    const bool was = shown;
+                    c.form.Switch(Labeled(named.name, "setup-widget-" + std::to_string(static_cast<int>(widget))).c_str(), shown, named.tip);
+                    if (shown == was) continue;
+                    SetWidgetShown(c.s, widget, shown);
+                    c.form.changed = true;
+                }
+            }
+        }
+
+
+        // A step's card: the warning of a run again, the preview, its choices and its settings.
+        void SetupStepCard(Context& c, const SetupPage& page)
+        {
+            Form& form    = c.form;
+            SetupRun& run = *c.state.setup;
+            if (run.rerun && !run.started)
+                form.Note((Words(Word(c, WindowWord::SetupWarning)) + ": " +
+                           Filled(Said(WordTip(c, WindowWord::SetupWarning)), kFileMark, kSetupBackupFile))
+                              .c_str());
+            form.Raw(std::string("<img class=\"") + kSetupPreviewClass + " " + kWheelClass + " " + kPanClass + "\" id=\"" +
+                     kSetupPreviewClass + "\" src=\"" + kSetupPicture + "\"/>");
+            if (const FormEvent* wheel = form.Took(kSetupPreviewClass, kWheelEvent))
+                run.zoom = std::clamp(run.zoom - static_cast<int>(std::lround(std::stof(wheel->value))) * kSetupZoomNotch, kLeastSetupZoom,
+                    kMostSetupZoom);
+            form.SliderPercent(Labeled(Word(c, WindowWord::SetupZoom), "zoom").c_str(), run.zoom, kLeastSetupZoom, kMostSetupZoom,
+                WordTip(c, WindowWord::SetupZoom));
+            if (const FormEvent* pan = form.Took(kSetupPreviewClass, kPanEvent))
+            {
+                float across = 0.0f, down = 0.0f;
+                std::sscanf(pan->value.c_str(), "%f %f", &across, &down);
+                run.panX += across;
+                run.panY += down;
+            }
+            // Zoomed z times, the picture can go (z - 1) / 2 of itself each way before the scene's edge comes in.
+            const float room = (static_cast<float>(run.zoom) / static_cast<float>(kLeastSetupZoom) - 1.0f) / 2.0f;
+            run.panX         = std::clamp(run.panX, -room, room);
+            run.panY         = std::clamp(run.panY, -room, room);
+            for (const SetupChoice& choice : page.choices)
+                SetupChoiceRow(c, choice);
+            for (const SettingPiece piece : page.settings)
+                if (const LayoutSetting* setting = c.layout.SettingOf(piece)) DrawSetting(c, *setting);
+            if (run.step == SetupStep::PlateLines) SetupLines(c, run);
+            if (run.step == SetupStep::Widgets) SetupWidgets(c);
+            form.EndCard();
+        }
+
+        // Where Setup is and the buttons that move through it, under its card, where folding the card leaves them.
+        void SetupButtons(Context& c)
+        {
+            Form& form      = c.form;
+            SetupRun& run   = *c.state.setup;
+            const int step  = static_cast<int>(run.step);
+            const bool last = step + 1 == kSetupSteps;
+            form.Fade(false); // a setting drawn above may have faded what follows it
+            form.BeginBare(Labeled(Word(c, WindowWord::SetupTitle), kSetupButtons).c_str());
+            form.Line();
+            const auto button = [&](WindowWord word, const char* id, const char* classes) {
+                return form.Button(Labeled(Word(c, word), id).c_str(), id, classes, WordTip(c, word));
+            };
+            const std::string count = Filled(Said(Word(c, WindowWord::SetupStep)), kCountMark, std::to_string(step + 1));
+            form.Caption(Filled(count, kTotalMark, std::to_string(kSetupSteps)).c_str());
+            bool finished = false, left = false;
+            if (!run.started)
+            {
+                if (button(WindowWord::SetupStart, "start", kAccentPill))
+                {
+                    c.state.setupBackup = run.rerun;
+                    run.started      = true;
+                    run.step         = SetupStep::Theme;
+                    form.scrollToTop = true;
+                }
+            }
+            else
+            {
+                if (step > 0 && button(WindowWord::SetupBack, "back", kRaisedPill))
+                {
+                    run.step         = static_cast<SetupStep>(step - 1);
+                    form.scrollToTop = true;
+                }
+                if (!last && button(WindowWord::SetupNext, "next", kAccentPill))
+                {
+                    run.step         = static_cast<SetupStep>(step + 1);
+                    form.scrollToTop = true;
+                }
+                finished = last && button(WindowWord::SetupFinish, "finish", kAccentPill);
+            }
+            left = !finished && button(run.rerun ? WindowWord::SetupCancel : WindowWord::SetupSkip, "leave", kRaisedPill);
+            form.EndLine();
+            form.EndCard();
+            if (!finished && !left) return;
+            EndSetup(c.s, c.state, finished);
+            form.changed     = true;
+            form.scrollToTop = true;
+        }
+
+        // Setup in place of the pages: its steps in the sidebar, then the step open and the buttons under it.
+        void BuildSetup(Context& c)
+        {
+            Form& form    = c.form;
+            SetupRun& run = *c.state.setup;
+            form.BeginBlock(kSidebarBlock);
+            for (const SetupPage& page : SetupPages())
+            {
+                const std::string id = kNavStart + std::string("setup-") + page.key;
+                if (run.started && form.Clicked(id) && run.step != page.step)
+                {
+                    run.step         = page.step;
+                    form.scrollToTop = true;
+                    c.state.form.popup.clear();
+                }
+                form.Raw("<div class=\"nav\" id=\"" + id + "\">" + EscapedRml(Words(Word(c, page.word))) + "</div>");
+            }
+            for (const SetupPage& page : SetupPages())
+                form.Set(kNavStart + std::string("setup-") + page.key, FormValueKind::Class, kPickedClass, {}, page.step == run.step);
+
+            form.pageKey          = kSetupPageKey;
+            const SetupPage& page = SetupPageOf(run.step);
+            if (form.BeginCard(Labeled(Word(c, page.word), page.key).c_str(), nullptr, WordTip(c, page.word))) SetupStepCard(c, page);
+            SetupButtons(c);
+        }
+    }
+
+    void EndSetup(Settings& s, MenuFormState& state, bool keep)
+    {
+        if (!state.setup) return;
+        if (!keep) s = state.setup->before;
+        s.setupDone          = true;
+        state.closeRequested = !keep;
+        state.setup.reset();
+        state.page = Page::Entities;
     }
 
     void BuildMenu(Form& form, Settings& s, const MenuReadings& readings, MenuFormState& state,
         const std::vector<std::string>& fonts, const std::vector<std::string>& menuFonts, const WindowLayout& layout)
     {
         form.layout = &layout;
+        if (state.setup)
+        {
+            Context c{form, s, readings, state, fonts, menuFonts, layout, std::nullopt};
+            BuildSetup(c);
+            s = Clamp(s);
+            return;
+        }
         if (KindOfPage(state.page) && !KindPagesShown(s))
         {
             state.Leave();

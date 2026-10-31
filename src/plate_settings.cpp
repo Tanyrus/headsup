@@ -85,6 +85,18 @@ namespace headsup
         return kinds;
     }
 
+    int StyleLineOf(const KindSettings& kind, int line)
+    {
+        int at = line;
+        for (int hop = 0; hop < kPlateLines; ++hop)
+        {
+            const int other = kind.lines[at].syncWith;
+            if (other < 0 || other >= kPlateLines || other == at) return at;
+            at = other;
+        }
+        return line;
+    }
+
     int RowCountOf(PlateKind kind)
     {
         switch (kind)

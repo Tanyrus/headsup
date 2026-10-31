@@ -173,9 +173,9 @@ namespace
 
         // Presses the left button on one control and lets it go on another, or that far from the first.
         bool Drag(const std::string& from, const std::string& onto) { return Drag(from, Center(onto) - Center(from)); }
-        bool Drag(const std::string& from, Rml::Vector2f by)
+        bool Drag(const std::string& from, Rml::Vector2f by) { return DragFrom(Center(from), by); }
+        bool DragFrom(Rml::Vector2f start, Rml::Vector2f by)
         {
-            const Rml::Vector2f start = Center(from);
             m_Host.context->ProcessMouseMove(static_cast<int>(start.x), static_cast<int>(start.y), 0);
             bool changed = Frames();
             m_Host.context->ProcessMouseButtonDown(kLeftButton, 0);
@@ -187,6 +187,15 @@ namespace
             }
             m_Host.context->ProcessMouseButtonUp(kLeftButton, 0);
             return Frames(3) || changed;
+        }
+        // Turns the wheel over a control, notches toward you (down the page) or away below 0.
+        void Wheel(const std::string& over, float notches)
+        {
+            const Rml::Vector2f at = Center(over);
+            m_Host.context->ProcessMouseMove(static_cast<int>(at.x), static_cast<int>(at.y), 0);
+            Frames();
+            m_Host.context->ProcessMouseWheel(notches, 0);
+            Frames(2);
         }
         // Presses the left button on one control and holds it over another, until Release.
         void HoldOver(const std::string& from, const std::string& onto, Rml::Vector2f nudge = {})
@@ -1239,6 +1248,23 @@ TEST(the_window_is_kept_where_it_is_dragged_by_its_title)
     CHECK_EQ(window.settings.menuX, static_cast<int>((test::RmlSession::kWidth - window.settings.menuWidth) / 2) - 120);
 }
 
+TEST(the_window_moves_from_its_very_top_edge_and_corner)
+{
+    Window window;
+    window.Frames(30); // past its opening, which scales it
+    Rml::Element* body = window.Find("title")->GetOwnerDocument();
+    // Just under the top edge over the title, then just inside the top left corner.
+    for (const bool corner : {false, true})
+    {
+        const Rml::Vector2f edge = body->GetAbsoluteOffset(Rml::BoxArea::Border);
+        const Rml::Vector2f was  = window.Center("title");
+        window.DragFrom(corner ? edge + Rml::Vector2f(4.0f, 4.0f) : Rml::Vector2f(was.x, edge.y + 3.0f), Rml::Vector2f(-60.0f, 30.0f));
+        const Rml::Vector2f now = window.Center("title");
+        CHECK(std::abs(now.x - was.x + 60.0f) < 0.01f);
+        CHECK(std::abs(now.y - was.y - 30.0f) < 0.01f);
+    }
+}
+
 TEST(a_narrow_window_cuts_a_rows_label_and_keeps_its_controls_beside_it)
 {
     auto top    = [](Rml::Element* element) { return element->GetAbsoluteOffset(Rml::BoxArea::Border).y; };
@@ -1879,4 +1905,259 @@ TEST(every_widget_tab_shows_its_whole_name_however_many_copies_there_are)
         }
         CHECK(tabs >= kPlacedWidgetCount);
     }
+}
+
+namespace
+{
+    // The settings window opened on Setup, as a new install or a player running it again opens it.
+    struct SetupWindow : Window
+    {
+        explicit SetupWindow(bool rerun, Settings start = {})
+        {
+            settings = start;
+            menu.StartSetup(settings, rerun);
+            Frames(2);
+        }
+    };
+}
+
+TEST(setup_opens_on_its_welcome_and_start_walks_its_steps_forward_and_back)
+{
+    SetupWindow window(false);
+    CHECK(window.menu.InSetup());
+    CHECK(window.Shows("nav-setup-welcome") && window.Find("nav-setup-welcome")->IsClassSet(kPickedClass));
+    CHECK(window.Shows("setup-preview"));
+    window.Click("setup-buttons-start");
+    CHECK(window.Find("nav-setup-theme")->IsClassSet(kPickedClass));
+    window.Click("setup-buttons-next");
+    CHECK(window.Shows("setup-fonts"));
+    window.Click("setup-buttons-back");
+    CHECK(window.Shows("setup-theme"));
+    window.Click("nav-setup-widgets");
+    CHECK(window.Shows("setup-widgets"));
+    CHECK(window.settings == Settings{});
+    CHECK_EQ(window.Said(), "");
+}
+
+TEST(a_setup_steps_list_moves_nowhere_before_it_has_started)
+{
+    SetupWindow window(true);
+    window.Click("nav-setup-widgets");
+    CHECK(window.Find("nav-setup-welcome")->IsClassSet(kPickedClass));
+}
+
+TEST(a_pick_in_setup_changes_the_settings_at_once)
+{
+    SetupWindow window(false);
+    window.Click("setup-buttons-start");
+    window.Click("setup-theme-theme");
+    CHECK(window.Click("setup-theme-theme-o-1"));
+    CHECK(window.settings.barTheme == BarTheme::UmbraDark);
+}
+
+TEST(skipping_setup_puts_back_its_defaults_closes_the_window_and_counts_it_done)
+{
+    SetupWindow window(false);
+    window.Click("setup-buttons-start");
+    window.Click("setup-theme-theme");
+    window.Click("setup-theme-theme-o-4");
+    window.Click("setup-buttons-leave");
+    window.Frames(2);
+    CHECK(!window.menu.open && !window.menu.InSetup());
+    Settings expected;
+    expected.setupDone = true;
+    CHECK(window.settings == expected);
+}
+
+TEST(running_setup_again_keeps_your_settings_saves_first_and_cancel_puts_back_what_was)
+{
+    Settings mine;
+    mine.barTheme = BarTheme::Aurora;
+    mine.autoCheck = true;
+    mine.setupDone = true;
+    SetupWindow window(true, mine);
+    CHECK(!window.menu.TakeSetupBackup());
+    window.Click("setup-buttons-start");
+    CHECK(window.menu.TakeSetupBackup());
+    CHECK(window.settings == mine);
+    // The theme step shows the theme you have.
+    const std::string aurora(Said(kWindowLayout.OptionsOf(WindowList::SetupTheme)[static_cast<size_t>(BarTheme::Aurora)].name));
+    CHECK(window.Find("setup-theme-theme")->GetInnerRML().find(aurora) != std::string::npos);
+    window.Click("setup-theme-theme");
+    window.Click("setup-theme-theme-o-1");
+    CHECK(window.settings.barTheme == BarTheme::UmbraDark && window.settings.autoCheck);
+    window.Click("setup-buttons-leave");
+    window.Frames(2);
+    CHECK(window.settings == mine);
+    CHECK(!window.menu.open);
+}
+
+TEST(setups_preview_zooms_by_the_wheel_over_it_and_by_its_slider)
+{
+    SetupWindow window(false);
+    window.Click("setup-buttons-start");
+    window.Frames(30); // past the window's opening
+    CHECK_EQ(window.menu.SetupShown()->zoom, kLeastSetupZoom);
+    Rml::Element* scrolled = window.Find("page");
+    window.PointAt(kSetupPreviewClass); // which scrolls it into view first
+    const float top = scrolled->GetScrollTop();
+    window.Wheel(kSetupPreviewClass, -1.0f);
+    CHECK_EQ(window.menu.SetupShown()->zoom, kLeastSetupZoom + kSetupZoomNotch);
+    CHECK_EQ(scrolled->GetScrollTop(), top); // the page stays where it was
+    window.Wheel(kSetupPreviewClass, 3.0f);
+    CHECK_EQ(window.menu.SetupShown()->zoom, kLeastSetupZoom); // not out past the whole picture
+    for (int i = 0; i < 20; ++i)
+        window.Wheel(kSetupPreviewClass, -1.0f);
+    CHECK_EQ(window.menu.SetupShown()->zoom, kMostSetupZoom);
+    CHECK(window.Shows("setup-theme-zoom"));
+    CHECK(window.settings == Settings{}); // the picture's, not a setting
+}
+
+TEST(finishing_setup_keeps_the_picks_and_leaves_the_window_on_its_pages)
+{
+    SetupWindow window(false);
+    window.Click("setup-buttons-start");
+    window.Click("setup-theme-theme");
+    window.Click("setup-theme-theme-o-1");
+    window.Click("nav-setup-mouse-extras");
+    window.Click("setup-buttons-finish");
+    window.Frames(2);
+    CHECK(window.menu.open && !window.menu.InSetup());
+    CHECK(window.settings.barTheme == BarTheme::UmbraDark && window.settings.setupDone);
+    CHECK(window.Shows("entities-nameplates"));
+}
+
+TEST(closing_the_window_during_setup_is_skipping_it)
+{
+    SetupWindow window(false);
+    window.Click("setup-buttons-start");
+    window.Click("setup-theme-theme");
+    window.Click("setup-theme-theme-o-1");
+    window.Click(kMenuCloseId);
+    CHECK(!window.menu.InSetup());
+    CHECK(window.settings.barTheme == BarTheme::PhoenixGold && window.settings.setupDone);
+}
+
+TEST(setups_widgets_step_turns_a_widget_on_and_off)
+{
+    SetupWindow window(false);
+    window.Click("setup-buttons-start");
+    window.Click("nav-setup-widgets");
+    const std::string party = "setup-widgets-setup-widget-" + std::to_string(static_cast<int>(BarWidget::Party));
+    CHECK(window.Shows(party));
+    CHECK(window.Click(party));
+    CHECK(Shown(window.settings, BarWidget::Party));
+}
+
+TEST(run_setup_on_the_config_page_opens_setup_as_a_run_again)
+{
+    Window window;
+    window.Page("configmenu");
+    CHECK(!window.Click("configmenu-reset-run-setup"));
+    CHECK(window.menu.InSetup());
+    CHECK(window.Shows("nav-setup-welcome"));
+}
+
+TEST(every_setup_step_builds_in_every_theme_without_a_complaint)
+{
+    for (int theme = 0; theme < kBarThemeCount; ++theme)
+    {
+        Settings start;
+        start.barTheme = static_cast<BarTheme>(theme);
+        SetupWindow window(false, start);
+        window.Click("setup-buttons-start");
+        for (const SetupPage& page : SetupPages())
+        {
+            window.Click(std::string("nav-setup-") + page.key);
+            CHECK(window.Shows(std::string("setup-") + page.key));
+        }
+        CHECK_EQ(window.Said(), "");
+    }
+}
+
+TEST(a_folded_setup_step_keeps_its_buttons)
+{
+    SetupWindow window(false);
+    window.Click("setup-welcome-head"); // folds the step's card
+    window.Click("setup-buttons-start");
+    CHECK(window.Find("nav-setup-theme")->IsClassSet(kPickedClass));
+    window.Click("setup-theme-head");
+    window.Click("setup-buttons-next");
+    CHECK(window.Find("nav-setup-fonts")->IsClassSet(kPickedClass));
+}
+
+TEST(a_choice_the_settings_hold_none_of_reads_your_own)
+{
+    Settings mine;
+    mine.outlineThickness = 135; // between Thin, Normal and Thick
+    SetupWindow window(false, mine);
+    window.Click("setup-buttons-start");
+    window.Click("nav-setup-outlines");
+    const std::string shown = window.Find("setup-outlines-outline-thickness")->GetInnerRML();
+    CHECK(shown.find(kWindowLayout.WordOf(WindowWord::SetupCustom).name) != std::string::npos);
+    window.Click("setup-outlines-outline-thickness");
+    window.Click("setup-outlines-outline-thickness-o-2");
+    CHECK_EQ(window.settings.outlineThickness, 200);
+}
+
+TEST(setups_lines_step_moves_one_line_of_a_kinds_nameplate_up_and_across)
+{
+    SetupWindow window(false);
+    window.Click("setup-buttons-start");
+    window.Click("nav-setup-plate-lines");
+    window.Click("setup-plate-lines-line-kind-t-1"); // players
+    window.Click("setup-plate-lines-line-t-1");      // the middle line
+    window.Drag("setup-plate-lines-padding-players1", Rml::Vector2f(80.0f, 0.0f));
+    window.Drag("setup-plate-lines-horizontal-offset-players1", Rml::Vector2f(80.0f, 0.0f));
+    const KindSettings& players = window.settings.Kind(PlateKind::Players);
+    CHECK(players.lines[kMiddleLine].padding > 0 && players.lines[kMiddleLine].offset > 0);
+    KindSettings expected = Settings{}.Kind(PlateKind::Players);
+    expected.lines[kMiddleLine].padding = players.lines[kMiddleLine].padding;
+    expected.lines[kMiddleLine].offset  = players.lines[kMiddleLine].offset;
+    CHECK(players == expected);
+    CHECK(window.settings.Kind(PlateKind::Mobs) == Settings{}.Kind(PlateKind::Mobs));
+    CHECK_EQ(window.Said(), "");
+}
+
+TEST(setups_lines_step_moves_the_line_a_synced_line_takes_its_style_from)
+{
+    Settings start;
+    start.Kind(PlateKind::Mobs).lines[kTopLine].syncWith = kMiddleLine;
+    SetupWindow window(false, start);
+    window.Click("setup-buttons-start");
+    window.Click("nav-setup-plate-lines");
+    window.Drag("setup-plate-lines-padding-mobs1", Rml::Vector2f(80.0f, 0.0f));
+    CHECK(window.settings.Kind(PlateKind::Mobs).lines[kMiddleLine].padding > 0);
+    CHECK_EQ(window.settings.Kind(PlateKind::Mobs).lines[kTopLine].padding, 0);
+}
+
+TEST(setups_welcome_fits_the_window_at_its_default_size_without_scrolling)
+{
+    SetupWindow window(false);
+    window.Frames(30); // past the window's opening
+    Rml::Element* page = window.Find("page");
+    CHECK(page->GetScrollHeight() <= page->GetClientHeight() + 0.5f);
+}
+
+TEST(dragging_setups_preview_pans_it_as_far_as_its_zoom_leaves_room)
+{
+    SetupWindow window(false);
+    window.Click("setup-buttons-start");
+    window.Frames(30); // past the window's opening
+    window.Drag(kSetupPreviewClass, Rml::Vector2f(60.0f, 30.0f));
+    const SetupRun& run = *window.menu.SetupShown();
+    CHECK_EQ(run.panX, 0.0f); // the whole scene shows: nowhere to move it
+    CHECK_EQ(run.panY, 0.0f);
+    for (int i = 0; i < 4; ++i)
+        window.Wheel(kSetupPreviewClass, -1.0f); // 200 percent
+    const float wide = window.Find(kSetupPreviewClass)->GetBox().GetSize(Rml::BoxArea::Content).x;
+    window.Drag(kSetupPreviewClass, Rml::Vector2f(wide * 0.2f, 0.0f));
+    CHECK(std::abs(run.panX - 0.2f) < 0.02f && std::abs(run.panY) < 0.02f);
+    window.Drag(kSetupPreviewClass, Rml::Vector2f(-wide * 0.9f, 0.0f));
+    CHECK(std::abs(run.panX + 0.5f) < 0.001f); // half the picture each way at twice as near
+    // Zoomed back out, it comes back within what is left.
+    for (int i = 0; i < 4; ++i)
+        window.Wheel(kSetupPreviewClass, 1.0f);
+    CHECK_EQ(run.panX, 0.0f);
+    CHECK(window.settings == Settings{});
 }

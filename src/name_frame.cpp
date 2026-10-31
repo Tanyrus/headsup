@@ -82,6 +82,8 @@ namespace headsup
         return depth > 0.0f && depth < 1.0f ? kNearPlane / (1.0f - depth) : std::nanf("");
     }
 
+    float DepthAtYalms(float yalms) { return 1.0f - kNearPlane / yalms; }
+
     float NameSizeAtDepth(float depth)
     {
         const float yalms = YalmsAtDepth(depth);

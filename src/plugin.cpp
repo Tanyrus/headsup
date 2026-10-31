@@ -44,6 +44,9 @@
 #include "window_skin.h"
 #include "linuxxi_report.h"
 #include "memory_query.h"
+#include "model_file.h"
+#include "setup_preview.h"
+#include "setup.h"
 #ifdef HEADSUP_DEV
 #include "codedump.h"
 #include "drawdump.h"
@@ -382,6 +385,11 @@ class HeadsUp final : public IPlugin
     std::optional<DWORD> m_QuadStates; // the bar's (RecordQuadStates), freed at unload
     bool m_QuadStatesTried = false;
     IDirect3DDevice8* m_Device = nullptr;
+    headsup::SetupPreview m_SetupPreview;
+    // The game's tables of where its files are and of players' models, read when Setup's preview first wants a model.
+    std::optional<headsup::FileTables> m_FileTables;
+    std::optional<headsup::PlayerTables> m_PlayerTables;
+    bool m_OfferSetup = false; // the settings file was missing at load: Setup opens once the player is in game
     headsup::CursorTargets m_CursorTargets;
     float m_MenuWidth   = 0.0f;
     // The windows the hook moves, as last given it (none until the first frame), and those it has seen.
@@ -510,6 +518,7 @@ public:
         m_Fonts.Wait();
         m_Search.Stop();
         m_Nameplates.Release();
+        m_SetupPreview.Release();
         UnhookPresent();
         UnhookReset();
         g_Plugin = nullptr;
@@ -536,6 +545,7 @@ public:
         m_Outline.SetDevice(device);
         m_Names.SetDevice(device);
         m_Nameplates.SetDevice(device);
+        m_SetupPreview.SetDevice(device);
         m_NameHook.SetDevice(device);
         return true;
     }
@@ -584,6 +594,8 @@ public:
             SetScreenshot(!m_Screenshot);
         else if (args[1] == "debug")
             m_DebugPending = true;
+        else if (args[1] == "setup")
+            m_RmlMenu.StartSetup(m_Settings, true);
         else if (args[1] == "rml")
         {
             if (!m_Rml.Running())
@@ -677,6 +689,7 @@ public:
             Print("/hu on | /hu off: turn all of HeadsUp (outlines, nameplates, the top panel and the rest) on or off");
             Print("/hu screenshot: hide every name, HeadsUp's bar and menu and every addon window until it is run again; bind it with /bind");
             Print("/hu debug: write what every outline and nameplate show to logs/headsup");
+            Print("/hu setup: walk through the main settings again, with a preview of each");
             Print("/hu menu <page>: open the settings at a page, such as entities, mobs or toppanel");
             Print("/hu popup <widget> | off: pin a widget's popup open, such as zone or vanatime");
             Print("/hu windowlog [stop]: write which game windows are open, as it changes, to logs/headsup/windows.log");
@@ -692,7 +705,7 @@ public:
         }
     }
 
-    // The only chat line HeadsUp keeps out: the checker addon's report of a check HeadsUp made by itself.
+    // The only chat lines HeadsUp keeps out: the checker and simplelog addons' reports of a check HeadsUp made by itself.
     bool HandleIncomingText(int32_t mode, bool indent, const char* message, int32_t* modifiedMode, bool* modifiedIndent,
         char* modifiedMessage, bool injected, bool blocked) override
     {
@@ -924,6 +937,12 @@ public:
         g_SyncClicks = m_Settings.enabled && m_Settings.fixPointer;
         if (m_Rml.Running())
         {
+            if (m_OfferSetup && loginStatus == headsup::kLoginInGame && !m_Player.inEvent &&
+                m_AshitaCore->GetMemoryManager()->GetPlayer()->GetIsZoning() == 0)
+            {
+                m_OfferSetup = false;
+                if (!m_Settings.setupDone) m_RmlMenu.StartSetup(m_Settings, false);
+            }
             const headsup::NameStats names = m_NameHook.Stats();
             if (m_RmlMenu.open) m_WindowPlaces = m_WindowHook.Places();
             const headsup::MenuReadings readings{
@@ -965,6 +984,7 @@ public:
                 SayGameFontFailure();
             }
             if (m_RmlMenu.TakeDebugRequest()) m_DebugPending = true;
+            if (m_RmlMenu.TakeSetupBackup()) BackUpSettings();
 #ifdef HEADSUP_DEV
             if (m_RmlMenu.TakeWatchRequest())
             {
@@ -1252,7 +1272,13 @@ private:
             return;
         }
         m_Nameplates.SetCoveredTop(g_BarOn && !g_BarHidden ? m_RmlBar.BarBottomNow() : 0.0f);
-        m_Nameplates.Update(m_Tracker, m_Names, m_NameHook, m_Settings, toX, toY, m_CursorTargets, Now(), m_SelfIndex, m_TimerLines);
+        const headsup::PlateScene scene{m_Names.BackBufferWidth(), m_Names.BackBufferHeight(), m_Names.SteadyCamera(),
+            [&](uint16_t index, bool picked) -> std::optional<headsup::DrawnName> {
+                const headsup::NameFrame* frame = m_NameHook.Drawn(index);
+                if (frame == nullptr) return std::nullopt;
+                return headsup::NameFromFrame(*frame, m_Names.TargetScaleX(), m_Names.TargetScaleY(), picked);
+            }};
+        m_Nameplates.Update(m_Tracker, scene, m_Settings, toX, toY, m_CursorTargets, Now(), m_SelfIndex, m_TimerLines);
         m_Nameplates.Draw(depthTest);
         m_PlatesPlaced = true;
     }
@@ -1380,6 +1406,100 @@ private:
         return std::nullopt;
     }
 
+    // A model of the game's, read from its files through its tables of where they are. None, saying why, when it
+    // cannot be.
+    std::optional<headsup::ModelFile> ReadModelFiles(const std::vector<uint32_t>& files, std::string& failure)
+    {
+        headsup::ModelFile model;
+        for (uint32_t id : files)
+        {
+            const auto file = headsup::DatFileOf(*m_FileTables, id);
+            if (!file)
+            {
+                failure = "the game's tables have no file " + std::to_string(id);
+                return std::nullopt;
+            }
+            const auto bytes = GameFileBytes(*file, failure);
+            if (!bytes) return std::nullopt;
+            headsup::Read<headsup::ModelFile> read = headsup::ReadModelFile(*bytes);
+            if (!read.value)
+            {
+                failure += read.failure;
+                return std::nullopt;
+            }
+            headsup::AddModelFile(model, std::move(*read.value));
+        }
+        return model;
+    }
+
+    bool ReadFileTables(std::string& failure)
+    {
+        if (m_FileTables) return true;
+        headsup::FileTables tables;
+        for (int folder = 1; folder <= headsup::kRomFolders; ++folder)
+        {
+            auto vtable = GameFileBytes(headsup::VTableFile(folder), failure);
+            auto ftable = GameFileBytes(headsup::FTableFile(folder), failure);
+            if (!vtable || !ftable) return false;
+            tables[static_cast<size_t>(folder - 1)] = {std::move(*vtable), std::move(*ftable)};
+        }
+        m_FileTables = std::move(tables);
+        return true;
+    }
+
+    std::optional<headsup::ModelFile> ReadNpcModel(uint16_t model, std::string& failure)
+    {
+        if (!ReadFileTables(failure)) return std::nullopt;
+        return ReadModelFiles({headsup::NpcModelFileId(model)}, failure);
+    }
+
+    std::optional<headsup::ModelFile> ReadPlayerModel(const headsup::PlayerLook& look, std::string& failure)
+    {
+        if (!ReadFileTables(failure)) return std::nullopt;
+        if (!m_PlayerTables)
+        {
+            const auto dll = GameFileBytes(headsup::kGameModule, failure);
+            if (!dll) return std::nullopt;
+            m_PlayerTables = headsup::FindPlayerTables(*dll);
+            if (!m_PlayerTables)
+            {
+                failure = "the game's tables of player models were not found in " + std::string(headsup::kGameModule);
+                return std::nullopt;
+            }
+        }
+        const auto files = headsup::PlayerFileIds(*m_PlayerTables, look);
+        if (!files)
+        {
+            failure = "the files of a look were not found";
+            return std::nullopt;
+        }
+        return ReadModelFiles(*files, failure);
+    }
+
+    // Your look as the game has it now, for Setup's preview to draw you.
+    headsup::PlayerLook OwnLook()
+    {
+        IEntity* e       = m_AshitaCore->GetMemoryManager()->GetEntity();
+        const uint32_t i = m_SelfIndex;
+        return {headsup::FaceAndRace(static_cast<uint8_t>(e->GetLookHair(i)), e->GetRace(i)), e->GetLookHead(i), e->GetLookBody(i),
+            e->GetLookHands(i), e->GetLookLegs(i), e->GetLookFeet(i), e->GetLookMain(i), e->GetLookSub(i), e->GetLookRanged(i)};
+    }
+
+    // Setup's preview drawn for the step open, before the window that shows it.
+    void DrawSetupPreview()
+    {
+        const char* name = m_AshitaCore->GetMemoryManager()->GetEntity()->GetName(m_SelfIndex);
+        const headsup::SetupPreview::Readers read{
+            [this](uint16_t model, std::string& failure) { return ReadNpcModel(model, failure); },
+            [this](const headsup::PlayerLook& look, std::string& failure) { return ReadPlayerModel(look, failure); }};
+        WithSavedState([&] {
+            const headsup::SetupRun& run = *m_RmlMenu.SetupShown();
+            m_SetupPreview.Render(m_Settings, run.step, run.zoom, run.panX, run.panY, Now(), name != nullptr ? name : "", OwnLook(), read);
+        });
+        if (const std::string failure = m_SetupPreview.TakeFailure(); !failure.empty())
+            Print("Setup's preview could not draw the game's models (" + failure + "). The rest of Setup works without it.");
+    }
+
     // The font the game writes its names in and the pearl it draws before them.
     void ReadGameFont()
     {
@@ -1405,6 +1525,7 @@ private:
             return;
         }
         m_GameFontFailure.clear();
+        m_SetupPreview.Plates().SetGameFont(font.value);
         m_Nameplates.SetGameFont(std::move(font.value));
     }
 
@@ -1447,8 +1568,10 @@ private:
     {
         if (!m_GamePearl || m_PearlOutlineDrawn == m_Settings.pearlOutline) return;
         m_PearlOutlineDrawn = m_Settings.pearlOutline;
-        m_Nameplates.SetGamePearl(
-            headsup::GameLitPearl(*m_GamePearl, headsup::IconImage(headsup::Icon::Linkshell), m_Settings.pearlOutline));
+        std::vector<unsigned char> lit =
+            headsup::GameLitPearl(*m_GamePearl, headsup::IconImage(headsup::Icon::Linkshell), m_Settings.pearlOutline);
+        m_SetupPreview.Plates().SetGamePearl(lit);
+        m_Nameplates.SetGamePearl(std::move(lit));
     }
 
     // Once, when a nameplate is set in the game's font and it could not be read.
@@ -1659,12 +1782,17 @@ private:
         g_PresentSlot = nullptr;
     }
 
-    void BeforeReset() { m_Rml.ReleaseLayers(); }
+    void BeforeReset()
+    {
+        m_Rml.ReleaseLayers();
+        m_SetupPreview.ReleaseTarget();
+    }
 
     // RmlUi's overlay (the popups and the settings window), over every ImGui window: in a scene of its own.
     void DrawOverGui()
     {
         if (m_Device == nullptr || FAILED(m_Device->BeginScene())) return;
+        if (m_Rml.Running() && !m_Screenshot && m_RmlMenu.open && m_RmlMenu.SetupShown() != nullptr) DrawSetupPreview();
         if (m_Rml.Running() && !m_Screenshot) WithQuadStates([&] { m_Rml.RenderOverlay(); });
         m_Device->EndScene();
     }
@@ -1859,6 +1987,9 @@ private:
                 return headsup::HostImage(name);
             });
         if (!started) Print("RmlUi did not start: the top panel and the settings window are off until HeadsUp reloads.");
+        else
+            m_Rml.SetLivePicture(headsup::kSetupPicture, headsup::SetupPreview::kWidth, headsup::SetupPreview::kHeight,
+                [this] { return m_SetupPreview.Picture(); });
     }
 
 
@@ -2014,6 +2145,7 @@ private:
         m_CursorFileRead = m_Settings.cursorFile;
         std::optional<headsup::Image> picture = headsup::CursorFilePicture(CursorFileFrames(m_Settings.cursorFile));
         if (!picture) Note("could not read the cursor " + m_Settings.cursorFile + " in " + CursorsFolder() + "; the feather stands in for it");
+        m_SetupPreview.Plates().SetCursorFile(picture);
         m_Nameplates.SetCursorFile(std::move(picture));
     }
 
@@ -2053,7 +2185,8 @@ private:
         // Ashita keeps a loaded file's values after the plugin unloads: without this, a file deleted since would load
         // as it was. A missing file is fine: every value keeps its default.
         config->Delete(kConfigAlias);
-        if (!config->Load(kConfigAlias, SettingsPath().c_str()) && GetFileAttributesA(file.c_str()) != INVALID_FILE_ATTRIBUTES)
+        m_OfferSetup = GetFileAttributesA(file.c_str()) == INVALID_FILE_ATTRIBUTES;
+        if (!config->Load(kConfigAlias, SettingsPath().c_str()) && !m_OfferSetup)
             Print("could not read " + file + "; using the defaults, which a change in the menu will write into that file");
         m_Settings = m_SavedKeys.Load();
         if (m_SavedKeys.Outdated()) m_SettingsChangedAt = Now();
@@ -2100,6 +2233,31 @@ private:
             return true;
         DeleteFileA(fresh.c_str());
         return false;
+    }
+
+    // Before Setup runs again: the settings file copied beside it, named for now.
+    void BackUpSettings()
+    {
+        std::string text;
+        if (!ReadSettingsFile(text) || text.empty())
+        {
+            Print("Setup could not save your settings first: HeadsUp could not read " + SettingsFile() + ". Cancel still puts them back while the game runs.");
+            return;
+        }
+        SYSTEMTIME t{};
+        GetLocalTime(&t);
+        const std::string folder = OwnFolder(kConfigFolder) + "\\";
+        const std::string name   = headsup::SetupBackupName({t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond},
+              [&](const std::string& file) { return GetFileAttributesA((folder + file).c_str()) != INVALID_FILE_ATTRIBUTES; });
+        const std::string path = folder + name;
+        std::ofstream out(path, std::ios::binary | std::ios::trunc);
+        out.write(text.data(), static_cast<std::streamsize>(text.size()));
+        if (!out.flush())
+        {
+            Print("Setup could not save your settings to " + path + ". Cancel still puts them back while the game runs.");
+            return;
+        }
+        Print("Your settings were saved to " + name + " in config/headsup. To put them back later, unload HeadsUp and copy it over " + SettingsName() + ".");
     }
 
     void SaveSettings()

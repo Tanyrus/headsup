@@ -15,6 +15,9 @@ namespace headsup
     {
         constexpr float kRunInset     = 0.3f;  // how much shorter a line box's stretches and chips are than the box
         constexpr float kSpacing      = 0.45f; // between rows
+        // Setup's picture, 16:9 like its target: short enough that its first step fits the window's own size.
+        constexpr float kPreviewTall  = 14.0f;
+        constexpr float kPreviewWide  = kPreviewTall * 16.0f / 9.0f;
         constexpr float kPadX         = 0.6f;  // a control's text from its sides
         constexpr float kHeadHeight   = 2.05f; // the window's title row
         constexpr float kScrollbar    = 0.7f;
@@ -121,8 +124,9 @@ namespace headsup
         css += "div{display:block;}handle{display:block;}";
         css += std::string(".") + kHiddenClass + "{display:none;}";
         // The frame: the title bar moves the window, the corner resizes it.
-        css += "#head{position:absolute;left:" + Em(kGutter) + ";right:" + Em(kGutter + kFrame + 0.5f) + ";top:" +
-               Em(kGutter) + ";height:" + Em(kHeadHeight) + ";}";
+        // It reaches the window's top and left edges, so a grab above or beside the title moves it too.
+        css += "#head{position:absolute;left:0px;right:" + Em(kGutter + kFrame + 0.5f) + ";top:0px;height:" +
+               Em(kHeadHeight) + ";padding:" + Em(kGutter) + " 0px 0px " + Em(kGutter) + ";}";
         css += "#title{display:inline-block;font-family:\"" + look.titleFont + "\";font-size:" + Em(kTitleScale) +
                ";color:" + color(c.heading) + ";font-effect:glow(0px 4px 0px 0px " + color(Faded(c.accent, kGlow)) + ");}";
         css += std::string("#") + kMenuVersionId + "{display:inline-block;margin-left:0.5em;color:" + color(c.muted) + ";}";
@@ -210,6 +214,8 @@ namespace headsup
         css += ".line.indent{margin-left:" + Em(kGutter) + ";}";
         css += ".gap{flex:1 1 auto;}";
         css += ".note{color:" + color(c.muted) + ";margin-bottom:" + Em(kSpacing) + ";}";
+        css += std::string(".") + kSetupPreviewClass + "{display:block;width:" + Em(kPreviewWide) + ";height:" + Em(kPreviewTall) +
+               ";margin:0px auto " + Em(kSpacing) + " auto;}";
         css += ".row.indent{margin-left:" + Em(kGutter) + ";}";
         css += ".caption{color:" + color(c.muted) + ";" + raised + "}";
         // A column's name over its controls.
@@ -376,6 +382,7 @@ namespace headsup
         css += ".chip .part,.chip .or{display:inline-block;}";
         css += ".chip .or{margin:0px 0.4em;opacity:0.65;}";
         css += ".drag{drag:clone;}";
+        css += std::string(".") + kPanClass + "{drag:drag;}";
         // Tabs: equal across each row, the open one filled, standing on a rule.
         css += ".tab-row{display:flex;flex-direction:row;margin-bottom:" + Em(kTabGap) + ";}";
         css += ".tab{flex:1 1 0px;height:" + Em(kTabHeight) + ";" + line(kTabHeight) + "margin-right:" +

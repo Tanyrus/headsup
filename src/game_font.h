@@ -82,6 +82,14 @@ namespace headsup
 
     // The body of a DAT's first chunk of this name and type, past its header; none when the walk finds none.
     std::optional<std::span<const uint8_t>> FindChunk(std::span<const uint8_t> dat, std::string_view name, uint8_t type);
+    struct DatChunk
+    {
+        std::string_view name; // its four letters
+        uint8_t type = 0;
+        std::span<const uint8_t> body;
+    };
+    // Every chunk of a DAT in order, past their headers; none when one's size does not fit the file.
+    std::optional<std::vector<DatChunk>> DatChunks(std::span<const uint8_t> dat);
 
     // What was read, or why nothing was: for the chat line.
     template <typename T>
@@ -98,7 +106,7 @@ namespace headsup
         int width = 0, height = 0;
         std::vector<uint8_t> bgra; // four bytes a pixel, rows top to bottom
     };
-    // A picture chunk's DXT3 or DXT1 picture in its colors.
+    // A picture chunk's picture in its colors: DXT3 or DXT1, or 8 bits a pixel with a palette, or 32.
     Read<ColorPicture> ReadColorPicture(std::span<const uint8_t> body);
     // The pearl the game draws before a name, out of a whole 51.DAT: a square of its status icons' picture, its colors
     // and alpha at half, as the game keeps them.

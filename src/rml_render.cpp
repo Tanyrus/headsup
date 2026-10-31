@@ -209,6 +209,14 @@ namespace headsup
         const Geometry& geometry = *reinterpret_cast<const Geometry*>(handle);
         if (geometry.vertices.empty()) return;
         const Texture* texture   = reinterpret_cast<const Texture*>(textureHandle);
+        Texture live;
+        if (texture != nullptr && texture->live)
+        {
+            const std::optional<LivePicture> now = m_Live ? m_Live() : std::nullopt;
+            if (!now || now->texture == nullptr) return;
+            live    = Texture{now->texture, now->u, now->v};
+            texture = &live;
+        }
         const float shareU = texture != nullptr ? texture->u : 1.0f, shareV = texture != nullptr ? texture->v : 1.0f;
         m_Placed.assign(geometry.vertices.begin(), geometry.vertices.end());
         for (ScreenVertex& v : m_Placed)
@@ -254,8 +262,23 @@ namespace headsup
         return reinterpret_cast<Rml::TextureHandle>(texture);
     }
 
+    void RmlRender::SetLivePicture(std::string name, int width, int height, LiveSource source)
+    {
+        m_LiveName   = std::move(name);
+        m_LiveWidth  = width;
+        m_LiveHeight = height;
+        m_Live       = std::move(source);
+    }
+
     Rml::TextureHandle RmlRender::LoadTexture(Rml::Vector2i& dimensions, const Rml::String& source)
     {
+        if (!m_LiveName.empty() && source == m_LiveName)
+        {
+            dimensions    = Rml::Vector2i(m_LiveWidth, m_LiveHeight);
+            auto* picture = new Texture;
+            picture->live = true;
+            return reinterpret_cast<Rml::TextureHandle>(picture);
+        }
         if (!m_Images) return 0;
         const std::optional<Image> image = m_Images(source);
         if (!image || image->width <= 0 || image->height <= 0) return 0;
@@ -283,7 +306,7 @@ namespace headsup
     {
         auto* texture = reinterpret_cast<Texture*>(handle);
         if (texture == nullptr) return;
-        headsup::ReleaseTexture(texture->texture);
+        if (!texture->live) headsup::ReleaseTexture(texture->texture);
         delete texture;
     }
 
